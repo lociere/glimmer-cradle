@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/VoiceConfig.schema.json",
+  "title": "VoiceConfig",
+  "description": "角色声音身份。只描述稳定声线、语言、表达和供应商绑定，不包含系统路由或密钥。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_id", "language", "prosody", "bindings"],
+  "definitions": {
+    "VoiceProsodyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rate": { "type": "number", "minimum": 0.5, "maximum": 2, "default": 1 },
+        "pitch": { "type": "number", "minimum": 0.5, "maximum": 2, "default": 1 },
+        "volume": { "type": "integer", "minimum": 0, "maximum": 100, "default": 50 }
+      }
+    },
+    "CloudVoiceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["voice_id"],
+      "properties": {
+        "voice_id": { "type": "string", "description": "云平台创建或复刻后得到的稳定 voice id；未创建时保持空字符串。" }
+      }
+    },
+    "VoiceBindingsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dashscope-cosyvoice"],
+      "properties": {
+        "dashscope-cosyvoice": { "$ref": "#/definitions/CloudVoiceBinding" }
+      }
+    }
+  },
+  "properties": {
+    "profile_id": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 2 },
+    "style_instruction": { "type": "string", "default": "" },
+    "prosody": { "$ref": "#/definitions/VoiceProsodyConfig" },
+    "bindings": { "$ref": "#/definitions/VoiceBindingsConfig" }
+  }
+}

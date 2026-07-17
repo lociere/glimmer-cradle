@@ -1,0 +1,14 @@
+# 系统身份、当前角色与备份策略。
+
+identity:
+  app_name: "Glimmer Cradle"
+  app_version: "0.1.0"
+
+character:
+  active_id: "selrena"
+  profile_root: "characters"
+
+backup:
+  enabled: true
+  backup_dir: "data/backups"
+  interval_hours: 24

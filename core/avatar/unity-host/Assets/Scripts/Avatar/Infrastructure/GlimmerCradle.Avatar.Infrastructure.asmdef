@@ -1,0 +1,10 @@
+{
+  "name": "GlimmerCradle.Avatar.Infrastructure",
+  "rootNamespace": "GlimmerCradle.Avatar",
+  "references": [
+    "GlimmerCradle.Avatar.Domain",
+    "Live2D.Cubism"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

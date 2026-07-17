@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/KernelMessageEnvelope.schema.json",
+  "title": "KernelMessageEnvelope",
+  "description": "内核入站消息统一信封。跨层单一事实源，Kernel 内核与 Cognition 认知核共用。payload 为自由形态字典，由各消息类型的专属 payload schema 二次解析。",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "消息类型（如 perception_message / life_heartbeat / agent_plan）"
+    },
+    "trace_id": {
+      "type": "string",
+      "default": "",
+      "description": "全链路追踪 ID（UUIDv4 hex）。空串表示无上游 trace。"
+    },
+    "span_id": {
+      "type": "string",
+      "default": "",
+      "description": "父 span（跨进程 span 嵌套用，蓝图 §6.2）。空串表示无 span。"
+    },
+    "payload": {
+      "type": "object",
+      "default": {},
+      "description": "消息载荷（自由形态；由专属 payload schema 解析）"
+    }
+  }
+}

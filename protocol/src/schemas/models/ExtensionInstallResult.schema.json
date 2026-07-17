@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionInstallResult.schema.json",
+  "title": "ExtensionInstallResult",
+  "type": "object",
+  "required": ["request_id", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["success", "cancelled", "error"] },
+    "message": { "type": "string" },
+    "extension_id": { "type": "string" },
+    "version": { "type": "string" },
+    "already_installed": { "type": "boolean" }
+  }
+}

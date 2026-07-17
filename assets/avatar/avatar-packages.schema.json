@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Glimmer Cradle Avatar Package",
+  "description": "角色身体资产包声明。身体资产包是角色正式身体渲染层的一等资产源；Desktop/Unity 只消费由该声明投影出的受控清单。",
+  "type": "object",
+  "required": [
+    "id",
+    "characterId",
+    "modelId",
+    "displayName",
+    "kind",
+    "preferredBackend",
+    "live2dVersion",
+    "assetRootPath",
+    "modelPath"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": {
+      "type": "string",
+      "description": "身体资产包稳定 ID。用于 package/projection/runtime 关联，不承载运行时实现细节。"
+    },
+    "default": {
+      "type": "boolean",
+      "description": "是否为默认身体资产包。整个 catalog 中只能有一个 default=true。"
+    },
+    "characterId": {
+      "type": "string",
+      "description": "角色 ID。通用层不依赖具体角色名，但角色资产包可保留 selrena 等命名。"
+    },
+    "modelId": {
+      "type": "string",
+      "description": "底层模型/驱动稳定 ID。Unity Avatar Shell 用它选择实际 driver 资源。"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Control Center 中展示的人类可读名称。"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["live2d"],
+      "description": "身体资产类型。"
+    },
+    "preferredBackend": {
+      "type": "string",
+      "enum": ["unity"],
+      "description": "承载该身体资产包的正式运行时。"
+    },
+    "previewImagePath": {
+      "type": "string",
+      "description": "可选的 Web 预览图仓库相对路径，仅供 Control Center 预览，不代表正式身体渲染资产。"
+    },
+    "live2dVersion": {
+      "type": "string",
+      "enum": ["cubism4", "cubism5"],
+      "description": "Live2D 模型格式。"
+    },
+    "assetRootPath": {
+      "type": "string",
+      "description": "身体资产包根目录仓库相对路径。构建投影从这里复制完整资源，不猜目录结构。"
+    },
+    "modelPath": {
+      "type": "string",
+      "description": "Live2D manifest 的仓库相对路径。"
+    },
+    "emotionMapPath": {
+      "type": "string",
+      "description": "可选的情绪映射仓库相对路径。"
+    },
+    "actionsPath": {
+      "type": "string",
+      "description": "可选的身体动作语义清单。"
+    },
+    "behaviorPath": {
+      "type": "string",
+      "description": "可选的身体行为映射清单。"
+    },
+    "presentation": {
+      "type": "object",
+      "required": ["defaultPlacement", "placementPresets"],
+      "additionalProperties": false,
+      "properties": {
+        "defaultPlacement": {
+          "type": "string"
+        },
+        "placementPresets": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["visibleRatio"],
+            "additionalProperties": false,
+            "properties": {
+              "visibleRatio": {
+                "type": "number",
+                "minimum": 0.25,
+                "maximum": 1
+              },
+              "rightInset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 512
+              },
+              "bottomInset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 512
+              }
+            }
+          }
+        }
+      }
+    },
+    "idleMotionGroup": {
+      "type": "string"
+    },
+    "interactionMotions": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "scaleFactor": {
+      "type": "number",
+      "minimum": 0.05,
+      "maximum": 2
+    },
+    "license": {
+      "type": "string"
+    }
+  }
+}

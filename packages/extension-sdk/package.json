@@ -1,0 +1,96 @@
+{
+  "name": "@glimmer-cradle/extension-sdk",
+  "version": "0.1.0",
+  "private": false,
+  "files": ["dist"],
+  "publishConfig": { "access": "public" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "require": "./dist/contracts/index.js",
+      "import": "./dist/contracts/index.js",
+      "default": "./dist/contracts/index.js"
+    },
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "require": "./dist/host/index.js",
+      "import": "./dist/host/index.js",
+      "default": "./dist/host/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "require": "./dist/events/index.js",
+      "import": "./dist/events/index.js",
+      "default": "./dist/events/index.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest/index.d.ts",
+      "require": "./dist/manifest/index.js",
+      "import": "./dist/manifest/index.js",
+      "default": "./dist/manifest/index.js"
+    },
+    "./lifecycle": {
+      "types": "./dist/lifecycle/index.d.ts",
+      "require": "./dist/lifecycle/index.js",
+      "import": "./dist/lifecycle/index.js",
+      "default": "./dist/lifecycle/index.js"
+    },
+    "./utilities": {
+      "types": "./dist/utilities/index.d.ts",
+      "require": "./dist/utilities/index.js",
+      "import": "./dist/utilities/index.js",
+      "default": "./dist/utilities/index.js"
+    },
+    "./utilities/websocket": {
+      "types": "./dist/utilities/websocket/index.d.ts",
+      "require": "./dist/utilities/websocket/index.js",
+      "import": "./dist/utilities/websocket/index.js",
+      "default": "./dist/utilities/websocket/index.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions/index.d.ts",
+      "require": "./dist/permissions/index.js",
+      "import": "./dist/permissions/index.js",
+      "default": "./dist/permissions/index.js"
+    },
+    "./distribution": {
+      "types": "./dist/distribution/index.d.ts",
+      "require": "./dist/distribution/index.js",
+      "import": "./dist/distribution/index.js",
+      "default": "./dist/distribution/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm --filter @glimmer-cradle/protocol run build",
+    "pretypecheck": "pnpm --filter @glimmer-cradle/protocol run build",
+    "pretest": "pnpm --filter @glimmer-cradle/protocol run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --threads false"
+  },
+  "dependencies": {
+    "@glimmer-cradle/protocol": "workspace:*",
+    "fflate": "^0.8.2",
+    "yaml": "^2.8.2",
+    "ws": "^8.18.3"
+  },
+  "peerDependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/ws": "^8.5.14",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.6",
+    "zod": "^3.23.0"
+  }
+}
+

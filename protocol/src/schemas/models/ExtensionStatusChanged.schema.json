@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionStatusChanged.schema.json",
+  "title": "ExtensionStatusChanged",
+  "type": "object",
+  "required": ["extension_id", "event"],
+  "additionalProperties": false,
+  "properties": {
+    "extension_id": { "type": "string", "minLength": 3 },
+    "event": { "type": "string", "enum": ["loaded", "started", "stopped", "error"] },
+    "message": { "type": "string" }
+  }
+}

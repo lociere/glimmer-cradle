@@ -1,0 +1,60 @@
+id: your-publisher.my-extension
+name: My Extension
+version: 0.1.0
+publisher: your-publisher
+license: GPL-3.0-only
+repository: https://github.com/your-publisher/my-extension
+author: Your Name
+products:
+  - any
+platforms:
+  - any
+description: Example extension scaffold for Glimmer Cradle.
+main: dist/index.js
+minAppVersion: 0.1.0
+
+engines:
+  glimmerCradle: 0.1.0
+
+tags:
+  - example
+
+permissions:
+  - CONFIG_READ_SELF
+  - COMMAND_REGISTER
+
+requires:
+  - commands
+
+activationEvents:
+  - onStartup
+  - onCommand:your-publisher.my-extension.ping
+
+contributes:
+  glimmer.command:
+    - command: your-publisher.my-extension.ping
+      title: Ping My Extension
+      audience: user
+      scope:
+        kind: global
+      requirements:
+        products: [any]
+        platforms: [any]
+        features: [extensions]
+      category: My Extension
+      preconditions: []
+  glimmer.setting:
+    - key: greeting
+      title: Greeting
+      description: Text returned by the sample command.
+      audience: user
+      scope:
+        kind: global
+      requirements:
+        products: [any]
+        platforms: [any]
+        features: [extensions]
+      type: string
+      default: hello
+      requiresRestart: false
+      secret: false

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionInstallCommitRequest.schema.json",
+  "title": "ExtensionInstallCommitRequest",
+  "type": "object",
+  "required": ["request_id", "transaction_id", "approved_permissions"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "transaction_id": { "type": "string", "minLength": 1 },
+    "approved_permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }
+}

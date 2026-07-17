@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/CharacterProfileConfig.schema.json",
+  "title": "CharacterProfileConfig",
+  "description": "角色作者种子配置。它是 Character Package 的稳定人格事实源，只描述身份锚点、性格轴、关系姿态、情绪行为、场景行为与表达倾向；不进入 RAG，不写入向量库，不由运行时静默改写。",
+  "type": "object",
+  "required": ["identity", "traits", "relationship", "expression"],
+  "additionalProperties": false,
+  "definitions": {
+    "ProfileTextEntry": {
+      "type": "object",
+      "required": ["id", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 1
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "ProfileConditionalEntry": {
+      "type": "object",
+      "required": ["id", "condition", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 1
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["summary"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "appearance": {
+          "type": "string",
+          "default": ""
+        },
+        "values": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/ProfileTextEntry"
+          }
+        }
+      }
+    },
+    "traits": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/ProfileTextEntry"
+      }
+    },
+    "relationship": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/ProfileTextEntry"
+      }
+    },
+    "expression": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/ProfileTextEntry"
+      }
+    },
+    "emotion_behaviors": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/ProfileConditionalEntry"
+      }
+    },
+    "context_behaviors": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/ProfileConditionalEntry"
+      }
+    },
+    "examples": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/ProfileTextEntry"
+      }
+    }
+  }
+}

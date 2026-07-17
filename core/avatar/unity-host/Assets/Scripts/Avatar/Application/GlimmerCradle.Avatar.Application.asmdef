@@ -1,0 +1,10 @@
+{
+  "name": "GlimmerCradle.Avatar.Application",
+  "rootNamespace": "GlimmerCradle.Avatar",
+  "references": [
+    "GlimmerCradle.Avatar.Contracts",
+    "GlimmerCradle.Avatar.Domain"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

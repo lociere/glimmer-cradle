@@ -1,0 +1,68 @@
+name: glimmer-cradle
+
+services:
+  personal-server:
+    image: ${GLIMMER_CRADLE_IMAGE:-glimmer-cradle/personal-server:0.1.0}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      GLIMMER_CRADLE_SERVER_TOKEN: ${GLIMMER_CRADLE_SERVER_TOKEN:?set GLIMMER_CRADLE_SERVER_TOKEN in .env}
+    volumes:
+      - ${GLIMMER_CRADLE_STATE_ROOT:-./state}/config:/var/lib/glimmer-cradle/config
+      - ${GLIMMER_CRADLE_STATE_ROOT:-./state}/data:/var/lib/glimmer-cradle/data
+    tmpfs:
+      - /run/glimmer-cradle:uid=10001,gid=10001,mode=0700
+      - /tmp:uid=10001,gid=10001,mode=1777
+    expose:
+      - "3210"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3210/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    networks:
+      - internal
+
+  caddy:
+    image: ${GLIMMER_CRADLE_CADDY_IMAGE:-caddy:2.10.2-alpine}
+    restart: unless-stopped
+    depends_on:
+      personal-server:
+        condition: service_healthy
+    environment:
+      GLIMMER_CRADLE_SITE_ADDRESS: ${GLIMMER_CRADLE_SITE_ADDRESS:-:80}
+    ports:
+      - "${GLIMMER_CRADLE_HTTP_BIND:-127.0.0.1}:${GLIMMER_CRADLE_HTTP_PORT:-8080}:80"
+      - "${GLIMMER_CRADLE_HTTPS_BIND:-127.0.0.1}:${GLIMMER_CRADLE_HTTPS_PORT:-8443}:443"
+      - "${GLIMMER_CRADLE_HTTPS_BIND:-127.0.0.1}:${GLIMMER_CRADLE_HTTPS_PORT:-8443}:443/udp"
+    volumes:
+      - ${GLIMMER_CRADLE_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/EmbeddingConfig.schema.json",
+  "title": "EmbeddingConfig",
+  "description": "系统向量能力配置。Provider 负责执行，Cognition 只消费稳定向量 Port。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enabled", "route", "providers"],
+  "definitions": {
+    "EmbeddingRouteConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["dashscope-text-embedding", "local-sentence-transformers"],
+          "default": "dashscope-text-embedding"
+        }
+      }
+    },
+    "DashScopeEmbeddingProviderConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "model", "dimensions", "request_timeout_ms", "max_retries"],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
+        },
+        "model": { "type": "string", "minLength": 1, "default": "text-embedding-v4" },
+        "dimensions": {
+          "type": "integer",
+          "enum": [64, 128, 256, 512, 768, 1024, 1536, 2048],
+          "default": 1024
+        },
+        "request_timeout_ms": { "type": "integer", "minimum": 1000, "default": 15000 },
+        "max_retries": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 }
+      }
+    },
+    "LocalEmbeddingProviderConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_path", "model_id", "auto_download", "device", "batch_size"],
+      "properties": {
+        "model_path": { "type": "string", "default": "embedding/m3e-small" },
+        "model_id": { "type": "string", "default": "moka-ai/m3e-small" },
+        "auto_download": { "type": "boolean", "default": false },
+        "device": { "type": "string", "default": "cpu" },
+        "batch_size": { "type": "integer", "minimum": 1, "default": 64 }
+      }
+    },
+    "EmbeddingProvidersConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dashscope-text-embedding", "local-sentence-transformers"],
+      "properties": {
+        "dashscope-text-embedding": { "$ref": "#/definitions/DashScopeEmbeddingProviderConfig" },
+        "local-sentence-transformers": { "$ref": "#/definitions/LocalEmbeddingProviderConfig" }
+      }
+    }
+  },
+  "properties": {
+    "enabled": { "type": "boolean", "default": false },
+    "route": { "$ref": "#/definitions/EmbeddingRouteConfig" },
+    "providers": { "$ref": "#/definitions/EmbeddingProvidersConfig" }
+  }
+}

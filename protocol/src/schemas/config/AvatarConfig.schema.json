@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/AvatarConfig.schema.json",
+  "title": "AvatarConfig",
+  "description": "人物 Avatar 领域配置。Unity 只是当前 Host 实现，Surface 不拥有 Avatar。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "AvatarEmotionMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "认知情绪到 Avatar 稳定动作语义的单条映射。",
+      "properties": {
+        "expression_id": { "type": "string" },
+        "motion_group": { "type": "string" },
+        "animator_trigger": { "type": "string" }
+      }
+    },
+    "UnityAvatarHostConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Unity Avatar Host 启动策略。manual 表示由用户启动，managed 表示由 Kernel 生命周期监督树拉起。",
+      "properties": {
+        "launch_mode": {
+          "type": "string",
+          "enum": ["manual", "managed"],
+          "default": "manual"
+        },
+        "command": { "type": "string", "default": "" },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "cwd": { "type": "string", "default": "" },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "startup_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 45000
+        },
+        "restart_on_exit": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "properties": {
+    "enabled": { "type": "boolean", "default": true },
+    "heartbeat_interval_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 10000
+    },
+    "heartbeat_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 30000
+    },
+    "host": {
+      "$ref": "#/definitions/UnityAvatarHostConfig",
+      "default": {}
+    },
+    "emotion_mapping": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/AvatarEmotionMapping" },
+      "default": {
+        "happy": { "expression_id": "happy", "motion_group": "happy", "animator_trigger": "happy" },
+        "sad": { "expression_id": "sad", "motion_group": "sad", "animator_trigger": "sad" },
+        "angry": { "expression_id": "angry", "motion_group": "angry", "animator_trigger": "angry" },
+        "surprised": { "expression_id": "surprised", "motion_group": "surprised", "animator_trigger": "surprised" },
+        "neutral": { "expression_id": "neutral", "motion_group": "idle", "animator_trigger": "idle" }
+      }
+    }
+  }
+}

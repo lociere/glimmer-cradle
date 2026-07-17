@@ -1,0 +1,26 @@
+packages:
+  - 'core/**'
+  # Unity 工程由 Unity Package Manager 管理；不能让 pnpm 递归扫描其 Library/PackageCache。
+  - '!core/avatar/unity-host/**'
+  - 'products/**'
+  - 'protocol'
+  - 'packages/extension-sdk'
+  - 'templates/extension-basic'
+
+# 发行投影必须包含 workspace 私有包的实体副本，不能在部署时回查 npm registry。
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build
+
+allowBuilds:
+  '@bufbuild/buf': true
+  better-sqlite3: true
+  electron: true
+  esbuild: true
+  zeromq: true
+
+minimumReleaseAgeExclude:
+  - electron@43.1.1
+
+shared-workspace-settings:
+  install: true

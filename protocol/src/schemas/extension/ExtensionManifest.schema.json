@@ -1,0 +1,411 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionManifest.schema.json",
+  "title": "ExtensionManifest",
+  "description": "扩展身份、目标环境、权限、宿主端口需求和贡献声明。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "publisher", "license", "repository", "main"],
+  "properties": {
+    "id": { "$ref": "#/definitions/ExtensionId" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "$ref": "#/definitions/ExtensionVersion" },
+    "publisher": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "license": { "type": "string", "minLength": 1 },
+    "repository": { "type": "string", "format": "uri" },
+    "homepage": { "type": "string", "format": "uri" },
+    "products": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ExtensionProductTarget" },
+      "default": ["any"]
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ExtensionPlatform" },
+      "default": ["any"]
+    },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "category": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "main": { "type": "string", "minLength": 1 },
+    "minAppVersion": { "type": "string", "default": "0.0.0" },
+    "permissions": {
+      "type": "array",
+      "items": { "$ref": "ExtensionPermission.schema.json" },
+      "default": []
+    },
+    "activationEvents": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": ["onStartup"]
+    },
+    "requires": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ExtensionHostPortId" },
+      "default": []
+    },
+    "engines": { "$ref": "#/definitions/ExtensionEngineConstraint", "default": {} },
+    "contributionPoints": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ContributionPointDefinition" },
+      "default": []
+    },
+    "contributes": { "$ref": "#/definitions/ExtensionContributions", "default": {} }
+  },
+  "definitions": {
+    "ExtensionId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$"
+    },
+    "ExtensionVersion": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "ContributionPointId": {
+      "type": "string",
+      "pattern": "^[a-z][A-Za-z0-9_-]*(?:\\.[a-z][A-Za-z0-9_-]*)+$"
+    },
+    "CapabilityAudience": {
+      "type": "string",
+      "enum": ["character", "user", "host", "renderer", "extension", "adapter"]
+    },
+    "ExtensionProductTarget": {
+      "type": "string",
+      "enum": ["any", "desktop", "personal-server"]
+    },
+    "ProductFeatureId": {
+      "type": "string",
+      "enum": ["control_surface_gateway", "local_device_actions", "avatar", "audio.tts", "audio.asr", "extensions"]
+    },
+    "ExtensionPlatform": {
+      "type": "string",
+      "enum": ["any", "windows-x64", "windows-arm64", "linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"]
+    },
+    "ContributionRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "products": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/ExtensionProductTarget" },
+          "default": ["any"]
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/ExtensionPlatform" },
+          "default": ["any"]
+        },
+        "features": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ProductFeatureId" },
+          "default": []
+        }
+      },
+      "default": {}
+    },
+    "ContributionPointDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/definitions/ContributionPointId" },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "owner": { "enum": ["platform", "extension", "thirdParty"], "default": "extension" },
+        "schema": true,
+        "activationEvents": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
+        "requiredPermissions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
+        "nodeKind": { "type": "string", "minLength": 1 },
+        "actionKind": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ContributionDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId"],
+      "properties": {
+        "nodeId": { "type": "string", "minLength": 1 },
+        "requiredState": { "type": "string" },
+        "relation": { "type": "string", "minLength": 1, "default": "depends_on" }
+      }
+    },
+    "ContributionDeclaration": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "audience": { "$ref": "#/definitions/CapabilityAudience" },
+        "scope": { "$ref": "../models/CapabilityScope.schema.json", "default": { "kind": "global" } },
+        "requirements": { "$ref": "#/definitions/ContributionRequirements", "default": {} },
+        "permissions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
+        "dependsOn": { "type": "array", "items": { "$ref": "#/definitions/ContributionDependency" }, "default": [] },
+        "metadata": { "type": "object", "additionalProperties": true, "default": {} }
+      }
+    },
+    "ExtensionCommandPrecondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId"],
+      "properties": {
+        "nodeId": { "type": "string", "minLength": 1 },
+        "requiredState": { "type": "string" },
+        "relation": { "type": "string", "minLength": 1, "default": "depends_on" }
+      }
+    },
+    "ExtensionCommandContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["command", "title"],
+          "properties": {
+            "command": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "user" },
+            "category": { "type": "string" },
+            "actionKind": { "type": "string", "minLength": 1, "default": "command" },
+            "preconditions": { "type": "array", "items": { "$ref": "#/definitions/ExtensionCommandPrecondition" }, "default": [] }
+          }
+        }
+      ]
+    },
+    "ExtensionSettingContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["key", "title", "type"],
+          "properties": {
+            "key": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "type": { "enum": ["string", "number", "boolean", "object", "array"] },
+            "default": true,
+            "requiresRestart": { "type": "boolean", "default": false },
+            "secret": { "type": "boolean", "default": false }
+          }
+        }
+      ]
+    },
+    "ExtensionSkillToolContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "character" },
+        "scope": { "$ref": "../models/CapabilityScope.schema.json" },
+        "requirements": { "$ref": "#/definitions/ContributionRequirements", "default": {} },
+        "parameters": { "default": {} }
+      }
+    },
+    "ExtensionSkillResourceContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "character" },
+        "scope": { "$ref": "../models/CapabilityScope.schema.json" },
+        "requirements": { "$ref": "#/definitions/ContributionRequirements", "default": {} }
+      }
+    },
+    "ExtensionSkillPromptContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "template"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "character" },
+        "scope": { "$ref": "../models/CapabilityScope.schema.json" },
+        "requirements": { "$ref": "#/definitions/ContributionRequirements", "default": {} },
+        "template": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ExtensionSkillPolicyContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "riskLevel": { "enum": ["low", "medium", "high", "critical"], "default": "low" },
+        "confirmationRequired": { "type": "boolean", "default": false },
+        "sideEffects": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "audit": { "type": "boolean", "default": true }
+      },
+      "default": {}
+    },
+    "ExtensionSkillContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["id", "name", "description"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 },
+            "description": { "type": "string", "minLength": 1 },
+            "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "character" },
+            "tools": { "type": "array", "items": { "$ref": "#/definitions/ExtensionSkillToolContribution" }, "default": [] },
+            "resources": { "type": "array", "items": { "$ref": "#/definitions/ExtensionSkillResourceContribution" }, "default": [] },
+            "prompts": { "type": "array", "items": { "$ref": "#/definitions/ExtensionSkillPromptContribution" }, "default": [] },
+            "policy": { "$ref": "#/definitions/ExtensionSkillPolicyContribution", "default": {} }
+          }
+        }
+      ]
+    },
+    "ExtensionCapabilityContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["id", "title"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "host" },
+            "required": { "type": "boolean", "default": false },
+            "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] }
+          }
+        }
+      ]
+    },
+    "ExtensionManagementSurfaceContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["id", "title"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "user" },
+            "kind": { "enum": ["status", "management", "diagnostics", "settings"], "default": "status" },
+            "resourceIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] },
+            "capabilityIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "default": [] }
+          }
+        }
+      ]
+    },
+    "ExternalDependencySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["githubRelease", "downloadUrl", "localPath", "manual"] },
+        "repository": { "type": "string" },
+        "assetName": { "type": "string" },
+        "url": { "type": "string" },
+        "version": { "type": "string" },
+        "checksum": { "type": "string" },
+        "license": { "type": "string" },
+        "homepage": { "type": "string" }
+      }
+    },
+    "ManagedResourcePackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/definitions/ExternalDependencySource", "default": { "type": "manual" } },
+        "installDir": { "type": "string" }
+      }
+    },
+    "ManagedResourceProcess": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "owner": { "enum": ["extensionHost", "extension", "user", "externalManager", "system"] },
+        "launchMode": { "enum": ["direct", "shell", "custom", "external", "service", "container", "manual"] },
+        "windowPolicy": { "enum": ["hidden", "visible", "service", "external"] },
+        "readinessPolicy": { "enum": ["probeRequired", "externalDeclared", "manual"] },
+        "command": { "type": "string" },
+        "args": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "cwd": { "type": "string" }
+      }
+    },
+    "ReadinessGateDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["none", "tcp", "http", "websocket", "onebot11", "custom"], "default": "none" },
+        "endpoint": { "type": "string" },
+        "action": { "type": "string" },
+        "timeoutMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ReadinessProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["none", "tcp", "http", "websocket", "onebot11", "custom"], "default": "none" },
+        "endpoint": { "type": "string" },
+        "action": { "type": "string" },
+        "timeoutMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ManagedResourceContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ContributionDeclaration" },
+        {
+          "type": "object",
+          "required": ["id", "kind"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "displayName": { "type": "string", "minLength": 1 },
+            "kind": { "enum": ["package", "managedProcess", "localService", "protocolBridge", "managementEndpoint"] },
+            "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "host" },
+            "required": { "type": "boolean", "default": true },
+            "package": { "$ref": "#/definitions/ManagedResourcePackage" },
+            "process": { "$ref": "#/definitions/ManagedResourceProcess" },
+            "readiness": { "$ref": "#/definitions/ReadinessProbe" },
+            "readinessGates": { "type": "array", "items": { "$ref": "#/definitions/ReadinessGateDeclaration" }, "default": [] }
+          }
+        }
+      ]
+    },
+    "ProtocolBridgeContribution": {
+      "allOf": [
+        { "$ref": "#/definitions/ManagedResourceContribution" },
+        { "type": "object", "properties": { "audience": { "$ref": "#/definitions/CapabilityAudience", "default": "adapter" } } }
+      ]
+    },
+    "ExtensionContributions": {
+      "type": "object",
+      "default": {},
+      "properties": {
+        "glimmer.capability": { "type": "array", "items": { "$ref": "#/definitions/ExtensionCapabilityContribution" } },
+        "glimmer.command": { "type": "array", "items": { "$ref": "#/definitions/ExtensionCommandContribution" } },
+        "glimmer.managedResource": { "type": "array", "items": { "$ref": "#/definitions/ManagedResourceContribution" } },
+        "glimmer.managementSurface": { "type": "array", "items": { "$ref": "#/definitions/ExtensionManagementSurfaceContribution" } },
+        "glimmer.protocolBridge": { "type": "array", "items": { "$ref": "#/definitions/ProtocolBridgeContribution" } },
+        "glimmer.setting": { "type": "array", "items": { "$ref": "#/definitions/ExtensionSettingContribution" } },
+        "glimmer.skill": { "type": "array", "items": { "$ref": "#/definitions/ExtensionSkillContribution" } }
+      },
+      "additionalProperties": true
+    },
+    "ExtensionHostPortId": {
+      "type": "string",
+      "enum": ["storage", "evidenceProposal", "perception", "sceneAttention", "events", "agents", "commands", "runtime"]
+    },
+    "ExtensionEngineConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "glimmerCradle": { "type": "string" },
+        "extensionSdk": { "type": "string" },
+        "node": { "type": "string" }
+      }
+    }
+  }
+}

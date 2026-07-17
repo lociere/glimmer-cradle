@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/AppConfig.schema.json",
+  "title": "AppConfig",
+  "description": "系统身份、当前角色选择与备份策略（来自 configs/system/identity.yaml）。Local Data Domain 由产品或部署环境持有，不进入业务配置。",
+  "type": "object",
+  "required": ["identity", "character", "backup"],
+  "additionalProperties": false,
+  "definitions": {
+    "SystemIdentityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "系统身份元信息，仅用于展示、日志和扩展宿主握手。",
+      "properties": {
+        "app_name": {
+          "type": "string",
+          "default": "Glimmer Cradle",
+          "description": "应用显示名称"
+        },
+        "app_version": {
+          "type": "string",
+          "default": "0.1.0",
+          "description": "语义化版本号（仅展示）"
+        }
+      }
+    },
+    "ActiveCharacterConfig": {
+      "type": "object",
+      "required": ["active_id", "profile_root"],
+      "additionalProperties": false,
+      "description": "当前激活角色配置。profile_root 相对 configs/，active_id 对应 configs/<profile_root>/<active_id>/。",
+      "properties": {
+        "active_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "description": "当前激活角色 profile id"
+        },
+        "profile_root": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9_-]|/[a-z0-9][a-z0-9_-]*)*$",
+          "description": "角色 profile 根目录，相对 configs/"
+        }
+      }
+    },
+    "SystemBackupConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "系统自动备份策略。",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用自动备份"
+        },
+        "backup_dir": {
+          "type": "string",
+          "default": "data/backups",
+          "description": "自动备份存放目录（相对项目根）"
+        },
+        "interval_hours": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 24,
+          "description": "自动备份间隔（小时），0 = 不调度自动备份"
+        }
+      }
+    }
+  },
+  "properties": {
+    "identity": { "$ref": "#/definitions/SystemIdentityConfig", "default": {} },
+    "character": { "$ref": "#/definitions/ActiveCharacterConfig" },
+    "backup": { "$ref": "#/definitions/SystemBackupConfig", "default": {} }
+  }
+}

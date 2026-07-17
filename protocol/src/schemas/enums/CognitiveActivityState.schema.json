@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/CognitiveActivityState.schema.json",
+  "title": "CognitiveActivityState",
+  "description": "当前角色的认知活动档位。quiescent=静息；ambient=低频环境感知；engaged=完整交互。它是调度投影，不是情感唤醒度或 Experience Moment。",
+  "type": "string",
+  "enum": ["quiescent", "ambient", "engaged"]
+}

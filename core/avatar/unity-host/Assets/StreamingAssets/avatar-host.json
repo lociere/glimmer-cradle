@@ -1,0 +1,16 @@
+{
+  "kernelUrl": "",
+  "hostId": "unity-avatar",
+  "hostVersion": "0.1.0",
+  "modelId": "",
+  "modelRegistryFile": "avatar-package-registry.json",
+  "reconnectDelaySeconds": 2.0,
+  "windowWidth": 420,
+  "windowHeight": 760,
+  "renderScale": 1.5,
+  "composition": {
+    "provider": "platform-native",
+    "alwaysOnTop": true,
+    "inputPolicy": "model-hull"
+  }
+}

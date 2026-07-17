@@ -1,0 +1,100 @@
+name: 发布 Personal Server
+
+concurrency:
+  group: release-personal-server-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 配置 uv 与 Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: '0.11.28'
+          python-version: '3.12.13'
+
+      - name: 执行发布门禁
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm sync:contracts
+          git diff --exit-code
+          pnpm check:encoding
+          pnpm test
+          pnpm typecheck
+          pnpm build
+
+      - name: 配置 Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: 登录 GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并发布 OCI 镜像
+        id: build_image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/personal-server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/glimmer-cradle-personal-server:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/glimmer-cradle-personal-server:latest
+          provenance: mode=max
+          sbom: true
+
+      - name: 生成部署发布包
+        id: release_metadata
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          VERSION="${GITHUB_REF_NAME#v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/glimmer-cradle-personal-server:${GITHUB_REF_NAME}@${{ steps.build_image.outputs.digest }}"
+          ./deploy/personal-server/package-release.sh "$VERSION" dist/personal-server "$IMAGE"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: 验证部署发布包
+        run: |
+          cd dist/personal-server
+          sha256sum --check SHA256SUMS
+          test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
+          test -x glimmer-cradle-installer.sh
+          test -s release-notes.md
+          tar -tzf "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz" \
+            | grep -qx 'glimmer-cradle-personal-server/VERSION'
+
+      - name: 发布 GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          name: Glimmer Cradle ${{ steps.release_metadata.outputs.version }}
+          body_path: dist/personal-server/release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64.tar.gz
+            dist/personal-server/glimmer-cradle-installer.sh
+            dist/personal-server/SHA256SUMS

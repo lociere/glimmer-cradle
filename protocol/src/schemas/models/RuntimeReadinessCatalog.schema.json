@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/RuntimeReadinessCatalog.schema.json",
+  "title": "RuntimeReadinessCatalog",
+  "description": "Kernel 向 Desktop 等跨进程消费者广播的统一 runtime readiness / reconciler 快照目录。",
+  "type": "object",
+  "required": ["updated_at", "runtimes"],
+  "additionalProperties": false,
+  "definitions": {
+    "RuntimeReadinessOwner": {
+      "type": "string",
+      "enum": ["kernel", "cognition", "engine", "renderer", "extension"]
+    },
+    "RuntimeReadinessState": {
+      "type": "string",
+      "enum": ["starting", "ready", "degraded", "failed", "stopped"]
+    },
+    "RuntimeResourceState": {
+      "type": "string",
+      "enum": ["pending", "ready", "missing", "degraded", "failed", "unknown"]
+    },
+    "RuntimeResourceSnapshot": {
+      "type": "object",
+      "required": [
+        "resource_id",
+        "resource_kind",
+        "desired_state",
+        "actual_state",
+        "readiness",
+        "summary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resource_id": { "type": "string" },
+        "resource_kind": { "type": "string" },
+        "desired_state": { "$ref": "#/definitions/RuntimeResourceState" },
+        "actual_state": { "$ref": "#/definitions/RuntimeResourceState" },
+        "readiness": { "$ref": "#/definitions/RuntimeResourceState" },
+        "summary": { "type": "string" },
+        "recovery_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "RuntimeReconcilerSnapshot": {
+      "type": "object",
+      "required": ["desired", "actual", "readiness", "resources"],
+      "additionalProperties": false,
+      "properties": {
+        "desired": { "type": "string" },
+        "actual": { "type": "string" },
+        "readiness": { "$ref": "#/definitions/RuntimeResourceState" },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/RuntimeResourceSnapshot" },
+          "default": []
+        }
+      }
+    },
+    "RuntimeReadinessSnapshot": {
+      "type": "object",
+      "required": ["runtime_id", "owner", "phase", "state", "blocking", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_id": { "type": "string" },
+        "owner": { "$ref": "#/definitions/RuntimeReadinessOwner" },
+        "phase": { "type": "string" },
+        "state": { "$ref": "#/definitions/RuntimeReadinessState" },
+        "blocking": { "type": "boolean" },
+        "summary": { "type": "string" },
+        "details_ref": { "type": "string" },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "reconciler": { "$ref": "#/definitions/RuntimeReconcilerSnapshot" }
+      }
+    }
+  },
+  "properties": {
+    "updated_at": {
+      "type": "number",
+      "description": "Unix 毫秒时间戳。"
+    },
+    "runtimes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/RuntimeReadinessSnapshot" },
+      "default": []
+    }
+  }
+}

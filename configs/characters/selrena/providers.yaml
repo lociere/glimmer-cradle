@@ -1,0 +1,24 @@
+# LLM provider 路由。API Key 由 configs/secrets/secrets.yaml 注入。
+
+api_type: "deepseek"
+base_url: "https://api.deepseek.com"
+temperature: 0.7
+models:
+  chat: "deepseek-v4-pro"
+
+providers:
+  deepseek:
+    api_type: "deepseek"
+    base_url: "https://api.deepseek.com"
+    temperature: 0.7
+    models:
+      chat: "deepseek-v4-pro"
+      reasoner: "deepseek-reasoner"
+  qwen:
+    api_type: "openai"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode"
+    temperature: 0.7
+    models:
+      text: "qwen3.5-plus"
+      vision: "qwen-vl-max"
+      audio: "qwen-audio-turbo"

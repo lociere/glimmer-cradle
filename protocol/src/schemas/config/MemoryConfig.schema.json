@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/MemoryConfig.schema.json",
+  "title": "MemoryConfig",
+  "description": "经历、Episode、记忆固化、时间记忆与有界召回的统一配置。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "WorkingMemoryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_messages_per_conversation": { "type": "integer", "minimum": 2, "default": 32 },
+        "hydrate_recent_messages": { "type": "integer", "minimum": 2, "default": 32 },
+        "context_message_limit": { "type": "integer", "minimum": 1, "default": 8 }
+      }
+    },
+    "ConversationProjectionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "segment_target_messages": { "type": "integer", "minimum": 4, "default": 20 },
+        "chapter_idle_minutes": { "type": "integer", "minimum": 1, "default": 360 },
+        "chapter_segment_limit": { "type": "integer", "minimum": 2, "default": 8 },
+        "state_update_messages": { "type": "integer", "minimum": 1, "default": 6 },
+        "history_candidate_limit": { "type": "integer", "minimum": 1, "default": 12 },
+        "history_result_limit": { "type": "integer", "minimum": 1, "default": 4 },
+        "summary_max_chars": { "type": "integer", "minimum": 256, "default": 2400 }
+      }
+    },
+    "ExperienceLedgerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "pack_max_size_mb": { "type": "integer", "minimum": 16, "default": 256 },
+        "flush_interval_ms": { "type": "integer", "minimum": 50, "default": 500 },
+        "flush_max_buffer": { "type": "integer", "minimum": 1, "default": 64 },
+        "episode_idle_seconds": { "type": "integer", "minimum": 10, "default": 300 },
+        "seal_integrity_check": { "type": "boolean", "default": true }
+      }
+    },
+    "ConsolidationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "batch_size": { "type": "integer", "minimum": 1, "default": 8 },
+        "max_batch_moments": { "type": "integer", "minimum": 1, "default": 64 },
+        "debounce_seconds": { "type": "integer", "minimum": 0, "default": 120 },
+        "max_wait_seconds": { "type": "integer", "minimum": 10, "default": 900 },
+        "lease_seconds": { "type": "integer", "minimum": 10, "default": 180 },
+        "retry_base_seconds": { "type": "integer", "minimum": 1, "default": 30 },
+        "minimum_salience": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.45 },
+        "autobiographical_evidence_threshold": { "type": "integer", "minimum": 2, "default": 3 },
+        "schedule_interval_seconds": { "type": "integer", "minimum": 10, "default": 300 }
+      }
+    },
+    "RetrievalConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token_budget": { "type": "integer", "minimum": 128, "default": 800 },
+        "candidate_limit": { "type": "integer", "minimum": 1, "default": 24 },
+        "result_limit": { "type": "integer", "minimum": 1, "default": 6 },
+        "semantic_weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.35 }
+      }
+    }
+  },
+  "properties": {
+    "working": { "$ref": "#/definitions/WorkingMemoryConfig", "default": {} },
+    "conversation": { "$ref": "#/definitions/ConversationProjectionConfig", "default": {} },
+    "experience": { "$ref": "#/definitions/ExperienceLedgerConfig", "default": {} },
+    "consolidation": { "$ref": "#/definitions/ConsolidationConfig", "default": {} },
+    "retrieval": { "$ref": "#/definitions/RetrievalConfig", "default": {} }
+  }
+}

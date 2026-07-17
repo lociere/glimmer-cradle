@@ -1,0 +1,27 @@
+{
+  "name": "@glimmer-cradle/extension-template",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "prebuild": "pnpm --filter @glimmer-cradle/extension-sdk run build",
+    "pretypecheck": "pnpm --filter @glimmer-cradle/extension-sdk run build",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@glimmer-cradle/extension-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@glimmer-cradle/protocol": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@glimmer-cradle/protocol": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "^5.0.0",
+    "zod": "^3.23.0"
+  }
+}
+

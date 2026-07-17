@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/IPCMessageType.schema.json",
+  "title": "IPCMessageType",
+  "description": "Kernel 与 Cognition 之间的 IPC 消息类型。Cognition 独占人格、经历和记忆语义；Kernel 不触发记忆固化。",
+  "type": "string",
+  "enum": [
+    "perception_message",
+    "perception_cancel",
+    "agent_plan",
+    "agent_synthesis",
+    "life_heartbeat",
+    "cognition_shutdown",
+    "state_sync",
+    "action_command",
+    "log",
+    "config_init",
+    "knowledge_init",
+    "success_response",
+    "error_response"
+  ]
+}

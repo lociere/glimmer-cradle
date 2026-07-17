@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/SurfaceConfig.schema.json",
+  "title": "SurfaceConfig",
+  "description": "人物呈现出口配置。Surface 只拥有窗口、交互与平台呈现，不拥有 Avatar。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ControlSurfaceGatewayConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "产品控制表面与 Kernel 之间的回环通信网关配置。",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "properties": {
+    "control_surface_gateway": {
+      "$ref": "#/definitions/ControlSurfaceGatewayConfig",
+      "default": {}
+    }
+  }
+}

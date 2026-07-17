@@ -1,0 +1,46 @@
+[project]
+name = "glimmer-cradle-cognition"
+version = "0.1.0"
+description = "Cognition subsystem for Glimmer Cradle"
+requires-python = ">=3.12,<3.13"
+authors = [
+    { name = "lociere", email = "2674610139@qq.com" },
+]
+
+dependencies = [
+    "numpy>=2.0,<3",
+    "pydantic>=2.7,<3",
+    "pyzmq>=26.0,<28",
+    "structlog>=24.0,<26",
+    "aiosqlite>=0.20,<1",
+]
+
+[project.optional-dependencies]
+local-embedding = [
+    "sentence-transformers>=3.0,<5",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "mypy>=1.10",
+    "ruff>=0.5",
+    # Pydantic 契约由 protocol/src/schemas 统一生成，详见协议实现文档。
+    "datamodel-code-generator>=0.25,<1",
+]
+
+[project.scripts]
+glimmer-cradle-cognition = "glimmer_cradle.cognition.host.process:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["glimmer_cradle.cognition*"]
+namespaces = true
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

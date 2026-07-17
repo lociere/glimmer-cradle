@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/MomentKind.schema.json",
+  "title": "MomentKind",
+  "description": "Moment 类型。反思是带证据的认知产物，不再伪装成经历事实。",
+  "type": "string",
+  "enum": [
+    "perception",
+    "emotion",
+    "reply",
+    "action",
+    "action_result",
+    "silence"
+  ]
+}

@@ -1,0 +1,15 @@
+# Selrena 的稳定声音身份。系统路由、供应商超时和密钥不属于角色包。
+
+profile_id: "selrena.default"
+language: "zh-CN"
+style_instruction: "自然、清醒、亲近，保持克制，不夸张表演。"
+
+prosody:
+  rate: 1.0
+  pitch: 1.0
+  volume: 50
+
+bindings:
+  dashscope-cosyvoice:
+    # 在阿里百炼创建或复刻正式声线后填入 voice id；为空时 TTS 明确不可用。
+    voice_id: ""

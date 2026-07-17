@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/AgentPlanPayload.schema.json",
+  "title": "AgentPlanPayload",
+  "description": "Agent 任务规划消息载荷。跨层单一事实源，Kernel 内核与 Cognition 认知核共用。",
+  "type": "object",
+  "properties": {
+    "user_goal": {
+      "type": "string",
+      "default": "",
+      "description": "用户目标描述"
+    },
+    "scene_id": {
+      "type": "string",
+      "default": "default",
+      "description": "场景 ID"
+    },
+    "available_tools": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/definitions/SkillToolDescriptor" },
+      "description": "当前可规划的 ready Skill 工具目录（由 Kernel 从 SkillCatalogSnapshot 投影）"
+    }
+  },
+  "definitions": {
+    "SkillToolDescriptor": {
+      "type": "object",
+      "description": "供 Cognition 规划、由 Kernel 统一执行的 Skill 工具描述。",
+      "required": ["skill_id", "tool_name", "description"],
+      "properties": {
+        "skill_id": {
+          "type": "string",
+          "description": "Skill 的稳定目录 ID"
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "Skill 内工具名"
+        },
+        "description": {
+          "type": "string",
+          "description": "工具用途说明"
+        },
+        "parameters": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": true,
+          "description": "工具参数 JSON Schema 投影"
+        }
+      }
+    }
+  }
+}

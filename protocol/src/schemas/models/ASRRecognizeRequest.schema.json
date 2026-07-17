@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ASRRecognizeRequest.schema.json",
+  "title": "ASRRecognizeRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["audio_path"],
+  "properties": {
+    "audio_path": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 }
+  }
+}

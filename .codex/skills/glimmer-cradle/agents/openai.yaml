@@ -1,0 +1,7 @@
+interface:
+  display_name: "Glimmer Cradle 开发"
+  short_description: "按 Glimmer Cradle 平台边界与当前角色边界实施、调试、审查并对齐文档"
+  default_prompt: "使用 $glimmer-cradle 完成这项 Glimmer Cradle 项目开发任务，并按受影响层验证代码与文档。"
+
+policy:
+  allow_implicit_invocation: true

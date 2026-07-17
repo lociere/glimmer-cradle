@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/AudioConfig.schema.json",
+  "title": "AudioConfig",
+  "description": "系统音频策略。只拥有路由、供应商执行参数、韧性和缓存，不拥有角色声线身份。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tts", "asr"],
+  "definitions": {
+    "CircuitBreakerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "failure_threshold": { "type": "integer", "minimum": 1, "default": 3 },
+        "recovery_timeout_ms": { "type": "integer", "minimum": 1000, "default": 30000 }
+      }
+    },
+    "TTSRouteConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "fallbacks"],
+      "properties": {
+        "primary": { "type": "string", "minLength": 1, "default": "dashscope-cosyvoice" },
+        "fallbacks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "default": []
+        },
+        "circuit_breaker": { "$ref": "#/definitions/CircuitBreakerConfig", "default": {} }
+      }
+    },
+    "TTSCacheConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "max_age_days": { "type": "integer", "minimum": 1, "default": 30 }
+      }
+    },
+    "DashScopeCosyVoiceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "default": "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+        },
+        "model": { "type": "string", "minLength": 1, "default": "cosyvoice-v3.5-flash" },
+        "format": { "type": "string", "enum": ["wav"], "default": "wav" },
+        "sample_rate": { "type": "integer", "enum": [8000, 16000, 22050, 24000, 44100, 48000], "default": 24000 },
+        "connect_timeout_ms": { "type": "integer", "minimum": 1000, "default": 5000 },
+        "receive_timeout_ms": { "type": "integer", "minimum": 1000, "default": 20000 },
+        "max_retries": { "type": "integer", "minimum": 0, "maximum": 3, "default": 1 }
+      }
+    },
+    "TTSProvidersConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dashscope-cosyvoice"],
+      "properties": {
+        "dashscope-cosyvoice": { "$ref": "#/definitions/DashScopeCosyVoiceConfig" }
+      }
+    },
+    "TTSConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "route", "cache", "providers"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "route": { "$ref": "#/definitions/TTSRouteConfig" },
+        "cache": { "$ref": "#/definitions/TTSCacheConfig" },
+        "providers": { "$ref": "#/definitions/TTSProvidersConfig" }
+      }
+    },
+    "ASRConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "provider", "resource_id"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "provider": { "type": "string", "enum": ["funasr"], "default": "funasr" },
+        "resource_id": { "type": "string", "minLength": 1, "default": "funasr.sensevoice-small" }
+      }
+    }
+  },
+  "properties": {
+    "tts": { "$ref": "#/definitions/TTSConfig" },
+    "asr": { "$ref": "#/definitions/ASRConfig" }
+  }
+}

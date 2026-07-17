@@ -1,0 +1,37 @@
+# 人物 Avatar 配置。Unity 是当前 Host 实现，Surface 不拥有 Avatar。
+
+enabled: true
+heartbeat_interval_ms: 10000
+heartbeat_timeout_ms: 30000
+host:
+  # managed：由 Kernel 生命周期监督树拉起 Unity Avatar Host。
+  # 首次使用前运行 `pnpm avatar:build`；缺失时 Avatar 降级，但不阻断文字对话。
+  launch_mode: "managed"
+  command: "build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe"
+  args:
+    - "UnityAvatarHost.exe"
+  cwd: "build/components/avatar/unity-host/windows-x64"
+  env: {}
+  startup_timeout_ms: 45000
+  restart_on_exit: false
+emotion_mapping:
+  happy:
+    expression_id: "happy"
+    motion_group: "happy"
+    animator_trigger: "happy"
+  sad:
+    expression_id: "sad"
+    motion_group: "sad"
+    animator_trigger: "sad"
+  angry:
+    expression_id: "angry"
+    motion_group: "angry"
+    animator_trigger: "angry"
+  surprised:
+    expression_id: "surprised"
+    motion_group: "surprised"
+    animator_trigger: "surprised"
+  neutral:
+    expression_id: "neutral"
+    motion_group: "idle"
+    animator_trigger: "idle"

@@ -1,0 +1,17 @@
+# Character Package manifest。这里只声明角色包身份、目录和模式，不写长人设。
+
+character_id: "selrena"
+base:
+  name: "Selrena"
+  nickname: "月见"
+
+persona_mode: "api"
+
+assets:
+  root: "assets"
+
+knowledge:
+  index: "knowledge/index.yaml"
+
+migrations:
+  root: "migrations"

@@ -1,0 +1,58 @@
+{
+  "name": "glimmer-cradle",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": "11.13.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "ws": "^8.18.3",
+    "yaml": "^2.8.1",
+    "zod": "^3.23.0"
+  },
+  "scripts": {
+    "bootstrap": "pnpm install",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "build": "pnpm run build:all",
+    "build:all": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run build:extension-tooling && pnpm --filter @glimmer-cradle/kernel run build && pnpm --filter @glimmer-cradle/desktop run build && pnpm --filter @glimmer-cradle/personal-server run build",
+    "build:extension-tooling": "pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm --filter @glimmer-cradle/extension-template run build",
+    "stage:extension-host": "node scripts/stage-extension-host-modules.mjs",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "dev": "pnpm -w run dev:all",
+    "dev:all": "node scripts/launch-product.mjs desktop",
+    "dev:desktop": "node scripts/launch-product.mjs desktop",
+    "dev:personal-server": "node scripts/launch-product.mjs personal-server",
+    "start:desktop": "node scripts/launch-product.mjs desktop --production",
+    "start:personal-server": "node scripts/launch-product.mjs personal-server --production",
+    "smoke:personal-server": "node scripts/smoke-personal-server.mjs",
+    "test": "pnpm -w run test:all",
+    "test:all": "pnpm run check:architecture && pnpm run test:tooling && pnpm run test:cognition && pnpm run test:audio && pnpm --filter @glimmer-cradle/extension-sdk test && pnpm --filter @glimmer-cradle/kernel test && pnpm --filter @glimmer-cradle/personal-server test",
+    "test:tooling": "node --test scripts/lib/*.test.mjs",
+    "test:cognition": "uv run --project core/cognition pytest -q core/cognition/tests",
+    "test:audio": "uv run --project engines/audio --extra dev pytest -q engines/audio/tests",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "check:encoding": "node scripts/check-no-bom.mjs",
+    "test:ui": "pnpm --filter @glimmer-cradle/desktop test:ui",
+    "test:ui:update": "pnpm --filter @glimmer-cradle/desktop test:ui:update",
+    "chat": "node scripts/launch-product.mjs desktop --kernel-only",
+    "sync:contracts": "pnpm --filter @glimmer-cradle/protocol gen:all",
+    "sync:assets": "node scripts/sync-assets.mjs",
+    "sync:unity-assets": "node scripts/sync-unity-assets.mjs",
+    "sync:unity-sdk": "node scripts/sync-unity-avatar-sdk.mjs",
+    "avatar:sync": "pnpm sync:unity-assets && pnpm sync:unity-sdk",
+    "avatar:doctor": "node scripts/sync-unity-avatar-sdk.mjs --check",
+    "avatar:projector:test": "node --test scripts/lib/unitypackage-projector.test.mjs",
+    "avatar:composition:build": "node scripts/build-composition-host.mjs",
+    "avatar:build": "node scripts/build-unity-avatar-host.mjs",
+    "prebuild:all": "node scripts/sync-assets.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/ws": "^8.5.14",
+    "tar": "^7.5.20",
+    "typescript": "^6.0.2"
+  }
+}

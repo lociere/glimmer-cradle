@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Glimmer Cradle Avatar Behavior Profile",
+  "description": "模型私有参数到当前角色身体语义的映射。该文件不参与跨进程协议。",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "const": 1 },
+    "speech": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mouthParameterId": { "type": "string", "minLength": 1 },
+        "intensityScale": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "gaze": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "responseTimeSeconds": { "type": "number", "minimum": 0.04, "maximum": 1.5 },
+        "targetRange": { "type": "number", "minimum": 0.1, "maximum": 4 },
+        "pointerAttention": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "movementThreshold": { "type": "number", "minimum": 0.001, "maximum": 1 },
+            "holdSeconds": { "type": "number", "minimum": 0, "maximum": 10 },
+            "releaseSeconds": { "type": "number", "minimum": 0.04, "maximum": 3 },
+            "deadZone": { "type": "number", "minimum": 0, "maximum": 0.5 }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["parameterId", "axis", "factor"],
+            "additionalProperties": false,
+            "properties": {
+              "parameterId": { "type": "string", "minLength": 1 },
+              "axis": { "type": "string", "enum": ["x", "y"] },
+              "factor": { "type": "number", "minimum": -100, "maximum": 100 }
+            }
+          }
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blink": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "meanSeconds": { "type": "number", "minimum": 1, "maximum": 10 },
+            "maximumDeviationSeconds": { "type": "number", "minimum": 0.5, "maximum": 5 },
+            "timescale": { "type": "number", "minimum": 1, "maximum": 20 }
+          }
+        },
+        "breath": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "parameterId": { "type": "string", "minLength": 1 },
+            "durationSeconds": { "type": "number", "minimum": 0.5, "maximum": 10 },
+            "normalizedOrigin": { "type": "number", "minimum": 0, "maximum": 1 },
+            "normalizedRange": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "posture": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pose": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["parameterId", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "parameterId": { "type": "string", "minLength": 1 },
+                  "value": { "type": "number", "minimum": -100, "maximum": 100 }
+                }
+              }
+            },
+            "idle": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["parameterId", "amplitude", "periodSeconds"],
+                "additionalProperties": false,
+                "properties": {
+                  "parameterId": { "type": "string", "minLength": 1 },
+                  "amplitude": { "type": "number", "minimum": -100, "maximum": 100 },
+                  "periodSeconds": { "type": "number", "minimum": 1.5, "maximum": 60 },
+                  "phase": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

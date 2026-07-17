@@ -1,0 +1,80 @@
+{
+  "appId": "com.lociere.glimmercradle",
+  "productName": "Glimmer Cradle",
+  "directories": {
+    "output": "../../dist/desktop"
+  },
+  "files": [
+    "dist/**/*",
+    "assets/icons/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "../../assets",
+      "to": "assets",
+      "filter": [
+        "avatar/**/*",
+        "icons/**/*",
+        "sounds/**/*",
+        "!**/.cache/**",
+        "!**/tmp/**"
+      ]
+    },
+    {
+      "from": "../../configs",
+      "to": "configs/defaults",
+      "filter": [
+        "**/*",
+        "!secrets/**",
+        "!**/secrets.yaml"
+      ]
+    },
+    {
+      "from": "../../configs/secrets/secrets.example.yaml",
+      "to": "configs/defaults/secrets/secrets.example.yaml"
+    },
+    {
+      "from": "../../engines/audio",
+      "to": "engines/audio",
+      "filter": [
+        "**/*",
+        "!**/.venv/**",
+        "!**/__pycache__/**",
+        "!**/.pytest_cache/**",
+        "!**/models/**",
+        "!**/outputs/**"
+      ]
+    },
+    {
+      "from": "../../build/extension-host/modules",
+      "to": "extension-host/modules",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "../../build/components/avatar/unity-host/windows-x64",
+      "to": "components/avatar/unity-host",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "../../native",
+      "to": "native",
+      "filter": [
+        "bin/**/*",
+        "dist/**/*",
+        "include/**/*",
+        "!build/**"
+      ]
+    }
+  ],
+  "win": {
+    "executableName": "GlimmerCradle",
+    "icon": "assets/icons/app-icon.ico"
+  },
+  "mac": {
+    "icon": "assets/icons/app-icon.png"
+  },
+  "linux": {
+    "icon": "assets/icons/app-icon.png"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/AuditRecord.schema.json",
+  "title": "AuditRecord",
+  "description": "高风险副作用动作的独立审计记录。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp",
+    "action",
+    "target_kind",
+    "owner",
+    "runtime_id",
+    "trace_id",
+    "outcome",
+    "schema_version"
+  ],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "action": { "type": "string" },
+    "target_kind": { "type": "string" },
+    "target_name": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "actor_kind": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "actor_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "owner": { "type": "string" },
+    "module": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "runtime_id": { "type": "string" },
+    "trace_id": { "type": "string" },
+    "span_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "scene_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "extension_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "provider_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "skill_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "tool_name": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "risk_level": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "partial",
+        "skipped",
+        "policy_denied",
+        "timeout",
+        "cancelled",
+        "queued",
+        "replayed"
+      ]
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "diagnostic_hint": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "artifact_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "details_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "duration_ms": {
+      "type": ["number", "null"],
+      "default": null,
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "attributes": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true
+    }
+  }
+}

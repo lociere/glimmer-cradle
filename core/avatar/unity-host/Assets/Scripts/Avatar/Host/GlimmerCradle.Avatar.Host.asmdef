@@ -1,0 +1,14 @@
+{
+  "name": "GlimmerCradle.Avatar.Host",
+  "rootNamespace": "GlimmerCradle.Avatar",
+  "references": [
+    "GlimmerCradle.Avatar.Application",
+    "GlimmerCradle.Avatar.Contracts",
+    "GlimmerCradle.Avatar.Domain",
+    "GlimmerCradle.Avatar.Infrastructure",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

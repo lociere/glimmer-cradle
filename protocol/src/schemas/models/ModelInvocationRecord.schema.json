@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ModelInvocationRecord.schema.json",
+  "title": "ModelInvocationRecord",
+  "description": "模型调用观测记录；默认只保留摘要，完整 prompt/response 仅在 full 模式进入受控 capture。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp",
+    "invocation_id",
+    "capture_mode",
+    "purpose",
+    "capture_category",
+    "owner",
+    "runtime_id",
+    "trace_id",
+    "provider_id",
+    "model_id",
+    "outcome",
+    "schema_version"
+  ],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "invocation_id": { "type": "string" },
+    "capture_mode": {
+      "type": "string",
+      "enum": ["off", "summary", "full"]
+    },
+    "purpose": { "type": "string" },
+    "capture_category": {
+      "type": "string",
+      "enum": ["decision", "skill", "response", "memory", "other"],
+      "description": "模型调用的语义分类；full 模式据此分类 capture，summary 模式据此支持诊断筛选。"
+    },
+    "owner": { "type": "string" },
+    "module": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "runtime_id": { "type": "string" },
+    "trace_id": { "type": "string" },
+    "span_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "scene_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "provider_id": { "type": "string" },
+    "model_id": { "type": "string" },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "partial",
+        "skipped",
+        "policy_denied",
+        "timeout",
+        "cancelled",
+        "queued",
+        "replayed"
+      ]
+    },
+    "duration_ms": {
+      "type": ["number", "null"],
+      "default": null,
+      "minimum": 0
+    },
+    "prompt_chars": {
+      "type": ["integer", "null"],
+      "default": null,
+      "minimum": 0
+    },
+    "response_chars": {
+      "type": ["integer", "null"],
+      "default": null,
+      "minimum": 0
+    },
+    "prompt_hash": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "response_hash": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "provider_payload_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "raw_response_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "prompt_text_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "response_text_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "normalized_text_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "error_code": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "error_summary": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "redacted": {
+      "type": "boolean",
+      "default": true
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "2.0.0"
+    },
+    "attributes": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true
+    }
+  }
+}

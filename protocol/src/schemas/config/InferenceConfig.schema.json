@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/InferenceConfig.schema.json",
+  "title": "InferenceConfig",
+  "description": "角色推理参数（跨语言 ABI 契约）—— 包含生成参数、生命时钟、多模态与动作流。模型能力 Provider 由系统配置拥有。",
+  "type": "object",
+  "required": ["model", "life_clock", "multimodal", "action_stream"],
+  "additionalProperties": false,
+  "definitions": {
+    "ModelConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "模型生成参数",
+      "properties": {
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1024,
+          "description": "单次生成最大 token 数"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.8,
+          "description": "采样温度（0 = 确定性，2 = 最大随机）"
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.9,
+          "description": "核采样概率阈值"
+        },
+        "frequency_penalty": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2,
+          "default": 0.0,
+          "description": "频率惩罚因子"
+        }
+      }
+    },
+    "LifeClockConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "生命时钟配置。只负责 Cognition 活性探测，不拥有认知节律、注意力模式或活动状态决策。",
+      "properties": {
+        "heartbeat_enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用 Kernel 到 Cognition 的活性探测。"
+        },
+        "heartbeat_interval_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 45000,
+          "description": "活性探测的兜底间隔（ms）；收到 Cognition CognitiveActivityPolicy.frequency_hint_ms 后可调整探测频率。"
+        },
+        "focus_duration_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 20000,
+          "description": "焦点模式持续时长（ms）"
+        },
+        "ingress_debounce_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "default": 1400,
+          "description": "普通消息防抖时间窗口（ms）"
+        },
+        "ingress_focused_debounce_ms": {
+          "type": "integer",
+          "minimum": 50,
+          "default": 700,
+          "description": "焦点模式下的防抖时间窗口（ms）"
+        },
+        "ingress_max_batch_messages": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 4,
+          "description": "单次批处理最大消息条数"
+        },
+        "ingress_max_batch_items": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 24,
+          "description": "单次批处理最大媒体项数"
+        },
+        "summon_keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "唤醒关键词列表"
+        },
+        "focus_on_any_chat": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否任意聊天都触发焦点"
+        }
+      }
+    },
+    "MultimodalConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "多模态处理策略",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用多模态输入处理"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["core_direct", "specialist_then_core"],
+          "default": "specialist_then_core",
+          "description": "处理策略：core_direct = 主模型直接处理；specialist_then_core = 专家预处理后传主模型"
+        },
+        "max_items": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 6,
+          "description": "单次请求最大媒体项数"
+        },
+        "core_model": {
+          "type": "string",
+          "default": "deepseek",
+          "description": "主推理模型名称"
+        },
+        "image_model": {
+          "type": "string",
+          "default": "",
+          "description": "图像专家模型名称"
+        },
+        "video_model": {
+          "type": "string",
+          "default": "",
+          "description": "视频专家模型名称"
+        }
+      }
+    },
+    "ActionStreamConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "动作流（Live2D 表情 / 动作联动）配置",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用动作流"
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["live2d"],
+          "default": "live2d",
+          "description": "渲染通道"
+        }
+      }
+    }
+  },
+  "properties": {
+    "model": { "$ref": "#/definitions/ModelConfig" },
+    "life_clock": { "$ref": "#/definitions/LifeClockConfig" },
+    "multimodal": { "$ref": "#/definitions/MultimodalConfig" },
+    "action_stream": { "$ref": "#/definitions/ActionStreamConfig" }
+  }
+}

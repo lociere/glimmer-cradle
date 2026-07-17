@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConversationAddress.schema.json",
+  "title": "ConversationAddress",
+  "description": "外部表面或扩展提交给 Kernel Conversation Directory 的平台中立地址。外部键只停留在 Kernel 边界。",
+  "type": "object",
+  "required": ["provider_id", "provider_account_id", "space_kind", "external_space_key", "visibility"],
+  "additionalProperties": false,
+  "properties": {
+    "provider_id": { "type": "string", "minLength": 1 },
+    "provider_account_id": { "type": "string", "minLength": 1 },
+    "space_kind": {
+      "type": "string",
+      "enum": ["personal", "direct", "group", "channel", "thread", "world", "custom"]
+    },
+    "external_space_key": { "type": "string", "minLength": 1 },
+    "external_thread_key": { "type": ["string", "null"] },
+    "parent_space_key": { "type": ["string", "null"] },
+    "actor_endpoint_key": { "type": ["string", "null"] },
+    "actor_display_name": { "type": ["string", "null"] },
+    "continuity_key": { "type": ["string", "null"] },
+    "visibility": {
+      "type": "string",
+      "enum": ["private", "shared", "public"]
+    }
+  }
+}

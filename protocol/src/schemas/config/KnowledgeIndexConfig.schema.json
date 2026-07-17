@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/KnowledgeIndexConfig.schema.json",
+  "title": "KnowledgeIndexConfig",
+  "description": "角色 Knowledge Vault 文件索引。索引只引用 knowledge/ 下的资料文件；Kernel 加载后组装为 KnowledgeBaseConfig 投放给 Cognition。",
+  "type": "object",
+  "required": ["version", "retrieval", "entries"],
+  "additionalProperties": false,
+  "definitions": {
+    "KnowledgeIndexEntry": {
+      "type": "object",
+      "required": ["entry_id", "file", "priority"],
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "KnowledgeIndexRetrievalConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["full_injection", "semantic_rag"],
+          "default": "full_injection"
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5
+        },
+        "min_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        },
+        "semantic_weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6
+        }
+      }
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieval": {
+      "$ref": "#/definitions/KnowledgeIndexRetrievalConfig"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/KnowledgeIndexEntry"
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/AgentSynthesisPayload.schema.json",
+  "title": "AgentSynthesisPayload",
+  "description": "Agent Skill/工具结果合成消息载荷。跨层单一事实源，Kernel 内核与 Cognition 认知核共用。",
+  "type": "object",
+  "required": ["original_goal", "scene_id", "conversation", "tool_results"],
+  "properties": {
+    "original_goal": {
+      "type": "string",
+      "default": "",
+      "description": "原始用户目标"
+    },
+    "scene_id": {
+      "type": "string",
+      "default": "default",
+      "description": "场景 ID"
+    },
+    "conversation": {
+      "$ref": "src/schemas/models/ConversationContext.schema.json"
+    },
+    "tool_results": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/definitions/AgentToolResult" },
+      "description": "工具执行结果列表"
+    }
+  },
+  "definitions": {
+    "AgentToolResult": {
+      "type": "object",
+      "description": "单个 Skill/工具调用或规划降级结果。",
+      "required": ["tool_name", "status", "result_json", "invocation_id", "provider_kind", "provider_id", "source_event_id", "schema_ref"],
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "description": "工具名"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "skipped"],
+          "default": "success",
+          "description": "执行状态"
+        },
+        "result_json": {
+          "type": "string",
+          "default": "{}",
+          "description": "JSON 序列化的结果内容"
+        },
+        "invocation_id": { "type": "string", "minLength": 1 },
+        "provider_kind": {
+          "type": "string",
+          "enum": ["core", "extension", "mcp", "user"]
+        },
+        "provider_id": { "type": "string", "minLength": 1 },
+        "provider_version": { "type": "string" },
+        "source_event_id": { "type": "string", "minLength": 1 },
+        "schema_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

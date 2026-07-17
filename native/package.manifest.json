@@ -1,0 +1,13 @@
+{
+  "id": "platform-native",
+  "displayName": "Glimmer Cradle Platform Native",
+  "version": "0.1.0",
+  "packageDirectory": "native",
+  "artifacts": {
+    "win32": "platform_native.dll",
+    "darwin": "libplatform_native.dylib",
+    "linux": "libplatform_native.so"
+  },
+  "source": "native/",
+  "license": "仓库自有 native 组件源码；运行时若依赖系统图形栈或第三方 SDK，遵循对应平台和上游许可。"
+}

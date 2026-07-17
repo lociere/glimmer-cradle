@@ -1,0 +1,27 @@
+{
+  "name": "@glimmer-cradle/personal-server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "pretest": "pnpm --filter @glimmer-cradle/protocol run build",
+    "test": "tsx --test src/*.test.ts",
+    "pretypecheck": "pnpm --filter @glimmer-cradle/protocol run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prebuild": "pnpm --filter @glimmer-cradle/protocol run build",
+    "build": "tsc -p tsconfig.json && node scripts/copy-public.mjs",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@glimmer-cradle/protocol": "workspace:*",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/LLMConfig.schema.json",
+  "title": "LLMConfig",
+  "description": "LLM 提供商配置（主提供商 + 多备选）—— 通过 'provider/alias' 格式字符串引用，provider_key=None 时取根 models 字典第一个值。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "LLMProviderConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["models"],
+      "description": "单个 LLM 提供商配置（拒绝旧 model 字段等备用键，对应 Zod .strict()）",
+      "properties": {
+        "api_type": {
+          "type": "string",
+          "default": "openai",
+          "description": "API 协议类型"
+        },
+        "api_key": {
+          "type": "string",
+          "description": "API Key（优先从 secrets.yaml 注入，此处可留空）"
+        },
+        "base_url": {
+          "type": "string",
+          "description": "API 端点地址"
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "模型字典：alias → 模型 ID；无 alias 时取第一个值"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "采样温度覆盖"
+        },
+        "request_method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+          "description": "自定义 HTTP 方法"
+        },
+        "request_path": {
+          "type": "string",
+          "description": "自定义请求路径"
+        },
+        "request_headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "自定义请求头"
+        },
+        "request_body_template": {
+          "type": "string",
+          "description": "请求体模板（支持 {prompt} / {model} / {temperature} 占位符）"
+        },
+        "response_extract": {
+          "type": "string",
+          "description": "响应解析路径（点分隔，例如 choices.0.text）"
+        }
+      }
+    }
+  },
+  "properties": {
+    "api_type": {
+      "type": "string",
+      "default": "openai",
+      "description": "主 API 协议类型"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "主 API Key（优先从 secrets.yaml 注入）"
+    },
+    "base_url": {
+      "type": "string",
+      "description": "主 API 端点"
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "根配置模型字典：alias → 模型 ID；provider_key=None 时取第一个值"
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "主采样温度"
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/LLMProviderConfig" },
+      "description": "多提供商配置映射（key = 提供商名称）"
+    },
+    "request_method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "description": "自定义 HTTP 方法"
+    },
+    "request_path": {
+      "type": "string",
+      "description": "自定义请求路径"
+    },
+    "request_headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "自定义请求头"
+    },
+    "request_body_template": {
+      "type": "string",
+      "description": "请求体模板"
+    },
+    "response_extract": {
+      "type": "string",
+      "description": "响应解析路径"
+    }
+  }
+}

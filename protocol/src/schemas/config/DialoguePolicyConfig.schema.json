@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/DialoguePolicyConfig.schema.json",
+  "title": "DialoguePolicyConfig",
+  "description": "角色对话呈现策略配置。它只约束输出节奏、消息分段、括号动作、Markdown 与代码呈现，不承载人格事实。",
+  "type": "object",
+  "required": ["presentation", "structured_output"],
+  "additionalProperties": false,
+  "properties": {
+    "presentation": {
+      "type": "object",
+      "required": ["rules"],
+      "additionalProperties": false,
+      "properties": {
+        "forbid_stage_directions": {
+          "type": "boolean",
+          "default": true
+        },
+        "forbid_emotion_labels": {
+          "type": "boolean",
+          "default": true
+        },
+        "casual_max_sentences": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "default": 3
+        },
+        "casual_max_chars_per_message": {
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 160,
+          "default": 48
+        },
+        "complex_reply_policy": {
+          "type": "string",
+          "minLength": 1,
+          "default": "复杂问题先给短结论，再按必要结构展开。"
+        },
+        "message_split_policy": {
+          "type": "string",
+          "minLength": 1,
+          "default": "普通闲聊优先 1 到 3 个短句；信息密度高时自然分段。"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "structured_output": {
+      "type": "object",
+      "required": ["rules"],
+      "additionalProperties": false,
+      "properties": {
+        "preserve_markdown": {
+          "type": "boolean",
+          "default": true
+        },
+        "preserve_code_blocks": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_fenced_code_blocks": {
+          "type": "boolean",
+          "default": true
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "strip_stage_directions": {
+          "type": "boolean",
+          "default": true
+        },
+        "strip_emotion_labels": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  }
+}

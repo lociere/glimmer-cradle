@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/PerceptionEvent.schema.json",
+  "title": "PerceptionEvent",
+  "description": "跨层感知事件契约——唯一真相源。Kernel 内核与 Cognition 认知核共用。禁止任何平台私有字段（user_id/group_id/CQ码）进入。",
+  "type": "object",
+  "required": ["id", "sensoryType", "source", "timestamp", "familiarity", "address_mode", "conversation", "content", "origin", "retention_ceiling"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "事件唯一 ID（由入站防腐层生成）"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "全链路追踪 ID（UUIDv4），从防腐网关注入，贯穿 LLM 推理、向量检索全流程"
+    },
+    "sensoryType": {
+      "type": "string",
+      "description": "感知类型：chat / voice / vision 等"
+    },
+    "source": {
+      "type": "string",
+      "description": "感知来源键；只标识来源通道，不再承担 scene、conversation 或 actor 语义。"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix 毫秒时间戳"
+    },
+    "familiarity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "对话对象熟悉度 0-10，由 Vessel Cortex 计算后注入"
+    },
+    "address_mode": {
+      "type": "string",
+      "enum": ["direct", "ambient"],
+      "description": "寻址模式：direct=明确呼唤；ambient=环境感知"
+    },
+    "response_policy": {
+      "type": "string",
+      "enum": ["reply_allowed", "observe_only"],
+      "description": "响应策略：reply_allowed=允许 Cognition 生成并外发回复；observe_only=只作为经历/情绪/记忆输入，不生成外显回复",
+      "default": "reply_allowed"
+    },
+    "conversation": {
+      "$ref": "src/schemas/models/ConversationContext.schema.json"
+    },
+    "origin": {
+      "$ref": "#/definitions/SourceDescriptor"
+    },
+    "retention_ceiling": {
+      "type": "string",
+      "enum": ["transient", "experience", "memory_candidate"],
+      "description": "该来源最多允许被 Cognition 保留到哪一层；最终是否保留仍由 Cognition 判断。"
+    },
+    "content": {
+      "$ref": "#/definitions/PerceptionContent"
+    }
+  },
+  "definitions": {
+    "SourceDescriptor": {
+      "type": "object",
+      "required": ["provider_kind", "provider_id", "source_event_id", "schema_ref", "trust_tier", "privacy_class", "cognitive_effect"],
+      "additionalProperties": false,
+      "properties": {
+        "provider_kind": { "type": "string", "enum": ["core", "extension", "mcp", "user"] },
+        "provider_id": { "type": "string", "minLength": 1 },
+        "provider_version": { "type": ["string", "null"] },
+        "contribution_id": { "type": ["string", "null"] },
+        "source_event_id": { "type": "string", "minLength": 1 },
+        "schema_ref": { "type": "string", "minLength": 1 },
+        "content_hash": { "type": ["string", "null"] },
+        "trust_tier": { "type": "string", "enum": ["untrusted", "user_asserted", "host_verified", "authoritative"] },
+        "privacy_class": { "type": "string", "enum": ["public", "private", "sensitive"] },
+        "cognitive_effect": { "type": "string", "enum": ["observation", "context", "action_result", "evidence_proposal"] }
+      }
+    },
+    "PerceptionContent": {
+      "type": "object",
+      "required": ["modality"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": ["string", "null"],
+          "description": "注入 LLM 的完整上下文文本。内核层不应对此字段做平台特定解析"
+        },
+        "modality": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "模态列表：text / image / video"
+        },
+        "actor_id": {
+          "type": ["string", "null"],
+          "description": "归一化语义发言者 ID，不得使用平台原始用户 ID"
+        },
+        "actor_name": {
+          "type": ["string", "null"],
+          "description": "发言者展示名，用于关系观察和经历召回"
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PerceptionModalityItem" },
+          "description": "结构化多模态项"
+        }
+      }
+    },
+    "PerceptionModalityItem": {
+      "type": "object",
+      "required": ["modality"],
+      "additionalProperties": false,
+      "properties": {
+        "modality": {
+          "type": "string",
+          "enum": ["text", "image", "video"]
+        },
+        "text": { "type": ["string", "null"] },
+        "uri": { "type": ["string", "null"] },
+        "mime_type": { "type": ["string", "null"] },
+        "semantic": {
+          "$ref": "#/definitions/PerceptionModalitySemantic"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "PerceptionModalitySemantic": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "source": { "type": ["string", "null"] },
+        "resolved": { "type": ["boolean", "null"] },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

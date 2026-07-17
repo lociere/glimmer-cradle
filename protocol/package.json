@@ -1,0 +1,38 @@
+{
+  "name": "@glimmer-cradle/protocol",
+  "version": "0.1.0",
+  "private": false,
+  "files": ["dist"],
+  "publishConfig": { "access": "public" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "gen:ts": "tsx codegen/gen-ts.ts",
+    "gen:py": "uv run --project ../core/cognition --extra dev python codegen/gen-py.py",
+    "gen:cs": "tsx codegen/gen-cs.ts",
+    "gen:all": "pnpm gen:ts && pnpm gen:py && pnpm gen:cs"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.0.0",
+    "@types/node": "^24.13.3",
+    "json-schema-to-typescript": "^15.0.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0"
+  }
+}

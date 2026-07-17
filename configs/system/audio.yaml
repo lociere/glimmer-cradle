@@ -1,0 +1,27 @@
+# 系统 Audio 策略。角色声线身份位于 Character Package 的 voice.yaml。
+
+tts:
+  enabled: false
+  route:
+    primary: "dashscope-cosyvoice"
+    fallbacks: []
+    circuit_breaker:
+      failure_threshold: 3
+      recovery_timeout_ms: 30000
+  cache:
+    enabled: true
+    max_age_days: 30
+  providers:
+    dashscope-cosyvoice:
+      enabled: true
+      endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+      model: "cosyvoice-v3.5-flash"
+      format: "wav"
+      sample_rate: 24000
+      connect_timeout_ms: 5000
+      receive_timeout_ms: 20000
+      max_retries: 1
+asr:
+  enabled: false
+  provider: "funasr"
+  resource_id: "funasr.sensevoice-small"

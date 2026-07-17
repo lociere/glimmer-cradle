@@ -1,0 +1,21 @@
+# Knowledge Vault 索引。entries 只引用 knowledge/ 下的资料文件。
+
+version: "1.0.0"
+retrieval:
+  mode: "full_injection"
+  top_k: 5
+  min_score: 0.3
+  semantic_weight: 0.6
+entries:
+  - entry_id: "knowledge.weather-seasons"
+    file: "weather-seasons.md"
+    priority: 5
+    enabled: true
+  - entry_id: "knowledge.time-awareness"
+    file: "time-awareness.md"
+    priority: 5
+    enabled: true
+  - entry_id: "knowledge.food-daily"
+    file: "food-daily.md"
+    priority: 4
+    enabled: true

@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/SkillCatalogSnapshot.schema.json",
+  "title": "SkillCatalogSnapshot",
+  "description": "Kernel 向 Desktop 等跨进程消费者广播的 Skill Plane 统一能力目录与 provider runtime 投影。",
+  "type": "object",
+  "required": [
+    "generatedAt",
+    "totalSkills",
+    "providerCounts",
+    "runtimeStatusCounts",
+    "totalTools",
+    "totalResources",
+    "totalPrompts",
+    "providerRuntimes",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "SkillProviderKind": {
+      "type": "string",
+      "enum": ["core", "extension", "mcp_server", "user"]
+    },
+    "SkillRiskLevel": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "SkillRuntimeStatus": {
+      "type": "string",
+      "enum": ["ready", "contract_only"]
+    },
+    "SkillProviderRuntimeState": {
+      "type": "string",
+      "enum": ["ready", "contract_only", "connecting", "degraded", "unavailable", "stopped"]
+    },
+    "SkillAudience": {
+      "type": "string",
+      "enum": ["character", "user", "host", "renderer", "extension", "adapter"]
+    },
+    "SkillProviderRef": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "#/definitions/SkillProviderKind" },
+        "id": { "type": "string" }
+      }
+    },
+    "SkillPolicy": {
+      "type": "object",
+      "required": ["riskLevel", "confirmationRequired", "sideEffects", "audit"],
+      "additionalProperties": false,
+      "properties": {
+        "riskLevel": { "$ref": "#/definitions/SkillRiskLevel" },
+        "confirmationRequired": { "type": "boolean" },
+        "sideEffects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "audit": { "type": "boolean" }
+      }
+    },
+    "SkillToolSummary": {
+      "type": "object",
+      "required": ["name", "description", "audience", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "audience": { "$ref": "#/definitions/SkillAudience" },
+        "scope": { "$ref": "CapabilityScope.schema.json" },
+        "parameters": {}
+      }
+    },
+    "SkillResourceSummary": {
+      "type": "object",
+      "required": ["id", "description", "audience", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "audience": { "$ref": "#/definitions/SkillAudience" },
+        "scope": { "$ref": "CapabilityScope.schema.json" },
+        "parameters": {}
+      }
+    },
+    "SkillPromptSummary": {
+      "type": "object",
+      "required": ["id", "description", "audience", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "audience": { "$ref": "#/definitions/SkillAudience" },
+        "scope": { "$ref": "CapabilityScope.schema.json" },
+        "parameters": {}
+      }
+    },
+    "SkillCatalogEntry": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "description",
+        "audience",
+        "scope",
+        "provider",
+        "tools",
+        "resources",
+        "prompts",
+        "policy",
+        "metadata"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "audience": { "$ref": "#/definitions/SkillAudience" },
+        "scope": { "$ref": "CapabilityScope.schema.json" },
+        "provider": { "$ref": "#/definitions/SkillProviderRef" },
+        "tools": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SkillToolSummary" },
+          "default": []
+        },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SkillResourceSummary" },
+          "default": []
+        },
+        "prompts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SkillPromptSummary" },
+          "default": []
+        },
+        "policy": { "$ref": "#/definitions/SkillPolicy" },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "SkillProviderRuntimeSnapshot": {
+      "type": "object",
+      "required": [
+        "provider",
+        "state",
+        "summary",
+        "skill_count",
+        "tool_count",
+        "resource_count",
+        "prompt_count",
+        "updated_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "$ref": "#/definitions/SkillProviderRef" },
+        "display_name": { "type": "string" },
+        "state": { "$ref": "#/definitions/SkillProviderRuntimeState" },
+        "summary": { "type": "string" },
+        "skill_count": { "type": "integer", "minimum": 0 },
+        "tool_count": { "type": "integer", "minimum": 0 },
+        "resource_count": { "type": "integer", "minimum": 0 },
+        "prompt_count": { "type": "integer", "minimum": 0 },
+        "error": { "type": "string" },
+        "recovery_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        },
+        "updated_at": { "type": "string" }
+      }
+    }
+  },
+  "properties": {
+    "generatedAt": { "type": "string" },
+    "totalSkills": { "type": "integer", "minimum": 0 },
+    "providerCounts": {
+      "type": "object",
+      "required": ["core", "extension", "mcp_server", "user"],
+      "additionalProperties": false,
+      "properties": {
+        "core": { "type": "integer", "minimum": 0 },
+        "extension": { "type": "integer", "minimum": 0 },
+        "mcp_server": { "type": "integer", "minimum": 0 },
+        "user": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "runtimeStatusCounts": {
+      "type": "object",
+      "required": ["ready", "contract_only"],
+      "additionalProperties": false,
+      "properties": {
+        "ready": { "type": "integer", "minimum": 0 },
+        "contract_only": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "totalTools": { "type": "integer", "minimum": 0 },
+    "totalResources": { "type": "integer", "minimum": 0 },
+    "totalPrompts": { "type": "integer", "minimum": 0 },
+    "providerRuntimes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/SkillProviderRuntimeSnapshot" },
+      "default": []
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/SkillCatalogEntry" },
+      "default": []
+    }
+  }
+}

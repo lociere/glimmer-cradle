@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/MemoryKind.schema.json",
+  "title": "MemoryKind",
+  "description": "Cognition 长期记忆的语义种类。多模态是内容形态，不是记忆种类。",
+  "type": "string",
+  "enum": [
+    "episodic",
+    "semantic",
+    "social",
+    "autobiographical",
+    "prospective",
+    "procedural"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/EventOutcome.schema.json",
+  "title": "EventOutcome",
+  "description": "结构化可观测性事件结果枚举。",
+  "type": "string",
+  "enum": [
+    "started",
+    "succeeded",
+    "failed",
+    "partial",
+    "skipped",
+    "policy_denied",
+    "timeout",
+    "cancelled",
+    "queued",
+    "replayed"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/ExtensionConfig.schema.json",
+  "title": "ExtensionConfig",
+  "description": "扩展系统配置 —— 根目录、沙箱、默认权限、黑名单。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "ExtensionSandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "扩展沙箱策略",
+      "properties": {
+        "enable_isolation": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用扩展隔离"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5000,
+          "description": "扩展 onActivate / onDeactivate 超时（ms）"
+        },
+        "allow_native_modules": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否允许扩展加载 native 模块"
+        }
+      }
+    }
+  },
+  "properties": {
+    "extension_root_dir": {
+      "type": "string",
+      "default": "data/packages/extensions",
+      "description": "已安装扩展包根目录（相对应用根）；源码仓库不参与运行期发现"
+    },
+    "sandbox": {
+      "$ref": "#/definitions/ExtensionSandbox",
+      "default": {},
+      "description": "沙箱策略"
+    },
+    "default_permissions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [
+        "CHAT_SEND",
+        "CONFIG_READ_SELF", "CONFIG_WRITE_SELF", "CONFIG_READ_GLOBAL",
+        "EVENT_SUBSCRIBE"
+      ],
+      "description": "新扩展默认获得的权限列表"
+    },
+    "extension_blacklist": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "扩展黑名单（ID 列表，阻止加载）"
+    }
+  }
+}

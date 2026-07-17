@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/CharacterManifestConfig.schema.json",
+  "title": "CharacterManifestConfig",
+  "description": "角色包 manifest。它声明角色包身份、最小名称锚点、persona mode、资产目录、知识索引和迁移目录；不承载长人设或安全红线正文。",
+  "type": "object",
+  "required": ["character_id", "base", "persona_mode", "assets", "knowledge", "migrations"],
+  "additionalProperties": false,
+  "definitions": {
+    "BaseCharacter": {
+      "type": "object",
+      "required": ["name", "nickname"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "角色正式名（英文 / 拼音）"
+        },
+        "nickname": {
+          "type": "string",
+          "minLength": 1,
+          "description": "角色昵称 / 中文名"
+        }
+      }
+    },
+    "CharacterAssets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string",
+          "default": "assets",
+          "minLength": 1
+        }
+      }
+    },
+    "CharacterKnowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "type": "string",
+          "default": "knowledge/index.yaml",
+          "minLength": 1
+        }
+      }
+    },
+    "CharacterMigrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string",
+          "default": "migrations",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base": {
+      "$ref": "#/definitions/BaseCharacter"
+    },
+    "persona_mode": {
+      "type": "string",
+      "enum": ["api", "local_base", "local_finetune"],
+      "default": "api",
+      "description": "人格模式：api/local_base 由 profile.yaml 与 dialogue.yaml 提供风格和呈现策略；local_finetune 表示主要风格已烘焙进模型权重，运行时保留最小身份、安全边界与必要对话策略。"
+    },
+    "assets": {
+      "$ref": "#/definitions/CharacterAssets"
+    },
+    "knowledge": {
+      "$ref": "#/definitions/CharacterKnowledge"
+    },
+    "migrations": {
+      "$ref": "#/definitions/CharacterMigrations"
+    }
+  }
+}

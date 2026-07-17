@@ -1,0 +1,16 @@
+{
+  "$schema": "https://glimmer-cradle.local/schemas/models/ProductComposition.schema.json",
+  "schema_version": 1,
+  "id": "desktop",
+  "display_name": "Glimmer Cradle Desktop",
+  "features": {
+    "control_surface_gateway": true,
+    "local_device_actions": true,
+    "avatar": true,
+    "audio": {
+      "tts": true,
+      "asr": true
+    },
+    "extensions": true
+  }
+}

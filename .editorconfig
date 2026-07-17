@@ -1,0 +1,12 @@
+root = true
+
+# 全语言代码格式统一配置。
+# EditorConfig 的 utf-8 表示 UTF-8 无 BOM；不要使用 utf-8-bom。
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false

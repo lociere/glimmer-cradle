@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/TraceContext.schema.json",
+  "title": "TraceContext",
+  "description": "跨层诊断链路上下文。Kernel 与 Cognition 共享的轻量 trace 契约。",
+  "type": "object",
+  "required": ["trace_id"],
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "一次跨层因果关联的 trace ID。"
+    },
+    "span_id": {
+      "type": ["string", "null"],
+      "description": "当前活动 span ID；无 span 时为 null。"
+    },
+    "parent_span_id": {
+      "type": ["string", "null"],
+      "description": "远端或上层 span ID；仅跨边界续接时存在。"
+    }
+  }
+}

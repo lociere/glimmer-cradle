@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionCommandRequest.schema.json",
+  "title": "ExtensionCommandRequest",
+  "type": "object",
+  "required": ["request_id", "command_id"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "command_id": { "type": "string", "minLength": 3 },
+    "args": { "type": "array", "items": {}, "default": [] }
+  }
+}

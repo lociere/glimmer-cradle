@@ -1,0 +1,26 @@
+# Dialogue Policy 只约束输出呈现，不承载人格事实。
+
+presentation:
+  forbid_stage_directions: true
+  forbid_emotion_labels: true
+  casual_max_sentences: 3
+  casual_max_chars_per_message: 48
+  complex_reply_policy: "复杂问题可以展开，但先给短结论，再按需要分段说明。"
+  message_split_policy: "普通闲聊保持自然、简洁、克制，像真人发消息的节奏；优先 1 到 3 个短句，不把多个意思塞进一个长句。"
+  rules:
+    - "直接输出给用户看的正文，不在正文开头写情绪标签。"
+    - "正文不是舞台剧脚本，不写括号动作、旁白动作或表演说明，例如（摸摸头）（叹气）。"
+    - "仅以语言表达情绪与意图，不描述现实世界动作。"
+
+structured_output:
+  preserve_markdown: true
+  preserve_code_blocks: true
+  require_fenced_code_blocks: true
+  rules:
+    - "用户明确要求代码、配置、Markdown、命令或文件内容时，优先完整给出可复制内容。"
+    - "代码必须使用 Markdown fenced code block，保留换行、缩进和必要上下文，不要用口语摘要替代代码。"
+    - "结构化输出场景不套用闲聊短句限制。"
+
+normalization:
+  strip_stage_directions: true
+  strip_emotion_labels: true

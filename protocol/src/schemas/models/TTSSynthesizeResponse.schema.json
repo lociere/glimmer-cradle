@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/TTSSynthesizeResponse.schema.json",
+  "title": "TTSSynthesizeResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": { "type": "string", "enum": ["success", "error"] },
+    "output_path": { "type": "string" },
+    "provider_id": { "type": "string" },
+    "fallback_used": { "type": "boolean" },
+    "duration_ms": { "type": "number", "minimum": 0 },
+    "message": { "type": "string" }
+  }
+}

@@ -1,0 +1,18 @@
+# 可选语义向量增强。默认关闭；基础召回本身就是完整的最小运行形态。
+
+enabled: false
+route:
+  provider: "dashscope-text-embedding"
+providers:
+  dashscope-text-embedding:
+    endpoint: "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding"
+    model: "text-embedding-v4"
+    dimensions: 1024
+    request_timeout_ms: 15000
+    max_retries: 1
+  local-sentence-transformers:
+    model_path: "embedding/m3e-small"
+    model_id: "moka-ai/m3e-small"
+    auto_download: false
+    device: "cpu"
+    batch_size: 64

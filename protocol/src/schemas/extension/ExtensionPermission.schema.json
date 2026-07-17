@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionPermission.schema.json",
+  "title": "ExtensionPermission",
+  "description": "Extension Host 可授予扩展的权限。",
+  "type": "string",
+  "enum": [
+    "CHAT_SEND",
+    "NATIVE_AUDIO_ASR",
+    "NATIVE_AUDIO_TTS",
+    "EVIDENCE_PROPOSAL_WRITE",
+    "PERCEPTION_WRITE",
+    "CONFIG_READ_SELF",
+    "CONFIG_WRITE_SELF",
+    "CONFIG_READ_GLOBAL",
+    "EVENT_SUBSCRIBE",
+    "EVENT_PUBLISH",
+    "AGENT_REGISTER",
+    "COMMAND_REGISTER",
+    "COMMAND_EXECUTE",
+    "RUNTIME_PROJECTION_WRITE",
+    "PACKAGE_INSTALL",
+    "EXTERNAL_PROCESS",
+    "EXTERNAL_NETWORK"
+  ]
+}

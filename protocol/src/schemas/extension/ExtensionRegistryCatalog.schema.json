@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionRegistryCatalog.schema.json",
+  "title": "ExtensionRegistryCatalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "registry", "extensions"],
+  "properties": {
+    "schema": { "const": "glimmer-cradle.extension-registry" },
+    "schema_version": { "const": 1 },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "homepage"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+        "name": { "type": "string", "minLength": 1 },
+        "homepage": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ExtensionRegistryRecord" }
+    }
+  },
+  "definitions": {
+    "ExtensionRegistryRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "publisher", "ownership", "listing_status", "publisher_verification", "security_status", "repository", "channels"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+$" },
+        "publisher": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "ownership": { "enum": ["first_party", "third_party"] },
+        "listing_status": { "enum": ["approved", "pending", "blocked", "unlisted"] },
+        "publisher_verification": { "enum": ["verified", "unverified"] },
+        "security_status": { "enum": ["normal", "warning", "blocked", "withdrawn"] },
+        "repository": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "channels": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stable": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "beta": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "nightly": { "type": "string", "format": "uri", "pattern": "^https://" }
+          }
+        }
+      }
+    }
+  }
+}

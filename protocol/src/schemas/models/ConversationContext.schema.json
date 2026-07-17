@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ConversationContext.schema.json",
+  "title": "ConversationContext",
+  "description": "Kernel 已解析的规范会话上下文；Cognition 只消费此结构，不解释平台地址。",
+  "type": "object",
+  "required": ["source_provider_id", "scene_id", "conversation_id", "continuity_id", "thread_id", "interaction_id", "recall_scope", "disclosure_scope"],
+  "additionalProperties": false,
+  "properties": {
+    "source_provider_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "产生当前会话的稳定 Provider ID；用于 Kernel 路由和能力作用域，不包含外部账号或联系人标识。"
+    },
+    "scene_id": { "type": "string", "minLength": 1 },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "continuity_id": { "type": "string", "minLength": 1 },
+    "thread_id": { "type": "string", "minLength": 1, "default": "main" },
+    "interaction_id": { "type": "string", "minLength": 1 },
+    "recall_scope": {
+      "type": "string",
+      "enum": ["conversation_private", "actor_private", "space_local", "character_internal", "global_safe", "public"]
+    },
+    "disclosure_scope": {
+      "type": "string",
+      "enum": ["conversation_private", "actor_private", "space_local", "global_safe", "public"]
+    }
+  }
+}

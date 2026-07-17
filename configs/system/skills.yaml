@@ -1,0 +1,11 @@
+# Skill Plane 配置：外部 MCP Server 与用户技能入口。
+
+# MCP server 是全局外部能力来源；启用后由 Kernel 连接、枚举并投影到人物 Skill Catalog。
+# stdio / http（Streamable HTTP）/ websocket 均使用官方 MCP SDK。密钥不写在这里。
+# 可用 products: [any]、[desktop]、[personal-server]。扩展私有 MCP 由扩展自己持有，
+# 只有显式重导出的 glimmer.skill 才进入全局人物目录。
+mcp_servers: []
+
+user_skills:
+  enabled: false
+  root_dir: "skills"

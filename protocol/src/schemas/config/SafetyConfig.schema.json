@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/SafetyConfig.schema.json",
+  "title": "SafetyConfig",
+  "description": "角色安全边界配置。它是 Character Package 的红线事实源，不承载人格叙述或外部知识。",
+  "type": "object",
+  "required": ["taboos"],
+  "additionalProperties": false,
+  "properties": {
+    "taboos": {
+      "type": "string",
+      "minLength": 1,
+      "description": "自由文本形式的禁忌规则"
+    },
+    "forbidden_phrases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "严格禁止出现的短语列表"
+    },
+    "forbidden_regex": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "禁止匹配的正则表达式列表"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://glimmer-cradle.local/schemas/models/ProductComposition.schema.json",
+  "schema_version": 1,
+  "id": "personal-server",
+  "display_name": "Glimmer Cradle Personal Server",
+  "features": {
+    "control_surface_gateway": true,
+    "local_device_actions": false,
+    "avatar": false,
+    "audio": {
+      "tts": true,
+      "asr": false
+    },
+    "extensions": true
+  }
+}

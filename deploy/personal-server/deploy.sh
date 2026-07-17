@@ -1,0 +1,444 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+ENV_TEMPLATE_FILE="${GLIMMER_CRADLE_ENV_TEMPLATE_FILE:-${SCRIPT_DIR}/.env.example}"
+DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
+STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
+BACKUP_ROOT="${STATE_ROOT}/backups"
+IMAGE_REPOSITORY="glimmer-cradle/personal-server"
+BACKUP_RETENTION=5
+IMAGE_RETENTION=3
+COMMAND="${1:-install}"
+DOCKER=(docker)
+PRIVILEGED=()
+TEMP_ENV_FILES=()
+TRANSACTION_ACTIVE=0
+TRANSACTION_MODE=""
+TRANSACTION_BACKUP=""
+TRANSACTION_CANDIDATE_ENV=""
+TRANSACTION_PREVIOUS_ENV=""
+TRANSACTION_PREVIOUS_IMAGE=""
+TRANSACTION_CANDIDATE_IMAGE=""
+
+if ! docker info >/dev/null 2>&1; then
+  if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+    DOCKER=(sudo docker)
+  else
+    echo "Docker Engine 不可用。先运行 sudo ./bootstrap-host.sh，或按 Docker 官方文档安装。" >&2
+    exit 1
+  fi
+fi
+
+if (( EUID != 0 )); then
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "部署状态由容器 UID 10001 持有，当前用户需要 sudo 才能执行一致性备份和恢复。" >&2
+    exit 1
+  fi
+  PRIVILEGED=(sudo)
+fi
+
+cleanup() {
+  local env_file
+  for env_file in "${TEMP_ENV_FILES[@]}"; do
+    if [[ -n "$env_file" ]]; then
+      rm -f -- "$env_file"
+    fi
+  done
+  return 0
+}
+
+on_exit() {
+  local exit_code=$?
+  trap - EXIT INT TERM
+  if (( TRANSACTION_ACTIVE )); then
+    rollback_transaction || true
+  fi
+  cleanup
+  exit "$exit_code"
+}
+
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+prepare_environment() {
+  mkdir -p "$(dirname -- "$DEPLOYMENT_ENV_FILE")"
+  if [[ ! -f "$DEPLOYMENT_ENV_FILE" ]]; then
+    cp "$ENV_TEMPLATE_FILE" "$DEPLOYMENT_ENV_FILE"
+  fi
+  if grep -q '^GLIMMER_CRADLE_SERVER_TOKEN=GENERATE_ON_INSTALL$' "$DEPLOYMENT_ENV_FILE"; then
+    local token
+    token="$(openssl rand -hex 32)"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVER_TOKEN "$token"
+  fi
+  if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.0"
+  fi
+  if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
+  fi
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+  chmod 600 "$DEPLOYMENT_ENV_FILE"
+}
+
+prepare_state() {
+  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data" "$BACKUP_ROOT"
+  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data"
+  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT/config" "$STATE_ROOT/data"
+  chmod 700 "$STATE_ROOT" "$BACKUP_ROOT"
+}
+
+set_env_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local temporary
+  temporary="$(mktemp "${file}.XXXXXX")"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    index($0, key "=") == 1 { print key "=" value; found = 1; next }
+    { print }
+    END { if (!found) print key "=" value }
+  ' "$file" > "$temporary"
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$file"
+}
+
+read_env() {
+  local key="$1"
+  local fallback="$2"
+  local value
+  value="$(grep -E "^${key}=" "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  printf '%s' "${value:-$fallback}"
+}
+
+read_env_file() {
+  local file="$1"
+  local key="$2"
+  local fallback="$3"
+  local value
+  value="$(grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2- || true)"
+  printf '%s' "${value:-$fallback}"
+}
+
+create_compose_env() {
+  local image="$1"
+  local env_file
+  env_file="$(mktemp "${STATE_ROOT}/.compose-env.XXXXXX")"
+  cp "$DEPLOYMENT_ENV_FILE" "$env_file"
+  set_env_value "$env_file" GLIMMER_CRADLE_IMAGE "$image"
+  TEMP_ENV_FILES+=("$env_file")
+  COMPOSE_ENV_RESULT="$env_file"
+}
+
+compose_with_env() {
+  local env_file="$1"
+  shift
+  local -a compose_args=(
+    compose
+    --project-directory "$SCRIPT_DIR"
+    --env-file "$env_file"
+    --file "$SCRIPT_DIR/compose.yaml"
+  )
+  if [[ "$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
+    compose_args+=(--file "$SCRIPT_DIR/compose.source.yaml")
+  fi
+  "${DOCKER[@]}" "${compose_args[@]}" "$@"
+}
+
+prepare_candidate() {
+  local env_file="$1"
+  if [[ "$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
+    compose_with_env "$env_file" build --pull
+  else
+    compose_with_env "$env_file" pull
+  fi
+}
+
+next_candidate_image() {
+  if [[ -n "${GLIMMER_CRADLE_CANDIDATE_IMAGE:-}" ]]; then
+    printf '%s' "$GLIMMER_CRADLE_CANDIDATE_IMAGE"
+  elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
+    candidate_image
+  else
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.0"
+  fi
+}
+
+candidate_image() {
+  local version revision timestamp dirty
+  version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${REPO_ROOT}/package.json" | head -n 1)"
+  revision="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf 'source')"
+  dirty=""
+  if git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null | grep -q .; then
+    dirty="-dirty"
+  fi
+  timestamp="$(date -u +%Y%m%d%H%M%S)"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.0}" "$revision" "$dirty" "$timestamp"
+}
+
+port_in_use() {
+  local protocol="$1"
+  local port="$2"
+  if [[ "$protocol" == "tcp" ]]; then
+    [[ -n "$(ss -H -ltn "sport = :${port}")" ]]
+  else
+    [[ -n "$(ss -H -lun "sport = :${port}")" ]]
+  fi
+}
+
+preflight_ports() {
+  if compose_with_env "$DEPLOYMENT_ENV_FILE" ps --status running --services 2>/dev/null | grep -qx 'caddy'; then
+    return
+  fi
+
+  local site_address http_bind http_port https_bind https_port
+  site_address="$(read_env GLIMMER_CRADLE_SITE_ADDRESS ':80')"
+  http_bind="$(read_env GLIMMER_CRADLE_HTTP_BIND '127.0.0.1')"
+  http_port="$(read_env GLIMMER_CRADLE_HTTP_PORT '8080')"
+  https_bind="$(read_env GLIMMER_CRADLE_HTTPS_BIND '127.0.0.1')"
+  https_port="$(read_env GLIMMER_CRADLE_HTTPS_PORT '8443')"
+
+  if [[ "$site_address" == ':80' && "$http_bind" != '127.0.0.1' && "$http_bind" != '::1' ]]; then
+    echo "拒绝将无 TLS 的控制面板绑定到公网地址 ${http_bind}。请使用默认 SSH 隧道，或配置域名与 HTTPS。" >&2
+    exit 1
+  fi
+  if port_in_use tcp "$http_port"; then
+    echo "宿主机 TCP 端口 ${http_port} 已被占用；请调整 GLIMMER_CRADLE_HTTP_PORT。" >&2
+    exit 1
+  fi
+  if port_in_use tcp "$https_port" || port_in_use udp "$https_port"; then
+    echo "宿主机 TCP/UDP 端口 ${https_port} 已被占用；请调整 GLIMMER_CRADLE_HTTPS_PORT。" >&2
+    exit 1
+  fi
+}
+
+wait_until_ready() {
+  local env_file="$1"
+  local deadline=$((SECONDS + 240))
+  while (( SECONDS < deadline )); do
+    if compose_with_env "$env_file" exec -T personal-server node -e \
+      "fetch('http://127.0.0.1:3210/readyz',{headers:{authorization:'Bearer '+process.env.GLIMMER_CRADLE_SERVER_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+      >/dev/null 2>&1; then
+      echo "Glimmer Cradle Personal Server 已就绪。"
+      return 0
+    fi
+    sleep 3
+  done
+  compose_with_env "$env_file" ps || true
+  compose_with_env "$env_file" logs --tail=120 personal-server || true
+  echo "等待服务就绪超时。" >&2
+  return 1
+}
+
+create_backup() {
+  local timestamp backup_dir
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  backup_dir="${BACKUP_ROOT}/${timestamp}"
+  mkdir -p "$backup_dir"
+  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/config.tar.gz" config
+  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/data.tar.gz" data
+  "${PRIVILEGED[@]}" chown -R "$(id -u):$(id -g)" "$backup_dir"
+  (
+    cd "$backup_dir"
+    sha256sum config.tar.gz data.tar.gz > SHA256SUMS
+  )
+  cat > "$backup_dir/deployment.env" <<EOF
+created_at=${timestamp}
+previous_image=${TRANSACTION_PREVIOUS_IMAGE}
+candidate_image=${TRANSACTION_CANDIDATE_IMAGE}
+status=pending
+EOF
+  printf '%s' "$backup_dir"
+}
+
+mark_backup() {
+  local backup_dir="$1"
+  local status="$2"
+  [[ -n "$backup_dir" && -f "$backup_dir/deployment.env" ]] || return 0
+  set_env_value "$backup_dir/deployment.env" status "$status"
+}
+
+assert_archive_root() {
+  local archive="$1"
+  local expected_root="$2"
+  local entry
+  while IFS= read -r entry; do
+    case "$entry" in
+      "$expected_root"|"$expected_root"/*) ;;
+      *) echo "备份包含越界路径: ${entry}" >&2; return 1 ;;
+    esac
+    [[ "$entry" != *'/../'* && "$entry" != '../'* ]] || return 1
+  done < <(tar -tzf "$archive")
+}
+
+restore_backup() {
+  local backup_dir="$1"
+  (
+    cd "$backup_dir"
+    sha256sum -c SHA256SUMS
+  )
+  assert_archive_root "$backup_dir/config.tar.gz" config
+  assert_archive_root "$backup_dir/data.tar.gz" data
+  "${PRIVILEGED[@]}" rm -rf -- "$STATE_ROOT/config" "$STATE_ROOT/data"
+  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/config.tar.gz"
+  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/data.tar.gz"
+  prepare_state
+}
+
+rollback_transaction() {
+  TRANSACTION_ACTIVE=0
+  echo "候选版本未通过就绪门，正在回滚。" >&2
+  if [[ -n "$TRANSACTION_CANDIDATE_ENV" ]]; then
+    compose_with_env "$TRANSACTION_CANDIDATE_ENV" down --remove-orphans || true
+  fi
+  if [[ -n "$TRANSACTION_BACKUP" ]]; then
+    restore_backup "$TRANSACTION_BACKUP"
+    mark_backup "$TRANSACTION_BACKUP" rollback-restored
+  fi
+  if [[ -n "$TRANSACTION_PREVIOUS_IMAGE" && -n "$TRANSACTION_PREVIOUS_ENV" ]]; then
+    compose_with_env "$TRANSACTION_PREVIOUS_ENV" up --detach --remove-orphans
+    if wait_until_ready "$TRANSACTION_PREVIOUS_ENV"; then
+      set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$TRANSACTION_PREVIOUS_IMAGE"
+      echo "已恢复上一版本 ${TRANSACTION_PREVIOUS_IMAGE}。" >&2
+    else
+      echo "上一版本也未能恢复就绪，请保留 ${TRANSACTION_BACKUP} 并检查日志。" >&2
+      return 1
+    fi
+  fi
+}
+
+current_container_image() {
+  local container_id
+  container_id="$(compose_with_env "$DEPLOYMENT_ENV_FILE" ps --all -q personal-server 2>/dev/null | head -n 1)"
+  if [[ -n "$container_id" ]]; then
+    "${DOCKER[@]}" inspect --format '{{.Config.Image}}' "$container_id"
+  fi
+}
+
+install_release() {
+  local existing candidate
+  existing="$(current_container_image)"
+  if [[ -n "$existing" ]]; then
+    echo "检测到现有安装，正在确保当前版本已启动并就绪。"
+    compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+    wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    print_access
+    return 0
+  fi
+  candidate="$(next_candidate_image)"
+  create_compose_env "$candidate"
+  TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
+  TRANSACTION_CANDIDATE_IMAGE="$candidate"
+  prepare_candidate "$TRANSACTION_CANDIDATE_ENV"
+  TRANSACTION_MODE=install
+  TRANSACTION_ACTIVE=1
+  compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
+  wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$candidate"
+  TRANSACTION_ACTIVE=0
+  cleanup_history "$candidate" ""
+  print_access
+}
+
+update_release() {
+  local previous candidate
+  previous="$(current_container_image)"
+  if [[ -z "$previous" ]]; then
+    echo "未检测到现有容器，将按首次安装处理。"
+    install_release
+    return
+  fi
+  candidate="$(next_candidate_image)"
+  create_compose_env "$previous"
+  TRANSACTION_PREVIOUS_ENV="$COMPOSE_ENV_RESULT"
+  create_compose_env "$candidate"
+  TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
+  TRANSACTION_PREVIOUS_IMAGE="$previous"
+  TRANSACTION_CANDIDATE_IMAGE="$candidate"
+
+  # Build while the current release is still serving traffic. State is untouched until this succeeds.
+  prepare_candidate "$TRANSACTION_CANDIDATE_ENV"
+  TRANSACTION_MODE=update
+  TRANSACTION_ACTIVE=1
+  compose_with_env "$TRANSACTION_PREVIOUS_ENV" down --remove-orphans
+  TRANSACTION_BACKUP="$(create_backup)"
+  compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
+  wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$candidate"
+  mark_backup "$TRANSACTION_BACKUP" succeeded
+  TRANSACTION_ACTIVE=0
+  cleanup_history "$candidate" "$previous"
+  print_access
+}
+
+cleanup_history() {
+  local current_image="$1"
+  local previous_image="$2"
+  local -a backups images
+  local index candidate
+  mapfile -t backups < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
+  for (( index=BACKUP_RETENTION; index<${#backups[@]}; index++ )); do
+    [[ "${backups[$index]}" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || continue
+    rm -rf -- "$BACKUP_ROOT/${backups[$index]}"
+  done
+
+  mapfile -t images < <("${DOCKER[@]}" image ls "$IMAGE_REPOSITORY" --format '{{.Repository}}:{{.Tag}}' | awk '!seen[$0]++')
+  local kept=0
+  for candidate in "${images[@]}"; do
+    if [[ "$candidate" == "$current_image" || "$candidate" == "$previous_image" || $kept -lt $IMAGE_RETENTION ]]; then
+      ((kept += 1))
+      continue
+    fi
+    "${DOCKER[@]}" image rm "$candidate" >/dev/null 2>&1 || true
+  done
+}
+
+print_access() {
+  local address http_bind http_port
+  address="$(read_env GLIMMER_CRADLE_SITE_ADDRESS ':80')"
+  http_bind="$(read_env GLIMMER_CRADLE_HTTP_BIND '127.0.0.1')"
+  http_port="$(read_env GLIMMER_CRADLE_HTTP_PORT '8080')"
+  if [[ "$address" == ':80' ]]; then
+    echo "控制面板仅监听 ${http_bind}:${http_port}。"
+    echo "从本机建立隧道: ssh -N -L ${http_port}:127.0.0.1:${http_port} <用户>@<服务器>"
+    echo "随后访问: http://127.0.0.1:${http_port}/"
+  else
+    echo "访问地址: https://${address}/"
+  fi
+  echo "访问 token 保存在 ${DEPLOYMENT_ENV_FILE}。"
+}
+
+prepare_environment
+prepare_state
+
+case "$COMMAND" in
+  install)
+    preflight_ports
+    install_release
+    ;;
+  update)
+    preflight_ports
+    update_release
+    ;;
+  restart)
+    compose_with_env "$DEPLOYMENT_ENV_FILE" restart
+    wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    ;;
+  stop)
+    compose_with_env "$DEPLOYMENT_ENV_FILE" down
+    ;;
+  status)
+    compose_with_env "$DEPLOYMENT_ENV_FILE" ps
+    ;;
+  logs)
+    compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
+    ;;
+  *)
+    echo "用法: ./deploy.sh [install|update|restart|stop|status|logs]" >&2
+    exit 2
+    ;;
+esac

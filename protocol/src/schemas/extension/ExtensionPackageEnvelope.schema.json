@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionPackageEnvelope.schema.json",
+  "title": "ExtensionPackageEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "format_version", "media_type", "payload_root", "extension_manifest", "integrity_manifest", "sbom"],
+  "properties": {
+    "schema": { "const": "glimmer-cradle.extension-package" },
+    "format_version": { "const": 1 },
+    "media_type": { "const": "application/vnd.glimmer-cradle.extension+zip" },
+    "payload_root": { "const": "extension/" },
+    "extension_manifest": { "const": "extension/extension-manifest.yaml" },
+    "integrity_manifest": { "const": "META-INF/checksums.json" },
+    "sbom": { "const": "META-INF/sbom.spdx.json" }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/LifecycleConfig.schema.json",
+  "title": "LifecycleConfig",
+  "description": "模块生命周期管理配置 —— 启停顺序与超时。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "start_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 30000,
+      "description": "模块启动总超时（ms）"
+    },
+    "stop_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 30000,
+      "description": "模块停止总超时（ms）"
+    },
+    "module_start_order": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["config", "persistence", "ipc", "cognition", "extensions", "life_clock"],
+      "description": "模块启动顺序（按数组顺序依次启动）"
+    },
+    "module_stop_order": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["life_clock", "extensions", "cognition", "ipc", "persistence", "config"],
+      "description": "模块停止顺序（按数组顺序依次停止）"
+    }
+  }
+}

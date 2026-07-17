@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/ModelInvocationCaptureMode.schema.json",
+  "title": "ModelInvocationCaptureMode",
+  "description": "模型调用观测采集模式。off 不记录，summary 仅摘要，full 显式保留完整 capture。",
+  "type": "string",
+  "enum": ["off", "summary", "full"]
+}

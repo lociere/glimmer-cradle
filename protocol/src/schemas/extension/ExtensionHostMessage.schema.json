@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionHostMessage.schema.json",
+  "title": "ExtensionHostMessage",
+  "description": "Kernel Extension Host 与隔离 Worker 之间的 RPC 消息。",
+  "oneOf": [
+    { "$ref": "#/definitions/ExtensionHostRequest" },
+    { "$ref": "#/definitions/ExtensionWorkerRequest" },
+    { "$ref": "#/definitions/ExtensionRpcResponse" },
+    { "$ref": "#/definitions/ExtensionWorkerReady" }
+  ],
+  "definitions": {
+    "ExtensionHostMethod": {
+      "type": "string",
+      "enum": [
+        "log",
+        "storage.get",
+        "storage.set",
+        "storage.delete",
+        "evidence.submit",
+        "perception.inject",
+        "attention.acquire",
+        "attention.focused",
+        "attention.policies",
+        "events.subscribe",
+        "events.emit",
+        "agents.register",
+        "commands.register",
+        "commands.execute",
+        "commands.list",
+        "runtime.capabilities",
+        "runtime.diagnostics",
+        "registration.dispose"
+      ]
+    },
+    "ExtensionWorkerMethod": {
+      "type": "string",
+      "enum": ["activate", "deactivate", "handler.invoke"]
+    },
+    "ExtensionHostRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "request_id", "method"],
+      "properties": {
+        "channel": { "const": "extension-host-request" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "method": { "$ref": "#/definitions/ExtensionHostMethod" },
+        "payload": true
+      }
+    },
+    "ExtensionWorkerRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "request_id", "method"],
+      "properties": {
+        "channel": { "const": "extension-worker-request" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "method": { "$ref": "#/definitions/ExtensionWorkerMethod" },
+        "payload": true
+      }
+    },
+    "ExtensionRpcResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "request_id", "ok"],
+      "properties": {
+        "channel": { "const": "extension-rpc-response" },
+        "request_id": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean" },
+        "result": true,
+        "error": { "type": "string" }
+      }
+    },
+    "ExtensionWorkerReady": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "pid"],
+      "properties": {
+        "channel": { "const": "extension-worker-ready" },
+        "pid": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

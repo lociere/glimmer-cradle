@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/CognitiveActivitySnapshot.schema.json",
+  "title": "CognitiveActivitySnapshot",
+  "description": "认知活动实时快照，嵌入 state_sync payload 跨进程透传。结构与 CognitiveActivityState、CognitiveActivityPolicy 对齐；因代码生成器不解析跨文件 $ref 而在此内联。",
+  "type": "object",
+  "required": ["state", "since_at", "idle_seconds", "policy"],
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "type": "string",
+      "enum": ["quiescent", "ambient", "engaged"],
+      "description": "当前认知活动态（与 CognitiveActivityState 枚举对齐）"
+    },
+    "since_at": {
+      "type": "string",
+      "description": "当前态进入时间（UTC 毫秒 ISO8601）"
+    },
+    "idle_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "当前 idle 时长（自最近一次 perception/reply Moment 起的秒数）"
+    },
+    "policy": {
+      "type": "object",
+      "description": "当前态对应的认知资源策略（与 CognitiveActivityPolicy 等价）",
+      "required": ["frequency_hint_ms", "allows_proactive", "model_tier", "context_budget_factor"],
+      "additionalProperties": false,
+      "properties": {
+        "frequency_hint_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "allows_proactive": {
+          "type": "boolean"
+        },
+        "model_tier": {
+          "type": "string",
+          "enum": ["none", "local_only", "cloud_allowed"]
+        },
+        "context_budget_factor": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+# Kernel 进程编排、IPC 与入站治理。
+
+ipc:
+  bind_address: "tcp://127.0.0.1:*"
+  request_timeout_ms: 30000
+  retry_count: 2
+  retry_interval_ms: 2000
+  heartbeat_interval_ms: 5000
+
+lifecycle:
+  start_timeout_ms: 30000
+  stop_timeout_ms: 30000
+  module_start_order:
+    - config
+    - persistence
+    - ipc
+    - cognition
+    - extensions
+    - life_clock
+  module_stop_order:
+    - life_clock
+    - extensions
+    - cognition
+    - ipc
+    - persistence
+    - config
+
+ingress:
+  rate_limit_per_source: 30
+  rate_limit_window_ms: 60000
+  max_concurrent_requests: 10
+  circuit_breaker_threshold: 5
+  circuit_breaker_recovery_ms: 30000

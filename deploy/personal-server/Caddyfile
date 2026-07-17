@@ -1,0 +1,12 @@
+{
+	admin off
+}
+
+{$GLIMMER_CRADLE_SITE_ADDRESS::80} {
+	encode zstd gzip
+	reverse_proxy personal-server:3210
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,5 @@
+services:
+  personal-server:
+    build:
+      context: ../..
+      dockerfile: deploy/personal-server/Dockerfile

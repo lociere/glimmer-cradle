@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/WorkspaceItem.schema.json",
+  "title": "WorkspaceItem",
+  "description": "全局工作区候选项，由认知 Provider 投放并按 salience 竞争进入本拍广播。",
+  "type": "object",
+  "required": ["item_id", "source", "content", "salience", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "description": "工作区项唯一 ID（UUIDv4 hex，无连字符）"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["perception", "affect", "memory", "drive", "social"],
+      "description": "投放此项的专家模块（与 Cognition workspace provider 五件套对齐）"
+    },
+    "content": {
+      "type": "object",
+      "description": "意义内容（按 source 解释，自由形态）"
+    },
+    "salience": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "显著度 [0,1] —— 工作区竞争的排序依据，高者胜出"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "投放时刻（UTC 毫秒 ISO8601）"
+    },
+    "decay_at": {
+      "type": "string",
+      "description": "衰减失效时刻（UTC 毫秒 ISO8601）；缺省表示由工作区按容量策略淘汰"
+    }
+  }
+}

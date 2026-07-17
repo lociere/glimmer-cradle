@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Glimmer Cradle Live2D Emotion Map",
+  "description": "单个形象模型的情绪到 expression / motion / mouth-param 映射。实际路径由模型注册表声明。",
+  "type": "object",
+  "required": ["model", "expressions", "motions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "model": {
+      "type": "string",
+      "description": "稳定模型标识，必须与模型注册表条目一致，不要求等于目录名。"
+    },
+    "expressions": {
+      "type": "object",
+      "description": "Emotion type → expression id. Use null for 'no expression change'.",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "motions": {
+      "type": "object",
+      "description": "Emotion type → motion group id. Empty / unknown emotion falls back to 'idle'.",
+      "additionalProperties": { "type": "string" }
+    },
+    "mouth": {
+      "type": "object",
+      "description": "Optional mouth-open parameter for lip sync.",
+      "additionalProperties": false,
+      "properties": {
+        "param_id": {
+          "type": "string",
+          "description": "Cubism parameter id, e.g. ParamMouthOpenY."
+        },
+        "intensity_scale": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Multiplier applied when driving mouth open from emotion intensity (0 disables emotion-driven mouth)."
+        }
+      }
+    }
+  }
+}

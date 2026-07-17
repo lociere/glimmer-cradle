@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ObservabilityEvent.schema.json",
+  "title": "ObservabilityEvent",
+  "description": "Glimmer Local Observability Plane 统一结构化事件模型。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp",
+    "level",
+    "event_type",
+    "owner",
+    "module",
+    "runtime_id",
+    "trace_id",
+    "schema_version"
+  ],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "level": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"]
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$"
+    },
+    "event_action": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "event_outcome": {
+      "type": ["string", "null"],
+      "enum": [
+        "started",
+        "succeeded",
+        "failed",
+        "partial",
+        "skipped",
+        "policy_denied",
+        "timeout",
+        "cancelled",
+        "queued",
+        "replayed",
+        null
+      ],
+      "default": null
+    },
+    "event_reason": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "owner": { "type": "string" },
+    "module": { "type": "string" },
+    "runtime_id": { "type": "string" },
+    "phase": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "trace_id": { "type": "string" },
+    "span_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "parent_span_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "scene_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "extension_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "provider_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "skill_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "tool_name": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "process_id": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "error_code": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "error_kind": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "diagnostic_hint": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "artifact_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "details_ref": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "duration_ms": {
+      "type": ["number", "null"],
+      "default": null,
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "attributes": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": true
+    }
+  }
+}

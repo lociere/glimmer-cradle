@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/ObservabilityConfig.schema.json",
+  "title": "ObservabilityConfig",
+  "description": "可观测性配置：日志格式、级别、轮转与模型调用观测采集策略。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "LogRotationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "日志轮转参数，供 logger.ts / logger.py 共享。",
+      "properties": {
+        "main_size_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "主日志单文件大小上限（MB）。"
+        },
+        "main_keep": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "主日志保留文件数。"
+        },
+        "error_size_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "错误日志单文件大小上限（MB）。"
+        },
+        "error_keep": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "错误日志保留文件数。"
+        }
+      }
+    },
+    "ModelInvocationCaptureConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "模型调用观测配置；summary 为默认模式，full 需显式打开。",
+      "properties": {
+        "capture_mode": {
+          "type": "string",
+          "enum": ["off", "summary", "full"],
+          "default": "summary",
+          "description": "采集模式：off 不记录；summary 仅摘要；full 落完整 capture。"
+        },
+        "full_retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "full 模式 capture 的建议保留天数。"
+        },
+        "redact_secrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否在记录与 capture 中脱敏 API key、Bearer token 等敏感值。"
+        }
+      }
+    },
+    "ObservabilityRetentionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "events_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 14
+        },
+        "traces_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 14
+        },
+        "metrics_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 14
+        },
+        "audit_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "model_invocation_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 14
+        },
+        "application_log_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 7
+        },
+        "dlq_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "bundles_days": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 7
+        }
+      }
+    },
+    "ObservabilityIndexConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["sqlite", "jsonl_scan"],
+          "default": "sqlite"
+        },
+        "db_path": {
+          "type": "string",
+          "default": "observability/index/observability.db"
+        }
+      }
+    },
+    "ObservabilityBundleConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "export_dir": {
+          "type": "string",
+          "default": "observability/bundles"
+        },
+        "process_tail_bytes": {
+          "type": "integer",
+          "minimum": 512,
+          "default": 8192
+        },
+        "include_model_invocation_captures": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "properties": {
+    "console_format": {
+      "type": "string",
+      "enum": ["pretty", "json"],
+      "default": "pretty",
+      "description": "控制台输出格式：pretty 供开发阅读；json 供机器解析。"
+    },
+    "file_format": {
+      "type": "string",
+      "enum": ["json"],
+      "default": "json",
+      "description": "文件输出格式，固定为 json。"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"],
+      "default": "info",
+      "description": "全局默认日志级别。"
+    },
+    "module_levels": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["debug", "info", "warn", "error"]
+          }
+        },
+        { "type": "null" }
+      ],
+      "default": {},
+      "description": "按模块覆盖日志级别。"
+    },
+    "rotation": {
+      "$ref": "#/definitions/LogRotationConfig",
+      "default": {}
+    },
+    "model_invocations": {
+      "$ref": "#/definitions/ModelInvocationCaptureConfig",
+      "default": {}
+    },
+    "retention": {
+      "$ref": "#/definitions/ObservabilityRetentionConfig",
+      "default": {}
+    },
+    "index": {
+      "$ref": "#/definitions/ObservabilityIndexConfig",
+      "default": {}
+    },
+    "bundles": {
+      "$ref": "#/definitions/ObservabilityBundleConfig",
+      "default": {}
+    }
+  }
+}

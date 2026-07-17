@@ -1,0 +1,13 @@
+{
+  "name": "GlimmerCradle.Avatar.Editor",
+  "rootNamespace": "GlimmerCradle.Avatar.Editor",
+  "references": [
+    "GlimmerCradle.Avatar.Host",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

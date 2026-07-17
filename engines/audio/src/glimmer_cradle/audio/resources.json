@@ -1,0 +1,18 @@
+{
+  "defaults": {
+    "asr": "funasr.sensevoice-small"
+  },
+  "providerDefaults": {
+    "funasr": "funasr.sensevoice-small"
+  },
+  "resources": [
+    {
+      "id": "funasr.sensevoice-small",
+      "lane": "asr",
+      "provider": "funasr",
+      "modelRepository": "iic/SenseVoiceSmall",
+      "aliases": ["sensevoice", "sensevoice-small"],
+      "cacheDirectory": "asr/funasr"
+    }
+  ]
+}

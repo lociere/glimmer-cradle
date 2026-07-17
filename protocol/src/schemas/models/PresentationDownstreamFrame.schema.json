@@ -1,0 +1,706 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/PresentationDownstreamFrame.schema.json",
+  "title": "PresentationDownstreamFrame",
+  "description": "Presentation Plane 下行帧契约(kernel → client)。Desktop Surface 消费对话与状态投影，Unity Avatar Host 消费稳定 Avatar 语义；两者不共享实现对象。",
+  "type": "object",
+  "required": ["kind", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "reply",
+        "emotion",
+        "thought",
+        "audio_play",
+        "audio_transcript",
+        "expression",
+        "motion",
+        "lip_sync",
+        "parameter",
+        "avatar_intent",
+        "avatar_action_state",
+        "presentation",
+        "character_presentation_projection",
+        "idle",
+        "avatar_status",
+        "runtime_readiness",
+        "audio_status",
+        "extension_install_preview",
+        "extension_install_result",
+      "extension_uninstall_result",
+      "extension_lifecycle_result",
+      "extension_command_result",
+      "extension_runtime_projection_result",
+      "extension_runtime_projection_changed",
+      "extension_status_changed",
+        "shutdown",
+        "load_scene",
+        "unload_scene",
+        "ping"
+      ],
+      "description": "帧类型(discriminator)。reply/emotion/thought 属于表达流；expression/motion/lip_sync/parameter/idle 属于 Avatar 控制；其余为 Presentation 状态与生命周期消息。"
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "全链路追踪 ID，关联触发此帧的 perception、drive 或 cognitive activity；渲染边界必须保持原值。"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix 毫秒时间戳"
+    },
+    "reply": {
+      "$ref": "#/definitions/ReplyPayload",
+      "description": "kind=reply 时存在"
+    },
+    "emotion": {
+      "$ref": "#/definitions/EmotionPayload",
+      "description": "kind=emotion 时存在 —— 蓝图 §6.5 emotion 帧(独立于 reply,emotion_system 变化时可单独推送)"
+    },
+    "thought": {
+      "$ref": "#/definitions/ThoughtPayload",
+      "description": "kind=thought 时存在 —— 蓝图 §6.5 thought 帧(Deliberate 期间推'思考中…'动效)"
+    },
+    "audio_play": {
+      "$ref": "#/definitions/AudioPlayPayload",
+      "description": "kind=audio_play 时存在"
+    },
+    "audio_transcript": {
+      "$ref": "#/definitions/AudioTranscriptPayload",
+      "description": "kind=audio_transcript 时存在。Kernel 对 audio_input 的 ASR 结果回执，供 Control Center 展示用户语音文本。"
+    },
+    "expression": {
+      "$ref": "#/definitions/AvatarExpressionPayload",
+      "description": "kind=expression 时存在；Avatar Host 将稳定语义 ID 映射到模型资源。"
+    },
+    "motion": {
+      "$ref": "#/definitions/AvatarMotionPayload",
+      "description": "kind=motion 时存在"
+    },
+    "lip_sync": {
+      "$ref": "#/definitions/AvatarLipSyncPayload",
+      "description": "kind=lip_sync 时存在"
+    },
+    "parameter": {
+      "$ref": "#/definitions/AvatarParameterPayload",
+      "description": "kind=parameter 时存在"
+    },
+    "avatar_intent": {
+      "$ref": "#/definitions/AvatarIntentPayload",
+      "description": "kind=avatar_intent 时存在。稳定动作语义由 Avatar 本地 catalog 解析。"
+    },
+    "avatar_action_state": {
+      "$ref": "#/definitions/AvatarActionStatePayload",
+      "description": "kind=avatar_action_state 时存在。Kernel 向管理界面投影 Avatar 的权威动作状态。"
+    },
+    "presentation": {
+      "$ref": "#/definitions/AvatarPresentationPayload",
+      "description": "kind=presentation 时存在。只控制身体的桌面呈现，不改变模型资产、人格或动作状态。"
+    },
+    "character_presentation_projection": {
+      "$ref": "#/definitions/CharacterPresentationProjectionPayload",
+      "description": "kind=character_presentation_projection 时存在。Kernel 向 Desktop、Presence 与 Avatar Host 广播统一呈现投影。"
+    },
+    "avatar_status": {
+      "$ref": "#/definitions/AvatarStatusPayload",
+      "description": "kind=avatar_status 时存在"
+    },
+    "runtime_readiness": {
+      "$ref": "#/definitions/PresentationRuntimeReadinessCatalogPayload",
+      "description": "kind=runtime_readiness 时存在。Kernel 向 Desktop 广播统一 runtime/reconciler readiness 快照。"
+    },
+    "audio_status": {
+      "$ref": "#/definitions/AudioStatusPayload",
+      "description": "kind=audio_status 时存在。Control Center 用它展示 ASR/TTS 是否可用，不直接探测 Kernel 内部服务。"
+    },
+    "extension_install_preview": {
+      "$ref": "src/schemas/models/ExtensionInstallPreview.schema.json"
+    },
+    "extension_install_result": {
+      "$ref": "src/schemas/models/ExtensionInstallResult.schema.json"
+    },
+    "extension_uninstall_result": {
+      "$ref": "src/schemas/models/ExtensionUninstallResult.schema.json"
+    },
+    "extension_lifecycle_result": {
+      "$ref": "src/schemas/models/ExtensionLifecycleResult.schema.json"
+    },
+    "extension_command_result": {
+      "$ref": "src/schemas/models/ExtensionCommandResult.schema.json"
+    },
+    "extension_runtime_projection_result": {
+      "$ref": "src/schemas/models/ExtensionRuntimeProjectionResult.schema.json"
+    },
+    "extension_runtime_projection_changed": {
+      "$ref": "src/schemas/models/ExtensionRuntimeProjection.schema.json"
+    },
+    "extension_status_changed": {
+      "$ref": "src/schemas/models/ExtensionStatusChanged.schema.json"
+    },
+    "load_scene": {
+      "$ref": "#/definitions/LoadScenePayload",
+      "description": "kind=load_scene 时存在。"
+    },
+    "unload_scene": {
+      "$ref": "#/definitions/UnloadScenePayload",
+      "description": "kind=unload_scene 时存在"
+    }
+  },
+  "definitions": {
+    "ReplyPayload": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "回复完整文本。用于记忆、日志和不支持多消息的 shell 兜底。"
+        },
+        "messages": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PresentationReplyMessage" },
+          "description": "回复投递消息列表。同一次 reply 可以拆成多条自然消息显示或发送。缺省时 shell 可按 text 作为单条消息处理。"
+        },
+        "emotion_snapshot": {
+          "$ref": "#/definitions/EmotionPayload",
+          "description": "回复时的情绪快照（可选，ChannelReplyPayload.emotion_state 的结构化版）。emotion 帧已独立时通常不必带。"
+        }
+      }
+    },
+    "PresentationReplyMessage": {
+      "type": "object",
+      "required": ["sequence", "content_type", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "同一次回复内的投递顺序，从 0 开始。"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["text", "code"],
+          "description": "消息内容类型。普通对话为 text；完整代码块可为 code。"
+        },
+        "text": {
+          "type": "string",
+          "description": "该条投递消息的正文。"
+        },
+        "language": {
+          "type": ["string", "null"],
+          "description": "content_type=code 时的语言标识。"
+        }
+      }
+    },
+    "EmotionPayload": {
+      "type": "object",
+      "required": ["emotion_type", "intensity"],
+      "additionalProperties": false,
+      "properties": {
+        "emotion_type": {
+          "type": "string",
+          "description": "情绪语义 ID（happy / sad / angry / shy / thinking / calm / ...）。语义层跨 Avatar Host 一致，具体表情、动作和参数映射由 Avatar Package 的 emotion map 决定。"
+        },
+        "intensity": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "强度 0-1"
+        },
+        "trigger": {
+          "type": "string",
+          "description": "触发原因(perception / drive / cognitive_activity / reflection / ...,观测用)"
+        },
+        "blend_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "表情过渡时间（毫秒，可选；Avatar Host 使用内部默认值）"
+        }
+      }
+    },
+    "ThoughtPayload": {
+      "type": "object",
+      "required": ["active"],
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "true=当前角色正在思考(显示动效);false=思考结束(隐藏动效)"
+        },
+        "hint": {
+          "type": "string",
+          "description": "可选思考提示(如'回忆中…'),shell 决定是否展示"
+        }
+      }
+    },
+    "AudioPlayPayload": {
+      "type": "object",
+      "required": ["audio_id"],
+      "additionalProperties": false,
+      "properties": {
+        "audio_id": {
+          "type": "string",
+          "description": "音频唯一 ID(供观测 / 去重 / 取消)"
+        },
+        "audio_uri": {
+          "type": "string",
+          "description": "音频 URI(file:// 或 http(s)://),shell 自行 fetch。优先于 audio_data。"
+        },
+        "audio_data": {
+          "type": "string",
+          "description": "Base64 内联音频数据,仅 URI 不可用时用"
+        },
+        "mime_type": {
+          "type": "string",
+          "description": "MIME 类型(默认 audio/wav)"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "时长(毫秒,可选;shell 可据此调整动画)"
+        }
+      }
+    },
+    "AudioTranscriptPayload": {
+      "type": "object",
+      "required": ["audio_id", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "audio_id": {
+          "type": "string",
+          "description": "对应 audio_input.audio_id。"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error"],
+          "description": "ASR 结果状态。"
+        },
+        "text": {
+          "type": "string",
+          "description": "识别成功后的文本。"
+        },
+        "message": {
+          "type": "string",
+          "description": "识别失败或诊断说明。"
+        }
+      }
+    },
+    "AvatarExpressionPayload": {
+      "type": "object",
+      "required": ["expression_id"],
+      "additionalProperties": false,
+      "properties": {
+        "expression_id": {
+          "type": "string",
+          "description": "表情抽象 ID（happy / sad / ...）。Avatar Host 映射到具体资源（Live2D .exp3.json、Unity BlendShape、3D Animator 等）。"
+        },
+        "blend_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "过渡时间(毫秒)"
+        },
+        "auto_reset": {
+          "type": "boolean",
+          "description": "表情结束后是否自动回到中性"
+        }
+      }
+    },
+    "AvatarMotionPayload": {
+      "type": "object",
+      "required": ["motion_id"],
+      "additionalProperties": false,
+      "properties": {
+        "motion_id": {
+          "type": "string",
+          "description": "动作抽象 ID。支持命名空间(如 'cafe.sit_down',8.7+ 场景特定动作)。shell 按命名空间从注册的动作集中查找。"
+        },
+        "loop": {
+          "type": "boolean",
+          "description": "是否循环"
+        },
+        "priority": {
+          "type": "integer",
+          "description": "优先级(数字越大越优先;同优先级新覆盖旧)"
+        }
+      }
+    },
+    "AvatarLipSyncPayload": {
+      "type": "object",
+      "required": ["amplitude"],
+      "additionalProperties": false,
+      "properties": {
+        "amplitude": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "嘴部开合幅度 0-1"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["audio", "manual"],
+          "description": "驱动源(audio=随音频包络,manual=直接指定值)"
+        }
+      }
+    },
+    "AvatarParameterPayload": {
+      "type": "object",
+      "required": ["param_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "param_id": {
+          "type": "string",
+          "description": "参数抽象 ID（blush_level / eye_openness / ...）。Avatar Host 映射到 Cubism parameter、shader property 或 3D blend shape。"
+        },
+        "value": {
+          "type": "number",
+          "description": "参数值；有效范围由 Avatar Host 的模型 driver 约束"
+        },
+        "fade_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "渐变时间(毫秒)"
+        }
+      }
+    },
+    "AvatarIntentPayload": {
+      "type": "object",
+      "required": ["action_id", "operation", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "稳定身体动作语义 ID。Shell 在模型 catalog 内解析其 expression、motion 或参数组合。"
+        },
+        "operation": {
+          "type": "string",
+          "enum": ["trigger", "activate", "deactivate"],
+          "description": "动作目标操作。保持动作不使用隐式翻转，避免重试和跨进程重复投递改变最终状态。"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["user", "cognition", "system", "extension"],
+          "description": "意图发起者。只影响行为导演的优先级与审计，不携带模型实现细节。"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "可选优先级提示。行为导演根据来源与当前直接操控状态裁决最终效果。"
+        }
+      }
+    },
+    "AvatarActionStatePayload": {
+      "type": "object",
+      "required": ["active_action_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "action_id": { "type": "string", "description": "引发本次变化的动作 ID。" },
+        "state": {
+          "type": "string",
+          "enum": ["inactive", "active", "running", "completed", "rejected"],
+          "description": "动作调度结果。"
+        },
+        "active_action_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Shell 当前全部已激活保持动作的权威快照。"
+        },
+        "message": { "type": "string", "description": "拒绝原因或补充说明。" }
+      }
+    },
+    "AvatarPresentationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "placement_id": {
+          "type": "string",
+          "description": "模型 catalog 声明的桌面驻留预设 ID，例如 bust / three-quarter / full-body；不得改变相机或模型比例。"
+        },
+        "display_scale": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2.5,
+          "description": "完整身体透明表面的绝对显示倍率；Shell 通过表面尺寸实现，不在固定相机中放大模型。"
+        },
+        "reset_placement": {
+          "type": "boolean",
+          "description": "为 true 时清除用户拖动位置，并按 placement_id 重新停靠到当前工作区。"
+        }
+      }
+    },
+    "CharacterPresentationProjectionPayload": {
+      "type": "object",
+      "required": ["avatar_package_id", "model_id", "display_name", "kind", "backend", "host_kind", "avatar_state", "appearance", "lifecycle"],
+      "additionalProperties": false,
+      "properties": {
+        "avatar_package_id": {
+          "type": "string"
+        },
+        "model_id": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["live2d"]
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["unity"]
+        },
+        "host_kind": {
+          "type": "string",
+          "enum": ["unity", "offline"]
+        },
+        "avatar_state": {
+          "type": "string",
+          "enum": ["pending", "starting", "ready", "degraded", "stopped"]
+        },
+        "appearance": {
+          "type": "object",
+          "required": ["display_scale"],
+          "additionalProperties": false,
+          "properties": {
+            "placement_id": {
+              "type": "string"
+            },
+            "display_scale": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 2.5
+            }
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "required": ["worker_window_state", "composition_surface_state", "first_frame_presented", "interaction_ready", "ready", "summary"],
+          "additionalProperties": false,
+          "properties": {
+            "worker_window_state": {
+              "type": "string",
+              "enum": ["isolated", "visible", "unknown"]
+            },
+            "composition_surface_state": {
+              "type": "string",
+              "enum": ["attached", "failed", "unknown"]
+            },
+            "first_frame_presented": {
+              "type": "boolean"
+            },
+            "interaction_ready": {
+              "type": "boolean"
+            },
+            "ready": {
+              "type": "boolean"
+            },
+            "summary": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "AvatarStatusPayload": {
+      "type": "object",
+      "required": ["host_kind"],
+      "additionalProperties": false,
+      "properties": {
+        "host_kind": {
+          "type": "string",
+          "enum": ["unity", "offline"],
+          "description": "kernel 视角下可观测的 shell 状态(对齐 KernelAvatarStatus):'unity' = 外部 Unity Avatar 已连接;'offline' = 没有外部 Shell，桌面端呈现等待或不可用状态，不再加载本地占位身体。"
+        },
+        "host_id": {
+          "type": "string",
+          "description": "shell 实例 ID(多 shell 并存时用)"
+        }
+      }
+    },
+    "PresentationRuntimeReadinessCatalogPayload": {
+      "type": "object",
+      "required": ["updated_at", "runtimes"],
+      "additionalProperties": false,
+      "properties": {
+        "updated_at": {
+          "type": "number"
+        },
+        "runtimes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PresentationRuntimeReadinessSnapshot" },
+          "default": []
+        }
+      }
+    },
+    "PresentationRuntimeReadinessOwner": {
+      "type": "string",
+      "enum": ["kernel", "cognition", "engine", "renderer", "extension"]
+    },
+    "PresentationRuntimeReadinessState": {
+      "type": "string",
+      "enum": ["starting", "ready", "degraded", "failed", "stopped"]
+    },
+    "PresentationRuntimeResourceState": {
+      "type": "string",
+      "enum": ["pending", "ready", "missing", "degraded", "failed", "unknown"]
+    },
+    "PresentationRuntimeResourceSnapshot": {
+      "type": "object",
+      "required": ["resource_id", "resource_kind", "desired_state", "actual_state", "readiness", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "resource_id": { "type": "string" },
+        "resource_kind": { "type": "string" },
+        "desired_state": { "$ref": "#/definitions/PresentationRuntimeResourceState" },
+        "actual_state": { "$ref": "#/definitions/PresentationRuntimeResourceState" },
+        "readiness": { "$ref": "#/definitions/PresentationRuntimeResourceState" },
+        "summary": { "type": "string" },
+        "recovery_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "PresentationRuntimeReconcilerSnapshot": {
+      "type": "object",
+      "required": ["desired", "actual", "readiness", "resources"],
+      "additionalProperties": false,
+      "properties": {
+        "desired": { "type": "string" },
+        "actual": { "type": "string" },
+        "readiness": { "$ref": "#/definitions/PresentationRuntimeResourceState" },
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PresentationRuntimeResourceSnapshot" },
+          "default": []
+        }
+      }
+    },
+    "PresentationRuntimeReadinessSnapshot": {
+      "type": "object",
+      "required": ["runtime_id", "owner", "phase", "state", "blocking", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_id": { "type": "string" },
+        "owner": { "$ref": "#/definitions/PresentationRuntimeReadinessOwner" },
+        "phase": { "type": "string" },
+        "state": { "$ref": "#/definitions/PresentationRuntimeReadinessState" },
+        "blocking": { "type": "boolean" },
+        "summary": { "type": "string" },
+        "details_ref": { "type": "string" },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "reconciler": { "$ref": "#/definitions/PresentationRuntimeReconcilerSnapshot" }
+      }
+    },
+    "AudioStatusPayload": {
+      "type": "object",
+      "required": ["updated_at", "tts", "asr"],
+      "additionalProperties": false,
+      "properties": {
+        "updated_at": {
+          "type": "number",
+          "description": "Unix 毫秒时间戳"
+        },
+        "tts": {
+          "$ref": "#/definitions/AudioCapabilityStatus",
+          "description": "TTS 能力状态"
+        },
+        "asr": {
+          "$ref": "#/definitions/AudioCapabilityStatus",
+          "description": "ASR 能力状态"
+        }
+      }
+    },
+    "AudioCapabilityStatus": {
+      "type": "object",
+      "required": ["enabled", "route_state", "providers"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "该音频能力是否被系统配置启用。关闭时不执行预热或业务请求。"
+        },
+        "disabled_reason": {
+          "type": "string",
+          "description": "关闭原因或用户可见说明。"
+        },
+        "active_provider": {
+          "type": "string",
+          "description": "当前实际承载请求的 provider id"
+        },
+        "route_state": {
+          "type": "string",
+          "enum": ["disabled", "ready", "degraded", "unavailable", "unknown"],
+          "description": "能力路线整体状态；degraded 表示已切换到 fallback。"
+        },
+        "providers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/AudioProviderStatus" },
+          "description": "按尝试顺序排列的 provider 状态"
+        }
+      }
+    },
+    "AudioProviderStatus": {
+      "type": "object",
+      "required": ["provider_id", "role", "execution", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": {
+          "type": "string",
+          "description": "稳定 provider id"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["primary", "fallback"],
+          "description": "provider 在当前路线中的角色"
+        },
+        "execution": {
+          "type": "string",
+          "enum": ["cloud", "local"],
+          "description": "provider 的执行位置"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ready", "degraded", "unavailable", "circuit_open", "unknown"],
+          "description": "provider 当前可用性与熔断状态"
+        },
+        "message": {
+          "type": "string",
+          "description": "不可用原因或补充说明"
+        }
+      }
+    },
+    "LoadScenePayload": {
+      "type": "object",
+      "required": ["scene_id"],
+      "additionalProperties": false,
+      "properties": {
+        "scene_id": {
+          "type": "string",
+          "description": "场景 ID(对应 Extension contributes.scenes.id)"
+        },
+        "fade_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "切换过渡时间(毫秒)"
+        }
+      }
+    },
+    "UnloadScenePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fade_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "卸载过渡时间(毫秒)"
+        }
+      }
+    }
+  }
+}

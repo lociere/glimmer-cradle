@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionInstallationProjection.schema.json",
+  "title": "ExtensionInstallationProjection",
+  "description": "Extension Package Manager 发布的安装态投影。它只表达本机已安装版本与激活选择，不承载扩展运行事实。",
+  "type": "object",
+  "required": ["extension_id", "installed_versions", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "extension_id": { "type": "string", "minLength": 3 },
+    "installed_versions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "active_version": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

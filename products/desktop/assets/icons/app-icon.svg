@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Glimmer Cradle app icon">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="224" y2="232" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#183846"/>
+      <stop offset="1" stop-color="#071216"/>
+    </linearGradient>
+    <linearGradient id="moon" x1="78" y1="48" x2="178" y2="210" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d9fff2"/>
+      <stop offset="0.5" stop-color="#59d0a7"/>
+      <stop offset="1" stop-color="#2f8f7d"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="220" height="220" rx="52" fill="url(#bg)"/>
+  <circle cx="132" cy="128" r="78" fill="url(#moon)"/>
+  <circle cx="158" cy="108" r="78" fill="#071216"/>
+  <circle cx="182" cy="63" r="7" fill="#d9fff2"/>
+  <circle cx="198" cy="88" r="4" fill="#7de3c2"/>
+  <path d="M95 177c18 12 44 15 68 4-19 24-55 30-85 13 4-7 9-13 17-17Z" fill="#d9fff2" opacity="0.78"/>
+</svg>

@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/extension/ExtensionPackageChecksums.schema.json",
+  "title": "ExtensionPackageChecksums",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "algorithm", "files"],
+  "properties": {
+    "schema": { "const": "glimmer-cradle.extension-checksums" },
+    "algorithm": { "const": "sha256" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "size": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

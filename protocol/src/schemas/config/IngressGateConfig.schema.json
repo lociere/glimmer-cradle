@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/IngressGateConfig.schema.json",
+  "title": "IngressGateConfig",
+  "description": "入站防护配置（速率限制 · 熔断 · 就绪守卫）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rate_limit_per_source": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 30,
+      "description": "单来源滑动窗口内最大请求数"
+    },
+    "rate_limit_window_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 60000,
+      "description": "滑动窗口时长（ms）"
+    },
+    "max_concurrent_requests": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10,
+      "description": "全局最大并发处理请求数"
+    },
+    "circuit_breaker_threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 5,
+      "description": "连续失败几次后触发熔断"
+    },
+    "circuit_breaker_recovery_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 30000,
+      "description": "熔断恢复等待时间（ms）"
+    }
+  }
+}

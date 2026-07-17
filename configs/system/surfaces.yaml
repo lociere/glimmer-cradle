@@ -1,0 +1,4 @@
+# 产品控制表面配置。Avatar 本体配置位于 avatar.yaml。
+
+control_surface_gateway:
+  enabled: true

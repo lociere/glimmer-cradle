@@ -1,0 +1,26 @@
+{
+  "sdks": [
+    {
+      "id": "cubism-unity",
+      "displayName": "Live2D Cubism SDK for Unity",
+      "modelFormats": ["cubism4", "cubism5"],
+      "status": "supported",
+      "sdkVersion": "5-r.5",
+      "installMode": "unitypackage",
+      "renderPipeline": "urp",
+      "verifiedUnityVersion": "6000.0.77f1",
+      "sourcePath": "data/packages/avatar-sdks/cubism-sdk-for-unity",
+      "sourceEnv": "GLIMMER_CRADLE_CUBISM_UNITY_SDK",
+      "projectionScopes": [
+        { "kind": "tree", "path": "Assets/Live2D" },
+        { "kind": "file", "path": "Assets/csc.rsp" },
+        { "kind": "file", "path": "Assets/mcs.rsp" }
+      ],
+      "targetPath": "core/avatar/unity-host/Assets/Live2D/Cubism",
+      "importMarkerPath": "core/avatar/unity-host/Assets/Live2D/Cubism/cubism-info.yml",
+      "artifactExtensions": [".unitypackage"],
+      "licenseNote": "Cubism SDK 受 Live2D 授权条款约束；仓库只登记本机安装位置，不提交第三方 SDK。",
+      "installHint": "把官方 Cubism SDK for Unity R5 (URP) 的 .unitypackage 放入 data/packages/avatar-sdks/cubism-sdk-for-unity；avatar:build 会在 Unity 启动前生成受控项目投影。"
+    }
+  ]
+}

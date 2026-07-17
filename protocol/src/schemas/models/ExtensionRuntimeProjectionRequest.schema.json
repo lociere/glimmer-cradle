@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionRuntimeProjectionRequest.schema.json",
+  "title": "ExtensionRuntimeProjectionRequest",
+  "type": "object",
+  "required": ["request_id"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "extension_id": { "type": "string", "minLength": 3 }
+  }
+}

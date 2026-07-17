@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/enums/MemoryStatus.schema.json",
+  "title": "MemoryStatus",
+  "description": "记忆修订的认知状态。状态变化保留历史，不覆盖证据。",
+  "type": "string",
+  "enum": ["candidate", "active", "disputed", "superseded", "redacted"]
+}

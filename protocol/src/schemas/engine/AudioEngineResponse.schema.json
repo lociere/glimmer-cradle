@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/engine/AudioEngineResponse.schema.json",
+  "title": "AudioEngineResponse",
+  "description": "Audio Engine 返回 Kernel 的单请求响应帧。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["success", "error"] },
+    "payload": { "type": "object", "additionalProperties": true },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

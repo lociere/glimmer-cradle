@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/KnowledgeInitPayload.schema.json",
+  "title": "KnowledgeInitPayload",
+  "description": "知识库初始化消息载荷。只负责 Knowledge Vault 预填，不承载角色人格或对话策略。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["knowledge_base"],
+  "properties": {
+    "knowledge_base": {
+      "$ref": "#/definitions/KnowledgeBaseInitPayload"
+    }
+  },
+  "definitions": {
+    "KnowledgeBaseInitPayload": {
+      "type": "object",
+      "description": "知识库初始化主载荷。",
+      "additionalProperties": false,
+      "required": ["version", "retrieval", "entries"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "default": "4.0"
+        },
+        "retrieval": {
+          "$ref": "#/definitions/IPCKnowledgeRetrievalConfig"
+        },
+        "entries": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/definitions/KernelKnowledgeRecord" }
+        }
+      }
+    },
+    "IPCKnowledgeRetrievalConfig": {
+      "type": "object",
+      "description": "知识检索配置。",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["full_injection", "semantic_rag"],
+          "default": "full_injection"
+        },
+        "top_k": {
+          "type": "integer",
+          "default": 5
+        },
+        "min_score": {
+          "type": "number",
+          "default": 0.3
+        },
+        "semantic_weight": {
+          "type": "number",
+          "default": 0.6
+        }
+      }
+    },
+    "KernelKnowledgeRecord": {
+      "type": "object",
+      "description": "内核注入的知识库记录。只允许 scope=knowledge；角色人格配置不经 KnowledgeInitPayload。",
+      "additionalProperties": false,
+      "required": ["entry_id", "scope", "content"],
+      "properties": {
+        "entry_id": { "type": "string" },
+        "scope": { "type": "string", "const": "knowledge" },
+        "content": { "type": "string" },
+        "enabled": { "type": "boolean", "default": true },
+        "priority": { "type": "integer", "default": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/VisualCommand.schema.json",
+  "title": "VisualCommand",
+  "description": "提线木偶视觉指令契约——唯一真相源。内核发出的视觉/音频同步指令，由渲染器插件（VTube Studio / Unity）执行。禁止平台私有字段。",
+  "type": "object",
+  "required": ["trace_id", "command_type", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "全链路追踪 ID（关联触发此视觉指令的 ActionCommand.trace_id）"
+    },
+    "command_type": {
+      "type": "string",
+      "enum": ["set_expression", "play_motion", "lip_sync", "set_parameter", "play_audio", "idle"],
+      "description": "指令类型：set_expression=设置表情；play_motion=播放动作；lip_sync=口型同步；set_parameter=设置模型参数；play_audio=播放音频；idle=回到待机"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix 毫秒时间戳"
+    },
+    "expression": {
+      "$ref": "#/definitions/ExpressionPayload"
+    },
+    "motion": {
+      "$ref": "#/definitions/MotionPayload"
+    },
+    "lip_sync": {
+      "$ref": "#/definitions/LipSyncPayload"
+    },
+    "parameter": {
+      "$ref": "#/definitions/ParameterPayload"
+    },
+    "audio": {
+      "$ref": "#/definitions/AudioPayload"
+    },
+    "emotion_state": {
+      "$ref": "#/definitions/VisualEmotionSnapshot"
+    }
+  },
+  "definitions": {
+    "ExpressionPayload": {
+      "type": "object",
+      "required": ["expression_id"],
+      "additionalProperties": false,
+      "properties": {
+        "expression_id": {
+          "type": "string",
+          "description": "表情 ID（对应 Live2D Expression / VTS Expression）"
+        },
+        "blend_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "表情过渡时间（毫秒）"
+        },
+        "auto_reset": {
+          "type": "boolean",
+          "description": "表情结束后是否自动回到中性"
+        }
+      }
+    },
+    "MotionPayload": {
+      "type": "object",
+      "required": ["motion_id"],
+      "additionalProperties": false,
+      "properties": {
+        "motion_id": {
+          "type": "string",
+          "description": "动作 ID（对应 Live2D Motion / Unity Animation）"
+        },
+        "motion_group": {
+          "type": ["string", "null"],
+          "description": "动作分组（如 idle / greeting / reaction）"
+        },
+        "loop": {
+          "type": "boolean",
+          "description": "是否循环播放"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "动作优先级：0=idle, 1=normal, 2=force, 3=override"
+        }
+      }
+    },
+    "LipSyncPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "audio_ref": {
+          "type": ["string", "null"],
+          "description": "关联的音频资源引用（与 AudioPayload.audio_id 对应）"
+        },
+        "viseme_data": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VisemeFrame" },
+          "description": "预计算的口型帧序列（可选，若无则由渲染器实时分析音频）"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "是否启用口型同步"
+        }
+      }
+    },
+    "VisemeFrame": {
+      "type": "object",
+      "required": ["time_ms", "viseme"],
+      "additionalProperties": false,
+      "properties": {
+        "time_ms": {
+          "type": "number",
+          "description": "相对于音频起始的毫秒偏移"
+        },
+        "viseme": {
+          "type": "string",
+          "description": "口型标识（如 sil/aa/oh/ee 等）"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "口型权重 0-1"
+        }
+      }
+    },
+    "ParameterPayload": {
+      "type": "object",
+      "required": ["parameters"],
+      "additionalProperties": false,
+      "properties": {
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ParameterValue" },
+          "description": "参数值列表"
+        },
+        "blend_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "参数过渡时间（毫秒）"
+        }
+      }
+    },
+    "ParameterValue": {
+      "type": "object",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "参数名称（如 ParamMouthOpenY / ParamEyeLOpen）"
+        },
+        "value": {
+          "type": "number",
+          "description": "参数值"
+        }
+      }
+    },
+    "AudioPayload": {
+      "type": "object",
+      "required": ["audio_id"],
+      "additionalProperties": false,
+      "properties": {
+        "audio_id": {
+          "type": "string",
+          "description": "音频资源唯一 ID"
+        },
+        "audio_data": {
+          "type": ["string", "null"],
+          "description": "Base64 编码的音频数据（PCM/WAV/MP3）"
+        },
+        "audio_uri": {
+          "type": ["string", "null"],
+          "description": "音频文件 URI（与 audio_data 二选一）"
+        },
+        "mime_type": {
+          "type": "string",
+          "description": "音频 MIME 类型（如 audio/wav）"
+        },
+        "duration_ms": {
+          "type": "number",
+          "description": "音频时长（毫秒）"
+        }
+      }
+    },
+    "VisualEmotionSnapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "emotion_type": { "type": "string" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "trigger": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionInstallPreview.schema.json",
+  "title": "ExtensionInstallPreview",
+  "type": "object",
+  "required": ["request_id", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["ready", "error"] },
+    "message": { "type": "string" },
+    "transaction_id": { "type": "string" },
+    "extension": {
+      "type": "object",
+      "required": ["id", "name", "version", "publisher", "permissions", "platforms"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "publisher": { "type": "string" },
+        "description": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "platforms": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["sha256", "size", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "sha256": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "platform": { "type": "string" }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "required": ["source_kind", "listing_reviewed", "publisher_verified", "artifact_signed", "build_attested"],
+      "additionalProperties": false,
+      "properties": {
+        "source_kind": { "type": "string", "enum": ["file", "release_manifest", "registry", "repository"] },
+        "listing_reviewed": { "type": "boolean" },
+        "publisher_verified": { "type": "boolean" },
+        "artifact_signed": { "type": "boolean" },
+        "build_attested": { "type": "boolean" },
+        "registry_id": { "type": "string" },
+        "repository": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# 日志与可观测性配置。
+
+console_format: "pretty"
+file_format: "json"
+level: "debug"
+module_levels: {}
+rotation:
+  main_size_mb: 10
+  main_keep: 5
+  error_size_mb: 5
+  error_keep: 3
+
+# 开发期保留脱敏后的模型输入/输出，captures 按 trace、语义分类与调用顺序组织。
+model_invocations:
+  capture_mode: "full"
+  full_retention_days: 3
+  redact_secrets: true

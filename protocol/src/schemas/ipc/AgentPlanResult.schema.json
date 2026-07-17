@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/AgentPlanResult.schema.json",
+  "title": "AgentPlanResult",
+  "description": "Agent 任务规划响应。Cognition 只提出建议，执行始终由 Kernel 的 SkillInvocationGateway 负责。",
+  "type": "object",
+  "required": ["summary", "reasoning", "suggestions", "trace_id"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "规划摘要"
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "供审计和 UI 投影使用的简短规划理由"
+    },
+    "suggestions": {
+      "type": "array",
+      "description": "按执行优先级排序的受目录约束建议",
+      "items": { "$ref": "#/definitions/SkillToolSuggestion" }
+    },
+    "trace_id": {
+      "type": "string",
+      "description": "调用链 trace ID"
+    }
+  },
+  "definitions": {
+    "SkillToolSuggestion": {
+      "type": "object",
+      "required": ["skill_id", "tool_name", "purpose", "confidence", "arguments_hint"],
+      "properties": {
+        "skill_id": {
+          "type": "string",
+          "description": "来自规划目录的 Skill ID"
+        },
+        "tool_name": {
+          "type": "string",
+          "description": "来自规划目录的工具名"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "建议调用该工具的原因"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "建议置信度"
+        },
+        "arguments_hint": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "建议参数；Kernel 执行前仍会经过策略与调用校验"
+        }
+      }
+    }
+  }
+}

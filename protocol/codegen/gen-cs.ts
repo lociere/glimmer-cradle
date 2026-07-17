@@ -1,0 +1,221 @@
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+type Schema = {
+  title?: string;
+  type?: string | string[];
+  $ref?: string;
+  enum?: string[];
+  default?: unknown;
+  properties?: Record<string, Schema>;
+  definitions?: Record<string, Schema>;
+  items?: Schema;
+  additionalProperties?: boolean | Schema;
+};
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const protocolRoot = path.resolve(__dirname, '..');
+const schemaRoot = path.join(protocolRoot, 'src', 'schemas', 'models');
+const outputFile = path.resolve(
+  protocolRoot,
+  '..',
+  'core',
+  'avatar',
+  'unity-host',
+  'Assets',
+  'Scripts',
+  'Avatar',
+  'Contracts',
+  'PresentationFrames.g.cs',
+);
+const schemaFiles = [
+  'PresentationDownstreamFrame.schema.json',
+  'PresentationUpstreamFrame.schema.json',
+];
+
+const inlineTypeNames = new Map<string, string>([
+  ['CharacterPresentationProjectionPayload.appearance', 'CharacterPresentationAppearancePayload'],
+  ['CharacterPresentationProjectionPayload.lifecycle', 'CharacterPresentationLifecyclePayload'],
+  ['SceneLifecyclePayload.narrative', 'SceneNarrativePayload'],
+]);
+
+function pascalCase(value: string): string {
+  return value
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join('');
+}
+
+function refName(ref: string): string {
+  return ref.slice(ref.lastIndexOf('/') + 1).replace(/\.schema\.json$/, '');
+}
+
+async function collectExternalSchemas(
+  schema: Schema,
+  models: Map<string, Schema>,
+  definitions: Map<string, Schema>,
+  visitedFiles: Set<string>,
+): Promise<void> {
+  if (schema.$ref && !schema.$ref.startsWith('#')) {
+    const fileName = schema.$ref.slice(schema.$ref.lastIndexOf('/') + 1);
+    if (!visitedFiles.has(fileName)) {
+      visitedFiles.add(fileName);
+      const external = JSON.parse(await fs.readFile(path.join(schemaRoot, fileName), 'utf8')) as Schema;
+      const modelName = external.title ?? refName(schema.$ref);
+      models.set(modelName, external);
+      for (const [name, definition] of Object.entries(external.definitions ?? {})) {
+        const existing = definitions.get(name);
+        if (existing && JSON.stringify(existing) !== JSON.stringify(definition)) {
+          throw new Error(`C# contract definition conflicts: ${name}`);
+        }
+        definitions.set(name, definition);
+      }
+      await collectExternalSchemas(external, models, definitions, visitedFiles);
+    }
+  }
+  for (const property of Object.values(schema.properties ?? {})) {
+    await collectExternalSchemas(property, models, definitions, visitedFiles);
+  }
+  if (schema.items) await collectExternalSchemas(schema.items, models, definitions, visitedFiles);
+  for (const definition of Object.values(schema.definitions ?? {})) {
+    await collectExternalSchemas(definition, models, definitions, visitedFiles);
+  }
+}
+
+function isStringAlias(schema: Schema | undefined): boolean {
+  return schema?.type === 'string' && Array.isArray(schema.enum);
+}
+
+function scalarType(schema: Schema, fieldName: string): string | undefined {
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  if (types.includes('string')) return 'string';
+  if (types.includes('boolean')) return 'bool';
+  if (types.includes('integer')) return 'int';
+  if (types.includes('number')) {
+    return fieldName === 'timestamp' || fieldName === 'updated_at' || fieldName === 'duration_ms'
+      ? 'double'
+      : 'float';
+  }
+  return undefined;
+}
+
+async function main(): Promise<void> {
+  const roots: Schema[] = [];
+  const definitions = new Map<string, Schema>();
+  const externalModels = new Map<string, Schema>();
+
+  for (const file of schemaFiles) {
+    const schema = JSON.parse(await fs.readFile(path.join(schemaRoot, file), 'utf8')) as Schema;
+    roots.push(schema);
+    for (const [name, definition] of Object.entries(schema.definitions ?? {})) {
+      const existing = definitions.get(name);
+      if (existing && JSON.stringify(existing) !== JSON.stringify(definition)) {
+        throw new Error(`C# contract definition conflicts: ${name}`);
+      }
+      definitions.set(name, definition);
+    }
+  }
+
+  const visitedFiles = new Set<string>();
+  for (const root of roots) {
+    await collectExternalSchemas(root, externalModels, definitions, visitedFiles);
+  }
+
+  const classes = new Map<string, Schema>();
+  for (const [name, schema] of definitions) {
+    if (schema.type === 'object') classes.set(name, schema);
+  }
+  for (const root of roots) {
+    if (!root.title) throw new Error('Presentation frame schema requires a title');
+    classes.set(root.title, root);
+  }
+  for (const [name, schema] of externalModels) {
+    if (schema.type === 'object') classes.set(name, schema);
+  }
+
+  for (const [ownerName, schema] of [...classes]) {
+    collectInlineObjects(ownerName, schema, classes);
+  }
+
+  const lines = [
+    '// <auto-generated>',
+    '// Generated from protocol/src/schemas/models/Presentation*Frame.schema.json.',
+    '// Run `pnpm sync:contracts`; do not edit this file directly.',
+    '// </auto-generated>',
+    'using System;',
+    '',
+    'namespace GlimmerCradle.Avatar',
+    '{',
+  ];
+
+  for (const [name, schema] of classes) {
+    lines.push('    [Serializable]', `    public class ${name}`, '    {');
+    for (const [fieldName, fieldSchema] of Object.entries(schema.properties ?? {})) {
+      const type = resolveType(name, fieldName, fieldSchema, definitions);
+      const initializer = initializerFor(fieldSchema, type);
+      lines.push(`        public ${type} ${fieldName}${initializer};`);
+    }
+    lines.push('    }', '');
+  }
+
+  lines.push('}', '');
+  await fs.mkdir(path.dirname(outputFile), { recursive: true });
+  await fs.writeFile(outputFile, lines.join('\n'), 'utf8');
+  console.log(`  [C#] ${path.relative(protocolRoot, outputFile)}`);
+}
+
+function collectInlineObjects(
+  ownerName: string,
+  schema: Schema,
+  classes: Map<string, Schema>,
+): void {
+  for (const [fieldName, fieldSchema] of Object.entries(schema.properties ?? {})) {
+    if (fieldSchema.type !== 'object' || fieldSchema.additionalProperties === true) continue;
+    const className = inlineTypeName(ownerName, fieldName);
+    if (!classes.has(className)) {
+      classes.set(className, fieldSchema);
+      collectInlineObjects(className, fieldSchema, classes);
+    }
+  }
+}
+
+function inlineTypeName(ownerName: string, fieldName: string): string {
+  return inlineTypeNames.get(`${ownerName}.${fieldName}`)
+    ?? `${ownerName}${pascalCase(fieldName)}Payload`;
+}
+
+function resolveType(
+  ownerName: string,
+  fieldName: string,
+  schema: Schema,
+  definitions: Map<string, Schema>,
+): string {
+  if (schema.$ref) {
+    const name = refName(schema.$ref);
+    return isStringAlias(definitions.get(name)) ? 'string' : name;
+  }
+  if (schema.type === 'array' && schema.items) {
+    return `${resolveType(ownerName, fieldName, schema.items, definitions)}[]`;
+  }
+  const scalar = scalarType(schema, fieldName);
+  if (scalar) return scalar;
+  if (schema.type === 'object') {
+    return schema.additionalProperties === true ? 'object' : inlineTypeName(ownerName, fieldName);
+  }
+  return 'object';
+}
+
+function initializerFor(schema: Schema, type: string): string {
+  if (schema.type === 'array') return ` = Array.Empty<${type.slice(0, -2)}>()`;
+  if (typeof schema.default === 'string') {
+    return ` = ${JSON.stringify(schema.default)}`;
+  }
+  return '';
+}
+
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

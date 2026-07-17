@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionUninstallRequest.schema.json",
+  "title": "ExtensionUninstallRequest",
+  "type": "object",
+  "required": ["request_id", "extension_id", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "extension_id": { "type": "string", "minLength": 3 },
+    "version": { "type": "string", "minLength": 1 }
+  }
+}

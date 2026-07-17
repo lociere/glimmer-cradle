@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionLifecycleResult.schema.json",
+  "title": "ExtensionLifecycleResult",
+  "type": "object",
+  "required": ["request_id", "extension_id", "operation", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "extension_id": { "type": "string", "minLength": 3 },
+    "version": { "type": "string", "minLength": 1 },
+    "operation": { "type": "string", "enum": ["start", "stop"] },
+    "status": { "type": "string", "enum": ["success", "error"] },
+    "message": { "type": "string" }
+  }
+}

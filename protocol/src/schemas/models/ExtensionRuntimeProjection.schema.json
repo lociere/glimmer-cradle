@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ExtensionRuntimeProjection.schema.json",
+  "title": "ExtensionRuntimeProjection",
+  "description": "Extension Host 发布给 Desktop 和其他跨进程消费者的扩展运行投影。Host 是唯一生产者，Renderer 只消费该投影。运行事实以 Capability Graph 表达，具体能力类型由 Contribution Point Registry 定义。",
+  "type": "object",
+  "required": [
+    "schema",
+    "extension_id",
+    "lifecycle",
+    "contribution_points",
+    "capability_graph",
+    "actions",
+    "diagnostics",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "LifecycleState": {
+      "type": "string",
+      "enum": ["discovered", "loaded", "starting", "running", "stopping", "stopped", "degraded", "failed"]
+    },
+    "CapabilityNodeState": {
+      "type": "string",
+      "enum": ["declared", "preparing", "starting", "live", "ready", "available", "unavailable", "degraded", "failed", "stopped", "disabled", "unsupported"]
+    },
+    "ActionIntentState": {
+      "type": "string",
+      "enum": ["enabled", "disabled", "hidden", "unsupported"]
+    },
+    "DiagnosticSeverity": {
+      "type": "string",
+      "enum": ["info", "warning", "error"]
+    },
+    "CapabilityAudience": {
+      "type": "string",
+      "enum": ["character", "user", "host", "renderer", "extension", "adapter"]
+    },
+    "ContributionPointDefinitionSnapshot": {
+      "type": "object",
+      "required": ["id", "title", "owner", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "owner": {
+          "type": "string",
+          "enum": ["platform", "extension", "third_party"]
+        },
+        "state": {
+          "type": "string",
+          "enum": ["registered", "unsupported", "disabled"]
+        },
+        "node_kind": { "type": "string" },
+        "action_kind": { "type": "string" },
+        "required_permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "ReadinessGateSnapshot": {
+      "type": "object",
+      "required": ["id", "kind", "state", "summary", "checked_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "state": { "$ref": "#/definitions/CapabilityNodeState" },
+        "summary": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "checked_at": { "type": "string" },
+        "latency_ms": { "type": "number" },
+        "error_code": { "type": "string" },
+        "error_message": { "type": "string" }
+      }
+    },
+    "CapabilityGraphNode": {
+      "type": "object",
+      "required": ["id", "contribution_point", "kind", "title", "state", "owner", "audience", "summary", "updated_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "contribution_point": { "type": "string" },
+        "kind": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "state": { "$ref": "#/definitions/CapabilityNodeState" },
+        "owner": {
+          "type": "string",
+          "enum": ["platform", "extension", "third_party"]
+        },
+        "owner_id": { "type": "string" },
+        "audience": {
+          "$ref": "#/definitions/CapabilityAudience",
+          "description": "能力暴露对象。只有 character 可以进入人物可用 Skill catalog；user 用于管理 UI；host/adapter/renderer/extension 不可被人物直接调用。"
+        },
+        "required": { "type": "boolean", "default": false },
+        "summary": { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "readiness_gates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ReadinessGateSnapshot" },
+          "default": []
+        },
+        "diagnostic_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        },
+        "updated_at": { "type": "string" }
+      }
+    },
+    "CapabilityGraphEdge": {
+      "type": "object",
+      "required": ["from", "to", "relation"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "relation": { "type": "string" },
+        "required_state": { "type": "string" },
+        "summary": { "type": "string" }
+      }
+    },
+    "CapabilityGraphSnapshot": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CapabilityGraphNode" },
+          "default": []
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CapabilityGraphEdge" },
+          "default": []
+        }
+      }
+    },
+    "ActionIntentSnapshot": {
+      "type": "object",
+      "required": ["id", "label", "contribution_point", "action_kind", "target_node_id", "audience", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "contribution_point": { "type": "string" },
+        "action_kind": { "type": "string" },
+        "target_node_id": { "type": "string" },
+        "audience": {
+          "$ref": "#/definitions/CapabilityAudience",
+          "description": "动作入口暴露对象。Control Center 只消费 user audience；character 不通过 action intent 触发。"
+        },
+        "state": { "$ref": "#/definitions/ActionIntentState" },
+        "disabled_reason": { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "confirmation_required": { "type": "boolean", "default": false },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "DiagnosticsEntry": {
+      "type": "object",
+      "required": ["id", "severity", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "severity": { "$ref": "#/definitions/DiagnosticSeverity" },
+        "summary": { "type": "string" },
+        "node_id": { "type": "string" },
+        "trace_id": { "type": "string" },
+        "log_locations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "recovery_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "DiagnosticsSnapshot": {
+      "type": "object",
+      "required": ["summary", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "last_error": { "type": "string" },
+        "trace_id": { "type": "string" },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DiagnosticsEntry" },
+          "default": []
+        },
+        "log_locations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "recovery_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    }
+  },
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "glimmer-cradle.extension.runtime-projection"
+    },
+    "extension_id": { "type": "string" },
+    "display_name": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "lifecycle": { "$ref": "#/definitions/LifecycleState" },
+    "summary": { "type": "string" },
+    "contribution_points": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ContributionPointDefinitionSnapshot" },
+      "default": []
+    },
+    "capability_graph": { "$ref": "#/definitions/CapabilityGraphSnapshot" },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ActionIntentSnapshot" },
+      "default": []
+    },
+    "diagnostics": { "$ref": "#/definitions/DiagnosticsSnapshot" },
+    "updated_at": { "type": "string" }
+  }
+}

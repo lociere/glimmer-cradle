@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ActionCommand.schema.json",
+  "title": "ActionCommand",
+  "description": "跨层行为指令契约——唯一真相源。AI 层发出的行为指令，由 Kernel 内核路由到目标通道。禁止平台私有字段。",
+  "type": "object",
+  "required": ["trace_id", "action_type", "target", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "全链路追踪 ID（与对应的 PerceptionEvent.trace_id 关联）"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": ["reply", "recall", "react", "skill_request", "noop"],
+      "description": "行为类型：reply=回复消息；recall=撤回消息；react=表情反应；skill_request=请求 Kernel 经 Skill Plane 执行能力并回传 Cognition 合成；noop=沉默"
+    },
+    "target": {
+      "$ref": "#/definitions/ActionTarget"
+    },
+    "payload": {
+      "$ref": "#/definitions/ActionPayload"
+    },
+    "emotion_state": {
+      "$ref": "#/definitions/EmotionSnapshot"
+    }
+  },
+  "definitions": {
+    "ActionTarget": {
+      "type": "object",
+      "required": ["scene_id"],
+      "additionalProperties": false,
+      "properties": {
+        "scene_id": {
+          "type": "string",
+          "description": "目标场景 ID（由 IdentityRouter 归一化后的 vessel_id 格式）"
+        },
+        "channel_hint": {
+          "type": ["string", "null"],
+          "description": "通道提示（可选，内核路由用）"
+        }
+      }
+    },
+    "ActionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": ["string", "null"],
+          "description": "回复完整文本（action_type=reply 时必填）。这是本次认知回复的完整语义内容，用于记忆、日志和通道兜底。"
+        },
+        "messages": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ActionReplyMessage" },
+          "description": "回复投递消息列表。用于把同一次认知回复拆成多条自然消息；缺省时由 Kernel 按完整文本规范化生成。"
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ActionMediaItem" },
+          "description": "附加多媒体项（图片/语音/表情等）"
+        },
+        "skill_request": {
+          "$ref": "#/definitions/SkillRequestPayload",
+          "description": "action_type=skill_request 时的 Skill 使用请求。Cognition 只表达目标与理由；Kernel 负责 catalog、policy、gateway、audit 与 synthesis 编排。"
+        }
+      }
+    },
+    "SkillRequestPayload": {
+      "type": "object",
+      "required": ["original_goal", "capability_kind", "confidence", "conversation"],
+      "additionalProperties": false,
+      "properties": {
+        "original_goal": {
+          "type": "string",
+          "description": "触发工具使用的用户目标或当前角色整理后的目标。"
+        },
+        "capability_kind": {
+          "$ref": "#/definitions/CapabilityKind",
+          "description": "Cognition 结构化 ActionPlan 判定的能力类型，用于规划和审计，不作为授权依据。"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cognition 对 skill_request 行动判断的置信度。"
+        },
+        "reason": {
+          "type": ["string", "null"],
+          "description": "Cognition 判断需要 Skill 的简短理由，用于审计与调试，不作为授权依据。"
+        },
+        "planning_hint": {
+          "type": ["string", "null"],
+          "description": "给 AgentPlan 的可选规划提示；Kernel 仍只暴露 ready catalog。"
+        },
+        "conversation": {
+          "$ref": "src/schemas/models/ConversationContext.schema.json"
+        }
+      }
+    },
+    "CapabilityKind": {
+      "type": "string",
+      "enum": [
+        "web_navigation",
+        "realtime_lookup",
+        "desktop_action",
+        "clipboard",
+        "notification",
+        "extension_action",
+        "mcp_tool",
+        "platform_message",
+        "none"
+      ]
+    },
+    "ActionMediaItem": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["image", "audio", "sticker"]
+        },
+        "uri": { "type": ["string", "null"] },
+        "mime_type": { "type": ["string", "null"] }
+      }
+    },
+    "ActionReplyMessage": {
+      "type": "object",
+      "required": ["sequence", "content_type", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "同一次回复内的投递顺序，从 0 开始。"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["text", "code"],
+          "description": "消息内容类型。普通对话为 text；完整代码块可为 code。"
+        },
+        "text": {
+          "type": "string",
+          "description": "该条投递消息的正文。"
+        },
+        "language": {
+          "type": ["string", "null"],
+          "description": "content_type=code 时的语言标识。"
+        }
+      }
+    },
+    "EmotionSnapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "emotion_type": { "type": "string" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "trigger": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionInstallPrepareRequest.schema.json",
+  "title": "ExtensionInstallPrepareRequest",
+  "type": "object",
+  "required": ["request_id", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "path"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "file" },
+            "path": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "release_manifest" },
+            "url": { "type": "string", "format": "uri", "pattern": "^https://" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "catalog_url", "extension_id"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "registry" },
+            "catalog_url": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "extension_id": { "type": "string", "minLength": 3 },
+            "channel": { "type": "string", "enum": ["stable", "beta", "nightly"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "repository", "tag"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "repository" },
+            "repository": { "type": "string", "format": "uri", "pattern": "^https://" },
+            "tag": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Glimmer Cradle Avatar Action Catalog",
+  "description": "模型私有动作能力声明。稳定动作 ID 由当前角色使用，目标资源名仅由模型驱动消费。",
+  "type": "object",
+  "required": ["version", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "const": 1 },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "category", "targetKind", "targetId", "toggle"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+          },
+          "label": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "minLength": 1 },
+          "targetKind": { "type": "string", "enum": ["expression", "motion"] },
+          "targetId": { "type": "string", "minLength": 1 },
+          "toggle": { "type": "boolean" },
+          "manualOnly": { "type": "boolean" },
+          "requires": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "exclusiveGroup": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "toggle": { "const": true } } },
+            "then": { "properties": { "targetKind": { "const": "expression" } } }
+          },
+          {
+            "if": { "required": ["exclusiveGroup"] },
+            "then": { "properties": { "toggle": { "const": true } } }
+          }
+        ]
+      }
+    }
+  }
+}

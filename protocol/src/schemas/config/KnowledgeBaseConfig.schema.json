@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/KnowledgeBaseConfig.schema.json",
+  "title": "KnowledgeBaseConfig",
+  "description": "知识库运行时配置（由 KnowledgeIndexConfig 与 Markdown 正文组装）。Knowledge Vault 只保存外部资料、世界事实或可检索知识；角色身份、人设、表达风格、情绪行为和安全边界不允许放入本配置。",
+  "type": "object",
+  "required": ["version", "retrieval", "entries"],
+  "additionalProperties": false,
+  "definitions": {
+    "KnowledgeScope": {
+      "type": "string",
+      "const": "knowledge",
+      "description": "知识条目范围。KnowledgeBaseConfig 只允许 knowledge。"
+    },
+    "KnowledgeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "scope", "content", "priority"],
+      "description": "单条知识条目",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "唯一标识"
+        },
+        "scope": { "$ref": "#/definitions/KnowledgeScope" },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "description": "知识内容文本"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "检索优先级（1-100，越大越优先）"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用"
+        }
+      }
+    },
+    "KnowledgeRetrievalConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "知识检索配置（仅用于 scope=knowledge 条目）",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["full_injection", "semantic_rag"],
+          "default": "full_injection",
+          "description": "检索模式：full_injection = 全量注入 / semantic_rag = 向量检索"
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5,
+          "description": "检索返回数量（semantic_rag 模式下生效）"
+        },
+        "min_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3,
+          "description": "最低相似度阈值"
+        },
+        "semantic_weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6,
+          "description": "语义向量匹配权重"
+        }
+      }
+    }
+  },
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "知识库 schema 版本号"
+    },
+    "retrieval": { "$ref": "#/definitions/KnowledgeRetrievalConfig" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/KnowledgeEntry" }
+    }
+  }
+}

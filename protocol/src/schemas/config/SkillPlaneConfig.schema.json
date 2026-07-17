@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/config/SkillPlaneConfig.schema.json",
+  "title": "SkillPlaneConfig",
+  "description": "Skill Plane 配置 —— 外部 MCP Server Provider、用户技能入口与发现策略。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "McpServerTransport": {
+      "type": "string",
+      "enum": ["stdio", "http", "websocket"],
+      "description": "MCP server 传输方式。stdio 用于本地子进程，http 表示 Streamable HTTP，websocket 用于外部服务。"
+    },
+    "SkillProductTarget": {
+      "type": "string",
+      "enum": ["any", "desktop", "personal-server"],
+      "description": "能力来源可运行的产品组合；操作系统与架构由其实际发布方式另行约束。"
+    },
+    "McpServerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "单个 MCP server 连接声明。",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MCP server 唯一 ID。"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用该 MCP server。"
+        },
+        "products": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SkillProductTarget" },
+          "minItems": 1,
+          "default": ["any"],
+          "description": "允许连接该 MCP server 的产品组合。扩展私有 MCP 不在这里声明，由扩展自行持有并按需重导出公开 Skill。"
+        },
+        "transport": {
+          "$ref": "#/definitions/McpServerTransport",
+          "default": "stdio",
+          "description": "连接方式。"
+        },
+        "command": {
+          "type": "string",
+          "description": "stdio 模式下的启动命令。"
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "stdio 模式下传给 command 的参数。"
+        },
+        "url": {
+          "type": "string",
+          "description": "Streamable HTTP / websocket 模式下的服务地址。"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "description": "传给 MCP server 的环境变量。敏感值应通过 secrets 或系统环境变量注入。"
+        },
+        "capability_prefix": {
+          "type": "string",
+          "description": "映射到 Skill ID 时使用的能力前缀；缺省使用 server id。"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 30000,
+          "description": "连接与调用超时（ms）。"
+        }
+      },
+      "required": ["id"]
+    },
+    "UserSkillConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "用户自定义技能入口配置。",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用用户技能 Provider。"
+        },
+        "root_dir": {
+          "type": "string",
+          "default": "skills",
+          "description": "用户技能根目录（相对项目根或用户数据目录）。"
+        }
+      }
+    }
+  },
+  "properties": {
+    "mcp_servers": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/McpServerConfig" },
+      "default": [],
+      "description": "外部 MCP server 列表。"
+    },
+    "user_skills": {
+      "$ref": "#/definitions/UserSkillConfig",
+      "default": {},
+      "description": "用户自定义技能 Provider 配置。"
+    }
+  }
+}

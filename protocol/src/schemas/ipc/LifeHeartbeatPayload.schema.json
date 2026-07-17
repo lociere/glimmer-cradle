@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/LifeHeartbeatPayload.schema.json",
+  "title": "LifeHeartbeatPayload",
+  "description": "Kernel 对 Cognition 的无状态活性探测载荷。认知节律与主动性由 Cognition Cognitive Activity 自主管理。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {}
+}

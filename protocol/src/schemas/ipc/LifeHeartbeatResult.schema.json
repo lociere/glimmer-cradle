@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ipc/LifeHeartbeatResult.schema.json",
+  "title": "LifeHeartbeatResult",
+  "description": "Cognition 对 Kernel 活性探测的响应。认知节律由 CycleController 自驱，不通过心跳返回思维内容。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": { "type": "string", "enum": ["alive"] }
+  }
+}

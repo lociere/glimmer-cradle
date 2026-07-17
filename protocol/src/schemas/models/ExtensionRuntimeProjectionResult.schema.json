@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/ExtensionRuntimeProjectionResult.schema.json",
+  "title": "ExtensionRuntimeProjectionResult",
+  "type": "object",
+  "required": ["request_id", "status", "projections", "installations"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["success", "error"] },
+    "projections": {
+      "type": "array",
+      "items": { "$ref": "ExtensionRuntimeProjection.schema.json" },
+      "default": []
+    },
+    "installations": {
+      "type": "array",
+      "items": { "$ref": "ExtensionInstallationProjection.schema.json" },
+      "default": []
+    },
+    "message": { "type": "string" }
+  }
+}
