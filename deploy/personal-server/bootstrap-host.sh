@@ -49,7 +49,7 @@ if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
   echo "已将 ${SUDO_USER} 加入 docker 组；重新登录后可不使用 sudo。"
 fi
 
-docker run --rm hello-world >/dev/null
+docker info >/dev/null
 docker compose version
 docker buildx version
 echo "Docker Engine 初始化完成。"

@@ -131,6 +131,7 @@ RELEASE_ROOT="${INSTALL_ROOT}/releases/${RELEASE_VERSION}"
 PREVIOUS_RELEASE=""
 EXISTING_DEPLOYMENT=0
 CURRENT_IMAGE=""
+CURRENT_CADDY_IMAGE=""
 DEPLOYMENT_ENV_BACKUP="${TEMP_ROOT}/deployment.env.previous"
 if [[ -L "${INSTALL_ROOT}/current" ]]; then
   PREVIOUS_RELEASE="$(readlink -f "${INSTALL_ROOT}/current")"
@@ -139,6 +140,7 @@ if [[ -f "$DEPLOYMENT_ENV_FILE" ]]; then
   EXISTING_DEPLOYMENT=1
   cp "$DEPLOYMENT_ENV_FILE" "$DEPLOYMENT_ENV_BACKUP"
   CURRENT_IMAGE="$(grep '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
+  CURRENT_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
 fi
 
 install -d -m 0755 "$INSTALL_ROOT" "${INSTALL_ROOT}/releases" "$CONFIG_ROOT"
@@ -185,6 +187,21 @@ set_env_value GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
 set_env_value GLIMMER_CRADLE_CADDYFILE "${RELEASE_ROOT}/Caddyfile"
 if [[ -n "${GLIMMER_CRADLE_CADDY_IMAGE:-}" ]]; then
   set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$GLIMMER_CRADLE_CADDY_IMAGE"
+else
+  RELEASE_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "${RELEASE_ROOT}/.env.example" | tail -n 1 | cut -d= -f2- || true)"
+  [[ "$RELEASE_CADDY_IMAGE" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]] || {
+    echo "发布包未声明 digest 固定的 Caddy 入口镜像。" >&2
+    exit 1
+  }
+  PREVIOUS_RELEASE_CADDY_IMAGE=""
+  if [[ -n "$PREVIOUS_RELEASE" && -f "${PREVIOUS_RELEASE}/.env.example" ]]; then
+    PREVIOUS_RELEASE_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "${PREVIOUS_RELEASE}/.env.example" | tail -n 1 | cut -d= -f2- || true)"
+  fi
+  if (( ! EXISTING_DEPLOYMENT )) \
+    || [[ -z "$PREVIOUS_RELEASE" ]] \
+    || [[ "$CURRENT_CADDY_IMAGE" == "$PREVIOUS_RELEASE_CADDY_IMAGE" ]]; then
+    set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$RELEASE_CADDY_IMAGE"
+  fi
 fi
 
 CANDIDATE_IMAGE="${GLIMMER_CRADLE_CANDIDATE_IMAGE:-$(grep '^GLIMMER_CRADLE_IMAGE=' "${RELEASE_ROOT}/.env.example" | cut -d= -f2-)}"

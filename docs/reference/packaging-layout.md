@@ -45,9 +45,9 @@ Audio engine 以 `engines/audio` 为源码事实源。TTS/ASR 默认关闭且不
 
 ## Personal Server OCI 投影
 
-`deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；Cognition 与 Audio 使用 uv 锁文件在 Linux builder 中创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移。
+`deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；Cognition 与 Audio 使用 uv 锁文件在 Linux builder 中创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。
 
-tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的 `linux/amd64` OCI 镜像和确定性部署包。GitHub Release 的自有资产固定为三个：`glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz`、稳定入口 `glimmer-cradle-installer.sh` 与统一校验清单 `SHA256SUMS`；GitHub 自动生成的源码归档不属于产品安装包。工作流依赖固定到完整 commit SHA，Release 正文由同一打包脚本生成，版本、支持平台、资产职责与 OCI digest 不依赖人工填写。
+tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的 `linux/amd64` OCI 镜像和确定性部署包。GitHub Release 的自有资产固定为三个：`glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz`、稳定入口 `glimmer-cradle-installer.sh` 与统一校验清单 `SHA256SUMS`；GitHub 自动生成的源码归档不属于产品安装包。工作流依赖固定到完整 commit SHA，Release 正文由同一打包脚本生成，版本、支持平台、资产职责与 OCI digest 不依赖人工填写。发布门禁会在 OCI 上直接执行 Caddy 版本检查，并验证部署包中的应用与 Caddy 默认镜像指向同一个 digest。
 
 社区安装器先下载 `SHA256SUMS`，从清单解析唯一目标平台部署包，再校验摘要、归档路径和包内版本。它不克隆源码：只读版本进入 `/opt/glimmer-cradle/releases/<version>`，`/opt/glimmer-cradle/current` 原子选择当前版本，配置、状态和运维命令分别固定在 `/etc/glimmer-cradle`、`/var/lib/glimmer-cradle` 与 `/usr/local/bin/glimmer-cradle`。私有开发发布可通过仅驻留当前安装进程的 GitHub token 下载 Release 并临时登录 GHCR；token 不写入项目配置。OSS/ACR 只允许作为同一发布物的显式传输镜像，不成为第二构建来源。
 
@@ -61,7 +61,7 @@ tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM
 | `/var/lib/glimmer-cradle/data` | 用户数据挂载 |
 | `/run/glimmer-cradle` | tmpfs 短期协调状态 |
 
-标准镜像包含 Cognition 与云端 TTS 所需代码，不包含 ASR 依赖、FunASR 模型、Embedding 本地模型、私人 Avatar、真实 secret 或本机数据。Caddy 单独作为入口容器；应用容器不直接发布 `3210` 到宿主机。
+标准镜像包含 Cognition、云端 TTS 所需代码和经完整性验证的 Caddy，不包含 ASR 依赖、FunASR 模型、Embedding 本地模型、私人 Avatar、真实 secret 或本机数据。应用和 Caddy 服务复用同一个 digest 固定的 OCI 传输单元，但仍是两个容器、两个主进程和两套权限边界；应用容器不直接发布 `3210` 到宿主机。目标服务器默认只访问 GitHub Release 与 GHCR，不为宿主就绪检查或入口服务额外拉取 Docker Hub 镜像。
 
 ## 验证清单
 

@@ -137,6 +137,14 @@ const personalServerInstaller = fs.readFileSync(
   path.join(repoRoot, 'deploy/personal-server/install.sh'),
   'utf8',
 );
+const personalServerBootstrap = fs.readFileSync(
+  path.join(repoRoot, 'deploy/personal-server/bootstrap-host.sh'),
+  'utf8',
+);
+if (/hello-world|registry-1\.docker\.io/.test(personalServerBootstrap)
+  || !personalServerBootstrap.includes('docker info >/dev/null')) {
+  violations.push('deploy/personal-server/bootstrap-host.sh: 主机就绪检查不得依赖外部测试镜像');
+}
 if (!personalServerInstaller.includes('bootstrap-host.sh')
   || !personalServerInstaller.includes('deploy.sh" install')) {
   violations.push('deploy/personal-server/install.sh: 必须统一编排宿主初始化与首次安装事务');
@@ -170,8 +178,28 @@ const personalServerReleasePackager = fs.readFileSync(
 if (!personalServerReleasePackager.includes('glimmer-cradle-personal-server-v${RELEASE_VERSION}-${RELEASE_TARGET}.tar.gz')
   || !personalServerReleasePackager.includes('glimmer-cradle-installer.sh')
   || !personalServerReleasePackager.includes('SHA256SUMS')
+  || !personalServerReleasePackager.includes('GLIMMER_CRADLE_CADDY_IMAGE=${IMAGE}')
   || !personalServerReleasePackager.includes('@sha256:')) {
   violations.push('deploy/personal-server/package-release.sh: 发布物必须版本化命名、统一校验并固定 OCI digest');
+}
+const personalServerCompose = fs.readFileSync(
+  path.join(repoRoot, 'deploy/personal-server/compose.yaml'),
+  'utf8',
+);
+const personalServerImageDefault = personalServerCompose.match(
+  /GLIMMER_CRADLE_IMAGE:-([^}]+)}/,
+)?.[1];
+const personalServerCaddyImageDefault = personalServerCompose.match(
+  /GLIMMER_CRADLE_CADDY_IMAGE:-([^}]+)}/,
+)?.[1];
+if (!personalServerDockerfile.includes('CADDY_AMD64_SHA512=')
+  || !personalServerDockerfile.includes('CADDY_LICENSE_SHA256=')
+  || !personalServerDockerfile.includes('COPY --from=caddy-runtime /usr/local/bin/caddy')
+  || !personalServerCompose.includes('/usr/local/bin/caddy')
+  || !personalServerImageDefault
+  || personalServerCaddyImageDefault !== personalServerImageDefault
+  || /image:\s*\$\{GLIMMER_CRADLE_CADDY_IMAGE:-caddy:/.test(personalServerCompose)) {
+  violations.push('deploy/personal-server: 正式 OCI 必须内含校验后的 Caddy，并保持独立入口进程');
 }
 if (/pnpm\s+deploy[^\n]*--legacy/.test(personalServerDockerfile)) {
   violations.push('deploy/personal-server/Dockerfile: 不得使用回查 registry 的 legacy deploy');

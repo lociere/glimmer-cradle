@@ -48,6 +48,7 @@ printf '%s\n' "$RELEASE_VERSION" > "$PAYLOAD_ROOT/VERSION"
 
 sed -i \
   -e "s|^GLIMMER_CRADLE_IMAGE=.*$|GLIMMER_CRADLE_IMAGE=${IMAGE}|" \
+  -e "s|^GLIMMER_CRADLE_CADDY_IMAGE=.*$|GLIMMER_CRADLE_CADDY_IMAGE=${IMAGE}|" \
   -e 's|^GLIMMER_CRADLE_DEPLOYMENT_MODE=.*$|GLIMMER_CRADLE_DEPLOYMENT_MODE=image|' \
   "$PAYLOAD_ROOT/.env.example"
 
@@ -84,9 +85,9 @@ curl -fsSL https://github.com/lociere/glimmer-cradle/releases/latest/download/${
 - \`${ASSET_NAME}\`：Compose、Caddy 与事务化部署脚本组成的轻量部署包；应用本体由下方不可变 OCI 镜像承载。
 - \`${INSTALLER_NAME}\`：安装、更新和失败回滚的统一入口。
 - \`${CHECKSUMS_NAME}\`：本次发布资产的 SHA-256 校验清单。
-- OCI：\`${IMAGE}\`
+- OCI：\`${IMAGE}\`；应用容器与 Caddy 入口容器共享该不可变镜像层，并以独立进程和权限运行。
 
-OCI 镜像由同一 tag 构建，并附带 BuildKit SBOM 与 provenance。GitHub 自动生成的源码归档仅用于源码审阅，不是 Personal Server 安装包。
+OCI 镜像由同一 tag 构建，内含经过摘要校验的 Caddy 可执行文件，并附带 BuildKit SBOM 与 provenance。目标服务器不需要访问 Docker Hub。GitHub 自动生成的源码归档仅用于源码审阅，不是 Personal Server 安装包。
 
 [完整提交记录](https://github.com/lociere/glimmer-cradle/commits/v${RELEASE_VERSION})
 EOF

@@ -37,6 +37,7 @@ jobs:
 
       - name: 执行发布门禁
         run: |
+          test "$(node -p 'require("./package.json").version')" = "${GITHUB_REF_NAME#v}"
           pnpm install --frozen-lockfile
           pnpm sync:contracts
           git diff --exit-code
@@ -78,6 +79,11 @@ jobs:
           ./deploy/personal-server/package-release.sh "$VERSION" dist/personal-server "$IMAGE"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
+      - name: 验证 OCI 入口组件
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/glimmer-cradle-personal-server:${GITHUB_REF_NAME}@${{ steps.build_image.outputs.digest }}"
+          test "$(docker run --rm --entrypoint /usr/local/bin/caddy "$IMAGE" version | awk '{print $1}')" = 'v2.10.2'
+
       - name: 验证部署发布包
         run: |
           cd dist/personal-server
@@ -85,8 +91,20 @@ jobs:
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
           test -x glimmer-cradle-installer.sh
           test -s release-notes.md
-          tar -tzf "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz" \
+          PACKAGE="glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
+          tar -tzf "$PACKAGE" \
             | grep -qx 'glimmer-cradle-personal-server/VERSION'
+          mkdir extracted
+          tar -xzf "$PACKAGE" -C extracted
+          ENV_FILE=extracted/glimmer-cradle-personal-server/.env.example
+          APP_IMAGE="$(grep '^GLIMMER_CRADLE_IMAGE=' "$ENV_FILE" | cut -d= -f2-)"
+          CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "$ENV_FILE" | cut -d= -f2-)"
+          test "$APP_IMAGE" = "$CADDY_IMAGE"
+          docker compose \
+            --project-directory extracted/glimmer-cradle-personal-server \
+            --env-file "$ENV_FILE" \
+            --file extracted/glimmer-cradle-personal-server/compose.yaml \
+            config --quiet
 
       - name: 发布 GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2

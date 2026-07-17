@@ -75,7 +75,7 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVER_TOKEN "$token"
   fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.0"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.1"
   fi
   if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
@@ -126,12 +126,32 @@ read_env_file() {
 
 create_compose_env() {
   local image="$1"
-  local env_file
+  local env_file current_image current_caddy_image deployment_mode
   env_file="$(mktemp "${STATE_ROOT}/.compose-env.XXXXXX")"
   cp "$DEPLOYMENT_ENV_FILE" "$env_file"
+  current_image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
+  current_caddy_image="$(read_env_file "$env_file" GLIMMER_CRADLE_CADDY_IMAGE '')"
+  deployment_mode="$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
   set_env_value "$env_file" GLIMMER_CRADLE_IMAGE "$image"
+  if [[ "$deployment_mode" == "source" || "$current_caddy_image" == "$current_image" ]]; then
+    set_env_value "$env_file" GLIMMER_CRADLE_CADDY_IMAGE "$image"
+  fi
   TEMP_ENV_FILES+=("$env_file")
   COMPOSE_ENV_RESULT="$env_file"
+}
+
+persist_selected_image() {
+  local image="$1"
+  local replacing_image="$2"
+  local current_caddy_image deployment_mode
+  current_caddy_image="$(read_env GLIMMER_CRADLE_CADDY_IMAGE '')"
+  deployment_mode="$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$image"
+  if [[ "$deployment_mode" == "source" \
+    || -z "$current_caddy_image" \
+    || "$current_caddy_image" == "$replacing_image" ]]; then
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_CADDY_IMAGE "$image"
+  fi
 }
 
 compose_with_env() {
@@ -164,7 +184,7 @@ next_candidate_image() {
   elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     candidate_image
   else
-    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.0"
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.1"
   fi
 }
 
@@ -177,7 +197,7 @@ candidate_image() {
     dirty="-dirty"
   fi
   timestamp="$(date -u +%Y%m%d%H%M%S)"
-  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.0}" "$revision" "$dirty" "$timestamp"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.1}" "$revision" "$dirty" "$timestamp"
 }
 
 port_in_use() {
@@ -302,7 +322,7 @@ rollback_transaction() {
   if [[ -n "$TRANSACTION_PREVIOUS_IMAGE" && -n "$TRANSACTION_PREVIOUS_ENV" ]]; then
     compose_with_env "$TRANSACTION_PREVIOUS_ENV" up --detach --remove-orphans
     if wait_until_ready "$TRANSACTION_PREVIOUS_ENV"; then
-      set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$TRANSACTION_PREVIOUS_IMAGE"
+      persist_selected_image "$TRANSACTION_PREVIOUS_IMAGE" "$TRANSACTION_CANDIDATE_IMAGE"
       echo "已恢复上一版本 ${TRANSACTION_PREVIOUS_IMAGE}。" >&2
     else
       echo "上一版本也未能恢复就绪，请保留 ${TRANSACTION_BACKUP} 并检查日志。" >&2
@@ -320,7 +340,7 @@ current_container_image() {
 }
 
 install_release() {
-  local existing candidate
+  local existing candidate replacing_image
   existing="$(current_container_image)"
   if [[ -n "$existing" ]]; then
     echo "检测到现有安装，正在确保当前版本已启动并就绪。"
@@ -329,6 +349,7 @@ install_release() {
     print_access
     return 0
   fi
+  replacing_image="$(read_env GLIMMER_CRADLE_IMAGE '')"
   candidate="$(next_candidate_image)"
   create_compose_env "$candidate"
   TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
@@ -338,7 +359,7 @@ install_release() {
   TRANSACTION_ACTIVE=1
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
-  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$candidate"
+  persist_selected_image "$candidate" "$replacing_image"
   TRANSACTION_ACTIVE=0
   cleanup_history "$candidate" ""
   print_access
@@ -368,7 +389,7 @@ update_release() {
   TRANSACTION_BACKUP="$(create_backup)"
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
-  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$candidate"
+  persist_selected_image "$candidate" "$previous"
   mark_backup "$TRANSACTION_BACKUP" succeeded
   TRANSACTION_ACTIVE=0
   cleanup_history "$candidate" "$previous"

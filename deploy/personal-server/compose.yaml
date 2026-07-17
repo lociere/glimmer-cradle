@@ -2,7 +2,7 @@ name: glimmer-cradle
 
 services:
   personal-server:
-    image: ${GLIMMER_CRADLE_IMAGE:-glimmer-cradle/personal-server:0.1.0}
+    image: ${GLIMMER_CRADLE_IMAGE:-glimmer-cradle/personal-server:0.1.1}
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -35,7 +35,15 @@ services:
       - internal
 
   caddy:
-    image: ${GLIMMER_CRADLE_CADDY_IMAGE:-caddy:2.10.2-alpine}
+    image: ${GLIMMER_CRADLE_CADDY_IMAGE:-glimmer-cradle/personal-server:0.1.1}
+    entrypoint:
+      - /usr/local/bin/caddy
+    command:
+      - run
+      - --config
+      - /etc/caddy/Caddyfile
+      - --adapter
+      - caddyfile
     restart: unless-stopped
     depends_on:
       personal-server:

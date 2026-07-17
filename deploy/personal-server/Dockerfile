@@ -3,9 +3,31 @@
 ARG NODE_IMAGE=node:24.18.0-trixie-slim
 ARG PYTHON_IMAGE=python:3.12.13-slim-trixie
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.28
+ARG CADDY_VERSION=2.10.2
+ARG CADDY_AMD64_SHA512=747df7ee74de188485157a383633a1a963fd9233b71fbb4a69ddcbcc589ce4e2cc82dacf5dbbe136cb51d17e14c59daeb5d9bc92487610b0f3b93680b2646546
+ARG CADDY_LICENSE_SHA256=cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
 
 FROM ${NODE_IMAGE} AS node-runtime
 FROM ${UV_IMAGE} AS uv-runtime
+
+FROM ${PYTHON_IMAGE} AS caddy-runtime
+ARG CADDY_VERSION
+ARG CADDY_AMD64_SHA512
+ARG CADDY_LICENSE_SHA256
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl \
+    && curl --fail --show-error --location --retry 5 \
+      --output /tmp/caddy.tar.gz \
+      "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_amd64.tar.gz" \
+    && echo "${CADDY_AMD64_SHA512}  /tmp/caddy.tar.gz" | sha512sum --check --strict \
+    && tar -xzf /tmp/caddy.tar.gz -C /usr/local/bin caddy \
+    && curl --fail --show-error --location --retry 5 \
+      --output /tmp/CADDY-LICENSE \
+      "https://raw.githubusercontent.com/caddyserver/caddy/v${CADDY_VERSION}/LICENSE" \
+    && echo "${CADDY_LICENSE_SHA256}  /tmp/CADDY-LICENSE" | sha256sum --check --strict \
+    && install -D -m 0644 /tmp/CADDY-LICENSE /usr/share/licenses/caddy/LICENSE \
+    && chmod 0755 /usr/local/bin/caddy \
+    && rm -rf /var/lib/apt/lists/* /tmp/caddy.tar.gz /tmp/CADDY-LICENSE
 
 FROM ${NODE_IMAGE} AS node-builder
 WORKDIR /workspace
@@ -50,6 +72,8 @@ RUN apt-get update \
     && useradd --uid ${APP_UID} --gid ${APP_GID} --home-dir /var/lib/glimmer-cradle --create-home --shell /usr/sbin/nologin glimmer
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 COPY --from=uv-runtime /uv /uvx /usr/local/bin/
+COPY --from=caddy-runtime /usr/local/bin/caddy /usr/local/bin/caddy
+COPY --from=caddy-runtime /usr/share/licenses/caddy/LICENSE /usr/share/licenses/caddy/LICENSE
 
 WORKDIR /opt/glimmer-cradle/app
 COPY --from=node-builder --chown=glimmer:glimmer /release/kernel core/kernel
@@ -64,7 +88,9 @@ COPY --chown=glimmer:glimmer deploy/personal-server/container /opt/glimmer-cradl
 RUN install -d -o glimmer -g glimmer \
       /var/lib/glimmer-cradle/config \
       /var/lib/glimmer-cradle/data \
-      /run/glimmer-cradle
+      /run/glimmer-cradle \
+      /data \
+      /config
 
 ENV NODE_ENV=production \
     PYTHONUNBUFFERED=1 \

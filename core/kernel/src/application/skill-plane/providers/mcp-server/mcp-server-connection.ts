@@ -67,7 +67,7 @@ export class McpServerConnection {
     private readonly _callbacks: McpServerConnectionCallbacks = {},
   ) {
     this._client = new Client(
-      { name: 'glimmer-cradle-kernel', version: '0.1.0' },
+      { name: 'glimmer-cradle-kernel', version: '0.1.1' },
       {
         capabilities: {},
         listChanged: {

@@ -2,7 +2,7 @@
 
 identity:
   app_name: "Glimmer Cradle"
-  app_version: "0.1.0"
+  app_version: "0.1.1"
 
 character:
   active_id: "selrena"
