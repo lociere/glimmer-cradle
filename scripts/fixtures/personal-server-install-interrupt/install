@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+last_argument="${!#}"
+if [[ -n "${GLIMMER_CRADLE_TEST_FAIL_INSTALL_TARGET:-}" \
+  && "$last_argument" == "$GLIMMER_CRADLE_TEST_FAIL_INSTALL_TARGET" ]]; then
+  echo "注入 install 目标失败: ${last_argument}" >&2
+  exit 74
+fi
+exec /usr/bin/install "$@"

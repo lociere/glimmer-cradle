@@ -76,7 +76,14 @@ jobs:
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
           VERSION="${GITHUB_REF_NAME#v}"
           IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/glimmer-cradle-personal-server:${GITHUB_REF_NAME}@${{ steps.build_image.outputs.digest }}"
-          ./deploy/personal-server/package-release.sh "$VERSION" dist/personal-server "$IMAGE"
+          docker pull "$IMAGE"
+          DIGEST="${{ steps.build_image.outputs.digest }}"
+          DIGEST_HEX="${DIGEST#sha256:}"
+          ARCHIVE_IMAGE="glimmer-cradle/personal-server:release-v${VERSION}-${DIGEST_HEX:0:12}"
+          docker tag "$IMAGE" "$ARCHIVE_IMAGE"
+          IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$ARCHIVE_IMAGE")"
+          docker save --output personal-server-linux-amd64.tar "$ARCHIVE_IMAGE"
+          ./deploy/personal-server/package-release.sh "$VERSION" dist/personal-server "$IMAGE" personal-server-linux-amd64.tar "$ARCHIVE_IMAGE" "$IMAGE_ID"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: 验证 OCI 入口组件
@@ -89,6 +96,7 @@ jobs:
           cd dist/personal-server
           sha256sum --check SHA256SUMS
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
+          test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64-full.tar.gz"
           test -x glimmer-cradle-installer.sh
           test -s release-notes.md
           PACKAGE="glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
@@ -105,6 +113,19 @@ jobs:
             --env-file "$ENV_FILE" \
             --file extracted/glimmer-cradle-personal-server/compose.yaml \
             config --quiet
+          FULL_PACKAGE="glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64-full.tar.gz"
+          tar -tzf "$FULL_PACKAGE" | grep -qx 'glimmer-cradle-personal-server/images/personal-server-linux-amd64.tar'
+          tar -xOf "$FULL_PACKAGE" glimmer-cradle-personal-server/images/IMAGE | grep -qxF "$APP_IMAGE"
+          ARCHIVE_IMAGE="$(tar -xOf "$FULL_PACKAGE" glimmer-cradle-personal-server/images/ARCHIVE_IMAGE)"
+          ARCHIVE_IMAGE_ID="$(tar -xOf "$FULL_PACKAGE" glimmer-cradle-personal-server/images/IMAGE_ID)"
+          ! tar -tzf "$FULL_PACKAGE" | grep -Eqi '(^|/)(secrets\.yaml|data|logs?|cache|backups?|models?)(/|$)|\.(live2d|moc3)$'
+          tar -xOf "$PACKAGE" glimmer-cradle-personal-server/RELEASE-MANIFEST.sha256 > light-manifest.sha256
+          tar -xOf "$FULL_PACKAGE" glimmer-cradle-personal-server/RELEASE-MANIFEST.sha256 > full-manifest.sha256
+          cmp light-manifest.sha256 full-manifest.sha256
+          tar -xOf "$FULL_PACKAGE" glimmer-cradle-personal-server/images/personal-server-linux-amd64.tar > image-archive.tar
+          docker image rm "$ARCHIVE_IMAGE" >/dev/null
+          docker load --input image-archive.tar >/dev/null
+          test "$(docker image inspect --format '{{.Id}}' "$ARCHIVE_IMAGE")" = "$ARCHIVE_IMAGE_ID"
 
       - name: 发布 GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
@@ -114,5 +135,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64.tar.gz
+            dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64-full.tar.gz
             dist/personal-server/glimmer-cradle-installer.sh
             dist/personal-server/SHA256SUMS

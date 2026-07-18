@@ -11,7 +11,9 @@
 | 事项 | 处理 |
 |---|---|
 | 跨表面 Conversation/Experience/Memory 边界、真实 Core Skill 执行、UI 打包前体验收口 | 已完成于 [M09：主体可用性、跨表面连续性与体验收口](./milestones/M09-主体可用性、跨场景记忆与体验收口.md) |
-| 发布形态、安装投影与数据迁移闭环 | 后移为 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)，等待 M09 验收后进入当前推进面 |
+| 发布形态、安装投影与数据迁移闭环 | 已完成于 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) |
+| 区域感知的官方分发端点 | 安装协议与一致性门禁已由 M10 建立；真实用户规模触发后的自动选源和项目方副本纳入 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) |
+| Personal Server 网页配置、跨产品 Extension 与 NapCat QQ 场景闭环 | 已晋升为计划中的 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) |
 
 ## 候选项
 
@@ -26,6 +28,8 @@
 | 多平台 Adapter 扩展 | 将更多平台接入当前角色感知/表达 | 权限、平台 payload、账号安全、限流 | 有明确用户入口和 Extension 边界设计 |
 | Avatar 行为租约泛化 | 允许 Cognition/用户/场景/扩展并发覆盖身体通道 | 优先级、冲突、帧率、模型能力缺口 | 当前动作/视线/口型不能满足真实场景 |
 | 本地模型管理工作台 | 让用户管理 LLM/ASR/TTS/Avatar 模型 | 包体积、下载失败、磁盘占用、授权 | M08 后模型资源诊断成为主要痛点 |
+| Debian Personal Server 支持 | 扩展服务器发行版覆盖 | 软件包、Docker、systemd 与网络环境差异 | Debian 13 全新宿主完成安装、更新、恢复和停机矩阵 |
+| Desktop/Avatar/Audio 正式打包矩阵 | 让桌面产品形成独立可安装发行物 | Windows 签名、Unity 资产、Native DLL、设备与用户数据投影 | 单独里程碑明确支持系统、资产许可和实机矩阵 |
 
 ## 拒绝或移出规则
 

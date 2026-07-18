@@ -1,41 +1,38 @@
 # Now
 
-> 审阅日期：2026-07-13
-> 范围：当前唯一活跃推进面、下一验收门和近期不做事项；不记录已完成架构事实。
+> 审阅日期：2026-07-18
+> 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
-当前暂不进入 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。人物自主使用 Skill 的 Cognition ActionPlan、Kernel Skill Plane 执行、结果回注与综合回复链路已经落地；当前唯一活跃推进面改为 **Official Audio 闭环**。
+[M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进：Official Audio
+## 等待启动：M11 Personal Server 控制面与 Extension 闭环
 
-Audio 架构已经收口为独立双 lane Engine：CosyVoice 3.5 Flash 是当前云端 TTS 基线，FunASR 是唯一 ASR provider；当前不保留本地 TTS fallback。角色声音身份、系统路由、密钥、Engine 执行和 Desktop 播放各有单一 owner；旧 experimental provider、Piper、GSV sidecar、Edge/SAPI/Whisper 与 Kernel provider 队列已删除。当前验收重点转为真实账号、真实声线和真实录音 smoke test，不再继续调整边界。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已完成架构规划，等待独立开发任务启动。启动后它将成为唯一活跃推进面，并把状态从 `planned` 更新为 `in-progress`。
 
-| 成果 | 当前关注 | 验收证据 |
-|---|---|---|
-| 云端 TTS 实机验收 | 创建 Selrena 正式 voice id，验证持久连接、连续短句、错误 key、超时与熔断 | 真实音频、route_state、provider_id、耗时和 process log |
-| TTS 失效隔离 | 验证断网/熔断后 TTS 明确 unavailable，文本回复和 Cognition 连续性不受影响 | unavailable 投影、文本回复、恢复窗口 |
-| ASR 实机验收 | FunASR 真实录音、空音频、坏文件、缺模型和超时 | transcript、输入状态和 process log |
-| 交互延迟基线 | 记录短句合成与播放器开口耗时，作为未来 PCM media plane 的比较基线 | 冷/热连接、合成耗时、播放开始时间 |
+M11 负责：
 
-## 随后推进
-
-1. **Desktop 配置投影**：Electron main 当前仍直接解析和改写多份 YAML。应由 Kernel Config Application Port 提供校验后的 `ConfigSnapshot` 与显式 update command，Control Center 只发送用户 intent；完成后删除 Desktop 的第二套 YAML normalizer。
-2. **商业级 Control Center**：基于 Kernel 投影统一空态、加载、保存、重启提示、错误恢复、Memory/Experience 可见性和 Avatar ready 状态，再做完整桌面与移动宽度视觉验收。
-3. **Avatar 体验收尾**：验证 Unity 首帧无左上角窗口闪现、任务栏图标不短暂出现、外观与动作设置持久化、Presence 与 Unity 状态不互相误报。
-4. **M10 发布闭环**：完成安装目录、用户数据域、组件域、缓存域、日志域、迁移与包内容检查后再进入实际发布。
-
-## 近期不做
-
-- 不新增真流式回复、本地模型工作台或新平台大集成。
-- 不把 Audio、Avatar、Cognition 或 Kernel 生命周期伪装为 Extension。
-- 不在 Desktop、打包脚本或 provider 包装中增加角色 fallback、旧目录 fallback 或永久兼容壳。
-- 不让 Renderer 读取原始配置、日志全文、secret 或内部 service。
-- 不把用户数据、日志、缓存、模型或私人资产写入安装目录。
+- 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
+- 为 Personal Server 提供首次 Provider 配置、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新页面；
+- 让 Extension 安装、启停、升级、权限与产品兼容性通过同一 Package Manager 闭环；
+- 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
+- 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
+- 在真实规模或网络需求出现时，为同一发布物增加项目方控制的区域传输副本，不把它作为基础安装前提。
 
 ## 第一验收门
 
-- 配置本机 `DASHSCOPE_API_KEY` 与 Selrena CosyVoice `voice_id`。
-- 用真实 TTS/ASR 样本跑通 warmup、连续调用、超时、失效隔离、缺资源和停机回收。
-- 保存 Control Center 声线 ID，重启后确认配置、route state 与播放队列一致。
+1. Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约。
+2. Kernel 成为唯一配置 owner，能够脱敏读取、预览变更、拒绝 revision 冲突并原子提交。
+3. Personal Server 首次配置页面可新建 Provider、测试连接、保存模型路由并完成真实角色回复。
+4. 页面信息架构、响应式布局、加载/空态/失败恢复和 Playwright 截图矩阵先形成可持续设计基线，不以临时表单堆叠代替正式控制面。
+
+## 近期不做
+
+- 不让浏览器直接读写服务器 YAML、secret、任意文件路径或 Docker Socket。
+- 不把 Desktop 的 Avatar、窗口、剪贴板和本机设备页面复制到 Personal Server。
+- 不把 NapCat 的 Windows OneKey 启动逻辑伪装成 Linux 兼容。
+- 不让 Extension 私有 Skill 泄露到无关 ConversationContext，也不把管理操作伪装成人物 Skill。
+- 不为特定云厂商、地域或代理域名分叉安装协议。
+- 不在缺少 Debian 实机矩阵时声明 Debian 正式支持。
 
 未承诺候选事项见 [backlog.md](./backlog.md)。

@@ -20,7 +20,7 @@ Selrena（月见）是当前默认角色。角色身份、人设、声音与 Ava
 | 产品 | 目标环境 | 能力范围 | 当前入口 |
 |---|---|---|---|
 | **Glimmer Cradle Desktop** | Windows 桌面 | 本机对话、Control Center、Presence、设备 Skill、Audio 与 Avatar | `products/desktop/` |
-| **Glimmer Cradle Personal Server** | Ubuntu 24.04 / Debian 13，`linux/amd64` | 常驻服务、浏览器控制面板、远程对话、云端 TTS lane、Skill Plane 与 Extension Host | `products/personal-server/` |
+| **Glimmer Cradle Personal Server** | Ubuntu 24.04 LTS，`linux/amd64` | 常驻服务、浏览器控制面板、远程对话、云端 TTS lane、Skill Plane 与 Extension Host | `products/personal-server/` |
 
 两个产品共享 Protocol、Kernel、Cognition、Audio Engine、Extension Host 和数据契约，但不是同一宿主程序。Desktop 负责本机窗口、设备和 Avatar；Personal Server 不声明其部署环境不具备的桌面能力。
 

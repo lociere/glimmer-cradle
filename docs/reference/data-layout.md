@@ -116,3 +116,5 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 5. 缓存可删除重建，但删除缓存不能代替状态迁移。
 
 操作见 [数据迁移与恢复](../guides/operations/数据迁移与恢复.md)，部署映射见 [Packaging Layout Reference](./packaging-layout.md)。
+
+Personal Server 将该备份域投影为宿主 `/var/lib/glimmer-cradle/backups/<UTC timestamp>/`。每个部署备份包含 `config.tar.gz`、`data.tar.gz`、`SHA256SUMS` 与事务元数据；`glimmer-cradle backup` 和 `restore` 是唯一受支持的宿主备份恢复入口，恢复不接受备份域外路径。

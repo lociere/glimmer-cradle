@@ -163,11 +163,17 @@ const personalServerReleaseInstaller = fs.readFileSync(
   path.join(repoRoot, 'deploy/personal-server/install-release.sh'),
   'utf8',
 );
-if (!personalServerReleaseInstaller.includes('GLIMMER_CRADLE_DOWNLOAD_BASE')
+if (!personalServerReleaseInstaller.includes('GLIMMER_CRADLE_RELEASE_SOURCE')
+  || !personalServerReleaseInstaller.includes('GLIMMER_CRADLE_PACKAGE_VARIANT')
   || !personalServerReleaseInstaller.includes('GLIMMER_CRADLE_CANDIDATE_IMAGE')
   || !personalServerReleaseInstaller.includes('GLIMMER_CRADLE_GITHUB_TOKEN')
   || !personalServerReleaseInstaller.includes('SHA256SUMS')
   || !personalServerReleaseInstaller.includes('sha256sum --check')
+  || !personalServerReleaseInstaller.includes('docker load --input')
+  || !personalServerReleaseInstaller.includes('trap cleanup EXIT')
+  || !personalServerReleaseInstaller.includes('handle_signal TERM 143')
+  || personalServerReleaseInstaller.includes('trap cleanup EXIT INT TERM')
+  || !personalServerReleaseInstaller.includes('GLIMMER_CRADLE_DEPLOY_RESULT_FILE')
   || !personalServerReleaseInstaller.includes('.release-sha256')) {
   violations.push('deploy/personal-server/install-release.sh: 远程安装必须支持可信下载源、镜像覆盖和摘要校验');
 }
@@ -176,6 +182,10 @@ const personalServerReleasePackager = fs.readFileSync(
   'utf8',
 );
 if (!personalServerReleasePackager.includes('glimmer-cradle-personal-server-v${RELEASE_VERSION}-${RELEASE_TARGET}.tar.gz')
+  || !personalServerReleasePackager.includes('glimmer-cradle-personal-server-v${RELEASE_VERSION}-${RELEASE_TARGET}-full.tar.gz')
+  || !personalServerReleasePackager.includes('personal-server-linux-amd64.tar')
+  || !personalServerReleasePackager.includes('ARCHIVE_IMAGE')
+  || !personalServerReleasePackager.includes('IMAGE_ID')
   || !personalServerReleasePackager.includes('glimmer-cradle-installer.sh')
   || !personalServerReleasePackager.includes('SHA256SUMS')
   || !personalServerReleasePackager.includes('GLIMMER_CRADLE_CADDY_IMAGE=${IMAGE}')

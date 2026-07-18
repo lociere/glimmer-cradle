@@ -13,9 +13,13 @@
 
 ## 控制面板与能力边界
 
-Desktop 与 Personal Server 使用同一设计语言和 Kernel 投影，但不是同一 Product Host 或同一页面装配。Desktop Control Center 由 Electron main/preload/renderer 承载，可调用系统文件选择器、本机设备 Skill、Avatar 和窗口能力；Personal Server 控制面板是 `products/personal-server/public/` 的浏览器应用，只暴露远程会话、服务状态、兼容能力与扩展生命周期，不接受浏览器提交服务器文件路径安装 `.gcex`。
+Desktop 与 Personal Server 使用同一设计语言和 Kernel 投影，但不是同一 Product Host 或同一页面装配。Desktop Control Center 由 Electron main/preload/renderer 承载，可调用系统文件选择器、本机设备 Skill、Avatar 和窗口能力；Personal Server 控制面板是 `products/personal-server/public/` 的浏览器应用。
 
-Personal Server 并不禁用 Skill Plane。Core、MCP、User 和 Extension Provider 都可以存在；Product Composition 只过滤不满足 `products`、Linux `platforms` 或 `features` 的贡献。扩展私有的 `source_provider` Skill 只在该 Extension/Adapter 产生的 ConversationContext 中进入规划和执行，不会泄露给其他来源。
+当前 `v0.1.x` 浏览器应用只提供远程会话、系统状态和基础 Extension 生命周期入口。它尚未提供 LLM Provider、Audio、Embedding、Memory、Skill Policy、网络安全或更新设置，也没有对应的配置读写 API；服务器配置仍由受控宿主配置文件和运维命令完成。这是当前产品限制，不是隐藏入口。计划中的配置投影、日志工作台、完整 Extension 管理和服务器设置由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 承担。
+
+未来浏览器配置也不得直接读写 YAML、secret 或任意服务器路径。Kernel Config Application Port 是唯一配置 owner：浏览器只消费脱敏 `ConfigSnapshot`，提交经过 Schema、权限、revision 和审计约束的 update command；secret 只写不可回显。Personal Server 不接受浏览器提交服务器文件路径安装 `.gcex`。
+
+Personal Server 并不禁用 Skill Plane。Core、MCP、User 和 Extension Provider 都可以存在；Product Composition 只过滤不满足 `products`、Linux `platforms` 或 `features` 的贡献。扩展私有的 `source_provider` Skill 只在该 Extension/Adapter 产生的 ConversationContext 中进入规划和执行，不会泄露给其他来源。管理 WebUI、账号登录、二维码、进程控制和部署操作属于管理能力，不是供角色选择的 Skill。
 
 ## 启动与监督
 

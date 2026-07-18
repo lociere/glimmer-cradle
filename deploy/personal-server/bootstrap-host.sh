@@ -8,9 +8,9 @@ fi
 
 . /etc/os-release
 case "${ID}:${VERSION_ID}" in
-  ubuntu:24.04|debian:13) ;;
+  ubuntu:24.04) ;;
   *)
-    echo "当前自动初始化仅验收 Ubuntu 24.04 LTS 与 Debian 13；检测到 ${PRETTY_NAME}." >&2
+    echo "当前自动初始化仅正式支持 Ubuntu 24.04 LTS；检测到 ${PRETTY_NAME}." >&2
     echo "其他系统请按 Docker 官方安装文档配置后运行 ./deploy.sh install。" >&2
     exit 1
     ;;

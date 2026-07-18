@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == light-success ]]; then
+  case "$*" in
+    'info'|'compose version'|'buildx version')
+      exit 0
+      ;;
+    *' ps --status running --services')
+      printf 'caddy\npersonal-server\n'
+      exit 0
+      ;;
+    *' ps --all -q personal-server')
+      printf 'glimmer-cradle-test-container\n'
+      exit 0
+      ;;
+    'inspect --format {{.Config.Image}} glimmer-cradle-test-container')
+      printf '%s\n' "${GLIMMER_CRADLE_TEST_CURRENT_IMAGE:?轻量安装成功测试必须提供当前镜像}"
+      exit 0
+      ;;
+    *' up --detach --remove-orphans'|*' exec -T personal-server node -e '*)
+      exit 0
+      ;;
+    *)
+      echo "轻量安装成功测试收到未预期的 docker 调用: $*" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+case "${1:-} ${2:-}" in
+  'info '|'compose version'|'buildx version')
+    exit 0
+    ;;
+  'load --input')
+    if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-block}" == success ]]; then
+      exit 0
+    fi
+    : > "${GLIMMER_CRADLE_TEST_DOCKER_MARKER:?阻塞测试必须提供标记路径}"
+    while true; do sleep 1; done
+    ;;
+  'image inspect')
+    [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == success ]] || exit 1
+    printf '%s\n' "${GLIMMER_CRADLE_TEST_IMAGE_ID:?成功模式必须提供 image ID}"
+    ;;
+  *)
+    if [[ -n "${GLIMMER_CRADLE_TEST_UNEXPECTED_DOCKER_MARKER:-}" ]]; then
+      : > "$GLIMMER_CRADLE_TEST_UNEXPECTED_DOCKER_MARKER"
+    fi
+    echo "中断测试收到未预期的 docker 调用: $*" >&2
+    exit 1
+    ;;
+esac

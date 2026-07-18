@@ -11,7 +11,10 @@ BACKUP_ROOT="${STATE_ROOT}/backups"
 IMAGE_REPOSITORY="glimmer-cradle/personal-server"
 BACKUP_RETENTION=5
 IMAGE_RETENTION=3
+READY_TIMEOUT_SECONDS="${GLIMMER_CRADLE_READY_TIMEOUT_SECONDS:-240}"
+DEPLOY_RESULT_FILE="${GLIMMER_CRADLE_DEPLOY_RESULT_FILE:-}"
 COMMAND="${1:-install}"
+COMMAND_ARGUMENT="${2:-}"
 DOCKER=(docker)
 PRIVILEGED=()
 TEMP_ENV_FILES=()
@@ -22,6 +25,11 @@ TRANSACTION_CANDIDATE_ENV=""
 TRANSACTION_PREVIOUS_ENV=""
 TRANSACTION_PREVIOUS_IMAGE=""
 TRANSACTION_CANDIDATE_IMAGE=""
+
+[[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && (( READY_TIMEOUT_SECONDS >= 10 && READY_TIMEOUT_SECONDS <= 900 )) || {
+  echo "GLIMMER_CRADLE_READY_TIMEOUT_SECONDS 必须是 10 到 900 秒的整数。" >&2
+  exit 1
+}
 
 if ! docker info >/dev/null 2>&1; then
   if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
@@ -54,6 +62,9 @@ on_exit() {
   local exit_code=$?
   trap - EXIT INT TERM
   if (( TRANSACTION_ACTIVE )); then
+    if [[ -n "$DEPLOY_RESULT_FILE" ]]; then
+      rm -f -- "$DEPLOY_RESULT_FILE"
+    fi
     rollback_transaction || true
   fi
   cleanup
@@ -154,6 +165,20 @@ persist_selected_image() {
   fi
 }
 
+write_deploy_result() {
+  [[ -n "$DEPLOY_RESULT_FILE" ]] || return 0
+  local result_parent result_temp
+  result_parent="$(dirname -- "$DEPLOY_RESULT_FILE")"
+  [[ -d "$result_parent" ]] || {
+    echo "部署结果目录不存在: ${result_parent}" >&2
+    return 1
+  }
+  result_temp="${DEPLOY_RESULT_FILE}.$$.new"
+  printf 'committed\n' > "$result_temp"
+  chmod 0600 "$result_temp"
+  mv -f -- "$result_temp" "$DEPLOY_RESULT_FILE"
+}
+
 compose_with_env() {
   local env_file="$1"
   shift
@@ -174,7 +199,13 @@ prepare_candidate() {
   if [[ "$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     compose_with_env "$env_file" build --pull
   else
-    compose_with_env "$env_file" pull
+    if [[ "${GLIMMER_CRADLE_CANDIDATE_PRELOADED:-0}" == 1 ]]; then
+      local image
+      image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
+      "${DOCKER[@]}" image inspect "$image" >/dev/null
+    else
+      compose_with_env "$env_file" pull
+    fi
   fi
 }
 
@@ -238,7 +269,7 @@ preflight_ports() {
 
 wait_until_ready() {
   local env_file="$1"
-  local deadline=$((SECONDS + 240))
+  local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
   while (( SECONDS < deadline )); do
     if compose_with_env "$env_file" exec -T personal-server node -e \
       "fetch('http://127.0.0.1:3210/readyz',{headers:{authorization:'Bearer '+process.env.GLIMMER_CRADLE_SERVER_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
@@ -255,9 +286,13 @@ wait_until_ready() {
 }
 
 create_backup() {
-  local timestamp backup_dir
+  local timestamp backup_dir counter=0
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
   backup_dir="${BACKUP_ROOT}/${timestamp}"
+  while [[ -e "$backup_dir" ]]; do
+    ((counter += 1))
+    backup_dir="${BACKUP_ROOT}/${timestamp}-$(printf '%02d' "$counter")"
+  done
   mkdir -p "$backup_dir"
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/config.tar.gz" config
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/data.tar.gz" data
@@ -293,6 +328,10 @@ assert_archive_root() {
     esac
     [[ "$entry" != *'/../'* && "$entry" != '../'* ]] || return 1
   done < <(tar -tzf "$archive")
+  if tar -tvzf "$archive" | awk 'substr($1,1,1) ~ /[lh]/ { found=1 } END { exit !found }'; then
+    echo "备份归档不得包含符号链接或硬链接: ${archive}" >&2
+    return 1
+  fi
 }
 
 restore_backup() {
@@ -307,6 +346,102 @@ restore_backup() {
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/config.tar.gz"
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/data.tar.gz"
   prepare_state
+}
+
+validate_backup() {
+  local backup_dir="$1"
+  [[ -d "$backup_dir" && ! -L "$backup_dir" \
+    && -f "$backup_dir/config.tar.gz" && ! -L "$backup_dir/config.tar.gz" \
+    && -f "$backup_dir/data.tar.gz" && ! -L "$backup_dir/data.tar.gz" \
+    && -f "$backup_dir/SHA256SUMS" && ! -L "$backup_dir/SHA256SUMS" ]] || {
+    echo "备份不完整: ${backup_dir}" >&2
+    return 1
+  }
+  (
+    cd "$backup_dir"
+    sha256sum --check SHA256SUMS
+  )
+  assert_archive_root "$backup_dir/config.tar.gz" config
+  assert_archive_root "$backup_dir/data.tar.gz" data
+}
+
+backup_release() {
+  local was_running=0 current backup_dir
+  if compose_with_env "$DEPLOYMENT_ENV_FILE" ps --status running --services 2>/dev/null | grep -qx personal-server; then
+    was_running=1
+  fi
+  current="$(current_container_image)"
+  TRANSACTION_PREVIOUS_IMAGE="$current"
+  TRANSACTION_CANDIDATE_IMAGE="$current"
+  if (( was_running )); then
+    compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans
+  fi
+  if ! backup_dir="$(create_backup)"; then
+    if (( was_running )); then
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    fi
+    echo "备份创建失败，服务已恢复到操作前状态。" >&2
+    return 1
+  fi
+  mark_backup "$backup_dir" manual
+  if (( was_running )); then
+    compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+    wait_until_ready "$DEPLOYMENT_ENV_FILE"
+  fi
+  echo "备份已创建: ${backup_dir}"
+}
+
+restore_release() {
+  local backup_name="$1"
+  local backup_dir safety_backup was_running=0 current
+  [[ "$backup_name" =~ ^[0-9]{8}T[0-9]{6}Z(-[0-9]{2})?$ ]] || {
+    echo "restore 只接受 backups 下的 UTC 时间戳目录名。" >&2
+    return 1
+  }
+  backup_dir="${BACKUP_ROOT}/${backup_name}"
+  validate_backup "$backup_dir"
+  if compose_with_env "$DEPLOYMENT_ENV_FILE" ps --status running --services 2>/dev/null | grep -qx personal-server; then
+    was_running=1
+  fi
+  current="$(current_container_image)"
+  TRANSACTION_PREVIOUS_IMAGE="$current"
+  TRANSACTION_CANDIDATE_IMAGE="$current"
+  if (( was_running )); then
+    compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans
+  fi
+  if ! safety_backup="$(create_backup)"; then
+    if (( was_running )); then
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    fi
+    echo "无法创建恢复前安全快照，未修改当前数据。" >&2
+    return 1
+  fi
+  if ! restore_backup "$backup_dir"; then
+    restore_backup "$safety_backup"
+    if (( was_running )); then
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    fi
+    mark_backup "$safety_backup" restore-rollback
+    echo "恢复写入失败，已恢复操作前状态。" >&2
+    return 1
+  fi
+  if (( was_running )); then
+    compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+    if ! wait_until_ready "$DEPLOYMENT_ENV_FILE"; then
+      compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans || true
+      restore_backup "$safety_backup"
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
+      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      mark_backup "$safety_backup" restore-rollback
+      echo "恢复后的服务未就绪，已恢复操作前状态。" >&2
+      return 1
+    fi
+  fi
+  mark_backup "$safety_backup" restore-safety
+  echo "已从备份恢复: ${backup_dir}"
 }
 
 rollback_transaction() {
@@ -347,6 +482,7 @@ install_release() {
     compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
     wait_until_ready "$DEPLOYMENT_ENV_FILE"
     print_access
+    write_deploy_result
     return 0
   fi
   replacing_image="$(read_env GLIMMER_CRADLE_IMAGE '')"
@@ -360,9 +496,10 @@ install_release() {
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
   persist_selected_image "$candidate" "$replacing_image"
-  TRANSACTION_ACTIVE=0
   cleanup_history "$candidate" ""
   print_access
+  write_deploy_result
+  TRANSACTION_ACTIVE=0
 }
 
 update_release() {
@@ -391,9 +528,10 @@ update_release() {
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
   persist_selected_image "$candidate" "$previous"
   mark_backup "$TRANSACTION_BACKUP" succeeded
-  TRANSACTION_ACTIVE=0
   cleanup_history "$candidate" "$previous"
   print_access
+  write_deploy_result
+  TRANSACTION_ACTIVE=0
 }
 
 cleanup_history() {
@@ -403,7 +541,7 @@ cleanup_history() {
   local index candidate
   mapfile -t backups < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
   for (( index=BACKUP_RETENTION; index<${#backups[@]}; index++ )); do
-    [[ "${backups[$index]}" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || continue
+    [[ "${backups[$index]}" =~ ^[0-9]{8}T[0-9]{6}Z(-[0-9]{2})?$ ]] || continue
     rm -rf -- "$BACKUP_ROOT/${backups[$index]}"
   done
 
@@ -458,8 +596,14 @@ case "$COMMAND" in
   logs)
     compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
     ;;
+  backup)
+    backup_release
+    ;;
+  restore)
+    restore_release "$COMMAND_ARGUMENT"
+    ;;
   *)
-    echo "用法: ./deploy.sh [install|update|restart|stop|status|logs]" >&2
+    echo "用法: ./deploy.sh [install|update|restart|stop|status|logs|backup|restore <UTC timestamp>]" >&2
     exit 2
     ;;
 esac
