@@ -24,6 +24,7 @@ const __dirname = path.dirname(__filename);
 const PROTOCOL_ROOT = path.resolve(__dirname, "..");
 const SCHEMA_DIR = path.join(PROTOCOL_ROOT, "src", "schemas");
 const TS_OUT_DIR = path.join(PROTOCOL_ROOT, "src", "generated");
+const MODELS_BARREL_SKIP = new Set(['SkillCatalogRequest.ts', 'SkillCatalogResponse.ts', 'SkillCatalogSnapshot.ts']);
 
 // ─────────────────────────── 工具 ──────────────────────────────
 
@@ -149,8 +150,28 @@ function dropOptionalForDefaulted(tsCode: string, defaultedFields: Map<string, S
 }
 
 const SHARED_MODEL_NAMES = [
+  'AudioConfig',
+  'EmbeddingConfig',
+  'MemoryConfig',
+  'SkillPlaneConfig',
   'CapabilityScope',
   'ConversationContext',
+  'ConversationHistoryEntry',
+  'ConversationHistoryRequest',
+  'ConversationHistoryResult',
+  'ConversationNotice',
+  'ConfigurationModelAlias',
+  'ConfigurationProviderDraft',
+  'ConfigurationProviderSnapshot',
+  'ConfigurationProviderTestDraft',
+  'ConfigurationRouteSnapshot',
+  'ConfigurationSnapshot',
+  'ConfigurationSnapshotRequest',
+  'ConfigurationSnapshotResult',
+  'ConfigurationTestRequest',
+  'ConfigurationTestResult',
+  'ConfigurationUpdateRequest',
+  'ConfigurationUpdateResult',
   'ExtensionPermission',
   'ExtensionInstallCommitRequest',
   'ExtensionInstallPrepareRequest',
@@ -167,9 +188,59 @@ const SHARED_MODEL_NAMES = [
   'ExtensionStatusChanged',
   'ExtensionUninstallRequest',
   'ExtensionUninstallResult',
+  'SkillCatalogRequest',
+  'SkillCatalogResponse',
+  'SkillCatalogSnapshot',
 ] as const;
 
 const SHARED_MODEL_DECLARATIONS: Partial<Record<(typeof SHARED_MODEL_NAMES)[number], readonly string[]>> = {
+  AudioConfig: [
+    'AudioConfig',
+    'ASRConfig',
+    'TTSConfig',
+    'TTSRouteConfig',
+    'CircuitBreakerConfig',
+    'TTSCacheConfig',
+    'TTSProvidersConfig',
+    'DashScopeCosyVoiceConfig',
+  ],
+  EmbeddingConfig: [
+    'EmbeddingConfig',
+    'EmbeddingRouteConfig',
+    'EmbeddingProvidersConfig',
+    'DashScopeEmbeddingProviderConfig',
+    'LocalEmbeddingProviderConfig',
+  ],
+  MemoryConfig: [
+    'MemoryConfig',
+    'WorkingMemoryConfig',
+    'ConversationProjectionConfig',
+    'ExperienceLedgerConfig',
+    'ConsolidationConfig',
+    'RetrievalConfig',
+  ],
+  SkillPlaneConfig: [
+    'SkillPlaneConfig',
+    'McpServerConfig',
+    'UserSkillConfig',
+  ],
+  SkillCatalogResponse: [
+    'SkillCatalogResponse',
+  ],
+  SkillCatalogSnapshot: [
+    'SkillCatalogSnapshot',
+    'SkillProviderKind',
+    'SkillProviderRuntimeState',
+    'SkillAudience',
+    'SkillRiskLevel',
+    'SkillProviderRuntimeSnapshot',
+    'SkillProviderRef',
+    'SkillCatalogEntry',
+    'SkillToolSummary',
+    'SkillResourceSummary',
+    'SkillPromptSummary',
+    'SkillPolicy',
+  ],
   ExtensionRuntimeProjection: [
     'ExtensionRuntimeProjection',
     'LifecycleState',
@@ -188,20 +259,17 @@ const SHARED_MODEL_DECLARATIONS: Partial<Record<(typeof SHARED_MODEL_NAMES)[numb
 };
 
 const SHARED_MODEL_DIRECTORIES: Partial<Record<(typeof SHARED_MODEL_NAMES)[number], string>> = {
+  AudioConfig: 'config',
+  EmbeddingConfig: 'config',
+  MemoryConfig: 'config',
+  SkillPlaneConfig: 'config',
   ExtensionPermission: 'extension',
 };
 
 function reuseSharedModels(tsCode: string, schema: any, outFile: string): string {
-  const imports: string[] = [];
   let stripped = tsCode;
   for (const modelName of SHARED_MODEL_NAMES) {
-    if (
-      schema.title === modelName
-      || (!stripped.includes(`export interface ${modelName}`) && !stripped.includes(`export type ${modelName} =`))
-    ) continue;
-    const sharedFile = path.join(TS_OUT_DIR, SHARED_MODEL_DIRECTORIES[modelName] ?? 'models', modelName);
-    let importPath = path.relative(path.dirname(outFile), sharedFile).replaceAll(path.sep, '/');
-    if (!importPath.startsWith('.')) importPath = `./${importPath}`;
+    if (schema.title === modelName) continue;
     for (const declarationName of SHARED_MODEL_DECLARATIONS[modelName] ?? [modelName]) {
       stripped = stripped.replace(
         new RegExp(
@@ -210,7 +278,19 @@ function reuseSharedModels(tsCode: string, schema: any, outFile: string): string
         '',
       );
     }
-    imports.push(`import type { ${modelName} } from '${importPath}';`);
+  }
+  const imports: string[] = [];
+  for (const modelName of SHARED_MODEL_NAMES) {
+    if (schema.title === modelName) continue;
+    const declarationNames = SHARED_MODEL_DECLARATIONS[modelName] ?? [modelName];
+    const used = declarationNames.some((declarationName) => (
+      new RegExp(`\\b${declarationName}\\b`).test(stripped)
+    ));
+    if (!used) continue;
+    const sharedFile = path.join(TS_OUT_DIR, SHARED_MODEL_DIRECTORIES[modelName] ?? 'models', modelName);
+    let importPath = path.relative(path.dirname(outFile), sharedFile).replaceAll(path.sep, '/');
+    if (!importPath.startsWith('.')) importPath = `./${importPath}`;
+    imports.push(`import type { ${declarationNames.join(', ')} } from '${importPath}';`);
   }
   if (imports.length === 0) return tsCode;
   stripped = stripped
@@ -282,7 +362,7 @@ async function generateIndices(): Promise<void> {
     if (!entry.isDirectory()) continue;
     const subDir = path.join(TS_OUT_DIR, entry.name);
     const files = (await fs.readdir(subDir))
-      .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+      .filter((f) => f.endsWith(".ts") && f !== "index.ts" && (entry.name !== 'models' || !MODELS_BARREL_SKIP.has(f)))
       .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     if (files.length === 0) continue;
     const lines = [

@@ -142,6 +142,7 @@ def compose_cognition(config: CharacterRuntimeConfig) -> CognitionComponents:
         self_entity=self_entity,
         agent_plan_use_case=agent_plan,
         agent_synthesis_use_case=agent_synthesis,
+        conversation_controller=conversation_controller,
     )
     ingress_cortex = KernelIngressCortex()
     kernel_bridge = KernelBridge()
@@ -319,6 +320,10 @@ def _register_kernel_handlers(
     bridge.register_handler(
         IPCMessageType.AGENT_SYNTHESIS,
         lambda message: inbound.on_agent_synthesis(ingress.parse_agent_synthesis(message)),
+    )
+    bridge.register_handler(
+        IPCMessageType.CONVERSATION_HISTORY,
+        lambda message: inbound.on_conversation_history(ingress.parse_conversation_history(message)),
     )
     bridge.register_handler(IPCMessageType.CONFIG_INIT, on_config_init)
     bridge.register_handler("heartbeat", lambda _message: on_heartbeat())

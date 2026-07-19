@@ -6,7 +6,25 @@
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import fs from "fs-extra";
-import { IPCMessageType, IPCRequest, IPCResponse, ChatMessageResponse, LifeHeartbeatRequest, LifeHeartbeatResponse, AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse, PerceptionCancelRequest, PerceptionEvent, createIPCRequest, ErrorCode, KnowledgeInitPayload } from '@glimmer-cradle/protocol';
+import {
+  IPCMessageType,
+  IPCRequest,
+  IPCResponse,
+  ChatMessageResponse,
+  LifeHeartbeatRequest,
+  LifeHeartbeatResponse,
+  AgentPlanRequest,
+  AgentPlanResponse,
+  AgentSynthesisRequest,
+  AgentSynthesisResponse,
+  ConversationHistoryIPCRequest,
+  ConversationHistoryResponse,
+  PerceptionCancelRequest,
+  PerceptionEvent,
+  createIPCRequest,
+  ErrorCode,
+  KnowledgeInitPayload,
+} from '@glimmer-cradle/protocol';
 import { CoreException } from '../../../foundation/exceptions';
 import { createTraceContext, getCurrentSpanId } from '../../../foundation/logger/trace-context';
 import { ConfigManager } from "../../../foundation/config/config-manager";
@@ -537,6 +555,33 @@ export class CognitionManager {
     }
 
     return response.payload as LifeHeartbeatResponse;
+  }
+
+  public async getConversationHistory(
+    request: ConversationHistoryIPCRequest,
+    traceId?: string,
+  ): Promise<ConversationHistoryResponse> {
+    if (!this._isReady) {
+      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
+    }
+
+    const traceContext = createTraceContext({ trace_id: traceId });
+    const ipcRequest = createIPCRequest(
+      IPCMessageType.CONVERSATION_HISTORY,
+      traceContext.trace_id,
+      request,
+    );
+
+    const response = await this.sendRequest(ipcRequest);
+    if (!response.success) {
+      throw new CoreException(
+        `Conversation 历史查询失败: ${response.error?.message}`,
+        response.error?.code as ErrorCode || ErrorCode.INFERENCE_ERROR,
+        traceContext.trace_id,
+      );
+    }
+
+    return response.payload as ConversationHistoryResponse;
   }
 
   public async restart(): Promise<void> {

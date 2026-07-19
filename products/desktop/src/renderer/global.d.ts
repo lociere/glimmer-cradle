@@ -3,6 +3,7 @@ import type {
   ExtensionInstallPreview,
   ExtensionInstallResult,
   ExtensionUninstallResult,
+  PresentationDownstreamFrame,
 } from '@glimmer-cradle/protocol';
 
 interface ReplyPayload {
@@ -331,51 +332,10 @@ interface SkillPolicySnapshot {
   audit: boolean;
 }
 
-interface SkillCatalogEntrySnapshot {
-  id: string;
-  name: string;
-  description: string;
-  audience: SkillAudience;
-  provider: SkillProviderRef;
-  tools: Array<{ name: string; description: string; audience: SkillAudience; parameters: unknown }>;
-  resources: Array<{ id: string; description: string; audience: SkillAudience; parameters?: unknown }>;
-  prompts: Array<{ id: string; description: string; audience: SkillAudience; parameters?: unknown }>;
-  policy: SkillPolicySnapshot;
-  metadata: Record<string, unknown> & { runtime_status?: SkillRuntimeStatus };
-}
-
-interface SkillProviderRuntimeSnapshot {
-  provider: SkillProviderRef;
-  display_name?: string;
-  state: SkillProviderRuntimeState;
-  summary: string;
-  skill_count: number;
-  tool_count: number;
-  resource_count: number;
-  prompt_count: number;
-  error?: string;
-  recovery_actions: string[];
-  metadata: Record<string, unknown>;
-  updated_at: string;
-}
-
-interface SkillCatalogSnapshot {
-  generatedAt: string;
-  totalSkills: number;
-  providerCounts: Record<SkillProviderKind, number>;
-  runtimeStatusCounts: Record<SkillRuntimeStatus, number>;
-  totalTools: number;
-  totalResources: number;
-  totalPrompts: number;
-  providerRuntimes: SkillProviderRuntimeSnapshot[];
-  entries: SkillCatalogEntrySnapshot[];
-}
-
-interface SkillCatalogResponse {
-  status: 'success' | 'error';
-  snapshot?: SkillCatalogSnapshot;
-  message: string;
-}
+type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+type SkillCatalogSnapshot = NonNullable<SkillCatalogResponse['snapshot']>;
+type SkillCatalogEntrySnapshot = SkillCatalogSnapshot['entries'][number];
+type SkillProviderRuntimeSnapshot = SkillCatalogSnapshot['providerRuntimes'][number];
 
 interface AvatarAppearanceSettings {
   modelId: string;

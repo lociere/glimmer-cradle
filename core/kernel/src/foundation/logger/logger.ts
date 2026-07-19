@@ -59,7 +59,8 @@ let _initialized = false;
 // ──────────────────────────────────────────────────────────────────────────────
 
 function _resolveInitialLogDir(): string {
-  const logRoot = process.env.LOG_DIR ? path.resolve(process.env.LOG_DIR) : resolveLogDir();
+  const configuredLogDir = normalizeOptionalPathEnv(process.env.LOG_DIR);
+  const logRoot = configuredLogDir ? path.resolve(configuredLogDir) : resolveLogDir();
   return path.join(logRoot, 'application');
 }
 
@@ -232,7 +233,7 @@ export function initLogger(config: {
   _baseLogger.level = level;
 
   const logRoot = process.env.LOG_DIR
-    ? path.resolve(process.env.LOG_DIR)
+    ? path.resolve(normalizeOptionalPathEnv(process.env.LOG_DIR) || resolveLogDir())
     : resolveLogDir();
   const targetDir = path.join(logRoot, 'application');
 
@@ -295,3 +296,11 @@ export function getLogger(name = 'core'): ILogger {
 
 export { _baseLogger as baseLogger };
 export { withTrace, getCurrentTraceId, newTraceId } from './trace-context';
+
+function normalizeOptionalPathEnv(value: string | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') return null;
+  return normalized;
+}

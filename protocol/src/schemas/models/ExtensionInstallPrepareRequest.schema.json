@@ -7,6 +7,11 @@
   "additionalProperties": false,
   "properties": {
     "request_id": { "type": "string", "minLength": 1 },
+    "activation_profile": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+    },
     "source": {
       "oneOf": [
         {
@@ -16,6 +21,19 @@
           "properties": {
             "kind": { "const": "file" },
             "path": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "upload_id"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "uploaded_package" },
+            "upload_id": {
+              "type": "string",
+              "minLength": 8,
+              "pattern": "^upload_[A-Za-z0-9-]+$"
+            }
           }
         },
         {

@@ -25,6 +25,9 @@ class Installation(BaseModel):
     extension_id: str = Field(..., min_length=3)
     installed_versions: list[InstalledVersion] = Field(..., min_length=1)
     active_version: str | None = Field(None, min_length=1)
+    active_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
     updated_at: AwareDatetime
 
 

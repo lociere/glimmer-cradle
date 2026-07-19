@@ -17,6 +17,9 @@ from glimmer_cradle.cognition.protocol.generated.ipc.kernel_message_envelope imp
 from glimmer_cradle.cognition.protocol.generated.ipc.agent_plan_payload import (
     AgentPlanPayload,
 )
+from glimmer_cradle.cognition.protocol.generated.ipc.conversation_history_payload import (
+    ConversationHistoryPayload,
+)
 from glimmer_cradle.cognition.protocol.generated.ipc.agent_synthesis_payload import (
     AgentSynthesisPayload,
 )
@@ -78,3 +81,7 @@ class KernelIngressCortex:
             tool_results=[r.model_dump() for r in payload.tool_results],
             trace_id=envelope.trace_id,
         )
+
+    def parse_conversation_history(self, message: dict) -> ConversationHistoryPayload:
+        envelope = KernelMessageEnvelope.model_validate(message)
+        return ConversationHistoryPayload.model_validate(envelope.payload)

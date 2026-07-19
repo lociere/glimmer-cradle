@@ -1,15 +1,17 @@
 import type {
-  SkillCatalogEntry as ProtocolSkillCatalogEntry,
-  SkillCatalogSnapshot as ProtocolSkillCatalogSnapshot,
-  SkillProviderRef as ProtocolSkillProviderRef,
-  SkillProviderRuntimeSnapshot as ProtocolSkillProviderRuntimeSnapshot,
   CapabilityScope,
   ExtensionPlatform,
   ExtensionProductTarget,
+  PresentationDownstreamFrame,
   ProductFeatureId,
 } from '@glimmer-cradle/protocol';
 
-export type SkillProviderKind = 'core' | 'extension' | 'mcp_server' | 'user';
+type SkillCatalogResponsePayload = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+export type SkillCatalogSnapshot = NonNullable<SkillCatalogResponsePayload['snapshot']>;
+export type SkillCatalogEntry = SkillCatalogSnapshot['entries'][number];
+export type SkillProviderRuntimeSnapshot = SkillCatalogSnapshot['providerRuntimes'][number];
+export type SkillProviderRef = SkillProviderRuntimeSnapshot['provider'];
+export type SkillProviderKind = SkillProviderRef['kind'];
 
 export type SkillRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
@@ -22,8 +24,6 @@ export interface SkillAvailabilityContext {
   readonly platform: Exclude<ExtensionPlatform, 'any'>;
   readonly features: ReadonlySet<ProductFeatureId>;
 }
-
-export type SkillProviderRef = ProtocolSkillProviderRef;
 
 export interface SkillPolicy {
   riskLevel: SkillRiskLevel;
@@ -120,9 +120,3 @@ export interface SkillPromptSummary {
   audience: SkillAudience;
   parameters?: unknown;
 }
-
-export type SkillCatalogEntry = ProtocolSkillCatalogEntry;
-
-export type SkillProviderRuntimeSnapshot = ProtocolSkillProviderRuntimeSnapshot;
-
-export type SkillCatalogSnapshot = ProtocolSkillCatalogSnapshot;

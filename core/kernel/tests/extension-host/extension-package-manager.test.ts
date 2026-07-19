@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { zipSync } from 'fflate';
 import { EXTENSION_PACKAGE_MEDIA_TYPE } from '@glimmer-cradle/protocol';
 import { ExtensionPackageManager } from '../../src/infrastructure/extension-installation/extension-package-manager';
+import { OutboundUrlPolicy } from '../../src/infrastructure/extension-installation/outbound-url-policy';
 
 const temporaryRoots: string[] = [];
 const originalDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
@@ -48,22 +49,24 @@ describe('ExtensionPackageManager', () => {
   });
 
   it('rejects a remote source before following an HTTPS downgrade redirect', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'extension-package-manager-redirect-'));
-    temporaryRoots.push(root);
-    process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(root, 'data');
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(null, { status: 302, headers: { Location: 'http://downloads.example.com/release-manifest.json' } }),
-    );
-    const manager = new ExtensionPackageManager(path.join(root, 'data', 'packages', 'extensions'));
-    try {
-      await expect(manager.prepareInstall({
-        kind: 'release_manifest',
-        url: 'https://downloads.example.com/release-manifest.json',
-      })).rejects.toThrow('必须使用 HTTPS');
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    } finally {
-      fetchMock.mockRestore();
-    }
+    const requester = vi.fn(async (): Promise<{
+      statusCode: number;
+      headers: Record<string, string>;
+      body: AsyncIterable<Uint8Array>;
+    }> => ({
+      statusCode: 302,
+      headers: { location: 'http://downloads.example.com/release-manifest.json' },
+      body: bytesFromText('redirect'),
+    }));
+    const policy = new OutboundUrlPolicy({
+      lookupAll: async () => ['93.184.216.34'],
+      requester,
+    });
+    await expect(policy.fetchJson('https://downloads.example.com/release-manifest.json', {
+      maxBytes: 1024,
+      maxRedirects: 2,
+    })).rejects.toThrow('必须使用 HTTPS');
+    expect(requester).toHaveBeenCalledTimes(1);
   });
 
   it('installs a canonical .gcex asset from an exact repository release without a release manifest', async () => {
@@ -158,4 +161,8 @@ function encode(value: string): Uint8Array {
 
 function sha256(value: Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+async function* bytesFromText(value: string): AsyncIterable<Uint8Array> {
+  yield new TextEncoder().encode(value);
 }

@@ -5,6 +5,24 @@ export interface ExtensionInstallPreview {
   status: 'ready' | 'error';
   message?: string;
   transaction_id?: string;
+  activation_profile?: {
+    id: string;
+    title: string;
+    description?: string;
+    default?: boolean;
+  };
+  available_profiles?: {
+    id: string;
+    title: string;
+    description?: string;
+    default?: boolean;
+    supported: boolean;
+    disabled_reason?: string;
+  }[];
+  effective_permissions?: string[];
+  effective_resources?: string[];
+  effective_capabilities?: string[];
+  effective_settings?: string[];
   extension?: {
     id: string;
     name: string;

@@ -13,7 +13,7 @@ export const USER_SKILL_PROVIDER: SkillProviderRef = {
 export class UserSkillProvider implements SkillProvider {
   private static _instance: UserSkillProvider | null = null;
   private readonly _registeredSkillIds = new Set<string>();
-  public readonly provider = USER_SKILL_PROVIDER;
+  public readonly provider: SkillProviderRef = USER_SKILL_PROVIDER;
 
   public static get instance(): UserSkillProvider {
     if (!UserSkillProvider._instance) {

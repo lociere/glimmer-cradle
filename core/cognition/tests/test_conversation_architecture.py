@@ -119,6 +119,55 @@ async def test_conversation_projection_filters_before_prompt_assembly(tmp_path: 
     await recorder.stop()
 
 
+async def test_conversation_history_page_uses_stable_cursor_and_actor_scope(tmp_path: Path) -> None:
+    recorder = ExperienceRecorder(tmp_path / "experience")
+    await recorder.start()
+    await record_dialogue(recorder)
+    controller = ConversationController(
+        store=ConversationStore(
+            tmp_path / "conversation" / "conversation.db",
+            config=projection_config(),
+        ),
+        recorder=recorder,
+        working_config=working_config(),
+    )
+    await controller.connect()
+
+    thread, first_page, next_cursor, has_more = await controller.history_page(
+        "conversation:desktop:primary",
+        allowed_scopes={"conversation_private"},
+        cursor=None,
+        limit=2,
+        scene_id="scene:desktop:primary",
+        actor_id="actor:desktop:user",
+    )
+    assert thread["conversation_id"] == "conversation:desktop:primary"
+    assert [item.content for item in first_page] == [
+        "下次继续讨论音频延迟",
+        "到时从首包延迟开始检查",
+    ]
+    assert has_more is True
+    assert next_cursor == "pos:4"
+
+    _, second_page, tail_cursor, tail_has_more = await controller.history_page(
+        "conversation:desktop:primary",
+        allowed_scopes={"conversation_private"},
+        cursor=next_cursor,
+        limit=3,
+        scene_id="scene:desktop:primary",
+        actor_id="actor:desktop:user",
+    )
+    assert [item.content for item in second_page] == [
+        "我们以后把测试代号叫星潮",
+        "好，我记住星潮这个代号了",
+    ]
+    assert tail_cursor is None
+    assert tail_has_more is False
+
+    await controller.close()
+    await recorder.stop()
+
+
 async def test_conversation_projection_rejects_identity_or_scope_drift(tmp_path: Path) -> None:
     recorder = ExperienceRecorder(tmp_path / "experience")
     await recorder.start()

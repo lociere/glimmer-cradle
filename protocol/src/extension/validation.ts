@@ -49,6 +49,10 @@ export function validateExtensionManifest(value: unknown): ExtensionContractVali
   if (result.data.publisher !== namespace) {
     return { ok: false, errors: [`/publisher: 必须与 extension id 命名空间一致，期望 ${namespace}`] };
   }
+  const activationProfileErrors = validateActivationProfiles(result.data);
+  if (activationProfileErrors.length > 0) {
+    return { ok: false, errors: activationProfileErrors };
+  }
   return result;
 }
 
@@ -86,4 +90,72 @@ function validate<T>(validator: ValidateFunction, value: unknown): ExtensionCont
     };
   }
   return { ok: true, data: value as T, errors: [] };
+}
+
+function validateActivationProfiles(manifest: ExtensionManifest): string[] {
+  const errors: string[] = [];
+  const profileIds = new Set<string>();
+  let defaultCount = 0;
+  for (const [index, profile] of manifest.activationProfiles.entries()) {
+    if (profileIds.has(profile.id)) {
+      errors.push(`/activationProfiles/${index}/id: 重复的 activation profile id ${profile.id}`);
+    }
+    profileIds.add(profile.id);
+    if (profile.default) defaultCount += 1;
+  }
+  if (defaultCount > 1) {
+    errors.push('/activationProfiles: 最多只能声明一个 default activation profile');
+  }
+
+  const validateRequirements = (requirements: { profiles?: string[] } | undefined, pointer: string): void => {
+    for (const profileId of requirements?.profiles ?? []) {
+      if (!profileIds.has(profileId)) {
+        errors.push(`${pointer}: 引用了未声明的 activation profile ${profileId}`);
+      }
+    }
+  };
+
+  for (const [pointId, entries] of Object.entries(manifest.contributes ?? {})) {
+    if (!Array.isArray(entries)) continue;
+    entries.forEach((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+      const record = entry as Record<string, unknown>;
+      validateRequirements(asRequirements(record.requirements), `/contributes/${pointId}/${index}/requirements.profiles`);
+      if (Array.isArray(record.tools)) {
+        record.tools.forEach((tool, toolIndex) => {
+          if (!tool || typeof tool !== 'object' || Array.isArray(tool)) return;
+          validateRequirements(
+            asRequirements((tool as Record<string, unknown>).requirements),
+            `/contributes/${pointId}/${index}/tools/${toolIndex}/requirements.profiles`,
+          );
+        });
+      }
+      if (Array.isArray(record.resources)) {
+        record.resources.forEach((resource, resourceIndex) => {
+          if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return;
+          validateRequirements(
+            asRequirements((resource as Record<string, unknown>).requirements),
+            `/contributes/${pointId}/${index}/resources/${resourceIndex}/requirements.profiles`,
+          );
+        });
+      }
+      if (Array.isArray(record.prompts)) {
+        record.prompts.forEach((prompt, promptIndex) => {
+          if (!prompt || typeof prompt !== 'object' || Array.isArray(prompt)) return;
+          validateRequirements(
+            asRequirements((prompt as Record<string, unknown>).requirements),
+            `/contributes/${pointId}/${index}/prompts/${promptIndex}/requirements.profiles`,
+          );
+        });
+      }
+    });
+  }
+
+  return errors;
+}
+
+function asRequirements(value: unknown): { profiles?: string[] } {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { profiles?: string[] }
+    : {};
 }

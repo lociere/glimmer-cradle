@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConversationHistoryEntry.schema.json",
+  "title": "ConversationHistoryEntry",
+  "type": "object",
+  "required": [
+    "entry_id",
+    "source_kind",
+    "role",
+    "status",
+    "text",
+    "occurred_at",
+    "conversation_id",
+    "scene_id",
+    "thread_id",
+    "recall_scope",
+    "disclosure_scope"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "entry_id": { "type": "string", "minLength": 1 },
+    "source_kind": {
+      "type": "string",
+      "enum": ["conversation", "notice", "transient"]
+    },
+    "role": {
+      "type": "string",
+      "enum": ["user", "assistant", "system"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["committed", "pending", "thinking", "failed", "notice"]
+    },
+    "text": { "type": "string" },
+    "title": { "type": "string" },
+    "occurred_at": {
+      "type": "string",
+      "description": "ISO 8601 UTC 时间戳。历史时间线统一按 occurred_at 升序展示。"
+    },
+    "trace_id": { "type": "string" },
+    "interaction_id": { "type": "string" },
+    "moment_id": { "type": "string" },
+    "position": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Conversation 投影中的稳定位置，仅对已提交消息存在。"
+    },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "scene_id": { "type": "string", "minLength": 1 },
+    "thread_id": { "type": "string", "minLength": 1 },
+    "actor_id": { "type": "string" },
+    "actor_name": { "type": "string" },
+    "recall_scope": { "type": "string", "minLength": 1 },
+    "disclosure_scope": { "type": "string", "minLength": 1 }
+  }
+}

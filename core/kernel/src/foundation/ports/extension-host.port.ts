@@ -114,6 +114,7 @@ export interface IExtensionSystemConfig {
 export interface ActiveExtensionSelection {
   id: string;
   version: string;
+  profile: string;
 }
 
 export interface IExtensionHostService {
@@ -169,4 +170,3 @@ export interface IExtensionHostService {
   listExtensionRuntimeProjections(): ExtensionRuntimeProjection[];
   getExtensionRuntimeProjection(extensionId: string): ExtensionRuntimeProjection | undefined;
 }
-

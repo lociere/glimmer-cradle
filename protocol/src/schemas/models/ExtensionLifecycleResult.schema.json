@@ -9,6 +9,11 @@
     "request_id": { "type": "string", "minLength": 1 },
     "extension_id": { "type": "string", "minLength": 3 },
     "version": { "type": "string", "minLength": 1 },
+    "activation_profile": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+    },
     "operation": { "type": "string", "enum": ["start", "stop"] },
     "status": { "type": "string", "enum": ["success", "error"] },
     "message": { "type": "string" }

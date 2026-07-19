@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationRouteSnapshot.schema.json",
+  "title": "ConfigurationRouteSnapshot",
+  "type": "object",
+  "required": ["ready"],
+  "additionalProperties": false,
+  "properties": {
+    "provider_key": {
+      "type": "string",
+      "description": "当前默认路由的 provider key。"
+    },
+    "model_alias": {
+      "type": "string",
+      "description": "当前默认路由的模型别名。"
+    },
+    "effective_model_id": {
+      "type": "string",
+      "description": "当前默认路由解析后的模型 ID。"
+    },
+    "ready": {
+      "type": "boolean",
+      "description": "默认对话路由是否可执行。"
+    },
+    "reason": {
+      "type": "string",
+      "description": "未就绪原因。"
+    }
+  }
+}

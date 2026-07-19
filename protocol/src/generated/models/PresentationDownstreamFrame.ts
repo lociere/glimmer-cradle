@@ -1,22 +1,27 @@
 /* 自动生成 — 从 PresentationDownstreamFrame.schema.json 生成，勿手动修改 */
 
+import type { ConversationHistoryResult } from './ConversationHistoryResult';
+import type { ConversationNotice } from './ConversationNotice';
+import type { ConfigurationSnapshotResult } from './ConfigurationSnapshotResult';
+import type { ConfigurationTestResult } from './ConfigurationTestResult';
+import type { ConfigurationUpdateResult } from './ConfigurationUpdateResult';
 import type { ExtensionInstallPreview } from './ExtensionInstallPreview';
 import type { ExtensionInstallResult } from './ExtensionInstallResult';
 import type { ExtensionLifecycleResult } from './ExtensionLifecycleResult';
 import type { ExtensionCommandResult } from './ExtensionCommandResult';
-import type { ExtensionInstallationProjection } from './ExtensionInstallationProjection';
-import type { ExtensionRuntimeProjection } from './ExtensionRuntimeProjection';
+import type { ExtensionRuntimeProjection, LifecycleState, CapabilityNodeState, ActionIntentState, DiagnosticSeverity, ContributionPointDefinitionSnapshot, CapabilityGraphSnapshot, CapabilityGraphNode, ReadinessGateSnapshot, CapabilityGraphEdge, ActionIntentSnapshot, DiagnosticsSnapshot, DiagnosticsEntry } from './ExtensionRuntimeProjection';
 import type { ExtensionRuntimeProjectionResult } from './ExtensionRuntimeProjectionResult';
 import type { ExtensionStatusChanged } from './ExtensionStatusChanged';
 import type { ExtensionUninstallResult } from './ExtensionUninstallResult';
+import type { SkillCatalogResponse } from './SkillCatalogResponse';
 
 export type PresentationRuntimeReadinessOwner = 'kernel' | 'cognition' | 'engine' | 'renderer' | 'extension';
 export type PresentationRuntimeReadinessState = 'starting' | 'ready' | 'degraded' | 'failed' | 'stopped';
 export type PresentationRuntimeResourceState = 'pending' | 'ready' | 'missing' | 'degraded' | 'failed' | 'unknown';
-
 /**
- * Presentation Plane 下行帧契约(kernel → client)。Desktop Surface 消费对话与状态投影，Unity Avatar Host 消费稳定 Avatar 语义；两者不共享实现对象。
+ * 能力在全局、来源、场景或会话边界内的可见范围。
  */
+
 export interface PresentationDownstreamFrame {
   /**
    * 帧类型(discriminator)。reply/emotion/thought 属于表达流；expression/motion/lip_sync/parameter/idle 属于 Avatar 控制；其余为 Presentation 状态与生命周期消息。
@@ -39,6 +44,12 @@ export interface PresentationDownstreamFrame {
     | 'avatar_status'
     | 'runtime_readiness'
     | 'audio_status'
+    | 'conversation_notice'
+    | 'conversation_history_result'
+    | 'skill_catalog_response'
+    | 'configuration_snapshot_result'
+    | 'configuration_update_result'
+    | 'configuration_test_result'
     | 'extension_install_preview'
     | 'extension_install_result'
     | 'extension_uninstall_result'
@@ -75,6 +86,12 @@ export interface PresentationDownstreamFrame {
   avatar_status?: AvatarStatusPayload;
   runtime_readiness?: PresentationRuntimeReadinessCatalogPayload;
   audio_status?: AudioStatusPayload;
+  conversation_notice?: ConversationNotice;
+  conversation_history_result?: ConversationHistoryResult;
+  skill_catalog_response?: SkillCatalogResponse;
+  configuration_snapshot_result?: ConfigurationSnapshotResult;
+  configuration_update_result?: ConfigurationUpdateResult;
+  configuration_test_result?: ConfigurationTestResult;
   extension_install_preview?: ExtensionInstallPreview;
   extension_install_result?: ExtensionInstallResult;
   extension_uninstall_result?: ExtensionUninstallResult;

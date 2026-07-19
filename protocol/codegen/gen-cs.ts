@@ -54,15 +54,16 @@ function refName(ref: string): string {
 
 async function collectExternalSchemas(
   schema: Schema,
+  currentFile: string,
   models: Map<string, Schema>,
   definitions: Map<string, Schema>,
   visitedFiles: Set<string>,
 ): Promise<void> {
   if (schema.$ref && !schema.$ref.startsWith('#')) {
-    const fileName = schema.$ref.slice(schema.$ref.lastIndexOf('/') + 1);
-    if (!visitedFiles.has(fileName)) {
-      visitedFiles.add(fileName);
-      const external = JSON.parse(await fs.readFile(path.join(schemaRoot, fileName), 'utf8')) as Schema;
+    const resolvedPath = resolveSchemaRefPath(schema.$ref, currentFile);
+    if (!visitedFiles.has(resolvedPath)) {
+      visitedFiles.add(resolvedPath);
+      const external = JSON.parse(await fs.readFile(resolvedPath, 'utf8')) as Schema;
       const modelName = external.title ?? refName(schema.$ref);
       models.set(modelName, external);
       for (const [name, definition] of Object.entries(external.definitions ?? {})) {
@@ -72,16 +73,23 @@ async function collectExternalSchemas(
         }
         definitions.set(name, definition);
       }
-      await collectExternalSchemas(external, models, definitions, visitedFiles);
+      await collectExternalSchemas(external, resolvedPath, models, definitions, visitedFiles);
     }
   }
   for (const property of Object.values(schema.properties ?? {})) {
-    await collectExternalSchemas(property, models, definitions, visitedFiles);
+    await collectExternalSchemas(property, currentFile, models, definitions, visitedFiles);
   }
-  if (schema.items) await collectExternalSchemas(schema.items, models, definitions, visitedFiles);
+  if (schema.items) await collectExternalSchemas(schema.items, currentFile, models, definitions, visitedFiles);
   for (const definition of Object.values(schema.definitions ?? {})) {
-    await collectExternalSchemas(definition, models, definitions, visitedFiles);
+    await collectExternalSchemas(definition, currentFile, models, definitions, visitedFiles);
   }
+}
+
+function resolveSchemaRefPath(ref: string, currentFile: string): string {
+  if (ref.startsWith('src/schemas/')) {
+    return path.join(protocolRoot, ref);
+  }
+  return path.resolve(path.dirname(currentFile), ref);
 }
 
 function isStringAlias(schema: Schema | undefined): boolean {
@@ -107,7 +115,8 @@ async function main(): Promise<void> {
   const externalModels = new Map<string, Schema>();
 
   for (const file of schemaFiles) {
-    const schema = JSON.parse(await fs.readFile(path.join(schemaRoot, file), 'utf8')) as Schema;
+    const schemaPath = path.join(schemaRoot, file);
+    const schema = JSON.parse(await fs.readFile(schemaPath, 'utf8')) as Schema;
     roots.push(schema);
     for (const [name, definition] of Object.entries(schema.definitions ?? {})) {
       const existing = definitions.get(name);
@@ -119,8 +128,8 @@ async function main(): Promise<void> {
   }
 
   const visitedFiles = new Set<string>();
-  for (const root of roots) {
-    await collectExternalSchemas(root, externalModels, definitions, visitedFiles);
+  for (const [index, root] of roots.entries()) {
+    await collectExternalSchemas(root, path.join(schemaRoot, schemaFiles[index]), externalModels, definitions, visitedFiles);
   }
 
   const classes = new Map<string, Schema>();

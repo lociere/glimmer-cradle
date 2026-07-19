@@ -2,8 +2,12 @@ import type { GlobalConfig } from '../../foundation/config/config-schema';
 import { ActionStreamManager } from '../../application/capabilities/action-stream/action-stream-manager';
 import { VisualCommandDispatcher } from '../../application/capabilities/action-stream/visual-command-dispatcher';
 import { ControlSurfaceGateway } from '../../application/capabilities/control-surface/control-surface-gateway';
+import { ConversationHistoryService } from '../../application/capabilities/control-surface/conversation-history-service';
+import { CognitionManager } from '../../application/capabilities/inference/cognition-manager';
 import { PerceptionAppService } from '../../application/services/perception-app.service';
+import { ConfigApplicationService } from '../../application/services/config-application.service';
 import { SkillCatalogAppService } from '../../application/services/skill-catalog-app.service';
+import { ConfigManager } from '../../foundation/config/config-manager';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 
@@ -29,6 +33,13 @@ export class PresentationRuntime implements RuntimeModule {
         this.config.system.surfaces.control_surface_gateway,
         this.requestApplicationShutdown,
       );
+      ControlSurfaceGateway.instance.setConfigApplicationService(new ConfigApplicationService({
+        configManager: ConfigManager.instance,
+        cognition: CognitionManager.instance,
+      }));
+      ControlSurfaceGateway.instance.setConversationHistoryService(
+        new ConversationHistoryService(this.perceptionAppService.getConversationDirectory()),
+      );
     }
 
     return {
@@ -40,6 +51,8 @@ export class PresentationRuntime implements RuntimeModule {
   }
 
   public async stop(_context: TraceContext): Promise<void> {
+    ControlSurfaceGateway.instance.setConfigApplicationService(null);
+    ControlSurfaceGateway.instance.setConversationHistoryService(null);
     await ControlSurfaceGateway.instance.stop();
     ActionStreamManager.instance.stop();
     VisualCommandDispatcher.instance.stop();

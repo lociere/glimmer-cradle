@@ -21,8 +21,9 @@ export function buildMcpRuntimeReadinessSnapshots(
 export function buildMcpProviderReadinessSnapshot(
   runtime: SkillProviderRuntimeSnapshot,
 ): RuntimeReadinessSnapshot {
-  const transport = typeof runtime.metadata.transport === 'string'
-    ? runtime.metadata.transport
+  const metadata = runtime.metadata ?? {};
+  const transport = typeof metadata.transport === 'string'
+    ? metadata.transport
     : 'unknown';
   const readiness = mapProviderStateToResourceState(runtime.state);
   const resources: RuntimeResourceSnapshot[] = [{

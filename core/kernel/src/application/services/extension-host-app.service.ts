@@ -170,7 +170,7 @@ export class ExtensionHostAppService implements IExtensionHostService {
         title: entry.metadata?.title ?? commandId,
         audience: 'user',
         scope: { kind: 'global' },
-        requirements: { products: ['any'], platforms: ['any'], features: [] },
+        requirements: { products: ['any'], platforms: ['any'], features: [], profiles: [] },
         category: entry.metadata?.category,
         permissions: [],
         dependsOn: [],

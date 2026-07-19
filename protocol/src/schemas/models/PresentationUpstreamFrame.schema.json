@@ -17,13 +17,18 @@
         "avatar_presentation",
         "avatar_intent",
         "avatar_action_state",
+        "config_snapshot_request",
+        "conversation_history_request",
+        "skill_catalog_request",
+        "config_update_request",
+        "config_test_request",
         "extension_install_prepare",
         "extension_install_commit",
-      "extension_install_cancel",
-      "extension_uninstall_request",
-      "extension_lifecycle_request",
-      "extension_command_request",
-      "extension_runtime_projection_request",
+        "extension_install_cancel",
+        "extension_uninstall_request",
+        "extension_lifecycle_request",
+        "extension_command_request",
+        "extension_runtime_projection_request",
         "shutdown_request",
         "perception",
         "scene_loaded",
@@ -70,6 +75,21 @@
     "avatar_action_state": {
       "$ref": "#/definitions/AvatarActionStateReportPayload",
       "description": "kind=avatar_action_state 时存在。Avatar 回报动作调度器的权威状态快照。"
+    },
+    "config_snapshot_request": {
+      "$ref": "src/schemas/models/ConfigurationSnapshotRequest.schema.json"
+    },
+    "conversation_history_request": {
+      "$ref": "src/schemas/models/ConversationHistoryRequest.schema.json"
+    },
+    "skill_catalog_request": {
+      "$ref": "src/schemas/models/SkillCatalogRequest.schema.json"
+    },
+    "config_update_request": {
+      "$ref": "src/schemas/models/ConfigurationUpdateRequest.schema.json"
+    },
+    "config_test_request": {
+      "$ref": "src/schemas/models/ConfigurationTestRequest.schema.json"
     },
     "extension_install_prepare": {
       "$ref": "src/schemas/models/ExtensionInstallPrepareRequest.schema.json"

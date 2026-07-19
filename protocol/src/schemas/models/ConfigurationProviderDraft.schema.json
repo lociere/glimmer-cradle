@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationProviderDraft.schema.json",
+  "title": "ConfigurationProviderDraft",
+  "type": "object",
+  "required": ["key", "api_type", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Provider 稳定 key。"
+    },
+    "api_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Provider API 协议类型。"
+    },
+    "base_url": {
+      "type": "string",
+      "description": "Provider API 根地址。"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "write-only secret。保存后不回显。"
+    },
+    "clear_api_key": {
+      "type": "boolean",
+      "description": "显式清除当前 provider secret。"
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "采样温度覆盖。"
+    },
+    "request_method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "description": "自定义 HTTP 方法。"
+    },
+    "request_path": {
+      "type": "string",
+      "description": "自定义请求路径。"
+    },
+    "request_headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "自定义请求头。"
+    },
+    "request_body_template": {
+      "type": "string",
+      "description": "请求体模板。"
+    },
+    "response_extract": {
+      "type": "string",
+      "description": "响应提取路径。"
+    },
+    "models": {
+      "type": "array",
+      "items": { "$ref": "ConfigurationModelAlias.schema.json" },
+      "minItems": 1,
+      "description": "Provider 暴露的模型别名列表。"
+    }
+  }
+}

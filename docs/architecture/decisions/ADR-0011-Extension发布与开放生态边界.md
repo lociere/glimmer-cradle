@@ -17,7 +17,7 @@
 6. Registry 与第一方扩展源码可以共用 `glimmer-cradle-extensions` 仓库和 CI，但保持独立目录与职责。Registry 只保存身份、所有权、仓库、审核/安全状态和作者侧发布来源指针，不托管或复制第三方源码、`.gcex`、Release Manifest、SBOM、签名或构建证明。
 7. Registry 审核、发布者验证、制品签名和构建证明是四个独立信任信号。任何一个信号都不能伪装成另外一个。
 8. 安装采用准备与提交事务。Kernel 在用户确认权限前后各验证一次，使用不可变版本目录和原子替换；激活选择由 Kernel 唯一写入。
-9. Desktop 可通过系统文件选择器安装本地包；Personal Server 的浏览器入口只接受 HTTPS 远程来源，不能把客户端字符串解释为服务器本地路径。
+9. Desktop 可通过系统文件选择器安装本地包；Personal Server 的浏览器入口禁止提交服务器本地路径，但允许认证后的浏览器把受限 `.gcex` 字节流上传到 Product Host owned 的临时目录，并换取只对当前 principal/session、有限时效和单次安装事务有效的 opaque `upload_id`。Host 在 `prepare/commit/cancel` 事务内把 `upload_id` 解析为受控文件 source 后再调用 Kernel Package Manager；上传必须校验扩展名/格式、大小上限、唯一临时文件名和路径边界，并在 prepare 完成、取消、失败或超时后清理文件与事务状态。
 
 ## 结果
 
@@ -33,4 +33,4 @@
 - `buildGcexPackage()` 不产生包外 JSON；只有显式调用 `buildExtensionReleaseManifest()` 才生成作者侧发布索引。
 - Registry validator 拒绝非命名空间 ID、复制 manifest 字段、非 HTTPS 清单和无审核依据的已发布通道。
 - SDK 包测试覆盖路径穿越、膨胀/文件数上限、摘要不符、SBOM 缺失与确定性构建；Kernel Package Manager 测试覆盖权限确认、HTTPS 重定向、原子安装、重复安装和激活版本卸载保护。
-- Desktop 与 Personal Server 通过 Protocol Schema 发送同一安装事务，Renderer/浏览器不直接写安装目录或 active config。
+- Desktop 与 Personal Server 通过 Protocol Schema 发送同一安装事务，Renderer/浏览器不直接写安装目录、active config、服务器文件路径或临时目录。

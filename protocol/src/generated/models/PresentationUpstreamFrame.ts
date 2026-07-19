@@ -1,12 +1,16 @@
 /* 自动生成 — 从 PresentationUpstreamFrame.schema.json 生成，勿手动修改 */
 
+import type { ConversationHistoryRequest } from './ConversationHistoryRequest';
+import type { ConfigurationSnapshotRequest } from './ConfigurationSnapshotRequest';
+import type { ConfigurationTestRequest } from './ConfigurationTestRequest';
+import type { ConfigurationUpdateRequest } from './ConfigurationUpdateRequest';
 import type { ExtensionInstallCommitRequest } from './ExtensionInstallCommitRequest';
 import type { ExtensionInstallPrepareRequest } from './ExtensionInstallPrepareRequest';
 import type { ExtensionLifecycleRequest } from './ExtensionLifecycleRequest';
 import type { ExtensionCommandRequest } from './ExtensionCommandRequest';
-import type { ExtensionRuntimeProjection } from './ExtensionRuntimeProjection';
 import type { ExtensionRuntimeProjectionRequest } from './ExtensionRuntimeProjectionRequest';
 import type { ExtensionUninstallRequest } from './ExtensionUninstallRequest';
+import type { SkillCatalogRequest } from './SkillCatalogRequest';
 
 /**
  * Presentation Plane 上行帧契约(client → kernel)。Unity Avatar Host 通过 host_hello 宣告实现与能力；Desktop Surface 通过 chat_input、audio_input 和 Avatar 请求提交用户交互。
@@ -23,6 +27,11 @@ export interface PresentationUpstreamFrame {
     | 'avatar_presentation'
     | 'avatar_intent'
     | 'avatar_action_state'
+    | 'config_snapshot_request'
+    | 'conversation_history_request'
+    | 'skill_catalog_request'
+    | 'config_update_request'
+    | 'config_test_request'
     | 'extension_install_prepare'
     | 'extension_install_commit'
     | 'extension_install_cancel'
@@ -53,6 +62,11 @@ export interface PresentationUpstreamFrame {
   avatar_presentation?: AvatarPresentationRequest;
   avatar_intent?: AvatarIntentRequest;
   avatar_action_state?: AvatarActionStateReportPayload;
+  config_snapshot_request?: ConfigurationSnapshotRequest;
+  conversation_history_request?: ConversationHistoryRequest;
+  skill_catalog_request?: SkillCatalogRequest;
+  config_update_request?: ConfigurationUpdateRequest;
+  config_test_request?: ConfigurationTestRequest;
   extension_install_prepare?: ExtensionInstallPrepareRequest;
   extension_install_commit?: ExtensionInstallCommitRequest;
   extension_install_cancel?: {

@@ -2,10 +2,15 @@
 
 export interface ExtensionInstallPrepareRequest {
   request_id: string;
+  activation_profile?: string;
   source:
     | {
         kind: 'file';
         path: string;
+      }
+    | {
+        kind: 'uploaded_package';
+        upload_id: string;
       }
     | {
         kind: 'release_manifest';

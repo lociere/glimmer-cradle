@@ -1,8 +1,8 @@
 import type {
   CapabilityGraphNode,
   ExtensionRuntimeProjection,
-  SkillProviderRuntimeSnapshot,
 } from '@glimmer-cradle/protocol';
+import type { SkillProviderRuntimeSnapshot } from '../../types';
 
 export function toExtensionProviderRuntimeSnapshot(
   projection: ExtensionRuntimeProjection,

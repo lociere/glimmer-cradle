@@ -25,6 +25,10 @@ interface ProviderConfig {
 }
 
 interface LLMConfigLike {
+  default_route?: {
+    provider?: string;
+    model_alias?: string;
+  };
   api_type?: string;
   api_key?: string;
   providers?: Record<string, ProviderConfig>;
@@ -283,10 +287,11 @@ export class ConfigManager {
         const record = item as Record<string, unknown>;
         const id = typeof record.id === 'string' ? record.id.trim() : '';
         const version = typeof record.version === 'string' ? record.version.trim() : '';
-        if (!EXTENSION_ID_PATTERN.test(id) || !EXTENSION_VERSION_PATTERN.test(version)) {
-          throw new CoreException(`extensions.active[${index}] 的 id/version 非法`, ErrorCode.CONFIG_ERROR);
+        const profile = typeof record.profile === 'string' ? record.profile.trim() : '';
+        if (!EXTENSION_ID_PATTERN.test(id) || !EXTENSION_VERSION_PATTERN.test(version) || !profile) {
+          throw new CoreException(`extensions.active[${index}] 的 id/version/profile 非法`, ErrorCode.CONFIG_ERROR);
         }
-        return { id, version };
+        return { id, version, profile };
       });
       const ids = new Set<string>();
       for (const selection of selections) {
@@ -306,12 +311,12 @@ export class ConfigManager {
 
   public async saveActiveExtensions(selections: ActiveExtensionSelection[]): Promise<void> {
     const normalized = selections
-      .map(({ id, version }) => ({ id: id.trim(), version: version.trim() }))
+      .map(({ id, version, profile }) => ({ id: id.trim(), version: version.trim(), profile: profile.trim() }))
       .sort((left, right) => left.id.localeCompare(right.id));
     const ids = new Set<string>();
     for (const selection of normalized) {
-      if (!EXTENSION_ID_PATTERN.test(selection.id) || !EXTENSION_VERSION_PATTERN.test(selection.version)) {
-        throw new CoreException(`扩展激活选择非法: ${selection.id}@${selection.version}`, ErrorCode.CONFIG_ERROR);
+      if (!EXTENSION_ID_PATTERN.test(selection.id) || !EXTENSION_VERSION_PATTERN.test(selection.version) || !selection.profile) {
+        throw new CoreException(`扩展激活选择非法: ${selection.id}@${selection.version}#${selection.profile}`, ErrorCode.CONFIG_ERROR);
       }
       if (ids.has(selection.id)) {
         throw new CoreException(`扩展激活配置重复: ${selection.id}`, ErrorCode.CONFIG_ERROR);
@@ -512,11 +517,17 @@ export class ConfigManager {
       const providers = secrets?.providers ?? {};
 
       if (!llmConfig.api_key) {
-        const providerName = String(llmConfig.api_type ?? 'deepseek').toLowerCase();
-        const provider = providers[providerName];
-        if (provider?.api_key) {
+        const routeProvider = typeof llmConfig.default_route?.provider === 'string'
+          ? llmConfig.default_route.provider.toLowerCase()
+          : '';
+        const fallbackProvider = String(llmConfig.api_type ?? 'deepseek').toLowerCase();
+        for (const providerName of [routeProvider, fallbackProvider]) {
+          if (!providerName) continue;
+          const provider = providers[providerName];
+          if (!provider?.api_key) continue;
           llmConfig.api_key = provider.api_key;
           logger.info('已从 secrets.yaml 注入默认 LLM API Key', { provider: providerName });
+          break;
         }
       }
 

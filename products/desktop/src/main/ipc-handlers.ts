@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import {
   type AudioStatusPayload,
   type AvatarActionStateDocument,
+  type PresentationDownstreamFrame,
   type PresentationUpstreamFrame,
   type CharacterPresentationProjectionPayload,
   type ExtensionInstallCommitRequest,
@@ -16,7 +17,6 @@ import {
   type ExtensionRuntimeProjection,
   type ExtensionUninstallResult,
   type RuntimeReadinessCatalog,
-  type SkillCatalogSnapshot,
   getPresentationFrameClass,
   isPresentationFrameKind,
 } from '@glimmer-cradle/protocol';
@@ -391,12 +391,6 @@ interface ExtensionCommandResult {
   message: string;
 }
 
-interface SkillCatalogResponse {
-  status: 'success' | 'error';
-  snapshot?: SkillCatalogSnapshot;
-  message: string;
-}
-
 export interface AvatarAppearanceSettings {
   modelId: string;
   displayScale: number;
@@ -447,6 +441,8 @@ const CHARACTER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const EXTENSION_ID_PATTERN = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/;
 const EXTENSION_VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const PROFILE_ROOT_PATTERN = /^[a-z0-9](?:[a-z0-9_-]|\/[a-z0-9][a-z0-9_-]*)*$/;
+type SkillCatalogRequest = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
+type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
 
 interface ActiveExtensionSelection {
   id: string;
@@ -1630,6 +1626,7 @@ function requestSkillCatalog(): Promise<SkillCatalogResponse> {
   if (kernelSocket?.readyState !== WebSocket.OPEN) {
     return Promise.resolve({
       status: 'error',
+      request_id: 'skill-catalog-unavailable',
       message: 'Kernel 尚未连接，无法读取能力目录。',
     });
   }
@@ -1640,6 +1637,7 @@ function requestSkillCatalog(): Promise<SkillCatalogResponse> {
       skillCatalogWaiters.delete(requestId);
       resolve({
         status: 'error',
+        request_id: requestId,
         message: '能力目录请求超时',
       });
     }, 10000);
@@ -1650,11 +1648,12 @@ function requestSkillCatalog(): Promise<SkillCatalogResponse> {
         resolve(result);
       },
     });
+    const request: SkillCatalogRequest = { request_id: requestId };
     kernelSocket?.send(JSON.stringify({
       kind: 'skill_catalog_request',
-      request_id: requestId,
       timestamp: Date.now(),
-    }));
+      skill_catalog_request: request,
+    } satisfies PresentationUpstreamFrame));
   });
 }
 
@@ -2657,16 +2656,16 @@ async function connectToKernel(): Promise<void> {
       }
 
       if (kindValue === 'skill_catalog_response') {
-        const requestId = typeof frame.request_id === 'string' ? frame.request_id : '';
-        const waiter = skillCatalogWaiters.get(requestId);
-        if (waiter) {
+        const response = frame.skill_catalog_response;
+        const requestId = response?.request_id ?? '';
+        const waiter = requestId ? skillCatalogWaiters.get(requestId) : undefined;
+        if (response && waiter) {
           skillCatalogWaiters.delete(requestId);
           waiter.resolve({
-            status: frame.status === 'success' ? 'success' : 'error',
-            snapshot: frame.skill_catalog && typeof frame.skill_catalog === 'object'
-              ? frame.skill_catalog as SkillCatalogSnapshot
-              : undefined,
-            message: typeof frame.message === 'string' ? frame.message : '',
+            request_id: requestId,
+            status: response.status === 'success' ? 'success' : 'error',
+            snapshot: response.snapshot,
+            message: typeof response.message === 'string' ? response.message : undefined,
           });
         }
         return;
@@ -2859,7 +2858,7 @@ async function connectToKernel(): Promise<void> {
     for (const [requestId, waiter] of skillCatalogWaiters) {
       skillCatalogWaiters.delete(requestId);
       clearTimeout(waiter.timer);
-      waiter.resolve({ status: 'error', message: 'Kernel 连接已断开' });
+      waiter.resolve({ request_id: requestId, status: 'error', message: 'Kernel 连接已断开' });
     }
     for (const [requestId, waiter] of extensionInstallPreviewWaiters) {
       extensionInstallPreviewWaiters.delete(requestId);

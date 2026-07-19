@@ -2,6 +2,8 @@
 from abc import ABC, abstractmethod
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanOutput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput, AgentSynthesisOutput
+from glimmer_cradle.cognition.protocol.generated.ipc.conversation_history_payload import ConversationHistoryPayload
+from glimmer_cradle.cognition.protocol.generated.models.conversation_history_result import ConversationHistoryResult
 from glimmer_cradle.cognition.protocol.generated.ipc.knowledge_init_payload import KnowledgeBaseInitPayload
 
 
@@ -35,4 +37,12 @@ class KernelRequestPort(ABC):
         """
         接收 MCP 工具执行结果，通过 LLM 合成为角色自然语言回复。
         """
+        pass
+
+    @abstractmethod
+    async def on_conversation_history(
+        self,
+        payload: ConversationHistoryPayload,
+    ) -> ConversationHistoryResult:
+        """读取可重建 Conversation 投影的历史页。"""
         pass

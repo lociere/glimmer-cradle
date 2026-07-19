@@ -46,6 +46,15 @@ const removedWorkspaceFiles = [
 const requiredWorkspaceDirectories = [
   'products/desktop',
   'products/personal-server',
+  'products/personal-server/src/server',
+  'products/personal-server/src/web',
+  'products/personal-server/src/web/features/conversation',
+  'products/personal-server/src/web/features/configuration/audio',
+  'products/personal-server/src/web/features/configuration/memory',
+  'products/personal-server/src/web/features/configuration/model-routing',
+  'products/personal-server/src/web/features/configuration/providers',
+  'products/personal-server/src/web/features/configuration/storage',
+  'products/personal-server/src/web/features/configuration/updates',
   'core/kernel/src/application',
   'core/kernel/src/composition',
   'core/kernel/src/domain',
@@ -98,6 +107,22 @@ if (personalServerProduct.features?.audio?.asr !== false) {
 }
 if (personalServerProduct.features?.audio?.tts !== true) {
   violations.push('products/personal-server/product.json: 标准 Personal Server 必须组装云端 TTS lane');
+}
+
+for (const forbiddenLegacyUiFile of [
+  'products/personal-server/public/app.js',
+  'products/personal-server/public/app.css',
+]) {
+  if (fs.existsSync(path.join(repoRoot, forbiddenLegacyUiFile))) {
+    violations.push(`${forbiddenLegacyUiFile}: M11 后不得继续保留 public 单体业务入口`);
+  }
+}
+for (const filePath of walkFiles(path.join(repoRoot, 'products/personal-server/public'))) {
+  const relativePath = toRepoPath(filePath);
+  if (relativePath === 'products/personal-server/public/index.html') continue;
+  if (/\.(?:js|jsx|ts|tsx|css|scss|sass|less)$/i.test(relativePath)) {
+    violations.push(`${relativePath}: Personal Server 浏览器业务不得重新写回 public 目录`);
+  }
 }
 
 const audioConfig = fs.readFileSync(path.join(repoRoot, 'configs/system/audio.yaml'), 'utf8');
@@ -319,6 +344,31 @@ for (const relativeRoot of [
   }
 }
 
+for (const filePath of walkFiles(path.join(repoRoot, 'products/personal-server/src/server'))) {
+  if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) continue;
+  reportMatches(
+    toRepoPath(filePath),
+    fs.readFileSync(filePath, 'utf8'),
+    /(?:from\s+|import\s*\(|require\s*\()\s*['"][^'"]*\/src\/web\/|(?:from\s+|import\s*\(|require\s*\()\s*['"]\.\.\/(?:\.\.\/)*web\//g,
+    'Personal Server server 边界不得 import web 目录',
+  );
+}
+
+for (const filePath of walkFiles(path.join(repoRoot, 'products/personal-server/src/web'))) {
+  if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) continue;
+  reportMatches(
+    toRepoPath(filePath),
+    fs.readFileSync(filePath, 'utf8'),
+    /(?:from\s+|import\s*\(|require\s*\()\s*['"][^'"]*\/src\/server\/|(?:from\s+|import\s*\(|require\s*\()\s*['"]\.\.\/(?:\.\.\/)*server\//g,
+    'Personal Server web 边界不得 import server 目录',
+  );
+}
+
+enforceMaxFileSize('products/personal-server/src/web/app/bootstrap.ts', 12000,
+  'Personal Server bootstrap 只负责组装，不得重新膨胀为巨型业务入口');
+enforceMaxFileSize('products/personal-server/src/web/features/configuration/configuration-view.ts', 20000,
+  '设置中心总装入口不得重新退化为超大单体；section owner 应继续下沉到 feature 目录');
+
 const nativeHeader = fs.readFileSync(
   path.join(repoRoot, 'native/include/platform_native.h'),
   'utf8',
@@ -367,4 +417,16 @@ function reportMatches(relativePath, content, pattern, message) {
 
 function toRepoPath(filePath) {
   return path.relative(repoRoot, filePath).split(path.sep).join('/');
+}
+
+function enforceMaxFileSize(relativePath, maxBytes, message) {
+  const absolutePath = path.join(repoRoot, relativePath);
+  if (!fs.existsSync(absolutePath)) {
+    violations.push(`${relativePath}: 受约束入口缺失`);
+    return;
+  }
+  const size = fs.statSync(absolutePath).size;
+  if (size > maxBytes) {
+    violations.push(`${relativePath}: ${message}（当前 ${size} bytes，限制 ${maxBytes} bytes）`);
+  }
 }

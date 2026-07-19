@@ -15,6 +15,11 @@
       "uniqueItems": true
     },
     "active_version": { "type": "string", "minLength": 1 },
+    "active_profile": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+    },
     "updated_at": { "type": "string", "format": "date-time" }
   }
 }

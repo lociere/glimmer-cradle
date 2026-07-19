@@ -82,6 +82,33 @@ class ExtensionPlatform(StrEnum):
     DARWIN_ARM64 = 'darwin-arm64'
 
 
+class ActivationProfileId(RootModel[str]):
+    root: str = Field(..., pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$')
+
+
+class ActivationProfileRequirements(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    products: list[ExtensionProductTarget] | None = Field(['any'], min_length=1)
+    platforms: list[ExtensionPlatform] | None = Field(['any'], min_length=1)
+    features: list[ProductFeatureId] | None = []
+
+
+class ExtensionActivationProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: ActivationProfileId
+    title: str = Field(..., min_length=1)
+    description: str | None = None
+    default: bool | None = False
+    requirements: ActivationProfileRequirements | None = Field(
+        {}, validate_default=True
+    )
+    permissions: list[Permission] | None = []
+
+
 class ContributionRequirements(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -89,6 +116,7 @@ class ContributionRequirements(BaseModel):
     products: list[ExtensionProductTarget] | None = Field(['any'], min_length=1)
     platforms: list[ExtensionPlatform] | None = Field(['any'], min_length=1)
     features: list[ProductFeatureId] | None = []
+    profiles: list[ActivationProfileId] | None = Field([], validate_default=True)
 
 
 class Owner(Enum):
@@ -152,7 +180,7 @@ class Scope1(BaseModel):
     ids: list[Id] = Field(..., min_length=1)
 
 
-class Permission1(RootModel[str]):
+class Permission2(RootModel[str]):
     root: str = Field(..., min_length=1)
 
 
@@ -171,7 +199,7 @@ class ContributionDeclaration(BaseModel):
         validate_default=True,
     )
     requirements: ContributionRequirements | None = Field({}, validate_default=True)
-    permissions: list[Permission1] | None = Field([], validate_default=True)
+    permissions: list[Permission2] | None = Field([], validate_default=True)
     dependsOn: list[ContributionDependency] | None = Field([], validate_default=True)
     metadata: dict[str, Any] | None = {}
 
@@ -577,6 +605,9 @@ class ExtensionManifest(BaseModel):
     requires: list[ExtensionHostPortId] | None = []
     engines: ExtensionEngineConstraint | None = Field({}, validate_default=True)
     contributionPoints: list[ContributionPointDefinition] | None = Field(
+        [], validate_default=True
+    )
+    activationProfiles: list[ExtensionActivationProfile] | None = Field(
         [], validate_default=True
     )
     contributes: ExtensionContributions | None = Field({}, validate_default=True)

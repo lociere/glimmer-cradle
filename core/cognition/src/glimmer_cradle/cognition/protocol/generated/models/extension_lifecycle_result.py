@@ -25,6 +25,9 @@ class ExtensionLifecycleResult(BaseModel):
     request_id: str = Field(..., min_length=1)
     extension_id: str = Field(..., min_length=3)
     version: str | None = Field(None, min_length=1)
+    activation_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
     operation: Operation
     status: Status
     message: str | None = None

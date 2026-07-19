@@ -28,6 +28,14 @@ export type ExtensionHostPortId =
   | 'commands'
   | 'runtime';
 export type ContributionPointId = string;
+export type ActivationProfileId = string;
+export type ProductFeatureId =
+  | 'control_surface_gateway'
+  | 'local_device_actions'
+  | 'avatar'
+  | 'audio.tts'
+  | 'audio.asr'
+  | 'extensions';
 export type ExtensionCapabilityContribution = ContributionDeclaration & {
   id: string;
   title: string;
@@ -41,13 +49,6 @@ export type CapabilityAudience = 'character' | 'user' | 'host' | 'renderer' | 'e
  * 能力在全局、来源、场景或会话边界内的可见范围。
  */
 
-export type ProductFeatureId =
-  | 'control_surface_gateway'
-  | 'local_device_actions'
-  | 'avatar'
-  | 'audio.tts'
-  | 'audio.asr'
-  | 'extensions';
 export type ExtensionCommandContribution = ContributionDeclaration & {
   command: string;
   title: string;
@@ -148,6 +149,7 @@ export interface ExtensionManifest {
   requires: ExtensionHostPortId[];
   engines: ExtensionEngineConstraint;
   contributionPoints: ContributionPointDefinition[];
+  activationProfiles: ExtensionActivationProfile[];
   contributes: ExtensionContributions;
 }
 export interface ExtensionEngineConstraint {
@@ -165,6 +167,25 @@ export interface ContributionPointDefinition {
   requiredPermissions: string[];
   nodeKind?: string;
   actionKind?: string;
+}
+export interface ExtensionActivationProfile {
+  id: ActivationProfileId;
+  title: string;
+  description?: string;
+  default: boolean;
+  requirements: ActivationProfileRequirements;
+  permissions: ExtensionPermission[];
+}
+export interface ActivationProfileRequirements {
+  /**
+   * @minItems 1
+   */
+  products: [ExtensionProductTarget, ...ExtensionProductTarget[]];
+  /**
+   * @minItems 1
+   */
+  platforms: [ExtensionPlatform, ...ExtensionPlatform[]];
+  features: ProductFeatureId[];
 }
 export interface ExtensionContributions {
   'glimmer.capability'?: ExtensionCapabilityContribution[];
@@ -200,6 +221,7 @@ export interface ContributionRequirements {
    */
   platforms: [ExtensionPlatform, ...ExtensionPlatform[]];
   features: ProductFeatureId[];
+  profiles: ActivationProfileId[];
 }
 export interface ContributionDependency {
   nodeId: string;
@@ -268,6 +290,7 @@ export interface ContributionRequirements1 {
    */
   platforms?: [ExtensionPlatform, ...ExtensionPlatform[]];
   features?: ProductFeatureId[];
+  profiles?: ActivationProfileId[];
 }
 export interface ExtensionSkillResourceContribution {
   id: string;
@@ -286,6 +309,7 @@ export interface ContributionRequirements2 {
    */
   platforms?: [ExtensionPlatform, ...ExtensionPlatform[]];
   features?: ProductFeatureId[];
+  profiles?: ActivationProfileId[];
 }
 export interface ExtensionSkillPromptContribution {
   id: string;
@@ -305,6 +329,7 @@ export interface ContributionRequirements3 {
    */
   platforms?: [ExtensionPlatform, ...ExtensionPlatform[]];
   features?: ProductFeatureId[];
+  profiles?: ActivationProfileId[];
 }
 export interface ExtensionSkillPolicyContribution {
   riskLevel: 'low' | 'medium' | 'high' | 'critical';

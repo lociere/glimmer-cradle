@@ -324,6 +324,253 @@ namespace GlimmerCradle.Avatar
     }
 
     [Serializable]
+    public class SkillProviderRef
+    {
+        public string kind;
+        public string id;
+    }
+
+    [Serializable]
+    public class SkillPolicy
+    {
+        public string riskLevel;
+        public bool confirmationRequired;
+        public string[] sideEffects = Array.Empty<string>();
+        public bool audit;
+    }
+
+    [Serializable]
+    public class SkillToolSummary
+    {
+        public string name;
+        public string description;
+        public string audience;
+        public CapabilityScope scope;
+        public object parameters;
+    }
+
+    [Serializable]
+    public class SkillResourceSummary
+    {
+        public string id;
+        public string description;
+        public string audience;
+        public CapabilityScope scope;
+        public object parameters;
+    }
+
+    [Serializable]
+    public class SkillPromptSummary
+    {
+        public string id;
+        public string description;
+        public string audience;
+        public CapabilityScope scope;
+        public object parameters;
+    }
+
+    [Serializable]
+    public class SkillCatalogEntry
+    {
+        public string id;
+        public string name;
+        public string description;
+        public string audience;
+        public CapabilityScope scope;
+        public SkillProviderRef provider;
+        public SkillToolSummary[] tools = Array.Empty<SkillToolSummary>();
+        public SkillResourceSummary[] resources = Array.Empty<SkillResourceSummary>();
+        public SkillPromptSummary[] prompts = Array.Empty<SkillPromptSummary>();
+        public SkillPolicy policy;
+        public object metadata;
+    }
+
+    [Serializable]
+    public class SkillProviderRuntimeSnapshot
+    {
+        public SkillProviderRef provider;
+        public string display_name;
+        public string state;
+        public string summary;
+        public int skill_count;
+        public int tool_count;
+        public int resource_count;
+        public int prompt_count;
+        public string error;
+        public string[] recovery_actions = Array.Empty<string>();
+        public object metadata;
+        public string updated_at;
+    }
+
+    [Serializable]
+    public class CircuitBreakerConfig
+    {
+        public int failure_threshold;
+        public int recovery_timeout_ms;
+    }
+
+    [Serializable]
+    public class TTSRouteConfig
+    {
+        public string primary = "dashscope-cosyvoice";
+        public string[] fallbacks = Array.Empty<string>();
+        public CircuitBreakerConfig circuit_breaker;
+    }
+
+    [Serializable]
+    public class TTSCacheConfig
+    {
+        public bool enabled;
+        public int max_age_days;
+    }
+
+    [Serializable]
+    public class DashScopeCosyVoiceConfig
+    {
+        public bool enabled;
+        public string endpoint = "wss://dashscope.aliyuncs.com/api-ws/v1/inference";
+        public string model = "cosyvoice-v3.5-flash";
+        public string format = "wav";
+        public int sample_rate;
+        public int connect_timeout_ms;
+        public int receive_timeout_ms;
+        public int max_retries;
+    }
+
+    [Serializable]
+    public class TTSProvidersConfig
+    {
+        public DashScopeCosyVoiceConfig dashscope-cosyvoice;
+    }
+
+    [Serializable]
+    public class TTSConfig
+    {
+        public bool enabled;
+        public TTSRouteConfig route;
+        public TTSCacheConfig cache;
+        public TTSProvidersConfig providers;
+    }
+
+    [Serializable]
+    public class ASRConfig
+    {
+        public bool enabled;
+        public string provider = "funasr";
+        public string resource_id = "funasr.sensevoice-small";
+    }
+
+    [Serializable]
+    public class EmbeddingRouteConfig
+    {
+        public string provider = "dashscope-text-embedding";
+    }
+
+    [Serializable]
+    public class DashScopeEmbeddingProviderConfig
+    {
+        public string endpoint = "https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding";
+        public string model = "text-embedding-v4";
+        public int dimensions;
+        public int request_timeout_ms;
+        public int max_retries;
+    }
+
+    [Serializable]
+    public class LocalEmbeddingProviderConfig
+    {
+        public string model_path = "embedding/m3e-small";
+        public string model_id = "moka-ai/m3e-small";
+        public bool auto_download;
+        public string device = "cpu";
+        public int batch_size;
+    }
+
+    [Serializable]
+    public class EmbeddingProvidersConfig
+    {
+        public DashScopeEmbeddingProviderConfig dashscope-text-embedding;
+        public LocalEmbeddingProviderConfig local-sentence-transformers;
+    }
+
+    [Serializable]
+    public class WorkingMemoryConfig
+    {
+        public int max_messages_per_conversation;
+        public int hydrate_recent_messages;
+        public int context_message_limit;
+    }
+
+    [Serializable]
+    public class ConversationProjectionConfig
+    {
+        public int segment_target_messages;
+        public int chapter_idle_minutes;
+        public int chapter_segment_limit;
+        public int state_update_messages;
+        public int history_candidate_limit;
+        public int history_result_limit;
+        public int summary_max_chars;
+    }
+
+    [Serializable]
+    public class ExperienceLedgerConfig
+    {
+        public bool enabled;
+        public int pack_max_size_mb;
+        public int flush_interval_ms;
+        public int flush_max_buffer;
+        public int episode_idle_seconds;
+        public bool seal_integrity_check;
+    }
+
+    [Serializable]
+    public class ConsolidationConfig
+    {
+        public bool enabled;
+        public int batch_size;
+        public int max_batch_moments;
+        public int debounce_seconds;
+        public int max_wait_seconds;
+        public int lease_seconds;
+        public int retry_base_seconds;
+        public float minimum_salience;
+        public int autobiographical_evidence_threshold;
+        public int schedule_interval_seconds;
+    }
+
+    [Serializable]
+    public class RetrievalConfig
+    {
+        public int token_budget;
+        public int candidate_limit;
+        public int result_limit;
+        public float semantic_weight;
+    }
+
+    [Serializable]
+    public class McpServerConfig
+    {
+        public string id;
+        public bool enabled;
+        public string[] products = Array.Empty<string>();
+        public string transport = "stdio";
+        public string command;
+        public string[] args = Array.Empty<string>();
+        public string url;
+        public McpServerConfigEnvPayload env;
+        public string capability_prefix;
+        public int timeout_ms;
+    }
+
+    [Serializable]
+    public class UserSkillConfig
+    {
+        public bool enabled;
+        public string root_dir = "skills";
+    }
+
+    [Serializable]
     public class ContributionPointDefinitionSnapshot
     {
         public string id;
@@ -451,6 +698,12 @@ namespace GlimmerCradle.Avatar
         public AvatarStatusPayload avatar_status;
         public PresentationRuntimeReadinessCatalogPayload runtime_readiness;
         public AudioStatusPayload audio_status;
+        public ConversationNotice conversation_notice;
+        public ConversationHistoryResult conversation_history_result;
+        public SkillCatalogResponse skill_catalog_response;
+        public ConfigurationSnapshotResult configuration_snapshot_result;
+        public ConfigurationUpdateResult configuration_update_result;
+        public ConfigurationTestResult configuration_test_result;
         public ExtensionInstallPreview extension_install_preview;
         public ExtensionInstallResult extension_install_result;
         public ExtensionUninstallResult extension_uninstall_result;
@@ -476,6 +729,11 @@ namespace GlimmerCradle.Avatar
         public AvatarPresentationRequest avatar_presentation;
         public AvatarIntentRequest avatar_intent;
         public AvatarActionStateReportPayload avatar_action_state;
+        public ConfigurationSnapshotRequest config_snapshot_request;
+        public ConversationHistoryRequest conversation_history_request;
+        public SkillCatalogRequest skill_catalog_request;
+        public ConfigurationUpdateRequest config_update_request;
+        public ConfigurationTestRequest config_test_request;
         public ExtensionInstallPrepareRequest extension_install_prepare;
         public ExtensionInstallCommitRequest extension_install_commit;
         public PresentationUpstreamFrameExtensionInstallCancelPayload extension_install_cancel;
@@ -492,12 +750,194 @@ namespace GlimmerCradle.Avatar
     }
 
     [Serializable]
+    public class ConversationNotice
+    {
+        public string code;
+        public string level;
+        public string title;
+        public string message;
+        public string action_route;
+        public string action_label;
+    }
+
+    [Serializable]
+    public class ConversationHistoryResult
+    {
+        public string request_id;
+        public string status;
+        public ConversationHistoryResultConversationPayload conversation;
+        public ConversationHistoryEntry[] items = Array.Empty<ConversationHistoryEntry>();
+        public string next_cursor;
+        public bool has_more;
+        public string message;
+    }
+
+    [Serializable]
+    public class ConversationHistoryEntry
+    {
+        public string entry_id;
+        public string source_kind;
+        public string role;
+        public string status;
+        public string text;
+        public string title;
+        public string occurred_at;
+        public string trace_id;
+        public string interaction_id;
+        public string moment_id;
+        public int position;
+        public string conversation_id;
+        public string scene_id;
+        public string thread_id;
+        public string actor_id;
+        public string actor_name;
+        public string recall_scope;
+        public string disclosure_scope;
+    }
+
+    [Serializable]
+    public class SkillCatalogResponse
+    {
+        public string request_id;
+        public string status;
+        public SkillCatalogSnapshot snapshot;
+        public string message;
+    }
+
+    [Serializable]
+    public class SkillCatalogSnapshot
+    {
+        public string generatedAt;
+        public int totalSkills;
+        public SkillCatalogSnapshotProviderCountsPayload providerCounts;
+        public SkillCatalogSnapshotRuntimeStatusCountsPayload runtimeStatusCounts;
+        public int totalTools;
+        public int totalResources;
+        public int totalPrompts;
+        public SkillProviderRuntimeSnapshot[] providerRuntimes = Array.Empty<SkillProviderRuntimeSnapshot>();
+        public SkillCatalogEntry[] entries = Array.Empty<SkillCatalogEntry>();
+    }
+
+    [Serializable]
+    public class ConfigurationSnapshotResult
+    {
+        public string request_id;
+        public string status;
+        public ConfigurationSnapshot snapshot;
+        public string message;
+    }
+
+    [Serializable]
+    public class ConfigurationSnapshot
+    {
+        public string revision;
+        public ConfigurationSnapshotLlmPayload llm;
+        public AudioConfig audio;
+        public EmbeddingConfig embedding;
+        public MemoryConfig memory;
+        public SkillPlaneConfig skills;
+        public ConfigurationSnapshotStoragePayload storage;
+        public ConfigurationSnapshotServicePayload service;
+    }
+
+    [Serializable]
+    public class ConfigurationProviderSnapshot
+    {
+        public string key;
+        public string api_type;
+        public string base_url;
+        public bool has_api_key;
+        public float temperature;
+        public string request_method;
+        public string request_path;
+        public string response_extract;
+        public ConfigurationModelAlias[] models = Array.Empty<ConfigurationModelAlias>();
+    }
+
+    [Serializable]
+    public class ConfigurationModelAlias
+    {
+        public string alias;
+        public string model_id;
+    }
+
+    [Serializable]
+    public class ConfigurationRouteSnapshot
+    {
+        public string provider_key;
+        public string model_alias;
+        public string effective_model_id;
+        public bool ready;
+        public string reason;
+    }
+
+    [Serializable]
+    public class AudioConfig
+    {
+        public TTSConfig tts;
+        public ASRConfig asr;
+    }
+
+    [Serializable]
+    public class EmbeddingConfig
+    {
+        public bool enabled;
+        public EmbeddingRouteConfig route;
+        public EmbeddingProvidersConfig providers;
+    }
+
+    [Serializable]
+    public class MemoryConfig
+    {
+        public WorkingMemoryConfig working;
+        public ConversationProjectionConfig conversation;
+        public ExperienceLedgerConfig experience;
+        public ConsolidationConfig consolidation;
+        public RetrievalConfig retrieval;
+    }
+
+    [Serializable]
+    public class SkillPlaneConfig
+    {
+        public McpServerConfig[] mcp_servers = Array.Empty<McpServerConfig>();
+        public UserSkillConfig user_skills;
+    }
+
+    [Serializable]
+    public class ConfigurationUpdateResult
+    {
+        public string request_id;
+        public string status;
+        public string apply_state;
+        public string new_revision;
+        public string[] change_summary = Array.Empty<string>();
+        public ConfigurationSnapshot snapshot;
+        public string message;
+    }
+
+    [Serializable]
+    public class ConfigurationTestResult
+    {
+        public string request_id;
+        public string status;
+        public string message;
+        public string[] discovered_models = Array.Empty<string>();
+        public float latency_ms;
+    }
+
+    [Serializable]
     public class ExtensionInstallPreview
     {
         public string request_id;
         public string status;
         public string message;
         public string transaction_id;
+        public ExtensionInstallPreviewActivationProfilePayload activation_profile;
+        public ExtensionInstallPreviewAvailableProfilesPayload[] available_profiles = Array.Empty<ExtensionInstallPreviewAvailableProfilesPayload>();
+        public string[] effective_permissions = Array.Empty<string>();
+        public string[] effective_resources = Array.Empty<string>();
+        public string[] effective_capabilities = Array.Empty<string>();
+        public string[] effective_settings = Array.Empty<string>();
         public ExtensionInstallPreviewExtensionPayload extension;
         public ExtensionInstallPreviewArtifactPayload artifact;
         public ExtensionInstallPreviewTrustPayload trust;
@@ -530,6 +970,7 @@ namespace GlimmerCradle.Avatar
         public string request_id;
         public string extension_id;
         public string version;
+        public string activation_profile;
         public string operation;
         public string status;
         public string message;
@@ -580,6 +1021,7 @@ namespace GlimmerCradle.Avatar
         public string extension_id;
         public string[] installed_versions = Array.Empty<string>();
         public string active_version;
+        public string active_profile;
         public string updated_at;
     }
 
@@ -592,9 +1034,88 @@ namespace GlimmerCradle.Avatar
     }
 
     [Serializable]
+    public class ConfigurationSnapshotRequest
+    {
+        public string request_id;
+    }
+
+    [Serializable]
+    public class ConversationHistoryRequest
+    {
+        public string request_id;
+        public string conversation_id;
+        public string scene_id;
+        public string thread_id;
+        public string actor_id;
+        public string source_provider_id;
+        public string cursor;
+        public int limit;
+    }
+
+    [Serializable]
+    public class SkillCatalogRequest
+    {
+        public string request_id;
+    }
+
+    [Serializable]
+    public class ConfigurationUpdateRequest
+    {
+        public string request_id;
+        public string revision;
+        public bool dry_run;
+        public ConfigurationUpdateRequestLlmPayload llm;
+        public AudioConfig audio;
+        public EmbeddingConfig embedding;
+        public MemoryConfig memory;
+        public SkillPlaneConfig skills;
+    }
+
+    [Serializable]
+    public class ConfigurationProviderDraft
+    {
+        public string key;
+        public string api_type;
+        public string base_url;
+        public string api_key;
+        public bool clear_api_key;
+        public float temperature;
+        public string request_method;
+        public string request_path;
+        public ConfigurationProviderDraftRequestHeadersPayload request_headers;
+        public string request_body_template;
+        public string response_extract;
+        public ConfigurationModelAlias[] models = Array.Empty<ConfigurationModelAlias>();
+    }
+
+    [Serializable]
+    public class ConfigurationTestRequest
+    {
+        public string request_id;
+        public ConfigurationProviderTestDraft provider;
+    }
+
+    [Serializable]
+    public class ConfigurationProviderTestDraft
+    {
+        public string key;
+        public string api_type;
+        public string base_url;
+        public string api_key;
+        public bool clear_api_key;
+        public float temperature;
+        public string request_method;
+        public string request_path;
+        public ConfigurationProviderTestDraftRequestHeadersPayload request_headers;
+        public string request_body_template;
+        public string response_extract;
+    }
+
+    [Serializable]
     public class ExtensionInstallPrepareRequest
     {
         public string request_id;
+        public string activation_profile;
         public object source;
     }
 
@@ -620,6 +1141,7 @@ namespace GlimmerCradle.Avatar
         public string request_id;
         public string extension_id;
         public string version;
+        public string activation_profile;
         public string operation;
     }
 
@@ -664,10 +1186,76 @@ namespace GlimmerCradle.Avatar
     }
 
     [Serializable]
+    public class McpServerConfigEnvPayload
+    {
+    }
+
+    [Serializable]
     public class PresentationUpstreamFrameExtensionInstallCancelPayload
     {
         public string request_id;
         public string transaction_id;
+    }
+
+    [Serializable]
+    public class ConversationHistoryResultConversationPayload
+    {
+        public string source_provider_id;
+        public string scene_id;
+        public string conversation_id;
+        public string thread_id;
+        public string actor_id;
+        public string actor_name;
+        public string recall_scope;
+        public string disclosure_scope;
+    }
+
+    [Serializable]
+    public class SkillCatalogSnapshotProviderCountsPayload
+    {
+        public int core;
+        public int extension;
+        public int mcp_server;
+        public int user;
+    }
+
+    [Serializable]
+    public class SkillCatalogSnapshotRuntimeStatusCountsPayload
+    {
+        public int ready;
+        public int contract_only;
+    }
+
+    [Serializable]
+    public class ConfigurationSnapshotLlmPayload
+    {
+        public int provider_count;
+        public ConfigurationProviderSnapshot[] providers = Array.Empty<ConfigurationProviderSnapshot>();
+        public ConfigurationRouteSnapshot default_route;
+    }
+
+    [Serializable]
+    public class ConfigurationSnapshotStoragePayload
+    {
+        public string config_root;
+        public string data_root;
+        public string state_root;
+    }
+
+    [Serializable]
+    public class ConfigurationSnapshotServicePayload
+    {
+        public bool cognition_ready;
+        public bool restart_supported;
+    }
+
+    [Serializable]
+    public class ExtensionInstallPreviewActivationProfilePayload
+    {
+        public string id;
+        public string title;
+        public string description;
+        public bool default;
     }
 
     [Serializable]
@@ -700,6 +1288,25 @@ namespace GlimmerCradle.Avatar
         public bool build_attested;
         public string registry_id;
         public string repository;
+    }
+
+    [Serializable]
+    public class ConfigurationUpdateRequestLlmPayload
+    {
+        public string default_route_provider_key;
+        public string default_route_model_alias;
+        public ConfigurationProviderDraft[] providers = Array.Empty<ConfigurationProviderDraft>();
+        public string[] removed_provider_keys = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public class ConfigurationProviderDraftRequestHeadersPayload
+    {
+    }
+
+    [Serializable]
+    public class ConfigurationProviderTestDraftRequestHeadersPayload
+    {
     }
 
 }

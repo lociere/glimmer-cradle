@@ -117,7 +117,7 @@ ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 
 随后访问 `http://127.0.0.1:8080/`。访问 token 位于 `/etc/glimmer-cradle/deployment.env`，只用于换取 HttpOnly 会话 Cookie，不进入 URL。
 
-当前 `v0.1.x` 网页只提供对话、系统状态和基础 Extension 生命周期入口，尚未提供 Provider、Audio、Embedding、Memory、Skill Policy、网络或更新配置页面。页面没有遗漏隐藏的“设置”入口；首次配置仍需通过下面的宿主配置文件完成。完整、脱敏、可审计的网页配置控制面已进入 [M11](../../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)，落地前不得让浏览器直接编辑原始 YAML 或回显 secret。
+当前 `v0.1.x` 网页已提供正式控制面：`对话`、`状态`、`扩展`、`日志`、`设置` 五个一级页面可在零 Provider 状态下登录使用。设置中心当前已接入 Provider/默认路由、Audio、Embedding、Memory/Experience、Skill、安全访问令牌、存储/备份、更新/服务状态等 section owner；Provider secret 仍保持 write-only，浏览器不会回显密钥，也不会直接编辑原始 YAML。若某个运维动作依赖宿主桥但当前源码直跑环境未接入，页面会显示真实 disabled reason，而不是假按钮。
 
 首次启动会把只读默认模板补充到 `/var/lib/glimmer-cradle/config/`，不会覆盖已有文件。真实 provider key 只写入：
 
@@ -127,7 +127,7 @@ ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 
 至少配置一个 LLM provider，然后执行 `sudo glimmer-cradle restart`。启用 TTS 或 Embedding 时分别修改 `system/audio.yaml`、`system/embedding.yaml` 并提供对应 secret；保持 `disabled` 不会阻止基础服务就绪。
 
-当前版本的 Extension 页面不等同完整 Registry 客户端。安装 `.gcex` 前必须确认包的 `products`、`platforms` 和所需 `features` 包含当前 Personal Server 组合；只声明 `desktop` 或 `windows-x64` 的包会被正确拒绝。NapCat 的现有 Windows OneKey 包属于这种情况，不能通过改清单伪装成服务器兼容；Personal Server 版本将在 M11 按 [ADR-0012](../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md) 拆分为跨平台 QQ 场景 Adapter 与外部 OneBot 资源配置后发布。
+当前版本的 Extension 页面已接入统一安装事务：仓库 Release、Registry、Release Manifest 和浏览器本地 `.gcex` 都会进入同一 `prepare -> preview -> commit` 主线，并展示兼容性、权限、摘要/信任元数据与失败原因。浏览器本地包不会提交服务器绝对路径；页面只会把 `.gcex` 字节流上传到 Product Host owned 临时目录并换取 opaque `upload_id`，后续 prepare/commit/cancel 必须属于当前登录会话，断线会取消已预览未提交事务。安装前仍必须确认包的 `products`、`platforms` 和所需 `features` 包含当前 Personal Server 组合；只声明 `desktop` 或 `windows-x64` 的包会被正确拒绝。NapCat 的现有 Windows OneKey 包属于这种情况，不能通过改清单伪装成服务器兼容；Personal Server 版本将在 M11 按 [ADR-0012](../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md) 拆分为跨平台 QQ 场景 Adapter 与外部 OneBot 资源配置后发布。
 
 ## 域名与 HTTPS
 

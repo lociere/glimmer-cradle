@@ -387,6 +387,60 @@ class ConversationStore:
         rows = list(reversed(await cursor.fetchall()))
         return state, [ConversationMessage(*row) for row in rows]
 
+    async def load_history_page(
+        self,
+        conversation_id: str,
+        *,
+        allowed_scopes: set[str],
+        cursor: str | None,
+        limit: int,
+        scene_id: str | None = None,
+        actor_id: str | None = None,
+    ) -> tuple[dict, list[ConversationMessage], str | None, bool]:
+        thread = await self._load_thread(conversation_id)
+        if thread is None:
+            return {}, [], None, False
+
+        before_position = _decode_history_cursor(cursor)
+        page_limit = max(1, min(limit, 200))
+        base_clauses, base_params = self._build_history_filters(
+            conversation_id,
+            allowed_scopes=allowed_scopes,
+            scene_id=scene_id,
+            actor_id=actor_id,
+            before_position=before_position,
+        )
+        anchor_position = await self._resolve_history_anchor(
+            conversation_id,
+            allowed_scopes=allowed_scopes,
+            scene_id=scene_id,
+            actor_id=actor_id,
+            before_position=before_position,
+        )
+        if anchor_position is None:
+            return thread, [], None, False
+
+        clauses = [*base_clauses, "position <= ?"]
+        params = [*base_params, anchor_position, page_limit + 1]
+
+        cursor_obj = await self._connection.execute(
+            f"""
+            SELECT position,moment_id,conversation_id,scene_id,thread_id,interaction_id,
+                   role,content,actor_id,actor_name,occurred_at,importance,
+                   recall_scope,disclosure_scope
+            FROM conversation_messages
+            WHERE {" AND ".join(clauses)}
+            ORDER BY position DESC LIMIT ?
+            """,
+            tuple(params),
+        )
+        rows_desc = await cursor_obj.fetchall()
+        has_more = len(rows_desc) > page_limit
+        selected_desc = rows_desc[:page_limit]
+        messages = [ConversationMessage(*row) for row in reversed(selected_desc)]
+        next_cursor = _encode_history_cursor(anchor_position) if has_more and messages else None
+        return thread, messages, next_cursor, has_more
+
     async def retrieve_segments(
         self, conversation_id: str, query: str, *, allowed_scopes: set[str], limit: int
     ) -> list[str]:
@@ -441,3 +495,106 @@ class ConversationStore:
         if self._conn is None:
             raise RuntimeError("ConversationStore 尚未连接")
         return self._conn
+
+    async def _load_thread(self, conversation_id: str) -> dict:
+        cursor = await self._connection.execute(
+            """
+            SELECT conversation_id,continuity_id,scene_id,thread_id,recall_scope,disclosure_scope
+            FROM conversation_threads WHERE conversation_id=?
+            """,
+            (conversation_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return {}
+        return {
+            "conversation_id": str(row[0]),
+            "continuity_id": str(row[1]),
+            "scene_id": str(row[2]),
+            "thread_id": str(row[3]),
+            "recall_scope": str(row[4]),
+            "disclosure_scope": str(row[5]),
+        }
+
+    def _build_history_filters(
+        self,
+        conversation_id: str,
+        *,
+        allowed_scopes: set[str],
+        scene_id: str | None,
+        actor_id: str | None,
+        before_position: int | None,
+    ) -> tuple[list[str], list[object]]:
+        clauses = ["conversation_id=?"]
+        params: list[object] = [conversation_id]
+        if before_position is not None:
+            clauses.append("position < ?")
+            params.append(before_position)
+        if scene_id:
+            clauses.append("scene_id=?")
+            params.append(scene_id)
+        if allowed_scopes:
+            placeholders = ",".join("?" for _ in sorted(allowed_scopes))
+            clauses.append(f"recall_scope IN ({placeholders})")
+            params.extend(sorted(allowed_scopes))
+        if actor_id:
+            clauses.append("(actor_id=? OR role='assistant')")
+            params.append(actor_id)
+        return clauses, params
+
+    async def _resolve_history_anchor(
+        self,
+        conversation_id: str,
+        *,
+        allowed_scopes: set[str],
+        scene_id: str | None,
+        actor_id: str | None,
+        before_position: int | None,
+    ) -> int | None:
+        base_clauses, base_params = self._build_history_filters(
+            conversation_id,
+            allowed_scopes=allowed_scopes,
+            scene_id=scene_id,
+            actor_id=actor_id,
+            before_position=before_position,
+        )
+
+        assistant_cursor = await self._connection.execute(
+            f"""
+            SELECT position FROM conversation_messages
+            WHERE {" AND ".join([*base_clauses, "role='assistant'"])}
+            ORDER BY position DESC LIMIT 1
+            """,
+            tuple(base_params),
+        )
+        assistant_row = await assistant_cursor.fetchone()
+        if assistant_row is not None:
+            return int(assistant_row[0])
+
+        fallback_cursor = await self._connection.execute(
+            f"""
+            SELECT position FROM conversation_messages
+            WHERE {" AND ".join(base_clauses)}
+            ORDER BY position DESC LIMIT 1
+            """,
+            tuple(base_params),
+        )
+        fallback_row = await fallback_cursor.fetchone()
+        return int(fallback_row[0]) if fallback_row is not None else None
+
+
+def _decode_history_cursor(cursor: str | None) -> int | None:
+    if not cursor:
+        return None
+    value = cursor.strip()
+    if not value.startswith("pos:"):
+        return None
+    try:
+        position = int(value[4:])
+    except ValueError:
+        return None
+    return position if position > 0 else None
+
+
+def _encode_history_cursor(position: int) -> str:
+    return f"pos:{position}"

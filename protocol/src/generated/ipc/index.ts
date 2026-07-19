@@ -2,6 +2,7 @@
 export * from './AgentPlanPayload';
 export * from './AgentPlanResult';
 export * from './AgentSynthesisPayload';
+export * from './ConversationHistoryPayload';
 export * from './KernelMessageEnvelope';
 export * from './KnowledgeInitPayload';
 export * from './LifeHeartbeatPayload';

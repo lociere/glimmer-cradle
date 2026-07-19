@@ -27,14 +27,20 @@
         "avatar_status",
         "runtime_readiness",
         "audio_status",
+        "conversation_notice",
+        "conversation_history_result",
+        "skill_catalog_response",
+        "configuration_snapshot_result",
+        "configuration_update_result",
+        "configuration_test_result",
         "extension_install_preview",
         "extension_install_result",
-      "extension_uninstall_result",
-      "extension_lifecycle_result",
-      "extension_command_result",
-      "extension_runtime_projection_result",
-      "extension_runtime_projection_changed",
-      "extension_status_changed",
+        "extension_uninstall_result",
+        "extension_lifecycle_result",
+        "extension_command_result",
+        "extension_runtime_projection_result",
+        "extension_runtime_projection_changed",
+        "extension_status_changed",
         "shutdown",
         "load_scene",
         "unload_scene",
@@ -113,6 +119,24 @@
     "audio_status": {
       "$ref": "#/definitions/AudioStatusPayload",
       "description": "kind=audio_status 时存在。Control Center 用它展示 ASR/TTS 是否可用，不直接探测 Kernel 内部服务。"
+    },
+    "conversation_notice": {
+      "$ref": "src/schemas/models/ConversationNotice.schema.json"
+    },
+    "conversation_history_result": {
+      "$ref": "src/schemas/models/ConversationHistoryResult.schema.json"
+    },
+    "skill_catalog_response": {
+      "$ref": "src/schemas/models/SkillCatalogResponse.schema.json"
+    },
+    "configuration_snapshot_result": {
+      "$ref": "src/schemas/models/ConfigurationSnapshotResult.schema.json"
+    },
+    "configuration_update_result": {
+      "$ref": "src/schemas/models/ConfigurationUpdateResult.schema.json"
+    },
+    "configuration_test_result": {
+      "$ref": "src/schemas/models/ConfigurationTestResult.schema.json"
     },
     "extension_install_preview": {
       "$ref": "src/schemas/models/ExtensionInstallPreview.schema.json"

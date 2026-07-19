@@ -10,5 +10,6 @@ export interface ExtensionInstallationProjection {
    */
   installed_versions: [string, ...string[]];
   active_version?: string;
+  active_profile?: string;
   updated_at: string;
 }

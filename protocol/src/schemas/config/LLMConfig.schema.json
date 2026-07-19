@@ -62,6 +62,21 @@
     }
   },
   "properties": {
+    "default_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "默认对话路由选定的 provider key。"
+        },
+        "model_alias": {
+          "type": "string",
+          "description": "默认对话路由选定的模型别名。"
+        }
+      },
+      "description": "显式默认对话路由。Kernel Config Application Port 负责把它投影为根配置。"
+    },
     "api_type": {
       "type": "string",
       "default": "openai",

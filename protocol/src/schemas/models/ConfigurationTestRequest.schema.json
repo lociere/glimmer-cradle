@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationTestRequest.schema.json",
+  "title": "ConfigurationTestRequest",
+  "type": "object",
+  "required": ["request_id", "provider"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "provider": {
+      "$ref": "ConfigurationProviderTestDraft.schema.json"
+    }
+  }
+}

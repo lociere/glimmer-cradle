@@ -10,6 +10,61 @@
     "status": { "type": "string", "enum": ["ready", "error"] },
     "message": { "type": "string" },
     "transaction_id": { "type": "string" },
+    "activation_profile": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "default": { "type": "boolean" }
+      }
+    },
+    "available_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "supported"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "default": { "type": "boolean" },
+          "supported": { "type": "boolean" },
+          "disabled_reason": { "type": "string" }
+        }
+      }
+    },
+    "effective_permissions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "effective_resources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "effective_capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "effective_settings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
     "extension": {
       "type": "object",
       "required": ["id", "name", "version", "publisher", "permissions", "platforms"],

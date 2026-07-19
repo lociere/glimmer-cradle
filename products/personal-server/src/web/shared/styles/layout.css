@@ -1,0 +1,60 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 52px clamp(190px, 15vw, 260px) minmax(520px, 1fr) clamp(230px, 18vw, 310px);
+  grid-template-rows: 52px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px 10px 0;
+  background: var(--base);
+}
+
+.titlebar { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+.brand-button, .rail-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.brand-button { width: 34px; height: 34px; border-radius: 10px; font-weight: 700; color: var(--accent); }
+.title-context { width: min(450px, 38vw); margin: auto; padding: 8px 18px; text-align: center; border-radius: 9px; background: rgba(0, 0, 0, 0.15); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.connection-state { display: flex; align-items: center; gap: 8px; min-width: 92px; color: var(--muted); font-size: 13px; }
+.connection-state i, .status-line i, .pane-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.is-online { background: var(--ready) !important; }
+.is-offline { background: var(--danger) !important; }
+
+.rail { grid-column: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 10px; }
+.rail-button { width: 40px; height: 40px; border-radius: 12px; font-weight: 700; }
+.rail-button.is-active { color: var(--accent); background: var(--accent-soft); }
+.rail-bottom { margin-top: auto; }
+
+.section-pane { grid-column: 2; display: flex; flex-direction: column; min-width: 0; padding: 12px; }
+.pane-heading { padding: 8px 8px 16px; border-bottom: 1px solid var(--line); }
+.pane-heading span, .workspace-head span, .inspector-heading span, .system-summary span { color: var(--muted); font-size: 12px; }
+.section-pane nav { display: grid; gap: 5px; padding-top: 10px; }
+.section-link { display: flex; justify-content: space-between; align-items: center; min-height: 42px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; color: #c8cad0; text-align: left; }
+.section-link.is-active { background: var(--accent-soft); color: var(--text); }
+.pane-status { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 14px 8px 2px; border-top: 1px solid var(--line); }
+
+.workspace, .inspector { min-width: 0; min-height: 0; border-radius: var(--radius); background: var(--surface); }
+.workspace { grid-column: 3; overflow: hidden; }
+.workspace-view { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; padding: 0 30px 18px; }
+.workspace-head { display: flex; justify-content: space-between; align-items: center; min-height: 78px; border-bottom: 1px solid var(--line); }
+.quiet-button { min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); cursor: pointer; }
+
+.inspector { grid-column: 4; display: flex; flex-direction: column; overflow: hidden; background: var(--base-soft); }
+.inspector-heading, .inspector section { padding: 20px; border-bottom: 1px solid var(--line); }
+
+.login-layer { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: var(--base); }
+.login-layer[hidden] { display: none; }
+.login-panel { width: min(390px, calc(100vw - 40px)); padding: 32px; border-radius: var(--radius); background: var(--surface); }
+.brand-mark { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+.login-panel input { width: 100%; height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; outline: none; background: var(--surface-raised); color: var(--text); }
+.login-panel button { width: 100%; height: 44px; margin-top: 14px; border: 0; border-radius: 11px; background: #527fc4; cursor: pointer; }
+
+@media (max-width: 1080px) {
+  .app-shell { grid-template-columns: 52px clamp(180px, 21vw, 230px) minmax(440px, 1fr); }
+  .inspector { display: none; }
+}
+
+@media (max-width: 760px) {
+  .app-shell { grid-template-columns: 48px minmax(0, 1fr); padding-right: 8px; gap: 8px; }
+  .title-context, .section-pane { display: none; }
+  .workspace { grid-column: 2; }
+  .workspace-view { padding: 0 16px 14px; }
+}

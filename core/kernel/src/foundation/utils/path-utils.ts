@@ -1,13 +1,24 @@
 import fs from 'fs-extra';
 import path from 'path';
 
+const INVALID_ENV_PATH_VALUES = new Set(['undefined', 'null']);
+
+function readConfiguredPathEnv(name: string): string | null {
+  const raw = process.env[name];
+  if (typeof raw !== 'string') return null;
+  const normalized = raw.trim();
+  if (!normalized) return null;
+  if (INVALID_ENV_PATH_VALUES.has(normalized.toLowerCase())) return null;
+  return normalized;
+}
+
 /**
  * 解析仓库根目录。
  *
  * 发布产品通过 GLIMMER_CRADLE_APP_ROOT 显式注入只读安装根；开发环境才向上查找 workspace。
  */
 export function resolveRepoRoot(): string {
-  const configured = process.env.GLIMMER_CRADLE_APP_ROOT?.trim();
+  const configured = readConfiguredPathEnv('GLIMMER_CRADLE_APP_ROOT');
   if (configured) {
     return path.resolve(configured);
   }
@@ -43,7 +54,7 @@ export function resolveRepoRoot(): string {
  */
 export function resolveDataDir(): string {
   const repoRoot = resolveRepoRoot();
-  const configured = process.env.GLIMMER_CRADLE_DATA_ROOT?.trim() || '';
+  const configured = readConfiguredPathEnv('GLIMMER_CRADLE_DATA_ROOT') || '';
   if (!configured) {
     return path.join(repoRoot, 'data');
   }
@@ -58,7 +69,7 @@ export function resolveConfigDir(repoRoot?: string): string {
   const resolvedRepoRoot = repoRoot
     ? (path.isAbsolute(repoRoot) ? repoRoot : path.resolve(resolveRepoRoot(), repoRoot))
     : resolveRepoRoot();
-  const configured = process.env.GLIMMER_CRADLE_CONFIG_ROOT?.trim();
+  const configured = readConfiguredPathEnv('GLIMMER_CRADLE_CONFIG_ROOT');
   if (configured) {
     return path.isAbsolute(configured)
       ? configured
@@ -134,7 +145,7 @@ export function resolveWorkPath(relativePath = ''): string {
 
 /** 短生命周期协调域：动态端点、锁和进程代际信息，不具备跨启动保留契约。 */
 export function resolveRunDir(): string {
-  const configured = process.env.GLIMMER_CRADLE_RUN_ROOT?.trim();
+  const configured = readConfiguredPathEnv('GLIMMER_CRADLE_RUN_ROOT');
   if (configured) {
     return path.isAbsolute(configured)
       ? configured
@@ -160,7 +171,7 @@ export function resolveConfiguredProjectPath(
 
   const normalized = value.replace(/\\/g, '/');
   const repoRoot = path.resolve(options.repoRoot ?? resolveRepoRoot());
-  const configuredDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT?.trim() || '';
+  const configuredDataRoot = readConfiguredPathEnv('GLIMMER_CRADLE_DATA_ROOT') || '';
   const dataRoot = configuredDataRoot
     ? path.resolve(repoRoot, configuredDataRoot)
     : path.join(repoRoot, 'data');

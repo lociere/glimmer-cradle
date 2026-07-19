@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationTestResult.schema.json",
+  "title": "ConfigurationTestResult",
+  "type": "object",
+  "required": ["request_id", "status", "message", "discovered_models"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "error"]
+    },
+    "message": {
+      "type": "string"
+    },
+    "discovered_models": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "latency_ms": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}

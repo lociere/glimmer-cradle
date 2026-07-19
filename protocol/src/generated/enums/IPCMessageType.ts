@@ -6,6 +6,7 @@ export type IPCMessageType =
   | 'perception_cancel'
   | 'agent_plan'
   | 'agent_synthesis'
+  | 'conversation_history'
   | 'life_heartbeat'
   | 'cognition_shutdown'
   | 'state_sync'
@@ -22,6 +23,7 @@ export const IPCMessageType = {
   PERCEPTION_CANCEL: 'perception_cancel',
   AGENT_PLAN: 'agent_plan',
   AGENT_SYNTHESIS: 'agent_synthesis',
+  CONVERSATION_HISTORY: 'conversation_history',
   LIFE_HEARTBEAT: 'life_heartbeat',
   COGNITION_SHUTDOWN: 'cognition_shutdown',
   STATE_SYNC: 'state_sync',

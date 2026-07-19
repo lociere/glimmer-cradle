@@ -27,6 +27,12 @@ class Kind(StrEnum):
     AVATAR_STATUS = 'avatar_status'
     RUNTIME_READINESS = 'runtime_readiness'
     AUDIO_STATUS = 'audio_status'
+    CONVERSATION_NOTICE = 'conversation_notice'
+    CONVERSATION_HISTORY_RESULT = 'conversation_history_result'
+    SKILL_CATALOG_RESPONSE = 'skill_catalog_response'
+    CONFIGURATION_SNAPSHOT_RESULT = 'configuration_snapshot_result'
+    CONFIGURATION_UPDATE_RESULT = 'configuration_update_result'
+    CONFIGURATION_TEST_RESULT = 'configuration_test_result'
     EXTENSION_INSTALL_PREVIEW = 'extension_install_preview'
     EXTENSION_INSTALL_RESULT = 'extension_install_result'
     EXTENSION_UNINSTALL_RESULT = 'extension_uninstall_result'
@@ -41,9 +47,283 @@ class Kind(StrEnum):
     PING = 'ping'
 
 
+class Level(StrEnum):
+    INFO = 'info'
+    WARNING = 'warning'
+    ERROR = 'error'
+
+
+class ConversationNotice(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    code: str
+    level: Level
+    title: str
+    message: str
+    action_route: str | None = None
+    action_label: str | None = None
+
+
 class Status(StrEnum):
+    SUCCESS = 'success'
+    ERROR = 'error'
+
+
+class Conversation(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    source_provider_id: str = Field(..., min_length=1)
+    scene_id: str = Field(..., min_length=1)
+    conversation_id: str = Field(..., min_length=1)
+    thread_id: str = Field(..., min_length=1)
+    actor_id: str | None = None
+    actor_name: str | None = None
+    recall_scope: str = Field(..., min_length=1)
+    disclosure_scope: str = Field(..., min_length=1)
+
+
+class SourceKind(StrEnum):
+    CONVERSATION = 'conversation'
+    NOTICE = 'notice'
+    TRANSIENT = 'transient'
+
+
+class Role(StrEnum):
+    USER = 'user'
+    ASSISTANT = 'assistant'
+    SYSTEM = 'system'
+
+
+class Status1(StrEnum):
+    COMMITTED = 'committed'
+    PENDING = 'pending'
+    THINKING = 'thinking'
+    FAILED = 'failed'
+    NOTICE = 'notice'
+
+
+class Item(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    entry_id: str = Field(..., min_length=1)
+    source_kind: SourceKind
+    role: Role
+    status: Status1
+    text: str
+    title: str | None = None
+    occurred_at: str = Field(
+        ..., description='ISO 8601 UTC 时间戳。历史时间线统一按 occurred_at 升序展示。'
+    )
+    trace_id: str | None = None
+    interaction_id: str | None = None
+    moment_id: str | None = None
+    position: int | None = Field(
+        None, description='Conversation 投影中的稳定位置，仅对已提交消息存在。', ge=0
+    )
+    conversation_id: str = Field(..., min_length=1)
+    scene_id: str = Field(..., min_length=1)
+    thread_id: str = Field(..., min_length=1)
+    actor_id: str | None = None
+    actor_name: str | None = None
+    recall_scope: str = Field(..., min_length=1)
+    disclosure_scope: str = Field(..., min_length=1)
+
+
+class ConversationHistoryResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str = Field(..., min_length=1)
+    status: Status
+    conversation: Conversation | None = None
+    items: list[Item]
+    next_cursor: str | None = Field(
+        None, description='继续向更旧历史翻页时使用的不透明游标。'
+    )
+    has_more: bool
+    message: str | None = None
+
+
+class Status2(StrEnum):
+    SUCCESS = 'success'
+    ERROR = 'error'
+
+
+class ProviderCounts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    core: int = Field(..., ge=0)
+    extension: int = Field(..., ge=0)
+    mcp_server: int = Field(..., ge=0)
+    user: int = Field(..., ge=0)
+
+
+class RuntimeStatusCounts(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    ready: int = Field(..., ge=0)
+    contract_only: int = Field(..., ge=0)
+
+
+class RequestMethod(StrEnum):
+    GET = 'GET'
+    POST = 'POST'
+    PUT = 'PUT'
+    PATCH = 'PATCH'
+    DELETE = 'DELETE'
+
+
+class Model(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    alias: str = Field(..., description='稳定模型别名。', min_length=1)
+    model_id: str = Field(..., description='Provider 实际模型 ID。', min_length=1)
+
+
+class Provider(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str = Field(..., description='Provider 稳定 key。')
+    api_type: str = Field(..., description='Provider API 协议类型。')
+    base_url: str | None = Field(None, description='Provider API 根地址。')
+    has_api_key: bool = Field(..., description='是否已配置 secret。')
+    temperature: float | None = Field(
+        None, description='采样温度覆盖。', ge=0.0, le=2.0
+    )
+    request_method: RequestMethod | None = Field(None, description='自定义 HTTP 方法。')
+    request_path: str | None = Field(None, description='自定义请求路径。')
+    response_extract: str | None = Field(None, description='响应提取路径。')
+    models: list[Model] = Field(..., description='Provider 已声明的模型别名列表。')
+
+
+class DefaultRoute(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    provider_key: str | None = Field(None, description='当前默认路由的 provider key。')
+    model_alias: str | None = Field(None, description='当前默认路由的模型别名。')
+    effective_model_id: str | None = Field(
+        None, description='当前默认路由解析后的模型 ID。'
+    )
+    ready: bool = Field(..., description='默认对话路由是否可执行。')
+    reason: str | None = Field(None, description='未就绪原因。')
+
+
+class Llm(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    provider_count: int = Field(..., description='当前 Provider 数量。', ge=0)
+    providers: list[Provider] = Field(..., description='当前 LLM Provider 脱敏快照。')
+    default_route: DefaultRoute = Field(..., title='ConfigurationRouteSnapshot')
+
+
+class Storage(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    config_root: str
+    data_root: str
+    state_root: str
+
+
+class Service(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    cognition_ready: bool
+    restart_supported: bool
+
+
+class Status4(StrEnum):
+    PREVIEW = 'preview'
+    SUCCESS = 'success'
+    CONFLICT = 'conflict'
+    ERROR = 'error'
+
+
+class ApplyState(StrEnum):
+    UNCHANGED = 'unchanged'
+    RESTART_REQUIRED = 'restart_required'
+    RESTARTING = 'restarting'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+
+
+class Provider1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str = Field(..., description='Provider 稳定 key。')
+    api_type: str = Field(..., description='Provider API 协议类型。')
+    base_url: str | None = Field(None, description='Provider API 根地址。')
+    has_api_key: bool = Field(..., description='是否已配置 secret。')
+    temperature: float | None = Field(
+        None, description='采样温度覆盖。', ge=0.0, le=2.0
+    )
+    request_method: RequestMethod | None = Field(None, description='自定义 HTTP 方法。')
+    request_path: str | None = Field(None, description='自定义请求路径。')
+    response_extract: str | None = Field(None, description='响应提取路径。')
+    models: list[Model] = Field(..., description='Provider 已声明的模型别名列表。')
+
+
+class Llm1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    provider_count: int = Field(..., description='当前 Provider 数量。', ge=0)
+    providers: list[Provider1] = Field(..., description='当前 LLM Provider 脱敏快照。')
+    default_route: DefaultRoute = Field(..., title='ConfigurationRouteSnapshot')
+
+
+class Status5(StrEnum):
+    SUCCESS = 'success'
+    ERROR = 'error'
+
+
+class ConfigurationTestResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    status: Status5
+    message: str
+    discovered_models: list[str]
+    latency_ms: float | None = Field(None, ge=0.0)
+
+
+class Status6(StrEnum):
     READY = 'ready'
     ERROR = 'error'
+
+
+class ActivationProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(..., min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$')
+    title: str = Field(..., min_length=1)
+    description: str | None = None
+    default: bool | None = None
+
+
+class AvailableProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(..., min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$')
+    title: str = Field(..., min_length=1)
+    description: str | None = None
+    default: bool | None = None
+    supported: bool
+    disabled_reason: str | None = None
 
 
 class Extension(BaseModel):
@@ -68,7 +348,7 @@ class Artifact(BaseModel):
     platform: str
 
 
-class SourceKind(StrEnum):
+class SourceKind1(StrEnum):
     FILE = 'file'
     RELEASE_MANIFEST = 'release_manifest'
     REGISTRY = 'registry'
@@ -79,7 +359,7 @@ class Trust(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    source_kind: SourceKind
+    source_kind: SourceKind1
     listing_reviewed: bool
     publisher_verified: bool
     artifact_signed: bool
@@ -93,15 +373,21 @@ class ExtensionInstallPreview(BaseModel):
         extra='forbid',
     )
     request_id: str
-    status: Status
+    status: Status6
     message: str | None = None
     transaction_id: str | None = None
+    activation_profile: ActivationProfile | None = None
+    available_profiles: list[AvailableProfile] | None = None
+    effective_permissions: list[str] | None = None
+    effective_resources: list[str] | None = None
+    effective_capabilities: list[str] | None = None
+    effective_settings: list[str] | None = None
     extension: Extension | None = None
     artifact: Artifact | None = None
     trust: Trust | None = None
 
 
-class Status1(StrEnum):
+class Status7(StrEnum):
     SUCCESS = 'success'
     CANCELLED = 'cancelled'
     ERROR = 'error'
@@ -112,14 +398,14 @@ class ExtensionInstallResult(BaseModel):
         extra='forbid',
     )
     request_id: str
-    status: Status1
+    status: Status7
     message: str | None = None
     extension_id: str | None = None
     version: str | None = None
     already_installed: bool | None = None
 
 
-class Status2(StrEnum):
+class Status8(StrEnum):
     SUCCESS = 'success'
     ERROR = 'error'
 
@@ -131,7 +417,7 @@ class ExtensionUninstallResult(BaseModel):
     request_id: str
     extension_id: str
     version: str
-    status: Status2
+    status: Status8
     message: str | None = None
 
 
@@ -147,8 +433,11 @@ class ExtensionLifecycleResult(BaseModel):
     request_id: str = Field(..., min_length=1)
     extension_id: str = Field(..., min_length=3)
     version: str | None = Field(None, min_length=1)
+    activation_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
     operation: Operation
-    status: Status2
+    status: Status8
     message: str | None = None
 
 
@@ -158,7 +447,7 @@ class ExtensionCommandResult(BaseModel):
     )
     request_id: str = Field(..., min_length=1)
     command_id: str = Field(..., min_length=3)
-    status: Status2
+    status: Status8
     result: Any | None = None
     message: str | None = None
 
@@ -174,6 +463,9 @@ class Installation(BaseModel):
     extension_id: str = Field(..., min_length=3)
     installed_versions: list[InstalledVersion] = Field(..., min_length=1)
     active_version: str | None = Field(None, min_length=1)
+    active_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
     updated_at: AwareDatetime
 
 
@@ -263,7 +555,7 @@ class AudioTranscriptPayload(BaseModel):
         extra='forbid',
     )
     audio_id: str = Field(..., description='对应 audio_input.audio_id。')
-    status: Status2 = Field(..., description='ASR 结果状态。')
+    status: Status8 = Field(..., description='ASR 结果状态。')
     text: str | None = Field(None, description='识别成功后的文本。')
     message: str | None = Field(None, description='识别失败或诊断说明。')
 
@@ -551,7 +843,7 @@ class RouteState(StrEnum):
     UNKNOWN = 'unknown'
 
 
-class Role(StrEnum):
+class Role1(StrEnum):
     PRIMARY = 'primary'
     FALLBACK = 'fallback'
 
@@ -561,7 +853,7 @@ class Execution(StrEnum):
     LOCAL = 'local'
 
 
-class Status7(StrEnum):
+class Status13(StrEnum):
     READY = 'ready'
     DEGRADED = 'degraded'
     UNAVAILABLE = 'unavailable'
@@ -574,9 +866,9 @@ class AudioProviderStatus(BaseModel):
         extra='forbid',
     )
     provider_id: str = Field(..., description='稳定 provider id')
-    role: Role = Field(..., description='provider 在当前路线中的角色')
+    role: Role1 = Field(..., description='provider 在当前路线中的角色')
     execution: Execution = Field(..., description='provider 的执行位置')
-    status: Status7 = Field(..., description='provider 当前可用性与熔断状态')
+    status: Status13 = Field(..., description='provider 当前可用性与熔断状态')
     message: str | None = Field(None, description='不可用原因或补充说明')
 
 
@@ -597,6 +889,10 @@ class UnloadScenePayload(BaseModel):
     fade_ms: int | None = Field(None, description='卸载过渡时间(毫秒)', ge=0)
 
 
+class ASRConfig(RootModel[Any]):
+    root: Any
+
+
 class ActionIntentSnapshot(RootModel[Any]):
     root: Any
 
@@ -605,7 +901,15 @@ class CapabilityGraphSnapshot(RootModel[Any]):
     root: Any
 
 
+class ConsolidationConfig(RootModel[Any]):
+    root: Any
+
+
 class ContributionPointDefinitionSnapshot(RootModel[Any]):
+    root: Any
+
+
+class ConversationProjectionConfig(RootModel[Any]):
     root: Any
 
 
@@ -613,8 +917,200 @@ class DiagnosticsSnapshot(RootModel[Any]):
     root: Any
 
 
+class EmbeddingProvidersConfig(RootModel[Any]):
+    root: Any
+
+
+class EmbeddingRouteConfig(RootModel[Any]):
+    root: Any
+
+
+class ExperienceLedgerConfig(RootModel[Any]):
+    root: Any
+
+
 class LifecycleState(RootModel[Any]):
     root: Any
+
+
+class McpServerConfig(RootModel[Any]):
+    root: Any
+
+
+class RetrievalConfig(RootModel[Any]):
+    root: Any
+
+
+class SkillCatalogEntry(RootModel[Any]):
+    root: Any
+
+
+class SkillProviderRuntimeSnapshot(RootModel[Any]):
+    root: Any
+
+
+class TTSConfig(RootModel[Any]):
+    root: Any
+
+
+class UserSkillConfig(RootModel[Any]):
+    root: Any
+
+
+class WorkingMemoryConfig(RootModel[Any]):
+    root: Any
+
+
+class Snapshot(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    generatedAt: str
+    totalSkills: int = Field(..., ge=0)
+    providerCounts: ProviderCounts
+    runtimeStatusCounts: RuntimeStatusCounts
+    totalTools: int = Field(..., ge=0)
+    totalResources: int = Field(..., ge=0)
+    totalPrompts: int = Field(..., ge=0)
+    providerRuntimes: list[SkillProviderRuntimeSnapshot]
+    entries: list[SkillCatalogEntry]
+
+
+class SkillCatalogResponse(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    status: Status2
+    snapshot: Snapshot | None = Field(
+        None,
+        description='Kernel 向 Desktop 等跨进程消费者广播的 Skill Plane 统一能力目录与 provider runtime 投影。',
+        title='SkillCatalogSnapshot',
+    )
+    message: str | None = None
+
+
+class Audio(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tts: TTSConfig
+    asr: ASRConfig
+
+
+class Embedding(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool
+    route: EmbeddingRouteConfig
+    providers: EmbeddingProvidersConfig
+
+
+class Memory(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    working: WorkingMemoryConfig | None = Field({}, validate_default=True)
+    conversation: ConversationProjectionConfig | None = Field({}, validate_default=True)
+    experience: ExperienceLedgerConfig | None = Field({}, validate_default=True)
+    consolidation: ConsolidationConfig | None = Field({}, validate_default=True)
+    retrieval: RetrievalConfig | None = Field({}, validate_default=True)
+
+
+class Skills(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    mcp_servers: list[McpServerConfig] | None = Field(
+        [], description='外部 MCP server 列表。', validate_default=True
+    )
+    user_skills: UserSkillConfig | None = Field(
+        {}, description='用户自定义技能 Provider 配置。', validate_default=True
+    )
+
+
+class Snapshot1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    revision: str = Field(..., description='配置快照修订号。')
+    llm: Llm
+    audio: Audio = Field(
+        ...,
+        description='系统音频策略。只拥有路由、供应商执行参数、韧性和缓存，不拥有角色声线身份。',
+        title='AudioConfig',
+    )
+    embedding: Embedding = Field(
+        ...,
+        description='系统向量能力配置。Provider 负责执行，Cognition 只消费稳定向量 Port。',
+        title='EmbeddingConfig',
+    )
+    memory: Memory = Field(
+        ...,
+        description='经历、Episode、记忆固化、时间记忆与有界召回的统一配置。',
+        title='MemoryConfig',
+    )
+    skills: Skills = Field(
+        ...,
+        description='Skill Plane 配置 —— 外部 MCP Server Provider、用户技能入口与发现策略。',
+        title='SkillPlaneConfig',
+    )
+    storage: Storage
+    service: Service
+
+
+class ConfigurationSnapshotResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    status: Status2
+    snapshot: Snapshot1 | None = Field(None, title='ConfigurationSnapshot')
+    message: str | None = None
+
+
+class Snapshot2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    revision: str = Field(..., description='配置快照修订号。')
+    llm: Llm1
+    audio: Audio = Field(
+        ...,
+        description='系统音频策略。只拥有路由、供应商执行参数、韧性和缓存，不拥有角色声线身份。',
+        title='AudioConfig',
+    )
+    embedding: Embedding = Field(
+        ...,
+        description='系统向量能力配置。Provider 负责执行，Cognition 只消费稳定向量 Port。',
+        title='EmbeddingConfig',
+    )
+    memory: Memory = Field(
+        ...,
+        description='经历、Episode、记忆固化、时间记忆与有界召回的统一配置。',
+        title='MemoryConfig',
+    )
+    skills: Skills = Field(
+        ...,
+        description='Skill Plane 配置 —— 外部 MCP Server Provider、用户技能入口与发现策略。',
+        title='SkillPlaneConfig',
+    )
+    storage: Storage
+    service: Service
+
+
+class ConfigurationUpdateResult(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    status: Status4
+    apply_state: ApplyState
+    new_revision: str | None = None
+    change_summary: list[str]
+    snapshot: Snapshot2 | None = Field(None, title='ConfigurationSnapshot')
+    message: str | None = None
 
 
 class Projection(BaseModel):
@@ -644,7 +1140,7 @@ class ExtensionRuntimeProjectionResult(BaseModel):
         extra='forbid',
     )
     request_id: str = Field(..., min_length=1)
-    status: Status2
+    status: Status8
     projections: list[Projection]
     installations: list[Installation]
     message: str | None = None
@@ -793,6 +1289,24 @@ class PresentationDownstreamFrame(BaseModel):
     audio_status: AudioStatusPayload | None = Field(
         None,
         description='kind=audio_status 时存在。Control Center 用它展示 ASR/TTS 是否可用，不直接探测 Kernel 内部服务。',
+    )
+    conversation_notice: ConversationNotice | None = Field(
+        None, title='ConversationNotice'
+    )
+    conversation_history_result: ConversationHistoryResult | None = Field(
+        None, title='ConversationHistoryResult'
+    )
+    skill_catalog_response: SkillCatalogResponse | None = Field(
+        None, title='SkillCatalogResponse'
+    )
+    configuration_snapshot_result: ConfigurationSnapshotResult | None = Field(
+        None, title='ConfigurationSnapshotResult'
+    )
+    configuration_update_result: ConfigurationUpdateResult | None = Field(
+        None, title='ConfigurationUpdateResult'
+    )
+    configuration_test_result: ConfigurationTestResult | None = Field(
+        None, title='ConfigurationTestResult'
     )
     extension_install_preview: ExtensionInstallPreview | None = Field(
         None, title='ExtensionInstallPreview'

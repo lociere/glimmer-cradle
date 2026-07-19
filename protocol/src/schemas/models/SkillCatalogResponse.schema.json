@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/SkillCatalogResponse.schema.json",
+  "title": "SkillCatalogResponse",
+  "type": "object",
+  "required": ["request_id", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "error"]
+    },
+    "snapshot": {
+      "$ref": "SkillCatalogSnapshot.schema.json"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

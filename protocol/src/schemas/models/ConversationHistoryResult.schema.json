@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConversationHistoryResult.schema.json",
+  "title": "ConversationHistoryResult",
+  "type": "object",
+  "required": ["request_id", "status", "items", "has_more"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["success", "error"]
+    },
+    "conversation": {
+      "type": "object",
+      "required": [
+        "source_provider_id",
+        "scene_id",
+        "conversation_id",
+        "thread_id",
+        "recall_scope",
+        "disclosure_scope"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source_provider_id": { "type": "string", "minLength": 1 },
+        "scene_id": { "type": "string", "minLength": 1 },
+        "conversation_id": { "type": "string", "minLength": 1 },
+        "thread_id": { "type": "string", "minLength": 1 },
+        "actor_id": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "recall_scope": { "type": "string", "minLength": 1 },
+        "disclosure_scope": { "type": "string", "minLength": 1 }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "ConversationHistoryEntry.schema.json" },
+      "default": []
+    },
+    "next_cursor": {
+      "type": "string",
+      "description": "继续向更旧历史翻页时使用的不透明游标。"
+    },
+    "has_more": {
+      "type": "boolean",
+      "default": false
+    },
+    "message": { "type": "string" }
+  }
+}

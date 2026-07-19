@@ -9,6 +9,7 @@ import type {
   AgentPlanPayload,
   AgentPlanResult,
   AgentSynthesisPayload,
+  ConversationHistoryPayload,
   ErrorCode,
   PerceptionModalitySemantic,
   PerceptionModalityItem,
@@ -16,6 +17,10 @@ import type {
   IPCMessageType,
   LifeHeartbeatResult,
 } from "../generated";
+import type {
+  ConversationHistoryRequest,
+  ConversationHistoryResult,
+} from '../generated/models';
 
 /**
  * IPC消息分类：用于日志、路由和扩展时保持语义清晰。
@@ -143,3 +148,9 @@ export type AgentPlanResponse = AgentPlanResult;
 export type LifeHeartbeatRequest = Record<string, never>;
 
 export type LifeHeartbeatResponse = LifeHeartbeatResult;
+
+export type ConversationHistoryIPCRequest = ConversationHistoryPayload;
+
+export type ConversationHistoryQuery = ConversationHistoryRequest;
+
+export type ConversationHistoryResponse = ConversationHistoryResult;

@@ -1,0 +1,130 @@
+.conversation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.conversation-banner {
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.conversation-banner[data-state='warning'],
+.conversation-banner[data-state='error'] {
+  color: var(--danger);
+}
+
+.conversation-banner[data-state='info'] {
+  color: var(--warn);
+}
+
+.ghost-button,
+.inline-button {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.ghost-button {
+  padding: 8px 12px;
+}
+
+.inline-button {
+  padding: 6px 10px;
+}
+
+.message-list {
+  overflow: auto;
+  padding: 24px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #3c3e43 transparent;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  height: 100%;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-state span {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.message {
+  display: flex;
+  margin: 0 auto 18px;
+  max-width: 850px;
+  animation: message-in 160ms ease-out;
+}
+
+.message.user { justify-content: flex-end; }
+.message article {
+  max-width: min(76%, 680px);
+  padding: 12px 15px;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message.user article {
+  background: var(--accent-soft);
+  border-bottom-right-radius: 5px;
+}
+
+.message.system article {
+  border: 1px solid rgba(229, 170, 98, 0.2);
+}
+
+.message.user.is-failed article,
+.message.system.is-failed article {
+  border: 1px solid rgba(223, 114, 114, 0.28);
+}
+
+.message-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.composer textarea {
+  resize: none;
+  min-height: 50px;
+  max-height: 160px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  outline: none;
+  background: var(--surface-raised);
+  color: var(--text);
+}

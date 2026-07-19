@@ -7,8 +7,10 @@ import {
   ErrorCode,
   EXTENSION_ID_PATTERN,
   EXTENSION_VERSION_PATTERN,
+  materializeManifestForActivationProfile,
   getExtensionContributions,
   getManagedResourceContributions,
+  resolveExtensionActivationProfile,
   validateExtensionManifest,
   type ExtensionCommandContribution,
   type ExtensionInstallationProjection,
@@ -35,6 +37,7 @@ import {
 } from '../infrastructure/extension-installation/extension-package-manager';
 import { ManagedResourceSupervisor } from './managed-resource-supervisor';
 import { ExtensionProcessHost } from './process/extension-process-host';
+import { currentExtensionPlatform } from '../application/skill-plane/availability';
 
 type ExtensionManifestRecord = {
   id: string;
@@ -50,6 +53,7 @@ type ExtensionManifestRecord = {
   requires: ExtensionManifest['requires'];
   engines: ExtensionManifest['engines'];
   contributionPoints: ExtensionManifest['contributionPoints'];
+  activationProfiles: ExtensionManifest['activationProfiles'];
   contributes: ExtensionManifest['contributes'];
 };
 
@@ -61,6 +65,7 @@ interface ExtensionInstance {
 }
 
 export class ExtensionManager {
+  private static readonly ACTIVATION_PROFILE_FEATURES = new Set(['extensions'] as const);
   private extensionRootDir = resolveConfiguredProjectPath(path.join('data', 'packages', 'extensions'));
   private readonly extensions = new Map<string, ExtensionInstance>();
   private extensionDirectoryIndex = new Map<string, string>();
@@ -89,14 +94,16 @@ export class ExtensionManager {
     this.extensionTimeoutMs = config.extensions.sandbox.timeout_ms;
     await fs.ensureDir(this.extensionRootDir);
     this.packageManager = new ExtensionPackageManager(this.extensionRootDir, this.productId);
+    await this.packageManager.initialize();
     this.activeExtensions = await this.hostService.loadActiveExtensions();
     this.extensionDirectoryIndex = await this.discoverExtensionDirectories(this.activeExtensions);
 
     await Promise.all([...this.extensionDirectoryIndex.entries()].map(async ([extensionId, extensionDir]) => {
       try {
         const manifest = await this.readExtensionManifest(extensionId, extensionDir);
-        this.assertProductCompatibility(extensionId, manifest);
-        this.hostService.registerExtensionRuntimeManifest(manifest);
+        const effectiveManifest = this.materializeManifestForRuntime(extensionId, manifest);
+        this.assertProductCompatibility(extensionId, effectiveManifest);
+        this.hostService.registerExtensionRuntimeManifest(effectiveManifest);
         this.hostService.updateExtensionRuntimeLifecycle(extensionId, 'discovered');
       } catch (error) {
         this.logger.warn('扩展发现失败，已跳过', {
@@ -117,7 +124,10 @@ export class ExtensionManager {
     if (this.isShuttingDown || this.extensions.has(extensionId)) return;
     const extensionDir = this.extensionDirectoryIndex.get(extensionId);
     if (!extensionDir) throw this.validationError(`未找到扩展目录: ${extensionId}`);
-    const manifest = await this.readExtensionManifest(extensionId, extensionDir);
+    const manifest = this.materializeManifestForRuntime(
+      extensionId,
+      await this.readExtensionManifest(extensionId, extensionDir),
+    );
     this.assertProductCompatibility(extensionId, manifest);
     this.assertEngineCompatibility(extensionId, manifest);
     const entryPath = path.resolve(extensionDir, manifest.main);
@@ -134,7 +144,13 @@ export class ExtensionManager {
       const declaredSkillDisposables = this.registerDeclaredSkillEntries(extensionId, manifest);
       this.extensions.set(extensionId, {
         manifest,
-        host: new ExtensionProcessHost(this.hostService, manifest, entryPath, config, this.extensionTimeoutMs),
+        host: new ExtensionProcessHost(
+          this.hostService,
+          manifest,
+          entryPath,
+          config,
+          this.extensionTimeoutMs,
+        ),
         declaredSkillDisposables,
         isRunning: false,
       });
@@ -190,14 +206,17 @@ export class ExtensionManager {
     }));
   }
 
-  public async activateExtension(extensionId: string, version?: string): Promise<void> {
+  public async activateExtension(extensionId: string, version?: string, profile?: string): Promise<void> {
     if (!EXTENSION_ID_PATTERN.test(extensionId)) throw this.validationError(`无效扩展 ID: ${extensionId}`);
+    const previousSelections = [...this.activeExtensions];
+    const previousSelection = previousSelections.find((selection) => selection.id === extensionId);
     const selectedVersion = version?.trim()
       || this.getRuntimeProjection(extensionId)?.version
       || '';
     if (!EXTENSION_VERSION_PATTERN.test(selectedVersion)) {
       throw this.validationError(`扩展没有可激活版本: ${extensionId}`);
     }
+    const selectedProfile = await this.resolveSelectionProfile(extensionId, selectedVersion, profile);
 
     const current = this.extensions.get(extensionId);
     if (current && current.manifest.version !== selectedVersion) {
@@ -206,12 +225,35 @@ export class ExtensionManager {
     }
     const next = [
       ...this.activeExtensions.filter((selection) => selection.id !== extensionId),
-      { id: extensionId, version: selectedVersion },
+      { id: extensionId, version: selectedVersion, profile: selectedProfile },
     ];
     await this.hostService.saveActiveExtensions(next);
     this.activeExtensions = next;
     await this.refreshInstalledExtensions();
-    await this.startExtension(extensionId);
+    try {
+      await this.startExtension(extensionId);
+    } catch (error) {
+      const failedItem = this.extensions.get(extensionId);
+      if (failedItem?.manifest.version === selectedVersion) {
+        await this.disposeDeclaredSkillEntries(failedItem).catch(() => undefined);
+        this.extensions.delete(extensionId);
+      }
+      await this.hostService.saveActiveExtensions(previousSelections);
+      this.activeExtensions = previousSelections;
+      await this.refreshInstalledExtensions();
+      if (previousSelection?.version) {
+        try {
+          await this.startExtension(extensionId);
+        } catch (restartError) {
+          this.logger.error('扩展激活失败后恢复旧版本失败', {
+            extension_id: extensionId,
+            version: previousSelection.version,
+            error: errorMessage(restartError),
+          });
+        }
+      }
+      throw error;
+    }
   }
 
   public async deactivateExtension(extensionId: string): Promise<void> {
@@ -272,9 +314,6 @@ export class ExtensionManager {
 
   public async uninstall(extensionId: string, version: string): Promise<void> {
     const active = this.activeExtensions.some((selection) => selection.id === extensionId && selection.version === version);
-    if (this.extensions.get(extensionId)?.isRunning) {
-      throw this.validationError(`扩展仍在运行，不能卸载: ${extensionId}`);
-    }
     await this.getPackageManager().uninstall(extensionId, version, active);
     await this.refreshInstalledExtensions();
   }
@@ -286,7 +325,10 @@ export class ExtensionManager {
     for (const extensionId of removedIds) this.hostService.unregisterExtensionRuntime(extensionId);
     this.extensionDirectoryIndex = nextIndex;
     await Promise.all([...nextIndex.entries()].map(async ([extensionId, extensionDir]) => {
-      const manifest = await this.readExtensionManifest(extensionId, extensionDir);
+      const manifest = this.materializeManifestForRuntime(
+        extensionId,
+        await this.readExtensionManifest(extensionId, extensionDir),
+      );
       this.hostService.registerExtensionRuntimeManifest(manifest);
       if (!this.extensions.has(extensionId)) this.hostService.updateExtensionRuntimeLifecycle(extensionId, 'discovered');
     }));
@@ -305,6 +347,7 @@ export class ExtensionManager {
           extension_id: extensionId,
           installed_versions: [firstVersion!, ...remainingVersions],
           active_version: activeById.get(extensionId),
+          active_profile: this.getSelectionFor(extensionId)?.profile,
           updated_at: updatedAt,
         };
       });
@@ -321,6 +364,7 @@ export class ExtensionManager {
     this.extensionDirectoryIndex.clear();
     this.installedVersionCatalog.clear();
     this.activeExtensions = [];
+    this.packageManager?.dispose();
     this.packageManager = null;
     this.isInitialized = false;
     this.syncRuntimeReadiness();
@@ -388,8 +432,52 @@ export class ExtensionManager {
       id: manifest.id, name: manifest.name, version: manifest.version, description: manifest.description,
       tags: [...manifest.tags], products: [...manifest.products], main: manifest.main, minAppVersion: manifest.minAppVersion,
       permissions: manifest.permissions, activationEvents: manifest.activationEvents, requires: manifest.requires,
-      engines: manifest.engines, contributionPoints: manifest.contributionPoints, contributes: manifest.contributes,
+      engines: manifest.engines, contributionPoints: manifest.contributionPoints,
+      activationProfiles: manifest.activationProfiles,
+      contributes: manifest.contributes,
     };
+  }
+
+  private getSelectionFor(extensionId: string): ActiveExtensionSelection | undefined {
+    return this.activeExtensions.find((selection) => selection.id === extensionId);
+  }
+
+  private materializeManifestForRuntime(
+    extensionId: string,
+    manifest: ExtensionManifestRecord,
+  ): ExtensionManifestRecord {
+    const requestedProfile = this.getSelectionFor(extensionId)?.profile;
+    const { manifest: effectiveManifest } = materializeManifestForActivationProfile(
+      manifest as ExtensionManifest,
+      {
+        productId: this.productId,
+        platform: currentExtensionPlatform(),
+        features: ExtensionManager.ACTIVATION_PROFILE_FEATURES,
+      },
+      requestedProfile,
+    );
+    return effectiveManifest as ExtensionManifestRecord;
+  }
+
+  private async resolveSelectionProfile(
+    extensionId: string,
+    version: string,
+    requestedProfile?: string,
+  ): Promise<string> {
+    const packageDir = this.installedVersionCatalog.get(extensionId)?.get(version);
+    if (!packageDir) {
+      throw this.validationError(`扩展未安装，无法解析 activation profile: ${extensionId}@${version}`);
+    }
+    const manifest = await this.readExtensionManifest(extensionId, packageDir);
+    return resolveExtensionActivationProfile(
+      manifest as ExtensionManifest,
+      {
+        productId: this.productId,
+        platform: currentExtensionPlatform(),
+        features: ExtensionManager.ACTIVATION_PROFILE_FEATURES,
+      },
+      requestedProfile,
+    ).selected.id;
   }
 
   private async loadExtensionConfig(extensionId: string): Promise<Record<string, unknown>> {

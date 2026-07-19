@@ -5,13 +5,20 @@
   "main": "dist/index.js",
   "files": ["dist"],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "pnpm run build:web && tsx src/index.ts",
+    "build:web": "vite build",
+    "preview:web": "vite preview",
     "pretest": "pnpm --filter @glimmer-cradle/protocol run build",
-    "test": "tsx --test src/*.test.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "pretest:ui": "pnpm build",
+    "test:ui": "playwright test",
+    "test:ui:update": "playwright test --update-snapshots",
+    "test:ui:report": "playwright show-report ../../build/reports/playwright/personal-server/report",
+    "test:ui:install": "playwright install chromium",
     "pretypecheck": "pnpm --filter @glimmer-cradle/protocol run build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.playwright.json --noEmit",
     "prebuild": "pnpm --filter @glimmer-cradle/protocol run build",
-    "build": "tsc -p tsconfig.json && node scripts/copy-public.mjs",
+    "build": "tsc -p tsconfig.json && vite build",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -19,9 +26,11 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@types/node": "^24.13.3",
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0"
   }
 }

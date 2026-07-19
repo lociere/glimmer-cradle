@@ -85,6 +85,76 @@ describe('ExtensionManager', () => {
     }
   });
 
+  it('激活新版本失败时保持原 active 选择与运行版本', async () => {
+    const fixture = await createExtensionFixture('test.activate-rollback', {
+      permissions: [],
+      entrySource: 'module.exports = { onActivate() {} };',
+      version: '1.0.0',
+    });
+    await installExtensionVersion(fixture.root, fixture.extensionId, {
+      permissions: [],
+      entrySource: `
+        module.exports = {
+          onActivate() {
+            throw new Error('broken-extension-version');
+          }
+        };
+      `,
+      version: '2.0.0',
+    });
+    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
+    const manager = new ExtensionManager(host);
+
+    try {
+      await manager.init();
+      await manager.startExtension(fixture.extensionId);
+
+      await expect(manager.activateExtension(fixture.extensionId, '2.0.0')).rejects.toThrow('broken-extension-version');
+      expect(manager.listInstallationProjections()[0]?.active_version).toBe('1.0.0');
+      expect(manager.getRuntimeProjection(fixture.extensionId)).toMatchObject({
+        version: '1.0.0',
+        lifecycle: 'running',
+      });
+      await expect(host.loadActiveExtensions()).resolves.toEqual([{ id: fixture.extensionId, version: '1.0.0' }]);
+    } finally {
+      await manager.shutdown();
+    }
+  });
+
+  it('当前激活版本不可卸载，切回旧版本后允许回滚', async () => {
+    const fixture = await createExtensionFixture('test.rollback-owner', {
+      permissions: [],
+      entrySource: 'module.exports = { onActivate() {} };',
+      version: '1.0.0',
+    });
+    await installExtensionVersion(fixture.root, fixture.extensionId, {
+      permissions: [],
+      entrySource: 'module.exports = { onActivate() {} };',
+      version: '2.0.0',
+    });
+    const manager = new ExtensionManager(new FakeExtensionHost(
+      fixture.root,
+      new SkillCatalogAppService(SkillRegistry.instance),
+      [{ id: fixture.extensionId, version: '1.0.0' }],
+    ));
+
+    try {
+      await manager.init();
+      await manager.startExtension(fixture.extensionId);
+      await manager.activateExtension(fixture.extensionId, '2.0.0');
+
+      await expect(manager.uninstall(fixture.extensionId, '2.0.0')).rejects.toThrow('不能卸载当前激活版本');
+
+      await manager.activateExtension(fixture.extensionId, '1.0.0');
+      expect(manager.listInstallationProjections()[0]?.active_version).toBe('1.0.0');
+      await expect(manager.uninstall(fixture.extensionId, '2.0.0')).resolves.toBeUndefined();
+      expect(manager.listInstallationProjections()[0]?.installed_versions).toEqual(['1.0.0']);
+    } finally {
+      await manager.shutdown();
+    }
+  });
+
   it('未激活扩展只投影最新已安装版本，不会自动启动', async () => {
     const fixture = await createExtensionFixture('test.catalog-only', {
       permissions: [],

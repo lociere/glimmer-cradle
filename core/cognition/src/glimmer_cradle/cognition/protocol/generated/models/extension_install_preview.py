@@ -13,6 +13,28 @@ class Status(StrEnum):
     ERROR = 'error'
 
 
+class ActivationProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(..., min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$')
+    title: str = Field(..., min_length=1)
+    description: str | None = None
+    default: bool | None = None
+
+
+class AvailableProfile(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(..., min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$')
+    title: str = Field(..., min_length=1)
+    description: str | None = None
+    default: bool | None = None
+    supported: bool
+    disabled_reason: str | None = None
+
+
 class Extension(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -63,6 +85,12 @@ class ExtensionInstallPreview(BaseModel):
     status: Status
     message: str | None = None
     transaction_id: str | None = None
+    activation_profile: ActivationProfile | None = None
+    available_profiles: list[AvailableProfile] | None = None
+    effective_permissions: list[str] | None = None
+    effective_resources: list[str] | None = None
+    effective_capabilities: list[str] | None = None
+    effective_settings: list[str] | None = None
     extension: Extension | None = None
     artifact: Artifact | None = None
     trust: Trust | None = None

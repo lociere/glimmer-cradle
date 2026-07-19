@@ -10,6 +10,10 @@
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase, AgentPlanInput, AgentPlanOutput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase, AgentSynthesisInput, AgentSynthesisOutput
+from glimmer_cradle.cognition.conversation.controller import ConversationController
+from glimmer_cradle.cognition.protocol.generated.ipc.conversation_history_payload import ConversationHistoryPayload
+from glimmer_cradle.cognition.protocol.generated.models.conversation_history_entry import ConversationHistoryEntry
+from glimmer_cradle.cognition.protocol.generated.models.conversation_history_result import ConversationHistoryResult
 from glimmer_cradle.cognition.protocol.generated.ipc.knowledge_init_payload import KnowledgeBaseInitPayload
 from glimmer_cradle.cognition.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.observability.logger import get_logger
@@ -32,10 +36,12 @@ class KernelEventInboundAdapter(KernelRequestPort):
         self_entity: SelfEntity,
         agent_plan_use_case: AgentPlanUseCase,
         agent_synthesis_use_case: AgentSynthesisUseCase,
+        conversation_controller: ConversationController,
     ):
         self.self_entity = self_entity
         self.agent_plan_use_case = agent_plan_use_case
         self.agent_synthesis_use_case = agent_synthesis_use_case
+        self.conversation_controller = conversation_controller
         logger.info("内核入站适配器初始化完成")
 
     async def on_knowledge_init(
@@ -61,3 +67,60 @@ class KernelEventInboundAdapter(KernelRequestPort):
         """接收工具执行结果，由 LLM 合成最终回复。"""
         logger.info("收到 Agent 工具合成请求", trace_id=input_data.trace_id, scene_id=input_data.scene_id)
         return await self.agent_synthesis_use_case.execute(input_data, input_data.trace_id)
+
+    async def on_conversation_history(
+        self,
+        payload: ConversationHistoryPayload,
+    ) -> ConversationHistoryResult:
+        logger.info(
+            "收到 Conversation 历史查询请求",
+            request_id=payload.request_id,
+            conversation_id=payload.conversation_id,
+        )
+        thread, messages, next_cursor, has_more = await self.conversation_controller.history_page(
+            payload.conversation_id,
+            allowed_scopes={str(scope) for scope in payload.allowed_scopes},
+            cursor=payload.cursor,
+            limit=payload.limit,
+            scene_id=payload.scene_id,
+            actor_id=payload.actor_id,
+        )
+        items = [
+            ConversationHistoryEntry(
+                entry_id=f"conversation:{message.position}:{message.role}",
+                source_kind="conversation",
+                role=message.role,
+                status="committed",
+                text=message.content,
+                occurred_at=message.occurred_at,
+                trace_id=message.interaction_id,
+                interaction_id=message.interaction_id,
+                moment_id=message.moment_id,
+                position=message.position,
+                conversation_id=message.conversation_id,
+                scene_id=message.scene_id,
+                thread_id=message.thread_id,
+                actor_id=message.actor_id,
+                actor_name=message.actor_name,
+                recall_scope=message.recall_scope,
+                disclosure_scope=message.disclosure_scope,
+            )
+            for message in messages
+        ]
+        return ConversationHistoryResult(
+            request_id=payload.request_id,
+            status="success",
+            conversation={
+                "source_provider_id": payload.source_provider_id,
+                "scene_id": thread.get("scene_id", payload.scene_id),
+                "conversation_id": thread.get("conversation_id", payload.conversation_id),
+                "thread_id": thread.get("thread_id", payload.thread_id),
+                "actor_id": payload.actor_id,
+                "actor_name": payload.actor_name,
+                "recall_scope": thread.get("recall_scope", payload.allowed_scopes[0]),
+                "disclosure_scope": thread.get("disclosure_scope", payload.allowed_scopes[0]),
+            },
+            items=items,
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )

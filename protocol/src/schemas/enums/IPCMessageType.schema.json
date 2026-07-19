@@ -9,6 +9,7 @@
     "perception_cancel",
     "agent_plan",
     "agent_synthesis",
+    "conversation_history",
     "life_heartbeat",
     "cognition_shutdown",
     "state_sync",

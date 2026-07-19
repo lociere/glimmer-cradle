@@ -1,0 +1,80 @@
+.extension-scroll {
+  overflow: auto;
+  padding: 24px 2px 32px;
+  scrollbar-width: thin;
+  scrollbar-color: #3c3e43 transparent;
+}
+
+.extension-install-section,
+.extension-directory-section {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.extension-install-grid,
+.extension-card-list {
+  display: grid;
+  gap: 18px;
+}
+
+.extension-install-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.extension-install-form,
+.extension-preview,
+.extension-card {
+  display: grid;
+  gap: 14px;
+}
+
+.extension-install-actions,
+.extension-card-actions {
+  flex-wrap: wrap;
+}
+
+.extension-meta-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.extension-trust-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+}
+
+.extension-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.extension-state-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.extension-state-pill.is-running,
+.extension-state-pill.is-loaded {
+  color: #9fd3ae;
+  background: rgba(74, 155, 94, 0.18);
+}
+
+.extension-state-pill.is-degraded,
+.extension-state-pill.is-failed {
+  color: #f1b7a3;
+  background: rgba(173, 92, 62, 0.18);
+}
+
+.extension-error {
+  margin: 0;
+  color: #f1b7a3;
+}

@@ -11,6 +11,7 @@ class IPCMessageType(StrEnum):
     PERCEPTION_CANCEL = 'perception_cancel'
     AGENT_PLAN = 'agent_plan'
     AGENT_SYNTHESIS = 'agent_synthesis'
+    CONVERSATION_HISTORY = 'conversation_history'
     LIFE_HEARTBEAT = 'life_heartbeat'
     COGNITION_SHUTDOWN = 'cognition_shutdown'
     STATE_SYNC = 'state_sync'

@@ -5,6 +5,19 @@
  */
 export interface LLMConfig {
   /**
+   * 显式默认对话路由。Kernel Config Application Port 负责把它投影为根配置。
+   */
+  default_route?: {
+    /**
+     * 默认对话路由选定的 provider key。
+     */
+    provider?: string;
+    /**
+     * 默认对话路由选定的模型别名。
+     */
+    model_alias?: string;
+  };
+  /**
    * 主 API 协议类型
    */
   api_type: string;

@@ -1,0 +1,98 @@
+.status-scroll {
+  overflow: auto;
+  padding: 24px 2px 28px;
+}
+
+.status-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.status-card,
+.status-section {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+.status-card {
+  display: grid;
+  gap: 6px;
+}
+
+.status-card span,
+.status-section-head span,
+.status-runtime-meta span,
+.status-runtime-side span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-card p,
+.status-empty p,
+.status-runtime-main p {
+  margin: 0;
+  color: #c5c8ce;
+  line-height: 1.5;
+}
+
+.status-section {
+  margin-top: 18px;
+}
+
+.status-section-head {
+  margin-bottom: 14px;
+}
+
+.status-runtime-list {
+  display: grid;
+  gap: 10px;
+}
+
+.status-runtime-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(160px, 0.5fr) minmax(120px, 0.35fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.status-runtime-row.state-ready {
+  border: 1px solid rgba(102, 201, 144, 0.22);
+}
+
+.status-runtime-row.state-degraded,
+.status-runtime-row.state-failed {
+  border: 1px solid rgba(229, 170, 98, 0.22);
+}
+
+.status-runtime-main,
+.status-runtime-meta,
+.status-runtime-side {
+  display: grid;
+  gap: 4px;
+}
+
+.status-runtime-side {
+  text-align: right;
+}
+
+.status-empty {
+  padding: 18px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+@media (max-width: 900px) {
+  .status-card-grid,
+  .status-runtime-row {
+    grid-template-columns: 1fr;
+  }
+
+  .status-runtime-side {
+    text-align: left;
+  }
+}

@@ -5,8 +5,8 @@ import type {
   ExtensionInstallPreview,
   ExtensionInstallResult,
   ExtensionUninstallResult,
+  PresentationDownstreamFrame,
   RuntimeReadinessCatalog,
-  SkillCatalogSnapshot,
 } from '@glimmer-cradle/protocol';
 
 export interface ReplyPayload {
@@ -380,11 +380,7 @@ export interface ExtensionCommandResult<T = unknown> {
   message: string;
 }
 
-export interface SkillCatalogResponse {
-  status: 'success' | 'error';
-  snapshot?: SkillCatalogSnapshot;
-  message: string;
-}
+export type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
 
 export interface AvatarAppearanceSettings {
   modelId: string;

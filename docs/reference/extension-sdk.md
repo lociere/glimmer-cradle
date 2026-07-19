@@ -114,9 +114,11 @@ publisher.extension-1.0.0-any.gcex
 | Registry | 发现经审核扩展和稳定/测试通道 | 提供 listing/publisher 审核信号，不替代包校验 |
 | Release Manifest URL | 已知发布者的精确发布 | 校验清单与 `.gcex` 摘要，不声明官方审核 |
 | Repository Release | GitHub/GitLab/Gitea 精确 tag | 优先解析 Release Manifest；缺失时按 `<id>-<version>-<platform>.gcex` 选择当前平台唯一制品；禁止跟随浮动分支 |
-| Local `.gcex` | 离线、开发和企业分发 | Desktop 通过系统文件选择器交给 main；Personal Server 不接受浏览器指定服务器路径 |
+| Local `.gcex` | 离线、开发和企业分发 | Desktop 通过系统文件选择器交给 main；Personal Server 只接受认证后的受限字节上传，浏览器换取 opaque `upload_id` 后再进入同一安装事务，不接受浏览器指定服务器路径 |
 
 安装分为 `prepare -> preview -> commit`：Kernel 下载到事务目录，逐跳拒绝非 HTTPS 或超过上限的重定向；SDK 在解压过程中限制文件数和膨胀体积，再验证路径、manifest、平台、摘要和 SBOM。用户确认的权限集合必须与包声明完全一致，Kernel 才重新验证并原子安装到 `data/packages/extensions/<id>/<version>/`。扩展目录落位和安装元数据写入属于同一提交结果，任一步失败都回滚新版本；正在运行或被 active config 选中的版本不能卸载。
+
+Personal Server 的浏览器本地包是这条事务的受控前置步骤，而不是第二条安装主线：`POST /api/v1/extensions/local-package` 只接受同源、已认证请求，限制 `.gcex` 扩展名与 256 MiB 大小上限，把字节流写入 Product Host owned 临时目录，并返回绑定当前 principal/session、30 分钟时效、单次消费的 opaque `upload_id`。后续 `extension_install_prepare` 只能提交 `uploaded_package.upload_id`；Host 在当前会话内把它解析为受控 file source 后再转给 Kernel Package Manager。prepare 完成、失败、取消、断线或超时都会清理上传文件与索引；commit/cancel 对所有 transaction_id 都要求属于当前登录会话，Host 断线会主动取消已预览未提交事务，Kernel Package Manager 启动和定时 sweep 仍会清理 stale transaction 目录。
 
 默认 Registry 位于 `glimmer-cradle-extensions/registry/catalog.json`。它与第一方扩展源码共用仓库和 CI，但只保存扩展身份、仓库、归属、审核/安全状态和作者侧发布来源指针，不复制扩展 manifest、权限、贡献点、源码、`.gcex`、Release Manifest、SBOM、签名或构建证明。社区可以运营兼容 Registry，也可以完全不进入目录而直接发布；是否被目录收录与是否符合安装协议是两件事。
 

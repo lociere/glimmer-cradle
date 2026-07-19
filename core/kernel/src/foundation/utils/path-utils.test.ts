@@ -47,6 +47,19 @@ describe('Local Data Domain path precedence', () => {
 
     expect(resolveRunDir()).toBe(runRoot);
   });
+
+  it('treats stringified undefined and null env values as unset', () => {
+    const repoRoot = path.resolve(__dirname, '..', '..', '..', '..', '..');
+    process.env.GLIMMER_CRADLE_APP_ROOT = 'undefined';
+    process.env.GLIMMER_CRADLE_CONFIG_ROOT = 'null';
+    process.env.GLIMMER_CRADLE_DATA_ROOT = 'undefined';
+    process.env.GLIMMER_CRADLE_RUN_ROOT = 'null';
+
+    expect(resolveRepoRoot()).toBe(repoRoot);
+    expect(resolveConfigDir()).toBe(path.join(repoRoot, 'configs'));
+    expect(resolveDataDir()).toBe(path.join(repoRoot, 'data'));
+    expect(resolveRunDir()).toBe(path.join(repoRoot, 'data', 'run'));
+  });
 });
 
 function restoreEnvironment(name: string, value: string | undefined): void {

@@ -55,7 +55,7 @@ export class McpServerSkillProvider implements SkillProvider {
   }>();
   private readonly _pendingConnections = new Set<Promise<void>>();
   private _registrationTarget: SkillRegistrationTarget | null = null;
-  public readonly provider = MCP_SERVER_SKILL_PROVIDER;
+  public readonly provider: SkillProviderRef = MCP_SERVER_SKILL_PROVIDER;
 
   public static get instance(): McpServerSkillProvider {
     if (!McpServerSkillProvider._instance) {

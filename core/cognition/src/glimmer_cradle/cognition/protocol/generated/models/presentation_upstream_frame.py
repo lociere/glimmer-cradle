@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import AnyUrl, BaseModel, ConfigDict, Field
+from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 
 class Kind(StrEnum):
@@ -17,6 +17,11 @@ class Kind(StrEnum):
     AVATAR_PRESENTATION = 'avatar_presentation'
     AVATAR_INTENT = 'avatar_intent'
     AVATAR_ACTION_STATE = 'avatar_action_state'
+    CONFIG_SNAPSHOT_REQUEST = 'config_snapshot_request'
+    CONVERSATION_HISTORY_REQUEST = 'conversation_history_request'
+    SKILL_CATALOG_REQUEST = 'skill_catalog_request'
+    CONFIG_UPDATE_REQUEST = 'config_update_request'
+    CONFIG_TEST_REQUEST = 'config_test_request'
     EXTENSION_INSTALL_PREPARE = 'extension_install_prepare'
     EXTENSION_INSTALL_COMMIT = 'extension_install_commit'
     EXTENSION_INSTALL_CANCEL = 'extension_install_cancel'
@@ -34,6 +39,123 @@ class Kind(StrEnum):
     ERROR = 'error'
 
 
+class ConfigSnapshotRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+
+
+class ConversationHistoryRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str = Field(..., min_length=1)
+    conversation_id: str | None = None
+    scene_id: str | None = None
+    thread_id: str | None = None
+    actor_id: str | None = None
+    source_provider_id: str | None = None
+    cursor: str | None = Field(None, description='不透明分页游标。缺省时返回最新一页。')
+    limit: int | None = Field(50, ge=1, le=200)
+
+
+class SkillCatalogRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str = Field(
+        ..., description='请求 ID，用于将 Skill Catalog 响应与调用方会话匹配。'
+    )
+
+
+class RequestMethod(StrEnum):
+    GET = 'GET'
+    POST = 'POST'
+    PUT = 'PUT'
+    PATCH = 'PATCH'
+    DELETE = 'DELETE'
+
+
+class Model(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    alias: str = Field(..., description='稳定模型别名。', min_length=1)
+    model_id: str = Field(..., description='Provider 实际模型 ID。', min_length=1)
+
+
+class Provider(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str = Field(
+        ..., description='Provider 稳定 key。', pattern='^[a-z0-9][a-z0-9._-]{0,63}$'
+    )
+    api_type: str = Field(..., description='Provider API 协议类型。', min_length=1)
+    base_url: str | None = Field(None, description='Provider API 根地址。')
+    api_key: str | None = Field(None, description='write-only secret。保存后不回显。')
+    clear_api_key: bool | None = Field(
+        None, description='显式清除当前 provider secret。'
+    )
+    temperature: float | None = Field(
+        None, description='采样温度覆盖。', ge=0.0, le=2.0
+    )
+    request_method: RequestMethod | None = Field(None, description='自定义 HTTP 方法。')
+    request_path: str | None = Field(None, description='自定义请求路径。')
+    request_headers: dict[str, str] | None = Field(None, description='自定义请求头。')
+    request_body_template: str | None = Field(None, description='请求体模板。')
+    response_extract: str | None = Field(None, description='响应提取路径。')
+    models: list[Model] = Field(
+        ..., description='Provider 暴露的模型别名列表。', min_length=1
+    )
+
+
+class RemovedProviderKey(RootModel[str]):
+    root: str = Field(..., pattern='^[a-z0-9][a-z0-9._-]{0,63}$')
+
+
+class Llm(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    default_route_provider_key: str | None = None
+    default_route_model_alias: str | None = None
+    providers: list[Provider]
+    removed_provider_keys: list[RemovedProviderKey]
+
+
+class Provider1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    key: str = Field(
+        ..., description='Provider 稳定 key。', pattern='^[a-z0-9][a-z0-9._-]{0,63}$'
+    )
+    api_type: str = Field(..., description='Provider API 协议类型。', min_length=1)
+    base_url: str | None = Field(None, description='Provider API 根地址。')
+    api_key: str | None = Field(None, description='write-only secret。保存后不回显。')
+    clear_api_key: bool | None = Field(
+        None, description='显式清除当前 provider secret。'
+    )
+    temperature: float | None = Field(
+        None, description='采样温度覆盖。', ge=0.0, le=2.0
+    )
+    request_method: RequestMethod | None = Field(None, description='自定义 HTTP 方法。')
+    request_path: str | None = Field(None, description='自定义请求路径。')
+    request_headers: dict[str, str] | None = Field(None, description='自定义请求头。')
+    request_body_template: str | None = Field(None, description='请求体模板。')
+    response_extract: str | None = Field(None, description='响应提取路径。')
+
+
+class ConfigTestRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    provider: Provider1 = Field(..., title='ConfigurationProviderTestDraft')
+
+
 class Source(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -43,6 +165,14 @@ class Source(BaseModel):
 
 
 class Source1(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    kind: Literal['uploaded_package']
+    upload_id: str = Field(..., min_length=8, pattern='^upload_[A-Za-z0-9-]+$')
+
+
+class Source2(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -56,7 +186,7 @@ class Channel(StrEnum):
     NIGHTLY = 'nightly'
 
 
-class Source2(BaseModel):
+class Source3(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -66,7 +196,7 @@ class Source2(BaseModel):
     channel: Channel | None = None
 
 
-class Source3(BaseModel):
+class Source4(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -80,7 +210,10 @@ class ExtensionInstallPrepare(BaseModel):
         extra='forbid',
     )
     request_id: str = Field(..., min_length=1)
-    source: Source | Source1 | Source2 | Source3
+    activation_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
+    source: Source | Source1 | Source2 | Source3 | Source4
 
 
 class ExtensionInstallCommit(BaseModel):
@@ -121,6 +254,9 @@ class ExtensionLifecycleRequest(BaseModel):
     request_id: str = Field(..., min_length=1)
     extension_id: str = Field(..., min_length=3)
     version: str | None = Field(None, min_length=1)
+    activation_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
     operation: Operation
 
 
@@ -386,6 +522,120 @@ class AvatarHostErrorPayload(BaseModel):
     details: dict[str, Any] | None = Field(None, description='可选附加详情')
 
 
+class ASRConfig(RootModel[Any]):
+    root: Any
+
+
+class ConsolidationConfig(RootModel[Any]):
+    root: Any
+
+
+class ConversationProjectionConfig(RootModel[Any]):
+    root: Any
+
+
+class EmbeddingProvidersConfig(RootModel[Any]):
+    root: Any
+
+
+class EmbeddingRouteConfig(RootModel[Any]):
+    root: Any
+
+
+class ExperienceLedgerConfig(RootModel[Any]):
+    root: Any
+
+
+class McpServerConfig(RootModel[Any]):
+    root: Any
+
+
+class RetrievalConfig(RootModel[Any]):
+    root: Any
+
+
+class TTSConfig(RootModel[Any]):
+    root: Any
+
+
+class UserSkillConfig(RootModel[Any]):
+    root: Any
+
+
+class WorkingMemoryConfig(RootModel[Any]):
+    root: Any
+
+
+class Audio(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    tts: TTSConfig
+    asr: ASRConfig
+
+
+class Embedding(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool
+    route: EmbeddingRouteConfig
+    providers: EmbeddingProvidersConfig
+
+
+class Memory(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    working: WorkingMemoryConfig | None = Field({}, validate_default=True)
+    conversation: ConversationProjectionConfig | None = Field({}, validate_default=True)
+    experience: ExperienceLedgerConfig | None = Field({}, validate_default=True)
+    consolidation: ConsolidationConfig | None = Field({}, validate_default=True)
+    retrieval: RetrievalConfig | None = Field({}, validate_default=True)
+
+
+class Skills(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    mcp_servers: list[McpServerConfig] | None = Field(
+        [], description='外部 MCP server 列表。', validate_default=True
+    )
+    user_skills: UserSkillConfig | None = Field(
+        {}, description='用户自定义技能 Provider 配置。', validate_default=True
+    )
+
+
+class ConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    request_id: str
+    revision: str = Field(..., description='客户端基于的快照修订号。')
+    dry_run: bool | None = Field(None, description='只生成预览，不提交。')
+    llm: Llm
+    audio: Audio = Field(
+        ...,
+        description='系统音频策略。只拥有路由、供应商执行参数、韧性和缓存，不拥有角色声线身份。',
+        title='AudioConfig',
+    )
+    embedding: Embedding = Field(
+        ...,
+        description='系统向量能力配置。Provider 负责执行，Cognition 只消费稳定向量 Port。',
+        title='EmbeddingConfig',
+    )
+    memory: Memory = Field(
+        ...,
+        description='经历、Episode、记忆固化、时间记忆与有界召回的统一配置。',
+        title='MemoryConfig',
+    )
+    skills: Skills = Field(
+        ...,
+        description='Skill Plane 配置 —— 外部 MCP Server Provider、用户技能入口与发现策略。',
+        title='SkillPlaneConfig',
+    )
+
+
 class PresentationUpstreamFrame(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -424,6 +674,21 @@ class PresentationUpstreamFrame(BaseModel):
     avatar_action_state: AvatarActionStateReportPayload | None = Field(
         None,
         description='kind=avatar_action_state 时存在。Avatar 回报动作调度器的权威状态快照。',
+    )
+    config_snapshot_request: ConfigSnapshotRequest | None = Field(
+        None, title='ConfigurationSnapshotRequest'
+    )
+    conversation_history_request: ConversationHistoryRequest | None = Field(
+        None, title='ConversationHistoryRequest'
+    )
+    skill_catalog_request: SkillCatalogRequest | None = Field(
+        None, title='SkillCatalogRequest'
+    )
+    config_update_request: ConfigUpdateRequest | None = Field(
+        None, title='ConfigurationUpdateRequest'
+    )
+    config_test_request: ConfigTestRequest | None = Field(
+        None, title='ConfigurationTestRequest'
     )
     extension_install_prepare: ExtensionInstallPrepare | None = Field(
         None, title='ExtensionInstallPrepareRequest'

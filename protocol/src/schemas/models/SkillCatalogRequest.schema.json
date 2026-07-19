@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/SkillCatalogRequest.schema.json",
+  "title": "SkillCatalogRequest",
+  "type": "object",
+  "required": ["request_id"],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "请求 ID，用于将 Skill Catalog 响应与调用方会话匹配。"
+    }
+  }
+}

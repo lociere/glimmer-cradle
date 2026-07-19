@@ -93,6 +93,28 @@ class ConversationController:
         )
         return state, recent, "\n".join(f"历史片段：{item}" for item in segments)
 
+    async def history_page(
+        self,
+        conversation_id: str,
+        *,
+        allowed_scopes: set[str],
+        cursor: str | None,
+        limit: int,
+        scene_id: str | None = None,
+        actor_id: str | None = None,
+    ) -> tuple[dict, list, str | None, bool]:
+        if not conversation_id:
+            return {}, [], None, False
+        await self.project_pending()
+        return await self._store.load_history_page(
+            conversation_id,
+            allowed_scopes=allowed_scopes,
+            cursor=cursor,
+            limit=limit,
+            scene_id=scene_id,
+            actor_id=actor_id,
+        )
+
     @staticmethod
     def _format_state(state: dict) -> str:
         if not state:

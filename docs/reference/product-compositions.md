@@ -13,11 +13,42 @@
 
 ## 控制面板与能力边界
 
-Desktop 与 Personal Server 使用同一设计语言和 Kernel 投影，但不是同一 Product Host 或同一页面装配。Desktop Control Center 由 Electron main/preload/renderer 承载，可调用系统文件选择器、本机设备 Skill、Avatar 和窗口能力；Personal Server 控制面板是 `products/personal-server/public/` 的浏览器应用。
+Desktop 与 Personal Server 使用同一设计语言和 Kernel 投影，但不是同一 Product Host 或同一页面装配。Desktop Control Center 由 Electron main/preload/renderer 承载，可调用系统文件选择器、本机设备 Skill、Avatar 和窗口能力；Personal Server 控制面板由 `products/personal-server/src/web/` 构建为浏览器应用，`public/` 只保留无需构建的静态资产与挂载入口。
 
-当前 `v0.1.x` 浏览器应用只提供远程会话、系统状态和基础 Extension 生命周期入口。它尚未提供 LLM Provider、Audio、Embedding、Memory、Skill Policy、网络安全或更新设置，也没有对应的配置读写 API；服务器配置仍由受控宿主配置文件和运维命令完成。这是当前产品限制，不是隐藏入口。计划中的配置投影、日志工作台、完整 Extension 管理和服务器设置由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 承担。
+### Personal Server 控制面的物理边界
 
-未来浏览器配置也不得直接读写 YAML、secret 或任意服务器路径。Kernel Config Application Port 是唯一配置 owner：浏览器只消费脱敏 `ConfigSnapshot`，提交经过 Schema、权限、revision 和审计约束的 update command；secret 只写不可回显。Personal Server 不接受浏览器提交服务器文件路径安装 `.gcex`。
+M11 起，Personal Server 控制面必须遵守以下长期物理结构：
+
+```text
+products/personal-server/
+  src/
+    server/
+      bootstrap/
+      auth/
+      http/
+      websocket/
+      adapters/
+    web/
+      app/
+      shell/
+      routes/
+      features/
+      shared/
+  public/
+```
+
+约束如下：
+
+- `src/server/` 只承载 Node Product Host：认证、HTTP ingress、WebSocket 代理、静态资源装配与 Product 生命周期对接；不得 import 浏览器业务模块。
+- `src/web/` 只承载浏览器控制面：路由、shell、feature、shared API client、Protocol decode 与样式；不得直接访问服务器文件、YAML、secret 或 Node-only API。
+- `routes/` 只做页面装配；feature 按领域 owner 切分，Provider、模型路由、Audio、Memory、Skill、安全、存储、更新各自拥有 view model、表单和局部状态。
+- `shared/api/` 是唯一 HTTP/WebSocket client 与跨边界 decode 入口；Web 不手写第二套 payload 类型。
+- `shared/styles/` 只放 token、global、motion、responsive 等共享样式；feature 局部样式与视图同 owner，不回流成单个全局 `app.css`。
+- `public/` 不再承载业务 `app.js`、`app.css` 或单体页面逻辑；新构建接管后，旧三文件入口必须删除，且通过架构门禁阻止回流。
+
+当前 `v0.1.x` 浏览器应用已经由 `src/web/` 构建入口接管，并提供受认证登录、系统状态、真实结构化日志、零 Provider 可登录降级，以及通过 Control Surface 协议读取/分页恢复 Conversation 历史的正式对话页。对话 feature 只把浏览器内存作为瞬时 view model，不再把 `localStorage` 或页面缓存当作历史事实源；真实历史、游标和恢复状态统一由 Kernel -> Cognition Conversation 投影 owner 提供。设置中心只消费脱敏 `ConfigurationSnapshot`，API key 保持 write-only，并把测试连接、revision 冲突检查和 apply 状态交给 Kernel Config Application Port。M11 现已按 `providers/`、`model-routing/`、`audio/`、`memory/`、`storage/`、`updates/`、`security/` 分出 section owner；安全页已接 Product Host owned 的访问令牌 store，支持受管令牌创建、轮换、撤销与一次性明文返回，环境变量 legacy token 和回环免令牌模式会明确标记为 degraded 来源。备份/恢复、更新与服务控制现已接入正式的运维 snapshot/command owner：当安装环境存在 `glimmer-cradle` CLI 时调用 M10 部署事务；当前源码直跑或未接宿主桥时，设置页会展示真实 disabled reason，而不是静态假按钮。Extension 页已覆盖仓库 Release、Registry、Release Manifest 与浏览器本地 `.gcex` 四类来源：浏览器上传只会换取同会话、30 分钟时效、单事务消费的 opaque `upload_id`，Host 在 prepare 时解析为受控临时文件并在 preview 失败、取消、断线或超时后清理；commit/cancel 对所有 transaction_id 都要求属于当前 principal/session，Host 断线会先向 Kernel cancel 本连接已预览未提交事务，Kernel Package Manager 启动与定时 sweep 仍会清理 stale transaction 目录。Audio、Memory、Embedding、Skill 的可写 owner 与完整运维桥仍在 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 的后续验收门内继续收口。
+
+未来浏览器配置也不得直接读写 YAML、secret 或任意服务器路径。Kernel Config Application Port 是唯一配置 owner：浏览器只消费脱敏 `ConfigSnapshot`，提交经过 Schema、权限、revision 和审计约束的 update command；secret 只写不可回显。Personal Server 不接受浏览器提交服务器文件路径安装 `.gcex`；本地包只允许认证后的二进制上传到 Product Host owned 临时目录，并通过 opaque `upload_id` 进入统一安装事务。
 
 Personal Server 并不禁用 Skill Plane。Core、MCP、User 和 Extension Provider 都可以存在；Product Composition 只过滤不满足 `products`、Linux `platforms` 或 `features` 的贡献。扩展私有的 `source_provider` Skill 只在该 Extension/Adapter 产生的 ConversationContext 中进入规划和执行，不会泄露给其他来源。管理 WebUI、账号登录、二维码、进程控制和部署操作属于管理能力，不是供角色选择的 Skill。
 

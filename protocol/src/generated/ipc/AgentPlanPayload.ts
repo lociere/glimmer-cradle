@@ -1,5 +1,7 @@
 /* 自动生成 — 从 AgentPlanPayload.schema.json 生成，勿手动修改 */
 
+import type { SkillCatalogSnapshot, SkillProviderKind, SkillProviderRuntimeState, SkillAudience, SkillRiskLevel, SkillProviderRuntimeSnapshot, SkillProviderRef, SkillCatalogEntry, SkillToolSummary, SkillResourceSummary, SkillPromptSummary, SkillPolicy } from '../models/SkillCatalogSnapshot';
+
 /**
  * Agent 任务规划消息载荷。跨层单一事实源，Kernel 内核与 Cognition 认知核共用。
  */

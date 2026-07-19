@@ -21,6 +21,14 @@ class Source1(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    kind: Literal['uploaded_package']
+    upload_id: str = Field(..., min_length=8, pattern='^upload_[A-Za-z0-9-]+$')
+
+
+class Source2(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     kind: Literal['release_manifest']
     url: AnyUrl
 
@@ -31,7 +39,7 @@ class Channel(StrEnum):
     NIGHTLY = 'nightly'
 
 
-class Source2(BaseModel):
+class Source3(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -41,7 +49,7 @@ class Source2(BaseModel):
     channel: Channel | None = None
 
 
-class Source3(BaseModel):
+class Source4(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -55,4 +63,7 @@ class ExtensionInstallPrepareRequest(BaseModel):
         extra='forbid',
     )
     request_id: str = Field(..., min_length=1)
-    source: Source | Source1 | Source2 | Source3
+    activation_profile: str | None = Field(
+        None, min_length=1, pattern='^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$'
+    )
+    source: Source | Source1 | Source2 | Source3 | Source4

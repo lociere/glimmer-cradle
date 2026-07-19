@@ -20,12 +20,16 @@ import {
   verifyExtensionPackage,
   type VerifiedExtensionPackage,
 } from './extension-package-verifier';
+import { OutboundUrlPolicy } from './outbound-url-policy';
 
 export type ExtensionReleaseChannel = ExtensionReleaseManifest['channel'];
 
 const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
 const MAX_PACKAGE_BYTES = 256 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
+const TRANSACTION_TTL_MS = 30 * 60 * 1000;
+const TRANSACTION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+const outboundUrlPolicy = new OutboundUrlPolicy();
 
 export type ExtensionInstallSource =
   | { kind: 'file'; path: string }
@@ -87,16 +91,52 @@ export class ExtensionPackageManager {
   private readonly pending = new Map<string, PendingInstall>();
   private readonly cacheRoot = resolveCachePath(path.join('extensions', 'package-manager'));
   private readonly stateRoot = resolveStatePath(path.join('kernel', 'extension-installations'));
+  private readonly transactionRoot: string;
+  private readonly stagingRoot: string;
+  private initialized = false;
+  private cleanupTimer: NodeJS.Timeout | null = null;
+  private readonly extensionRoot: string;
+  private readonly productId: Exclude<ExtensionProductTarget, 'any'>;
 
   public constructor(
-    private readonly extensionRoot: string,
-    private readonly productId: Exclude<ExtensionProductTarget, 'any'> = 'desktop',
-  ) {}
+    extensionRoot: string,
+    productId: Exclude<ExtensionProductTarget, 'any'> = 'desktop',
+  ) {
+    this.extensionRoot = extensionRoot;
+    this.productId = productId;
+    this.transactionRoot = path.join(this.cacheRoot, 'transactions');
+    this.stagingRoot = path.join(this.extensionRoot, '.staging');
+  }
+
+  public async initialize(): Promise<void> {
+    if (this.initialized) return;
+    await fs.ensureDir(this.transactionRoot);
+    await fs.ensureDir(this.stagingRoot);
+    await this.sweepTransactionArtifacts();
+    await this.sweepStagingArtifacts();
+    this.cleanupTimer = setInterval(() => {
+      void Promise.all([
+        this.sweepTransactionArtifacts(),
+        this.sweepStagingArtifacts(),
+      ]);
+    }, TRANSACTION_SWEEP_INTERVAL_MS);
+    this.cleanupTimer.unref?.();
+    this.initialized = true;
+  }
+
+  public dispose(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+    this.initialized = false;
+  }
 
   public async prepareInstall(source: ExtensionInstallSource): Promise<ExtensionInstallPreview> {
-    this.pruneExpiredTransactions();
+    await this.ensureInitialized();
+    await this.sweepTransactionArtifacts();
     const transactionId = randomUUID();
-    const transactionRoot = path.join(this.cacheRoot, 'transactions', transactionId);
+    const transactionRoot = path.join(this.transactionRoot, transactionId);
     await fs.ensureDir(transactionRoot);
     try {
       const resolved = await this.resolveSource(source, transactionRoot);
@@ -135,6 +175,7 @@ export class ExtensionPackageManager {
   }
 
   public async commitInstall(transactionId: string, approvedPermissions: string[]): Promise<ExtensionInstallResult> {
+    await this.ensureInitialized();
     const pending = this.pending.get(transactionId);
     if (!pending) throw new Error('扩展安装事务不存在或已经过期');
     assertSameStringSet(pending.preview.extension.permissions, approvedPermissions, '用户确认的权限与安装预览不一致');
@@ -160,28 +201,35 @@ export class ExtensionPackageManager {
       };
     }
 
-    const stagingDir = path.join(this.extensionRoot, '.staging', transactionId);
+    const stagingDir = path.join(this.stagingRoot, transactionId);
+    let movedToTarget = false;
     await fs.remove(stagingDir);
-    await extractVerifiedExtensionPackage(verified, stagingDir);
-    await fs.ensureDir(path.dirname(targetDir));
-    if (await fs.pathExists(targetDir)) throw new Error(`扩展安装目标已存在: ${targetDir}`);
-    await fs.move(stagingDir, targetDir, { overwrite: false });
     try {
+      await extractVerifiedExtensionPackage(verified, stagingDir);
+      await fs.ensureDir(path.dirname(targetDir));
+      if (await fs.pathExists(targetDir)) throw new Error(`扩展安装目标已存在: ${targetDir}`);
+      await fs.move(stagingDir, targetDir, { overwrite: false });
+      movedToTarget = true;
       await this.writeInstallationMetadata(verified.manifest, pending.preview);
+      return {
+        extension_id: verified.manifest.id,
+        version: verified.manifest.version,
+        installed_path: targetDir,
+        already_installed: false,
+      };
     } catch (error) {
-      await fs.remove(targetDir);
+      if (movedToTarget) {
+        await fs.remove(targetDir).catch(() => undefined);
+      }
       throw error;
+    } finally {
+      await fs.remove(stagingDir).catch(() => undefined);
+      await this.finishTransaction(transactionId);
     }
-    await this.finishTransaction(transactionId);
-    return {
-      extension_id: verified.manifest.id,
-      version: verified.manifest.version,
-      installed_path: targetDir,
-      already_installed: false,
-    };
   }
 
   public async cancelInstall(transactionId: string): Promise<void> {
+    await this.ensureInitialized();
     if (!this.pending.has(transactionId)) return;
     await this.finishTransaction(transactionId);
   }
@@ -336,15 +384,34 @@ export class ExtensionPackageManager {
 
   private async finishTransaction(transactionId: string): Promise<void> {
     this.pending.delete(transactionId);
-    await fs.remove(path.join(this.cacheRoot, 'transactions', transactionId));
+    await fs.remove(path.join(this.transactionRoot, transactionId));
   }
 
-  private pruneExpiredTransactions(): void {
-    const threshold = Date.now() - 30 * 60 * 1000;
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  private async sweepTransactionArtifacts(): Promise<void> {
+    const threshold = Date.now() - TRANSACTION_TTL_MS;
     for (const [transactionId, pending] of this.pending) {
       if (pending.createdAt >= threshold) continue;
-      this.pending.delete(transactionId);
-      void fs.remove(path.join(this.cacheRoot, 'transactions', transactionId));
+      await this.finishTransaction(transactionId);
+    }
+    await fs.ensureDir(this.transactionRoot);
+    const entries = await fs.readdir(this.transactionRoot).catch(() => []);
+    for (const entry of entries) {
+      if (this.pending.has(entry)) continue;
+      await fs.remove(path.join(this.transactionRoot, entry));
+    }
+  }
+
+  private async sweepStagingArtifacts(): Promise<void> {
+    await fs.ensureDir(this.stagingRoot);
+    const entries = await fs.readdir(this.stagingRoot).catch(() => []);
+    for (const entry of entries) {
+      await fs.remove(path.join(this.stagingRoot, entry));
     }
   }
 }
@@ -374,53 +441,26 @@ function emptyTrust(sourceKind: ExtensionInstallSource['kind']): ExtensionInstal
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  assertHttpsUrl(url);
-  const response = await fetchWithHttpsRedirects(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`远程清单下载失败: ${response.status} ${url}`);
-  const contentLength = Number(response.headers.get('content-length') ?? 0);
-  if (contentLength > MAX_MANIFEST_BYTES) throw new Error('远程清单超过大小上限');
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > MAX_MANIFEST_BYTES) throw new Error('远程清单超过大小上限');
-  return JSON.parse(new TextDecoder().decode(bytes));
+  const response = await outboundUrlPolicy.fetchJson(url, {
+    headers: { Accept: 'application/json' },
+    maxBytes: MAX_MANIFEST_BYTES,
+    maxRedirects: MAX_REDIRECTS,
+  });
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`远程清单下载失败: ${response.statusCode} ${url}`);
+  }
+  return response.payload;
 }
 
 async function downloadFile(url: string, destination: string, maxBytes: number): Promise<{ size: number; sha256: string }> {
-  assertHttpsUrl(url);
-  const response = await fetchWithHttpsRedirects(url);
-  if (!response.ok || !response.body) throw new Error(`扩展包下载失败: ${response.status} ${url}`);
-  const contentLength = Number(response.headers.get('content-length') ?? 0);
-  if (contentLength > maxBytes) throw new Error('扩展包超过下载大小上限');
-  await fs.ensureDir(path.dirname(destination));
-  const output = await open(destination, 'w');
-  const hash = createHash('sha256');
-  let size = 0;
-  try {
-    for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-      size += chunk.byteLength;
-      if (size > maxBytes) throw new Error('扩展包超过下载大小上限');
-      hash.update(chunk);
-      await output.write(chunk);
-    }
-  } finally {
-    await output.close();
+  const response = await outboundUrlPolicy.downloadFile(url, destination, {
+    maxBytes,
+    maxRedirects: MAX_REDIRECTS,
+  });
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(`扩展包下载失败: ${response.statusCode} ${url}`);
   }
-  return { size, sha256: hash.digest('hex') };
-}
-
-async function fetchWithHttpsRedirects(url: string, init: RequestInit = {}): Promise<Response> {
-  let currentUrl = new URL(url);
-  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
-    assertHttpsUrl(currentUrl.toString());
-    const response = await fetch(currentUrl, { ...init, redirect: 'manual' });
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-    const location = response.headers.get('location');
-    if (!location) throw new Error(`远程扩展来源返回了无 Location 的重定向: ${currentUrl}`);
-    if (redirectCount === MAX_REDIRECTS) throw new Error(`远程扩展来源重定向超过 ${MAX_REDIRECTS} 次`);
-    await response.body?.cancel();
-    currentUrl = new URL(location, currentUrl);
-    assertHttpsUrl(currentUrl.toString());
-  }
-  throw new Error(`远程扩展来源重定向超过 ${MAX_REDIRECTS} 次`);
+  return { size: response.size, sha256: response.sha256 };
 }
 
 interface RepositoryReleaseAsset {
@@ -492,11 +532,6 @@ function chooseRepositoryPackageAsset(
     throw new Error(`仓库 Release 中适用于 ${platform} 的 .gcex 不唯一，请提供 release-manifest.json`);
   }
   return { ...candidates[0], platform: exact.length > 0 ? platform : 'any' };
-}
-
-function assertHttpsUrl(value: string): void {
-  const url = new URL(value);
-  if (url.protocol !== 'https:') throw new Error(`远程扩展来源必须使用 HTTPS: ${value}`);
 }
 
 function assertSameStringSet(expected: string[], actual: string[], message: string): void {

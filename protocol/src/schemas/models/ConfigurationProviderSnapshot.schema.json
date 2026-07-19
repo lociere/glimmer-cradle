@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationProviderSnapshot.schema.json",
+  "title": "ConfigurationProviderSnapshot",
+  "type": "object",
+  "required": ["key", "api_type", "has_api_key", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Provider 稳定 key。"
+    },
+    "api_type": {
+      "type": "string",
+      "description": "Provider API 协议类型。"
+    },
+    "base_url": {
+      "type": "string",
+      "description": "Provider API 根地址。"
+    },
+    "has_api_key": {
+      "type": "boolean",
+      "description": "是否已配置 secret。"
+    },
+    "temperature": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "采样温度覆盖。"
+    },
+    "request_method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "description": "自定义 HTTP 方法。"
+    },
+    "request_path": {
+      "type": "string",
+      "description": "自定义请求路径。"
+    },
+    "response_extract": {
+      "type": "string",
+      "description": "响应提取路径。"
+    },
+    "models": {
+      "type": "array",
+      "items": { "$ref": "ConfigurationModelAlias.schema.json" },
+      "description": "Provider 已声明的模型别名列表。"
+    }
+  }
+}

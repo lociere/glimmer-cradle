@@ -13,6 +13,8 @@ import { isLocalAvatarSurfaceScene } from '../action-stream/surface-scene-scope'
 import { EXTENSION_ID_PATTERN, getPresentationFrameClass, PerceptionEvent } from '@glimmer-cradle/protocol';
 import { AudioService } from '../audio/audio-service';
 import { SkillCatalogAppService } from '../../services/skill-catalog-app.service';
+import type { ConfigApplicationService } from '../../services/config-application.service';
+import { ConversationHistoryService } from './conversation-history-service';
 import {
   ActionStreamCancelledEvent,
   ActionStreamStartedEvent,
@@ -25,10 +27,15 @@ import {
   ExtensionStoppedEvent,
 } from '../../../foundation/event-bus/events';
 import type {
+  PresentationUpstreamFrame,
   PresentationDownstreamFrame,
   AudioStatusPayload,
   ChannelReplyMessage,
+  ConversationHistoryRequest,
   ControlSurfaceGatewayConfig,
+  ConfigurationSnapshotRequest,
+  ConfigurationTestRequest,
+  ConfigurationUpdateRequest,
   ExtensionInstallCommitRequest,
   ExtensionInstallPrepareRequest,
   ExtensionCommandRequest,
@@ -43,6 +50,8 @@ import type { SkillConfirmationRequest } from '../../skill-plane/skill-invocatio
 import { EndpointRegistry } from '../../../foundation/endpoints/endpoint-registry';
 
 const logger = getLogger('control-surface-gateway');
+type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
+type SkillCatalogResponsePayload = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
 
 /**
  * Kernel 侧可确认的 Avatar Host 状态。
@@ -103,6 +112,8 @@ export class ControlSurfaceGateway {
   private _lastAvatarActionState: NonNullable<PresentationDownstreamFrame['avatar_action_state']> | null = null;
   private _requestApplicationShutdown: ((reason: string) => Promise<void>) | null = null;
   private _extensionLifecycleController: ExtensionLifecycleController | null = null;
+  private _configApplicationService: ConfigApplicationService | null = null;
+  private _conversationHistoryService: ConversationHistoryService | null = null;
   private _disposeRuntimeReadinessSubscription: (() => void) | null = null;
   private readonly _pendingSurfaceRequests = new Map<string, PendingSurfaceRequest>();
   // Avatar status 由 AvatarStatusChangedEvent 驱动，不由 UI 定时推断。
@@ -193,6 +204,7 @@ export class ControlSurfaceGateway {
           hint: stage === 'thinking' ? '正在思考…' : '正在回应…',
         },
       });
+      this._conversationHistoryService?.updateThought(streamId, true);
     });
 
     EventBus.instance.subscribe('ActionStreamCancelledEvent', async (event: any) => {
@@ -208,6 +220,7 @@ export class ControlSurfaceGateway {
         timestamp: Date.now(),
         thought: { active: false },
       });
+      this._conversationHistoryService?.updateThought(streamId, false);
     });
 
     EventBus.instance.subscribe('action.channel.reply', async (event: any) => {
@@ -219,6 +232,7 @@ export class ControlSurfaceGateway {
       const matchesDesktopUI = isLocalAvatarSurfaceScene(targetChannel);
 
       if (matchesDesktopUI) {
+        this._conversationHistoryService?.recordReply(traceId, text);
         this.broadcastFrame({
           kind: 'thought',
           trace_id: traceId,
@@ -347,6 +361,14 @@ export class ControlSurfaceGateway {
 
   public setExtensionLifecycleController(controller: ExtensionLifecycleController | null): void {
     this._extensionLifecycleController = controller;
+  }
+
+  public setConfigApplicationService(service: ConfigApplicationService | null): void {
+    this._configApplicationService = service;
+  }
+
+  public setConversationHistoryService(service: ConversationHistoryService | null): void {
+    this._conversationHistoryService = service;
   }
 
   private _isDesktopScene(sceneId: string): boolean {
@@ -563,6 +585,26 @@ export class ControlSurfaceGateway {
       const text: string = (data.chat_input?.text as string) ?? '';
       const traceId = (typeof data.trace_id === 'string' && data.trace_id)
         || `ui_${Date.now()}`;
+      if (!this._configApplicationService?.hasUsableModelRoute()) {
+        this._conversationHistoryService?.recordSubmittedUserMessage(text, traceId);
+        const notice = {
+          code: 'llm_unconfigured',
+          level: 'warning',
+          title: '尚未配置可用模型',
+          message: '控制面可以正常使用，但当前默认对话路由没有可用模型。请前往设置中心添加 Provider、写入 API Key 并选择默认模型。',
+          action_route: 'settings',
+          action_label: '打开设置中心',
+        } as const;
+        this._conversationHistoryService?.recordNotice(traceId, notice);
+        this._sendFrame(ws, {
+          kind: 'conversation_notice',
+          trace_id: traceId,
+          timestamp: Date.now(),
+          conversation_notice: notice,
+        });
+        return;
+      }
+      this._conversationHistoryService?.recordSubmittedUserMessage(text, traceId);
       this._injectDesktopText(text, traceId);
     } else if (kind === 'audio_input') {
       const traceId = (typeof data.trace_id === 'string' && data.trace_id)
@@ -602,6 +644,14 @@ export class ControlSurfaceGateway {
       });
     } else if (kind === 'core_skill_action_response' || kind === 'core_skill_confirmation_response') {
       this._handleCoreSkillResponse(data);
+    } else if (kind === 'config_snapshot_request') {
+      void this._handleConfigSnapshotRequest(data.config_snapshot_request, ws);
+    } else if (kind === 'conversation_history_request') {
+      void this._handleConversationHistoryRequest(data.conversation_history_request, ws);
+    } else if (kind === 'config_update_request') {
+      void this._handleConfigUpdateRequest(data.config_update_request, ws);
+    } else if (kind === 'config_test_request') {
+      void this._handleConfigTestRequest(data.config_test_request, ws);
     } else if (kind === 'extension_lifecycle_request') {
       void this._handleExtensionLifecycleRequest(data, ws);
     } else if (kind === 'extension_install_prepare') {
@@ -633,6 +683,161 @@ export class ControlSurfaceGateway {
       logger.info('产品控制表面请求全局停机', { reason });
       void this._requestApplicationShutdown?.(reason);
     }
+  }
+
+  private async _handleConfigSnapshotRequest(raw: unknown, ws: WebSocket): Promise<void> {
+    const request = raw as ConfigurationSnapshotRequest | undefined;
+    const requestId = request?.request_id?.trim() || `config-snapshot-${Date.now()}`;
+    if (!this._configApplicationService) {
+      this._sendFrame(ws, {
+        kind: 'configuration_snapshot_result',
+        timestamp: Date.now(),
+        configuration_snapshot_result: {
+          request_id: requestId,
+          status: 'error',
+          message: '配置服务尚未就绪',
+        },
+      });
+      return;
+    }
+    try {
+      const snapshot = await this._configApplicationService.getSnapshot();
+      this._sendFrame(ws, {
+        kind: 'configuration_snapshot_result',
+        timestamp: Date.now(),
+        configuration_snapshot_result: {
+          request_id: requestId,
+          status: 'success',
+          snapshot,
+        },
+      });
+    } catch (error) {
+      this._sendFrame(ws, {
+        kind: 'configuration_snapshot_result',
+        timestamp: Date.now(),
+        configuration_snapshot_result: {
+          request_id: requestId,
+          status: 'error',
+          message: errorMessage(error),
+        },
+      });
+    }
+  }
+
+  private async _handleConversationHistoryRequest(raw: unknown, ws: WebSocket): Promise<void> {
+    const request = raw as ConversationHistoryRequest | undefined;
+    const requestId = request?.request_id?.trim()
+      ? request.request_id.trim()
+      : `conversation-history-${Date.now()}`;
+    if (!this._conversationHistoryService) {
+      this._sendFrame(ws, {
+        kind: 'conversation_history_result',
+        timestamp: Date.now(),
+        conversation_history_result: {
+          request_id: requestId,
+          status: 'error',
+          items: [],
+          has_more: false,
+          message: 'Conversation 历史服务尚未就绪',
+        },
+      });
+      return;
+    }
+
+    try {
+      const result = await this._conversationHistoryService.readHistory({
+        request_id: requestId,
+        conversation_id: request?.conversation_id,
+        scene_id: request?.scene_id,
+        thread_id: request?.thread_id,
+        actor_id: request?.actor_id,
+        source_provider_id: request?.source_provider_id,
+        cursor: request?.cursor,
+        limit: request?.limit ?? 50,
+      });
+      this._sendFrame(ws, {
+        kind: 'conversation_history_result',
+        timestamp: Date.now(),
+        conversation_history_result: result,
+      });
+    } catch (error) {
+      this._sendFrame(ws, {
+        kind: 'conversation_history_result',
+        timestamp: Date.now(),
+        conversation_history_result: {
+          request_id: requestId,
+          status: 'error',
+          items: [],
+          has_more: false,
+          message: errorMessage(error),
+        },
+      });
+    }
+  }
+
+  private async _handleConfigUpdateRequest(raw: unknown, ws: WebSocket): Promise<void> {
+    const request = raw as ConfigurationUpdateRequest | undefined;
+    const requestId = request?.request_id?.trim() || `config-update-${Date.now()}`;
+    if (!request || !this._configApplicationService) {
+      this._sendFrame(ws, {
+        kind: 'configuration_update_result',
+        timestamp: Date.now(),
+        configuration_update_result: {
+          request_id: requestId,
+          status: 'error',
+          apply_state: 'unchanged',
+          change_summary: [],
+          message: this._configApplicationService ? '无效的配置更新请求' : '配置服务尚未就绪',
+        },
+      });
+      return;
+    }
+    try {
+      const result = request.dry_run
+        ? await this._configApplicationService.previewUpdate(request)
+        : await this._configApplicationService.applyUpdate(request);
+      this._sendFrame(ws, {
+        kind: 'configuration_update_result',
+        timestamp: Date.now(),
+        configuration_update_result: result,
+      });
+    } catch (error) {
+      this._sendFrame(ws, {
+        kind: 'configuration_update_result',
+        timestamp: Date.now(),
+        configuration_update_result: {
+          request_id: requestId,
+          status: 'error',
+          apply_state: 'unchanged',
+          change_summary: [],
+          message: errorMessage(error),
+        },
+      });
+    }
+  }
+
+  private async _handleConfigTestRequest(raw: unknown, ws: WebSocket): Promise<void> {
+    const request = raw as ConfigurationTestRequest | undefined;
+    const requestId = request?.request_id?.trim() || `config-test-${Date.now()}`;
+    if (!request || !this._configApplicationService) {
+      this._sendFrame(ws, {
+        kind: 'configuration_test_result',
+        timestamp: Date.now(),
+        configuration_test_result: {
+          request_id: requestId,
+          status: 'error',
+          message: this._configApplicationService ? '无效的 Provider 测试请求' : '配置服务尚未就绪',
+          discovered_models: [],
+        },
+      });
+      return;
+    }
+    const result = await this._configApplicationService.testProvider(request);
+    this._sendFrame(ws, {
+      kind: 'configuration_test_result',
+      timestamp: Date.now(),
+      configuration_test_result: result,
+    });
   }
 
   private async _handleExtensionInstallPrepare(raw: unknown, ws: WebSocket): Promise<void> {
@@ -800,8 +1005,9 @@ export class ControlSurfaceGateway {
   }
 
   private _handleSkillCatalogRequest(data: any, ws: WebSocket): void {
-    const requestId = typeof data.request_id === 'string' && data.request_id.trim()
-      ? data.request_id.trim()
+    const request = data.skill_catalog_request as SkillCatalogRequestPayload | undefined;
+    const requestId = typeof request?.request_id === 'string' && request.request_id.trim()
+      ? request.request_id.trim()
       : `skill-catalog-${Date.now()}`;
 
     if (!this._skillCatalogAppService) {
@@ -821,17 +1027,19 @@ export class ControlSurfaceGateway {
     ws: WebSocket,
     requestId: string,
     status: 'success' | 'error',
-    snapshot?: unknown,
+    snapshot?: SkillCatalogResponsePayload['snapshot'],
     message?: string,
   ): void {
     if (ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify({
       kind: 'skill_catalog_response',
-      request_id: requestId,
       timestamp: Date.now(),
-      status,
-      skill_catalog: snapshot,
-      message,
+      skill_catalog_response: {
+        request_id: requestId,
+        status,
+        snapshot,
+        message,
+      } satisfies SkillCatalogResponsePayload,
     }));
   }
 
@@ -1179,6 +1387,7 @@ export class ControlSurfaceGateway {
     }
     this._requestApplicationShutdown = null;
     this._lastAvatarActionState = null;
+    this._conversationHistoryService = null;
     this._initialized = false;
     logger.info('ControlSurfaceGateway stopped');
   }

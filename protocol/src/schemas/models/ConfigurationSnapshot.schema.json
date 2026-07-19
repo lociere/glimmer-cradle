@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://glimmer-cradle.local/schemas/models/ConfigurationSnapshot.schema.json",
+  "title": "ConfigurationSnapshot",
+  "type": "object",
+  "required": ["revision", "llm", "audio", "embedding", "memory", "skills", "storage", "service"],
+  "additionalProperties": false,
+  "properties": {
+    "revision": {
+      "type": "string",
+      "description": "配置快照修订号。"
+    },
+    "llm": {
+      "type": "object",
+      "required": ["providers", "default_route", "provider_count"],
+      "additionalProperties": false,
+      "properties": {
+        "provider_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "当前 Provider 数量。"
+        },
+        "providers": {
+          "type": "array",
+          "items": { "$ref": "ConfigurationProviderSnapshot.schema.json" },
+          "description": "当前 LLM Provider 脱敏快照。"
+        },
+        "default_route": {
+          "$ref": "ConfigurationRouteSnapshot.schema.json"
+        }
+      }
+    },
+    "audio": {
+      "$ref": "../config/AudioConfig.schema.json"
+    },
+    "embedding": {
+      "$ref": "../config/EmbeddingConfig.schema.json"
+    },
+    "memory": {
+      "$ref": "../config/MemoryConfig.schema.json"
+    },
+    "skills": {
+      "$ref": "../config/SkillPlaneConfig.schema.json"
+    },
+    "storage": {
+      "type": "object",
+      "required": ["config_root", "data_root", "state_root"],
+      "additionalProperties": false,
+      "properties": {
+        "config_root": {
+          "type": "string"
+        },
+        "data_root": {
+          "type": "string"
+        },
+        "state_root": {
+          "type": "string"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["cognition_ready", "restart_supported"],
+      "additionalProperties": false,
+      "properties": {
+        "cognition_ready": {
+          "type": "boolean"
+        },
+        "restart_supported": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

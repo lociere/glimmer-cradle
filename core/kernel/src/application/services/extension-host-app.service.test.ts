@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BuiltInContributionPoint } from '@glimmer-cradle/protocol';
+import { BuiltInContributionPoint, type ContributionRequirements } from '@glimmer-cradle/protocol';
 import { ExtensionHostAppService } from './extension-host-app.service';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
+
+function createDefaultRequirements(): ContributionRequirements {
+  return {
+    products: ['any'],
+    platforms: ['any'],
+    features: [],
+    profiles: [],
+  };
+}
 
 describe('ExtensionHostAppService', () => {
   it('由 Host 分别标记普通观察和证据候选', async () => {
@@ -73,7 +82,7 @@ describe('ExtensionHostAppService', () => {
           kind: 'localService',
           audience: 'host',
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           required: true,
           permissions: [],
           dependsOn: [],

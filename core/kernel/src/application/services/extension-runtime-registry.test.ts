@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { BuiltInContributionPoint, ExtensionPermission } from '@glimmer-cradle/protocol';
+import { BuiltInContributionPoint, ExtensionPermission, type ContributionRequirements } from '@glimmer-cradle/protocol';
 import { ExtensionRuntimeRegistry } from './extension-runtime-registry';
+
+function createDefaultRequirements(): ContributionRequirements {
+  return {
+    products: ['any'],
+    platforms: ['any'],
+    features: [],
+    profiles: [],
+  };
+}
 
 describe('ExtensionRuntimeRegistry', () => {
   it('uses capability graph dependencies to enable action intents', () => {
@@ -20,7 +29,7 @@ describe('ExtensionRuntimeRegistry', () => {
         audience: 'host',
         required: true,
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -30,7 +39,7 @@ describe('ExtensionRuntimeRegistry', () => {
           title: 'Demo Capability',
           resourceIds: ['demo-resource'],
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -41,7 +50,7 @@ describe('ExtensionRuntimeRegistry', () => {
           command: 'demo-extension.run',
           title: 'Run',
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -152,7 +161,7 @@ describe('ExtensionRuntimeRegistry', () => {
           command: 'audience-defaults.openPanel',
           title: 'Open Panel',
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -164,7 +173,7 @@ describe('ExtensionRuntimeRegistry', () => {
           title: 'Panel',
           kind: 'management',
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -175,7 +184,7 @@ describe('ExtensionRuntimeRegistry', () => {
           kind: 'localService',
           required: true,
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},
@@ -186,7 +195,7 @@ describe('ExtensionRuntimeRegistry', () => {
           kind: 'protocolBridge',
           required: true,
           scope: { kind: 'global' },
-          requirements: { products: ['any'], platforms: ['any'], features: [] },
+          requirements: createDefaultRequirements(),
           permissions: [],
           dependsOn: [],
           metadata: {},

@@ -8,6 +8,15 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class DefaultRoute(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+        frozen=True,
+    )
+    provider: str | None = Field(None, description='默认对话路由选定的 provider key。')
+    model_alias: str | None = Field(None, description='默认对话路由选定的模型别名。')
+
+
 class RequestMethod(StrEnum):
     GET = 'GET'
     POST = 'POST'
@@ -45,6 +54,10 @@ class LLMConfig(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
         frozen=True,
+    )
+    default_route: DefaultRoute | None = Field(
+        None,
+        description='显式默认对话路由。Kernel Config Application Port 负责把它投影为根配置。',
     )
     api_type: str | None = Field('openai', description='主 API 协议类型')
     api_key: str | None = Field(
