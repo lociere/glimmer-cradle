@@ -86,7 +86,7 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVER_TOKEN "$token"
   fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.2"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.3"
   fi
   if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
@@ -215,7 +215,7 @@ next_candidate_image() {
   elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     candidate_image
   else
-    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.2"
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.3"
   fi
 }
 
@@ -228,7 +228,7 @@ candidate_image() {
     dirty="-dirty"
   fi
   timestamp="$(date -u +%Y%m%d%H%M%S)"
-  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.2}" "$revision" "$dirty" "$timestamp"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.3}" "$revision" "$dirty" "$timestamp"
 }
 
 port_in_use() {

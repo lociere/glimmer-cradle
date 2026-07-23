@@ -154,7 +154,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   kernelUrl: ws://127.0.0.1:8082
   hostId: unity-avatar
-  hostVersion: 0.1.2
+  hostVersion: 0.1.3
   modelId:
   avatarController: {fileID: 0}
   connectOnStart: 1

@@ -318,6 +318,62 @@ set_env_value() {
   mv -f -- "$temporary" "$DEPLOYMENT_ENV_FILE"
 }
 
+validate_oci_archive() {
+  local archive="$1"
+  local expected_ref_name="$2"
+  local expected_config_digest="$3"
+  local oci_root index_file manifest_digest manifest_blob config_digest blob_digest blob_file
+  oci_root="${TEMP_ROOT}/oci-archive"
+  rm -rf -- "$oci_root"
+  mkdir -p "$oci_root"
+  tar -xf "$archive" -C "$oci_root"
+  [[ -f "${oci_root}/oci-layout" && -f "${oci_root}/index.json" ]] || {
+    echo "完整包镜像归档必须是 OCI image layout。" >&2
+    exit 1
+  }
+  grep -q '"imageLayoutVersion"[[:space:]]*:[[:space:]]*"1.0.0"' "${oci_root}/oci-layout" || {
+    echo "完整包 OCI layout 版本无效。" >&2
+    exit 1
+  }
+  index_file="${oci_root}/index.json"
+  grep -q "\"org.opencontainers.image.ref.name\"[[:space:]]*:[[:space:]]*\"${expected_ref_name}\"" "$index_file" || {
+    echo "完整包 OCI ref name 与版本或 digest 不一致。" >&2
+    exit 1
+  }
+  manifest_digest="$(grep -o 'sha256:[0-9a-f]\{64\}' "$index_file" | head -n 1)"
+  [[ "$manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+    echo "完整包 OCI index 未声明 manifest digest。" >&2
+    exit 1
+  }
+  manifest_blob="${oci_root}/blobs/sha256/${manifest_digest#sha256:}"
+  [[ -f "$manifest_blob" ]] || {
+    echo "完整包 OCI manifest blob 缺失。" >&2
+    exit 1
+  }
+  [[ "$(sha256sum "$manifest_blob" | cut -d' ' -f1)" == "${manifest_digest#sha256:}" ]] || {
+    echo "完整包 OCI manifest digest 校验失败。" >&2
+    exit 1
+  }
+  config_digest="$(grep -o '"config"[^{]*{[^}]*"digest"[[:space:]]*:[[:space:]]*"sha256:[0-9a-f]\{64\}"' "$manifest_blob" \
+    | grep -o 'sha256:[0-9a-f]\{64\}' | head -n 1)"
+  [[ "$config_digest" == "$expected_config_digest" ]] || {
+    echo "完整包 OCI config digest 与发布声明不一致。" >&2
+    exit 1
+  }
+  for blob_digest in $(grep -o 'sha256:[0-9a-f]\{64\}' "$manifest_blob"); do
+    blob_file="${oci_root}/blobs/sha256/${blob_digest#sha256:}"
+    [[ -f "$blob_file" ]] || {
+      echo "完整包 OCI blob 缺失: ${blob_digest}" >&2
+      exit 1
+    }
+    [[ "$(sha256sum "$blob_file" | cut -d' ' -f1)" == "${blob_digest#sha256:}" ]] || {
+      echo "完整包 OCI blob digest 校验失败: ${blob_digest}" >&2
+      exit 1
+    }
+  done
+  OCI_ARCHIVE_MANIFEST_DIGEST="$manifest_digest"
+}
+
 set_env_value GLIMMER_CRADLE_DEPLOYMENT_MODE image
 DEPLOYMENT_ENV_TOUCHED=1
 set_env_value GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
@@ -371,6 +427,7 @@ if [[ "$PACKAGE_VARIANT" == full ]]; then
     exit 1
   }
   CANDIDATE_IMAGE_ARCHIVE="${PAYLOAD_ROOT}/images/personal-server-linux-amd64.tar"
+  validate_oci_archive "$CANDIDATE_IMAGE_ARCHIVE" "release-v${RELEASE_VERSION}-${DIGEST_HEX:0:12}" "$ARCHIVE_IMAGE_ID"
 fi
 
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE"
@@ -385,8 +442,12 @@ fi
 if [[ "$PACKAGE_VARIANT" == full ]]; then
   "$DOCKER_BIN" load --input "$CANDIDATE_IMAGE_ARCHIVE" >/dev/null
   LOADED_IMAGE_ID="$("$DOCKER_BIN" image inspect --format '{{.Id}}' "$LOCAL_ARCHIVE_IMAGE" 2>/dev/null || true)"
-  [[ "$LOADED_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || {
-    echo "完整包镜像归档加载后无法解析本地镜像身份。" >&2
+  [[ "$LOADED_IMAGE_ID" == "$OCI_ARCHIVE_MANIFEST_DIGEST" || "$LOADED_IMAGE_ID" == "$ARCHIVE_IMAGE_ID" ]] || {
+    echo "已加载归档的本地镜像身份与 OCI manifest/config digest 均不一致。" >&2
+    exit 1
+  }
+  "$DOCKER_BIN" image inspect "$LOCAL_ARCHIVE_IMAGE" >/dev/null 2>&1 || {
+    echo "完整包镜像归档加载后缺少候选本地 tag。" >&2
     exit 1
   }
   CANDIDATE_IMAGE="$LOCAL_ARCHIVE_IMAGE"

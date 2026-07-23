@@ -6,7 +6,7 @@ TEST_ROOT="$(mktemp -d)"
 VERSION=9.8.7
 IMAGE="ghcr.io/example/glimmer-cradle-personal-server:v${VERSION}@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 ARCHIVE_IMAGE="glimmer-cradle/personal-server:release-v${VERSION}-aaaaaaaaaaaa"
-IMAGE_ID="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+IMAGE_ID=""
 OUTPUT_ROOT="${TEST_ROOT}/release"
 INSTALL_ROOT="${TEST_ROOT}/install"
 STATE_ROOT="${TEST_ROOT}/state"
@@ -38,7 +38,33 @@ trap cleanup EXIT
 trap 'handle_test_signal 130' INT
 trap 'handle_test_signal 143' TERM
 
-printf 'test image archive\n' > "${TEST_ROOT}/image.tar"
+create_test_oci_archive() {
+  local archive="$1"
+  local archive_image="$2"
+  local oci_root config_digest manifest_digest config_size manifest_size
+  oci_root="${TEST_ROOT}/oci-image"
+  rm -rf -- "$oci_root"
+  mkdir -p "${oci_root}/blobs/sha256"
+  printf '{"imageLayoutVersion":"1.0.0"}\n' > "${oci_root}/oci-layout"
+  printf '{"created":"1970-01-01T00:00:00Z","architecture":"amd64","os":"linux","config":{},"rootfs":{"type":"layers","diff_ids":[]},"history":[]}\n' \
+    > "${oci_root}/config.json"
+  config_digest="$(sha256sum "${oci_root}/config.json" | cut -d' ' -f1)"
+  config_size="$(wc -c < "${oci_root}/config.json" | tr -d ' ')"
+  mv "${oci_root}/config.json" "${oci_root}/blobs/sha256/${config_digest}"
+  cat > "${oci_root}/manifest.json" <<EOF
+{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:${config_digest}","size":${config_size}},"layers":[]}
+EOF
+  manifest_digest="$(sha256sum "${oci_root}/manifest.json" | cut -d' ' -f1)"
+  manifest_size="$(wc -c < "${oci_root}/manifest.json" | tr -d ' ')"
+  mv "${oci_root}/manifest.json" "${oci_root}/blobs/sha256/${manifest_digest}"
+  cat > "${oci_root}/index.json" <<EOF
+{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:${manifest_digest}","size":${manifest_size},"annotations":{"io.containerd.image.name":"docker.io/${archive_image}","org.opencontainers.image.ref.name":"release-v${VERSION}-aaaaaaaaaaaa"}}]}
+EOF
+  tar -C "$oci_root" -cf "$archive" .
+  printf 'sha256:%s' "$config_digest"
+}
+
+IMAGE_ID="$(create_test_oci_archive "${TEST_ROOT}/image.tar" "$ARCHIVE_IMAGE")"
 SOURCE_DATE_EPOCH=1 "${REPO_ROOT}/deploy/personal-server/package-release.sh" \
   "$VERSION" "$OUTPUT_ROOT" "$IMAGE" "${TEST_ROOT}/image.tar" "$ARCHIVE_IMAGE" "$IMAGE_ID"
 
@@ -152,7 +178,16 @@ if run_installer 'http://release.invalid/example' >/dev/null 2>&1; then
 fi
 [[ ! -e "${INSTALL_ROOT}/releases/${VERSION}" ]]
 
-if run_installer "$OUTPUT_ROOT" >/dev/null 2>&1; then
+mkdir "${TEST_ROOT}/invalid-oci" "${TEST_ROOT}/invalid-oci-stage"
+cp -a "${TEST_ROOT}/full/glimmer-cradle-personal-server" "${TEST_ROOT}/invalid-oci-stage/"
+printf 'not an oci archive\n' > "${TEST_ROOT}/invalid-oci-stage/glimmer-cradle-personal-server/images/personal-server-linux-amd64.tar"
+tar -C "${TEST_ROOT}/invalid-oci-stage" -czf "${TEST_ROOT}/invalid-oci/${FULL}" glimmer-cradle-personal-server
+cp "${OUTPUT_ROOT}/glimmer-cradle-installer.sh" "${TEST_ROOT}/invalid-oci/"
+(
+  cd "${TEST_ROOT}/invalid-oci"
+  sha256sum "$FULL" glimmer-cradle-installer.sh > SHA256SUMS
+)
+if run_installer "${TEST_ROOT}/invalid-oci" >/dev/null 2>&1; then
   echo '包含无效镜像归档的测试包错误完成了安装。' >&2
   exit 1
 fi
@@ -209,6 +244,39 @@ if run_installer "$OUTPUT_ROOT" \
   exit 1
 fi
 [[ ! -e "$ENTRY_FAILURE_DEPLOY_MARKER" ]]
+[[ "$(readlink -f "${INSTALL_ROOT}/current")" == "$PREVIOUS_RELEASE" ]]
+as_root cmp "${TEST_ROOT}/deployment.env.baseline" "${CONFIG_ROOT}/deployment.env"
+as_root cmp "${TEST_ROOT}/cli.baseline" "$CLI_PATH"
+[[ ! -e "${INSTALL_ROOT}/releases/${VERSION}" ]]
+
+mkdir "${TEST_ROOT}/deploy-failure" "${TEST_ROOT}/deploy-failure-stage"
+cp -a "${TEST_ROOT}/full/glimmer-cradle-personal-server" "${TEST_ROOT}/deploy-failure-stage/"
+cat > "${TEST_ROOT}/deploy-failure-stage/glimmer-cradle-personal-server/deploy.sh" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+echo "注入 deploy 故障" >&2
+exit 75
+EOF
+chmod 0755 "${TEST_ROOT}/deploy-failure-stage/glimmer-cradle-personal-server/deploy.sh"
+(
+  cd "${TEST_ROOT}/deploy-failure-stage/glimmer-cradle-personal-server"
+  mapfile -t release_files < <(find . -type f ! -name RELEASE-MANIFEST.sha256 -print | LC_ALL=C sort)
+  sha256sum "${release_files[@]}" > RELEASE-MANIFEST.sha256
+)
+tar -C "${TEST_ROOT}/deploy-failure-stage" -czf "${TEST_ROOT}/deploy-failure/${FULL}" glimmer-cradle-personal-server
+cp "${OUTPUT_ROOT}/glimmer-cradle-installer.sh" "${TEST_ROOT}/deploy-failure/"
+(
+  cd "${TEST_ROOT}/deploy-failure"
+  sha256sum "$FULL" glimmer-cradle-installer.sh > SHA256SUMS
+)
+if run_installer "${TEST_ROOT}/deploy-failure" \
+  GLIMMER_CRADLE_DOCKER_BIN="${REPO_ROOT}/scripts/fixtures/personal-server-install-interrupt/docker" \
+  GLIMMER_CRADLE_TEST_DOCKER_MODE=success \
+  GLIMMER_CRADLE_TEST_IMAGE_ID="$IMAGE_ID" \
+  >/dev/null 2>&1; then
+  echo '部署故障错误完成了安装。' >&2
+  exit 1
+fi
 [[ "$(readlink -f "${INSTALL_ROOT}/current")" == "$PREVIOUS_RELEASE" ]]
 as_root cmp "${TEST_ROOT}/deployment.env.baseline" "${CONFIG_ROOT}/deployment.env"
 as_root cmp "${TEST_ROOT}/cli.baseline" "$CLI_PATH"
