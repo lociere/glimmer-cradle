@@ -8,7 +8,7 @@
 
 ## 当前唯一活跃推进面：M11 Personal Server 控制面与 Extension 闭环
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已进入 `in-progress`，现为唯一活跃推进面。当前实现已完成 Config Application Port 对 Provider、Audio、Embedding、Memory、Skill 的正式读写链路，Personal Server 设置页也已本地验证这些配置以及 Security/Storage/Update 正式能力投影；扩展生态模板仓库已补齐 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档。当前仍未过门的是全新 Ubuntu 安装、宿主运维恢复矩阵、真实发布物升级/失败恢复，以及跨仓库 NapCat `external_onebot` 闭环。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已进入 `in-progress`，现为唯一活跃推进面。当前实现已完成 Config Application Port 对 Provider、Audio、Embedding、Memory、Skill 的正式读写链路，Personal Server 设置页也已本地验证这些配置以及 Security/Storage/Update 正式能力投影；扩展生态模板仓库已补齐 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档。2026-07-24 生产验收确认目标服务器与 GitHub latest 仍是 v0.1.1 三页控制面，公开资产没有完整安装包，生产缺少 M11 设置/日志/运维/API、本地 `.gcex` 上传与 CLI backup/restore。因此当前仍未过门的是发布或部署包含当前 M11 实现的 digest 固定版本、全新 Ubuntu 安装、宿主运维恢复矩阵、真实发布物升级/失败恢复，以及跨仓库 NapCat `external_onebot` 闭环。
 
 M11 负责：
 
