@@ -86,6 +86,8 @@ export class PersonalServerApp {
       cliPath: normalizeOptionalPathEnv(process.env.GLIMMER_CRADLE_CLI_PATH) || undefined,
       deploymentEnvFile: process.env.GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE,
       releaseSource: process.env.GLIMMER_CRADLE_RELEASE_SOURCE,
+      bridgeSocketPath: normalizeOptionalPathEnv(process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET) || undefined,
+      bridgeToken: normalizeOptionalPathEnv(process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN) || undefined,
     });
     this.accessTokens = new AccessTokenStore({
       configRoot: this.configRoot,

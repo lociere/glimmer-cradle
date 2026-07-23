@@ -9,6 +9,7 @@ DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
 BACKUP_ROOT="${STATE_ROOT}/backups"
 IMAGE_REPOSITORY="glimmer-cradle/personal-server"
+OPS_BRIDGE_CONTAINER="glimmer-cradle-ops-bridge"
 BACKUP_RETENTION=5
 IMAGE_RETENTION=3
 READY_TIMEOUT_SECONDS="${GLIMMER_CRADLE_READY_TIMEOUT_SECONDS:-240}"
@@ -85,8 +86,17 @@ prepare_environment() {
     token="$(openssl rand -hex 32)"
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVER_TOKEN "$token"
   fi
+  if ! grep -q '^GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN=' "$DEPLOYMENT_ENV_FILE" \
+    || grep -q '^GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN=GENERATE_ON_INSTALL$' "$DEPLOYMENT_ENV_FILE"; then
+    local bridge_token
+    bridge_token="$(openssl rand -hex 32)"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN "$bridge_token"
+  fi
+  if ! grep -q '^GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=' "$DEPLOYMENT_ENV_FILE"; then
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock
+  fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.4"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.5"
   fi
   if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
@@ -96,10 +106,9 @@ prepare_environment() {
 }
 
 prepare_state() {
-  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data" "$BACKUP_ROOT"
-  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data"
-  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT/config" "$STATE_ROOT/data"
-  chmod 700 "$STATE_ROOT" "$BACKUP_ROOT"
+  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run" "$BACKUP_ROOT"
+  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run"
+  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT" "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run" "$BACKUP_ROOT"
 }
 
 set_env_value() {
@@ -215,7 +224,7 @@ next_candidate_image() {
   elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     candidate_image
   else
-    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.4"
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.5"
   fi
 }
 
@@ -228,7 +237,7 @@ candidate_image() {
     dirty="-dirty"
   fi
   timestamp="$(date -u +%Y%m%d%H%M%S)"
-  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.4}" "$revision" "$dirty" "$timestamp"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.5}" "$revision" "$dirty" "$timestamp"
 }
 
 port_in_use() {
@@ -283,6 +292,50 @@ wait_until_ready() {
   compose_with_env "$env_file" logs --tail=120 personal-server || true
   echo "等待服务就绪超时。" >&2
   return 1
+}
+
+start_ops_bridge() {
+  local image token socket_path docker_gid docker_bin compose_plugin
+  image="$(read_env GLIMMER_CRADLE_IMAGE '')"
+  token="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN '')"
+  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock)"
+  [[ -n "$image" && -n "$token" && -S /var/run/docker.sock ]] || return 0
+  docker_bin="$(command -v docker)"
+  compose_plugin="${GLIMMER_CRADLE_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}"
+  [[ -x "$compose_plugin" ]] || compose_plugin="/usr/lib/docker/cli-plugins/docker-compose"
+  [[ -x "$compose_plugin" ]] || {
+    echo "未找到 Docker Compose CLI 插件，运维桥不启动。" >&2
+    return 0
+  }
+  docker_gid="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || printf '0')"
+  "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" run --detach \
+    --name "$OPS_BRIDGE_CONTAINER" \
+    --restart unless-stopped \
+    --user root \
+    --read-only \
+    --network none \
+    --group-add "$docker_gid" \
+    --entrypoint /usr/local/bin/node \
+    --env GLIMMER_CRADLE_CLI_PATH=/host/glimmer-cradle/current/deploy.sh \
+    --env GLIMMER_CRADLE_STATE_ROOT=/var/lib/glimmer-cradle \
+    --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE=/etc/glimmer-cradle/deployment.env \
+    --env GLIMMER_CRADLE_HOST_RELEASE_ROOT=/host/glimmer-cradle/current \
+    --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET="$socket_path" \
+    --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN="$token" \
+    --env GLIMMER_CRADLE_RELEASE_SOURCE="$(read_env GLIMMER_CRADLE_RELEASE_SOURCE https://github.com/lociere/glimmer-cradle/releases/latest/download)" \
+    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+    --mount type=bind,src="$docker_bin",dst=/usr/bin/docker,readonly \
+    --mount type=bind,src="$compose_plugin",dst=/usr/libexec/docker/cli-plugins/docker-compose,readonly \
+    --mount type=bind,src=/opt/glimmer-cradle/current,dst=/host/glimmer-cradle/current,readonly \
+    --mount type=bind,src=/etc/glimmer-cradle,dst=/etc/glimmer-cradle \
+    --mount type=bind,src="$STATE_ROOT",dst=/var/lib/glimmer-cradle \
+    --tmpfs /tmp:mode=1777 \
+    "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
+}
+
+stop_ops_bridge() {
+  "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
 }
 
 create_backup() {
@@ -481,6 +534,7 @@ install_release() {
     echo "检测到现有安装，正在确保当前版本已启动并就绪。"
     compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
     wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    start_ops_bridge
     print_access
     write_deploy_result
     return 0
@@ -497,6 +551,7 @@ install_release() {
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
   persist_selected_image "$candidate" "$replacing_image"
   cleanup_history "$candidate" ""
+  start_ops_bridge
   print_access
   write_deploy_result
   TRANSACTION_ACTIVE=0
@@ -529,6 +584,7 @@ update_release() {
   persist_selected_image "$candidate" "$previous"
   mark_backup "$TRANSACTION_BACKUP" succeeded
   cleanup_history "$candidate" "$previous"
+  start_ops_bridge
   print_access
   write_deploy_result
   TRANSACTION_ACTIVE=0
@@ -586,9 +642,11 @@ case "$COMMAND" in
   restart)
     compose_with_env "$DEPLOYMENT_ENV_FILE" restart
     wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    start_ops_bridge
     ;;
   stop)
     compose_with_env "$DEPLOYMENT_ENV_FILE" down
+    stop_ops_bridge
     ;;
   status)
     compose_with_env "$DEPLOYMENT_ENV_FILE" ps

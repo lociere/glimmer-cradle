@@ -21,6 +21,12 @@ if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == light-success ]]; then
     *' up --detach --remove-orphans'|*' exec -T personal-server node -e '*)
       exit 0
       ;;
+    'rm -f glimmer-cradle-ops-bridge')
+      exit 0
+      ;;
+    'run --detach --name glimmer-cradle-ops-bridge '*)
+      exit 0
+      ;;
     *)
       echo "轻量安装成功测试收到未预期的 docker 调用: $*" >&2
       exit 1

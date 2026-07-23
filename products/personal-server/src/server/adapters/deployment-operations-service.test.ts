@@ -47,7 +47,7 @@ describe('DeploymentOperationsService', () => {
   });
 
   it('发布镜像缺少仓库根 package.json 时从产品包读取当前版本', async () => {
-    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true, packageVersion: '0.1.4' });
+    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true, packageVersion: '0.1.5' });
     const service = new DeploymentOperationsService({
       applicationRoot: fixture.applicationRoot,
       packageRoot: fixture.packageRoot,
@@ -56,7 +56,7 @@ describe('DeploymentOperationsService', () => {
     });
 
     const snapshot = await service.getSnapshot();
-    assert.equal(snapshot.update.current_version, '0.1.4');
+    assert.equal(snapshot.update.current_version, '0.1.5');
     assert.equal(snapshot.update.apply_supported, true);
   });
 

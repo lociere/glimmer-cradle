@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -61,6 +62,8 @@ export class DeploymentOperationsService {
       readonly cliPath?: string;
       readonly deploymentEnvFile?: string;
       readonly releaseSource?: string;
+      readonly bridgeSocketPath?: string;
+      readonly bridgeToken?: string;
       readonly spawnDetachedFn?: (
         lease: DeploymentOperationLease,
         command: string,
@@ -70,6 +73,12 @@ export class DeploymentOperationsService {
   ) {}
 
   public async getSnapshot(availableVersion?: string): Promise<DeploymentOperationsSnapshot> {
+    const bridgeSnapshot = await this.bridgeRequest<DeploymentOperationsSnapshot>('GET', '/snapshot').catch(() => null);
+    if (bridgeSnapshot) {
+      return availableVersion
+        ? { ...bridgeSnapshot, update: { ...bridgeSnapshot.update, available_version: availableVersion } }
+        : bridgeSnapshot;
+    }
     const runner = await this.resolveRunner();
     const entries = await this.listBackups(runner.stateRoot);
     return {
@@ -105,6 +114,9 @@ export class DeploymentOperationsService {
         snapshot: await this.getSnapshot(availableVersion),
       };
     }
+
+    const bridgeResult = await this.bridgeRequest<DeploymentOperationResult>('POST', '/operations', request).catch(() => null);
+    if (bridgeResult) return bridgeResult;
 
     const runner = await this.resolveRunner();
     if (!runner.command) {
@@ -339,6 +351,45 @@ export class DeploymentOperationsService {
     return this.options.releaseSource
       || process.env.GLIMMER_CRADLE_RELEASE_SOURCE
       || 'https://github.com/lociere/glimmer-cradle/releases/latest/download';
+  }
+
+  private bridgeRequest<T>(method: 'GET' | 'POST', route: string, body?: unknown): Promise<T | null> {
+    const socketPath = this.options.bridgeSocketPath?.trim();
+    const token = this.options.bridgeToken?.trim();
+    if (!socketPath || !token) return Promise.resolve(null);
+    const payload = body === undefined ? '' : JSON.stringify(body);
+    return new Promise((resolve, reject) => {
+      const request = http.request({
+        socketPath,
+        path: route,
+        method,
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          'content-length': Buffer.byteLength(payload),
+        },
+        timeout: 10_000,
+      }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          if (!response.statusCode || response.statusCode >= 500) {
+            reject(new Error(`operations_bridge_${response.statusCode || 'unknown'}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(text) as T);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+      request.once('timeout', () => request.destroy(new Error('operations_bridge_timeout')));
+      request.once('error', reject);
+      if (payload) request.write(payload);
+      request.end();
+    });
   }
 
   private async checkLatestVersion(): Promise<string | undefined> {
