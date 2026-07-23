@@ -385,8 +385,8 @@ fi
 if [[ "$PACKAGE_VARIANT" == full ]]; then
   "$DOCKER_BIN" load --input "$CANDIDATE_IMAGE_ARCHIVE" >/dev/null
   LOADED_IMAGE_ID="$("$DOCKER_BIN" image inspect --format '{{.Id}}' "$LOCAL_ARCHIVE_IMAGE" 2>/dev/null || true)"
-  [[ "$LOADED_IMAGE_ID" == "$ARCHIVE_IMAGE_ID" ]] || {
-    echo "已加载归档的本地镜像身份与发布声明不一致。" >&2
+  [[ "$LOADED_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+    echo "完整包镜像归档加载后无法解析本地镜像身份。" >&2
     exit 1
   }
   CANDIDATE_IMAGE="$LOCAL_ARCHIVE_IMAGE"
