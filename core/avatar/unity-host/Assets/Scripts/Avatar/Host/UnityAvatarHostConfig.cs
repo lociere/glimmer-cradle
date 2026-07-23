@@ -17,7 +17,7 @@ namespace GlimmerCradle.Avatar
     {
         public string kernelUrl = "";
         public string hostId = "unity-avatar";
-        public string hostVersion = "0.1.1";
+        public string hostVersion = "0.1.2";
         public string modelId = "";
         public string modelRegistryFile = "avatar-package-registry.json";
         public float reconnectDelaySeconds = 2.0f;

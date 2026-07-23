@@ -13,7 +13,7 @@ namespace GlimmerCradle.Avatar
     {
         [SerializeField] private string kernelUrl = "";
         [SerializeField] private string hostId = "unity-avatar";
-        [SerializeField] private string hostVersion = "0.1.1";
+        [SerializeField] private string hostVersion = "0.1.2";
         [SerializeField] private string modelId = "";
         [SerializeField] private string avatarPackageId = "";
         [SerializeField] private AvatarLive2DController avatarController;
