@@ -99,6 +99,7 @@ EOF
 
   local -a command=(env
     PATH="${fake_bin}:${PATH}"
+    GLIMMER_CRADLE_DOCKER_BIN="${fake_bin}/docker"
     GLIMMER_CRADLE_TEST_DOCKER_MODE=light-success
     GLIMMER_CRADLE_TEST_CURRENT_IMAGE="$IMAGE"
     GLIMMER_CRADLE_RELEASE_SOURCE="$OUTPUT_ROOT"
@@ -127,6 +128,7 @@ start_interrupt_installer() {
   local fake_bin="${REPO_ROOT}/scripts/fixtures/personal-server-install-interrupt"
   local -a command=(env
     PATH="${fake_bin}:${PATH}"
+    GLIMMER_CRADLE_DOCKER_BIN="${fake_bin}/docker"
     GLIMMER_CRADLE_TEST_DOCKER_MARKER="$marker"
     GLIMMER_CRADLE_RELEASE_SOURCE="$OUTPUT_ROOT"
     GLIMMER_CRADLE_PACKAGE_VARIANT=full
@@ -197,6 +199,7 @@ cp "${CONFIG_ROOT}/deployment.env" "${TEST_ROOT}/deployment.env.baseline"
 cp "$CLI_PATH" "${TEST_ROOT}/cli.baseline"
 if run_installer "$OUTPUT_ROOT" \
   PATH="${REPO_ROOT}/scripts/fixtures/personal-server-install-interrupt:${PATH}" \
+  GLIMMER_CRADLE_DOCKER_BIN="${REPO_ROOT}/scripts/fixtures/personal-server-install-interrupt/docker" \
   GLIMMER_CRADLE_TEST_DOCKER_MODE=success \
   GLIMMER_CRADLE_TEST_IMAGE_ID="$IMAGE_ID" \
   GLIMMER_CRADLE_TEST_UNEXPECTED_DOCKER_MARKER="$ENTRY_FAILURE_DEPLOY_MARKER" \

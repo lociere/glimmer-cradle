@@ -20,6 +20,7 @@ RELEASE_SOURCE="${GLIMMER_CRADLE_RELEASE_SOURCE:-}"
 DOWNLOAD_TOKEN="${GLIMMER_CRADLE_GITHUB_TOKEN:-${GH_TOKEN:-}}"
 GHCR_TOKEN="${GLIMMER_CRADLE_GHCR_TOKEN:-$DOWNLOAD_TOKEN}"
 GHCR_USERNAME="${GLIMMER_CRADLE_GITHUB_USER:-lociere}"
+DOCKER_BIN="${GLIMMER_CRADLE_DOCKER_BIN:-docker}"
 RELEASE_ROOT=""
 STAGED_RELEASE=""
 RELEASE_CREATED=0
@@ -375,15 +376,15 @@ fi
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE"
 export GLIMMER_CRADLE_ENV_TEMPLATE_FILE="${RELEASE_ROOT}/.env.example"
 export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
-if ! docker info >/dev/null 2>&1 \
-  || ! docker compose version >/dev/null 2>&1 \
-  || ! docker buildx version >/dev/null 2>&1; then
+if ! "$DOCKER_BIN" info >/dev/null 2>&1 \
+  || ! "$DOCKER_BIN" compose version >/dev/null 2>&1 \
+  || ! "$DOCKER_BIN" buildx version >/dev/null 2>&1; then
   "${RELEASE_ROOT}/bootstrap-host.sh" </dev/null
 fi
 
 if [[ "$PACKAGE_VARIANT" == full ]]; then
-  docker load --input "$CANDIDATE_IMAGE_ARCHIVE" >/dev/null
-  LOADED_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$LOCAL_ARCHIVE_IMAGE" 2>/dev/null || true)"
+  "$DOCKER_BIN" load --input "$CANDIDATE_IMAGE_ARCHIVE" >/dev/null
+  LOADED_IMAGE_ID="$("$DOCKER_BIN" image inspect --format '{{.Id}}' "$LOCAL_ARCHIVE_IMAGE" 2>/dev/null || true)"
   [[ "$LOADED_IMAGE_ID" == "$ARCHIVE_IMAGE_ID" ]] || {
     echo "已加载归档的本地镜像身份与发布声明不一致。" >&2
     exit 1
@@ -397,7 +398,7 @@ export GLIMMER_CRADLE_CANDIDATE_IMAGE="$CANDIDATE_IMAGE"
 if [[ "$CANDIDATE_IMAGE" == ghcr.io/* && -n "$GHCR_TOKEN" ]]; then
   export DOCKER_CONFIG="${TEMP_ROOT}/docker-config"
   install -d -m 0700 "$DOCKER_CONFIG"
-  printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+  printf '%s' "$GHCR_TOKEN" | "$DOCKER_BIN" login ghcr.io \
     --username "$GHCR_USERNAME" --password-stdin >/dev/null
 fi
 
