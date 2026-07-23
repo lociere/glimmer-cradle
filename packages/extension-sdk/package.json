@@ -1,6 +1,6 @@
 {
   "name": "@glimmer-cradle/extension-sdk",
-  "version": "0.1.2",
+  "version": "0.1.2-rc.1",
   "private": false,
   "files": ["dist"],
   "publishConfig": { "access": "public" },
