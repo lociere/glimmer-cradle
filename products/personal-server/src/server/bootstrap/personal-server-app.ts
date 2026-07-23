@@ -82,6 +82,7 @@ export class PersonalServerApp {
     this.auditLog = new ProductAuditLog(path.join(this.dataRoot, 'observability'));
     this.operations = new DeploymentOperationsService({
       applicationRoot: this.applicationRoot,
+      packageRoot: this.packageRoot,
       cliPath: normalizeOptionalPathEnv(process.env.GLIMMER_CRADLE_CLI_PATH) || undefined,
       deploymentEnvFile: process.env.GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE,
       releaseSource: process.env.GLIMMER_CRADLE_RELEASE_SOURCE,

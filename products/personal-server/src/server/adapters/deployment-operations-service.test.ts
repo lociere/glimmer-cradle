@@ -46,6 +46,33 @@ describe('DeploymentOperationsService', () => {
     }]);
   });
 
+  it('发布镜像缺少仓库根 package.json 时从产品包读取当前版本', async () => {
+    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true, packageVersion: '0.1.4' });
+    const service = new DeploymentOperationsService({
+      applicationRoot: fixture.applicationRoot,
+      packageRoot: fixture.packageRoot,
+      cliPath: fixture.cliPath,
+      deploymentEnvFile: fixture.envFile,
+    });
+
+    const snapshot = await service.getSnapshot();
+    assert.equal(snapshot.update.current_version, '0.1.4');
+    assert.equal(snapshot.update.apply_supported, true);
+  });
+
+  it('版本文件都缺失时运维快照不抛异常', async () => {
+    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true });
+    const service = new DeploymentOperationsService({
+      applicationRoot: fixture.applicationRoot,
+      cliPath: fixture.cliPath,
+      deploymentEnvFile: fixture.envFile,
+    });
+
+    const snapshot = await service.getSnapshot();
+    assert.equal(snapshot.update.current_version, 'unknown');
+  });
+
+
   it('显式桥接命令缺失时返回明确 disabled reason', async () => {
     const fixture = createOperationsFixture();
     const missingCliPath = path.join(fixture.root, 'bin', 'glimmer-cradle');
@@ -112,21 +139,31 @@ describe('DeploymentOperationsService', () => {
 function createOperationsFixture(options: {
   readonly withCli?: boolean;
   readonly backups?: string[];
+  readonly omitApplicationPackage?: boolean;
+  readonly packageVersion?: string;
 } = {}): {
   readonly root: string;
   readonly applicationRoot: string;
+  readonly packageRoot: string;
   readonly envFile: string;
   readonly cliPath: string;
 } {
   const root = mkdtempSync(path.join(tmpdir(), 'gc-operations-'));
   tempRoots.push(root);
   const applicationRoot = path.join(root, 'app');
+  const packageRoot = path.join(applicationRoot, 'products', 'personal-server');
   const stateRoot = path.join(root, 'state');
   const envFile = path.join(root, 'deployment.env');
   const cliPath = path.join(root, 'bin', 'glimmer-cradle');
   mkdirSync(applicationRoot, { recursive: true });
+  mkdirSync(packageRoot, { recursive: true });
   mkdirSync(stateRoot, { recursive: true });
-  writeFileSync(path.join(applicationRoot, 'package.json'), JSON.stringify({ version: '0.1.1' }), 'utf8');
+  if (!options.omitApplicationPackage) {
+    writeFileSync(path.join(applicationRoot, 'package.json'), JSON.stringify({ version: '0.1.1' }), 'utf8');
+  }
+  if (options.packageVersion) {
+    writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ version: options.packageVersion }), 'utf8');
+  }
   writeFileSync(envFile, `GLIMMER_CRADLE_STATE_ROOT=${stateRoot}\n`, 'utf8');
   for (const backupId of options.backups ?? []) {
     const backupDir = path.join(stateRoot, 'backups', backupId);
@@ -138,7 +175,7 @@ function createOperationsFixture(options: {
     writeFileSync(cliPath, process.platform === 'win32' ? '@echo off\r\nexit /b 0\r\n' : '#!/bin/sh\nexit 0\n', 'utf8');
     if (process.platform !== 'win32') chmodSync(cliPath, 0o755);
   }
-  return { root, applicationRoot, envFile, cliPath };
+  return { root, applicationRoot, packageRoot, envFile, cliPath };
 }
 
 function escapeRegExp(value: string): string {

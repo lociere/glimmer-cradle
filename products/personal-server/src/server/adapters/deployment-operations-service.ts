@@ -56,6 +56,7 @@ export class DeploymentOperationsService {
   public constructor(
     private readonly options: {
       readonly applicationRoot: string;
+      readonly packageRoot?: string;
       readonly fetchFn?: typeof fetch;
       readonly cliPath?: string;
       readonly deploymentEnvFile?: string;
@@ -319,9 +320,19 @@ export class DeploymentOperationsService {
   }
 
   private async readCurrentVersion(): Promise<string> {
-    const packageJsonPath = path.join(this.options.applicationRoot, 'package.json');
-    const content = await readFile(packageJsonPath, 'utf8');
-    return JSON.parse(content).version || 'unknown';
+    for (const packageJsonPath of [
+      this.options.packageRoot ? path.join(this.options.packageRoot, 'package.json') : null,
+      path.join(this.options.applicationRoot, 'package.json'),
+    ]) {
+      if (!packageJsonPath || !await fileExists(packageJsonPath)) continue;
+      try {
+        const content = await readFile(packageJsonPath, 'utf8');
+        return JSON.parse(content).version || 'unknown';
+      } catch {
+        continue;
+      }
+    }
+    return 'unknown';
   }
 
   private resolveReleaseSource(): string {

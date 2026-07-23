@@ -1,7 +1,7 @@
 {
   "id": "platform-native",
   "displayName": "Glimmer Cradle Platform Native",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "packageDirectory": "native",
   "artifacts": {
     "win32": "platform_native.dll",
