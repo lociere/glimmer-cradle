@@ -27,12 +27,16 @@ export interface SupplementalControllerContext {
     setSnapshot: (value: AccessTokenSnapshot | null) => void;
     setResult: (value: AccessTokenMutationResult | null) => void;
     setPending: (value: boolean) => void;
+    getError: () => string | null;
+    setError: (value: string | null) => void;
   };
   readonly operations: {
     getSnapshot: () => DeploymentOperationsSnapshot | null;
     setSnapshot: (value: DeploymentOperationsSnapshot | null) => void;
     setResult: (value: DeploymentOperationResult | null) => void;
     setPending: (value: boolean) => void;
+    getError: () => string | null;
+    setError: (value: string | null) => void;
   };
   readonly skills: {
     getCatalog: () => SkillCatalogLoadResult | null;
@@ -94,14 +98,24 @@ export async function refreshSupplementalSnapshots(context: SupplementalControll
 }
 
 async function refreshAccessTokens(context: SupplementalControllerContext): Promise<void> {
-  const snapshot = await context.options.loadAccessTokens();
-  context.accessTokens.setSnapshot(snapshot);
+  try {
+    const snapshot = await context.options.loadAccessTokens();
+    context.accessTokens.setSnapshot(snapshot);
+    context.accessTokens.setError(null);
+  } catch (error) {
+    context.accessTokens.setError(context.asErrorMessage(error));
+  }
   context.render();
 }
 
 async function refreshOperations(context: SupplementalControllerContext): Promise<void> {
-  const snapshot = await context.options.loadOperations();
-  context.operations.setSnapshot(snapshot);
+  try {
+    const snapshot = await context.options.loadOperations();
+    context.operations.setSnapshot(snapshot);
+    context.operations.setError(null);
+  } catch (error) {
+    context.operations.setError(context.asErrorMessage(error));
+  }
   context.render();
 }
 
@@ -130,9 +144,11 @@ async function runAccessTokenMutation(
   context.render();
   try {
     const result = await action();
+    context.accessTokens.setError(null);
     context.accessTokens.setResult(result);
     context.accessTokens.setSnapshot(result.snapshot);
   } catch (error) {
+    context.accessTokens.setError(context.asErrorMessage(error));
     context.accessTokens.setResult({
       status: 'error',
       message: context.asErrorMessage(error),
@@ -158,9 +174,11 @@ async function runOperation(
   context.render();
   try {
     const result = await context.options.runOperation(operation, options);
+    context.operations.setError(null);
     context.operations.setResult(result);
     context.operations.setSnapshot(result.snapshot);
   } catch (error) {
+    context.operations.setError(context.asErrorMessage(error));
     context.operations.setResult({
       status: 'error',
       message: context.asErrorMessage(error),

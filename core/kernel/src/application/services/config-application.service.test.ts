@@ -109,6 +109,70 @@ describe('ConfigApplicationService', () => {
     });
   });
 
+  it('applies audio, embedding, memory and skill changes through the same config owner', async () => {
+    const fixture = await createFixture({ api_type: 'openai' });
+    const service = createService(fixture, { isReady: true });
+    const request = createUpdateRequest('rev-system', fixture.currentConfig.character.llm, 'system-provider');
+    request.revision = (await service.getSnapshot()).revision;
+    request.audio.tts.enabled = true;
+    request.audio.asr.enabled = true;
+    request.audio.tts.cache.max_age_days = 14;
+    request.embedding.enabled = true;
+    request.embedding.route.provider = 'local-sentence-transformers';
+    request.embedding.providers['local-sentence-transformers'].auto_download = true;
+    request.memory.working.context_message_limit = 12;
+    request.memory.experience.enabled = false;
+    request.skills.user_skills = {
+      enabled: true,
+      root_dir: 'skills/local',
+    };
+    request.skills.mcp_servers = [{
+      id: 'ops-maintenance',
+      enabled: true,
+      products: ['personal-server'],
+      transport: 'stdio',
+      command: 'pnpm',
+      args: ['run', 'mcp'],
+      env: {
+        MCP_MODE: 'maintenance',
+      },
+      timeout_ms: 45000,
+    }];
+
+    const result = await service.applyUpdate(request);
+
+    expect(result.status).toBe('success');
+    expect(result.snapshot?.audio.tts.enabled).toBe(true);
+    expect(result.snapshot?.embedding.route.provider).toBe('local-sentence-transformers');
+    expect(result.snapshot?.memory.working.context_message_limit).toBe(12);
+    expect(result.snapshot?.skills.user_skills?.root_dir).toBe('skills/local');
+    expect(result.snapshot?.skills.mcp_servers?.[0]).toMatchObject({
+      id: 'ops-maintenance',
+      command: 'pnpm',
+      timeout_ms: 45000,
+    });
+
+    const audioDocument = yaml.parse(await fs.readFile(fixture.audioPath, 'utf8')) as AudioConfig;
+    const embeddingDocument = yaml.parse(await fs.readFile(fixture.embeddingPath, 'utf8')) as EmbeddingConfig;
+    const memoryDocument = yaml.parse(await fs.readFile(fixture.memoryPath, 'utf8')) as MemoryConfig;
+    const skillsDocument = yaml.parse(await fs.readFile(fixture.skillsPath, 'utf8')) as SkillPlaneConfig;
+
+    expect(audioDocument.tts.enabled).toBe(true);
+    expect(audioDocument.asr.enabled).toBe(true);
+    expect(audioDocument.tts.cache.max_age_days).toBe(14);
+    expect(embeddingDocument.enabled).toBe(true);
+    expect(embeddingDocument.route.provider).toBe('local-sentence-transformers');
+    expect(embeddingDocument.providers['local-sentence-transformers'].auto_download).toBe(true);
+    expect(memoryDocument.working.context_message_limit).toBe(12);
+    expect(memoryDocument.experience?.enabled).toBe(false);
+    expect(skillsDocument.user_skills?.enabled).toBe(true);
+    expect(skillsDocument.user_skills?.root_dir).toBe('skills/local');
+    expect(skillsDocument.mcp_servers?.[0]).toMatchObject({
+      id: 'ops-maintenance',
+      command: 'pnpm',
+    });
+  });
+
   it('rejects provider tests without an API key and does not touch the network', async () => {
     const fixture = await createFixture({ api_type: 'openai' });
     const fetchSpy = vi.fn(async () => new Response('{}', { status: 200 }));

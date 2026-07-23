@@ -179,6 +179,49 @@ test('projects skill catalog runtime and refreshes it after skill config save', 
   }
 });
 
+test('saves audio, embedding and memory settings without falling back to yaml editing', async ({ page }) => {
+  const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
+  try {
+    await login(page, fixture.baseUrl);
+    await page.locator('[data-route="settings"]').first().click();
+    const settingsView = page.locator('[data-role="view-settings"]');
+    await expect(settingsView).toBeVisible();
+    await expect(settingsView.locator('[data-action="save"]')).toBeVisible({ timeout: 15000 });
+    const audioSection = settingsView.locator('[data-role="audio-section"]');
+    const embeddingSection = settingsView.locator('[data-role="embedding-section"]');
+    const memorySection = settingsView.locator('[data-role="memory-section"]');
+
+    await expect(audioSection).toBeVisible();
+    await audioSection.locator('[data-path="audio.tts.enabled"]').check();
+    await audioSection.locator('[data-path="audio.asr.enabled"]').check();
+    await audioSection.locator('[data-path="audio.tts.cache.max_age_days"]').fill('14');
+
+    await expect(embeddingSection).toBeVisible();
+    await embeddingSection.locator('[data-path="embedding.enabled"]').check();
+    await embeddingSection.locator('[data-path="embedding.route.provider"]').selectOption('local-sentence-transformers');
+    await embeddingSection.locator('[data-path="embedding.providers.local-sentence-transformers.auto_download"]').check();
+
+    await expect(memorySection).toBeVisible();
+    await memorySection.locator('[data-path="memory.working.context_message_limit"]').fill('12');
+    await memorySection.locator('[data-path="memory.experience.enabled"]').uncheck();
+
+    await expect(settingsView.locator('[data-action="save"]')).toBeEnabled();
+    await settingsView.locator('[data-action="save"]').click();
+
+    await expect(settingsView.locator('.save-bar .save-status')).toContainText('配置已保存');
+    await expect(audioSection.locator('[data-path="audio.tts.enabled"]')).toBeChecked();
+    await expect(audioSection.locator('[data-path="audio.asr.enabled"]')).toBeChecked();
+    await expect(audioSection.locator('[data-path="audio.tts.cache.max_age_days"]')).toHaveValue('14');
+    await expect(embeddingSection.locator('[data-path="embedding.enabled"]')).toBeChecked();
+    await expect(embeddingSection.locator('[data-path="embedding.route.provider"]')).toHaveValue('local-sentence-transformers');
+    await expect(embeddingSection.locator('[data-path="embedding.providers.local-sentence-transformers.auto_download"]')).toBeChecked();
+    await expect(memorySection.locator('[data-path="memory.working.context_message_limit"]')).toHaveValue('12');
+    await expect(memorySection.locator('[data-path="memory.experience.enabled"]')).not.toBeChecked();
+  } finally {
+    await fixture.stop();
+  }
+});
+
 test('keeps both shell connection indicators in sync and restores them after reconnect', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {

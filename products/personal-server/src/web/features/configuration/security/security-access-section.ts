@@ -8,6 +8,7 @@ export function renderSecurityAccessSection(
   snapshot: AccessTokenSnapshot | null,
   pending: boolean,
   result: AccessTokenMutationResult | null,
+  loadError: string | null,
 ): string {
   const issueNotice = result?.issued_token
     ? `
@@ -41,8 +42,8 @@ export function renderSecurityAccessSection(
         <div><span>安全 / 访问令牌</span><h2>控制面登录边界</h2></div>
       </div>
       <div class="settings-card">
-        <strong>${escapeHtml(snapshot?.mode || 'loading')}</strong>
-        <p>${escapeHtml(snapshot?.message || '正在读取访问令牌状态…')}</p>
+        <strong>${escapeHtml(loadError ? 'error' : snapshot?.mode || 'loading')}</strong>
+        <p>${escapeHtml(loadError || snapshot?.message || '正在读取访问令牌状态…')}</p>
       </div>
       ${issueNotice}
       <div class="settings-form-grid">

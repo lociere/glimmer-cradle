@@ -76,9 +76,11 @@ export class ConfigurationView {
   private accessTokens: AccessTokenSnapshot | null = null;
   private accessTokenResult: AccessTokenMutationResult | null = null;
   private accessTokenPending = false;
+  private accessTokenError: string | null = null;
   private operations: DeploymentOperationsSnapshot | null = null;
   private operationResult: DeploymentOperationResult | null = null;
   private operationPending = false;
+  private operationsError: string | null = null;
   private skillCatalog: SkillCatalogLoadResult | null = null;
   private skillCatalogPending = false;
 
@@ -132,9 +134,9 @@ export class ConfigurationView {
             ${renderEmbeddingSection(draft)}
             ${renderMemoryExperienceSection(draft)}
             ${renderSkillsSection(draft, this.skillCatalog, this.skillCatalogPending)}
-            ${renderSecurityAccessSection(this.accessTokens, this.accessTokenPending, this.accessTokenResult)}
-            ${renderStorageBackupSection(snapshot, this.operations, this.operationResult, this.operationPending)}
-            ${renderUpdatesServiceSection(snapshot, this.operations, this.operationResult, this.operationPending)}
+            ${renderSecurityAccessSection(this.accessTokens, this.accessTokenPending, this.accessTokenResult, this.accessTokenError)}
+            ${renderStorageBackupSection(snapshot, this.operations, this.operationResult, this.operationPending, this.operationsError)}
+            ${renderUpdatesServiceSection(snapshot, this.operations, this.operationResult, this.operationPending, this.operationsError)}
           </div>
 
           <section class="settings-section save-bar">
@@ -450,12 +452,16 @@ export class ConfigurationView {
         setSnapshot: (value) => { this.accessTokens = value; },
         setResult: (value) => { this.accessTokenResult = value; },
         setPending: (value) => { this.accessTokenPending = value; },
+        getError: () => this.accessTokenError,
+        setError: (value) => { this.accessTokenError = value; },
       },
       operations: {
         getSnapshot: () => this.operations,
         setSnapshot: (value) => { this.operations = value; },
         setResult: (value) => { this.operationResult = value; },
         setPending: (value) => { this.operationPending = value; },
+        getError: () => this.operationsError,
+        setError: (value) => { this.operationsError = value; },
       },
       skills: {
         getCatalog: () => this.skillCatalog,

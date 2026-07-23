@@ -95,21 +95,21 @@
 
 ## 实施追踪清单
 
-### 当前检查点（2026-07-19）
+### 当前检查点（2026-07-23）
 
 - 已完成：控制面物理结构从 `public/app.js`/`app.css` 单体迁移到 `products/personal-server/src/server/*` 与 `src/web/*`，并有架构门禁阻止旧入口回流。
 - 已完成：Protocol、Kernel Config Application Port 和 Personal Server 设置页已形成 LLM Provider/默认路由的真实闭环；零 Provider 可登录控制面，依赖 LLM 的对话会返回明确 `conversation_notice`。
 - 已完成：状态页已接 `ReadinessStatus`、runtime catalog 与配置快照；日志页已接真实结构化日志 HTTP/SSE、级别/模块/`trace_id` 筛选、暂停、原始视图与安全导出。
-- 进行中：完整设置、NapCat Linux profile、更新/回滚运维入口与剩余 Config owner。
+- 进行中：NapCat Linux profile、真实发布物升级/失败恢复、宿主运维恢复矩阵与全新服务器安装验收。
 - 已完成到当前阶段：Extension 页已接真实运行投影、仓库/Registry/Release Manifest 安装预览、安装提交、启停与卸载事务；浏览器本地 `.gcex` 已改为认证上传到 Product Host 受控临时目录并换取 opaque `upload_id`，随后由 Host 在同一安装事务内解析为 Kernel file source，具备会话绑定、30 分钟时效、单事务消费与成功/失败/取消/超时清理；安全页已接受管访问令牌 store，支持创建/轮换/撤销、legacy env degraded 标记与一次性明文返回；运维页已接正式 backup/update/service snapshot，并在缺少宿主运维桥时显示真实 disabled reason；Playwright 已固化零 Provider、Provider 保存、日志筛选、扩展安装/启用、版本切换回退、本地 `.gcex` 上传、访问令牌与运维 disabled reason 在桌面与窄窗双视口。
 - 未开始或未过门：QQ 场景外部验收、Extension 升级/回滚、完整宿主运维恢复矩阵。
 
 ### 按实施顺序追踪
 
 - `[x]` 事实与契约：配置 Snapshot/Command、Secret write-only、默认路由与 `conversation_notice` 契约已合入并完成生成同步。
-- `[~]` Kernel 配置主线：LLM Provider 与默认路由的脱敏读取、revision、预览、原子写入、审计和 apply 状态已落地；Audio/Embedding/Memory/Skill 的可写 owner 尚未全部接通。
-- `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；完整 Config owner、宿主运维桥与更广覆盖 Playwright 仍未完成。
-- `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI 与本地 `.gcex` 上传主线已落地；模板仓库 workflow、真实发布物升级/失败恢复与跨仓库 Linux `.gcex` 门禁仍未完成。
+- `[x]` Kernel 配置主线：LLM Provider 与默认路由的脱敏读取、revision、预览、原子写入、审计和 apply 状态已落地；Audio/Embedding/Memory/Skill 也已接入同一 Config Application Port，并经本地单测验证落盘与 snapshot 回读。
+- `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、Audio/Embedding/Memory/Skill 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；Security/Storage/Update 读取失败语义已改为显式错误投影，并经桌面/窄窗 Playwright 验证关键流程；宿主运维桥、真实恢复矩阵与更广 smoke 仍未完成。
+- `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI、本地 `.gcex` 上传主线，以及模板仓库 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档已落地；真实发布物升级/失败恢复与跨仓库 Linux `.gcex` 门禁仍未完成。
 - `[ ]` NapCat 跨产品化：外部 OneBot Linux profile、Adapter Core 收口、QQ 场景 E2E 与 Linux `.gcex` 发布未完成。
 - `[ ]` 生产验收：全新服务器安装、长运行、升级回滚、外部场景与停机矩阵尚未完成。
 
@@ -118,17 +118,17 @@
 - `[x]` Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约，并通过生成一致性检查。
 - `[x]` Kernel 能读取脱敏配置、预览一次变更、拒绝 revision 冲突并原子提交；Secret 从读取响应中消失。
 - `[x]` Personal Server 首次配置页面可新建 Provider、测试连接、保存模型路由；真实角色回复链路、正式历史读取、分页恢复与 `conversation_notice` 已接入控制面输入。
-- `[~]` 页面信息架构、响应式布局、加载/空态/失败恢复和仓库内 Playwright 基线已覆盖零 Provider、Provider 保存、日志筛选、扩展安装/启用/版本回退与窄窗；更广运维/恢复矩阵尚未完成。
+- `[~]` 页面信息架构、响应式布局、加载/空态/失败恢复和仓库内 Playwright 基线已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用/版本回退与窄窗；更广运维/恢复矩阵尚未完成。
 - `[x]` 区域传输副本已从近期实施范围移出，保留为长期候选，不再驱动当前代码。
 
 ### 最终验收门追踪
 
 - `[ ]` 一条命令全新 Ubuntu 安装与无需源码树的完整控制面验收未完成。
-- `[ ]` 浏览器内 Audio、Embedding、Memory、Skill、Security、Storage、Update 配置尚未全部可操作。
+- `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已本地打通并验证；全新 Ubuntu 安装、宿主运维桥可用态、真实更新失败恢复与长期运行矩阵仍未完成。
 - `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 仍未完成。
 - `[ ]` NapCat Linux 外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。
 - `[ ]` 更新失败自动恢复、备份/恢复连续性、完整停机和长运行矩阵未完成。
-- `[~]` Personal Server Playwright 已覆盖零 Provider、Provider 保存、日志筛选、扩展安装/启用与桌面/窄窗；安装矩阵和真实外部场景 smoke 尚未全部完成。
+- `[~]` Personal Server Playwright 已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用与桌面/窄窗；安装矩阵和真实外部场景 smoke 尚未全部完成。
 
 ## 风险
 

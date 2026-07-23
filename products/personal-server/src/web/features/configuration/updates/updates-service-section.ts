@@ -9,11 +9,12 @@ export function renderUpdatesServiceSection(
   operations: DeploymentOperationsSnapshot | null,
   lastResult: DeploymentOperationResult | null,
   pending: boolean,
+  loadError: string | null,
 ): string {
   const service = operations?.service;
   const update = operations?.update;
   return `
-    <section class="settings-section settings-card-shell">
+    <section class="settings-section settings-card-shell" data-role="updates-service-section">
       <div class="settings-section-head">
         <div><span>更新与服务控制</span><h2>当前 apply / restart 能力</h2></div>
       </div>
@@ -23,7 +24,7 @@ export function renderUpdatesServiceSection(
       </div>
       <div class="settings-card">
         <strong>部署级运维</strong>
-        <p>${escape(update?.disabled_reason || service?.disabled_reason || '正在读取部署级能力。')}</p>
+        <p>${escape(loadError || update?.disabled_reason || service?.disabled_reason || '正在读取部署级能力。')}</p>
         <p>当前版本 ${escape(update?.current_version || 'unknown')}${update?.available_version ? `，候选版本 ${escape(update.available_version)}` : ''}。</p>
         <div class="inline-actions">
           <button class="quiet-button" type="button" data-action="check-updates" ${update?.check_supported && !pending ? '' : 'disabled'}>检查更新</button>

@@ -3,7 +3,7 @@ import { escapeAttribute } from '../configuration-support';
 
 export function renderMemoryExperienceSection(draft: ConfigurationDraftState): string {
   return `
-    <section class="settings-section settings-card-shell">
+    <section class="settings-section settings-card-shell" data-role="memory-section">
       <div class="settings-section-head">
         <div><span>Memory / Experience</span><h2>上下文与经验</h2></div>
       </div>

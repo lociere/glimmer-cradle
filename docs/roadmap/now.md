@@ -1,6 +1,6 @@
 # Now
 
-> 审阅日期：2026-07-19
+> 审阅日期：2026-07-23
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
@@ -8,7 +8,7 @@
 
 ## 当前唯一活跃推进面：M11 Personal Server 控制面与 Extension 闭环
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已进入 `in-progress`，现为唯一活跃推进面。当前实现已完成 Config Application Port、Provider 设置、状态页、日志页、服务端对话历史恢复，以及浏览器本地 `.gcex` 上传经 `upload_id` 进入同一安装事务的正式链路；仓库内 Playwright 现已本地验证扩展版本安装、激活切换与回退 UI 主线，但真实 Ubuntu 安装、宿主运维恢复矩阵和跨仓库 NapCat `external_onebot` 闭环仍是未过门禁。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已进入 `in-progress`，现为唯一活跃推进面。当前实现已完成 Config Application Port 对 Provider、Audio、Embedding、Memory、Skill 的正式读写链路，Personal Server 设置页也已本地验证这些配置以及 Security/Storage/Update 正式能力投影；扩展生态模板仓库已补齐 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档。当前仍未过门的是全新 Ubuntu 安装、宿主运维恢复矩阵、真实发布物升级/失败恢复，以及跨仓库 NapCat `external_onebot` 闭环。
 
 M11 负责：
 
@@ -24,7 +24,7 @@ M11 负责：
 1. Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约。
 2. Kernel 成为唯一配置 owner，能够脱敏读取、预览变更、拒绝 revision 冲突并原子提交。
 3. Personal Server 在零 Provider 状态下也能登录并进入完整控制面；执行依赖 LLM 的对话时才明确提示尚未配置可用模型。
-4. 设置中心可新建 Provider、测试连接、保存模型路由并在配置后完成真实角色回复；页面信息架构、响应式布局、加载/空态/失败恢复和 Playwright 截图矩阵先形成可持续设计基线，不以临时表单堆叠代替正式控制面。
+4. 设置中心可新建 Provider、测试连接、保存模型路由，并在浏览器内完成 Audio、Embedding、Memory、Skill 的正式配置与 Security/Storage/Update 能力查看；页面信息架构、响应式布局、加载/空态/失败恢复和 Playwright 截图矩阵先形成可持续设计基线，不以临时表单堆叠代替正式控制面。
 
 ## 近期不做
 

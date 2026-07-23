@@ -5,7 +5,7 @@ export function renderEmbeddingSection(draft: ConfigurationDraftState): string {
   const dashscope = draft.embedding.providers['dashscope-text-embedding'];
   const local = draft.embedding.providers['local-sentence-transformers'];
   return `
-    <section class="settings-section settings-card-shell">
+    <section class="settings-section settings-card-shell" data-role="embedding-section">
       <div class="settings-section-head">
         <div><span>Embedding</span><h2>语义向量增强</h2></div>
       </div>

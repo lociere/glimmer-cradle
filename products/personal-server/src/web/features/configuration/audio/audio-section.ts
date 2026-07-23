@@ -4,7 +4,7 @@ import { escapeAttribute, escapeHtml } from '../configuration-support';
 export function renderAudioSection(draft: ConfigurationDraftState): string {
   const provider = draft.audio.tts.providers['dashscope-cosyvoice'];
   return `
-    <section class="settings-section settings-card-shell">
+    <section class="settings-section settings-card-shell" data-role="audio-section">
       <div class="settings-section-head">
         <div><span>Audio</span><h2>可选增强</h2></div>
       </div>
