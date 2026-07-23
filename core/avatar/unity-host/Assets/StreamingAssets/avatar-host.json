@@ -1,7 +1,7 @@
 {
   "kernelUrl": "",
   "hostId": "unity-avatar",
-  "hostVersion": "0.1.2-rc.1",
+  "hostVersion": "0.1.2",
   "modelId": "",
   "modelRegistryFile": "avatar-package-registry.json",
   "reconnectDelaySeconds": 2.0,
