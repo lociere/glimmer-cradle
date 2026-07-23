@@ -1,9 +1,9 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { chmod, chown, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { createOperationController } from './ops-bridge-core.mjs';
 
 const socketPath = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET || '/var/lib/glimmer-cradle/run/ops-bridge.sock';
 const token = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN || '';
@@ -11,7 +11,6 @@ const cliPath = process.env.GLIMMER_CRADLE_CLI_PATH || '/usr/local/bin/glimmer-c
 const stateRoot = process.env.GLIMMER_CRADLE_STATE_ROOT || '/var/lib/glimmer-cradle';
 const hostReleaseRoot = process.env.GLIMMER_CRADLE_HOST_RELEASE_ROOT || '/host/glimmer-cradle/current';
 const releaseSource = process.env.GLIMMER_CRADLE_RELEASE_SOURCE || 'https://github.com/lociere/glimmer-cradle/releases/latest/download';
-let activeOperation = null;
 
 if (!token) {
   console.error('GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN is required');
@@ -21,6 +20,14 @@ if (!token) {
 await mkdir(path.dirname(socketPath), { recursive: true, mode: 0o770 });
 await chownIfRoot(path.dirname(socketPath), 10001, 10001);
 await rm(socketPath, { force: true });
+
+const operations = createOperationController({
+  snapshot,
+  launch: runDetachedCli,
+  onError: (operationId, error) => {
+    console.error(`[ops-bridge] operation ${operationId} failed: ${error instanceof Error ? error.message : String(error)}`);
+  },
+});
 
 const server = createServer(async (request, response) => {
   if (request.headers.authorization !== `Bearer ${token}`) {
@@ -34,7 +41,10 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && request.url === '/operations') {
       const body = await readBody(request, 8192);
-      sendJson(response, 200, await execute(JSON.parse(body || '{}')));
+      const prepared = await operations.prepare(JSON.parse(body || '{}'));
+      const { start, ...result } = prepared;
+      sendJson(response, 200, result);
+      if (start) setTimeout(start, 250);
       return;
     }
     sendJson(response, 404, { error: 'not_found' });
@@ -83,76 +93,13 @@ async function snapshot(availableVersion) {
   };
 }
 
-async function execute(body) {
-  const operation = String(body.operation || '');
-  if (!['backup.create', 'backup.restore', 'service.restart', 'service.stop', 'update.apply'].includes(operation)) {
-    return { status: 'error', message: '未知的运维操作。', snapshot: await snapshot(), operation_id: opId() };
-  }
-  if (activeOperation) {
-    return { status: 'conflict', message: '当前已有部署级运维事务在进行中，请等待前一项操作结束。', snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  activeOperation = opId();
-  try {
-  if (operation === 'backup.create') {
-    await runCli(['backup']);
-    return { status: 'success', message: '备份已创建。', snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  if (operation === 'backup.restore') {
-    const backupId = String(body.backup_id || '');
-    if (!/^[0-9]{8}T[0-9]{6}Z(?:-[0-9]{2})?$/.test(backupId)) {
-      return { status: 'error', message: '指定备份不存在，无法恢复。', snapshot: await snapshot(), operation_id: activeOperation };
-    }
-    if (!body.confirm) {
-      const operationId = activeOperation;
-      activeOperation = null;
-      return {
-        status: 'preflight',
-        message: `恢复 ${backupId} 将中断当前服务，并在失败时依赖部署事务回滚。`,
-        requires_confirmation: true,
-        snapshot: await snapshot(),
-        operation_id: operationId,
-      };
-    }
-    await runCli(['restore', backupId]);
-    return { status: 'success', message: `已从备份恢复 ${backupId}。`, snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  if (operation === 'service.restart') {
-    detachCli(['restart']);
-    return { status: 'accepted', message: '已接受重启请求，当前控制面连接将重新建立。', snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  if (operation === 'service.stop') {
-    detachCli(['stop']);
-    return { status: 'accepted', message: '已接受停机请求，当前控制面连接将被关闭。', snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  if (operation === 'update.apply') {
-    if (!body.confirm) {
-      const operationId = activeOperation;
-      activeOperation = null;
-      return { status: 'preflight', message: '更新将触发部署级事务、就绪门与失败回滚；确认后当前连接可能中断。', requires_confirmation: true, snapshot: await snapshot(), operation_id: operationId };
-    }
-    detachCli(['update']);
-    return { status: 'accepted', message: '已接受更新请求，当前控制面连接将根据部署事务状态中断或恢复。', snapshot: await snapshot(), operation_id: activeOperation };
-  }
-  } catch (error) {
-    return { status: 'error', message: error instanceof Error ? error.message : String(error), snapshot: await snapshot(), operation_id: activeOperation };
-  } finally {
-    if (!['service.restart', 'service.stop', 'update.apply'].includes(operation) || body.confirm !== true) {
-      activeOperation = null;
-    }
-  }
-}
-
-function runCli(args) {
+function runDetachedCli(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cliPath, args, { stdio: 'ignore' });
+    const child = spawn(cliPath, args, { detached: true, stdio: 'ignore' });
     child.once('error', reject);
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`运维桥命令失败，退出码 ${code ?? 'null'}。`)));
+    child.unref();
   });
-}
-
-function detachCli(args) {
-  const child = spawn(cliPath, args, { detached: true, stdio: 'ignore' });
-  child.unref();
 }
 
 async function listBackups() {
@@ -205,8 +152,4 @@ function readBody(request, maxBytes) {
 function sendJson(response, status, body) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(body));
-}
-
-function opId() {
-  return `deployment_op_${randomUUID()}`;
 }

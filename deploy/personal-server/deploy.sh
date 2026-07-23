@@ -96,7 +96,7 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock
   fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.5"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.6"
   fi
   if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
@@ -224,7 +224,7 @@ next_candidate_image() {
   elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     candidate_image
   else
-    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.5"
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.6"
   fi
 }
 
@@ -237,7 +237,7 @@ candidate_image() {
     dirty="-dirty"
   fi
   timestamp="$(date -u +%Y%m%d%H%M%S)"
-  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.5}" "$revision" "$dirty" "$timestamp"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.6}" "$revision" "$dirty" "$timestamp"
 }
 
 port_in_use() {
@@ -312,9 +312,13 @@ start_ops_bridge() {
   "${DOCKER[@]}" run --detach \
     --name "$OPS_BRIDGE_CONTAINER" \
     --restart unless-stopped \
+    --init \
     --user root \
     --read-only \
     --network none \
+    --cap-drop ALL \
+    --security-opt no-new-privileges \
+    --pids-limit 64 \
     --group-add "$docker_gid" \
     --entrypoint /usr/local/bin/node \
     --env GLIMMER_CRADLE_CLI_PATH=/host/glimmer-cradle/current/deploy.sh \
@@ -335,7 +339,12 @@ start_ops_bridge() {
 }
 
 stop_ops_bridge() {
+  local socket_path
   "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
+  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${STATE_ROOT}/run/ops-bridge.sock")"
+  if [[ -n "$socket_path" && "$socket_path" == "${STATE_ROOT}/run/"* ]]; then
+    "${PRIVILEGED[@]}" rm -f -- "$socket_path"
+  fi
 }
 
 create_backup() {

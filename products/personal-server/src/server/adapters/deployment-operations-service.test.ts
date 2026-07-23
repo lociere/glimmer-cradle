@@ -47,7 +47,7 @@ describe('DeploymentOperationsService', () => {
   });
 
   it('发布镜像缺少仓库根 package.json 时从产品包读取当前版本', async () => {
-    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true, packageVersion: '0.1.5' });
+    const fixture = createOperationsFixture({ withCli: true, omitApplicationPackage: true, packageVersion: '0.1.6' });
     const service = new DeploymentOperationsService({
       applicationRoot: fixture.applicationRoot,
       packageRoot: fixture.packageRoot,
@@ -56,7 +56,7 @@ describe('DeploymentOperationsService', () => {
     });
 
     const snapshot = await service.getSnapshot();
-    assert.equal(snapshot.update.current_version, '0.1.5');
+    assert.equal(snapshot.update.current_version, '0.1.6');
     assert.equal(snapshot.update.apply_supported, true);
   });
 
@@ -133,6 +133,27 @@ describe('DeploymentOperationsService', () => {
     });
     assert.equal(conflict.status, 'conflict');
     assert.match(conflict.message, /已有部署级运维事务/);
+  });
+
+  it('运维桥已配置但不可达时不回退重复执行', async () => {
+    const fixture = createOperationsFixture({ withCli: true });
+    let fallbackExecutions = 0;
+    const service = new DeploymentOperationsService({
+      applicationRoot: fixture.applicationRoot,
+      cliPath: fixture.cliPath,
+      deploymentEnvFile: fixture.envFile,
+      bridgeSocketPath: path.join(fixture.root, 'missing-ops-bridge.sock'),
+      bridgeToken: 'test-token',
+      spawnDetachedFn: async () => { fallbackExecutions += 1; },
+    });
+
+    const result = await service.execute({
+      operation: 'service.restart',
+      confirm: true,
+    });
+    assert.equal(result.status, 'error');
+    assert.match(result.message, /避免重复执行/);
+    assert.equal(fallbackExecutions, 0);
   });
 });
 

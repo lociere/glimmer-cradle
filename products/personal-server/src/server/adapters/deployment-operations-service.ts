@@ -115,8 +115,19 @@ export class DeploymentOperationsService {
       };
     }
 
-    const bridgeResult = await this.bridgeRequest<DeploymentOperationResult>('POST', '/operations', request).catch(() => null);
-    if (bridgeResult) return bridgeResult;
+    if (this.hasBridgeConfiguration()) {
+      try {
+        const bridgeResult = await this.bridgeRequest<DeploymentOperationResult>('POST', '/operations', request);
+        if (bridgeResult) return bridgeResult;
+      } catch {
+        return {
+          status: 'error',
+          message: '部署级运维桥不可达；为避免重复执行，当前请求没有回退到其他执行路径。',
+          snapshot: await this.getSnapshot(),
+          operation_id: `deployment_op_${randomUUID()}`,
+        };
+      }
+    }
 
     const runner = await this.resolveRunner();
     if (!runner.command) {
@@ -390,6 +401,10 @@ export class DeploymentOperationsService {
       if (payload) request.write(payload);
       request.end();
     });
+  }
+
+  private hasBridgeConfiguration(): boolean {
+    return Boolean(this.options.bridgeSocketPath?.trim() && this.options.bridgeToken?.trim());
   }
 
   private async checkLatestVersion(): Promise<string | undefined> {
