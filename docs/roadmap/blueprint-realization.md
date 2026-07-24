@@ -101,7 +101,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 
 ### 3.5 蓝图可以长期稳定，阶段可以重排
 
-蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 13 以后候选阶段；Phase 12 已由 accepted ADR 和 planned M12 固定，若平台验证要求改变方向，必须用新 ADR 修订。所有重排必须满足：
+蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 13 以后候选阶段；Phase 12 已由 accepted ADR-0013/ADR-0014 和 planned M12 固定，若平台验证要求改变方向，必须用新 ADR 修订。所有重排必须满足：
 
 - 不破坏蓝图中的人格边界和器官分层。
 - 不绕过协议、权限、数据和可观测性验收门。
@@ -125,7 +125,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../architecture/current/07-子系统当前视图/Cognition.md)、[Extension 与 Skill Plane 当前视图](../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)、[extension-sdk](../reference/extension-sdk.md) | [M09](./milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
 | Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../reference/packaging-layout.md)、[Personal Server 部署](../guides/release/Personal%20Server部署.md) | [M10](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
 | Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `in-progress` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
-| Phase 12：契约脊柱与跨进程服务架构重建 | `planned` | 以 `contracts/`、Protobuf Service、JSON Schema 文档契约和 Kernel Surface Gateway 重建服务神经系统。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)。 |
+| Phase 12：契约脊柱与跨进程服务架构重建 | `planned` | 以 `contracts/`、版本化 Service 和 Kernel Surface Gateway 重建服务神经系统，并收口根职责、器官模块与 Host 崩溃域。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
 | Phase 13：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来 Contracts、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
 | Phase 14：Native 与本地能力加速 | `candidate` | C++ / Native / 本地模型 / 向量与音视频能力成为受控能力层。 | 未来 native reference 与 implementation map | [Backlog](./backlog.md)。 |
 | Phase 15：Extension 内容生态成熟化 | `candidate` | Extension 从开发扩展点走向可分发、可治理、可组合的生态。 | 未来 SDK、权限、发布与示例文档 | [Backlog](./backlog.md)。 |
@@ -344,13 +344,13 @@ Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、�
 | 项 | 内容 |
 | --- | --- |
 | 状态 | `planned` |
-| 主问题 | 当前 `protocol/` 已集中 JSON Schema，却仍把文档、IPC envelope、SDK 模型和 transport 混在一个概念中；ZMQ、stdio 与手写 WebSocket 主线缺少统一 Service、deadline、取消、错误和兼容治理。 |
-| 计划成果 | 建立 `contracts/`；以版本化 Protobuf Service 和 gRPC 重建核心器官调用，以 JSON Schema 保留文档型契约，以 Kernel Surface Gateway/Connect 服务 Web/Desktop，并分离 control/data plane。 |
+| 主问题 | 当前 `protocol/` 把文档、IPC envelope、SDK 模型和 transport 混在一个概念中；根目录、器官内部层次、Avatar/Extension Host 归属也尚未稳定表达 owner 与崩溃域。 |
+| 计划成果 | 建立 `contracts/` 与版本化跨进程 Service；以 Kernel Surface Gateway 服务 Web/Desktop；收口 `core/engines/hosts/products/packages/contracts/native` 根职责、Kernel/Cognition 模块化单体、Avatar/Unity Host 与 Extension Host 物理边界。 |
 | 关键依赖 | Phase 11 完成并稳定产品边界；ADR-0009 的动态端点、监督树和 readiness；Node/Python/C# 与 Windows/Linux 工具链验证。 |
-| 非范围 | 不改变领域 owner，不实现托管云或公网器官 API，不把全部文档改成 Protobuf，不永久保留新旧 transport 双轨。 |
-| 验收门 | Buf/JSON Schema compatibility、三语言 round-trip、Adapter contract test、deadline/cancellation/error/trace/readiness、Surface/data plane 与全生命周期矩阵通过；`protocol/` 和被替代的 ZMQ/stdio/手写 WebSocket 主线删除。 |
+| 非范围 | 不改变领域 owner，不把 Cognition/Kernel 拆成微服务，不实现托管云或公网器官 API，不预建 UI shared package，不永久保留新旧物理或 transport 双轨。 |
+| 验收门 | Contract compatibility、跨语言 Adapter、调用/生命周期语义和 Surface/data plane 通过；目标目录、imports、composition、构建、测试和打包一致；旧 `protocol/`、旧 Host/聚合目录及被替代 transport 主线删除。 |
 
-Phase 12 固定的是契约脊柱和服务神经系统，不是一次库替换。DDD/Hexagonal 保持领域 owner，IDL-first 负责可生成边界，Kernel BFF/Projection 保护 Surface，control/data plane 保护媒体热路径；gRPC/Connect 只是可替换的 Adapter/Transport 默认实现。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)，长期取舍与供应链防锁定规则见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)。
+Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边界，不是一次库替换或目录改名。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；Contract Spine、供应链与 transport 取舍见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)，根职责、模块化单体与 Host 归属见 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。
 
 ### 7.5 Phase 13：低延迟多模态交互
 
