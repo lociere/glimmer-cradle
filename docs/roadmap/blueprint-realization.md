@@ -345,7 +345,7 @@ Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、�
 | --- | --- |
 | 状态 | `planned` |
 | 主问题 | 当前 `protocol/` 把文档、IPC envelope、SDK 模型和 transport 混在一个概念中；根目录、器官内部层次、Avatar/Extension Host 归属也尚未稳定表达 owner 与崩溃域。 |
-| 计划成果 | 建立 `contracts/` 与版本化跨进程 Service；以 Kernel Surface Gateway 服务 Web/Desktop；收口 `core/engines/hosts/products/packages/contracts/native` 根职责、Kernel/Cognition 模块化单体、Avatar/Unity Host 与 Extension Host 物理边界。 |
+| 计划成果 | 建立 `contracts/` 与版本化跨进程 Service；以 Kernel Surface Gateway 服务 Web/Desktop；收口 `core/`、`engines/`、`hosts/`、`products/`、`packages/`、`contracts/`、`native/`、`templates/` 根职责、Kernel/Cognition 模块化单体、Avatar/Unity Host 与 Extension Host 物理边界。 |
 | 关键依赖 | Phase 11 完成并稳定产品边界；ADR-0009 的动态端点、监督树和 readiness；Node/Python/C# 与 Windows/Linux 工具链验证。 |
 | 非范围 | 不改变领域 owner，不把 Cognition/Kernel 拆成微服务，不实现托管云或公网器官 API，不预建 UI shared package，不永久保留新旧物理或 transport 双轨。 |
 | 验收门 | Contract compatibility、跨语言 Adapter、调用/生命周期语义和 Surface/data plane 通过；目标目录、imports、composition、构建、测试和打包一致；旧 `protocol/`、旧 Host/聚合目录及被替代 transport 主线删除。 |
