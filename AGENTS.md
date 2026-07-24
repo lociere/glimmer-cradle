@@ -9,6 +9,7 @@
 - 使用 TypeScript workspace 的 `pnpm`；Python 使用 `uv`，禁止用全局 `pip` 替代项目环境。
 - 密钥、token 与 provider key 只进入 `configs/secrets/` 或环境变量；不得进入 Git、日志、文档、示例、Skill 或 agent profile。
 - 保留用户已有改动；修改前查看 `git status --short`，不使用破坏性 Git 操作。
+- Git 分支名必须表达工作性质与 scope，不得使用 `codex/`、`claude/`、`copilot/` 等 agent/tool 身份前缀；完整类型与格式规则见 `docs/guides/development/命名规范.md`。
 
 ## 项目 Skill
 
