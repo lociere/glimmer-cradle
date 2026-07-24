@@ -95,22 +95,22 @@
 
 ## 实施追踪清单
 
-### 当前检查点（2026-07-23）
+### 当前检查点（2026-07-24）
 
 - 已完成：控制面物理结构从 `public/app.js`/`app.css` 单体迁移到 `products/personal-server/src/server/*` 与 `src/web/*`，并有架构门禁阻止旧入口回流。
 - 已完成：Protocol、Kernel Config Application Port 和 Personal Server 设置页已形成 LLM Provider/默认路由的真实闭环；零 Provider 可登录控制面，依赖 LLM 的对话会返回明确 `conversation_notice`。
 - 已完成：状态页已接 `ReadinessStatus`、runtime catalog 与配置快照；日志页已接真实结构化日志 HTTP/SSE、级别/模块/`trace_id` 筛选、暂停、原始视图与安全导出。
-- 进行中：NapCat Linux profile、真实发布物升级/失败恢复、宿主运维恢复矩阵与全新服务器安装验收。
+- 进行中：NapCat Linux profile、宿主运维恢复矩阵与全新服务器安装验收。
 - 已完成到当前阶段：Extension 页已接真实运行投影、仓库/Registry/Release Manifest 安装预览、安装提交、启停与卸载事务；浏览器本地 `.gcex` 已改为认证上传到 Product Host 受控临时目录并换取 opaque `upload_id`，随后由 Host 在同一安装事务内解析为 Kernel file source，具备会话绑定、30 分钟时效、单事务消费与成功/失败/取消/超时清理；安全页已接受管访问令牌 store，支持创建/轮换/撤销、legacy env degraded 标记与一次性明文返回；运维页已接正式 backup/update/service snapshot，并在缺少宿主运维桥时显示真实 disabled reason；Playwright 已固化零 Provider、Provider 保存、日志筛选、扩展安装/启用、版本切换回退、本地 `.gcex` 上传、访问令牌与运维 disabled reason 在桌面与窄窗双视口。
 - 未开始或未过门：QQ 场景外部验收、Extension 升级/回滚、完整宿主运维恢复矩阵。
 
 ### 生产验收记录（2026-07-24）
 
-- 目标服务器 `47.99.49.252` 为 Ubuntu 24.04.2 LTS / linux amd64，Docker 29.6.2、Compose v5.3.1、Buildx v0.35.0 可用；当前安装根为 `/opt/glimmer-cradle/current -> /opt/glimmer-cradle/releases/0.1.1`，状态根为 `/var/lib/glimmer-cradle`，入口配置在 `/etc/glimmer-cradle/deployment.env`。
-- 当前生产容器运行 `ghcr.io/lociere/glimmer-cradle-personal-server:v0.1.1@sha256:c5d453f3037b902487dec4174ce9795ba13c79e6ce19c79889f6df5487e1a15c`，宿主只监听 `127.0.0.1:8080` 与 `127.0.0.1:8443`，未发现公开控制面端口；`/healthz`、登录 session、`/api/v1/status` 与 `/api/v1/product` 返回 200。
-- GitHub latest Release 仍为 `v0.1.1`，公开资产只有 `glimmer-cradle-installer.sh`、轻量 `glimmer-cradle-personal-server-v0.1.1-linux-amd64.tar.gz` 与 `SHA256SUMS`；没有完整安装包，因此离线完整包、同版本完整包摘要和公开一条命令完整包验收不能声明通过。
-- 通过 SSH 隧道完成浏览器登录，生产 v0.1.1 控制面仅有 `对话`、`系统状态`、`扩展` 三个一级入口；状态页显示 Kernel/Cognition/Extension ready，TTS/ASR 为未启用；扩展页仅支持远程审核目录/仓库 Release/Release Manifest 来源，尚未提供 M11 的 `日志`、`设置`、浏览器本地 `.gcex` 上传、Security/Storage/Update 页面。
-- 生产 v0.1.1 的 `/api/v1/logs/recent`、`/api/v1/operations`、`/api/v1/security/access-tokens` 返回 404；`glimmer-cradle backup` 返回旧用法 `install|update|restart|stop|status|logs`，尚未部署当前代码中的 backup/restore/update 运维语义。由于无法先创建并验证备份，本次未继续执行 restore、stop、restart 或更新失败恢复等有风险操作。
+- GitHub latest Release 已为 `v0.1.7`，公开资产包含服务器安装器、SSH push 安装器、轻量包、完整包与统一 `SHA256SUMS`；GitHub 继续是唯一发行事实源，未增加 GitCode、OSS、国内 Registry、公共代理或第二安装协议。
+- `install-remote.sh` 审查确认控制机与服务器分别执行一次发布摘要校验，完整包随后复用 `install-release.sh`；full 路径加载应用镜像归档，将应用与跟随发行版的默认 Caddy 都切换到本地镜像，并通过 `GLIMMER_CRADLE_CANDIDATE_PRELOADED=1` 阻止部署层执行 Registry pull。
+- 审查发现失败路径会保留服务器 `/tmp/glimmer-cradle-<version>.*` 的真实缺口；当前工作树已改为成功、远端校验失败和安装失败都清理，清理本身失败时以失败退出并报告精确目录。定向 `pnpm test:remote-install` 已覆盖成功、安装故障和推送后篡改，验证双重摘要、失败不提交与远端临时目录清理。
+- 已配置目标 `47.99.49.252` 为 Ubuntu 24.04.2 LTS / linux amd64，但只读核验时已运行一周且 `/opt/glimmer-cradle/current -> /opt/glimmer-cradle/releases/0.1.5`，不是可销毁的全新主机。未获得重建该主机或创建新实例的入口，因此没有在其上执行清空、安装、重装或故障注入。
+- 全新 Ubuntu 24.04 的真实 SSH push、`/readyz`、幂等重装、无 Registry 网络观察与失败回滚仍是当前安装链最终验收的唯一阻断；不能用已有生产主机或本地伪 SSH 回归替代。
 - `glimmer-cradle-napcat-adapter` 当前本地存在 `release/lociere.napcat-adapter-0.1.0-linux-x64.gcex`，Manifest 声明 `personal-server`、`linux-x64` 与 `external_onebot`；但生产控制面缺少本地上传入口，且本次没有可用 external OneBot/QQ 凭据，因此未执行 QQ E2E。
 - 结论：生产服务器当前证明的是 M10/v0.1.1 基础安装与三页控制面可用，不证明 M11 可归档。M11 生产验收的下一门槛是发布或部署包含当前 M11 控制面与运维桥的 digest 固定版本，再重复安装、设置、Extension、备份恢复、停机回收和 NapCat external OneBot 矩阵。
 
@@ -121,7 +121,7 @@
 - `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、Audio/Embedding/Memory/Skill 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；Security/Storage/Update 读取失败语义已改为显式错误投影，并经桌面/窄窗 Playwright 验证关键流程；宿主运维桥、真实恢复矩阵与更广 smoke 仍未完成。
 - `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI、本地 `.gcex` 上传主线，以及模板仓库 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档已落地；真实发布物升级/失败恢复与跨仓库 Linux `.gcex` 门禁仍未完成。
 - `[ ]` NapCat 跨产品化：外部 OneBot Linux profile、Adapter Core 收口、QQ 场景 E2E 与 Linux `.gcex` 发布未完成。
-- `[ ]` 生产验收：2026-07-24 目标服务器仍运行公开 v0.1.1 三页控制面，缺少 M11 设置/日志/运维/API 与本地 `.gcex` 上传入口；全新服务器安装、长运行、升级回滚、外部场景与停机矩阵尚未完成。
+- `[ ]` 生产验收：公开 `v0.1.7` 与 SSH push 安装链已具备，定向回归已覆盖双重摘要和临时目录清理；现有目标不是全新可销毁主机，真实 remote install、`/readyz`、幂等重装、无 Registry 回源与失败回滚尚未完成。
 
 ### 第一验收门追踪
 
@@ -133,7 +133,7 @@
 
 ### 最终验收门追踪
 
-- `[ ]` 一条命令全新 Ubuntu 安装与无需源码树的完整控制面验收未完成；2026-07-24 GitHub latest `v0.1.1` 没有完整安装包，目标服务器也不是全新主机。
+- `[ ]` 一条命令全新 Ubuntu 安装与无需源码树的完整控制面验收未完成；2026-07-24 GitHub latest `v0.1.7` 已具备完整包与 SSH push 安装器，但现有目标服务器不是全新可销毁主机。
 - `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已本地打通并验证；生产 v0.1.1 尚未部署这些页面和 API，全新 Ubuntu 安装、宿主运维桥可用态、真实更新失败恢复与长期运行矩阵仍未完成。
 - `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；生产 v0.1.1 仅有旧远程来源入口，真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 生产安装仍未完成。
 - `[ ]` NapCat Linux 外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。

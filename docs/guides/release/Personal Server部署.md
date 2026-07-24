@@ -83,7 +83,7 @@ curl -fsSL \
   bash -s -- root@server.example.com
 ```
 
-控制机入口会下载原始 `SHA256SUMS`、完整包和服务器安装器，在控制机与服务器各校验一次；随后由服务器安装器完成宿主准备、候选健康检查、原子切换和失败回滚。SSH key 只由本机 `ssh` 使用，不上传也不进入项目配置。非 root 账号必须具备 `sudo -n`；自定义端口使用 `GLIMMER_CRADLE_SSH_PORT`，固定版本使用 `GLIMMER_CRADLE_VERSION`。
+控制机入口会下载原始 `SHA256SUMS`、完整包和服务器安装器，在控制机与服务器各校验一次；随后由服务器安装器完成宿主准备、候选健康检查、原子切换和失败回滚。控制机本地下载目录与服务器 `/tmp/glimmer-cradle-<version>.*` 校验目录在成功、校验失败或安装失败后都会清理；若远端清理本身失败，入口以失败退出并报告需要手工删除的精确目录。SSH key 只由本机 `ssh` 使用，不上传也不进入项目配置。非 root 账号必须具备 `sudo -n`；自定义端口使用 `GLIMMER_CRADLE_SSH_PORT`，固定版本使用 `GLIMMER_CRADLE_VERSION`。
 
 本地离线安装仍使用服务器安装器。目录至少包含完整包、安装器与发布时生成的原始 `SHA256SUMS`：
 

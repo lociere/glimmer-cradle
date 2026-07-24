@@ -11,7 +11,6 @@ SSH_PORT="${GLIMMER_CRADLE_SSH_PORT:-}"
 CHECKSUMS_NAME=SHA256SUMS
 INSTALLER_NAME=glimmer-cradle-installer.sh
 REMOTE_ROOT=""
-INSTALL_SUCCEEDED=0
 
 [[ "$REMOTE_HOST" =~ ^[A-Za-z0-9._@:%+-]+$ && "$REMOTE_HOST" != -* ]] || {
   echo "远程主机只接受 SSH 的 user@host 或已配置 Host alias。" >&2
@@ -62,10 +61,13 @@ TEMP_ROOT="$(mktemp -d)"
 cleanup() {
   local exit_code=$?
   rm -rf -- "$TEMP_ROOT"
-  if (( INSTALL_SUCCEEDED )) && [[ -n "$REMOTE_ROOT" ]]; then
-    "${SSH[@]}" "$REMOTE_HOST" rm -rf -- "$REMOTE_ROOT" >/dev/null 2>&1 || true
-  elif [[ -n "$REMOTE_ROOT" ]]; then
-    echo "远程校验目录已保留用于诊断或重试: ${REMOTE_HOST}:${REMOTE_ROOT}" >&2
+  if [[ -n "$REMOTE_ROOT" ]]; then
+    if ! "${SSH[@]}" "$REMOTE_HOST" rm -rf -- "$REMOTE_ROOT" >/dev/null 2>&1; then
+      echo "远程临时目录清理失败，请手工删除: ${REMOTE_HOST}:${REMOTE_ROOT}" >&2
+      if (( exit_code == 0 )); then
+        exit_code=1
+      fi
+    fi
   fi
   exit "$exit_code"
 }
@@ -180,5 +182,4 @@ fi
 EOF
 )
 printf '%s\n' "$REMOTE_SCRIPT" | "${SSH[@]}" "$REMOTE_HOST" bash -s -- "$REMOTE_ROOT" "$RELEASE_VERSION"
-INSTALL_SUCCEEDED=1
 echo "Glimmer Cradle Personal Server ${RELEASE_VERSION} 远程安装完成。"
