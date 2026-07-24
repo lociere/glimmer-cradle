@@ -16,6 +16,7 @@ PAYLOAD_ROOT="${STAGING_ROOT}/glimmer-cradle-personal-server"
 ASSET_NAME="glimmer-cradle-personal-server-v${RELEASE_VERSION}-${RELEASE_TARGET}.tar.gz"
 FULL_ASSET_NAME="glimmer-cradle-personal-server-v${RELEASE_VERSION}-${RELEASE_TARGET}-full.tar.gz"
 INSTALLER_NAME="glimmer-cradle-installer.sh"
+REMOTE_INSTALLER_NAME="glimmer-cradle-remote-installer.sh"
 CHECKSUMS_NAME="SHA256SUMS"
 RELEASE_NOTES_NAME="release-notes.md"
 
@@ -40,6 +41,7 @@ rm -f -- \
   "$OUTPUT_DIR"/install.sh \
   "$OUTPUT_DIR"/install.sh.sha256 \
   "$OUTPUT_DIR/$INSTALLER_NAME" \
+  "$OUTPUT_DIR/$REMOTE_INSTALLER_NAME" \
   "$OUTPUT_DIR/$CHECKSUMS_NAME" \
   "$OUTPUT_DIR/$RELEASE_NOTES_NAME"
 
@@ -92,13 +94,14 @@ if [[ -n "$IMAGE_ARCHIVE" ]]; then
 fi
 
 install -m 0755 "$SCRIPT_DIR/install-release.sh" "$OUTPUT_DIR/$INSTALLER_NAME"
+install -m 0755 "$SCRIPT_DIR/install-remote.sh" "$OUTPUT_DIR/$REMOTE_INSTALLER_NAME"
 (
   cd "$OUTPUT_DIR"
   checksum_assets=("$ASSET_NAME")
   if [[ -n "$IMAGE_ARCHIVE" ]]; then
     checksum_assets+=("$FULL_ASSET_NAME")
   fi
-  checksum_assets+=("$INSTALLER_NAME")
+  checksum_assets+=("$INSTALLER_NAME" "$REMOTE_INSTALLER_NAME")
   sha256sum "${checksum_assets[@]}" > "$CHECKSUMS_NAME"
 )
 
@@ -124,6 +127,7 @@ curl -fsSL https://github.com/lociere/glimmer-cradle/releases/latest/download/${
 - \`${ASSET_NAME}\`：Compose、Caddy 与事务化部署脚本组成的轻量部署包；应用本体由下方不可变 OCI 镜像承载。
 - \`${FULL_ASSET_NAME}\`：在轻量部署内容之外携带同一次发布镜像结果，供可信 HTTPS 或本地离线安装使用。
 - \`${INSTALLER_NAME}\`：安装、更新和失败回滚的统一入口。
+- \`${REMOTE_INSTALLER_NAME}\`：由控制机校验完整包并经 SSH 推送到受限网络服务器的一键入口。
 - \`${CHECKSUMS_NAME}\`：本次发布资产的 SHA-256 校验清单。
 - OCI：\`${IMAGE}\`；应用容器与 Caddy 入口容器共享该不可变镜像层，并以独立进程和权限运行。
 

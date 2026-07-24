@@ -47,13 +47,17 @@ Audio engine 以 `engines/audio` 为源码事实源。TTS/ASR 默认关闭且不
 
 `deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；Cognition 与 Audio 使用 uv 锁文件在 Linux builder 中创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。
 
-tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的 `linux/amd64` OCI 镜像和确定性部署包。当前 workflow 生成并上传四个自有资产：轻量包 `glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz`、完整包 `glimmer-cradle-personal-server-v<version>-linux-amd64-full.tar.gz`、稳定入口 `glimmer-cradle-installer.sh` 与统一校验清单 `SHA256SUMS`；GitHub 自动生成的源码归档不属于产品安装包。工作流依赖固定到完整 commit SHA，Release 正文由同一打包脚本生成，版本、支持平台、资产职责与 OCI digest 不依赖人工填写。发布门禁会在 OCI 上直接执行 Caddy 版本检查，并验证两个部署包中的应用与 Caddy 默认镜像指向同一个 digest。该 workflow 只影响包含本实现的后续 tag，不追溯补写既有 Release。
+tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的 `linux/amd64` OCI 镜像和确定性部署包。当前 workflow 生成并上传五个自有资产：轻量包 `glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz`、完整包 `glimmer-cradle-personal-server-v<version>-linux-amd64-full.tar.gz`、服务器拉取入口 `glimmer-cradle-installer.sh`、控制机推送入口 `glimmer-cradle-remote-installer.sh` 与统一校验清单 `SHA256SUMS`；GitHub 自动生成的源码归档不属于产品安装包。工作流依赖固定到完整 commit SHA，Release 正文由同一打包脚本生成，版本、支持平台、资产职责与 OCI digest 不依赖人工填写。发布门禁会在 OCI 上直接执行 Caddy 版本检查，并验证两个部署包中的应用与 Caddy 默认镜像指向同一个 digest。该 workflow 只影响包含本实现的后续 tag，不追溯补写既有 Release。
 
 当前 `glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz` 是**轻量部署包**：它只携带 Compose、Caddy 配置、事务化部署脚本、默认配置投影和目标 OCI digest，不携带应用镜像。标准在线安装先取得该包，再从 GHCR 按 digest 拉取应用与 Caddy 共用的 OCI 镜像，因此部署包体积很小是预期行为。
 
-`glimmer-cradle-personal-server-v<version>-linux-amd64-full.tar.gz` 是**完整安装包**。完整包在轻量部署内容之外携带由同一次发布镜像结果导出的容器镜像归档，供区域弱网、Registry 不可达和离线安装使用；安装器通过 Docker 的镜像加载能力导入后，仍进入同一候选版本、健康检查、原子切换和回滚链路。完整包不得独立重建镜像，不成为第二发行事实源，也不得携带 secret、用户数据、日志或私人资产。
+`glimmer-cradle-personal-server-v<version>-linux-amd64-full.tar.gz` 是**完整安装包**。完整包在轻量部署内容之外携带由同一次发布镜像结果导出的容器镜像归档，供区域弱网、Registry 不可达和离线安装使用；安装器通过 Docker 的镜像加载能力导入后，让应用与默认 Caddy 入口共同使用已验证的本地引用，再进入同一候选版本、健康检查、原子切换和回滚链路。只有用户显式维护独立 Caddy 镜像时才保留该覆盖。完整包不得独立重建镜像，不成为第二发行事实源，也不得携带 secret、用户数据、日志或私人资产。
 
-社区安装器先取得 `SHA256SUMS`，按显式 `light` 或 `full` 形态从清单解析唯一目标平台部署包，再校验摘要、归档路径、链接类型、内部部署内容清单和包内版本。发布源可为默认 GitHub Release、显式可信 HTTPS 目录或本地目录；远程明文 HTTP 被拒绝，本地来源也不能绕过同目录校验清单。完整包同时记录权威 OCI digest、由版本与 digest 前缀派生的本地归档引用和 image config ID；安装器先确认三者关系，再加载归档并用 Docker 实际 image ID 校验本地引用。运行期使用该已验证的本地引用，不需要 Registry；权威发行身份仍是包内唯一 OCI digest。它不克隆源码：只读版本进入 `/opt/glimmer-cradle/releases/<version>`，`/opt/glimmer-cradle/current` 原子选择当前版本，配置、状态和运维命令分别固定在 `/etc/glimmer-cradle`、`/var/lib/glimmer-cradle` 与 `/usr/local/bin/glimmer-cradle`。镜像归档只用于导入，不持久化到版本目录。私有开发发布可通过仅驻留当前安装进程的 GitHub token 下载 Release 并临时登录 GHCR；token 不写入项目配置。当前官方传输源是 GitHub Release 与 GHCR；项目方控制的 HTTPS 对象端点或 OCI Registry 只允许在真实规模和网络条件触发后，作为同一发布物的可选传输副本接入，不成为第二构建来源，也不是 M10 的完成前提。
+社区安装器先取得 `SHA256SUMS`，按显式 `light` 或 `full` 形态从清单解析唯一目标平台部署包，再校验摘要、归档路径、链接类型、内部部署内容清单和包内版本。发布源可为默认 GitHub Release、显式可信 HTTPS 目录或本地目录；远程明文 HTTP 被拒绝，本地来源也不能绕过同目录校验清单。完整包同时记录权威 OCI digest、由版本与 digest 前缀派生的本地归档引用和 image config ID；安装器先确认三者关系，再加载归档并用 Docker 实际 image ID 校验本地引用。运行期使用该已验证的本地引用，不需要 Registry；权威发行身份仍是包内唯一 OCI digest。它不克隆源码：只读版本进入 `/opt/glimmer-cradle/releases/<version>`，`/opt/glimmer-cradle/current` 原子选择当前版本，配置、状态和运维命令分别固定在 `/etc/glimmer-cradle`、`/var/lib/glimmer-cradle` 与 `/usr/local/bin/glimmer-cradle`。镜像归档只用于导入，不持久化到版本目录。私有开发发布可通过仅驻留当前安装进程的 GitHub token 下载 Release 并临时登录 GHCR；token 不写入项目配置。
+
+`glimmer-cradle-remote-installer.sh` 是受限网络的正式控制机推送入口。能稳定访问 GitHub 的控制机取得 `SHA256SUMS`、完整包和服务器安装器，先在本地校验，再经 SSH/SCP 传到目标服务器并复核，最后调用同一事务安装器。服务器不需要访问 GitHub、GHCR 或 Docker Hub；SSH 认证、root/sudo、宿主准备、健康门与回滚语义保持不变。该入口不缓存、不重建、不重签发布物，因此不是镜像源，也不是第二安装协议。
+
+当前官方权威源仍是 GitHub Release 与 GHCR；服务器拉取和控制机推送覆盖全球直连与受限网络两类一键安装。项目方控制的 HTTPS 对象端点或 OCI Registry 只在匿名服务器拉取规模、带宽成本或长期稳定性需要时作为同一发布物的可选传输副本接入，不成为第二构建来源，也不是当前安装前提。
 
 最终容器边界：
 

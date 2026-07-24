@@ -12,7 +12,7 @@
 |---|---|
 | 跨表面 Conversation/Experience/Memory 边界、真实 Core Skill 执行、UI 打包前体验收口 | 已完成于 [M09：主体可用性、跨表面连续性与体验收口](./milestones/M09-主体可用性、跨场景记忆与体验收口.md) |
 | 发布形态、安装投影与数据迁移闭环 | 已完成于 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) |
-| 区域感知的官方分发端点 | 安装协议与一致性门禁已由 M10 建立；真实用户规模触发后的自动选源和项目方副本纳入 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) |
+| 区域感知的官方分发端点 | 控制机推送安装已覆盖当前受限网络；仅在匿名服务器拉取规模、带宽成本或长期稳定性触发后，再建设自动选源和项目方传输副本 |
 | Personal Server 网页配置、跨产品 Extension 与 NapCat QQ 场景闭环 | 已晋升为计划中的 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) |
 
 ## 候选项

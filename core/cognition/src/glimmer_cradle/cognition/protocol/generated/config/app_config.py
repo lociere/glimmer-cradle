@@ -12,7 +12,7 @@ class SystemIdentityConfig(BaseModel):
         frozen=True,
     )
     app_name: str | None = Field('Glimmer Cradle', description='应用显示名称')
-    app_version: str | None = Field('0.1.6', description='语义化版本号（仅展示）')
+    app_version: str | None = Field('0.1.7', description='语义化版本号（仅展示）')
 
 
 class ActiveCharacterConfig(BaseModel):

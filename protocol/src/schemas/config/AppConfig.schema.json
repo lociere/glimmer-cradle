@@ -19,7 +19,7 @@
         },
         "app_version": {
           "type": "string",
-          "default": "0.1.6",
+          "default": "0.1.7",
           "description": "语义化版本号（仅展示）"
         }
       }

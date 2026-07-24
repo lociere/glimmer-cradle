@@ -1,6 +1,43 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == full-success ]]; then
+  case "$*" in
+    'info'|'compose version'|'buildx version')
+      exit 0
+      ;;
+    'load --input '*)
+      exit 0
+      ;;
+    'image inspect --format {{.Id}} '*)
+      printf '%s\n' "${GLIMMER_CRADLE_TEST_IMAGE_ID:?完整包安装成功测试必须提供 image ID}"
+      exit 0
+      ;;
+    'image inspect '*)
+      exit 0
+      ;;
+    *' ps --status running --services'|*' ps --all -q personal-server')
+      exit 0
+      ;;
+    *' up --detach --remove-orphans'|*' exec -T personal-server node -e '*)
+      exit 0
+      ;;
+    'image ls glimmer-cradle/personal-server --format {{.Repository}}:{{.Tag}}')
+      exit 0
+      ;;
+    'rm -f glimmer-cradle-ops-bridge')
+      exit 0
+      ;;
+    'run --detach --name glimmer-cradle-ops-bridge '*)
+      exit 0
+      ;;
+    *)
+      echo "完整包安装成功测试收到未预期的 docker 调用: $*" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == light-success ]]; then
   case "$*" in
     'info'|'compose version'|'buildx version')

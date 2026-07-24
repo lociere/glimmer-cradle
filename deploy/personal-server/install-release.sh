@@ -265,6 +265,7 @@ fi
 RELEASE_ROOT="${INSTALL_ROOT}/releases/${RELEASE_VERSION}"
 CURRENT_IMAGE=""
 CURRENT_CADDY_IMAGE=""
+CADDY_TRACKS_RELEASE_IMAGE=0
 DEPLOYMENT_ENV_BACKUP="${TEMP_ROOT}/deployment.env.previous"
 if [[ -L "${INSTALL_ROOT}/current" ]]; then
   PREVIOUS_RELEASE="$(readlink -f "${INSTALL_ROOT}/current")"
@@ -392,8 +393,10 @@ else
   fi
   if (( ! EXISTING_DEPLOYMENT )) \
     || [[ -z "$PREVIOUS_RELEASE" ]] \
+    || [[ "$CURRENT_CADDY_IMAGE" == "$CURRENT_IMAGE" ]] \
     || [[ "$CURRENT_CADDY_IMAGE" == "$PREVIOUS_RELEASE_CADDY_IMAGE" ]]; then
     set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$RELEASE_CADDY_IMAGE"
+    CADDY_TRACKS_RELEASE_IMAGE=1
   fi
 fi
 
@@ -451,6 +454,9 @@ if [[ "$PACKAGE_VARIANT" == full ]]; then
     exit 1
   }
   CANDIDATE_IMAGE="$LOCAL_ARCHIVE_IMAGE"
+  if (( CADDY_TRACKS_RELEASE_IMAGE )); then
+    set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$LOCAL_ARCHIVE_IMAGE"
+  fi
   export GLIMMER_CRADLE_CANDIDATE_PRELOADED=1
 fi
 

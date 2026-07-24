@@ -98,6 +98,7 @@ jobs:
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64-full.tar.gz"
           test -x glimmer-cradle-installer.sh
+          test -x glimmer-cradle-remote-installer.sh
           test -s release-notes.md
           PACKAGE="glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
           tar -tzf "$PACKAGE" \
@@ -137,4 +138,5 @@ jobs:
             dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64.tar.gz
             dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64-full.tar.gz
             dist/personal-server/glimmer-cradle-installer.sh
+            dist/personal-server/glimmer-cradle-remote-installer.sh
             dist/personal-server/SHA256SUMS

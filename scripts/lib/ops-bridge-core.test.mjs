@@ -5,7 +5,7 @@ import { createOperationController } from '../../deploy/personal-server/containe
 const snapshot = {
   backup: { supported: true, backup_root: '/state/backups', entries: [] },
   service: { restart_supported: true, stop_supported: true },
-  update: { check_supported: true, apply_supported: true, current_version: '0.1.6', source: 'test' },
+  update: { check_supported: true, apply_supported: true, current_version: '0.1.7', source: 'test' },
 };
 
 describe('Personal Server operations bridge controller', () => {

@@ -1,6 +1,6 @@
 [project]
 name = "glimmer-cradle-cognition"
-version = "0.1.6"
+version = "0.1.7"
 description = "Cognition subsystem for Glimmer Cradle"
 requires-python = ">=3.12,<3.13"
 authors = [

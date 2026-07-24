@@ -74,8 +74,10 @@ FULL="glimmer-cradle-personal-server-v${VERSION}-linux-amd64-full.tar.gz"
   cd "$OUTPUT_ROOT"
   sha256sum --check SHA256SUMS
   [[ "$(awk '{ print $2 }' SHA256SUMS | LC_ALL=C sort | tr '\n' ' ')" == \
-    "glimmer-cradle-installer.sh glimmer-cradle-personal-server-v${VERSION}-linux-amd64-full.tar.gz glimmer-cradle-personal-server-v${VERSION}-linux-amd64.tar.gz " ]]
+    "glimmer-cradle-installer.sh glimmer-cradle-personal-server-v${VERSION}-linux-amd64-full.tar.gz glimmer-cradle-personal-server-v${VERSION}-linux-amd64.tar.gz glimmer-cradle-remote-installer.sh " ]]
 )
+[[ -x "${OUTPUT_ROOT}/glimmer-cradle-remote-installer.sh" ]]
+bash -n "${OUTPUT_ROOT}/glimmer-cradle-remote-installer.sh"
 
 mkdir "${TEST_ROOT}/light" "${TEST_ROOT}/full"
 tar -xzf "${OUTPUT_ROOT}/${LIGHT}" -C "${TEST_ROOT}/light"
@@ -159,6 +161,36 @@ EOF
   as_root grep -q '^GLIMMER_CRADLE_SERVER_TOKEN=light-install-token$' "${light_config_root}/deployment.env"
   as_root grep -q "^GLIMMER_CRADLE_CADDYFILE=${light_install_root}/releases/${VERSION}/Caddyfile$" \
     "${light_config_root}/deployment.env"
+}
+
+run_full_installer() {
+  local full_install_root="${TEST_ROOT}/full-install"
+  local full_state_root="${TEST_ROOT}/full-state"
+  local full_config_root="${TEST_ROOT}/full-config"
+  local full_cli_path="${TEST_ROOT}/full-bin/glimmer-cradle"
+  local fake_bin="${REPO_ROOT}/scripts/fixtures/personal-server-install-interrupt"
+  local -a command=(env
+    PATH="${fake_bin}:${PATH}"
+    GLIMMER_CRADLE_DOCKER_BIN="${fake_bin}/docker"
+    GLIMMER_CRADLE_TEST_DOCKER_MODE=full-success
+    GLIMMER_CRADLE_TEST_IMAGE_ID="$IMAGE_ID"
+    GLIMMER_CRADLE_RELEASE_SOURCE="$OUTPUT_ROOT"
+    GLIMMER_CRADLE_PACKAGE_VARIANT=full
+    GLIMMER_CRADLE_VERSION="$VERSION"
+    GLIMMER_CRADLE_INSTALL_ROOT="$full_install_root"
+    GLIMMER_CRADLE_STATE_ROOT="$full_state_root"
+    GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT="$full_config_root"
+    GLIMMER_CRADLE_CLI_PATH="$full_cli_path"
+    bash "${OUTPUT_ROOT}/glimmer-cradle-installer.sh")
+  if (( EUID == 0 )); then
+    "${command[@]}" >/dev/null
+  else
+    sudo "${command[@]}" >/dev/null
+  fi
+
+  [[ "$(readlink -f "${full_install_root}/current")" == "${full_install_root}/releases/${VERSION}" ]]
+  as_root grep -qxF "GLIMMER_CRADLE_IMAGE=${ARCHIVE_IMAGE}" "${full_config_root}/deployment.env"
+  as_root grep -qxF "GLIMMER_CRADLE_CADDY_IMAGE=${ARCHIVE_IMAGE}" "${full_config_root}/deployment.env"
 }
 
 start_interrupt_installer() {
@@ -323,5 +355,6 @@ as_root cmp "${TEST_ROOT}/cli.baseline" "$CLI_PATH"
 [[ ! -e "${INSTALL_ROOT}/releases/${VERSION}" ]]
 
 run_light_installer
+run_full_installer
 
 echo 'Personal Server 发布包与安装器安全测试通过。'
