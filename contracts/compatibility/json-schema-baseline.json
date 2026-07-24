@@ -1,0 +1,15 @@
+{
+  "generated_at": "fixed by M12 Slice 1 baseline refresh",
+  "compatibility": "Schema removals or content changes require an intentional baseline update and review.",
+  "schemas": [
+    {
+      "path": "json-schema/skill/v1/tool-parameters.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/skill/v1/tool-parameters.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Skill Plane Document",
+      "kind": "Document",
+      "compatibility": "additive-v1",
+      "sha256": "e4436448c913b34f98972e29645db3ce9a7fe46c75c398a15973583d7fc38008"
+    }
+  ]
+}

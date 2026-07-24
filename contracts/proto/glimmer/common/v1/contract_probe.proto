@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package glimmer.common.v1;
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Common.V1";
+
+message TraceMetadata {
+  string trace_id = 1;
+  string causation_id = 2;
+  string correlation_id = 3;
+}
+
+message DocumentReference {
+  string document_id = 1;
+  string schema_id = 2;
+  string schema_version = 3;
+  bytes digest_sha256 = 4;
+}
+
+message EchoProbeRequest {
+  string probe_id = 1;
+  DocumentReference document = 2;
+  TraceMetadata trace = 3;
+}
+
+message EchoProbeResponse {
+  string probe_id = 1;
+  DocumentReference document = 2;
+  string status = 3;
+}
+
+service ContractProbeService {
+  rpc EchoProbe(EchoProbeRequest) returns (EchoProbeResponse);
+}

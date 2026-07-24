@@ -1,7 +1,7 @@
 # Protocol 契约层实现
 
 > 范围：跨语言、跨进程和公开 SDK 契约如何由 JSON Schema 定义、生成、校验和消费；不列全部字段。
-> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`scripts/sync_contracts.py`、Cognition `protocol/generated/`。
+> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/`、Cognition `protocol/generated/`、M12 Slice 1 `contracts/` baseline。
 > 维护触发：Schema、IPC 消息、Avatar frame、配置模型、生成脚本、runtime helper、跨语言消费者或错误码变化。
 
 ## 目录与生成链
@@ -25,6 +25,27 @@ pnpm sync:contracts
 ```
 
 生成物不能手改。若生成物不满足消费需求，应改 Schema、生成脚本或 runtime helper，而不是在消费者里复制字段。
+
+M12 Slice 1 新增了不切运行主线的 `contracts/` baseline：
+
+```text
+contracts/
+├── proto/glimmer/common/v1/contract_probe.proto
+├── json-schema/skill/v1/tool-parameters.schema.json
+├── generated/{ts,python,csharp}/
+├── compatibility/{proto-image.binpb,json-schema-baseline.json}
+├── inventory.md
+└── supply-chain.md
+```
+
+该 baseline 的生成入口为：
+
+```powershell
+pnpm contracts:generate
+pnpm contracts:verify
+```
+
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘；当前 Kernel、Cognition、Desktop、Avatar、Engine、Extension 和 Personal Server runtime consumer 仍走旧 `@glimmer-cradle/protocol`。Slice 1 不修改 `protocol/`、不切 ZMQ/stdio/WebSocket/gRPC/Connect 链路，也不删除旧生成链。
 
 ## 契约分类
 
@@ -70,6 +91,8 @@ Protocol 的 runtime helper 负责：
 | 症状 | 先查 |
 |---|---|
 | TS/Python 字段不一致 | Schema、生成物、`pnpm sync:contracts` 输出 |
+| contracts 生成物有 diff | `pnpm contracts:generate`、`contracts/buf.gen.yaml`、本地 `protoc`/插件版本 |
+| contracts compatibility 失败 | `contracts/compatibility/` baseline、`buf breaking --against`、JSON Schema baseline |
 | 运行时报未知字段 | validator、producer payload、consumer 版本 |
 | 配置读不出 | config schema、normalizer、默认值和实际 YAML |
 | Avatar frame 不兼容 | `PresentationUpstreamFrame`/`DownstreamFrame` schema 与 runtime helper |
@@ -79,6 +102,7 @@ Protocol 的 runtime helper 负责：
 
 ```powershell
 pnpm sync:contracts
+pnpm contracts:verify
 pnpm --filter @glimmer-cradle/protocol typecheck
 pnpm --filter @glimmer-cradle/kernel typecheck
 cd core/cognition

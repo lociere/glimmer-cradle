@@ -1,0 +1,5 @@
+{
+  "schema_version": "skill.tool_parameters.v1",
+  "tool_id": "Invalid Tool",
+  "parameters": "not an object"
+}

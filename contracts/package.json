@@ -1,0 +1,33 @@
+{
+  "name": "@glimmer-cradle/contracts",
+  "version": "0.1.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "baseline:refresh": "node scripts/refresh-baselines.mjs",
+    "lint:proto": "buf lint",
+    "breaking:proto": "buf breaking --against compatibility/proto-image.binpb",
+    "check:json-schema": "node scripts/check-json-schema.mjs",
+    "roundtrip:ts": "tsx tests/roundtrip/roundtrip.ts",
+    "roundtrip:py": "node scripts/run-python-roundtrip.mjs",
+    "roundtrip:cs": "node scripts/run-csharp-roundtrip.mjs",
+    "roundtrip": "pnpm run roundtrip:ts && pnpm run roundtrip:py && pnpm run roundtrip:cs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:generated": "node scripts/check-generated-clean.mjs",
+    "check:inventory": "node scripts/check-inventory.mjs",
+    "verify": "pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run typecheck && pnpm run roundtrip && pnpm run check:generated"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.13.0",
+    "ajv": "8.20.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.66.1",
+    "@bufbuild/protoc-gen-es": "2.13.0",
+    "@types/node": "24.13.3",
+    "protoc": "33.0.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

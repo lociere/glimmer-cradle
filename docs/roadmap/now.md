@@ -6,17 +6,17 @@
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前唯一活跃推进面：M11 Personal Server 控制面与 Extension 闭环
+## 当前唯一活跃推进面：M12 Slice 1 contracts baseline
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 为 `in-progress`，现为唯一活跃推进面。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已开始 Slice 1 `contracts baseline`，范围只限建立 canonical `contracts/` baseline、离线可复现生成链、兼容基线、三语言最小 round-trip 和供应链证据。Slice 1 不切换运行主线、不修改或删除当前 `protocol/`，也不进入 Slice 2。
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已依据 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 与 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md) 接受为 `planned` 下一阶段，但尚未开始，不改变 M11 的唯一 active 状态，也不把 Contract Spine、目标根目录或 Host 边界写成当前事实。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 暂停/延期，未完成、未关闭。M12 Slice 1 是用户授权的“不切运行主线”前置基线工作，不表示 M11 前置依赖已经满足，也不得把 M11 写成完成。
 
 `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
 
 真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。
 
-M11 当前继续负责：
+M11 暂停前仍未完成的范围：
 
 - 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
 - 为 Personal Server 提供零 Provider 可登录的正式控制面，以及 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新能力；

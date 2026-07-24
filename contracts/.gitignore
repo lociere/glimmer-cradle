@@ -1,0 +1,5 @@
+.tools/
+generated/python/**/__pycache__/
+tests/csharp/bin/
+tests/csharp/obj/
+tests/python/.venv/

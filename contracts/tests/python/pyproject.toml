@@ -1,0 +1,7 @@
+[project]
+name = "glimmer-cradle-contracts-python-roundtrip"
+version = "0.1.8"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "protobuf==6.33.0",
+]

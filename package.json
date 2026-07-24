@@ -39,6 +39,8 @@
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:version": "node scripts/check-version-consistency.mjs",
     "check:encoding": "node scripts/check-no-bom.mjs",
+    "contracts:generate": "pnpm --filter @glimmer-cradle/contracts generate",
+    "contracts:verify": "pnpm --filter @glimmer-cradle/contracts verify",
     "test:ui": "pnpm --filter @glimmer-cradle/desktop test:ui",
     "test:ui:update": "pnpm --filter @glimmer-cradle/desktop test:ui:update",
     "chat": "node scripts/launch-product.mjs desktop --kernel-only",

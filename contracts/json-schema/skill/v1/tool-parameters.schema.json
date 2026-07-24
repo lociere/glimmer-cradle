@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/skill/v1/tool-parameters.schema.json",
+  "title": "SkillToolParametersDocument",
+  "description": "Document contract for dynamic Skill tool parameters. Protobuf may reference this document by id, version and digest, but does not duplicate its structure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool_id", "parameters"],
+  "properties": {
+    "schema_version": {
+      "const": "skill.tool_parameters.v1"
+    },
+    "tool_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{2,127}$"
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "x-glimmer-owner": "Skill Plane Document",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "additive-v1"
+}

@@ -14,6 +14,23 @@
 7. 搜索并删除旧字段、旧事件、手写镜像和无期限兼容代码。
 8. 更新 `reference/protocol.md`、对应 Implementation 和实际开发指南。
 
+## M12 Slice 1 contracts baseline
+
+`contracts/` 已建立长期 baseline，但当前运行主线仍未迁移。处理 `contracts/` 本身时使用：
+
+```powershell
+pnpm contracts:generate
+pnpm contracts:verify
+```
+
+规则：
+
+- Protobuf Service 放在 `contracts/proto/`，用于目标跨进程可调用能力。
+- JSON Schema Document 放在 `contracts/json-schema/`，用于配置、Character Package、Extension manifest/package、动态 Skill/tool 参数等文档型契约。
+- 同一结构不得同时由 Protobuf 和 JSON Schema 拥有权威定义；Protobuf 只能引用 Document 的稳定 id、version、digest 或 typed reference。
+- `contracts/generated/` 只属于 Adapter/Transport 边缘，不能 import 到 Domain/Application/Port。
+- Slice 1 不切换 ZMQ、stdio、WebSocket、gRPC/Connect runtime 链路，不删除当前 `protocol/`。
+
 ## 兼容判断
 
 | 变更 | 推荐做法 |
@@ -37,6 +54,7 @@
 
 ```powershell
 pnpm sync:contracts
+pnpm contracts:verify
 pnpm typecheck
 pnpm build
 ```

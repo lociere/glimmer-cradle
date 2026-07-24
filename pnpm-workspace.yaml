@@ -4,6 +4,7 @@ packages:
   - '!core/avatar/unity-host/**'
   - 'products/**'
   - 'protocol'
+  - 'contracts'
   - 'packages/extension-sdk'
   - 'templates/extension-basic'
 

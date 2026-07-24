@@ -1,0 +1,11 @@
+{
+  "schema_version": "skill.tool_parameters.v1",
+  "tool_id": "glimmer.example.echo",
+  "parameters": {
+    "utterance": "hello contracts",
+    "repeat": 1
+  },
+  "metadata": {
+    "owner": "contracts-slice-1"
+  }
+}

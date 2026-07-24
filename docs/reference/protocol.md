@@ -7,6 +7,7 @@
 ## 目录
 
 - [权威来源](#权威来源)
+- [M12 Slice 1 Contracts Baseline](#m12-slice-1-contracts-baseline)
 - [Accepted 目标与当前差距](#accepted-目标与当前差距)
 - [消息与事件规则](#消息与事件规则)
 - [关键契约族](#关键契约族)
@@ -30,13 +31,27 @@
 
 禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新 Schema。
 
+## M12 Slice 1 Contracts Baseline
+
+M12 Slice 1 已建立长期 `contracts/` baseline，但尚未切换任何运行主线。当前查表规则如下：
+
+| 路径 | 当前状态 | 规则 |
+|---|---|---|
+| `contracts/proto/` | canonical Protobuf Service baseline | 新跨进程可调用能力的目标 IDL；Slice 1 只包含最小 `ContractProbeService`。 |
+| `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；Slice 1 只包含最小 Skill tool parameters Document。 |
+| `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；当前 runtime consumer 不 import。 |
+| `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
+| `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
+
+迁移期必须明确区分：`contracts/` 是已落地的 baseline，`protocol/` 仍是运行事实。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+
 ## Accepted 目标与当前差距
 
-[ADR-0013：契约脊柱与跨进程服务架构](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 已接受长期目标，[M12](../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 为 `planned` 迁移里程碑，但这些目标尚未落地：
+[ADR-0013：契约脊柱与跨进程服务架构](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 已接受长期目标，[M12](../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 已开始 Slice 1 baseline，但 runtime 目标尚未落地：
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| 权威目录是 `protocol/src/schemas/` | 重建为 `contracts/` 契约脊柱 |
+| 运行权威目录仍是 `protocol/src/schemas/`；baseline 已在 `contracts/` | 重建为 `contracts/` 契约脊柱并删除旧 `protocol/` |
 | JSON Schema 同时覆盖共享模型、IPC、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有配置、Character Package、Extension manifest/package、动态 Skill/tool 参数等文档契约 |
 | Kernel ↔ Cognition 使用 ZMQ 自制 RPC，部分 Engine 使用 stdio 命令协议，Surface/Host 存在手写 WebSocket 链路 | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
