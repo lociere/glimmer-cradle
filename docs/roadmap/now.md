@@ -10,6 +10,8 @@
 
 [M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 为 `in-progress`，现为唯一活跃推进面。
 
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已依据 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 接受为 `planned` 下一阶段，但尚未开始，不改变 M11 的唯一 active 状态，也不把目标架构写成当前事实。
+
 `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
 
 真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。

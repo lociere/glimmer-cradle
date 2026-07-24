@@ -4,6 +4,15 @@
 > 事实依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/codegen/`、Kernel/Cognition/Desktop/Avatar/Extension 消费端。
 > 维护触发：Schema、事件、IPC/WS frame、错误码、config schema、codegen、兼容策略或任一跨边界消费者变化。
 
+## 目录
+
+- [权威来源](#权威来源)
+- [Accepted 目标与当前差距](#accepted-目标与当前差距)
+- [消息与事件规则](#消息与事件规则)
+- [关键契约族](#关键契约族)
+- [变更顺序](#变更顺序)
+- [验证](#验证)
+
 ## 权威来源
 
 两个及以上语言或进程共同理解的结构，必须定义在 `protocol/src/schemas/`。生成投影由 `pnpm sync:contracts` 产出，常见消费端包括：
@@ -20,6 +29,21 @@
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 
 禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新 Schema。
+
+## Accepted 目标与当前差距
+
+[ADR-0013：契约脊柱与跨进程服务架构](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 已接受长期目标，[M12](../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 为 `planned` 迁移里程碑，但这些目标尚未落地：
+
+| 当前事实 | Accepted 目标 |
+|---|---|
+| 权威目录是 `protocol/src/schemas/` | 重建为 `contracts/` 契约脊柱 |
+| JSON Schema 同时覆盖共享模型、IPC、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有配置、Character Package、Extension manifest/package、动态 Skill/tool 参数等文档契约 |
+| Kernel ↔ Cognition 使用 ZMQ 自制 RPC，部分 Engine 使用 stdio 命令协议，Surface/Host 存在手写 WebSocket 链路 | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
+| 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
+| 大对象主要依赖资源引用、路径投影或现有帧约定 | control/data plane 分离，使用 typed reference、stream、Blob lease 或经验证的数据通道 |
+| 兼容主要依赖 Schema 同步、类型/测试与旧字段搜索 | 增加 Buf breaking、JSON Schema compatibility、TS/Python/C# round-trip 和 Adapter contract test |
+
+迁移前，下面所有字段、目录、命令和验证仍以“当前事实”执行。不得提前创建手写 Protobuf/JSON Schema 双份消息，也不得把 gRPC/Connect 目标当成已经可用。迁移完成后必须删除 ZMQ 自制 RPC、被替代的 stdio/手写 WebSocket 主线和 `protocol/`，不保留无退出条件双轨。
 
 ## 消息与事件规则
 

@@ -9,4 +9,6 @@
 - “接下来承诺做什么”以 [../../roadmap/](../../roadmap/README.md) 为准；
 - 长期取舍以 ADR 为准。
 
+契约脊柱的长期目标由 [ADR-0013](../decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 固定：目标 `contracts/`、版本化 Protobuf Service、JSON Schema 文档契约和 Kernel Surface Gateway 均是 accepted 方向；当前 `protocol/` 与既有 transport 事实仍以 Current/Implementation/Reference 为准，迁移由 [M12](../../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 承担。
+
 蓝图不再被降格为简短 vision；它是所有跨层设计和重大重构的第一阅读入口。

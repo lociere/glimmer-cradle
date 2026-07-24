@@ -13,7 +13,7 @@
 | [1. 文档定位](#1-文档定位) | 本页与 blueprint、current、implementation、now、milestone、backlog 的关系。 |
 | [2. 阶段状态语言](#2-阶段状态语言) | 统一解释 done、recent-done、planned、candidate 等状态。 |
 | [3. 落地原则](#3-落地原则) | 阶段划分、契约优先、边界稳定和归档原则。 |
-| [4. 全阶段总览](#4-全阶段总览) | 从 Phase 0 到 Phase 16 的完整路线图。 |
+| [4. 全阶段总览](#4-全阶段总览) | 从 Phase 0 到 Phase 17 的完整路线图。 |
 | [5. 已归档主干阶段](#5-已归档主干阶段) | 已完成并沉淀到当前架构事实源的基础阶段。 |
 | [6. 近期完成阶段](#6-近期完成阶段) | 桌面身体、Skill Plane 与 Extension 收口阶段。 |
 | [7. 当前与未来阶段](#7-当前与未来阶段) | 当前主体可用性阶段、后续发布闭环阶段，以及低延迟多模态、本地能力、生态和最终蓝图验收候选。 |
@@ -101,7 +101,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 
 ### 3.5 蓝图可以长期稳定，阶段可以重排
 
-蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 12 以后阶段，但必须满足：
+蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 13 以后候选阶段；Phase 12 已由 accepted ADR 和 planned M12 固定，若平台验证要求改变方向，必须用新 ADR 修订。所有重排必须满足：
 
 - 不破坏蓝图中的人格边界和器官分层。
 - 不绕过协议、权限、数据和可观测性验收门。
@@ -124,12 +124,13 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 8：桌面身体、Skill Plane 与 Extension 收口 | `recent-done` | Renderer / Shell / Extension / Skill Plane 形成开发期闭环。 | `architecture/current/`、`implementation/`、`reference/extension-sdk.md` | [M08](./milestones/M08-SkillPlane、Extension与桌面体验收口.md)、[阶段8 ADR](../history/architecture-decisions/阶段8-渲染层架构分析与重构.md)。 |
 | Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../architecture/current/07-子系统当前视图/Cognition.md)、[Extension 与 Skill Plane 当前视图](../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)、[extension-sdk](../reference/extension-sdk.md) | [M09](./milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
 | Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../reference/packaging-layout.md)、[Personal Server 部署](../guides/release/Personal%20Server部署.md) | [M10](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
-| Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `planned` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
-| Phase 12：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来协议、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
-| Phase 13：Native 与本地能力加速 | `candidate` | C++ / Native / 本地模型 / 向量与音视频能力成为受控能力层。 | 未来 native reference 与 implementation map | [Backlog](./backlog.md)。 |
-| Phase 14：Extension 内容生态成熟化 | `candidate` | Extension 从开发扩展点走向可分发、可治理、可组合的生态。 | 未来 SDK、权限、发布与示例文档 | [Backlog](./backlog.md)。 |
-| Phase 15：自我演化与长期记忆质量 | `candidate` | LLM Reflection、记忆重排、叙事日记和自我评估质量提升。 | 未来 cognition、memory、evaluation 文档 | [Backlog](./backlog.md)。 |
-| Phase 16：蓝图完成验收与发布稳定化 | `candidate` | 对照蓝图完成全系统验收，消除影子架构与文档债。 | 全部事实源 | 本页未来晋升。 |
+| Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `in-progress` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
+| Phase 12：契约脊柱与跨进程服务架构重建 | `planned` | 以 `contracts/`、Protobuf Service、JSON Schema 文档契约和 Kernel Surface Gateway 重建服务神经系统。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)。 |
+| Phase 13：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来 Contracts、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
+| Phase 14：Native 与本地能力加速 | `candidate` | C++ / Native / 本地模型 / 向量与音视频能力成为受控能力层。 | 未来 native reference 与 implementation map | [Backlog](./backlog.md)。 |
+| Phase 15：Extension 内容生态成熟化 | `candidate` | Extension 从开发扩展点走向可分发、可治理、可组合的生态。 | 未来 SDK、权限、发布与示例文档 | [Backlog](./backlog.md)。 |
+| Phase 16：自我演化与长期记忆质量 | `candidate` | LLM Reflection、记忆重排、叙事日记和自我评估质量提升。 | 未来 cognition、memory、evaluation 文档 | [Backlog](./backlog.md)。 |
+| Phase 17：蓝图完成验收与发布稳定化 | `candidate` | 对照蓝图完成全系统验收，消除影子架构与文档债。 | 全部事实源 | 本页未来晋升。 |
 
 ## 5. 已归档主干阶段
 
@@ -256,7 +257,7 @@ P.9 的意义是把“架构正确”转化为“团队可维护”。没有这�
 | 历史证据 | [阶段6-反思与记忆图谱设计](../history/architecture-decisions/阶段6-反思与记忆图谱设计.md)。 |
 | 完成门 | 经历能进入反思材料；记忆关系可追踪；叙事日记有稳定写入与查询路径。 |
 
-Phase 6 完成的是结构主线，不等于记忆质量最终形态。质量提升应放到 Phase 15 或独立候选里程碑。
+Phase 6 完成的是结构主线，不等于记忆质量最终形态。质量提升应放到 Phase 16 或独立候选里程碑。
 
 ### 5.10 Phase 7：自主输出通路
 
@@ -297,7 +298,7 @@ Phase 8 之后，Glimmer Cradle 具备开发期意义上的完整交互闭环。
 
 ## 7. 当前与未来阶段
 
-Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 已形成计划里程碑，等待独立任务启动；Phase 12 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
+Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 是当前唯一 `in-progress` 推进面；Phase 12 已由 accepted ADR 固定并作为 `planned` 下一阶段，但尚未开始。Phase 13 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
 
 ### 7.1 Phase 9：主体可用性、跨场景记忆与体验收口
 
@@ -329,29 +330,42 @@ Phase 10 优先解决“从仓库运行”到“用户正式安装并持续更�
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | `planned` |
+| 状态 | `in-progress` |
 | 主问题 | Personal Server 已能安装和对话，但仍缺少可用的远程配置、日志与 Extension 管理；场景 Adapter 仍可能被平台启动实现错误限制。 |
 | 计划成果 | Kernel Config Application Port、脱敏配置投影、服务器设置与日志页面、统一 Extension Package Manager、产品/平台兼容校验、区域端点目录，以及 NapCat 外部 OneBot 的 QQ 场景、私有 Skill、回复、Experience 与 Memory 闭环。 |
 | 关键依赖 | Phase 10 的可靠安装、更新、回滚和区域传输基线；Protocol 配置与 Extension Schema；Kernel Policy、Skill Plane、Ingress 和 Observability。 |
 | 非范围 | 不让浏览器直接编辑 YAML 或读取 secret；不把 Docker Socket 交给 Extension；不把 Windows OneKey 可执行文件伪装为 Linux 兼容；不提前实现托管云。 |
 | 验收门 | 用户可在已部署服务器的认证网页完成首次 Provider 配置和真实对话；可从精确 Release 安装、升级、禁用和移除兼容 `.gcex`；NapCat 通过外部 OneBot 在私聊/群聊完成场景和私有 Skill 链路；失败与停机无残留。 |
 
-Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、统一扩展管理和可跨产品复用的场景 Adapter。计划见 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)，长期平台资源分层见 [ADR-0012](../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)。
+Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、统一扩展管理和可跨产品复用的场景 Adapter。当前推进与剩余验收门见 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)，长期平台资源分层见 [ADR-0012](../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)。
 
-### 7.4 Phase 12：低延迟多模态交互
+### 7.4 Phase 12：契约脊柱与跨进程服务架构重建
+
+| 项 | 内容 |
+| --- | --- |
+| 状态 | `planned` |
+| 主问题 | 当前 `protocol/` 已集中 JSON Schema，却仍把文档、IPC envelope、SDK 模型和 transport 混在一个概念中；ZMQ、stdio 与手写 WebSocket 主线缺少统一 Service、deadline、取消、错误和兼容治理。 |
+| 计划成果 | 建立 `contracts/`；以版本化 Protobuf Service 和 gRPC 重建核心器官调用，以 JSON Schema 保留文档型契约，以 Kernel Surface Gateway/Connect 服务 Web/Desktop，并分离 control/data plane。 |
+| 关键依赖 | Phase 11 完成并稳定产品边界；ADR-0009 的动态端点、监督树和 readiness；Node/Python/C# 与 Windows/Linux 工具链验证。 |
+| 非范围 | 不改变领域 owner，不实现托管云或公网器官 API，不把全部文档改成 Protobuf，不永久保留新旧 transport 双轨。 |
+| 验收门 | Buf/JSON Schema compatibility、三语言 round-trip、Adapter contract test、deadline/cancellation/error/trace/readiness、Surface/data plane 与全生命周期矩阵通过；`protocol/` 和被替代的 ZMQ/stdio/手写 WebSocket 主线删除。 |
+
+Phase 12 固定的是契约脊柱和服务神经系统，不是一次库替换。DDD/Hexagonal 保持领域 owner，IDL-first 负责可生成边界，Kernel BFF/Projection 保护 Surface，control/data plane 保护媒体热路径；gRPC/Connect 只是可替换的 Adapter/Transport 默认实现。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)，长期取舍与供应链防锁定规则见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)。
+
+### 7.5 Phase 13：低延迟多模态交互
 
 | 项 | 内容 |
 | --- | --- |
 | 状态 | `candidate` |
 | 主问题 | 当前角色的交互节奏需要从文本回合走向低延迟、多模态、可中断的共处体验。 |
 | 候选成果 | 文本流、语音输入、TTS 输出、视觉/屏幕感知、实时取消、延迟预算、Provider 能力声明、多模态事件协议。 |
-| 关键依赖 | Protocol 稳定；Observability 能追踪延迟；Renderer 能呈现进行中状态；Cognition 能区分感知、理解、输出和动作。 |
+| 关键依赖 | Phase 12 的 Contracts 稳定；Observability 能追踪延迟；Renderer 能呈现进行中状态；Cognition 能区分感知、理解、输出和动作。 |
 | 非范围 | 不把所有多模态输入直接写入长期记忆；不绕过 consent 和权限；不让 Provider 细节泄漏到 Renderer。 |
 | 候选验收门 | 关键交互链路有延迟指标；用户可取消或打断；多模态事件可追踪；失败不会污染认知状态。 |
 
-Phase 12 的核心不是“接入更多模型”，而是建立低延迟交互节奏和跨模态协议。
+Phase 13 的核心不是“接入更多模型”，而是建立低延迟交互节奏和跨模态协议。
 
-### 7.5 Phase 13：Native 与本地能力加速
+### 7.6 Phase 14：Native 与本地能力加速
 
 | 项 | 内容 |
 | --- | --- |
@@ -362,9 +376,9 @@ Phase 12 的核心不是“接入更多模型”，而是建立低延迟交互�
 | 非范围 | Native 层不拥有业务语义，不直接读取 Cognition 私有数据，不绕过协议与观测。 |
 | 候选验收门 | Native 能力可声明、可加载、可禁用、可观测；崩溃不拖垮主进程；打包产物可复现。 |
 
-Phase 13 应把 Native 看成“受控能力加速层”，不是新的核心架构中心。
+Phase 14 应把 Native 看成“受控能力加速层”，不是新的核心架构中心。
 
-### 7.6 Phase 14：Extension 内容生态成熟化
+### 7.7 Phase 15：Extension 内容生态成熟化
 
 | 项 | 内容 |
 | --- | --- |
@@ -375,33 +389,33 @@ Phase 13 应把 Native 看成“受控能力加速层”，不是新的核心架
 | 非范围 | Extension 不成为系统事实源；不复制项目文档；不允许扩展绕过 Kernel 能力网关。 |
 | 候选验收门 | 第三方/项目内扩展能按 SDK 开发、测试、打包、安装、禁用；权限和事件链路可解释。 |
 
-Phase 14 的目标是让 Extension 成为“当前角色可成长的外部器官和内容生态”，但它必须始终受主体边界约束。
+Phase 15 的目标是让 Extension 成为“当前角色可成长的外部器官和内容生态”，但它必须始终受主体边界约束。
 
-### 7.7 Phase 15：自我演化与长期记忆质量
+### 7.8 Phase 16：自我演化与长期记忆质量
 
 | 项 | 内容 |
 | --- | --- |
 | 状态 | `candidate` |
 | 主问题 | 结构化记忆已经存在后，需要提升反思质量、记忆召回质量和自我叙事连续性。 |
 | 候选成果 | 真 LLM Reflection、记忆 LLM rerank、情绪与 thought frame 增强、vivid Narrative Journal、自我评估指标、记忆压缩与遗忘策略。 |
-| 关键依赖 | Phase 6 的记忆主线；Protocol 与 Observability；Provider 策略；数据迁移与备份能力。 |
+| 关键依赖 | Phase 6 的记忆主线；Contracts 与 Observability；Provider 策略；数据迁移与备份能力。 |
 | 非范围 | 不把模型输出无条件写入人格核心；不删除可追溯经历；不把“更像人”作为无边界目标。 |
 | 候选验收门 | 反思可解释、可回滚、可引用来源；记忆召回质量可评估；叙事日记不破坏事实与想象边界。 |
 
-Phase 15 需要格外谨慎。它直接影响当前角色“是谁”和“如何记得自己”，必须以可追溯、可评估、可回滚为前提。
+Phase 16 需要格外谨慎。它直接影响当前角色“是谁”和“如何记得自己”，必须以可追溯、可评估、可回滚为前提。
 
-### 7.8 Phase 16：蓝图完成验收与发布稳定化
+### 7.9 Phase 17：蓝图完成验收与发布稳定化
 
 | 项 | 内容 |
 | --- | --- |
 | 状态 | `candidate` |
 | 主问题 | 当主要能力都落地后，需要对照蓝图做系统性收口，消除影子架构和文档债。 |
 | 候选成果 | 蓝图逐项验收、架构边界审计、协议漂移检查、文档事实源审计、E2E 启停/安装/权限/数据/扩展验证、弃用路径清理。 |
-| 关键依赖 | Phase 9-15 的核心成果；完整观测和发布验证。 |
+| 关键依赖 | Phase 9-16 的核心成果；完整观测和发布验证。 |
 | 非范围 | 不新增大型功能；不以“最后阶段”为名重写全部架构。 |
 | 候选验收门 | 蓝图中的主体、器官、能力、身体、生态和安全边界都有当前事实源与验证证据；旧路线和旧文档均已归档或删除。 |
 
-Phase 16 是“蓝图完成”的验收阶段，不是新功能阶段。它的主要产物是稳定性、可维护性和事实一致性。
+Phase 17 是“蓝图完成”的验收阶段，不是新功能阶段。它的主要产物是稳定性、可维护性和事实一致性。
 
 ## 8. 当前推进面关系
 
@@ -411,7 +425,7 @@ Phase 16 是“蓝图完成”的验收阶段，不是新功能阶段。它的�
 | --- | --- | --- |
 | `now.md` | 当前唯一活跃推进面。 | 如果某个 Phase 变成 `in-progress`，必须同步在 `now.md` 声明。 |
 | `milestones/` | 已承诺阶段或里程碑。 | Phase 晋升后必须有独立 milestone 文件，写清范围、非范围、验收门和证据。 |
-| `backlog.md` | 候选增强和未承诺任务池。 | Phase 12-15 的子项可以先进入 Backlog，再择机晋升。 |
+| `backlog.md` | 候选增强和未承诺任务池。 | Phase 13-16 的子项可以先进入 Backlog，再择机晋升。 |
 | 本页 | 蓝图全阶段母路线。 | 维持阶段连续性和架构意图，不替代执行列表。 |
 
 如果 `now.md`、milestone 和本页出现冲突，按以下顺序处理：
