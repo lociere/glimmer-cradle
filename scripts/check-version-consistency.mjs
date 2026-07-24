@@ -47,12 +47,37 @@ const expectedFacts = [
   ['core/avatar/unity-host/Assets/Scenes/UnityAvatarHost.unity', `hostVersion: ${rootVersion}`],
   ['deploy/personal-server/.env.example', `GLIMMER_CRADLE_IMAGE=glimmer-cradle/personal-server:${rootVersion}`],
   ['deploy/personal-server/compose.yaml', `glimmer-cradle/personal-server:${rootVersion}`],
+  ['deploy/personal-server/package-release.sh', `printf '%s\\n' "$RELEASE_VERSION" > "$PAYLOAD_ROOT/VERSION"`],
 ];
 
 for (const [relativePath, expected] of expectedFacts) {
   if (!read(relativePath).includes(expected)) {
     violations.push(`${relativePath}: 缺少发行版本事实 ${expected}`);
   }
+}
+
+const deployScript = read('deploy/personal-server/deploy.sh');
+const deployVersionFacts = [
+  'resolve_release_version()',
+  'local packaged_version_file="${SCRIPT_DIR}/VERSION"',
+  'local source_package_file="${REPO_ROOT}/package.json"',
+  'RELEASE_VERSION="$(resolve_release_version)"',
+  'GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"',
+  'read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"',
+  `printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "$RELEASE_VERSION"`,
+];
+for (const expected of deployVersionFacts) {
+  if (!deployScript.includes(expected)) {
+    violations.push(`deploy/personal-server/deploy.sh: 缺少版本解析不变量 ${expected}`);
+  }
+}
+const hardcodedDeployVersions = deployScript.match(
+  /(?<![\d.])\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?(?![\d.])/g,
+) ?? [];
+if (hardcodedDeployVersions.length > 0) {
+  violations.push(
+    `deploy/personal-server/deploy.sh: 禁止活跃硬编码发行版本 ${[...new Set(hardcodedDeployVersions)].join(', ')}`,
+  );
 }
 
 if (violations.length > 0) {

@@ -26,28 +26,28 @@ TRANSACTION_CANDIDATE_ENV=""
 TRANSACTION_PREVIOUS_ENV=""
 TRANSACTION_PREVIOUS_IMAGE=""
 TRANSACTION_CANDIDATE_IMAGE=""
+RELEASE_VERSION=""
 
-[[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && (( READY_TIMEOUT_SECONDS >= 10 && READY_TIMEOUT_SECONDS <= 900 )) || {
-  echo "GLIMMER_CRADLE_READY_TIMEOUT_SECONDS 必须是 10 到 900 秒的整数。" >&2
-  exit 1
-}
-
-if ! docker info >/dev/null 2>&1; then
-  if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-    DOCKER=(sudo docker)
+resolve_release_version() {
+  local packaged_version_file="${SCRIPT_DIR}/VERSION"
+  local source_package_file="${REPO_ROOT}/package.json"
+  local version version_source
+  if [[ -f "$packaged_version_file" ]]; then
+    version="$(<"$packaged_version_file")"
+    version_source="$packaged_version_file"
+  elif [[ -f "$source_package_file" ]]; then
+    version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$source_package_file" | head -n 1)"
+    version_source="$source_package_file"
   else
-    echo "Docker Engine 不可用。先运行 sudo ./bootstrap-host.sh，或按 Docker 官方文档安装。" >&2
-    exit 1
+    echo "无法解析部署版本：缺少 ${packaged_version_file} 和 ${source_package_file}。" >&2
+    return 1
   fi
-fi
-
-if (( EUID != 0 )); then
-  if ! command -v sudo >/dev/null 2>&1; then
-    echo "部署状态由容器 UID 10001 持有，当前用户需要 sudo 才能执行一致性备份和恢复。" >&2
-    exit 1
-  fi
-  PRIVILEGED=(sudo)
-fi
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || {
+    echo "部署版本标识无效（${version_source}）: ${version:-<empty>}" >&2
+    return 1
+  }
+  printf '%s' "$version"
+}
 
 cleanup() {
   local env_file
@@ -72,10 +72,6 @@ on_exit() {
   exit "$exit_code"
 }
 
-trap on_exit EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
 prepare_environment() {
   mkdir -p "$(dirname -- "$DEPLOYMENT_ENV_FILE")"
   if [[ ! -f "$DEPLOYMENT_ENV_FILE" ]]; then
@@ -96,7 +92,7 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock
   fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.7"
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"
   fi
   if ! grep -q '^GLIMMER_CRADLE_DEPLOYMENT_MODE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
@@ -224,20 +220,19 @@ next_candidate_image() {
   elif [[ "$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     candidate_image
   else
-    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:0.1.7"
+    read_env GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"
   fi
 }
 
 candidate_image() {
-  local version revision timestamp dirty
-  version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${REPO_ROOT}/package.json" | head -n 1)"
+  local revision timestamp dirty
   revision="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf 'source')"
   dirty=""
   if git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null | grep -q .; then
     dirty="-dirty"
   fi
   timestamp="$(date -u +%Y%m%d%H%M%S)"
-  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "${version:-0.1.7}" "$revision" "$dirty" "$timestamp"
+  printf '%s:%s-%s%s-%s' "$IMAGE_REPOSITORY" "$RELEASE_VERSION" "$revision" "$dirty" "$timestamp"
 }
 
 port_in_use() {
@@ -639,41 +634,74 @@ print_access() {
   echo "访问 token 保存在 ${DEPLOYMENT_ENV_FILE}。"
 }
 
-prepare_environment
-prepare_state
+main() {
+  RELEASE_VERSION="$(resolve_release_version)"
+  [[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && (( READY_TIMEOUT_SECONDS >= 10 && READY_TIMEOUT_SECONDS <= 900 )) || {
+    echo "GLIMMER_CRADLE_READY_TIMEOUT_SECONDS 必须是 10 到 900 秒的整数。" >&2
+    exit 1
+  }
 
-case "$COMMAND" in
-  install)
-    preflight_ports
-    install_release
-    ;;
-  update)
-    preflight_ports
-    update_release
-    ;;
-  restart)
-    compose_with_env "$DEPLOYMENT_ENV_FILE" restart
-    wait_until_ready "$DEPLOYMENT_ENV_FILE"
-    start_ops_bridge
-    ;;
-  stop)
-    compose_with_env "$DEPLOYMENT_ENV_FILE" down
-    stop_ops_bridge
-    ;;
-  status)
-    compose_with_env "$DEPLOYMENT_ENV_FILE" ps
-    ;;
-  logs)
-    compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
-    ;;
-  backup)
-    backup_release
-    ;;
-  restore)
-    restore_release "$COMMAND_ARGUMENT"
-    ;;
-  *)
-    echo "用法: ./deploy.sh [install|update|restart|stop|status|logs|backup|restore <UTC timestamp>]" >&2
-    exit 2
-    ;;
-esac
+  if ! docker info >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+      DOCKER=(sudo docker)
+    else
+      echo "Docker Engine 不可用。先运行 sudo ./bootstrap-host.sh，或按 Docker 官方文档安装。" >&2
+      exit 1
+    fi
+  fi
+
+  if (( EUID != 0 )); then
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "部署状态由容器 UID 10001 持有，当前用户需要 sudo 才能执行一致性备份和恢复。" >&2
+      exit 1
+    fi
+    PRIVILEGED=(sudo)
+  fi
+
+  trap on_exit EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  prepare_environment
+  prepare_state
+
+  case "$COMMAND" in
+    install)
+      preflight_ports
+      install_release
+      ;;
+    update)
+      preflight_ports
+      update_release
+      ;;
+    restart)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" restart
+      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      start_ops_bridge
+      ;;
+    stop)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" down
+      stop_ops_bridge
+      ;;
+    status)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" ps
+      ;;
+    logs)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
+      ;;
+    backup)
+      backup_release
+      ;;
+    restore)
+      restore_release "$COMMAND_ARGUMENT"
+      ;;
+    *)
+      echo "用法: ./deploy.sh [install|update|restart|stop|status|logs|backup|restore <UTC timestamp>]" >&2
+      exit 2
+      ;;
+  esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

@@ -101,6 +101,80 @@ grep -q -- '--security-opt no-new-privileges \\' "$PACKAGED_DEPLOY"
 grep -q -- '--pids-limit 64 \\' "$PACKAGED_DEPLOY"
 grep -q -- 'src=/var/run/docker.sock,dst=/var/run/docker.sock,readonly' "$PACKAGED_DEPLOY"
 grep -q -- '--tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \\' "$PACKAGED_DEPLOY"
+! grep -Eq '(^|[^0-9.])[0-9]+\.[0-9]+\.[0-9]+([^0-9.]|$)' "$PACKAGED_DEPLOY"
+
+resolve_deploy_version() {
+  local deploy_script="$1"
+  local script_dir="$2"
+  local repo_root="$3"
+  bash -c '
+    source "$1"
+    SCRIPT_DIR="$2"
+    REPO_ROOT="$3"
+    resolve_release_version
+  ' bash "$deploy_script" "$script_dir" "$repo_root"
+}
+
+PACKAGED_ROOT="${TEST_ROOT}/light/glimmer-cradle-personal-server"
+[[ "$(resolve_deploy_version "$PACKAGED_DEPLOY" "$PACKAGED_ROOT" "${TEST_ROOT}/no-source-root")" == "$VERSION" ]]
+SOURCE_VERSION="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+  "${REPO_ROOT}/package.json" | head -n 1)"
+[[ "$(resolve_deploy_version \
+  "${REPO_ROOT}/deploy/personal-server/deploy.sh" \
+  "${REPO_ROOT}/deploy/personal-server" \
+  "$REPO_ROOT")" == "$SOURCE_VERSION" ]]
+
+mkdir -p "${TEST_ROOT}/version-invalid/deploy/personal-server" "${TEST_ROOT}/version-missing/deploy/personal-server"
+printf 'not-semver\n' > "${TEST_ROOT}/version-invalid/deploy/personal-server/VERSION"
+printf '{"version":"1.2.3"}\n' > "${TEST_ROOT}/version-invalid/package.json"
+if resolve_deploy_version \
+  "$PACKAGED_DEPLOY" \
+  "${TEST_ROOT}/version-invalid/deploy/personal-server" \
+  "${TEST_ROOT}/version-invalid" \
+  >"${TEST_ROOT}/version-invalid.out" 2>"${TEST_ROOT}/version-invalid.err"; then
+  echo '部署脚本错误接受了非法包内 VERSION。' >&2
+  exit 1
+fi
+grep -q '部署版本标识无效' "${TEST_ROOT}/version-invalid.err"
+
+if resolve_deploy_version \
+  "$PACKAGED_DEPLOY" \
+  "${TEST_ROOT}/version-missing/deploy/personal-server" \
+  "${TEST_ROOT}/version-missing" \
+  >"${TEST_ROOT}/version-missing.out" 2>"${TEST_ROOT}/version-missing.err"; then
+  echo '部署脚本在版本事实源缺失时错误继续执行。' >&2
+  exit 1
+fi
+grep -q '无法解析部署版本' "${TEST_ROOT}/version-missing.err"
+
+VERSION_PATH_TEST_ROOT="${TEST_ROOT}/version-paths"
+mkdir -p "$VERSION_PATH_TEST_ROOT"
+bash -c '
+  source "$1"
+  RELEASE_VERSION="$2"
+  REPO_ROOT="$3"
+  ENV_TEMPLATE_FILE="$4/template.env"
+  DEPLOYMENT_ENV_FILE="$4/deployment.env"
+  STATE_ROOT="$4/state"
+  cat > "$ENV_TEMPLATE_FILE" <<EOF
+GLIMMER_CRADLE_SERVER_TOKEN=test-server-token
+GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN=test-bridge-token
+GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=/tmp/glimmer-cradle-test.sock
+GLIMMER_CRADLE_DEPLOYMENT_MODE=source
+EOF
+  prepare_environment
+  grep -qxF "GLIMMER_CRADLE_IMAGE=${IMAGE_REPOSITORY}:${RELEASE_VERSION}" "$DEPLOYMENT_ENV_FILE"
+
+  read_env() {
+    if [[ "$1" == GLIMMER_CRADLE_DEPLOYMENT_MODE ]]; then
+      printf image
+    else
+      printf "%s" "$2"
+    fi
+  }
+  [[ "$(next_candidate_image)" == "${IMAGE_REPOSITORY}:${RELEASE_VERSION}" ]]
+  [[ "$(candidate_image)" == "${IMAGE_REPOSITORY}:${RELEASE_VERSION}-"* ]]
+' bash "$PACKAGED_DEPLOY" "$VERSION" "$REPO_ROOT" "$VERSION_PATH_TEST_ROOT"
 
 run_installer() {
   local source="$1"
