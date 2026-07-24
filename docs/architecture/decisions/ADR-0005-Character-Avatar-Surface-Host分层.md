@@ -2,6 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-07-13
+- 部分替代：第 7 条中 `core/avatar/unity-host/` 的物理落点已由 [ADR-0014](./ADR-0014-仓库物理分层与器官模块边界.md) 部分替代；本 ADR 的 Character、Avatar、Surface、Host 语义分层及其他决策继续有效。
 
 ## 背景
 
@@ -15,7 +16,7 @@
 4. `NativeCompositionHost` 只拥有平台合成原语，把 Unity 产生的帧放到桌面 Surface；它不拥有 Avatar 行为。
 5. 跨 Desktop 与 Avatar Host 的公共消息属于 `Presentation Plane`，契约使用 `PresentationUpstreamFrame` / `PresentationDownstreamFrame`；Host 握手使用 `host_hello` / `host_ready`。
 6. Avatar 配置归 `configs/system/avatar.yaml`；Surface 配置归 `configs/system/surfaces.yaml`。两者不得再次合并。
-7. Avatar 源码采用 `core/avatar/unity-host/`，Unity 自有代码按 `Domain / Application / Infrastructure / Host` 分层；Desktop 的物理归属由 [ADR-0006](./ADR-0006-Desktop物理归属与Electron进程分层.md) 规定。
+7. 原决策把 Avatar 源码与 Unity 工程共同放在 `core/avatar/unity-host/`。该物理落点现由 [ADR-0014](./ADR-0014-仓库物理分层与器官模块边界.md) 部分替代为“独立 `core/avatar/` C# Core assembly + `hosts/` 下 UnityAvatarHost 单向消费”；Desktop 的物理归属仍由 [ADR-0006](./ADR-0006-Desktop物理归属与Electron进程分层.md) 规定。
 8. UI 正式名称使用“形象”；“外显”只可作为自然语言动词，不作为模块、页面、配置域或进程名称。
 
 ## 结果

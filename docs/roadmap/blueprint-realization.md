@@ -350,7 +350,7 @@ Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、�
 | 非范围 | 不改变领域 owner，不把 Cognition/Kernel 拆成微服务，不实现托管云或公网器官 API，不预建 UI shared package，不永久保留新旧物理或 transport 双轨。 |
 | 验收门 | Contract compatibility、跨语言 Adapter、调用/生命周期语义和 Surface/data plane 通过；目标目录、imports、composition、构建、测试和打包一致；旧 `protocol/`、旧 Host/聚合目录及被替代 transport 主线删除。 |
 
-Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边界，不是一次库替换或目录改名。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；Contract Spine、供应链与 transport 取舍见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)，根职责、模块化单体与 Host 归属见 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。
+Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边界，不是一次库替换或目录改名。它只通过 M12 定义的九个顺序切片推进；每个切片独立输入/输出 fixed state、审查、回退与删除，前一切片失败即停止，不做全里程碑大爆炸提交。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；Contract Spine、供应链与 transport 取舍见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)，根职责、模块化单体与 Host 归属见 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。
 
 ### 7.5 Phase 13：低延迟多模态交互
 
