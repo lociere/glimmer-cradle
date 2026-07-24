@@ -88,6 +88,18 @@ cmp \
 ! tar -tzf "${OUTPUT_ROOT}/${FULL}" | grep -Eqi \
   '(^|/)(secrets\.yaml|data|logs?|cache|backups?|models?)(/|$)|\.(live2d|moc3)$'
 
+PACKAGED_DEPLOY="${TEST_ROOT}/light/glimmer-cradle-personal-server/deploy.sh"
+grep -q -- '--read-only \\' "$PACKAGED_DEPLOY"
+grep -q -- '--network none \\' "$PACKAGED_DEPLOY"
+grep -q -- '--cap-drop ALL \\' "$PACKAGED_DEPLOY"
+grep -q -- '--cap-add CHOWN \\' "$PACKAGED_DEPLOY"
+grep -q -- '--cap-add DAC_OVERRIDE \\' "$PACKAGED_DEPLOY"
+grep -q -- '--cap-add FOWNER \\' "$PACKAGED_DEPLOY"
+grep -q -- '--security-opt no-new-privileges \\' "$PACKAGED_DEPLOY"
+grep -q -- '--pids-limit 64 \\' "$PACKAGED_DEPLOY"
+grep -q -- 'src=/var/run/docker.sock,dst=/var/run/docker.sock,readonly' "$PACKAGED_DEPLOY"
+grep -q -- '--tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \\' "$PACKAGED_DEPLOY"
+
 run_installer() {
   local source="$1"
   shift

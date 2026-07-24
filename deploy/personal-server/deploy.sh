@@ -317,6 +317,9 @@ start_ops_bridge() {
     --read-only \
     --network none \
     --cap-drop ALL \
+    --cap-add CHOWN \
+    --cap-add DAC_OVERRIDE \
+    --cap-add FOWNER \
     --security-opt no-new-privileges \
     --pids-limit 64 \
     --group-add "$docker_gid" \
@@ -328,13 +331,13 @@ start_ops_bridge() {
     --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET="$socket_path" \
     --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN="$token" \
     --env GLIMMER_CRADLE_RELEASE_SOURCE="$(read_env GLIMMER_CRADLE_RELEASE_SOURCE https://github.com/lociere/glimmer-cradle/releases/latest/download)" \
-    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock,readonly \
     --mount type=bind,src="$docker_bin",dst=/usr/bin/docker,readonly \
     --mount type=bind,src="$compose_plugin",dst=/usr/libexec/docker/cli-plugins/docker-compose,readonly \
     --mount type=bind,src=/opt/glimmer-cradle/current,dst=/host/glimmer-cradle/current,readonly \
     --mount type=bind,src=/etc/glimmer-cradle,dst=/etc/glimmer-cradle \
     --mount type=bind,src="$STATE_ROOT",dst=/var/lib/glimmer-cradle \
-    --tmpfs /tmp:mode=1777 \
+    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
     "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
 }
 

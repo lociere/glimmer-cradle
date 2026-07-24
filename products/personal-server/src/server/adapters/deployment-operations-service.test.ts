@@ -118,6 +118,7 @@ describe('DeploymentOperationsService', () => {
       cliPath: fixture.cliPath,
       deploymentEnvFile: fixture.envFile,
       spawnDetachedFn: async () => undefined,
+      scheduleDetachedFn: (start) => start(),
     });
 
     const accepted = await service.execute({
@@ -133,6 +134,26 @@ describe('DeploymentOperationsService', () => {
     });
     assert.equal(conflict.status, 'conflict');
     assert.match(conflict.message, /已有部署级运维事务/);
+  });
+
+  it('无 socket bridge 的受控 CLI 备份也先返回 accepted 再异步启动', async () => {
+    const fixture = createOperationsFixture({ withCli: true });
+    const launches: string[][] = [];
+    let start: (() => void) | undefined;
+    const service = new DeploymentOperationsService({
+      applicationRoot: fixture.applicationRoot,
+      cliPath: fixture.cliPath,
+      deploymentEnvFile: fixture.envFile,
+      spawnDetachedFn: async (_lease, _command, args) => { launches.push(args); },
+      scheduleDetachedFn: (scheduled) => { start = scheduled; },
+    });
+
+    const result = await service.execute({ operation: 'backup.create' });
+    assert.equal(result.status, 'accepted');
+    assert.deepEqual(launches, []);
+    start?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(launches, [['backup']]);
   });
 
   it('运维桥已配置但不可达时不回退重复执行', async () => {

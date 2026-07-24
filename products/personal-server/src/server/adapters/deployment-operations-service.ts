@@ -69,6 +69,7 @@ export class DeploymentOperationsService {
         command: string,
         args: string[],
       ) => Promise<void>;
+      readonly scheduleDetachedFn?: (start: () => void) => void;
     },
   ) {}
 
@@ -148,7 +149,12 @@ export class DeploymentOperationsService {
     }
 
     if (operation === 'backup.create') {
-      return this.runBlocking(lease, runner, ['backup'], '备份已创建。');
+      return this.runDetached(
+        lease,
+        runner.command,
+        ['backup'],
+        '已接受备份请求，服务恢复后可在备份列表查看结果。',
+      );
     }
     if (operation === 'backup.restore') {
       const backupId = request.backup_id?.trim() || '';
@@ -218,54 +224,25 @@ export class DeploymentOperationsService {
     };
   }
 
-  private async runBlocking(
-    lease: DeploymentOperationLease,
-    runner: DeploymentRunner,
-    args: string[],
-    successMessage: string,
-  ): Promise<DeploymentOperationResult> {
-    try {
-      await this.runCommand(runner.command || '', args);
-      return {
-        status: 'success',
-        message: successMessage,
-        snapshot: await this.getSnapshot(),
-        operation_id: lease.operationId,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        snapshot: await this.getSnapshot(),
-        operation_id: lease.operationId,
-      };
-    } finally {
-      this.releaseLease(lease.operationId);
-    }
-  }
-
   private async runDetached(
     lease: DeploymentOperationLease,
     command: string,
     args: string[],
     acceptedMessage: string,
   ): Promise<DeploymentOperationResult> {
-    try {
-      await this.spawnDetached(lease, command, args);
-      return {
-        status: 'accepted',
-        message: acceptedMessage,
-        snapshot: await this.getSnapshot(),
-        operation_id: lease.operationId,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        snapshot: await this.getSnapshot(),
-        operation_id: lease.operationId,
-      };
-    }
+    const snapshot = await this.getSnapshot();
+    const schedule = this.options.scheduleDetachedFn
+      ?? ((start: () => void) => setTimeout(start, 250));
+    schedule(() => {
+      void this.spawnDetached(lease, command, args)
+        .catch(() => this.releaseLease(lease.operationId));
+    });
+    return {
+      status: 'accepted',
+      message: acceptedMessage,
+      snapshot,
+      operation_id: lease.operationId,
+    };
   }
 
   private async resolveRunner(): Promise<DeploymentRunner> {
@@ -426,20 +403,6 @@ export class DeploymentOperationsService {
     const localChecksums = path.join(source.replace(/^file:\/\//, ''), 'SHA256SUMS');
     if (!await fileExists(localChecksums)) return undefined;
     return parseVersionFromChecksums(await readFile(localChecksums, 'utf8'));
-  }
-
-  private runCommand(command: string, args: string[]): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(command, args, {
-        cwd: this.options.applicationRoot,
-        stdio: 'ignore',
-      });
-      child.once('error', reject);
-      child.once('exit', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`运维命令 ${args.join(' ')} 失败，退出码 ${code ?? 'null'}。`));
-      });
-    });
   }
 
   private spawnDetached(
