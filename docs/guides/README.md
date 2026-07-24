@@ -13,6 +13,7 @@
 | Schema、IPC、跨进程契约 | [development/Schema与跨进程契约变更.md](./development/Schema与跨进程契约变更.md) |
 | 架构边界、进程、分层重构 | [development/架构性改动.md](./development/架构性改动.md) |
 | Git 分支、命名、术语和标识符重构 | [development/命名规范.md](./development/命名规范.md) |
+| Web、Renderer、视觉设计、响应式与 UI 验收 | [development/前端开发与UI验收.md](./development/前端开发与UI验收.md) |
 | 测试、验收和交付说明 | [development/测试与验收.md](./development/测试与验收.md) |
 | 文档同步和迁移 | [development/文档维护.md](./development/文档维护.md) |
 | Kernel/runtime | [subsystems/Kernel开发.md](./subsystems/Kernel开发.md) |

@@ -1,113 +1,168 @@
 # UI Design Tokens Reference
 
-> 范围：Control Center、Presence 和桌面表面的稳定视觉 token、工作台布局、交互状态与可访问性要求。
-> 事实依据：`products/desktop/src/renderer/styles/`、`components/control-center/`、Playwright UI 测试。
-> 维护触发：主题、token、页面域、工作台布局、窗口断点、组件状态或 UI 验收规则变化。
+> 范围：Desktop Control Center、Presence 与 Personal Server Web 共享设计语言的质量不变量、当前实现边界、目标 token 框架、视觉变量和变更规则；不保存开发步骤或把尚未实现目标写成当前事实。
+> 事实依据：`products/desktop/src/renderer/styles/`、`products/desktop/src/renderer/components/control-center/`、`products/personal-server/src/web/shared/styles/`、对应 UI 测试与用户确认的视觉方向。
+> 维护触发：当前主题/token、页面结构、组件状态、响应式策略、可访问性基线、品牌资产消费边界或用户确认的视觉方向变化。
 
-微光摇篮桌面 UI 是长期使用的角色工作台，不是营销首页、开发仪表盘或卡片墙。默认采用深色 Bubble 工作台，提供完整浅色与跟随系统主题；结构区域依靠连续底色、稳定间距和信息层级建立质感，交互控件再使用必要边界，不使用渐变、装饰光斑或大面积同色卡片堆叠。
+本文必须同时回答三件事：当前代码已经是什么、跨产品长期必须达到什么质量、哪些视觉选择仍可重新设计。精确开发与验收步骤见 [前端开发与 UI 验收](../guides/development/前端开发与UI验收.md)。
 
-## 物理结构
+## 目录
 
-```text
-renderer/
-├── components/control-center/
-│   ├── ControlCenter.tsx
-│   ├── workbench/                 # 工作台壳、导航、用户界面偏好
-│   ├── shared/                    # 无领域事实的基础 UI
-│   └── pages/
-│       ├── conversation/
-│       ├── memory/
-│       ├── character/
-│       ├── avatar/
-│       ├── capabilities/
-│       ├── logs/
-│       └── settings/
-└── styles/
-    ├── tokens.css
-    ├── base.css
-    ├── workbench.css
-    ├── components.css
-    ├── pages.css
-    └── presence.css
-```
+- [1. 事实状态分层](#1-事实状态分层)
+- [2. 稳定质量不变量](#2-稳定质量不变量)
+- [3. 当前实现与比较基线](#3-当前实现与比较基线)
+- [4. 可重新设计的视觉变量](#4-可重新设计的视觉变量)
+- [5. 目标 Token 框架](#5-目标-token-框架)
+- [6. 组件与状态契约](#6-组件与状态契约)
+- [7. 产品边界与 owner](#7-产品边界与-owner)
+- [8. 变更与验证规则](#8-变更与验证规则)
 
-旧 `renderer/styles.css`、页面聚合单体、主页、独立形象一级入口和诊断一级入口已经退出主线，不得恢复兼容壳。
+## 1. 事实状态分层
 
-## 主题 Token
+| 标记 | 含义 | 能否直接用于实现 |
+|---|---|---|
+| **当前实现** | 已能从代码、样式或测试核对的事实 | 可以；改变时同步本页 |
+| **稳定质量不变量** | 不依赖主题或表面风格、所有方向都必须满足的质量门 | 必须 |
+| **目标规范** | 已确认需要建立，但具体值或组件语言仍待视觉探索/实现 | 不能冒充已落地 |
+| **待用户选择的视觉变量** | 重大改造前必须比较并由用户确认的方向 | 用户确认前不得固化 |
 
-| 类别 | 规则 |
-|---|---|
-| Canvas | 连续窗口基底，Frame、Rail 和桌面宽屏 Navigation 直接位于其上 |
-| Frame | 顶部窗口栏，不显示产品文字、不绘制整条分界线；只有当前页签可有局部弱轮廓 |
-| Rail | 最左活动轨道，直接位于 Canvas，只放六个一级域图标 |
-| Navigation | 当前域的二级分区；桌面宽屏不抬升，窄窗覆盖时才成为浮层 |
-| Workspace | 主阅读与操作 Bubble，拥有独立明度和 12px 结构圆角，不使用结构性描边或投影 |
-| Surface | 真正的信息单元、表单组、列表详情和对话消息 |
-| Overlay | 对话框与工具提示 |
-| Accent | 当前选择、焦点和主操作；角色强调色不能代替系统状态色 |
-| Semantic | 成功、警告、错误、信息各自独立，并同时使用文字或图标表达 |
+当前“无边界 + Bubble”是用户目前认为最顺眼的视觉比较基线，不是永久视觉风格或架构不变量。最终视觉方向未确认前，深浅主题、表面结构、颜色、圆角、阴影、透明度、纹理、字体气质、密度、导航形态与动效语言都不得被提升为永久约束。
 
-`dark` 是默认主题；`light` 和 `system` 使用同一语义 token，不维护两套组件 CSS。工作台固定使用舒适密度，不提供密度开关；主题、减少动态效果、两侧栏宽度和上下文栏折叠状态属于工作台偏好，只能写入 localStorage，不得保存会话、记忆或运行事实。
+用户确认某一轮方向后，具体 token 才作为“当前目标/当前实现”进入本 Reference；未来仍可通过新的设计决策和完整验收继续演化。
 
-## 工作台布局
+## 2. 稳定质量不变量
 
-Control Center 只有六个一级入口：对话、记忆、角色、能力、日志、设置。Avatar 归角色；语音状态、技能和扩展归能力；故障排除归设置高级；可读活动与模型链路归日志。
+以下质量不随视觉方向改变：
 
-| 区域 | 规则 |
-|---|---|
-| Window Frame | 固定 42px；可拖动区与窗口按钮明确分离，不使用贯穿窗口的底边界 |
-| Activity Rail | 固定约 52px；使用图标、选中指示与悬浮说明 |
-| Section Navigation | 默认 216px，可在 184–300px 调整并持久化；不按窗口百分比缩放 |
-| Main Workspace | `minmax(0, 1fr)`，内容最大宽度约 1160px；页面自己拥有滚动 |
-| Context Inspector | 自动宽度为 `clamp(236px, 18vw, 320px)`，支持拖动、键盘调整和双击恢复自动；空间足够时并排，容量不足时按需成为右侧抽屉 |
-| Narrow Layout | 当窗口不足约 900px 时分区导航成为显式打开的覆盖层；实际切换以主区最低容量为约束，不以设备类型判断 |
+1. 信息架构清晰，一级域、真实子域、当前位置、对象详情和全局操作不重复争夺注意力。
+2. 排版、空间、控件尺寸与组件状态形成统一系统，不以大量任意值拼接页面。
+3. 可读性、键盘、焦点、语义、缩放、reduced-motion、触控目标与响应式达到可持续验收基线。
+4. 视觉方向与 Glimmer Cradle 产品身份、页面用途和个人长期使用场景一致。
+5. 不使用临时后台、组件库默认皮肤、卡片墙或通用 AI 模板作为正式产品界面。
+6. 视觉美感不能以牺牲可用性、状态完整性、信息容量、可访问性或失败恢复为代价。
+7. Web 与 Renderer 只消费受控投影并提交用户 intent，不依据 UI 状态推断 Kernel、Cognition、Extension 或运维事实。
+8. 所有方向都必须覆盖 `loading`、`empty`、`degraded`、`error`、`pending`、`success`，不能只设计理想数据态。
 
-窗口缩放遵循“固定 Rail + 有界可调 Pane + 弹性 Workspace + 按容量折叠”。Inspector 是否并排由 Section Navigation 实际宽度、Inspector 期望宽度与 Workspace 约 540px 的最低可用宽度共同决定，不使用单个宽屏断点一刀切；并排时 Inspector 的可调上限随剩余空间收缩，拖动不得挤破主工作区或触发布局跳变。1024×640 是自动化常规最低验收尺寸，840px 额外验证双覆盖层，1148、1280 和 1536 验证三栏自适应且无横向溢出。
+“真正好看”需要能够解释层级、比例、节奏、信息密度、交互反馈与品牌意图，而不是只列主题名或形容词。
 
-## 表面层级与动态效果
+## 3. 当前实现与比较基线
 
-Control Center 使用三层表面，不允许所有区域获得相同描边、圆角和投影：
+### Desktop 当前实现
 
-1. Canvas 层连续覆盖整个窗口；Frame、Activity Rail 和桌面宽屏 Section Navigation 不得被画成独立卡片。
-2. Secondary 层用于 Context Inspector 和宽屏导航；Inspector 与主 Bubble 共用 12px 结构圆角，但只使用次级明度，窄窗导航成为浮层时才使用边界与阴影。
-3. Workspace 层是主要 Bubble；四周必须露出 Canvas，深浅主题均通过明度差、12px 结构圆角和外部间距表达层级，不绘制结构性描边或阴影。
+Desktop Control Center 当前由 `products/desktop/src/renderer/components/control-center/` 与 `styles/` 装配：
 
-顶层页面和分区切换使用约 140ms 的纯淡入，不使用整页位移。导航悬停只改变颜色和底色，不移动控件；只有侧栏展开、对话框、上下文抽屉和新消息可在自身边界内运动。覆盖式侧栏必须支持显式按钮、点击遮罩和 `Escape` 关闭；宽屏上下文栏折叠后主工作区接管可用宽度。所有动态效果必须服从 `data-reduced-motion`，减少动态效果后持续时间降为近零。
+- `tokens.css` 提供深色默认值和 `light` 覆盖，包含 canvas、workspace、surface、semantic color、focus、radius、布局尺寸与 motion 变量。
+- `workbench.css` 和 `ControlCenterShell.tsx` 实现 Activity Rail、Section Navigation、Workspace、可调 Context Inspector，以及容量不足时的导航/Inspector overlay。
+- 当前结构采用连续底层与主要 Workspace Bubble，宽屏存在可调分区栏和 Context Inspector；reduced-motion 偏好会将动画时长降到近零。
+- 当前这些值描述现状，不自动约束 Personal Server，也不代表下一轮视觉探索必须保留相同表面结构。
 
-## 页面职责
+Desktop 的精确 CSS 值仍以当前实现为准。本页不复制完整数值表，避免形成代码之外的手工镜像；实现变化时应同步语义、owner 与验证结论。
 
-- 对话：默认入口，显示当前连续对话、文字/语音输入和受控上下文预览。
-- 记忆：区分 Conversation、Moment、Episode、Memory 和知识，不把预览数量冒充实际召回。
-- 角色：展示身份、人设、唤醒、声音和 Avatar；持久偏好跳转设置。
-- 能力：消费 Skill Catalog、Extension Projection 与 Audio Projection；普通界面把 Skill Provider 表达为“能力来源”，`core` 显示为摇篮内置能力，技术 ID 只进入日志和高级诊断；扩展采用通用列表/详情管理，不硬编码 NapCat 等具体扩展。
-- 日志：默认提供可筛选的结构化事件浏览器；“原始输出”使用同一受控投影提供终端式扫读，不让 Renderer 直接读取日志文件。交互链路、服务状态、文件位置与保留维护各自独立，不把所有诊断职责堆在一页。
-- 设置：唯一持久配置入口，支持主题、多 Provider、语音、角色、隐私、数据和高级设置。
+### Personal Server 当前实现
 
-## 组件状态
+Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 
-所有可操作控件至少覆盖 `default`、`hover`、`pressed`、`focus-visible`、`disabled`、`selected` 和异步 `pending/success/error`。图标按钮必须有无障碍名称；不熟悉的图标提供悬浮说明；静态元素不得伪装按钮。
+- `shared/styles/tokens.css` 只有一组深色 canvas/surface/text/accent/semantic color 与单一 radius 变量，尚未形成完整 typography、spacing、layout、control sizing、motion 和 accessibility token 系统。
+- `shell/layout.ts` 当前创建 Titlebar、Activity Rail、Section Pane、Workspace 与常驻 Inspector；Rail 和 Section Pane 重复同一组一级路由。
+- 路由当前是内存状态，没有 URL、history、back/forward 与 deep-link。
+- `.workspace-view` 的通用 `display: grid` 当前会覆盖原生 `hidden`，使非当前页面继续参与布局；登录遮罩下的应用壳也可能被 `.app-shell` 的 `display: grid` 覆盖。
+- 当前固定断点与多列宽度在中间视口压缩主工作区，页面内容宽度、文字层级、圆角、间距和控件高度存在大量局部任意值。
+- 当前测试覆盖多项真实功能交互，但没有断言所有非当前页面隐藏，也没有关键页面截图视觉基线。
 
-设置编辑必须有脏状态、保存、重置、失败文案和重启提示。Provider 支持新增、编辑、删除与当前选择；API Key 只从环境变量或 `configs/secrets/` 读取，Renderer 不读取、不回显。
+以上是已核对的当前问题，不是目标结构。详细待实现优化与验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
 
-Avatar 动作不得乐观翻转，必须等待 Avatar Host 权威状态；形象预览使用 Avatar Package 的受控公开资产。Renderer 不读取 Unity、模型文件、SQLite、原始配置或扩展目录。
+### 比较基线的使用方式
 
-## 视觉约束
+“无边界 + Bubble”可以在视觉探索中作为一个候选方向或参考元素，用来比较连续底层、主要任务 Surface、留白和层级是否协调；不得据此预设：
 
-- 控件和信息面板圆角不超过 8px；Workspace 与 Context Inspector 共用 12px 结构圆角，页面区域本身不是卡片。
-- 顶栏、活动轨道和宽屏分区栏属于连续底层，不绘制贯穿边界或投影。
-- 结构层不使用阴影表达高度；主 Bubble 依靠可感知的外部间隙、明度差和圆角轮廓建立层级。
-- 不使用渐变、光斑、装饰性大图或嵌套卡片。
-- 主内容标题适配工作台密度，不使用营销式巨型字号。
-- 文字必须在 1024–1536px 验收视口内保持可读且不重叠。
-- 深浅主题均使用独立表面层级和足够对比度；颜色不是唯一状态反馈。
-- 网站式横向顶部导航、全局搜索和独立“诊断”产品入口不属于当前 Control Center。
+- 必须深色或浅色；
+- 必须无边界、Bubble、实体 Surface 或其他表面结构；
+- 必须克制极简或使用系统字体；
+- 必须使用或禁止渐变、阴影、透明、纹理；
+- Desktop 与 Personal Server 必须拥有完全相同的页面装配。
 
-## 验收
+## 4. 可重新设计的视觉变量
 
-- `pnpm --filter @glimmer-cradle/desktop typecheck`
-- `pnpm --filter @glimmer-cradle/desktop build`
-- `cd products/desktop && pnpm test:ui`
-- Playwright 截图覆盖四档窗口、六个一级域、深浅主题和 Provider 编辑。
-- Electron 实机覆盖窗口按钮、侧栏拖动、主题持久化、preload 白名单和本机日志入口。
+下列变量必须在相同信息架构、内容和功能边界下探索；差异不能只靠换色：
 
-Presence 与 Unity/Native Avatar 的实机验收仍按 [Desktop 与 Avatar 实现](../architecture/implementation/Desktop与Avatar实现.md) 执行。
+| 变量 | 可探索范围 | 不可突破 |
+|---|---|---|
+| 主题 | 深色、浅色、跟随系统或其他完整主题策略 | 可读性、语义色、状态不能丢失 |
+| 表面结构 | 无边界、Bubble、实体 Surface、分区、混合层级 | 信息层级与主要任务容量明确 |
+| 色彩 | 中性基底、强调色、语义色、角色/产品识别 | 颜色不是唯一反馈，Secret/状态语义不混用 |
+| 形状与深度 | 圆角、直角、描边、阴影、透明、纹理 | 一致、有限、可形成 token；不能制造无意义卡片墙 |
+| Typography | 字体气质、字号比例、字重、行高、行长 | 缩放、中文/英文/技术 ID 可读 |
+| 密度 | 舒适、紧凑或按页面用途变化 | 触控、键盘、状态文本与主要任务不被压缩 |
+| 导航 | Rail、侧栏、顶栏、命令入口或混合 | 单层全局导航，二级导航只服务真实子域 |
+| Motion | 淡入、位移、弹性或近静态语言 | reduced-motion、焦点与状态连续性完整 |
+
+正式 Logo、Wordmark、Favicon 与图标系统属于未来品牌资产任务。本 Reference 只规定消费边界：产品表面从 canonical 品牌/图标入口消费，不以字符、emoji、随手文字或 feature 私有文件建立替代品牌系统。
+
+## 5. 目标 Token 框架
+
+以下是**目标规范框架**，不是对当前已实现 token 的声明。视觉方向确认后，为每类 token 记录名称、语义、当前值/主题映射、owner、适用组件与验证方式。
+
+| 类别 | 至少表达 | 验证重点 |
+|---|---|---|
+| `typography` | family/role、display/title/body/label/code、size、weight、line-height、tracking、reading width | 中文/英文/技术 ID、200%/400% 缩放、默认标题样式清零 |
+| `spacing` | 基础步长、组件内距、页面节奏、分组间距 | 不出现相近任意值；密度与层级一致 |
+| `radius` | control、surface、structure、overlay | 语义有限；不让每个组件自选圆角 |
+| `surface` | canvas、workspace、section、raised、overlay、scrim | 表面层级可辨且不过度卡片化 |
+| `color/semantic` | text 层级、accent、info/success/warning/danger、disabled、selection | 对比度、非颜色反馈、深浅/高对比映射 |
+| `motion` | duration、easing、enter/exit、state change、reduced-motion | 不遮断操作；降动效后语义仍清楚 |
+| `control sizing` | 最小高度、inline padding、icon、target、gap | 键盘/触控、长标签、不同输入模式 |
+| `layout capacity` | 页面最低/理想/最大宽度、reading measure、pane/Drawer 容量 | 主任务优先；不同页面不被单一宽度绑死 |
+| `breakpoint/overlay` | 由内容容量触发的布局模式、Drawer/Scrim、层级 | 断点前后、缩放、backdrop、Escape、焦点返回 |
+| `focus/accessibility` | focus ring、outline offset、disabled、error association、high contrast | 可见、不被遮挡、名称/角色/值、颜色非唯一 |
+
+token 应按语义命名，不用具体颜色或单个页面命名跨产品 token。组件可以拥有受控别名，但不得复制原始值形成第二套主题。
+
+## 6. 组件与状态契约
+
+所有可操作组件至少覆盖：
+
+- `default`、`hover`（适用时）、`pressed`、`focus-visible`、`disabled`、`selected`；
+- 异步 `pending`、`success`、`error`；
+- 数据 `loading`、`empty`、`degraded`；
+- 长文本、未知值、只读、权限拒绝与断线。
+
+表单还要覆盖脏状态、字段校验、保存/重置、revision 冲突、Secret write-only、reload/restart 和失败后输入保留。静态元素不得伪装按钮；图标按钮必须有可访问名称，陌生图标需要可发现说明。
+
+路由和 Shell 必须确保：
+
+- 当前页面唯一参与主要布局与可访问交互；
+- 登录层与应用壳不会同时暴露为可操作界面；
+- URL、history、刷新与 deep-link 一致；
+- 页面离开时清理 listener、timer、stream、observer 和临时请求；
+- Drawer/Overlay 支持显式关闭、`Escape`、scrim、焦点进入与返回。
+
+## 7. 产品边界与 owner
+
+- Desktop 与 Personal Server 共享设计质量、语义 token 框架和无领域事实的交互原语，不共享 Product Host、设备能力或整页装配。
+- Control Center 负责完整工作台；Presence 只承担轻量常驻状态和即时交互，不复制设置、日志或 Extension 管理。
+- 页面 owner 负责编排，feature owner 负责领域 view model/局部样式，`shared UI` 负责通用原语，token owner 负责跨产品语义。
+- Provider、Audio、Memory、Skill、安全、存储、更新等真实领域保持独立 owner；设置页不能以单条超长页面抹平 owner。
+- runtime、日志、Extension、Provider 等对象使用列表/主体 + 按需详情；未选对象时不常驻无意义 Context Inspector。
+- Renderer/Web 不读取配置文件、数据库、日志文件、Extension 目录、Unity/Avatar 原始资产或 Secret；品牌资产也必须经公开、受控的消费边界。
+
+## 8. 变更与验证规则
+
+### 视觉方向确认
+
+重大 UI 改造必须按 Guide 产出至少三个方向，每个方向覆盖对话、系统概览、设置的宽屏与窄屏，并比较字体、比例、色彩、表面、品牌、导航、密度、动效、可访问性和维护成本。只有用户选择或明确混合元素后，才更新本页的当前目标 token。
+
+### 验证
+
+- token 名称、原始值与任意值残留定向扫描；
+- 当前页面可见、非当前页面隐藏/卸载、登录层隔离与路由 history 测试；
+- `loading/empty/degraded/error/pending/success` 状态矩阵；
+- 内容驱动的宽屏、临界宽度、窄屏、100–400% 缩放与长内容截图；
+- 键盘、焦点、reduced-motion、触控目标、语义 HTML 与高对比检查；
+- Personal Server 使用真实浏览器交互与 Playwright；Desktop 还需 Electron 实机；
+- 截图不能替代路由、输入、焦点、失败恢复和跨边界契约验证。
+
+### 同步与兼容
+
+改变当前 token 或组件状态时，在同一工作更新实现、测试和本页。改变页面/装配链路时更新对应 Implementation；改变跨边界数据时先更新 Schema/Port；尚未实现的设计目标只进入 Roadmap。
+
+新的视觉方向应替换旧的当前目标和无 owner 的兼容样式，不长期维护两套主线。Git 保存历史，不以旧 CSS 入口、重复 token 或永久 fallback 保存历史设计。

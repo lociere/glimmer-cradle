@@ -33,11 +33,14 @@
 
 ### Personal Server 网页
 
-- 一级信息架构收敛为 `对话`、`状态`、`扩展`、`日志`、`设置`；控制面独立可登录，零 Provider 状态下仍可进入全部页面。保持 Desktop 设计语言，但不复制 Avatar、窗口、剪贴板和本机录音等设备页面。
-- 状态页展示 Kernel、Cognition、Audio、Extension Host、Provider、受管资源、启动耗时和 degraded 原因。
-- 日志页提供结构化事件流、级别/模块/`trace_id` 筛选、暂停、自动滚动、原始/结构化切换和安全导出，不让浏览器直接读取日志文件。
-- 设置页覆盖模型服务、音频、Embedding、记忆、Skill、安全、存储、更新和 Extension 配置；高风险操作必须二次确认并进入审计。
-- 补齐窄窗口、移动端、键盘导航、焦点、加载、空态、失败恢复、长文本和低速连接体验；动效遵循淡入/状态过渡，不使用横向弹跳。
+- 目标一级信息架构收敛为 `对话`、`概览`、`能力`、`活动`、`设置`；控制面独立可登录，零 Provider 状态下仍可进入全部页面。只共享 Desktop 的设计质量与 token 框架，不复制 Avatar、窗口、剪贴板和本机录音等设备页面。
+- 使用单层全局导航；页面内只在存在真实子域时显示二级导航。顶栏只保留品牌、当前位置、健康状态和全局操作。
+- 概览展示 Kernel、Cognition、Audio、Extension Host、Provider、受管资源、启动耗时和 degraded 原因；runtime 使用列表/主体 + 按需详情。
+- 活动域提供错误优先的结构化事件流、级别/模块/`trace_id` 筛选、暂停、自动滚动、原始/结构化切换和安全导出；日志详情按需展开，不让浏览器直接读取日志文件。
+- 能力域承载 Extension、Skill 与 Provider 等能力视图，并使用列表/主体 + 按需详情，不把全部管理动作堆在单页。
+- 设置拆分为模型与路由、语音、记忆、安全、存储、更新等真实子页面；高风险操作必须二次确认并进入审计。
+- Context Inspector 改为选中对象后按需出现的 Context Drawer，未选对象时不常驻无效右栏。
+- 补齐内容容量驱动的窄窗口/宽屏布局、键盘、焦点、缩放、reduced-motion、触控目标、加载、空态、降级、失败恢复、长文本和低速连接体验；具体动效语言由视觉探索决定。
 
 ### Extension 分发与管理
 
@@ -100,44 +103,113 @@
 - 已完成：控制面物理结构从 `public/app.js`/`app.css` 单体迁移到 `products/personal-server/src/server/*` 与 `src/web/*`，并有架构门禁阻止旧入口回流。
 - 已完成：Protocol、Kernel Config Application Port 和 Personal Server 设置页已形成 LLM Provider/默认路由的真实闭环；零 Provider 可登录控制面，依赖 LLM 的对话会返回明确 `conversation_notice`。
 - 已完成：状态页已接 `ReadinessStatus`、runtime catalog 与配置快照；日志页已接真实结构化日志 HTTP/SSE、级别/模块/`trace_id` 筛选、暂停、原始视图与安全导出。
-- 进行中：NapCat Linux profile、宿主运维恢复矩阵与全新服务器安装验收。
+- 进行中：Personal Server UI 正确性、信息架构、视觉系统与验收基线优化；NapCat Linux profile、真实失败回滚与跨仓生产闭环。
 - 已完成到当前阶段：Extension 页已接真实运行投影、仓库/Registry/Release Manifest 安装预览、安装提交、启停与卸载事务；浏览器本地 `.gcex` 已改为认证上传到 Product Host 受控临时目录并换取 opaque `upload_id`，随后由 Host 在同一安装事务内解析为 Kernel file source，具备会话绑定、30 分钟时效、单事务消费与成功/失败/取消/超时清理；安全页已接受管访问令牌 store，支持创建/轮换/撤销、legacy env degraded 标记与一次性明文返回；运维页已接正式 backup/update/service snapshot，并在缺少宿主运维桥时显示真实 disabled reason；Playwright 已固化零 Provider、Provider 保存、日志筛选、扩展安装/启用、版本切换回退、本地 `.gcex` 上传、访问令牌与运维 disabled reason 在桌面与窄窗双视口。
-- 未开始或未过门：QQ 场景外部验收、Extension 升级/回滚、完整宿主运维恢复矩阵。
+- 未开始或未过门：QQ 场景外部验收、Extension 跨仓真实发布物升级/失败恢复、完整宿主运维恢复与长运行矩阵。
+
+### Personal Server UI 优化门（待实现）
+
+本节记录已确认问题与后续目标，不表示 UI 已修复。实施必须遵循 [前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md) 和 [UI Design Tokens Reference](../../reference/ui-design-tokens.md)。
+
+#### 当前已确认问题
+
+**正确性**
+
+- `.workspace-view` 的 `display: grid` 覆盖原生 `hidden`，非当前页面仍参与布局，五个复杂页面纵向堆叠。
+- 登录遮罩下仍渲染本应隐藏的应用壳；导航只改变标题和选中态，中央工作区没有正确切换。
+- `AppRouter` 只有内存状态，缺少 URL、history、back/forward 和 deep-link；所有复杂页面同时挂载。
+- Playwright 只检查目标元素存在或可见，没有断言非当前页面隐藏；缺少关键页面截图视觉基线。
+
+**信息架构**
+
+- Activity Rail 与 Section Navigation 完整重复同一组一级路由；顶栏、侧栏和页面标题重复表达当前位置。
+- Context Inspector 只重复产品名称和在线状态，没有选中对象上下文。
+- 设置页把 Provider、Audio、Embedding、Memory、Skill、安全、备份和更新堆在一条长页面。
+- 日志默认呈现大量 debug 卡片，缺少错误优先和按需详情。
+- runtime、日志、Extension 和 Provider 缺少真正的上下文详情层。
+
+**视觉与品牌**
+
+- Logo 是硬编码字符 `G`；导航使用“对、态、扩、志、设、退”等文字冒充图标，且没有 canonical 品牌资产消费边界。
+- 缺少正式 typography、spacing、radius、layout、surface 和 motion token；`h1`/`h2` 依赖浏览器默认样式，页面标题过大过粗。
+- 12/13px 辅助文字与默认正文之间缺少稳定层级；页面既空又挤，信息密度和留白没有统一节奏。
+- 圆角、间距和控件高度存在大量任意值；主工作区在 1440px 仅约占六成，外围 UI 占比过高。
+- 761–1080px 同时保留两层左栏，约 808px 时明显挤压和异常换行；固定断点没有根据主工作区最低容量决定布局。
+
+#### 目标信息架构
+
+- 收敛为单层全局导航；页面内只在存在真实子域时出现二级导航。
+- Context Inspector 改为按需 Context Drawer；未选中对象时不常驻无效右栏。
+- 顶栏只保留品牌、当前位置、健康状态和全局操作。
+- 对话、概览、能力、活动、设置形成清晰一级域。
+- 设置拆分为模型与路由、语音、记忆、安全、存储、更新等真实子页面。
+- runtime、日志、Extension、Provider 使用列表/主体 + 按需详情。
+- 页面按用途拥有不同内容宽度；响应式由内容容量驱动，不只按设备或固定百分比判断。
+- 所有视觉方向保持完整 `loading`、`empty`、`degraded`、`error`、`pending`、`success`。
+- 正式 Logo、Wordmark、Favicon 和统一图标系统由未来品牌资产任务提供；本 UI 门不创建或临时替代品牌资产。
+
+#### 视觉探索门
+
+重大 UI 实现前必须：
+
+1. 固定相同的信息架构、页面内容和功能边界。
+2. 产出至少三个真正不同的视觉方向，差异不能只是换颜色。
+3. 每个方向至少展示对话、系统概览、设置三个代表页面，并同时展示宽屏和窄屏。
+4. 比较字体、比例、色彩、表面、品牌、导航、信息密度、动效、可访问性和长期维护成本。
+5. 可以学习优秀产品、官方设计系统和先进 frontend Skill 的方法，但外部参考只作为 inspiration，不成为项目事实源，不复制品牌、布局、颜色、图标、模板、代码或 token。
+6. 由用户选择一个方向，或明确混合哪些元素；用户确认后才把具体 token 与组件语言写为当前实现目标。
+
+评价方向时检查：是否真正好看且完整、适合个人长期使用、与 Glimmer Cradle 身份协调、层级与比例清晰、避免通用 AI 模板感、兼顾可用性/响应式/可访问性，并能形成可维护系统。
+
+不得预设必须深色、Bubble、无边界、克制极简、系统字体，或必须使用渐变、阴影、透明、纹理中的任何一种。当前“无边界 + Bubble”只是比较基线，不是永久不变量。
+
+#### 非范围与验收矩阵
+
+本优化门不改变 Kernel/Cognition/Extension owner，不让浏览器读取 YAML、Secret、日志文件或内部对象，不复制 Desktop 设备页面，不在同一工作内创建品牌资产，也不以视觉改造掩盖缺失 Schema/Port。
+
+验收至少覆盖：
+
+- URL、刷新、deep-link、back/forward、未知路由，且目标页面唯一可见、非当前页面不参与布局/可访问交互；
+- 未登录、登录中、登录失败、会话过期，登录层与应用壳正确隔离；
+- 对话、系统概览、设置，以及 runtime/日志/Extension/Provider 列表与按需详情；
+- 宽屏、内容容量临界宽度、窄屏、断点前后、长内容、100–400% 缩放；
+- 键盘、焦点、`Escape`、Drawer/Scrim、reduced-motion、触控目标和语义 HTML；
+- `loading/empty/degraded/error/pending/success` 与认证、断线、冲突、失败恢复；
+- 代表页面和关键状态截图基线，以及真实点击、输入、滚动、历史导航和网络失败回归。
 
 ### 生产验收记录（2026-07-24）
 
-- GitHub latest Release 已为 `v0.1.7`，公开资产包含服务器安装器、SSH push 安装器、轻量包、完整包与统一 `SHA256SUMS`；GitHub 继续是唯一发行事实源，未增加 GitCode、OSS、国内 Registry、公共代理或第二安装协议。
-- `install-remote.sh` 审查确认控制机与服务器分别执行一次发布摘要校验，完整包随后复用 `install-release.sh`；full 路径加载应用镜像归档，将应用与跟随发行版的默认 Caddy 都切换到本地镜像，并通过 `GLIMMER_CRADLE_CANDIDATE_PRELOADED=1` 阻止部署层执行 Registry pull。
-- 审查发现失败路径会保留服务器 `/tmp/glimmer-cradle-<version>.*` 的真实缺口；当前工作树已改为成功、远端校验失败和安装失败都清理，清理本身失败时以失败退出并报告精确目录。定向 `pnpm test:remote-install` 已覆盖成功、安装故障和推送后篡改，验证双重摘要、失败不提交与远端临时目录清理。
-- 已配置目标 `47.99.49.252` 为 Ubuntu 24.04.2 LTS / linux amd64，但只读核验时已运行一周且 `/opt/glimmer-cradle/current -> /opt/glimmer-cradle/releases/0.1.5`，不是可销毁的全新主机。未获得重建该主机或创建新实例的入口，因此没有在其上执行清空、安装、重装或故障注入。
-- 全新 Ubuntu 24.04 的真实 SSH push、`/readyz`、幂等重装、无 Registry 网络观察与失败回滚仍是当前安装链最终验收的唯一阻断；不能用已有生产主机或本地伪 SSH 回归替代。
-- `glimmer-cradle-napcat-adapter` 当前本地存在 `release/lociere.napcat-adapter-0.1.0-linux-x64.gcex`，Manifest 声明 `personal-server`、`linux-x64` 与 `external_onebot`；但生产控制面缺少本地上传入口，且本次没有可用 external OneBot/QQ 凭据，因此未执行 QQ E2E。
-- 结论：生产服务器当前证明的是 M10/v0.1.1 基础安装与三页控制面可用，不证明 M11 可归档。M11 生产验收的下一门槛是发布或部署包含当前 M11 控制面与运维桥的 digest 固定版本，再重复安装、设置、Extension、备份恢复、停机回收和 NapCat external OneBot 矩阵。
+- `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、服务器安装器、SSH push 安装器、轻量包、完整包与统一摘要链已验证；GitHub 继续是唯一发行事实源，未增加第二安装协议。
+- 全新 Ubuntu 24.04 remote/full 安装已完成；控制机与服务器分别执行发布摘要校验，应用和随发行版提供的默认 Caddy 都从本地已校验镜像归档加载。
+- `/readyz`、容器、ops bridge 与端口通过；同版本幂等重装通过，安装期间未观察到 Registry 回源。当前服务器健康运行 `v0.1.8`。
+- 真实失败回滚仍未完成：缺少获授权的 distinct candidate 或 fault injection 入口。不能用同版本重装、本地伪回归或未经授权的生产故障代替。
+- NapCat `external_onebot`/QQ E2E 仍缺少获授权的真实外部场景入口；Extension 跨仓生产安装、升级失败恢复和回滚证据仍未完成。
+- 结论：`v0.1.8` 已证明正式发布、全新安装、离线 full 镜像加载、摘要、readiness、幂等重装和无 Registry 回源；M11 仍需完成 UI 优化门、真实失败回滚、完整宿主运维/长运行矩阵、Extension 跨仓闭环和 NapCat external OneBot 场景。
 
 ### 按实施顺序追踪
 
 - `[x]` 事实与契约：配置 Snapshot/Command、Secret write-only、默认路由与 `conversation_notice` 契约已合入并完成生成同步。
 - `[x]` Kernel 配置主线：LLM Provider 与默认路由的脱敏读取、revision、预览、原子写入、审计和 apply 状态已落地；Audio/Embedding/Memory/Skill 也已接入同一 Config Application Port，并经本地单测验证落盘与 snapshot 回读。
-- `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、Audio/Embedding/Memory/Skill 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；Security/Storage/Update 读取失败语义已改为显式错误投影，并经桌面/窄窗 Playwright 验证关键流程；宿主运维桥、真实恢复矩阵与更广 smoke 仍未完成。
+- `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、Audio/Embedding/Memory/Skill 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；但当前页面切换、URL/history、信息架构、视觉 token、内容容量响应式、可访问性和截图基线存在已确认缺口，必须通过本里程碑 UI 优化门后才能视为正式控制面体验完成。
 - `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI、本地 `.gcex` 上传主线，以及模板仓库 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档已落地；真实发布物升级/失败恢复与跨仓库 Linux `.gcex` 门禁仍未完成。
 - `[ ]` NapCat 跨产品化：外部 OneBot Linux profile、Adapter Core 收口、QQ 场景 E2E 与 Linux `.gcex` 发布未完成。
-- `[ ]` 生产验收：公开 `v0.1.7` 与 SSH push 安装链已具备，定向回归已覆盖双重摘要和临时目录清理；现有目标不是全新可销毁主机，真实 remote install、`/readyz`、幂等重装、无 Registry 回源与失败回滚尚未完成。
+- `[~]` 生产验收：`v0.1.8` fixed commit 已正式发布；全新 Ubuntu 24.04 remote/full、双重摘要、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已通过。真实失败回滚仍因缺少获授权 distinct candidate/fault injection 入口未完成。
 
 ### 第一验收门追踪
 
 - `[x]` Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约，并通过生成一致性检查。
 - `[x]` Kernel 能读取脱敏配置、预览一次变更、拒绝 revision 冲突并原子提交；Secret 从读取响应中消失。
 - `[x]` Personal Server 首次配置页面可新建 Provider、测试连接、保存模型路由；真实角色回复链路、正式历史读取、分页恢复与 `conversation_notice` 已接入控制面输入。
-- `[~]` 页面信息架构、响应式布局、加载/空态/失败恢复和仓库内 Playwright 基线已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用/版本回退与窄窗；更广运维/恢复矩阵尚未完成。
+- `[~]` 功能 Playwright 已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用/版本回退与窄窗；页面唯一可见、URL/history/deep-link、信息架构、内容容量、完整状态矩阵、可访问性和关键页面截图基线尚未完成，不能把现有“目标元素可见”测试写成 UI 质量门已通过。
 - `[x]` 区域传输副本已从近期实施范围移出，保留为长期候选，不再驱动当前代码。
 
 ### 最终验收门追踪
 
-- `[ ]` 一条命令全新 Ubuntu 安装与无需源码树的完整控制面验收未完成；2026-07-24 GitHub latest `v0.1.7` 已具备完整包与 SSH push 安装器，但现有目标服务器不是全新可销毁主机。
-- `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已本地打通并验证；生产 v0.1.1 尚未部署这些页面和 API，全新 Ubuntu 安装、宿主运维桥可用态、真实更新失败恢复与长期运行矩阵仍未完成。
-- `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；生产 v0.1.1 仅有旧远程来源入口，真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 生产安装仍未完成。
+- `[x]` `v0.1.8` 在全新 Ubuntu 24.04 无需源码树完成 remote/full 安装；五项 Release 资产与摘要、双重校验、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已验证。
+- `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已打通；生产已运行包含这些能力的 `v0.1.8`，但 UI 优化门、宿主运维完整恢复、真实更新失败恢复与长期运行矩阵仍未完成。
+- `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 生产闭环仍未完成。
 - `[ ]` NapCat Linux 外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。
-- `[ ]` 更新失败自动恢复、备份/恢复连续性、完整停机和长运行矩阵未完成；生产 v0.1.1 CLI 尚不支持 `backup`/`restore`，本次未在无备份前提下执行风险操作。
+- `[ ]` 更新失败自动恢复、备份/恢复连续性、完整停机和长运行矩阵未完成；失败回滚缺少获授权 distinct candidate/fault injection 入口。
 - `[~]` Personal Server Playwright 已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用与桌面/窄窗；安装矩阵和真实外部场景 smoke 尚未全部完成。
 
 ## 风险

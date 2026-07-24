@@ -37,6 +37,7 @@ description: Develop, review, debug, document, or coordinate Glimmer Cradle（�
 | 日志、trace、metrics、DLQ、性能 | `architecture/可观测性与诊断.md` |
 | 人格、情绪、记忆、LLM、认知循环 | `subsystems/Cognition.md` |
 | Control Center、Presence、Electron、Unity、Live2D | `subsystems/Desktop与Avatar.md` |
+| Web、Renderer、Control Center、页面布局、视觉设计、设计系统、响应式、可访问性、前端测试 | `subsystems/Frontend与UI.md` |
 | Extension、Skill Plane、MCP、公开 SDK | `subsystems/Extensions与SkillPlane.md` |
 
 ## 硬约束

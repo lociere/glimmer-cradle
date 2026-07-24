@@ -15,7 +15,7 @@ Reference 是查表层。它应回答“准确叫什么、在哪里、谁拥有�
 | [extension-sdk.md](./extension-sdk.md) | Extension manifest、公开 SDK、权限、Port 与生命周期 |
 | [packaging-layout.md](./packaging-layout.md) | 源码、构建投影、安装目录、组件和用户数据映射 |
 | [product-compositions.md](./product-compositions.md) | Desktop/Personal Server 清单、启动监督、端口和认证变量 |
-| [ui-design-tokens.md](./ui-design-tokens.md) | Control Center/桌面表面的视觉 token、交互状态和可访问性基线 |
+| [ui-design-tokens.md](./ui-design-tokens.md) | Desktop 与 Personal Server 共享设计语言、当前实现边界、目标 token 框架、视觉变量与质量门 |
 
 ## 写作规则
 

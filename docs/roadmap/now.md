@@ -1,35 +1,58 @@
 # Now
 
-> 审阅日期：2026-07-23
-> 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实。
+> 审阅日期：2026-07-24
+> 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
 ## 当前唯一活跃推进面：M11 Personal Server 控制面与 Extension 闭环
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已进入 `in-progress`，现为唯一活跃推进面。当前实现已完成 Config Application Port 对 Provider、Audio、Embedding、Memory、Skill 的正式读写链路，Personal Server 设置页也已本地验证这些配置以及 Security/Storage/Update 正式能力投影；扩展生态模板仓库已补齐 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档。2026-07-24 生产验收确认目标服务器与 GitHub latest 仍是 v0.1.1 三页控制面，公开资产没有完整安装包，生产缺少 M11 设置/日志/运维/API、本地 `.gcex` 上传与 CLI backup/restore。因此当前仍未过门的是发布或部署包含当前 M11 实现的 digest 固定版本、全新 Ubuntu 安装、宿主运维恢复矩阵、真实发布物升级/失败恢复，以及跨仓库 NapCat `external_onebot` 闭环。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 为 `in-progress`，现为唯一活跃推进面。
 
-M11 负责：
+`v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
+
+真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。
+
+M11 当前继续负责：
 
 - 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
-- 为 Personal Server 提供可在零 Provider 状态下登录使用的正式控制面，以及按需配置 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新页面；
+- 为 Personal Server 提供零 Provider 可登录的正式控制面，以及 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新能力；
+- 收口 Personal Server 当前 UI 的路由正确性、信息架构、视觉系统、响应式、可访问性和截图验收；
 - 让 Extension 安装、启停、升级、权限与产品兼容性通过同一 Package Manager 闭环；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
-- 把区域 HTTP(S)/OCI 传输副本保留为长期演化候选，只有在真实用户规模或长期稳定网络需求出现后再实施。
+- 把区域 HTTP(S)/OCI 传输副本保留为长期演化候选，只有真实需求出现后再实施。
 
-## 第一验收门
+## 下一验收门
 
-1. Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约。
-2. Kernel 成为唯一配置 owner，能够脱敏读取、预览变更、拒绝 revision 冲突并原子提交。
-3. Personal Server 在零 Provider 状态下也能登录并进入完整控制面；执行依赖 LLM 的对话时才明确提示尚未配置可用模型。
-4. 设置中心可新建 Provider、测试连接、保存模型路由，并在浏览器内完成 Audio、Embedding、Memory、Skill 的正式配置与 Security/Storage/Update 能力查看；页面信息架构、响应式布局、加载/空态/失败恢复和 Playwright 截图矩阵先形成可持续设计基线，不以临时表单堆叠代替正式控制面。
+### Personal Server UI 优化门
+
+本门当前只完成问题与规范记录，UI 优化尚未实现：
+
+1. 先修正页面唯一可见、登录层隔离、URL/history/deep-link、back/forward 和复杂页面挂载语义，并补齐“非当前页面隐藏”断言。
+2. 信息架构收敛为单层全局导航；页面内只在真实子域存在时显示二级导航。Context Inspector 改为选中对象后按需出现的 Context Drawer。
+3. 对话、概览、能力、活动、设置形成清晰一级域；设置拆为模型与路由、语音、记忆、安全、存储、更新等真实子页面；runtime、日志、Extension、Provider 使用列表/主体 + 按需详情。
+4. 重大实现前固定相同信息架构、内容与功能，产出至少三个真正不同的视觉方向；每个方向覆盖对话、系统概览、设置的宽屏和窄屏。用户确认或明确混合元素后，才固化具体 token 与组件语言。
+5. 响应式由页面内容容量驱动；不同用途页面拥有不同内容宽度，并覆盖临界宽度、长内容、100–400% 缩放、键盘、焦点、reduced-motion 与触控目标。
+6. 所有方向和最终实现覆盖 `loading`、`empty`、`degraded`、`error`、`pending`、`success`，并建立代表页面/关键状态截图基线与真实交互回归。
+7. 正式 Logo、Wordmark、Favicon 和统一图标系统等待未来品牌资产任务；本门不以硬编码字符、单字伪图标或临时资产替代。
+
+当前“无边界 + Bubble”只是视觉探索比较基线，不是永久主题、表面结构或架构不变量。外部产品、官方设计系统和 frontend Skill 只提供方法 inspiration，不成为项目事实源，也不覆盖用户后续选择权。
+
+### 生产与跨仓门
+
+1. 取得 distinct candidate/fault injection 的明确授权与固定制品，验证真实更新失败自动恢复；未取得入口前保持阻断，不操作健康服务器。
+2. 通过跨仓库固定发布物完成 Extension 安装、升级、失败恢复和回滚证据。
+3. 取得获授权 external OneBot/QQ 环境，完成 NapCat 私聊、群聊、背景观察、注意力、私有 Skill、回复、Experience、Memory 与重启连续性 E2E。
+4. 完成长运行、备份/恢复连续性与完整停机矩阵，确认端口、连接、Worker 和受管进程全部释放。
 
 ## 近期不做
 
-- 不让浏览器直接读写服务器 YAML、secret、任意文件路径或 Docker Socket。
+- 不让浏览器直接读写服务器 YAML、Secret、任意文件路径或 Docker Socket。
 - 不把 Desktop 的 Avatar、窗口、剪贴板和本机设备页面复制到 Personal Server。
+- 不在用户确认前选择最终视觉方向，或把深色、Bubble、无边界、圆角、配色写成永久不变量。
+- 不在本 UI 规范任务中实现路由、布局、响应式、品牌资产或测试改动。
 - 不把 NapCat 的 Windows OneKey 启动逻辑伪装成 Linux 兼容。
 - 不让 Extension 私有 Skill 泄露到无关 ConversationContext，也不把管理操作伪装成人物 Skill。
 - 不为特定云厂商、地域或代理域名分叉安装协议。
