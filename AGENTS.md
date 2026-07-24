@@ -27,21 +27,19 @@
 - 连续两次出现相同理解偏差、同类失败或无效调试时立即停止当前策略，核对事实源并缩小问题；不得用更多并行会话或更大模型掩盖边界不清。
 - 工具输出必须有范围和上限。优先读取失败摘要、目标文件和增量日志，禁止反复载入完整任务历史、完整 CI 日志或无关目录；长任务由唯一执行者等待并回报紧凑快照。
 - 模型按任务复杂度选择：跨层架构、疑难调试和最终审查使用高能力模型；机械修改、独立查证和格式整理使用中等模型。不得默认全最高，也不得为省额度使用会导致反复返工的过低能力模型。
-- 新实现、审查或发布阶段通常保留总控并创建对应角色会话；只有总控上下文健康下降或用户明确要求时才更换总控。建议必须写明 `建议创建执行会话`、`建议创建审查会话`、`建议创建发布/运维会话` 或 `建议更换总控会话`，不得只说“切换会话”。
+- 新实现、审查或发布阶段通常保留总控并创建对应角色会话；只有总控上下文健康下降或用户明确要求时才更换总控。新增角色时使用 `建议创建执行会话`、`建议创建审查会话` 或 `建议创建发布/运维会话`；结束当前会话并换届时必须写出 `建议现在切换到新会话（更换总控会话）` 等包含角色的完整措辞，不得只说“切换会话”。
 - 新会话首条提示必须声明 `session_role`、parent controller、目标、禁止项、独占资源及 owner、授权动作、验证账本、停止条件和回报契约；已有 active owner 时，新总控或执行者不得碰同一工作树或环境。
 - 详细执行规则和交接模板以 `.codex/skills/glimmer-cradle/references/common/会话与任务编排.md` 为准。
 
 ## Agent 配置分层
 
-本仓库采用“一份项目事实源 + 多个工具薄适配层”：
+本仓库采用“一份项目事实源 + 一套 Codex canonical Skill”：
 
 - `AGENTS.md`：所有 AI/人类协作者共同遵守的项目协作宪法。
 - `docs/`：唯一项目事实源，保存架构、实现、参考、指南、路线图和历史证据。
 - `.codex/skills/glimmer-cradle/`：Codex canonical Skill；`references/` 是唯一 agent 操作准则卡片。
-- `.claude/CLAUDE.md`：Claude Code 薄入口，只指向 `AGENTS.md`、`docs/` 和 `.codex` canonical Skill，不复制项目事实。
-- `.github/copilot-instructions.md`：GitHub Copilot 薄入口，只写高频约束和文档入口。
 
-新增任何 agent/tool 配置时，只允许写工具适配、读取顺序和安全边界；项目事实必须链接 `docs/` 或 `.codex/skills/glimmer-cradle/references/`，不得复制成另一套规则。
+项目只维护 Codex agent 配置。除非用户重新作出架构决策，不得新增 Claude、Copilot、Cursor 或其他 agent/tool 适配配置；项目事实必须进入 `docs/`，Codex 操作规则必须进入 `AGENTS.md` 或 `.codex/skills/glimmer-cradle/references/`。
 
 ## 事实源与文档
 
