@@ -13,6 +13,8 @@
 | [milestones/](./milestones/) | 已承诺或进行中的里程碑，按成果写 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
+当前唯一 active 推进面是 [M12 Slice 1 contracts baseline](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；[M13 工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 已承诺为 `planned`，尚未开始。进入关系与门禁以 [now.md](./now.md) 为准。
+
 ## 状态规则
 
 | 状态 | 含义 |

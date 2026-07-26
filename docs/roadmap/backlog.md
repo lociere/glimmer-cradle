@@ -14,6 +14,7 @@
 | 发布形态、安装投影与数据迁移闭环 | 已完成于 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) |
 | 区域感知的官方分发端点 | 控制机推送安装已覆盖当前受限网络；仅在匿名服务器拉取规模、带宽成本或长期稳定性触发后，再建设自动选源和项目方传输副本 |
 | Personal Server 网页配置、跨产品 Extension 与 NapCat QQ 场景闭环 | 已晋升为计划中的 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) |
+| Scripts/Automation/CI/Build/Release/Install/Ops 生命周期收口、部署与恢复安全、可复现供应链、owner-local task graph、Desktop 独立打包矩阵 | 已作为整体工程生命周期承重面晋升为 planned [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)；相关散项不再作为 candidate 双重承诺 |
 
 ## 候选项
 
@@ -29,7 +30,6 @@
 | Avatar 行为租约泛化 | 允许 Cognition/用户/场景/扩展并发覆盖身体通道 | 优先级、冲突、帧率、模型能力缺口 | 当前动作/视线/口型不能满足真实场景 |
 | 本地模型管理工作台 | 让用户管理 LLM/ASR/TTS/Avatar 模型 | 包体积、下载失败、磁盘占用、授权 | M08 后模型资源诊断成为主要痛点 |
 | Debian Personal Server 支持 | 扩展服务器发行版覆盖 | 软件包、Docker、systemd 与网络环境差异 | Debian 13 全新宿主完成安装、更新、恢复和停机矩阵 |
-| Desktop/Avatar/Audio 正式打包矩阵 | 让桌面产品形成独立可安装发行物 | Windows 签名、Unity 资产、Native DLL、设备与用户数据投影 | 单独里程碑明确支持系统、资产许可和实机矩阵 |
 
 ## 拒绝或移出规则
 
