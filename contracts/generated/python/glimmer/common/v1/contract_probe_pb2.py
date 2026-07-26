@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n&glimmer/common/v1/contract_probe.proto\x12\x11glimmer.common.v1\"t\n\rTraceMetadata\x12\x19\n\x08trace_id\x18\x01 \x01(\tR\x07traceId\x12!\n\x0c\x63\x61usation_id\x18\x02 \x01(\tR\x0b\x63\x61usationId\x12%\n\x0e\x63orrelation_id\x18\x03 \x01(\tR\rcorrelationId\"\x9d\x01\n\x11\x44ocumentReference\x12\x1f\n\x0b\x64ocument_id\x18\x01 \x01(\tR\ndocumentId\x12\x1b\n\tschema_id\x18\x02 \x01(\tR\x08schemaId\x12%\n\x0eschema_version\x18\x03 \x01(\tR\rschemaVersion\x12#\n\rdigest_sha256\x18\x04 \x01(\x0cR\x0c\x64igestSha256\"\xa7\x01\n\x10\x45\x63hoProbeRequest\x12\x19\n\x08probe_id\x18\x01 \x01(\tR\x07probeId\x12@\n\x08\x64ocument\x18\x02 \x01(\x0b\x32$.glimmer.common.v1.DocumentReferenceR\x08\x64ocument\x12\x36\n\x05trace\x18\x03 \x01(\x0b\x32 .glimmer.common.v1.TraceMetadataR\x05trace\"\x88\x01\n\x11\x45\x63hoProbeResponse\x12\x19\n\x08probe_id\x18\x01 \x01(\tR\x07probeId\x12@\n\x08\x64ocument\x18\x02 \x01(\x0b\x32$.glimmer.common.v1.DocumentReferenceR\x08\x64ocument\x12\x16\n\x06status\x18\x03 \x01(\tR\x06status2n\n\x14\x43ontractProbeService\x12V\n\tEchoProbe\x12#.glimmer.common.v1.EchoProbeRequest\x1a$.glimmer.common.v1.EchoProbeResponseB,\xaa\x02)GlimmerCradle.Contracts.Glimmer.Common.V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n&glimmer/common/v1/contract_probe.proto\x12\x11glimmer.common.v1\"t\n\rTraceMetadata\x12\x19\n\x08trace_id\x18\x01 \x01(\tR\x07traceId\x12!\n\x0c\x63\x61usation_id\x18\x02 \x01(\tR\x0b\x63\x61usationId\x12%\n\x0e\x63orrelation_id\x18\x03 \x01(\tR\rcorrelationId\"\x9d\x01\n\x11\x44ocumentReference\x12\x1f\n\x0b\x64ocument_id\x18\x01 \x01(\tR\ndocumentId\x12\x1b\n\tschema_id\x18\x02 \x01(\tR\x08schemaId\x12%\n\x0eschema_version\x18\x03 \x01(\tR\rschemaVersion\x12#\n\rdigest_sha256\x18\x04 \x01(\x0cR\x0c\x64igestSha256\"\xa7\x01\n\x10\x45\x63hoProbeRequest\x12\x19\n\x08probe_id\x18\x01 \x01(\tR\x07probeId\x12@\n\x08\x64ocument\x18\x02 \x01(\x0b\x32$.glimmer.common.v1.DocumentReferenceR\x08\x64ocument\x12\x36\n\x05trace\x18\x03 \x01(\x0b\x32 .glimmer.common.v1.TraceMetadataR\x05trace\"~\n\x11\x45\x63hoProbeResponse\x12\x19\n\x08probe_id\x18\x01 \x01(\tR\x07probeId\x12@\n\x08\x64ocument\x18\x02 \x01(\x0b\x32$.glimmer.common.v1.DocumentReferenceR\x08\x64ocumentJ\x04\x08\x03\x10\x04R\x06status2n\n\x14\x43ontractProbeService\x12V\n\tEchoProbe\x12#.glimmer.common.v1.EchoProbeRequest\x1a$.glimmer.common.v1.EchoProbeResponseB,\xaa\x02)GlimmerCradle.Contracts.Glimmer.Common.V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -38,8 +38,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_DOCUMENTREFERENCE']._serialized_end=337
   _globals['_ECHOPROBEREQUEST']._serialized_start=340
   _globals['_ECHOPROBEREQUEST']._serialized_end=507
-  _globals['_ECHOPROBERESPONSE']._serialized_start=510
-  _globals['_ECHOPROBERESPONSE']._serialized_end=646
-  _globals['_CONTRACTPROBESERVICE']._serialized_start=648
-  _globals['_CONTRACTPROBESERVICE']._serialized_end=758
+  _globals['_ECHOPROBERESPONSE']._serialized_start=509
+  _globals['_ECHOPROBERESPONSE']._serialized_end=635
+  _globals['_CONTRACTPROBESERVICE']._serialized_start=637
+  _globals['_CONTRACTPROBESERVICE']._serialized_end=747
 # @@protoc_insertion_point(module_scope)

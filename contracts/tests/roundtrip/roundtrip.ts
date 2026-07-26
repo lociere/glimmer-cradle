@@ -35,11 +35,13 @@ if (requestRoundTrip.document?.documentId !== document.tool_id) {
 const response = create(EchoProbeResponseSchema, {
   probeId: requestRoundTrip.probeId,
   document: requestRoundTrip.document,
-  status: 'ok',
 });
 const responseRoundTrip = fromBinary(EchoProbeResponseSchema, toBinary(EchoProbeResponseSchema, response));
-if (responseRoundTrip.status !== 'ok' || responseRoundTrip.document?.schemaVersion !== document.schema_version) {
-  throw new Error('TypeScript response protobuf round-trip lost the service status or schema version');
+if (
+  responseRoundTrip.probeId !== request.probeId
+  || responseRoundTrip.document?.schemaVersion !== document.schema_version
+) {
+  throw new Error('TypeScript response protobuf round-trip lost the successful echo result');
 }
 
 console.log('contracts roundtrip ts: ok');

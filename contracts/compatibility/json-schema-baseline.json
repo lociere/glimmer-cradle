@@ -1,6 +1,6 @@
 {
   "generated_at": "fixed by M12 Slice 1 baseline refresh",
-  "compatibility": "Schema removals or content changes require an intentional baseline update and review.",
+  "compatibility": "Schema additions, removals, path or id changes, and content changes require an intentional baseline update and review.",
   "schemas": [
     {
       "path": "json-schema/skill/v1/tool-parameters.schema.json",

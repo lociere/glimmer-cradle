@@ -43,7 +43,7 @@ const schemaRoot = resolve(root, 'json-schema');
 const schemas = walk(schemaRoot).filter((file) => file.endsWith('.schema.json'));
 const baseline = {
   generated_at: 'fixed by M12 Slice 1 baseline refresh',
-  compatibility: 'Schema removals or content changes require an intentional baseline update and review.',
+  compatibility: 'Schema additions, removals, path or id changes, and content changes require an intentional baseline update and review.',
   schemas: schemas.map((file) => {
     const json = JSON.parse(readFileSync(file, 'utf8'));
     return {

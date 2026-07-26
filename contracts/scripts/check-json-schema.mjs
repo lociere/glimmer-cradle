@@ -3,7 +3,15 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
-const root = resolve(import.meta.dirname, '..');
+function option(name, fallback) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return fallback;
+  const value = process.argv[index + 1];
+  if (!value) throw new Error(`${name} requires a path`);
+  return resolve(value);
+}
+
+const root = option('--contracts-root', resolve(import.meta.dirname, '..'));
 const schemaRoot = resolve(root, 'json-schema');
 const baselinePath = resolve(root, 'compatibility/json-schema-baseline.json');
 const validFixture = resolve(root, 'fixtures/skill-tool-parameters.valid.json');
@@ -62,6 +70,48 @@ for (const file of schemas) {
   });
 }
 
+const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+if (!Array.isArray(baseline.schemas)) {
+  throw new Error('JSON Schema compatibility baseline must contain a schemas array');
+}
+
+const baselinePaths = new Set();
+const baselineIds = new Set();
+for (const expected of baseline.schemas) {
+  if (!expected.path || !expected.id) {
+    throw new Error('JSON Schema compatibility baseline entries require path and id');
+  }
+  if (baselinePaths.has(expected.path)) {
+    throw new Error(`duplicate JSON Schema compatibility baseline path: ${expected.path}`);
+  }
+  if (baselineIds.has(expected.id)) {
+    throw new Error(`duplicate JSON Schema compatibility baseline $id: ${expected.id}`);
+  }
+  baselinePaths.add(expected.path);
+  baselineIds.add(expected.id);
+
+  const actual = current.get(expected.path);
+  if (!actual) throw new Error(`JSON Schema compatibility baseline lost ${expected.path}`);
+  for (const key of ['id', 'dialect', 'owner', 'kind', 'compatibility', 'sha256']) {
+    if (actual[key] !== expected[key]) {
+      throw new Error(`JSON Schema compatibility baseline mismatch for ${expected.path}: ${key}`);
+    }
+  }
+}
+
+for (const [path, actual] of current) {
+  if (!baselinePaths.has(path)) {
+    throw new Error(`JSON Schema is not registered in compatibility baseline: ${path}`);
+  }
+  if (!baselineIds.has(actual.id)) {
+    throw new Error(`JSON Schema $id is not registered in compatibility baseline: ${actual.id}`);
+  }
+}
+
+if (current.size !== baseline.schemas.length) {
+  throw new Error(`JSON Schema compatibility set size mismatch: current=${current.size}, baseline=${baseline.schemas.length}`);
+}
+
 const validate = compiled.get('json-schema/skill/v1/tool-parameters.schema.json');
 if (!validate) {
   throw new Error('missing compiled tool parameters schema');
@@ -71,17 +121,6 @@ if (!validate(JSON.parse(readFileSync(validFixture, 'utf8')))) {
 }
 if (validate(JSON.parse(readFileSync(invalidFixture, 'utf8')))) {
   throw new Error('invalid fixture unexpectedly passed validation');
-}
-
-const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-for (const expected of baseline.schemas) {
-  const actual = current.get(expected.path);
-  if (!actual) throw new Error(`JSON Schema compatibility baseline lost ${expected.path}`);
-  for (const key of ['id', 'dialect', 'owner', 'kind', 'compatibility', 'sha256']) {
-    if (actual[key] !== expected[key]) {
-      throw new Error(`JSON Schema compatibility baseline mismatch for ${expected.path}: ${key}`);
-    }
-  }
 }
 
 console.log('contracts json-schema: ok');

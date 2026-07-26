@@ -5,10 +5,10 @@
 
 ## 步骤
 
-1. 用 `rg` 定位现有 Schema、生成物、生产者、消费者、映射层、测试和文档引用。
+1. 用 `rg` 定位现有 Schema/IDL、生成物、生产者、消费者、映射层、测试和文档引用，并确认对应 M12 迁移切片。
 2. 判断这是新增语义、重命名、删除、拆分还是兼容迁移；写清成功、错误、未知值和缺字段语义。
-3. 修改 `protocol/src/schemas/` 中的权威 Schema，不修改生成物。
-4. 运行 `pnpm sync:contracts`。
+3. 选择唯一 owner：尚未迁移的现有 runtime 结构修改 `protocol/src/schemas/`；新 Contract Spine Service/Document 修改 `contracts/{proto,json-schema}/`。不修改生成物，也不复制双份权威定义。
+4. 旧 runtime 路由运行 `pnpm sync:contracts`；新 Contract Spine 路由运行 `pnpm contracts:generate` 与 `pnpm contracts:verify`。
 5. 先改生产者，再改映射层，再改消费者，最后改 UI/日志投影。
 6. 补测试：合法 payload、非法 payload、旧字段、未知枚举、错误 code、降级路径。
 7. 搜索并删除旧字段、旧事件、手写镜像和无期限兼容代码。

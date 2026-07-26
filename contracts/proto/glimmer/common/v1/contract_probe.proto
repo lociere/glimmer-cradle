@@ -26,7 +26,8 @@ message EchoProbeRequest {
 message EchoProbeResponse {
   string probe_id = 1;
   DocumentReference document = 2;
-  string status = 3;
+  reserved 3;
+  reserved "status";
 }
 
 service ContractProbeService {

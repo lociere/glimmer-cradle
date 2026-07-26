@@ -1,12 +1,23 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { verifyUv } from './lib/toolchain.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-const uv = process.platform === 'win32' ? 'uv.exe' : 'uv';
+const uv = verifyUv(root);
 
-const result = spawnSync(uv, ['run', '--project', 'tests/python', 'python', 'tests/roundtrip/roundtrip.py'], {
+const result = spawnSync(uv, [
+  'run',
+  '--project',
+  'tests/python',
+  '--locked',
+  '--offline',
+  '--no-python-downloads',
+  'python',
+  'tests/roundtrip/roundtrip.py',
+], {
   cwd: root,
   stdio: 'inherit',
+  shell: false,
 });
 
 if (result.status !== 0) {

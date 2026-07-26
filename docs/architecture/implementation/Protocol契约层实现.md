@@ -1,6 +1,6 @@
 # Protocol 契约层实现
 
-> 范围：跨语言、跨进程和公开 SDK 契约如何由 JSON Schema 定义、生成、校验和消费；不列全部字段。
+> 范围：迁移期现有 runtime Protocol 与 M12 Slice 1 Contract Spine baseline 如何分 owner 定义、生成、校验和消费；不列全部字段。
 > 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/`、Cognition `protocol/generated/`、M12 Slice 1 `contracts/` baseline。
 > 维护触发：Schema、IPC 消息、Avatar frame、配置模型、生成脚本、runtime helper、跨语言消费者或错误码变化。
 
@@ -18,13 +18,13 @@ core/cognition/src/glimmer_cradle/cognition/protocol/generated/
 └── Python 生成投影
 ```
 
-跨语言结构先改 `protocol/src/schemas/`，再运行：
+对应 M12 迁移切片尚未开始的现有 runtime 跨语言结构先改 `protocol/src/schemas/`，再运行：
 
 ```powershell
 pnpm sync:contracts
 ```
 
-生成物不能手改。若生成物不满足消费需求，应改 Schema、生成脚本或 runtime helper，而不是在消费者里复制字段。
+生成物不能手改。若生成物不满足消费需求，应改对应 owner 的 Schema/IDL、生成脚本或 runtime helper，而不是在消费者里复制字段。
 
 M12 Slice 1 新增了不切运行主线的 `contracts/` baseline：
 
@@ -34,18 +34,19 @@ contracts/
 ├── json-schema/skill/v1/tool-parameters.schema.json
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
+├── toolchain.json、global.json
 ├── inventory.md
 └── supply-chain.md
 ```
 
-该 baseline 的生成入口为：
+新 Contract Spine Service/Document 只在 `contracts/{proto,json-schema}/` 演进，生成与验证入口为：
 
 ```powershell
 pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘；当前 Kernel、Cognition、Desktop、Avatar、Engine、Extension 和 Personal Server runtime consumer 仍走旧 `@glimmer-cradle/protocol`。Slice 1 不修改 `protocol/`、不切 ZMQ/stdio/WebSocket/gRPC/Connect 链路，也不删除旧生成链。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘；当前 Kernel、Cognition、Desktop、Avatar、Engine、Extension 和 Personal Server runtime consumer 仍走旧 `@glimmer-cradle/protocol`。Slice 1 不修改 `protocol/`、不切 ZMQ/stdio/WebSocket/gRPC/Connect 链路，也不删除旧生成链。两条 canonical 路由按“现有 runtime / 新 Contract Spine”分工，不是同一结构的兼容双轨。
 
 ## 契约分类
 
@@ -61,9 +62,9 @@ pnpm contracts:verify
 
 ## 变更顺序
 
-1. 判断是否跨语言/跨进程/公开 SDK；如果是，先改 Schema。
+1. 判断是否跨语言/跨进程/公开 SDK，并确认它是对应切片前的现有 runtime 契约，还是新 Contract Spine Service/Document。
 2. 为新增字段写清 owner、默认值、是否必填、兼容语义和错误 code。
-3. 运行 `pnpm sync:contracts`。
+3. 现有 runtime 契约改 `protocol/src/schemas/` 并运行 `pnpm sync:contracts`；新契约改 `contracts/{proto,json-schema}/` 并运行 `pnpm contracts:generate` / `pnpm contracts:verify`。
 4. 改生产者、映射层、消费者、投影和测试。
 5. 搜索旧字段、旧消息、手写镜像和无期限 fallback。
 6. 更新 Reference、Implementation 和 Guide。

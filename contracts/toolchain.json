@@ -1,0 +1,121 @@
+{
+  "schema_version": "contracts.toolchain.v1",
+  "uv": {
+    "version": "0.11.28",
+    "license": "MIT OR Apache-2.0",
+    "release": "https://github.com/astral-sh/uv/releases/tag/0.11.28",
+    "platforms": {
+      "win32-x64": {
+        "archive": "uv-x86_64-pc-windows-msvc.zip",
+        "url": "https://releases.astral.sh/github/uv/releases/download/0.11.28/uv-x86_64-pc-windows-msvc.zip",
+        "archive_sha256": "0a23463216d09c6a72ff80ef5dc5a795f07dc1575cb84d24596c2f124a441b7b",
+        "launcher_sha256": "533fe4044bc50b05ac89f4d07925597fdb5285369724e8986ecab356818f09ee"
+      },
+      "linux-x64": {
+        "archive": "uv-x86_64-unknown-linux-gnu.tar.gz",
+        "url": "https://releases.astral.sh/github/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz",
+        "archive_sha256": "e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224",
+        "launcher_sha256": "1cb9cd0a1749debf6049d7d2bb933882cc52d81016326ee6d99a786d6c988b03"
+      }
+    }
+  },
+  "dotnet": {
+    "version": "8.0.423",
+    "license": "MIT",
+    "release_metadata": "https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/8.0/releases.json",
+    "platforms": {
+      "win32-x64": {
+        "archive": "dotnet-sdk-8.0.423-win-x64.zip",
+        "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.423/dotnet-sdk-8.0.423-win-x64.zip",
+        "archive_sha512": "063fcc35c136277e6fd767c66579f3b92db22a078a7f0c7177b6af1edb2c9afae1613f6cfdc01acf7421773d9ac77f0ef73a7fd8b37f469e7e3505e5c1361ba0",
+        "launcher_sha256": "e94c17675054a5dec941971293f08c417756a9a4f78efb4b7f88e312272a07c2"
+      },
+      "linux-x64": {
+        "archive": "dotnet-sdk-8.0.423-linux-x64.tar.gz",
+        "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.423/dotnet-sdk-8.0.423-linux-x64.tar.gz",
+        "archive_sha512": "e94513dfe42271a85f01e87bd4272aa80b4ec13556f4531754802542225667775242c5e281a94837dae6cc65f7bcc457d2f663f240c0e2b7573fd909e786b1a5",
+        "launcher_sha256": "f83fb9e3a98b01944c8bf153029451b425c5e33f63e08f4d7da107f2b0e46155"
+      }
+    }
+  },
+  "npm_packages": [
+    {
+      "name": "@bufbuild/buf",
+      "version": "1.66.1",
+      "license": "Apache-2.0",
+      "source": "https://github.com/bufbuild/buf",
+      "integrity": "sha512-TelMLptEDfdcl8D+WjKQLzGGYKAwOSVjCPJ21L9X9xT7KZHigTAhHP5idrTCtXKHHPPQB6Sq12wVnhWgFQ9s7w==",
+      "relationship": "direct"
+    },
+    {
+      "name": "@bufbuild/buf-win32-x64",
+      "version": "1.66.1",
+      "license": "Apache-2.0",
+      "source": "https://github.com/bufbuild/buf",
+      "integrity": "sha512-QzDiv9dAUr89HjHsKOrC5EQB+2aWVwKmhZFYzAGgHTt+ONAgz9RgLhwIm6LTtrLigB0LIHk/nLMIXB3sXUhyrg==",
+      "relationship": "platform",
+      "platform": "win32-x64"
+    },
+    {
+      "name": "@bufbuild/buf-linux-x64",
+      "version": "1.66.1",
+      "license": "Apache-2.0",
+      "source": "https://github.com/bufbuild/buf",
+      "integrity": "sha512-at0JeAlc+pquaNB/80R5F6bQs1gtdSuJRj+naei+lH2L2M1yQTiYU3f9dJnY4hVbq4/JbxSdxqJx2VOLPt1ztw==",
+      "relationship": "platform",
+      "platform": "linux-x64"
+    },
+    {
+      "name": "@bufbuild/protoc-gen-es",
+      "version": "2.13.0",
+      "license": "Apache-2.0",
+      "source": "https://github.com/bufbuild/protobuf-es",
+      "integrity": "sha512-ylI1vrLksdnXrVZRs9xGxmrQxKGhUm6pPszv26kqBvNiO3qPTktk+hgfwbLISBY4M/reShkT2dFLGT9fbydBXg==",
+      "relationship": "direct"
+    },
+    {
+      "name": "@bufbuild/protoplugin",
+      "version": "2.13.0",
+      "license": "Apache-2.0",
+      "source": "https://github.com/bufbuild/protobuf-es",
+      "integrity": "sha512-32eMChKaL/A8Hh5AfMmXSdnuyznN85uoEjoyWiWeRrvtQOtpqX/v1R9PDe0g9vMIgzznK9inMT3CUaal0kjLUQ==",
+      "relationship": "transitive"
+    },
+    {
+      "name": "@bufbuild/protobuf",
+      "version": "2.13.0",
+      "license": "(Apache-2.0 AND BSD-3-Clause)",
+      "source": "https://github.com/bufbuild/protobuf-es",
+      "integrity": "sha512-acq7c49vxfm1ggJ95P70TX7ABDM0vxr1SYD3BB0o0jnBLB4OAqeHyKuN+cD3w80gXEDQ2zxHpR6CUeA+O/aU9g==",
+      "relationship": "direct"
+    },
+    {
+      "name": "protoc",
+      "version": "33.0.0",
+      "license": "Apache-2.0",
+      "source": "https://github.com/timostamm/protobuf-npm",
+      "integrity": "sha512-zp1nrPRwXcmxGHlsrhlbBhmAWqAhcsHY4IEsuqZxNsIHqC//ojlAGsSnqfgqw4MqyUAp630XOrVYYEes1NtBgA==",
+      "relationship": "direct"
+    },
+    {
+      "name": "ajv",
+      "version": "8.20.0",
+      "license": "MIT",
+      "source": "https://github.com/ajv-validator/ajv",
+      "integrity": "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==",
+      "relationship": "direct"
+    }
+  ],
+  "language_packages": {
+    "python_protobuf": {
+      "version": "6.33.0",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/protocolbuffers/protobuf"
+    },
+    "google_protobuf": {
+      "version": "3.33.0",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/protocolbuffers/protobuf"
+    }
+  }
+}

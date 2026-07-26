@@ -41,13 +41,12 @@ var response = new EchoProbeResponse
 {
     ProbeId = requestRoundTrip.ProbeId,
     Document = requestRoundTrip.Document,
-    Status = "ok",
 };
 var responseRoundTrip = EchoProbeResponse.Parser.ParseFrom(response.ToByteArray());
-if (responseRoundTrip.Status != "ok"
+if (responseRoundTrip.ProbeId != request.ProbeId
     || responseRoundTrip.Document.SchemaVersion != document.GetProperty("schema_version").GetString())
 {
-    throw new InvalidOperationException("C# response protobuf round-trip lost the service status or schema version");
+    throw new InvalidOperationException("C# response protobuf round-trip lost the successful echo result");
 }
 
 Console.WriteLine("contracts roundtrip cs: ok");

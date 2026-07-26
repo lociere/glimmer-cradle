@@ -35,21 +35,20 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             "Cghwcm9iZV9pZBgBIAEoCVIHcHJvYmVJZBJACghkb2N1bWVudBgCIAEoCzIk",
             "LmdsaW1tZXIuY29tbW9uLnYxLkRvY3VtZW50UmVmZXJlbmNlUghkb2N1bWVu",
             "dBI2CgV0cmFjZRgDIAEoCzIgLmdsaW1tZXIuY29tbW9uLnYxLlRyYWNlTWV0",
-            "YWRhdGFSBXRyYWNlIogBChFFY2hvUHJvYmVSZXNwb25zZRIZCghwcm9iZV9p",
-            "ZBgBIAEoCVIHcHJvYmVJZBJACghkb2N1bWVudBgCIAEoCzIkLmdsaW1tZXIu",
-            "Y29tbW9uLnYxLkRvY3VtZW50UmVmZXJlbmNlUghkb2N1bWVudBIWCgZzdGF0",
-            "dXMYAyABKAlSBnN0YXR1czJuChRDb250cmFjdFByb2JlU2VydmljZRJWCglF",
-            "Y2hvUHJvYmUSIy5nbGltbWVyLmNvbW1vbi52MS5FY2hvUHJvYmVSZXF1ZXN0",
-            "GiQuZ2xpbW1lci5jb21tb24udjEuRWNob1Byb2JlUmVzcG9uc2VCLKoCKUds",
-            "aW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ29tbW9uLlYxYgZwcm90",
-            "bzM="));
+            "YWRhdGFSBXRyYWNlIn4KEUVjaG9Qcm9iZVJlc3BvbnNlEhkKCHByb2JlX2lk",
+            "GAEgASgJUgdwcm9iZUlkEkAKCGRvY3VtZW50GAIgASgLMiQuZ2xpbW1lci5j",
+            "b21tb24udjEuRG9jdW1lbnRSZWZlcmVuY2VSCGRvY3VtZW50SgQIAxAEUgZz",
+            "dGF0dXMybgoUQ29udHJhY3RQcm9iZVNlcnZpY2USVgoJRWNob1Byb2JlEiMu",
+            "Z2xpbW1lci5jb21tb24udjEuRWNob1Byb2JlUmVxdWVzdBokLmdsaW1tZXIu",
+            "Y29tbW9uLnYxLkVjaG9Qcm9iZVJlc3BvbnNlQiyqAilHbGltbWVyQ3JhZGxl",
+            "LkNvbnRyYWN0cy5HbGltbWVyLkNvbW1vbi5WMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.TraceMetadata), global::GlimmerCradle.Contracts.Glimmer.Common.V1.TraceMetadata.Parser, new[]{ "TraceId", "CausationId", "CorrelationId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.DocumentReference), global::GlimmerCradle.Contracts.Glimmer.Common.V1.DocumentReference.Parser, new[]{ "DocumentId", "SchemaId", "SchemaVersion", "DigestSha256" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeRequest), global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeRequest.Parser, new[]{ "ProbeId", "Document", "Trace" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeResponse), global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeResponse.Parser, new[]{ "ProbeId", "Document", "Status" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeResponse), global::GlimmerCradle.Contracts.Glimmer.Common.V1.EchoProbeResponse.Parser, new[]{ "ProbeId", "Document" }, null, null, null, null)
           }));
     }
     #endregion
@@ -964,7 +963,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
     public EchoProbeResponse(EchoProbeResponse other) : this() {
       probeId_ = other.probeId_;
       document_ = other.document_ != null ? other.document_.Clone() : null;
-      status_ = other.status_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -998,18 +996,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       }
     }
 
-    /// <summary>Field number for the "status" field.</summary>
-    public const int StatusFieldNumber = 3;
-    private string status_ = "";
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Status {
-      get { return status_; }
-      set {
-        status_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
-      }
-    }
-
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1027,7 +1013,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       }
       if (ProbeId != other.ProbeId) return false;
       if (!object.Equals(Document, other.Document)) return false;
-      if (Status != other.Status) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1037,7 +1022,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       int hash = 1;
       if (ProbeId.Length != 0) hash ^= ProbeId.GetHashCode();
       if (document_ != null) hash ^= Document.GetHashCode();
-      if (Status.Length != 0) hash ^= Status.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1064,10 +1048,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Document);
       }
-      if (Status.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteString(Status);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1086,10 +1066,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
         output.WriteRawTag(18);
         output.WriteMessage(Document);
       }
-      if (Status.Length != 0) {
-        output.WriteRawTag(26);
-        output.WriteString(Status);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1105,9 +1081,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       }
       if (document_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Document);
-      }
-      if (Status.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Status);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1129,9 +1102,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
           Document = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.DocumentReference();
         }
         Document.MergeFrom(other.Document);
-      }
-      if (other.Status.Length != 0) {
-        Status = other.Status;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1163,10 +1133,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             input.ReadMessage(Document);
             break;
           }
-          case 26: {
-            Status = input.ReadString();
-            break;
-          }
         }
       }
     #endif
@@ -1195,10 +1161,6 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
               Document = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.DocumentReference();
             }
             input.ReadMessage(Document);
-            break;
-          }
-          case 26: {
-            Status = input.ReadString();
             break;
           }
         }

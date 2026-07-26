@@ -15,7 +15,8 @@
 | `generated/` | Contract Spine Adapter edge | Buf 生成的 TS/Python/C# DTO；只读，不进入 Domain/Application/Port。 |
 | `compatibility/` | Contract Spine owner | 仓库内 Protobuf image 与 JSON Schema compatibility baseline；`buf breaking` 不依赖 BSR。 |
 | `fixtures/`、`tests/` | Contract Spine owner | 有效/无效 Document fixture 与三语言最小 round-trip。 |
-| `scripts/` | Contract Spine owner | 生成、兼容、inventory 和 C# round-trip 门。 |
+| `toolchain.json`、`global.json` | Contract Spine owner | Windows/Linux x64 工具 archive、launcher 摘要、许可证与 exact .NET SDK 固定。 |
+| `scripts/` | Contract Spine owner | 生成、兼容、inventory、工具链和三语言 round-trip 门。 |
 
 ## 命令
 
@@ -30,14 +31,17 @@ pnpm contracts:verify
 pnpm --filter @glimmer-cradle/contracts baseline:refresh
 ```
 
-`pnpm contracts:verify` 运行 inventory、Buf lint、Buf breaking、JSON Schema dialect/fixture/compatibility、TS/Python/C# round-trip 与生成物无 diff 检查。
+普通验证要求当前 canonical JSON Schema 的 path + `$id` 集合与 baseline 完全相等，并逐项核对内容摘要；新增未登记、删除、path/`$id` 变化或内容变化都会失败。只有评审确认后的显式 `baseline:refresh` 才能登记变化。
+
+`pnpm contracts:verify` 运行 compatibility/inventory/toolchain 负例回归、inventory、Buf lint/breaking、JSON Schema dialect/fixture/compatibility、固定工具链、TS/Python/C# round-trip 与连续生成无 diff 检查。
 
 ## 离线复现
 
 - Node 与 pnpm 依赖由根 `pnpm-lock.yaml` 固定；本机已有 store 时可用 `pnpm install --offline --frozen-lockfile` 后运行全部 Node/Buff/TS 门。
 - Buf 使用本地 npm package `@bufbuild/buf@1.66.1`，TS 插件使用本地 `@bufbuild/protoc-gen-es@2.13.0`，不使用远程插件或 Buf Schema Registry。
-- Python round-trip 使用 `contracts/tests/python/pyproject.toml` 固定的 `protobuf==6.33.0`；全新环境先执行一次在线 `uv run --project contracts/tests/python python --version` 建立 uv cache，之后可在缓存存在时离线运行。
-- C# round-trip 使用 `.NET SDK 8.0.423` 与 `Google.Protobuf` NuGet 包。全新环境先安装/缓存 `.NET SDK 8.0.423` 和 NuGet 包；本机没有全局 SDK 时可把 SDK 放在未入库的 `contracts/.tools/dotnet/` 并设置 `DOTNET_EXE`，之后 `contracts/.gitignore` 会排除本地工具缓存。
+- Python round-trip 只接受 `uv 0.11.28`，并使用 `--locked --offline --no-python-downloads`；全新环境必须先按 [supply-chain.md](./supply-chain.md) 校验官方 archive、准备 Python/依赖 cache，离线缺件时失败闭合。
+- C# round-trip 只接受 `.NET SDK 8.0.423` 与 locked `Google.Protobuf 3.33.0`。全新环境按 supply-chain 清单校验 archive 后安装，或放到 ignored `contracts/.tools/dotnet/`；`DOTNET_EXE` 指向本地 SDK 时还会校验 launcher SHA-256。
+- `toolchain.json` 的支持平台、archive 摘要和 launcher 摘要是机器事实源；工具缺失、版本/摘要/许可证不符均失败，不降为 warn。
 
 ## Slice 1 边界
 

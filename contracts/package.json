@@ -6,9 +6,11 @@
   "scripts": {
     "generate": "node scripts/generate.mjs",
     "baseline:refresh": "node scripts/refresh-baselines.mjs",
+    "test:gates": "node --test tests/gates/*.test.mjs",
     "lint:proto": "buf lint",
     "breaking:proto": "buf breaking --against compatibility/proto-image.binpb",
     "check:json-schema": "node scripts/check-json-schema.mjs",
+    "check:toolchain": "node scripts/check-toolchain.mjs",
     "roundtrip:ts": "tsx tests/roundtrip/roundtrip.ts",
     "roundtrip:py": "node scripts/run-python-roundtrip.mjs",
     "roundtrip:cs": "node scripts/run-csharp-roundtrip.mjs",
@@ -16,7 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check:generated": "node scripts/check-generated-clean.mjs",
     "check:inventory": "node scripts/check-inventory.mjs",
-    "verify": "pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run typecheck && pnpm run roundtrip && pnpm run check:generated"
+    "verify": "pnpm run test:gates && pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run check:toolchain && pnpm run typecheck && pnpm run roundtrip && pnpm run check:generated"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.13.0",

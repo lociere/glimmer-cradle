@@ -43,11 +43,13 @@ if request_round_trip.document.document_id != document["tool_id"]:
 response = EchoProbeResponse(
     probe_id=request_round_trip.probe_id,
     document=request_round_trip.document,
-    status="ok",
 )
 response_round_trip = EchoProbeResponse()
 response_round_trip.ParseFromString(response.SerializeToString())
-if response_round_trip.status != "ok" or response_round_trip.document.schema_version != document["schema_version"]:
-    raise RuntimeError("Python response protobuf round-trip lost the service status or schema version")
+if (
+    response_round_trip.probe_id != request.probe_id
+    or response_round_trip.document.schema_version != document["schema_version"]
+):
+    raise RuntimeError("Python response protobuf round-trip lost the successful echo result")
 
 print("contracts roundtrip py: ok")

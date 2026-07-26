@@ -56,8 +56,8 @@
 
 | 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
 |---|---|---|---|---|---|
-| Protobuf Service baseline | `contracts/proto/glimmer/common/v1/contract_probe.proto` 定义最小 `ContractProbeService`、`ContractProbeRequest`、`ContractProbeResponse`、`DocumentReference` 和 `TraceMetadata`。 | Contract Spine owner | `contracts/proto/` | Slice 1 | 只在新兼容世代或审查通过的 baseline refresh 中演进；不得由 runtime consumer 手写镜像替代。 |
-| JSON Schema Document baseline | `contracts/json-schema/skill/v1/tool-parameters.schema.json` 定义动态 Skill tool parameters Document。 | Skill Plane Document owner | `contracts/json-schema/` | Slice 1 | Document 结构只能由 JSON Schema 演进；Protobuf 只引用 id/version/digest。 |
+| Protobuf Service baseline | `proto/glimmer/common/v1/contract_probe.proto` 定义最小 `ContractProbeService`、`EchoProbe`、`EchoProbeRequest`、`EchoProbeResponse`、`DocumentReference` 和 `TraceMetadata`。 | Contract Spine owner | `contracts/proto/` | Slice 1 | 只在新兼容世代或审查通过的 baseline refresh 中演进；不得由 runtime consumer 手写镜像替代。 |
+| JSON Schema Document baseline | `json-schema/skill/v1/tool-parameters.schema.json` 定义 `$id` 为 `https://glimmer-cradle.local/contracts/skill/v1/tool-parameters.schema.json`、title 为 `SkillToolParametersDocument` 的动态 Skill tool parameters Document。 | Skill Plane Document owner | `contracts/json-schema/` | Slice 1 | Document 结构只能由 JSON Schema 演进；Protobuf 只引用 id/version/digest。 |
 | Generated DTO | `contracts/generated/{ts,python,csharp}` 由 `buf generate` 生成。 | Contract Spine Adapter edge owner | `contracts/buf.gen.yaml` | Slice 1 | 手改生成物或生成后有 diff 时门禁失败；Domain/Application/Port 不得 import。 |
 | Compatibility baseline | `contracts/compatibility/proto-image.binpb` 与 `json-schema-baseline.json` 在仓库内，`buf breaking` 不依赖 BSR。 | Contract Spine owner | `contracts/compatibility/` | Slice 1 | 破坏性变更必须经有意 baseline refresh 与审查；普通生成不自动刷新。 |
-| Supply chain evidence | `contracts/supply-chain.md` 记录版本、来源、许可证、摘要与缓存/获取方式。 | Contract Spine owner | `pnpm-lock.yaml`、NuGet/package caches、工具版本输出 | Slice 1 | 工具版本或来源变化时同步更新并重跑验证。 |
+| Supply chain evidence | `contracts/toolchain.json` 固定机器可校验的工具/依赖版本、许可证与摘要；`contracts/supply-chain.md` 解释来源和缓存规则。 | Contract Spine owner | `toolchain.json`、`global.json`、npm/uv/NuGet lock 与官方发布摘要 | Slice 1 | 工具版本、来源、支持平台或许可证变化时同步更新并重跑验证。 |

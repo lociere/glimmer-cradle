@@ -1,7 +1,7 @@
 # Protocol Reference
 
 > 范围：跨语言、跨进程和公开 SDK 契约的权威规则，包括 Schema、生成物、事件、错误、Avatar frame 和变更流程。
-> 事实依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/codegen/`、Kernel/Cognition/Desktop/Avatar/Extension 消费端。
+> 事实依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/codegen/`、M12 Slice 1 `contracts/{proto,json-schema,compatibility,generated}/` 与当前 runtime 消费端。
 > 维护触发：Schema、事件、IPC/WS frame、错误码、config schema、codegen、兼容策略或任一跨边界消费者变化。
 
 ## 目录
@@ -16,7 +16,13 @@
 
 ## 权威来源
 
-两个及以上语言或进程共同理解的结构，必须定义在 `protocol/src/schemas/`。生成投影由 `pnpm sync:contracts` 产出，常见消费端包括：
+迁移期权威路由按 owner 分流：
+
+- 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
+- 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
+- Slice 1 只建立 canonical baseline，没有 runtime consumer 已迁移；不得把同一结构同时复制为旧 Protocol 与新 Contracts 权威定义。
+
+现有 runtime Protocol 的生成投影和消费端包括：
 
 | 目录 | 角色 |
 |---|---|
@@ -29,7 +35,7 @@
 | `core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs` | Unity C# Presentation Frame 生成物，只读 |
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 
-禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新 Schema。
+禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新其实际 owner。
 
 ## M12 Slice 1 Contracts Baseline
 
@@ -115,9 +121,9 @@ Kernel 入站、注意力批处理和 Cognition IPC 全程使用同一份 `Perce
 
 ## 变更顺序
 
-1. 用 `rg` 找 Schema、生成物、生产者、映射层、消费者、测试和文档引用。
-2. 修改 `protocol/src/schemas/` 中的权威 Schema，明确必填性、默认值、枚举、错误和兼容语义。
-3. 运行 `pnpm sync:contracts`。
+1. 用 `rg` 找 Schema/IDL、生成物、生产者、映射层、消费者、测试和文档引用，并确认迁移切片与 owner。
+2. 现有 runtime 契约修改 `protocol/src/schemas/`；新 Service/Document 修改 `contracts/{proto,json-schema}/`。明确必填性、默认值、枚举、错误和兼容语义。
+3. 分别运行 `pnpm sync:contracts`，或 `pnpm contracts:generate` 与 `pnpm contracts:verify`；不得交叉刷新另一条基线。
 4. 按生产者、映射层、消费者、UI/日志投影顺序实现。
 5. 删除旧字段、旧消息、手写镜像和无期限 fallback。
 6. 更新受影响的 Current、Implementation、Reference、Guide。
@@ -127,7 +133,7 @@ Kernel 入站、注意力批处理和 Cognition IPC 全程使用同一份 `Perce
 
 ## 验证
 
-- `pnpm sync:contracts` 后 TypeScript、Python 与 Unity C# 生成物均与 Schema 一致。
+- 现有 runtime 变更在 `pnpm sync:contracts` 后保证 TypeScript、Python 与 Unity C# 生成物一致；新 Contract Spine 变更通过 `pnpm contracts:verify` 的兼容、工具链与三语言门。
 - TypeScript 与 Python 消费端都能通过类型/单元测试。
 - IPC/WS/stdio 链路能处理成功、缺字段、未知枚举、错误 code 和降级。
 - 旧字段搜索无运行时残留。
