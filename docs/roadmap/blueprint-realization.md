@@ -101,7 +101,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 
 ### 3.5 蓝图可以长期稳定，阶段可以重排
 
-蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 14 以后候选阶段；Phase 12 已由 accepted ADR-0013/ADR-0014 和 active M12 固定，Phase 13 已由 accepted ADR-0015 和 planned M13 固定。若平台验证要求改变这两个承诺阶段的方向，必须用新 ADR 修订。所有重排必须满足：
+蓝图定义长期不变量。阶段路线定义落地顺序。未来如果技术条件、用户体验或项目重点变化，可以重排 Phase 14 以后候选阶段；Phase 12 已由 accepted ADR-0013/ADR-0014 和 M12 固定，Phase 13 已由 accepted ADR-0015 和 active M13 固定。若平台验证要求改变这两个承诺阶段的方向，必须用新 ADR 修订。所有重排必须满足：
 
 - 不破坏蓝图中的人格边界和器官分层。
 - 不绕过协议、权限、数据和可观测性验收门。
@@ -125,13 +125,17 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../architecture/current/07-子系统当前视图/Cognition.md)、[Extension 与 Skill Plane 当前视图](../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)、[extension-sdk](../reference/extension-sdk.md) | [M09](./milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
 | Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../reference/packaging-layout.md)、[Personal Server 部署](../guides/release/Personal%20Server部署.md) | [M10](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
 | Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `at-risk` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环；当前暂停/延期，未完成。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
-| Phase 12：契约脊柱与跨进程服务架构重建 | `in-progress` | 当前只推进 Slice 1 contracts baseline；长期以 `contracts/`、版本化 Service 和 Kernel Surface Gateway 重建服务神经系统，并收口根职责、器官模块与 Host 崩溃域。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
-| Phase 13：工程自动化脊柱与交付生命周期闭环 | `planned` | 将 Scripts、Automation、CI、Build、Release、Install 与 Ops 收口为 owner 清晰、同构可复现、制品固定且宿主事务安全的一等工程生命周期平面。 | Blueprint、未来 Current/Implementation/Reference/Guide | [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。 |
+| Phase 12：契约脊柱与跨进程服务架构重建 | `in-progress` | Slice 1 contracts baseline 已集成，Slice 2 尚未启动；长期以 `contracts/`、版本化 Service 和 Kernel Surface Gateway 重建服务神经系统，并收口根职责、器官模块与 Host 崩溃域。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[M12 manifest](./manifests/M12-目标物理清单.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
+| Phase 13：工程自动化脊柱与交付生命周期闭环 | `in-progress` | Slice A active 但修复暂停且 fixed state 未集成；B–F planned。目标是 owner 清晰、同构可复现、制品固定且宿主事务安全的一等工程生命周期平面。 | Blueprint、未来 Current/Implementation/Reference/Guide | [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[M13 manifest](./manifests/M13-目标物理清单.md)、[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。 |
 | Phase 14：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来 Contracts、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
 | Phase 15：Native 与本地能力加速 | `candidate` | C++ / Native / 本地模型 / 向量与音视频能力成为受控能力层。 | 未来 native reference 与 implementation map | [Backlog](./backlog.md)。 |
 | Phase 16：Extension 内容生态成熟化 | `candidate` | Extension 从开发扩展点走向可分发、可治理、可组合的生态。 | 未来 SDK、权限、发布与示例文档 | [Backlog](./backlog.md)。 |
 | Phase 17：自我演化与长期记忆质量 | `candidate` | LLM Reflection、记忆重排、叙事日记和自我评估质量提升。 | 未来 cognition、memory、evaluation 文档 | [Backlog](./backlog.md)。 |
 | Phase 18：蓝图完成验收与发布稳定化 | `candidate` | 对照蓝图完成全系统验收，消除影子架构与文档债。 | 全部事实源 | 本页未来晋升。 |
+
+Phase 12/13 的完成态目录与迁移动作不在本页复制，分别见
+[M12 清单](./manifests/M12-目标物理清单.md) 与
+[M13 清单](./manifests/M13-目标物理清单.md)。
 
 ## 5. 已归档主干阶段
 
@@ -299,7 +303,7 @@ Phase 8 之后，Glimmer Cradle 具备开发期意义上的完整交互闭环。
 
 ## 7. 当前与未来阶段
 
-Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 当前暂停/延期并标记为 `at-risk`，未完成、未关闭。Phase 12 的 Slice 1 contracts baseline 是 [now.md](./now.md) 中当前唯一 `in-progress` 推进面。Phase 13 已由 accepted ADR-0015 固定并作为 `planned` 里程碑，但尚未开始；Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
+Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 当前暂停/延期并标记为 `at-risk`，未完成、未关闭。Phase 12 的 Slice 1 contracts baseline 已集成，Slice 2 尚未启动。Phase 13 Slice A 是 [now.md](./now.md) 中当前唯一 active 推进面，但修复暂停且 fixed state 未集成；B–F 仍是 planned。Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
 
 ### 7.1 Phase 9：主体可用性、跨场景记忆与体验收口
 
@@ -344,27 +348,33 @@ Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、�
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | `in-progress`（当前只推进 Slice 1 contracts baseline） |
+| 状态 | `in-progress`（Slice 1 contracts baseline 已集成；Slice 2 尚未启动） |
 | 主问题 | 当前 `protocol/` 把文档、IPC envelope、SDK 模型和 transport 混在一个概念中；根目录、器官内部层次、Avatar/Extension Host 归属也尚未稳定表达 owner 与崩溃域。 |
 | 计划成果 | 建立 `contracts/` 与版本化跨进程 Service；以 Kernel Surface Gateway 服务 Web/Desktop；收口 `core/`、`engines/`、`hosts/`、`products/`、`packages/`、`contracts/`、`native/`、`templates/` 根职责、Kernel/Cognition 模块化单体、Avatar/Unity Host 与 Extension Host 物理边界。 |
-| 关键依赖 | 完整 runtime 迁移仍依赖 Phase 11 完成并稳定产品边界；当前 Slice 1 是用户授权的不切运行主线例外；ADR-0009 的动态端点、监督树和 readiness；Node/Python/C# 与 Windows/Linux 工具链验证。 |
+| 关键依赖 | 完整 runtime 迁移仍依赖 Phase 11 完成并稳定产品边界；Slice 1 是已集成的不切运行主线例外；ADR-0009 的动态端点、监督树和 readiness；Node/Python/C# 与 Windows/Linux 工具链验证。 |
 | 非范围 | 不改变领域 owner，不把 Cognition/Kernel 拆成微服务，不实现托管云或公网器官 API，不预建 UI shared package，不永久保留新旧物理或 transport 双轨。 |
 | 验收门 | Contract compatibility、跨语言 Adapter、调用/生命周期语义和 Surface/data plane 通过；目标目录、imports、composition、构建、测试和打包一致；旧 `protocol/`、旧 Host/聚合目录及被替代 transport 主线删除。 |
 
-Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边界，不是一次库替换或目录改名。它只通过 M12 定义的九个顺序切片推进；当前唯一 active 范围是 Slice 1，每个切片独立输入/输出 fixed state、审查、回退与删除，前一切片失败即停止，不做全里程碑大爆炸提交。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；Contract Spine、供应链与 transport 取舍见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)，根职责、模块化单体与 Host 归属见 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。
+Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边界，不是一次库替换或目录改名。它只通过 M12 定义的九个顺序切片推进；Slice 1 已集成但没有 runtime consumer 迁移，每个后续切片仍须独立输入/输出 fixed state、审查、回退与删除，前一切片失败即停止，不做全里程碑大爆炸提交。计划见 [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)，精确完成树见 [M12 manifest](./manifests/M12-目标物理清单.md)；Contract Spine、供应链与 transport 取舍见 [ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)，根职责、模块化单体与 Host 归属见 [ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。
 
 ### 7.5 Phase 13：工程自动化脊柱与交付生命周期闭环
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | `planned` |
+| 状态 | `in-progress`（Slice A active，修复暂停且 fixed state 未集成；B–F planned） |
 | 主问题 | 运行时架构已经跨越多语言、多产品、多进程与宿主事务，但 Scripts、Automation、CI、Build、Release、Install 与 Ops 仍需要形成同等完整、可验证、可长期演化的工程生命周期承重面。 |
 | 计划成果 | owner-local 原子任务、root 薄编排、workflow 只调公共任务、Windows/Linux PR CI、fixed artifact、宿主级部署事务、恢复安全、可复现供应链和独立 Desktop packaging 矩阵。 |
-| 关键依赖 | Phase 12 当前 Slice 1 fixed-state commit 完成并集成，相关 writer 释放；工程 task/workflow/artifact/install/ops inventory 冻结；后续 M12 重叠入口按 fixed commit 串行 handoff。 |
+| 关键依赖 | Phase 12 Slice 1 fixed-state commit 已完成并集成，相关 writer 已释放；工程 task/workflow/artifact/install/ops inventory 冻结；后续 M12 重叠入口按 fixed commit 串行 handoff。 |
 | 非范围 | 不实现角色运行时功能，不改变 M12 Contract Spine，不把工程生命周期混称为角色运行时器官，不为采用 Nx、Turborepo、Taskfile 或其他流行工具重写。 |
 | 验收门 | M13 六个 slice 各有独立 fixed state；审查 P1/P2 全部关闭；task contract、local/CI parity、host-global lock、数据恢复、owner-local 收口、provenance/attestation 与 Desktop 产品矩阵通过；旧入口删除；Current/Implementation/Reference/Guide 按真实实现同步。 |
 
-Phase 13 的核心不是整理脚本，而是让源码经 owner-local task、薄编排、CI 和固定制品抵达可恢复宿主，形成与运行时架构同等可靠的交付生命周期。M13 尚未开始；进入门、风险覆盖和分层验证见 [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)，长期取舍见 [ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。
+Phase 13 的核心不是整理脚本，而是让源码经 owner-local task、薄编排、CI 和固定制品
+抵达可恢复宿主，形成与运行时架构同等可靠的交付生命周期。Slice A 是唯一 active
+推进面，但实现状态 paused/non-reproducible；暂停 patch 不是 Current 或 accepted
+fixed state，恢复前必须由原 owner 在新 main 上复核并重放。进入门、风险覆盖和分层
+验证见 [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)，完成态目录见
+[M13 清单](./manifests/M13-目标物理清单.md)，长期取舍见
+[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。
 
 ### 7.6 Phase 14：低延迟多模态交互
 
@@ -439,7 +449,7 @@ Phase 18 是“蓝图完成”的验收阶段，不是新功能阶段。它的�
 | --- | --- | --- |
 | `now.md` | 当前唯一活跃推进面。 | 如果某个 Phase 变成 `in-progress`，必须同步在 `now.md` 声明。 |
 | `milestones/` | 已承诺阶段或里程碑。 | Phase 晋升后必须有独立 milestone 文件，写清范围、非范围、验收门和证据。 |
-| `backlog.md` | 候选增强和未承诺任务池。 | Phase 14-17 的子项可以先进入 Backlog，再择机晋升；Phase 13 已是 planned M13，不再作为 candidate 双重承诺。 |
+| `backlog.md` | 候选增强和未承诺任务池。 | Phase 14-17 的子项可以先进入 Backlog，再择机晋升；Phase 13 已是 active M13，不再作为 candidate 双重承诺。 |
 | 本页 | 蓝图全阶段母路线。 | 维持阶段连续性和架构意图，不替代执行列表。 |
 
 如果 `now.md`、milestone 和本页出现冲突，按以下顺序处理：

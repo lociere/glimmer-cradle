@@ -11,9 +11,10 @@
 | [now.md](./now.md) | 当前唯一活跃推进面、下一验收门和本次审阅日期 |
 | [blueprint-realization.md](./blueprint-realization.md) | 从项目 0 到架构蓝图完全落地的全阶段母路线；不等同当前承诺 |
 | [milestones/](./milestones/) | 已承诺或进行中的里程碑，按成果写 |
+| [manifests/](./manifests/) | M12/M13 的完成态目录树、Current → Target 动作与删除门 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
-当前唯一 active 推进面是 [M12 Slice 1 contracts baseline](./milestones/M12-契约脊柱与跨进程服务架构重建.md)；[M13 工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 已承诺为 `planned`，尚未开始。进入关系与门禁以 [now.md](./now.md) 为准。
+当前唯一 active 推进面是 [M13 Slice A 部署事务安全](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)，其修复工作暂停且 fixed state 尚未集成；[M12 Slice 1 contracts baseline](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已集成，但 runtime consumer 尚未迁移。进入关系与门禁以 [now.md](./now.md) 为准。
 
 ## 状态规则
 
@@ -32,6 +33,9 @@
 - 过程材料或被替代计划进入 History。
 - Roadmap 只保留完成摘要或从 `now.md` 移除。
 
-## 里程碑模板
+## 可执行里程碑门
 
-里程碑必须包含：目标成果、范围、非范围、依赖、风险、验收门、完成后的归档位置。不得写“完成百分比”代替验收证据；不得把未触发的候选愿望塞进当前里程碑。
+里程碑必须包含目标成果、范围、非范围、依赖、风险、验收门和完成后的归档位置。每个
+可执行 slice 还必须按 [文档维护规范](../文档维护规范.md#完成态物理目录门) 写出最终
+目录树、owner、Current → Target 动作和旧路径删除门；无法确定最终路径时只能处于
+discovery/design。历史 milestone 不追溯整改，本次只更新 M12/M13。
