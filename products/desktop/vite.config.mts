@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// renderer public 资产由 scripts/sync-assets.mjs 从仓库根 assets/ 同步而来。
+// renderer public 资产由产品 owner 的 scripts/sync-assets.mjs 从仓库根 assets/ 同步。
 // 配置保持 ESM 入口，避免 Vite 5 在 dev/build 时回退到已弃用的 CJS Node API。
 export default defineConfig({
   root: path.resolve(__dirname, 'src', 'renderer'),

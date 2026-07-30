@@ -1,7 +1,7 @@
 # Observability Reference
 
 > 范围：日志、trace、span、metrics、audit、模型调用观测、DLQ、应用 console 输出、诊断索引与导出 bundle 的精确规则。
-> 事实依据：`configs/system/observability.yaml`、Kernel/Cognition/Desktop observability 代码、`scripts/dlq.py`、`scripts/telemetry.py`。  
+> 事实依据：`configs/system/observability.yaml`、Kernel/Cognition/Desktop observability 代码、`core/kernel/tools/dlq.py`、`core/kernel/tools/telemetry.py`。
 > 维护触发：字段、目录、IPC、保留期、脱敏、导出或 cleanup 行为变化。
 
 ## 本地可观测性平面目录
@@ -213,8 +213,8 @@ bundle 由 Desktop main 导出到受控 data root，不写安装目录。当前�
 常用脚本入口：
 
 ```powershell
-python scripts/dlq.py
-python scripts/telemetry.py
+python core/kernel/tools/dlq.py
+python core/kernel/tools/telemetry.py
 ```
 
 ## 保留期与 Cleanup

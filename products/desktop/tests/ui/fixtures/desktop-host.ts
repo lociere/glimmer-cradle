@@ -445,7 +445,7 @@ export async function installDesktopHostMock(page: Page): Promise<void> {
           resolution: null,
           diagnostic_hint: 'retry after provider recovers',
           redacted_payload_summary: '{"purpose":"reply"}',
-          replay_command: 'python scripts/dlq.py replay --id 7',
+          replay_command: 'python core/kernel/tools/dlq.py replay kernel:7 --dispatcher <command>',
           source_path: 'data/observability/logs/application/cognition.console.log',
         },
       ],

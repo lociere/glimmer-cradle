@@ -48,7 +48,7 @@ describe('observability foundation', () => {
         sourcePath: 'core/kernel/tests',
         redactedPayloadSummary: '{"skill_id":"test.skill"}',
         retryPolicy: 'manual',
-        replayCommand: 'python scripts/dlq.py replay kernel:1',
+        replayCommand: 'python core/kernel/tools/dlq.py replay kernel:1 --confirm --dispatcher <command>',
         diagnosticHint: '检查 skill handler',
       },
     );

@@ -8,7 +8,7 @@
 | Manifest | 状态范围 |
 |---|---|
 | [M12 目标物理清单](./M12-目标物理清单.md) | Slice 1 已集成；Slice 2–9 planned |
-| [M13 目标物理清单](./M13-目标物理清单.md) | Slice A 是唯一 active 推进面，但实现状态 paused/non-reproducible；Slice B–F planned |
+| [M13 目标物理清单](./M13-目标物理清单.md) | A～F fixed-state candidate 的精确 source/test/workflow/runtime/artifact 路径与删除门 |
 
 稳定设计入口属于 Blueprint，基准树解释属于 Current；本目录只保存 M12/M13 的完成态
 子树、迁移动作和删除门，不得反向声明当前能力。

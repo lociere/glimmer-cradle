@@ -1,26 +1,25 @@
 # Now
 
-> 审阅日期：2026-07-29
+> 审阅日期：2026-07-30
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前唯一活跃推进面：M13 Slice A 部署事务安全
+## 当前唯一活跃推进面：M13 fixed-state 独立复审
 
 [M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1 `contracts baseline` 已集成：canonical `contracts/` baseline、离线可复现生成链、兼容基线、三语言最小 round-trip 和供应链证据已经形成。Slice 1 没有切换运行主线；当前 runtime consumers 仍使用 `protocol/`，Slice 2 尚未启动，M11 前置关系也没有因此完成。
 
-[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 已进入 Slice A `部署事务安全`。当前代码修复暂停，未形成并集成 fixed state；因此 host-global transaction、稳定 handoff、旧入口删除等目标都不能写入 Current。恢复实现前先以 [M13 目标物理清单](./manifests/M13-目标物理清单.md) 核对精确 target path、允许/禁止路径和删除门；B–F 仍是 planned。
+[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。该状态尚未独立复审或集成，不能写成 main 已完成。
 
 M12/M13 的完成态目录、迁移动作和删除门分别见对应
 [M12 清单](./manifests/M12-目标物理清单.md) 与
 [M13 清单](./manifests/M13-目标物理清单.md)。M12-9 必须在候选状态重新核对全部
 Protocol consumer，不能用冻结 main inventory 冒充完成证据。
 
-Slice A 的暂停 checkpoint 来自 branch `fix/deploy-transaction-safety`、rejected HEAD
-`3d8cb9676326758dc277f57b155c51b444f49413` 和唯一未提交路径
-`deploy/personal-server/host-transaction.sh`。该 patch 未验证、不可复现，不是 Current
-或 accepted fixed state；恢复规则以 [M13 清单](./manifests/M13-目标物理清单.md) 为准。
+旧 Slice A checkpoint 已由原 owner 保全并重放到 canonical
+`deploy/personal-server/lib/host-transaction.sh`；旧临时路径不属于完成态。下一步只做候选
+commit 的独立复审、必要修复与集成，不再恢复 rejected checkpoint。
 
 [M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 暂停/延期，未完成、未关闭。M12 Slice 1 是用户授权的“不切运行主线”前置基线工作，不表示 M11 前置依赖已经满足，也不得把 M11 写成完成。
 
@@ -40,16 +39,13 @@ M11 暂停前仍未完成的范围：
 
 ## 下一验收门
 
-### M13 Slice A 恢复与 fixed-state 门
+### M13 fixed-state 独立复审与集成门
 
-M12 Slice 1 已满足 fixed-state 集成前置；恢复 M13 Slice A 代码修复前，原 owner 必须在
-新集成 main 上复核并重放暂停 patch，检查冲突和内容，并形成可复现 patch artifact 或
-commit。任何 diff 变化都会使现有 SHA-256 与 stable patch-id 失效。在此之前 Slice A
-保持 paused/non-reproducible，禁止继续实现。恢复后还须冻结 deploy/install/ops/bridge
-consumer inventory，并按 M13 完成态目录核对实际改动。输出 fixed state 必须通过
-host-global lock、只读查询无持久副作用、handoff、自替换、崩溃恢复、旧入口消费者
-归零与结构化事务日志验收。若 M12 后续切片需要修改相同 generate/build/package 入口，
-必须按固定 commit 串行 handoff。
+独立复审以候选 commit/tree 和验证账本为输入，逐项核对 A～F 物理清单、实际 diff、旧入口
+删除门、事务 trusted namespace、外部 handoff、恢复失败终态、DLQ lifecycle、CI/Release
+权限以及 Desktop clean Windows runner 风险。真实 Docker、Ubuntu、Windows installer、
+签名、公证、Registry 与生产未运行，不得从隔离 fixture 外推。复审通过后由总控集成；若
+M12 后续切片修改相同 generate/build/package 入口，必须按固定 commit 串行 handoff。
 
 ### Personal Server UI 优化门
 

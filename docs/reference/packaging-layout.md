@@ -1,7 +1,7 @@
 # Packaging Layout Reference
 
 > 范围：源码目录、开发投影、安装包资源、组件、只读资产、用户数据、外部运行时和打包验证的映射。
-> 事实依据：Desktop `electron-builder` 配置、`scripts/build-*`、Avatar/Unity 同步脚本、路径 resolver、`data/` 布局。
+> 事实依据：Desktop `electron-builder` 配置、owner-local Avatar/Unity/产品脚本、路径 resolver、`data/` 布局。
 > 维护触发：安装树、构建输出、组件路径、资源投影、更新策略、平台目标或打包脚本变化。
 
 ## 概念映射
@@ -35,7 +35,7 @@
 
 当前开发期 Avatar 可由 `pnpm avatar:build` 生成到本机投影：`build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe` 是 Kernel 受管入口，负责在 HWND 创建阶段隔离 worker；同目录 `UnityAvatarHost.exe` 是 Unity Player。打包暂存进入 `build/staging/desktop/<platform>/resources/components/avatar/unity-host/`，最终 Desktop 分发物进入 `dist/desktop/`。Unity 正式身体的源资产来自 `assets/avatar/avatar-packages/*/avatar-package.json`，同步脚本生成 Unity project 投影和 `avatar-package-registry.json`；私人模型内容不进入 Git。
 
-当前开发链路中，Desktop main 通过 `products/desktop/src/main/avatar-paths.ts` 解析 Unity project、Avatar Package Registry、SDK catalog、受管 Host 包和构建日志；脚本侧通过 `scripts/lib/avatar-paths.mjs` 生成同一套开发期物理位置。Kernel 运行时资源投影再通过 `core/kernel/src/foundation/resource-resolver.ts` 把 Avatar Package Registry、Host executable、workdir 和 `avatar.sdk.*` SDK 状态并入 `avatar.host.reconciler.resources`。新增 Avatar 相关入口时，必须先扩展 resolver，不再直接散落仓库相对路径。
+当前开发链路中，Desktop main 通过 `products/desktop/src/main/avatar-paths.ts` 解析 Unity project、Avatar Package Registry、SDK catalog、受管 Host 包和构建日志；脚本侧通过 `core/avatar/scripts/avatar-paths.mjs` 生成同一套开发期物理位置。Kernel 运行时资源投影再通过 `core/kernel/src/foundation/resource-resolver.ts` 把 Avatar Package Registry、Host executable、workdir 和 `avatar.sdk.*` SDK 状态并入 `avatar.host.reconciler.resources`。新增 Avatar 相关入口时，必须先扩展 resolver，不再直接散落仓库相对路径。
 
 打包验收必须覆盖：UnityAvatarHost 可启动、`host_hello`、`host_ready`、首帧 present、透明命中、拖动、DPI、多显示器、退出回收和 process log。
 
@@ -47,7 +47,11 @@ Audio engine 以 `engines/audio` 为源码事实源。TTS/ASR 默认关闭且不
 
 `deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；Cognition 与 Audio 使用 uv 锁文件在 Linux builder 中创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。
 
-tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的 `linux/amd64` OCI 镜像和确定性部署包。当前 workflow 生成并上传五个自有资产：轻量包 `glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz`、完整包 `glimmer-cradle-personal-server-v<version>-linux-amd64-full.tar.gz`、服务器拉取入口 `glimmer-cradle-installer.sh`、控制机推送入口 `glimmer-cradle-remote-installer.sh` 与统一校验清单 `SHA256SUMS`；GitHub 自动生成的源码归档不属于产品安装包。工作流依赖固定到完整 commit SHA，Release 正文由同一打包脚本生成，版本、支持平台、资产职责与 OCI digest 不依赖人工填写。发布门禁会在 OCI 上直接执行 Caddy 版本检查，并验证两个部署包中的应用与 Caddy 默认镜像指向同一个 digest。该 workflow 只影响包含本实现的后续 tag，不追溯补写既有 Release。
+tag workflow 的 build job 先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的
+`linux/amd64` OCI 与确定性部署包，并附加 artifact manifest、provenance、SPDX SBOM 和
+in-toto attestation。release job 只下载该 fixed artifact 后发布，不再现场构建。基础镜像
+必须以 digest 输入；workflow 权限按 build 的 packages write 与 release 的 contents write
+分开。
 
 当前 `glimmer-cradle-personal-server-v<version>-linux-amd64.tar.gz` 是**轻量部署包**：它只携带 Compose、Caddy 配置、事务化部署脚本、默认配置投影和目标 OCI digest，不携带应用镜像。标准在线安装先取得该包，再从 GHCR 按 digest 拉取应用与 Caddy 共用的 OCI 镜像，因此部署包体积很小是预期行为。
 
@@ -67,7 +71,7 @@ tag 发布流水线先执行仓库门禁，再生成带 BuildKit provenance/SBOM
 | `/opt/glimmer-cradle/default-config` | 只读首次配置模板 |
 | `/var/lib/glimmer-cradle/config` | 用户配置挂载 |
 | `/var/lib/glimmer-cradle/data` | 用户数据挂载 |
-| `/run/glimmer-cradle` | tmpfs 短期协调状态 |
+| `/run/glimmer-cradle` | 宿主同路径协调根；包含 transaction lock 与 Ops Bridge socket |
 
 标准镜像包含 Cognition、云端 TTS 所需代码和经完整性验证的 Caddy，不包含 ASR 依赖、FunASR 模型、Embedding 本地模型、私人 Avatar、真实 secret 或本机数据。应用和 Caddy 服务复用同一个 digest 固定的 OCI 传输单元，但仍是两个容器、两个主进程和两套权限边界；应用容器不直接发布 `3210` 到宿主机。目标服务器默认只访问 GitHub Release 与 GHCR，不为宿主就绪检查或入口服务额外拉取 Docker Hub 镜像。
 

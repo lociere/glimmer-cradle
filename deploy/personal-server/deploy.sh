@@ -4,12 +4,20 @@ umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/lib/host-transaction.sh"
 ENV_TEMPLATE_FILE="${GLIMMER_CRADLE_ENV_TEMPLATE_FILE:-${SCRIPT_DIR}/.env.example}"
 DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
-BACKUP_ROOT="${STATE_ROOT}/backups"
+RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-${SCRIPT_DIR}}"
+CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-$(dirname -- "$DEPLOYMENT_ENV_FILE")}"
+BACKUP_ROOT="${STATE_ROOT}/data/backups"
+MANUAL_BACKUP_ROOT="${BACKUP_ROOT}/manual"
+TRANSACTION_BACKUP_ROOT="${BACKUP_ROOT}/transaction"
+RESTORE_SAFETY_BACKUP_ROOT="${BACKUP_ROOT}/restore-safety"
 IMAGE_REPOSITORY="glimmer-cradle/personal-server"
 OPS_BRIDGE_CONTAINER="glimmer-cradle-ops-bridge"
+DOCKER_SOCKET_PATH="${GLIMMER_CRADLE_DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
 BACKUP_RETENTION=5
 IMAGE_RETENTION=3
 READY_TIMEOUT_SECONDS="${GLIMMER_CRADLE_READY_TIMEOUT_SECONDS:-240}"
@@ -26,6 +34,8 @@ TRANSACTION_CANDIDATE_ENV=""
 TRANSACTION_PREVIOUS_ENV=""
 TRANSACTION_PREVIOUS_IMAGE=""
 TRANSACTION_CANDIDATE_IMAGE=""
+TRANSACTION_REPLACING_IMAGE=""
+TRANSACTION_IMAGE_PERSISTED=0
 RELEASE_VERSION=""
 
 resolve_release_version() {
@@ -61,14 +71,22 @@ cleanup() {
 
 on_exit() {
   local exit_code=$?
+  local finish_code=0
   trap - EXIT INT TERM
   if (( TRANSACTION_ACTIVE )); then
     if [[ -n "$DEPLOY_RESULT_FILE" ]]; then
       rm -f -- "$DEPLOY_RESULT_FILE"
     fi
-    rollback_transaction || true
+    if ! rollback_transaction; then
+      host_transaction_mark_recovery_required \
+        "restore the last verified transaction backup and restart the previous image"
+      exit_code="$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+    fi
   fi
   cleanup
+  exit_code="$(host_transaction_normalize_exit "$exit_code")"
+  host_transaction_finish "$exit_code" || finish_code=$?
+  (( finish_code == 0 )) || exit_code="$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
   exit "$exit_code"
 }
 
@@ -89,7 +107,7 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN "$bridge_token"
   fi
   if ! grep -q '^GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock
+    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock"
   fi
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"
@@ -98,13 +116,21 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
   fi
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
   chmod 600 "$DEPLOYMENT_ENV_FILE"
 }
 
 prepare_state() {
-  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run" "$BACKUP_ROOT"
-  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run"
-  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT" "$STATE_ROOT/config" "$STATE_ROOT/data" "$STATE_ROOT/run" "$BACKUP_ROOT"
+  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data/state" "$STATE_ROOT/data/models" \
+    "$STATE_ROOT/data/packages" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" \
+    "$RESTORE_SAFETY_BACKUP_ROOT"
+  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data/state" \
+    "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages"
+  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT" "$STATE_ROOT/config" "$STATE_ROOT/data" \
+    "$STATE_ROOT/data/state" "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages" \
+    "$BACKUP_ROOT" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" "$RESTORE_SAFETY_BACKUP_ROOT"
 }
 
 set_env_value() {
@@ -290,11 +316,23 @@ wait_until_ready() {
 }
 
 start_ops_bridge() {
-  local image token socket_path docker_gid docker_bin compose_plugin
+  local image token socket_path docker_gid docker_bin compose_plugin deployment_mode release_root
   image="$(read_env GLIMMER_CRADLE_IMAGE '')"
   token="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN '')"
-  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET /var/lib/glimmer-cradle/run/ops-bridge.sock)"
-  [[ -n "$image" && -n "$token" && -S /var/run/docker.sock ]] || return 0
+  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock")"
+  deployment_mode="$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
+  if [[ "$deployment_mode" != image ]]; then
+    stop_ops_bridge
+    printf '{"event":"ops_bridge_disabled","error_code":"source_mode_has_no_stable_host_owner","exit_code":66}\n' >&2
+    return 0
+  fi
+  release_root="${INSTALL_ROOT}/current"
+  [[ -d "$release_root" && -f "$release_root/lib/host-transaction.sh" \
+    && ! -L "$release_root/lib/host-transaction.sh" ]] || {
+    printf '{"event":"ops_bridge_disabled","error_code":"installed_owner_missing","exit_code":66}\n' >&2
+    return 0
+  }
+  [[ -n "$image" && -n "$token" && -S "$DOCKER_SOCKET_PATH" ]] || return 0
   docker_bin="$(command -v docker)"
   compose_plugin="${GLIMMER_CRADLE_DOCKER_COMPOSE_PLUGIN:-/usr/libexec/docker/cli-plugins/docker-compose}"
   [[ -x "$compose_plugin" ]] || compose_plugin="/usr/lib/docker/cli-plugins/docker-compose"
@@ -302,7 +340,7 @@ start_ops_bridge() {
     echo "未找到 Docker Compose CLI 插件，运维桥不启动。" >&2
     return 0
   }
-  docker_gid="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || printf '0')"
+  docker_gid="$(stat -c '%g' "$DOCKER_SOCKET_PATH" 2>/dev/null || printf '0')"
   "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
   "${DOCKER[@]}" run --detach \
     --name "$OPS_BRIDGE_CONTAINER" \
@@ -319,43 +357,71 @@ start_ops_bridge() {
     --pids-limit 64 \
     --group-add "$docker_gid" \
     --entrypoint /usr/local/bin/node \
-    --env GLIMMER_CRADLE_CLI_PATH=/host/glimmer-cradle/current/deploy.sh \
-    --env GLIMMER_CRADLE_STATE_ROOT=/var/lib/glimmer-cradle \
-    --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE=/etc/glimmer-cradle/deployment.env \
-    --env GLIMMER_CRADLE_HOST_RELEASE_ROOT=/host/glimmer-cradle/current \
+    --env GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
+    --env GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT" \
+    --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE" \
+    --env GLIMMER_CRADLE_HOST_RELEASE_ROOT="$release_root" \
+    --env GLIMMER_CRADLE_HOST_INSTALL_ROOT="$INSTALL_ROOT" \
+    --env GLIMMER_CRADLE_TRANSACTION_IMAGE="$image" \
+    --env GLIMMER_CRADLE_HOST_DOCKER_BIN="$docker_bin" \
+    --env GLIMMER_CRADLE_HOST_DOCKER_COMPOSE_PLUGIN="$compose_plugin" \
+    --env GLIMMER_CRADLE_HOST_DOCKER_SOCKET="$DOCKER_SOCKET_PATH" \
     --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET="$socket_path" \
     --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN="$token" \
     --env GLIMMER_CRADLE_RELEASE_SOURCE="$(read_env GLIMMER_CRADLE_RELEASE_SOURCE https://github.com/lociere/glimmer-cradle/releases/latest/download)" \
-    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock,readonly \
+    --mount type=bind,src="$DOCKER_SOCKET_PATH",dst=/var/run/docker.sock,readonly \
     --mount type=bind,src="$docker_bin",dst=/usr/bin/docker,readonly \
     --mount type=bind,src="$compose_plugin",dst=/usr/libexec/docker/cli-plugins/docker-compose,readonly \
-    --mount type=bind,src=/opt/glimmer-cradle/current,dst=/host/glimmer-cradle/current,readonly \
-    --mount type=bind,src=/etc/glimmer-cradle,dst=/etc/glimmer-cradle \
-    --mount type=bind,src="$STATE_ROOT",dst=/var/lib/glimmer-cradle \
+    --mount type=bind,src="$INSTALL_ROOT",dst="$INSTALL_ROOT" \
+    --mount type=bind,src="$CONFIG_ROOT",dst="$CONFIG_ROOT" \
+    --mount type=bind,src="$STATE_ROOT",dst="$STATE_ROOT" \
+    --mount type=bind,src="$RUN_ROOT",dst="$RUN_ROOT" \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
     "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
+  wait_until_ops_bridge_ready
+}
+
+wait_until_ops_bridge_ready() {
+  local deadline=$((SECONDS + 30))
+  while (( SECONDS < deadline )); do
+    if "${DOCKER[@]}" exec "$OPS_BRIDGE_CONTAINER" node -e \
+      "const h=require('node:http');const r=h.request({socketPath:process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET,path:'/snapshot',headers:{authorization:'Bearer '+process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN}},x=>process.exit(x.statusCode===200?0:1));r.on('error',()=>process.exit(1));r.end()" \
+      >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  host_transaction_event ops_bridge_readiness_failed ops_bridge_not_ready "$HOST_TRANSACTION_EXIT_FAILED"
+  return "$HOST_TRANSACTION_EXIT_FAILED"
 }
 
 stop_ops_bridge() {
   local socket_path
   "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
-  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${STATE_ROOT}/run/ops-bridge.sock")"
-  if [[ -n "$socket_path" && "$socket_path" == "${STATE_ROOT}/run/"* ]]; then
+  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock")"
+  if [[ -n "$socket_path" && "$socket_path" == "${RUN_ROOT}/"* ]]; then
     "${PRIVILEGED[@]}" rm -f -- "$socket_path"
   fi
 }
 
 create_backup() {
-  local timestamp backup_dir counter=0
+  local kind="${1:-transaction}" root timestamp backup_dir counter=0
+  case "$kind" in
+    manual) root="$MANUAL_BACKUP_ROOT" ;;
+    transaction) root="$TRANSACTION_BACKUP_ROOT" ;;
+    restore-safety) root="$RESTORE_SAFETY_BACKUP_ROOT" ;;
+    *) return "$HOST_TRANSACTION_EXIT_USAGE" ;;
+  esac
   timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  backup_dir="${BACKUP_ROOT}/${timestamp}"
+  backup_dir="${root}/${timestamp}"
   while [[ -e "$backup_dir" ]]; do
     ((counter += 1))
-    backup_dir="${BACKUP_ROOT}/${timestamp}-$(printf '%02d' "$counter")"
+    backup_dir="${root}/${timestamp}-$(printf '%02d' "$counter")"
   done
   mkdir -p "$backup_dir"
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/config.tar.gz" config
-  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/data.tar.gz" data
+  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/data.tar.gz" \
+    data/state data/models data/packages
   "${PRIVILEGED[@]}" chown -R "$(id -u):$(id -g)" "$backup_dir"
   (
     cd "$backup_dir"
@@ -363,6 +429,7 @@ create_backup() {
   )
   cat > "$backup_dir/deployment.env" <<EOF
 created_at=${timestamp}
+kind=${kind}
 previous_image=${TRANSACTION_PREVIOUS_IMAGE}
 candidate_image=${TRANSACTION_CANDIDATE_IMAGE}
 status=pending
@@ -402,7 +469,8 @@ restore_backup() {
   )
   assert_archive_root "$backup_dir/config.tar.gz" config
   assert_archive_root "$backup_dir/data.tar.gz" data
-  "${PRIVILEGED[@]}" rm -rf -- "$STATE_ROOT/config" "$STATE_ROOT/data"
+  "${PRIVILEGED[@]}" rm -rf -- "$STATE_ROOT/config" "$STATE_ROOT/data/state" \
+    "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages"
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/config.tar.gz"
   "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/data.tar.gz"
   prepare_state
@@ -436,18 +504,26 @@ backup_release() {
   if (( was_running )); then
     compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans
   fi
-  if ! backup_dir="$(create_backup)"; then
+  if ! backup_dir="$(create_backup manual)"; then
     if (( was_running )); then
-      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      if ! compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans \
+        || ! wait_until_ready "$DEPLOYMENT_ENV_FILE"; then
+        host_transaction_mark_recovery_required \
+          "backup failed and the pre-operation service could not be restored; restart the recorded image"
+        return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+      fi
     fi
     echo "备份创建失败，服务已恢复到操作前状态。" >&2
     return 1
   fi
   mark_backup "$backup_dir" manual
   if (( was_running )); then
-    compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-    wait_until_ready "$DEPLOYMENT_ENV_FILE"
+    if ! compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans \
+      || ! wait_until_ready "$DEPLOYMENT_ENV_FILE"; then
+      host_transaction_mark_recovery_required \
+        "manual backup completed but the pre-operation service did not become ready"
+      return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+    fi
   fi
   echo "备份已创建: ${backup_dir}"
 }
@@ -459,7 +535,8 @@ restore_release() {
     echo "restore 只接受 backups 下的 UTC 时间戳目录名。" >&2
     return 1
   }
-  backup_dir="${BACKUP_ROOT}/${backup_name}"
+  backup_dir="${MANUAL_BACKUP_ROOT}/${backup_name}"
+  [[ -d "$backup_dir" ]] || backup_dir="${TRANSACTION_BACKUP_ROOT}/${backup_name}"
   validate_backup "$backup_dir"
   if compose_with_env "$DEPLOYMENT_ENV_FILE" ps --status running --services 2>/dev/null | grep -qx personal-server; then
     was_running=1
@@ -470,32 +547,48 @@ restore_release() {
   if (( was_running )); then
     compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans
   fi
-  if ! safety_backup="$(create_backup)"; then
+  if ! safety_backup="$(create_backup restore-safety)"; then
     if (( was_running )); then
-      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      if ! compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans \
+        || ! wait_until_ready "$DEPLOYMENT_ENV_FILE"; then
+        host_transaction_mark_recovery_required \
+          "restore safety snapshot failed and the pre-operation service could not be restarted"
+        return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+      fi
     fi
     echo "无法创建恢复前安全快照，未修改当前数据。" >&2
     return 1
   fi
   if ! restore_backup "$backup_dir"; then
-    restore_backup "$safety_backup"
+    local compensation_failed=0
+    restore_backup "$safety_backup" || compensation_failed=1
     if (( was_running )); then
-      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans || compensation_failed=1
+      wait_until_ready "$DEPLOYMENT_ENV_FILE" || compensation_failed=1
     fi
     mark_backup "$safety_backup" restore-rollback
+    if (( compensation_failed )); then
+      host_transaction_mark_recovery_required \
+        "target restore and safety compensation failed; restore the recorded restore-safety snapshot manually"
+      return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+    fi
     echo "恢复写入失败，已恢复操作前状态。" >&2
     return 1
   fi
   if (( was_running )); then
     compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
     if ! wait_until_ready "$DEPLOYMENT_ENV_FILE"; then
-      compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans || true
-      restore_backup "$safety_backup"
-      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-      wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      local readiness_compensation_failed=0
+      compose_with_env "$DEPLOYMENT_ENV_FILE" down --remove-orphans || readiness_compensation_failed=1
+      restore_backup "$safety_backup" || readiness_compensation_failed=1
+      compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans || readiness_compensation_failed=1
+      wait_until_ready "$DEPLOYMENT_ENV_FILE" || readiness_compensation_failed=1
       mark_backup "$safety_backup" restore-rollback
+      if (( readiness_compensation_failed )); then
+        host_transaction_mark_recovery_required \
+          "restored data failed readiness and safety compensation did not recover the pre-operation service"
+        return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+      fi
       echo "恢复后的服务未就绪，已恢复操作前状态。" >&2
       return 1
     fi
@@ -505,25 +598,33 @@ restore_release() {
 }
 
 rollback_transaction() {
+  local rollback_failed=0
   TRANSACTION_ACTIVE=0
   echo "候选版本未通过就绪门，正在回滚。" >&2
   if [[ -n "$TRANSACTION_CANDIDATE_ENV" ]]; then
-    compose_with_env "$TRANSACTION_CANDIDATE_ENV" down --remove-orphans || true
+    compose_with_env "$TRANSACTION_CANDIDATE_ENV" down --remove-orphans || rollback_failed=1
   fi
   if [[ -n "$TRANSACTION_BACKUP" ]]; then
-    restore_backup "$TRANSACTION_BACKUP"
-    mark_backup "$TRANSACTION_BACKUP" rollback-restored
+    if restore_backup "$TRANSACTION_BACKUP"; then
+      mark_backup "$TRANSACTION_BACKUP" rollback-restored
+    else
+      rollback_failed=1
+    fi
   fi
   if [[ -n "$TRANSACTION_PREVIOUS_IMAGE" && -n "$TRANSACTION_PREVIOUS_ENV" ]]; then
-    compose_with_env "$TRANSACTION_PREVIOUS_ENV" up --detach --remove-orphans
-    if wait_until_ready "$TRANSACTION_PREVIOUS_ENV"; then
+    if compose_with_env "$TRANSACTION_PREVIOUS_ENV" up --detach --remove-orphans \
+      && wait_until_ready "$TRANSACTION_PREVIOUS_ENV"; then
       persist_selected_image "$TRANSACTION_PREVIOUS_IMAGE" "$TRANSACTION_CANDIDATE_IMAGE"
       echo "已恢复上一版本 ${TRANSACTION_PREVIOUS_IMAGE}。" >&2
     else
       echo "上一版本也未能恢复就绪，请保留 ${TRANSACTION_BACKUP} 并检查日志。" >&2
-      return 1
+      rollback_failed=1
     fi
+  elif (( TRANSACTION_IMAGE_PERSISTED )) && [[ -n "$TRANSACTION_REPLACING_IMAGE" ]]; then
+    persist_selected_image "$TRANSACTION_REPLACING_IMAGE" "$TRANSACTION_CANDIDATE_IMAGE" \
+      || rollback_failed=1
   fi
+  (( rollback_failed == 0 ))
 }
 
 current_container_image() {
@@ -547,18 +648,25 @@ install_release() {
     return 0
   fi
   replacing_image="$(read_env GLIMMER_CRADLE_IMAGE '')"
+  TRANSACTION_REPLACING_IMAGE="$replacing_image"
   candidate="$(next_candidate_image)"
   create_compose_env "$candidate"
   TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
   TRANSACTION_CANDIDATE_IMAGE="$candidate"
+  host_transaction_phase prepare
   prepare_candidate "$TRANSACTION_CANDIDATE_ENV"
   TRANSACTION_MODE=install
   TRANSACTION_ACTIVE=1
+  host_transaction_phase replace
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
+  host_transaction_phase readiness
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
   persist_selected_image "$candidate" "$replacing_image"
+  TRANSACTION_IMAGE_PERSISTED=1
   cleanup_history "$candidate" ""
+  host_transaction_phase bridge_readiness
   start_ops_bridge
+  host_transaction_phase commit
   print_access
   write_deploy_result
   TRANSACTION_ACTIVE=0
@@ -581,17 +689,24 @@ update_release() {
   TRANSACTION_CANDIDATE_IMAGE="$candidate"
 
   # Build while the current release is still serving traffic. State is untouched until this succeeds.
+  host_transaction_phase prepare
   prepare_candidate "$TRANSACTION_CANDIDATE_ENV"
   TRANSACTION_MODE=update
   TRANSACTION_ACTIVE=1
+  host_transaction_phase replace
   compose_with_env "$TRANSACTION_PREVIOUS_ENV" down --remove-orphans
-  TRANSACTION_BACKUP="$(create_backup)"
+  TRANSACTION_BACKUP="$(create_backup transaction)"
+  host_transaction_phase restart
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
+  host_transaction_phase readiness
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
   persist_selected_image "$candidate" "$previous"
+  TRANSACTION_IMAGE_PERSISTED=1
   mark_backup "$TRANSACTION_BACKUP" succeeded
   cleanup_history "$candidate" "$previous"
+  host_transaction_phase bridge_readiness
   start_ops_bridge
+  host_transaction_phase commit
   print_access
   write_deploy_result
   TRANSACTION_ACTIVE=0
@@ -602,10 +717,10 @@ cleanup_history() {
   local previous_image="$2"
   local -a backups images
   local index candidate
-  mapfile -t backups < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
+  mapfile -t backups < <(find "$TRANSACTION_BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
   for (( index=BACKUP_RETENTION; index<${#backups[@]}; index++ )); do
     [[ "${backups[$index]}" =~ ^[0-9]{8}T[0-9]{6}Z(-[0-9]{2})?$ ]] || continue
-    rm -rf -- "$BACKUP_ROOT/${backups[$index]}"
+    rm -rf -- "$TRANSACTION_BACKUP_ROOT/${backups[$index]}"
   done
 
   mapfile -t images < <("${DOCKER[@]}" image ls "$IMAGE_REPOSITORY" --format '{{.Repository}}:{{.Tag}}' | awk '!seen[$0]++')
@@ -634,11 +749,76 @@ print_access() {
   echo "访问 token 保存在 ${DEPLOYMENT_ENV_FILE}。"
 }
 
+validate_query_environment() {
+  local canonical
+  [[ "$DEPLOYMENT_ENV_FILE" == /* ]] || {
+    host_transaction_event deployment_query_failed deployment_env_path_not_absolute "$HOST_TRANSACTION_EXIT_USAGE"
+    return "$HOST_TRANSACTION_EXIT_USAGE"
+  }
+  canonical="$(realpath -m -- "$DEPLOYMENT_ENV_FILE" 2>/dev/null || true)"
+  [[ "$canonical" == "$DEPLOYMENT_ENV_FILE" && -f "$DEPLOYMENT_ENV_FILE" \
+    && ! -L "$DEPLOYMENT_ENV_FILE" && -r "$DEPLOYMENT_ENV_FILE" ]] || {
+    host_transaction_event deployment_query_failed deployment_env_unavailable "$HOST_TRANSACTION_EXIT_MISSING"
+    return "$HOST_TRANSACTION_EXIT_MISSING"
+  }
+  STATE_ROOT="$(grep '^GLIMMER_CRADLE_STATE_ROOT=' "$DEPLOYMENT_ENV_FILE" | tail -n1 | cut -d= -f2-)"
+  [[ "$STATE_ROOT" == /* && "$(realpath -m -- "$STATE_ROOT" 2>/dev/null || true)" == "$STATE_ROOT" ]] || {
+    host_transaction_event deployment_query_failed state_root_invalid "$HOST_TRANSACTION_EXIT_USAGE"
+    return "$HOST_TRANSACTION_EXIT_USAGE"
+  }
+}
+
+print_transaction_state() {
+  local transaction_file="${STATE_ROOT}/transactions/current.json"
+  if [[ -f "$transaction_file" && ! -L "$transaction_file" && -r "$transaction_file" ]]; then
+    printf 'host_transaction='
+    cat -- "$transaction_file"
+  else
+    printf 'host_transaction={"status":"none"}\n'
+  fi
+}
+
+run_query() {
+  validate_query_environment || return $?
+  docker info >/dev/null 2>&1 || {
+    host_transaction_event deployment_query_failed docker_unavailable_without_elevation "$HOST_TRANSACTION_EXIT_MISSING"
+    return "$HOST_TRANSACTION_EXIT_MISSING"
+  }
+  case "$COMMAND" in
+    status)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" ps
+      print_transaction_state
+      ;;
+    logs)
+      compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
+      ;;
+  esac
+}
+
 main() {
+  case "$COMMAND" in
+    install|update|restart|stop|status|logs|backup) ;;
+    restore)
+      [[ -n "$COMMAND_ARGUMENT" ]] || {
+        host_transaction_event deployment_validation_failed restore_backup_id_missing "$HOST_TRANSACTION_EXIT_USAGE"
+        exit "$HOST_TRANSACTION_EXIT_USAGE"
+      }
+      ;;
+    *)
+      echo "用法: ./deploy.sh [install|update|restart|stop|status|logs|backup|restore <UTC timestamp>]" >&2
+      exit "$HOST_TRANSACTION_EXIT_USAGE"
+      ;;
+  esac
+
+  if [[ "$COMMAND" == status || "$COMMAND" == logs ]]; then
+    run_query
+    return $?
+  fi
+
   RELEASE_VERSION="$(resolve_release_version)"
   [[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && (( READY_TIMEOUT_SECONDS >= 10 && READY_TIMEOUT_SECONDS <= 900 )) || {
     echo "GLIMMER_CRADLE_READY_TIMEOUT_SECONDS 必须是 10 到 900 秒的整数。" >&2
-    exit 1
+    exit "$HOST_TRANSACTION_EXIT_USAGE"
   }
 
   if ! docker info >/dev/null 2>&1; then
@@ -646,14 +826,14 @@ main() {
       DOCKER=(sudo docker)
     else
       echo "Docker Engine 不可用。先运行 sudo ./bootstrap-host.sh，或按 Docker 官方文档安装。" >&2
-      exit 1
+      exit "$HOST_TRANSACTION_EXIT_MISSING"
     fi
   fi
 
   if (( EUID != 0 )); then
     if ! command -v sudo >/dev/null 2>&1; then
       echo "部署状态由容器 UID 10001 持有，当前用户需要 sudo 才能执行一致性备份和恢复。" >&2
-      exit 1
+      exit "$HOST_TRANSACTION_EXIT_MISSING"
     fi
     PRIVILEGED=(sudo)
   fi
@@ -662,6 +842,8 @@ main() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
+  export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
+  host_transaction_acquire "deploy.${COMMAND}"
   prepare_environment
   prepare_state
 
@@ -675,29 +857,30 @@ main() {
       update_release
       ;;
     restart)
+      host_transaction_phase restart
       compose_with_env "$DEPLOYMENT_ENV_FILE" restart
+      host_transaction_phase readiness
       wait_until_ready "$DEPLOYMENT_ENV_FILE"
+      host_transaction_phase bridge_readiness
       start_ops_bridge
+      host_transaction_phase commit
       ;;
     stop)
+      host_transaction_phase replace
       compose_with_env "$DEPLOYMENT_ENV_FILE" down
       stop_ops_bridge
-      ;;
-    status)
-      compose_with_env "$DEPLOYMENT_ENV_FILE" ps
-      ;;
-    logs)
-      compose_with_env "$DEPLOYMENT_ENV_FILE" logs --follow --tail=200
+      host_transaction_phase commit
       ;;
     backup)
+      host_transaction_phase prepare
       backup_release
+      host_transaction_phase commit
       ;;
     restore)
+      host_transaction_require_confirmation "${GLIMMER_CRADLE_TRANSACTION_CONFIRMED:-0}"
+      host_transaction_phase prepare
       restore_release "$COMMAND_ARGUMENT"
-      ;;
-    *)
-      echo "用法: ./deploy.sh [install|update|restart|stop|status|logs|backup|restore <UTC timestamp>]" >&2
-      exit 2
+      host_transaction_phase commit
       ;;
   esac
 }

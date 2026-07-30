@@ -16,7 +16,7 @@
 | Avatar renderer bridge | `renderer/avatar/`、`renderer/components/avatar/` |
 | Unity Avatar | `core/avatar/unity-host/Assets/Scripts/Avatar/` |
 | Avatar build/setup | `Assets/Scripts/Avatar/Editor/` |
-| Unity SDK 投影 | `avatar-sdk-catalog.json`、`scripts/lib/unitypackage-projector.mjs` |
+| Unity SDK 投影 | `avatar-sdk-catalog.json`、`hosts/unity-avatar-host/scripts/unitypackage-projector.mjs` |
 
 ## 标准步骤
 

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { resolvePnpmInvocation } from './lib/package-manager-command.mjs';
+import { resolvePnpmInvocation } from '../packages/extension-sdk/scripts/package-manager-command.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageManager = resolvePnpmInvocation({
@@ -79,7 +79,7 @@ process.once('SIGHUP', () => void shutdown(0));
 
 async function runPreparation() {
   await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(repoRoot, 'scripts', 'prepare-runtime.mjs')], {
+    const child = spawn(process.execPath, [path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-runtime.mjs')], {
       cwd: repoRoot,
       stdio: 'inherit',
       windowsHide: true,

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "lock": {
+    "path": "/run/glimmer-cradle/host.lock",
+    "owner": "root",
+    "contention_exit_code": 75,
+    "recovery_exit_code": 78
+  },
+  "execution_phases": [
+    "acquired",
+    "prepare",
+    "replace",
+    "restart",
+    "readiness",
+    "bridge_readiness",
+    "commit"
+  ],
+  "terminal_states": [
+    "committed",
+    "failed",
+    "recovery_required"
+  ],
+  "stable_exit_codes": [
+    0,
+    64,
+    66,
+    70,
+    75,
+    77,
+    78,
+    130,
+    143
+  ]
+}

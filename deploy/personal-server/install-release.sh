@@ -10,6 +10,7 @@ fi
 VERSION="${GLIMMER_CRADLE_VERSION:-latest}"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-/opt/glimmer-cradle}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-/var/lib/glimmer-cradle}"
+RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
 CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-/etc/glimmer-cradle}"
 DEPLOYMENT_ENV_FILE="${CONFIG_ROOT}/deployment.env"
 CLI_PATH="${GLIMMER_CRADLE_CLI_PATH:-/usr/local/bin/glimmer-cradle}"
@@ -34,6 +35,7 @@ CLI_EXISTED=0
 CLI_BACKUP=""
 PREVIOUS_RELEASE=""
 DEPLOY_RESULT_FILE=""
+HOST_TRANSACTION_LIBRARY_LOADED=0
 
 case "$PACKAGE_VARIANT" in
   light|full) ;;
@@ -124,11 +126,18 @@ cleanup() {
   rm -rf -- "$TEMP_ROOT" || cleanup_failed=1
   if (( cleanup_failed )); then
     echo "安装器退出清理未能完整完成，请检查 ${INSTALL_ROOT} 与 ${CONFIG_ROOT}。" >&2
-    if (( exit_code == 0 )); then
-      exit_code=1
+    if (( HOST_TRANSACTION_LIBRARY_LOADED )); then
+      host_transaction_mark_recovery_required \
+        "inspect current, deployment.env and the CLI projection before retrying" || true
     fi
+    exit_code=78
   fi
-  return "$exit_code"
+  if (( HOST_TRANSACTION_LIBRARY_LOADED )); then
+    exit_code="$(host_transaction_normalize_exit "$exit_code")"
+    host_transaction_finish "$exit_code" || exit_code=78
+  fi
+  trap - EXIT
+  exit "$exit_code"
 }
 
 handle_signal() {
@@ -262,6 +271,14 @@ if [[ "$VERSION" != "latest" && "$RELEASE_VERSION" != "${VERSION#v}" ]]; then
   echo "请求版本与发布包内部版本不一致: ${VERSION} != ${RELEASE_VERSION}" >&2
   exit 1
 fi
+
+source "${PAYLOAD_ROOT}/lib/host-transaction.sh"
+HOST_TRANSACTION_LIBRARY_LOADED=1
+export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
+export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
+host_transaction_acquire install.release
+host_transaction_phase prepare
+
 RELEASE_ROOT="${INSTALL_ROOT}/releases/${RELEASE_VERSION}"
 CURRENT_IMAGE=""
 CURRENT_CADDY_IMAGE=""
@@ -277,6 +294,7 @@ if [[ -f "$DEPLOYMENT_ENV_FILE" ]]; then
   CURRENT_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
 fi
 
+host_transaction_phase replace
 install -d -m 0755 "$INSTALL_ROOT" "${INSTALL_ROOT}/releases" "$CONFIG_ROOT"
 if [[ -d "$RELEASE_ROOT" ]]; then
   EXISTING_RELEASE_SHA=""
@@ -378,6 +396,9 @@ validate_oci_archive() {
 set_env_value GLIMMER_CRADLE_DEPLOYMENT_MODE image
 DEPLOYMENT_ENV_TOUCHED=1
 set_env_value GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+set_env_value GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
+set_env_value GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
+set_env_value GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
 set_env_value GLIMMER_CRADLE_CADDYFILE "${RELEASE_ROOT}/Caddyfile"
 if [[ -n "${GLIMMER_CRADLE_CADDY_IMAGE:-}" ]]; then
   set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$GLIMMER_CRADLE_CADDY_IMAGE"
@@ -492,6 +513,9 @@ cat > "$CLI_TEMP" <<EOF
 set -Eeuo pipefail
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="${DEPLOYMENT_ENV_FILE}"
 export GLIMMER_CRADLE_STATE_ROOT="${STATE_ROOT}"
+export GLIMMER_CRADLE_RUN_ROOT="${RUN_ROOT}"
+export GLIMMER_CRADLE_INSTALL_ROOT="${INSTALL_ROOT}"
+export GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT="${CONFIG_ROOT}"
 if (( \$# == 0 )); then
   set -- status
 fi
@@ -502,20 +526,18 @@ CLI_TOUCHED=1
 install -m 0755 "$CLI_TEMP" "$CLI_PATH"
 
 export GLIMMER_CRADLE_DEPLOY_RESULT_FILE="$DEPLOY_RESULT_FILE"
-if "${RELEASE_ROOT}/deploy.sh" "$DEPLOY_COMMAND" </dev/null; then
+set +e
+"${RELEASE_ROOT}/deploy.sh" "$DEPLOY_COMMAND" </dev/null
+DEPLOY_EXIT=$?
+set -e
+if (( DEPLOY_EXIT == 0 )); then
   [[ -f "$DEPLOY_RESULT_FILE" ]] && grep -qx committed "$DEPLOY_RESULT_FILE" || {
     echo "部署脚本成功返回但未提交事务结果。" >&2
     exit 1
   }
   INSTALL_COMMITTED=1
 else
-  if (( EXISTING_DEPLOYMENT )); then
-    cp "$DEPLOYMENT_ENV_BACKUP" "$DEPLOYMENT_ENV_FILE"
-    chmod 600 "$DEPLOYMENT_ENV_FILE"
-  else
-    rm -f -- "$DEPLOYMENT_ENV_FILE"
-  fi
-  exit 1
+  exit "$(host_transaction_normalize_exit "$DEPLOY_EXIT")"
 fi
 
 echo "安装完成。后续可使用 sudo glimmer-cradle status|logs|restart|stop。"

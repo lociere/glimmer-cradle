@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_IMAGE=node:24.18.0-trixie-slim
-ARG PYTHON_IMAGE=python:3.12.13-slim-trixie
-ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.28
+ARG NODE_IMAGE
+ARG PYTHON_IMAGE
+ARG UV_IMAGE
 ARG CADDY_VERSION=2.10.2
 ARG CADDY_AMD64_SHA512=747df7ee74de188485157a383633a1a963fd9233b71fbb4a69ddcbcc589ce4e2cc82dacf5dbbe136cb51d17e14c59daeb5d9bc92487610b0f3b93680b2646546
 ARG CADDY_LICENSE_SHA256=cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -66,7 +66,7 @@ FROM ${PYTHON_IMAGE} AS personal-server
 ARG APP_UID=10001
 ARG APP_GID=10001
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates tini libatomic1 libstdc++6 libzmq5 \
+    && apt-get install --yes --no-install-recommends bash ca-certificates coreutils tini tar util-linux libatomic1 libstdc++6 libzmq5 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid ${APP_GID} glimmer \
     && useradd --uid ${APP_UID} --gid ${APP_GID} --home-dir /var/lib/glimmer-cradle --create-home --shell /usr/sbin/nologin glimmer

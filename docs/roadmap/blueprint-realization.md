@@ -126,7 +126,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../reference/packaging-layout.md)、[Personal Server 部署](../guides/release/Personal%20Server部署.md) | [M10](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
 | Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `at-risk` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环；当前暂停/延期，未完成。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
 | Phase 12：契约脊柱与跨进程服务架构重建 | `in-progress` | Slice 1 contracts baseline 已集成，Slice 2 尚未启动；长期以 `contracts/`、版本化 Service 和 Kernel Surface Gateway 重建服务神经系统，并收口根职责、器官模块与 Host 崩溃域。 | Blueprint、未来 Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[M12 manifest](./manifests/M12-目标物理清单.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
-| Phase 13：工程自动化脊柱与交付生命周期闭环 | `in-progress` | Slice A active 但修复暂停且 fixed state 未集成；B–F planned。目标是 owner 清晰、同构可复现、制品固定且宿主事务安全的一等工程生命周期平面。 | Blueprint、未来 Current/Implementation/Reference/Guide | [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[M13 manifest](./manifests/M13-目标物理清单.md)、[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。 |
+| Phase 13：工程自动化脊柱与交付生命周期闭环 | `fixed-state-candidate` | A～F 已实现，等待独立复审与集成；真实 Docker/Ubuntu/Windows installer/签名/发布未外推为通过。 | Current/Implementation/Reference/Guide 已同步候选事实 | [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[M13 manifest](./manifests/M13-目标物理清单.md)、[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。 |
 | Phase 14：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来 Contracts、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
 | Phase 15：Native 与本地能力加速 | `candidate` | C++ / Native / 本地模型 / 向量与音视频能力成为受控能力层。 | 未来 native reference 与 implementation map | [Backlog](./backlog.md)。 |
 | Phase 16：Extension 内容生态成熟化 | `candidate` | Extension 从开发扩展点走向可分发、可治理、可组合的生态。 | 未来 SDK、权限、发布与示例文档 | [Backlog](./backlog.md)。 |
@@ -303,7 +303,7 @@ Phase 8 之后，Glimmer Cradle 具备开发期意义上的完整交互闭环。
 
 ## 7. 当前与未来阶段
 
-Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 当前暂停/延期并标记为 `at-risk`，未完成、未关闭。Phase 12 的 Slice 1 contracts baseline 已集成，Slice 2 尚未启动。Phase 13 Slice A 是 [now.md](./now.md) 中当前唯一 active 推进面，但修复暂停且 fixed state 未集成；B–F 仍是 planned。Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
+Phase 9 与 Phase 10 已完成并迁入当前事实源。Phase 11 当前暂停/延期并标记为 `at-risk`，未完成、未关闭。Phase 12 的 Slice 1 contracts baseline 已集成，Slice 2 尚未启动。Phase 13 A～F 已形成 fixed-state candidate，当前唯一 active 门是独立复审与集成。Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
 
 ### 7.1 Phase 9：主体可用性、跨场景记忆与体验收口
 
@@ -361,7 +361,7 @@ Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边�
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | `in-progress`（Slice A active，修复暂停且 fixed state 未集成；B–F planned） |
+| 状态 | `fixed-state-candidate`（A～F 已实现，待独立复审与集成） |
 | 主问题 | 运行时架构已经跨越多语言、多产品、多进程与宿主事务，但 Scripts、Automation、CI、Build、Release、Install 与 Ops 仍需要形成同等完整、可验证、可长期演化的工程生命周期承重面。 |
 | 计划成果 | owner-local 原子任务、root 薄编排、workflow 只调公共任务、Windows/Linux PR CI、fixed artifact、宿主级部署事务、恢复安全、可复现供应链和独立 Desktop packaging 矩阵。 |
 | 关键依赖 | Phase 12 Slice 1 fixed-state commit 已完成并集成，相关 writer 已释放；工程 task/workflow/artifact/install/ops inventory 冻结；后续 M12 重叠入口按 fixed commit 串行 handoff。 |

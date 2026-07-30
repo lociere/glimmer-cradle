@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf 'sudo-called\n' >>"${GLIMMER_CRADLE_TEST_SUDO_LOG:?}"
+exit 99

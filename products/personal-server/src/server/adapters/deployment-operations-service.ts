@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -40,36 +39,16 @@ export interface DeploymentOperationResult {
   readonly operation_id?: string;
 }
 
-interface DeploymentRunner {
-  readonly command: string | null;
-  readonly stateRoot: string | null;
-  readonly disabledReason: string;
-}
-
-interface DeploymentOperationLease {
-  readonly operationId: string;
-  readonly operation: string;
-}
-
 export class DeploymentOperationsService {
-  private activeLease: DeploymentOperationLease | null = null;
-
   public constructor(
     private readonly options: {
       readonly applicationRoot: string;
       readonly packageRoot?: string;
       readonly fetchFn?: typeof fetch;
-      readonly cliPath?: string;
       readonly deploymentEnvFile?: string;
       readonly releaseSource?: string;
       readonly bridgeSocketPath?: string;
       readonly bridgeToken?: string;
-      readonly spawnDetachedFn?: (
-        lease: DeploymentOperationLease,
-        command: string,
-        args: string[],
-      ) => Promise<void>;
-      readonly scheduleDetachedFn?: (start: () => void) => void;
     },
   ) {}
 
@@ -80,26 +59,27 @@ export class DeploymentOperationsService {
         ? { ...bridgeSnapshot, update: { ...bridgeSnapshot.update, available_version: availableVersion } }
         : bridgeSnapshot;
     }
-    const runner = await this.resolveRunner();
-    const entries = await this.listBackups(runner.stateRoot);
+    const stateRoot = await this.resolveStateRoot();
+    const disabledReason = '当前 Product Host 未连接部署级外部事务 owner；宿主写操作不可用。';
+    const entries = await this.listBackups(stateRoot);
     return {
       backup: {
-        supported: Boolean(runner.command),
-        disabled_reason: runner.command ? undefined : runner.disabledReason,
-        backup_root: runner.stateRoot ? path.join(runner.stateRoot, 'backups') : undefined,
+        supported: false,
+        disabled_reason: disabledReason,
+        backup_root: stateRoot ? path.join(stateRoot, 'data', 'backups') : undefined,
         entries,
       },
       service: {
-        restart_supported: Boolean(runner.command),
-        stop_supported: Boolean(runner.command),
-        disabled_reason: runner.command ? undefined : runner.disabledReason,
+        restart_supported: false,
+        stop_supported: false,
+        disabled_reason: disabledReason,
       },
       update: {
         check_supported: true,
-        apply_supported: Boolean(runner.command),
+        apply_supported: false,
         current_version: await this.readCurrentVersion(),
         source: this.resolveReleaseSource(),
-        disabled_reason: runner.command ? undefined : runner.disabledReason,
+        disabled_reason: disabledReason,
         available_version: availableVersion,
       },
     };
@@ -130,141 +110,10 @@ export class DeploymentOperationsService {
       }
     }
 
-    const runner = await this.resolveRunner();
-    if (!runner.command) {
-      return {
-        status: 'disabled',
-        message: runner.disabledReason,
-        snapshot: await this.getSnapshot(),
-      };
-    }
-
-    const lease = this.acquireLease(operation);
-    if (!lease) {
-      return {
-        status: 'conflict',
-        message: '当前已有部署级运维事务在进行中，请等待前一项操作结束。',
-        snapshot: await this.getSnapshot(),
-      };
-    }
-
-    if (operation === 'backup.create') {
-      return this.runDetached(
-        lease,
-        runner.command,
-        ['backup'],
-        '已接受备份请求，服务恢复后可在备份列表查看结果。',
-      );
-    }
-    if (operation === 'backup.restore') {
-      const backupId = request.backup_id?.trim() || '';
-      if (!await this.hasBackup(runner.stateRoot, backupId)) {
-        this.releaseLease(lease.operationId);
-        return {
-          status: 'error',
-          message: '指定备份不存在，无法恢复。',
-          snapshot: await this.getSnapshot(),
-        };
-      }
-      if (request.confirm !== true) {
-        this.releaseLease(lease.operationId);
-        return {
-          status: 'preflight',
-          message: `恢复 ${backupId} 将中断当前服务，并在失败时依赖部署事务回滚。`,
-          requires_confirmation: true,
-          snapshot: await this.getSnapshot(),
-        };
-      }
-      return this.runDetached(
-        lease,
-        runner.command,
-        ['restore', backupId],
-        `已接受恢复请求 ${backupId}，页面连接将随后中断。`,
-      );
-    }
-    if (operation === 'service.restart') {
-      return this.runDetached(
-        lease,
-        runner.command,
-        ['restart'],
-        '已接受重启请求，当前控制面连接将重新建立。',
-      );
-    }
-    if (operation === 'service.stop') {
-      return this.runDetached(
-        lease,
-        runner.command,
-        ['stop'],
-        '已接受停机请求，当前控制面连接将被关闭。',
-      );
-    }
-    if (operation === 'update.apply') {
-      if (request.confirm !== true) {
-        this.releaseLease(lease.operationId);
-        return {
-          status: 'preflight',
-          message: '更新将触发部署级事务、就绪门与失败回滚；确认后当前连接可能中断。',
-          requires_confirmation: true,
-          snapshot: await this.getSnapshot(),
-        };
-      }
-      return this.runDetached(
-        lease,
-        runner.command,
-        ['update'],
-        '已接受更新请求，当前控制面连接将根据部署事务状态中断或恢复。',
-      );
-    }
-
-    this.releaseLease(lease.operationId);
     return {
-      status: 'error',
-      message: '未知的运维操作。',
+      status: 'disabled',
+      message: '当前 Product Host 未连接部署级外部事务 owner；请求未执行。',
       snapshot: await this.getSnapshot(),
-    };
-  }
-
-  private async runDetached(
-    lease: DeploymentOperationLease,
-    command: string,
-    args: string[],
-    acceptedMessage: string,
-  ): Promise<DeploymentOperationResult> {
-    const snapshot = await this.getSnapshot();
-    const schedule = this.options.scheduleDetachedFn
-      ?? ((start: () => void) => setTimeout(start, 250));
-    schedule(() => {
-      void this.spawnDetached(lease, command, args)
-        .catch(() => this.releaseLease(lease.operationId));
-    });
-    return {
-      status: 'accepted',
-      message: acceptedMessage,
-      snapshot,
-      operation_id: lease.operationId,
-    };
-  }
-
-  private async resolveRunner(): Promise<DeploymentRunner> {
-    const cliPath = normalizeConfiguredPath(this.options.cliPath);
-    if (cliPath && await fileExists(cliPath)) {
-      return {
-        command: cliPath,
-        stateRoot: await this.resolveStateRoot(),
-        disabledReason: '',
-      };
-    }
-    if (cliPath) {
-      return {
-        command: null,
-        stateRoot: await this.resolveStateRoot(),
-        disabledReason: `已配置宿主运维桥，但桥接命令不存在：${cliPath}`,
-      };
-    }
-    return {
-      command: null,
-      stateRoot: await this.resolveStateRoot(),
-      disabledReason: '当前 Product Host 未配置部署级 glimmer-cradle 运维桥；备份、恢复、更新与服务控制仅在安装环境中可用。',
     };
   }
 
@@ -285,32 +134,23 @@ export class DeploymentOperationsService {
 
   private async listBackups(stateRoot: string | null): Promise<DeploymentBackupEntry[]> {
     if (!stateRoot) return [];
-    const backupRoot = path.join(stateRoot, 'backups');
+    const backupRoot = path.join(stateRoot, 'data', 'backups');
     if (!await fileExists(backupRoot)) return [];
-    const entries = await readdir(backupRoot, { withFileTypes: true });
     const backups = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const envPath = path.join(backupRoot, entry.name, 'deployment.env');
-      const status = await this.readBackupStatus(envPath);
-      backups.push({
-        backup_id: entry.name,
-        created_at: entry.name,
-        status,
-      });
+    for (const kind of ['manual', 'transaction', 'restore-safety']) {
+      const kindRoot = path.join(backupRoot, kind);
+      if (!await fileExists(kindRoot)) continue;
+      const entries = await readdir(kindRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        backups.push({
+          backup_id: entry.name,
+          created_at: entry.name,
+          status: await this.readBackupStatus(path.join(kindRoot, entry.name, 'deployment.env')),
+        });
+      }
     }
     return backups.sort((left, right) => right.backup_id.localeCompare(left.backup_id));
-  }
-
-  private async hasBackup(stateRoot: string | null, backupId: string): Promise<boolean> {
-    if (!stateRoot) return false;
-    const backupDir = resolveBackupDirectory(stateRoot, backupId);
-    if (!backupDir) return false;
-    const entries = await this.listBackups(stateRoot);
-    if (!entries.some((entry) => entry.backup_id === backupId)) {
-      return false;
-    }
-    return fileExists(backupDir);
   }
 
   private async readBackupStatus(filePath: string): Promise<string> {
@@ -405,46 +245,6 @@ export class DeploymentOperationsService {
     return parseVersionFromChecksums(await readFile(localChecksums, 'utf8'));
   }
 
-  private spawnDetached(
-    lease: DeploymentOperationLease,
-    command: string,
-    args: string[],
-  ): Promise<void> {
-    if (this.options.spawnDetachedFn) {
-      return this.options.spawnDetachedFn(lease, command, args);
-    }
-    return new Promise((resolve, reject) => {
-      const child = spawn(command, args, {
-        cwd: this.options.applicationRoot,
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.once('error', (error) => {
-        this.releaseLease(lease.operationId);
-        reject(error);
-      });
-      child.once('spawn', () => {
-        child.unref();
-        resolve();
-      });
-    });
-  }
-
-  private acquireLease(operation: string): DeploymentOperationLease | null {
-    if (this.activeLease) return null;
-    const lease = {
-      operationId: `deployment_op_${randomUUID()}`,
-      operation,
-    };
-    this.activeLease = lease;
-    return lease;
-  }
-
-  private releaseLease(operationId: string): void {
-    if (this.activeLease?.operationId === operationId) {
-      this.activeLease = null;
-    }
-  }
 }
 
 function parseVersionFromChecksums(content: string): string | undefined {
@@ -458,24 +258,4 @@ async function fileExists(targetPath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function normalizeConfiguredPath(value: string | undefined): string | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim();
-  return normalized ? normalized : null;
-}
-
-function resolveBackupDirectory(stateRoot: string, backupId: string): string | null {
-  const normalized = backupId.trim();
-  if (!/^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$/.test(normalized)) {
-    return null;
-  }
-  const backupRoot = path.resolve(stateRoot, 'backups');
-  const candidate = path.resolve(backupRoot, normalized);
-  const relative = path.relative(backupRoot, candidate);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return null;
-  }
-  return candidate;
 }

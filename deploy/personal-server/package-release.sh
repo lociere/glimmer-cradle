@@ -47,6 +47,8 @@ rm -f -- \
 
 install -m 0755 "$SCRIPT_DIR/bootstrap-host.sh" "$PAYLOAD_ROOT/bootstrap-host.sh"
 install -m 0755 "$SCRIPT_DIR/deploy.sh" "$PAYLOAD_ROOT/deploy.sh"
+install -d -m 0755 "$PAYLOAD_ROOT/lib"
+install -m 0755 "$SCRIPT_DIR/lib/host-transaction.sh" "$PAYLOAD_ROOT/lib/host-transaction.sh"
 install -m 0644 "$SCRIPT_DIR/compose.yaml" "$PAYLOAD_ROOT/compose.yaml"
 install -m 0644 "$SCRIPT_DIR/Caddyfile" "$PAYLOAD_ROOT/Caddyfile"
 install -m 0644 "$SCRIPT_DIR/.env.example" "$PAYLOAD_ROOT/.env.example"

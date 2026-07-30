@@ -6,16 +6,19 @@ const root = process.cwd();
 const roots = [
   'AGENTS.md',
   '.editorconfig',
+  '.dockerignore',
+  '.gitignore',
   '.codex',
-  '.claude',
   '.github',
-  'CLAUDE.md',
   'README.md',
   'assets',
   'configs',
+  'contracts',
   'core',
+  'deploy',
   'docs',
   'engines',
+  'hosts',
   'native',
   'packages',
   'products',
@@ -24,6 +27,7 @@ const roots = [
   'templates',
   'package.json',
   'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
   'pyproject.toml',
 ];
 const ignoredDirectories = new Set([
@@ -55,7 +59,8 @@ const checkedExtensions = new Set([
   '.yaml',
   '.yml',
 ]);
-const checkedNames = new Set(['.editorconfig']);
+const checkedNames = new Set(['.dockerignore', '.editorconfig', '.gitignore']);
+const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 function shouldIgnoreDirectory(relativePath, name) {
   return ignoredDirectories.has(name) || ignoredDirectories.has(relativePath.replaceAll(path.sep, '/'));
@@ -95,6 +100,7 @@ function hasUtf8Bom(filePath) {
 }
 
 const filesWithBom = [];
+const filesWithInvalidUtf8 = [];
 for (const item of roots) {
   const entryPath = path.join(root, item);
   if (!fs.existsSync(entryPath)) {
@@ -104,15 +110,24 @@ for (const item of roots) {
     if (hasUtf8Bom(filePath)) {
       filesWithBom.push(path.relative(root, filePath));
     }
+    try {
+      utf8Decoder.decode(fs.readFileSync(filePath));
+    } catch {
+      filesWithInvalidUtf8.push(path.relative(root, filePath));
+    }
   }
 }
 
-if (filesWithBom.length > 0) {
-  console.error('UTF-8 BOM is not allowed in project text files:');
+if (filesWithBom.length > 0 || filesWithInvalidUtf8.length > 0) {
+  if (filesWithBom.length > 0) console.error('UTF-8 BOM is not allowed in project text files:');
   for (const filePath of filesWithBom) {
+    console.error(`- ${filePath}`);
+  }
+  if (filesWithInvalidUtf8.length > 0) console.error('Project text files must be valid UTF-8:');
+  for (const filePath of filesWithInvalidUtf8) {
     console.error(`- ${filePath}`);
   }
   process.exit(1);
 }
 
-console.log('No UTF-8 BOM found.');
+console.log('All inventoried text files are valid UTF-8 without BOM.');

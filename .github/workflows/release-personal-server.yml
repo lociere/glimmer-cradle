@@ -10,12 +10,16 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
-  release:
+  build-fixed-artifact:
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release_metadata.outputs.version }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: 检出源码
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -49,6 +53,16 @@ jobs:
       - name: 配置 Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
+      - name: 验证固定基础镜像
+        env:
+          NODE_IMAGE: ${{ vars.PERSONAL_SERVER_NODE_IMAGE }}
+          PYTHON_IMAGE: ${{ vars.PERSONAL_SERVER_PYTHON_IMAGE }}
+          UV_IMAGE: ${{ vars.PERSONAL_SERVER_UV_IMAGE }}
+        run: |
+          for value in "$NODE_IMAGE" "$PYTHON_IMAGE" "$UV_IMAGE"; do
+            echo "$value" | grep -Eq '^.+@sha256:[0-9a-f]{64}$'
+          done
+
       - name: 登录 GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -69,6 +83,10 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/glimmer-cradle-personal-server:latest
           provenance: mode=max
           sbom: true
+          build-args: |
+            NODE_IMAGE=${{ vars.PERSONAL_SERVER_NODE_IMAGE }}
+            PYTHON_IMAGE=${{ vars.PERSONAL_SERVER_PYTHON_IMAGE }}
+            UV_IMAGE=${{ vars.PERSONAL_SERVER_UV_IMAGE }}
 
       - name: 生成部署发布包
         id: release_metadata
@@ -83,7 +101,8 @@ jobs:
           docker tag "$IMAGE" "$ARCHIVE_IMAGE"
           IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$ARCHIVE_IMAGE")"
           docker save --output personal-server-linux-amd64.tar "$ARCHIVE_IMAGE"
-          ./deploy/personal-server/package-release.sh "$VERSION" dist/personal-server "$IMAGE" personal-server-linux-amd64.tar "$ARCHIVE_IMAGE" "$IMAGE_ID"
+          export GLIMMER_CRADLE_SOURCE_COMMIT="$GITHUB_SHA"
+          node products/personal-server/scripts/package-release.mjs "$VERSION" "$IMAGE" personal-server-linux-amd64.tar "$ARCHIVE_IMAGE" "$IMAGE_ID"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: 验证 OCI 入口组件
@@ -93,7 +112,7 @@ jobs:
 
       - name: 验证部署发布包
         run: |
-          cd dist/personal-server
+          cd "dist/personal-server/${{ steps.release_metadata.outputs.version }}/linux-amd64"
           sha256sum --check SHA256SUMS
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64-full.tar.gz"
@@ -128,15 +147,38 @@ jobs:
           docker load --input image-archive.tar >/dev/null
           test "$(docker image inspect --format '{{.Id}}' "$ARCHIVE_IMAGE")" = "$ARCHIVE_IMAGE_ID"
 
-      - name: 发布 GitHub Release
+      - name: 上传固定制品
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: personal-server-${{ steps.release_metadata.outputs.version }}-linux-amd64
+          path: dist/personal-server/${{ steps.release_metadata.outputs.version }}/linux-amd64/
+          if-no-files-found: error
+
+  release:
+    needs: build-fixed-artifact
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: 下载固定制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: personal-server-${{ needs.build-fixed-artifact.outputs.version }}-linux-amd64
+          path: dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/
+
+      - name: 仅发布已固定制品
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          name: Glimmer Cradle ${{ steps.release_metadata.outputs.version }}
-          body_path: dist/personal-server/release-notes.md
+          name: Glimmer Cradle ${{ needs.build-fixed-artifact.outputs.version }}
+          body_path: dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/release-notes.md
           fail_on_unmatched_files: true
           files: |
-            dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64.tar.gz
-            dist/personal-server/glimmer-cradle-personal-server-v*-linux-amd64-full.tar.gz
-            dist/personal-server/glimmer-cradle-installer.sh
-            dist/personal-server/glimmer-cradle-remote-installer.sh
-            dist/personal-server/SHA256SUMS
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/glimmer-cradle-personal-server-v*-linux-amd64.tar.gz
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/glimmer-cradle-personal-server-v*-linux-amd64-full.tar.gz
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/glimmer-cradle-installer.sh
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/glimmer-cradle-remote-installer.sh
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/SHA256SUMS
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/artifact-manifest.json
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/provenance.json
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/sbom.spdx.json
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/attestation.json

@@ -28,3 +28,4 @@ Implementation 只解释 current 路径如何装配和被消费，不保存 Blue
 | [Engines 与 Native 实现](./Engines与Native实现.md) | Audio engine、resource readiness、子进程协议、native 加载 |
 | [Extension 与 Skill Plane 实现](./Extension与SkillPlane实现.md) | SDK、Host、Provider、Policy、Gateway、MCP |
 | [数据、记忆与可观测性实现](./数据、记忆与可观测性实现.md) | data owner、repositories、logs、trace、metrics、DLQ、migration |
+| [工程生命周期实现](./工程生命周期实现.md) | owner-local task、部署事务、恢复、CI 与 fixed artifact 链 |

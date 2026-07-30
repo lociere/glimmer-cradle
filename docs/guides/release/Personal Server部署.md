@@ -68,6 +68,8 @@ GitHub 自动附加的 `Source code (zip)` 与 `Source code (tar.gz)` 是 tag �
 | `/etc/glimmer-cradle/deployment.env` | 宿主部署配置与访问 token |
 | `/var/lib/glimmer-cradle/config/` | 应用配置和 secret |
 | `/var/lib/glimmer-cradle/data/` | 记忆、经历、扩展包与可观测数据 |
+| `/var/lib/glimmer-cradle/data/backups/{manual,transaction,restore-safety}/` | 手工、事务与恢复安全快照的独立保留域 |
+| `/run/glimmer-cradle/host.lock` | 所有宿主写操作共享的 transaction lock |
 | `/usr/local/bin/glimmer-cradle` | 稳定运维命令 |
 
 重复执行同一命令是幂等的；已停止的同版本会重新启动，发现新镜像时会先备份状态、验收候选版本，并在失败时恢复上一镜像和状态。
@@ -160,6 +162,12 @@ sudo glimmer-cradle restore <UTC时间戳目录名>
 
 更新使用和首次安装相同的一行命令。`backup` 在运行中的服务停机后为 `config/` 与 `data/` 创建带 `SHA256SUMS` 的一致性备份，再恢复服务；输出的 UTC 时间戳目录名可交给 `restore`。恢复只接受部署备份域内的时间戳目录，写入前校验摘要和归档根，并先创建操作前安全快照；恢复后未通过 `/readyz` 时自动恢复安全快照。`stop` 发送容器级 SIGTERM；容器内 Supervisor 回收 Kernel、Product Host 和所有受管子进程。版本目录只读，用户配置和状态独立保存，不会因容器重建或版本切换丢失。
 
+写事务竞争时命令返回 75，并在结构化诊断中给出当前 owner；不要删除 `host.lock` 抢锁。
+若补偿不能恢复操作前服务或数据，终态为 `recovery_required`、退出码 78。此时先读取
+`/var/lib/glimmer-cradle/transactions/current.json` 的 `recovery_action` 与 `events.jsonl`，
+完成所列人工恢复并确认服务/数据一致后再重试。`status/logs` 不获取写锁，也不会隐式 sudo
+或初始化 token/env/state。
+
 ## 开发者源码安装
 
 只有开发和发布验收需要仓库：
@@ -169,7 +177,9 @@ cd deploy/personal-server
 ./install.sh
 ```
 
-该入口会在本机从源码构建候选镜像。它与社区安装共享同一套 Compose、状态边界、就绪门和停机语义，但不作为最终用户分发方式。
+该入口会在本机从源码构建候选镜像。源码模式没有可在容器被替换后继续持锁的稳定外部
+owner，因此 Ops Bridge 明确禁用；开发者直接在宿主执行 CLI。它不伪装成社区安装的
+self-update 能力。
 
 ## 验证
 
@@ -181,7 +191,7 @@ pnpm test
 pnpm typecheck
 pnpm build
 pnpm smoke:personal-server
-pnpm test:release
+pnpm test:release:linux
 ```
 
 本地已有 digest 固定的正式镜像时，可运行 `pnpm verify:personal-server-full-install -- <image@sha256:digest> <version>`，验证完整包离线加载、`/readyz`、重复安装、数据连续性和 `stop` 资源释放。部署侧还必须验证远程下载、摘要校验、浏览器登录、文字对话、更新回滚和重启状态连续性。显式启用并配置 TTS 后，使用 `GLIMMER_CRADLE_SMOKE_REQUIRE_TTS=1 pnpm smoke:personal-server` 追加语音和首段延迟验收。

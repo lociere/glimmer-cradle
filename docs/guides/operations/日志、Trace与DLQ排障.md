@@ -111,7 +111,13 @@ cleanup 后 `observability.db` 会在下一次查询时重建。
 3. 判断是契约错误、生产者错误、消费者错误、资源错误还是环境错误
 4. 如果是旧 Schema / 旧字段，走 Schema 迁移，不在消费者吞掉
 5. 修复后用同类 payload 重验
-6. 只有确认不可再处理或已重放成功，才清理对应 DLQ
+6. replay 使用 `python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <command> [args...]`；
+   只有 dispatcher receipt 成功后记录才进入 replayed
+7. 人工关闭使用 `resolve <source:id> --confirm`，它不会伪装 replay
+8. `cleanup --days <N> --confirm` 只删除超过 retention 的 replay 成功记录
+
+`show <trace_id>` 默认只输出脱敏摘要；`--raw --confirm` 还要求本机 root。dispatcher 失败、
+receipt 缺失或 owner 不匹配时保持原始证据，不手工更新数据库绕过状态机。
 
 DLQ 不是普通错误日志。它表示“当前系统无法安全处理，但必须保留证据与恢复语义”。
 

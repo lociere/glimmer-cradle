@@ -6,6 +6,23 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/host-transaction.sh"
+export GLIMMER_CRADLE_STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-/var/lib/glimmer-cradle}"
+export GLIMMER_CRADLE_RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+finish_bootstrap_transaction() {
+  local exit_code=$?
+  trap - EXIT INT TERM
+  exit_code="$(host_transaction_normalize_exit "$exit_code")"
+  host_transaction_finish "$exit_code" || exit_code=78
+  exit "$exit_code"
+}
+trap finish_bootstrap_transaction EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+host_transaction_acquire bootstrap.host
+host_transaction_phase prepare
+
 . /etc/os-release
 case "${ID}:${VERSION_ID}" in
   ubuntu:24.04) ;;
@@ -52,4 +69,5 @@ fi
 docker info >/dev/null
 docker compose version
 docker buildx version
+host_transaction_phase commit
 echo "Docker Engine 初始化完成。"

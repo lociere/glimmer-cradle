@@ -41,6 +41,25 @@ const removedWorkspaceFiles = [
   'engines/audio/src/glimmer_cradle/audio/tts/gpt_sovits_engine.py',
   'engines/audio/src/glimmer_cradle/audio/tts/gpt_sovits_sidecar.py',
   'native/src/platform_native.c',
+  'deploy/personal-server/host-transaction.sh',
+  'scripts/dlq.py',
+  'scripts/telemetry.py',
+  'scripts/experience.py',
+  'scripts/smoke-personal-server.mjs',
+  'scripts/build-composition-host.mjs',
+  'scripts/build-unity-avatar-host.mjs',
+  'scripts/sync-unity-assets.mjs',
+  'scripts/sync-unity-avatar-sdk.mjs',
+  'scripts/sync-assets.mjs',
+  'scripts/prepare-runtime.mjs',
+  'scripts/stage-extension-host-modules.mjs',
+  'scripts/check-version-consistency.mjs',
+  'scripts/setup-dev.sh',
+  'scripts/test-personal-server-release.sh',
+  'scripts/test-personal-server-remote-install.sh',
+  'scripts/verify-personal-server-full-install.sh',
+  'scripts/fixtures/personal-server-install-interrupt',
+  'scripts/lib',
 ];
 
 const requiredWorkspaceDirectories = [
@@ -67,6 +86,16 @@ const requiredWorkspaceDirectories = [
   'protocol/codegen',
   'packages/extension-sdk',
   'templates/extension-basic',
+  'deploy/personal-server/lib',
+  'deploy/personal-server/tests',
+  'core/avatar/scripts',
+  'core/avatar/tests',
+  'core/kernel/tools',
+  'core/cognition/tools',
+  'hosts/unity-avatar-host/scripts',
+  'hosts/unity-avatar-host/tests',
+  'products/personal-server/scripts',
+  'products/desktop/scripts',
 ];
 
 for (const relativePath of requiredWorkspaceDirectories) {
@@ -78,6 +107,37 @@ for (const relativePath of requiredWorkspaceDirectories) {
 for (const relativePath of removedWorkspaceFiles) {
   if (fs.existsSync(path.join(repoRoot, relativePath))) {
     violations.push(`${relativePath}: 已删除的架构入口被重新引入`);
+  }
+}
+
+const expectedRootScripts = new Set([
+  'check-architecture.mjs',
+  'check-no-bom.mjs',
+  'launch-product.mjs',
+]);
+for (const entry of fs.readdirSync(path.join(repoRoot, 'scripts'), { withFileTypes: true })) {
+  if (!entry.isFile() || !expectedRootScripts.has(entry.name)) {
+    violations.push(`scripts/${entry.name}: root 只允许三项跨 owner 薄编排`);
+  }
+}
+for (const requiredFile of [
+  'deploy/personal-server/lib/host-transaction.sh',
+  'deploy/personal-server/container/ops-bridge-handoff.mjs',
+  'core/kernel/tools/dlq.py',
+  'core/kernel/tools/telemetry.py',
+  'core/cognition/tools/experience.py',
+  'products/desktop/scripts/package.mjs',
+  'products/desktop/scripts/release-manifest.mjs',
+  'products/desktop/scripts/verify-package.mjs',
+  'products/personal-server/scripts/build-image.mjs',
+  'products/personal-server/scripts/package-release.mjs',
+  'products/personal-server/scripts/release-manifest.mjs',
+  'products/personal-server/scripts/verify-release.mjs',
+  '.github/workflows/pr.yml',
+  '.github/workflows/release-desktop.yml',
+]) {
+  if (!fs.existsSync(path.join(repoRoot, requiredFile))) {
+    violations.push(`${requiredFile}: M13 canonical 入口缺失`);
   }
 }
 

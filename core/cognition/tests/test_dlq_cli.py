@@ -9,7 +9,7 @@ from pathlib import Path
 
 def load_dlq_module():
     repo_root = Path(__file__).resolve().parents[3]
-    module_path = repo_root / "scripts" / "dlq.py"
+    module_path = repo_root / "core" / "kernel" / "tools" / "dlq.py"
     spec = importlib.util.spec_from_file_location("selrena_test_dlq_cli", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -111,7 +111,7 @@ def test_dlq_cli_reads_both_sources(tmp_path: Path) -> None:
     assert records[1]["exception"] == "cognition failed"
 
 
-def test_dlq_cli_marks_replay_by_source_ref(tmp_path: Path) -> None:
+def test_dlq_cli_requires_real_dispatcher_before_marking_replay(tmp_path: Path) -> None:
     dlq = load_dlq_module()
     kernel_db = tmp_path / "kernel.db"
     create_kernel_dlq(kernel_db)
@@ -120,7 +120,16 @@ def test_dlq_cli_marks_replay_by_source_ref(tmp_path: Path) -> None:
         "kernel": dlq.DlqSource("kernel", kernel_db, "dead_letters_ts", "error_message"),
     }
 
-    assert dlq.cmd_replay(["kernel:1"]) == 0
+    dispatcher = tmp_path / "dispatcher.py"
+    dispatcher.write_text(
+        "import json,sys\n"
+        "payload=json.load(sys.stdin)\n"
+        "print(json.dumps({'status':'accepted','receipt_id':'r1'}))\n",
+        encoding="utf-8",
+    )
+    assert dlq.cmd_replay(
+        ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(dispatcher)]
+    ) == 0
 
     conn = sqlite3.connect(kernel_db)
     try:

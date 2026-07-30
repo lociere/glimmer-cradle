@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf '%s\n' "$*" >>"${GLIMMER_CRADLE_TEST_DOCKER_LOG:?}"
+if [[ "${1:-}" == info ]]; then
+  [[ "${GLIMMER_CRADLE_TEST_DOCKER_UNAVAILABLE:-0}" != 1 ]]
+  exit
+fi
+if [[ "${1:-}" == compose ]]; then
+  shift
+  while (( $# )); do
+    case "$1" in
+      --project-directory|--env-file|--file) shift 2 ;;
+      *) break ;;
+    esac
+  done
+  case "${1:-}" in
+    version|config|pull|build|up|down|restart|ps|logs|exec) exit 0 ;;
+  esac
+fi
+if [[ "${1:-}" == inspect ]]; then
+  printf 'glimmer-cradle/personal-server:fixture\n'
+fi
+exit 0

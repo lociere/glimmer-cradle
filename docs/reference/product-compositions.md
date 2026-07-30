@@ -65,7 +65,7 @@ Personal Server 并不禁用 Skill Plane。Core、MCP、User 和 Extension Provi
 
 `scripts/launch-product.mjs` 是开发期 Product Supervisor。它先运行可缓存准备器，再注入 `GLIMMER_CRADLE_PRODUCT_MANIFEST`，共同持有 Kernel 与 Product Host。主进程以 `code=0` 正常退出时，Supervisor 先等待兄弟进程沿协议自然退出，再在短期限后回收剩余进程树；异常退出则立即收口故障域并向部署层返回失败。Windows 通过当前 Node 附带的 Corepack `pnpm.js` 入口执行仓库锁定版本，避免 `.cmd` 外壳和项目内全局 pnpm 假设破坏进程所有权；其他平台通过 `corepack pnpm` 启动。
 
-`scripts/smoke-personal-server.mjs` 是需要真实 LLM 配置的生产组合 smoke。它分配临时回环端口和隔离 Local Data Domain，只链接只读模型与安装包，不污染真实会话、记忆、日志或缓存；随后记录 `/readyz` 状态迁移，经 `/api/v1/surface` 完成一次文本对话并等待 `reply` 与真实 Audio 状态，最后从受信任控制表面发起全局停机并要求 Product Supervisor 以 `0` 退出。默认接受 TTS/ASR 为 `disabled`；只有设置 `GLIMMER_CRADLE_SMOKE_REQUIRE_TTS=1` 时才要求 `audio_play`。它不替代 Linux OCI 分发物验收。
+`products/personal-server/scripts/smoke.mjs` 是需要真实 LLM 配置的生产组合 smoke。它分配临时回环端口，并把 models/packages 复制到隔离 Local Data Domain；任一 symlink/junction 会失败闭合，不会把可写路径投影回真实数据。随后记录 `/readyz` 状态迁移，经 `/api/v1/surface` 完成一次文本对话并等待 `reply` 与真实 Audio 状态，最后从受信任控制表面发起全局停机并要求 Product Supervisor 以 `0` 退出。默认接受 TTS/ASR 为 `disabled`；只有设置 `GLIMMER_CRADLE_SMOKE_REQUIRE_TTS=1` 时才要求 `audio_play`。它不替代 Linux OCI 分发物验收。
 
 ## Personal Server 网络配置
 
