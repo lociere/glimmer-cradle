@@ -17,6 +17,7 @@ allowBuilds:
   '@bufbuild/buf': true
   better-sqlite3: true
   electron: true
+  electron-winstaller: true
   esbuild: true
   zeromq: true
 

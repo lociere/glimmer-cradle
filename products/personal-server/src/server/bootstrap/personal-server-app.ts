@@ -14,6 +14,7 @@ import {
 import {
   DeploymentOperationsService,
   type DeploymentOperationResult,
+  type DeploymentOperationStatus,
 } from '../adapters/deployment-operations-service';
 import { readEndpointCatalogEntry } from '../adapters/endpoint-catalog';
 import { ObservabilityLogService, type ObservabilityLogQuery } from '../adapters/observability-log-service';
@@ -38,6 +39,7 @@ export interface PersonalServerAppOptions {
   readonly token: string;
   readonly productManifestPath?: string;
   readonly cwd?: string;
+  readonly deploymentOperations?: DeploymentOperationsService;
 }
 
 export class PersonalServerApp {
@@ -80,7 +82,7 @@ export class PersonalServerApp {
     this.publicRoot = path.join(this.packageRoot, 'dist', 'public');
     this.observabilityLogs = new ObservabilityLogService(path.join(this.dataRoot, 'observability'));
     this.auditLog = new ProductAuditLog(path.join(this.dataRoot, 'observability'));
-    this.operations = new DeploymentOperationsService({
+    this.operations = options.deploymentOperations ?? new DeploymentOperationsService({
       applicationRoot: this.applicationRoot,
       packageRoot: this.packageRoot,
       deploymentEnvFile: process.env.GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE,
@@ -232,6 +234,13 @@ export class PersonalServerApp {
       await this.handleOperationsRequest(request, response);
       return;
     }
+    const operationResultRoute = request.method === 'GET'
+      ? /^\/api\/v1\/operations\/(deployment_op_[A-Za-z0-9][A-Za-z0-9._-]{0,111})$/.exec(pathname)
+      : null;
+    if (operationResultRoute) {
+      await this.handleOperationResult(request, response, operationResultRoute[1]);
+      return;
+    }
     if (pathname === '/api/v1/extensions/local-package' && request.method === 'POST') {
       await this.handleLocalExtensionUpload(request, response);
       return;
@@ -350,19 +359,35 @@ export class PersonalServerApp {
     try {
       const body = await readJsonBody(request, 8192) as {
         operation?: string;
+        operation_id?: string;
         backup_id?: string;
         confirm?: boolean;
       };
       const result = await this.operations.execute(body);
       await this.auditOperationsResult(body.operation || 'unknown', body.backup_id || null, result);
-      sendJson(response, result.status === 'error'
-        ? 400
-        : result.status === 'conflict'
-          ? 409
-          : 200, result);
+      sendJson(response, operationHttpStatus(result.status, result.requires_confirmation), result);
     } catch {
       sendJson(response, 400, { error: 'invalid_request' });
     }
+  }
+
+  private async handleOperationResult(
+    request: IncomingMessage,
+    response: ServerResponse,
+    operationId: string,
+  ): Promise<void> {
+    const authorized = await this.sessions.authenticate(request, 'operations:write');
+    if (!authorized) {
+      sendJson(response, 403, { error: 'forbidden' });
+      return;
+    }
+    const result = await this.operations.getOperation(operationId);
+    if (!result) {
+      sendJson(response, 404, { error: 'operation_not_found', operation_id: operationId });
+      return;
+    }
+    await this.auditOperationsResult(result.operation || 'result.get', operationId, result);
+    sendJson(response, operationHttpStatus(result.status), result);
   }
 
   private async handleLocalExtensionUpload(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -484,16 +509,38 @@ export class PersonalServerApp {
       action: `operations.${operation}`,
       target_kind: 'deployment_operation',
       target_name: targetName,
-      outcome: result.status === 'error'
-        || result.status === 'conflict'
-        ? 'failed'
-        : result.status === 'accepted'
-          ? 'accepted'
-          : 'succeeded',
-      reason: result.status === 'error' || result.status === 'conflict' ? result.message : null,
-      attributes: result.operation_id ? { operation_id: result.operation_id } : undefined,
+      outcome: operationAuditOutcome(result.status),
+      reason: operationAuditOutcome(result.status) === 'failed' ? result.message : null,
+      attributes: {
+        operation_id: result.operation_id,
+        operation_status: result.status,
+        exit_code: result.exit_code ?? null,
+      },
     }).catch(() => undefined);
   }
+}
+
+export function operationHttpStatus(
+  status: DeploymentOperationStatus,
+  requiresConfirmation = false,
+): number {
+  if (requiresConfirmation) return 428;
+  if (status === 'accepted' || status === 'started') return 202;
+  if (status === 'committed') return 200;
+  if (status === 'unsupported') return 422;
+  if (status === 'conflict') return 409;
+  if (status === 'owner_timeout') return 504;
+  if (status === 'recovery_required') return 503;
+  if (status === 'failed') return 500;
+  return 400;
+}
+
+export function operationAuditOutcome(
+  status: DeploymentOperationStatus,
+): 'succeeded' | 'failed' | 'accepted' {
+  if (status === 'committed') return 'succeeded';
+  if (status === 'accepted' || status === 'started') return 'accepted';
+  return 'failed';
 }
 
 function isLoopback(value: string): boolean {

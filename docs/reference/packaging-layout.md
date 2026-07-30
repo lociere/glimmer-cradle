@@ -43,6 +43,41 @@
 
 Audio engine 以 `engines/audio` 为源码事实源。TTS/ASR 默认关闭且不影响基础运行 readiness；CosyVoice 是显式启用 TTS 后的当前云端 provider，凭据不入包。FunASR 本地模型位于用户数据模型域，标准 Personal Server 发行物不包含 ASR 依赖或模型。Kernel 只投影 `audio.host -> audio.tts/audio.asr -> providers`，不扫描 sidecar 包或复制 Engine provider 逻辑。
 
+## Desktop 安装投影
+
+Windows x64 安装树的 `resources/` 包含：
+
+```text
+runtime/
+├── node/node.exe
+├── python/Scripts/python.exe
+├── python/Lib/site-packages/{glimmer_cradle,...}
+├── kernel/dist/
+├── kernel/node_modules/
+└── runtime-manifest.json
+components/
+├── avatar/unity-host/
+└── native/composition-host/
+extension-host/modules/
+products/desktop/product.json
+component-manifest.json
+```
+
+Python 固定为 3.12.13，依赖分别由 Cognition/Audio `uv.lock` frozen export 解析；Kernel 由
+pnpm production deploy 产生 resolved dependency tree。`packaged-paths.ts` 拒绝缺失或
+symlink 运行组件，并把首次配置从只读 defaults 原子投影到 user-data；
+`packaged-supervisor.ts` 使用 bundled Node 启动 Kernel，并注入 bundled Python、Avatar、
+Extension、native 与 product manifest 路径。它不调用仓库 root
+`scripts/launch-product.mjs`。打包后的物理入口为
+`win-unpacked/resources/app.asar.unpacked/dist/main/{packaged-paths,packaged-supervisor}.js`；
+verifier 同时要求真实 PE installer、`win-unpacked/GlimmerCradle.exe`、`app.asar`、上述
+unpacked 入口和完整组件清单存在并与固定制品 manifest/SBOM 摘要一致。
+
+Avatar/native 先由独立 clean Windows job 使用固定摘要工具链构建为
+`build/artifacts/avatar-windows-x64/`，再经 GitHub attestation、source commit 与 manifest
+digest 复验后投影到 Desktop staging。缺许可、工具链、固定制品或任一 runtime manifest
+输入时 package 失败闭合。
+
 ## Personal Server OCI 投影
 
 `deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；Cognition 与 Audio 使用 uv 锁文件在 Linux builder 中创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。

@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import hashlib
 import os
-import secrets
 import sqlite3
 import subprocess
 import sys
@@ -61,10 +60,19 @@ SOURCES: dict[str, DlqSource] = {
     ),
 }
 
-# 只有对应 owner 在代码审查中注册的 adapter 才能执行。当前仓库尚未有可在离线 CLI
-# 中正确重建 runtime event class 与订阅关系的 adapter，因此生产默认失败闭合；测试通过
-# 注入同一 registration contract 验证 receipt 绑定，不能用任意 --dispatcher 命令绕过。
-DISPATCHERS: dict[str, DispatcherRegistration] = {}
+# Kernel 的真实在产 DLQ 通过 owner-local durable EventBus ingress 重放。Cognition 当前只保留
+# legacy 查询兼容，没有仍在写入该表的生产 owner，因此不注册 replay dispatcher。
+DISPATCHERS: dict[str, DispatcherRegistration] = {
+    "kernel.event-bus.v1": DispatcherRegistration(
+        dispatcher_id="kernel.event-bus.v1",
+        owner="kernel",
+        sources=("kernel",),
+        command=(
+            os.environ.get("GLIMMER_CRADLE_NODE_RUNTIME", "node"),
+            str(REPO_ROOT / "core" / "kernel" / "tools" / "dlq-replay-dispatcher.mjs"),
+        ),
+    ),
+}
 
 
 def open_existing(source: DlqSource, *, writable: bool = False) -> sqlite3.Connection | None:
@@ -348,23 +356,38 @@ def cmd_replay(args: list[str]) -> int:
     source, record_id, conn, row = loaded
     try:
         row_owner = row["owner"] if "owner" in row.keys() else source.name
+        row_status = row["status"] if "status" in row.keys() else (
+            "replayed" if row["replayed"] else "pending"
+        )
         if (
             row_owner != source.name
             or registration.owner != row_owner
             or source.name not in registration.sources
+            or row_status != "pending"
+            or bool(row["replayed"])
         ):
-            print(json.dumps({"event": "dlq_replay_denied", "error_code": "owner_mismatch"}))
+            print(json.dumps({
+                "event": "dlq_replay_denied",
+                "error_code": "owner_or_state_mismatch",
+            }))
             return 77
         raw_payload = str(row["payload"])
         payload_digest = hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
-        operation_id = f"dlq_replay_{secrets.token_hex(16)}"
+        operation_binding = (
+            f"{source.name}:{record_id}:{row['trace_id']}:"
+            f"{payload_digest}:{registration.dispatcher_id}"
+        )
+        operation_id = (
+            "dlq_replay_"
+            + hashlib.sha256(operation_binding.encode("utf-8")).hexdigest()[:32]
+        )
         payload = {
             "source": source.name,
             "id": record_id,
             "owner": row_owner,
             "event_type": row["event_type"],
             "trace_id": row["trace_id"],
-            "payload": json.loads(raw_payload),
+            "payload_json": raw_payload,
             "payload_digest": payload_digest,
             "operation_id": operation_id,
             "dispatcher_id": registration.dispatcher_id,
@@ -388,9 +411,11 @@ def cmd_replay(args: list[str]) -> int:
             "record_id": record_id,
             "owner": row_owner,
             "trace_id": row["trace_id"],
+            "event_type": row["event_type"],
             "payload_digest": payload_digest,
             "operation_id": operation_id,
             "dispatcher_id": registration.dispatcher_id,
+            "delivery": "kernel_event_bus_published",
         }
         if (
             receipt.get("status") != "success"

@@ -112,13 +112,16 @@ cleanup 后 `observability.db` 会在下一次查询时重建。
 4. 如果是旧 Schema / 旧字段，走 Schema 迁移，不在消费者吞掉
 5. 修复后用同类 payload 重验
 6. replay 使用 `python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <registered-id>`；
-   只有 owner 已注册 adapter，且绑定 source/record/trace/payload digest/operation 的 success
-   receipt 全部匹配后记录才进入 replayed；当前无生产 registration 时返回 66
+   Kernel 当前注册 `kernel.event-bus.v1`。只有 owner/state 匹配，且 EventBus 已发布原始
+   payload，绑定 source/record/event type/trace/payload digest/operation/dispatcher 的
+   success receipt 全部匹配后记录才进入 replayed；未注册 source 返回 66
 7. 人工关闭使用 `resolve <source:id> --confirm`，它不会伪装 replay
 8. `cleanup --days <N> --confirm` 只删除超过 retention 的 replay 成功记录
 
 `show <trace_id>` 默认只输出脱敏摘要；`--raw --confirm` 还要求本机 root。dispatcher 失败、
-receipt 缺失或 owner 不匹配时保持原始证据，不手工更新数据库绕过状态机。
+receipt 缺失、下游 timeout、owner/state 不匹配或 receipt 漂移时保持原始证据，不手工更新
+数据库绕过状态机。Kernel ingress/receipt 位于
+`data/state/kernel/dlq-replay-inbox/{,processed/}`；只有成功 receipt 才允许后续 cleanup。
 
 DLQ 不是普通错误日志。它表示“当前系统无法安全处理，但必须保留证据与恢复语义”。
 

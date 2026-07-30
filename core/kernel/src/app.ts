@@ -28,6 +28,7 @@ import { ExtensionRuntime } from './lifecycle/runtime/extension-runtime';
 import { AvatarRuntime } from './lifecycle/runtime/avatar-runtime';
 import { PresentationRuntime } from './lifecycle/runtime/presentation-runtime';
 import { OrganismRuntime } from './lifecycle/runtime/organism-runtime';
+import { DlqReplayRuntime } from './lifecycle/runtime/dlq-replay-runtime';
 import { loadProductComposition } from './composition/product-composition';
 import { currentExtensionPlatform } from './application/skill-plane/availability';
 
@@ -152,6 +153,10 @@ export class App {
       await orchestrator.startPhase({
         name: 'organism',
         modules: [new OrganismRuntime()],
+      }, rootTraceContext);
+      await orchestrator.startPhase({
+        name: 'recovery-ingress',
+        modules: [new DlqReplayRuntime()],
       }, rootTraceContext);
 
       this._startupTimeMs = Date.now() - appStartTime;

@@ -63,8 +63,13 @@ export interface ConfigurationViewOptions {
   readonly loadOperations: () => Promise<DeploymentOperationsSnapshot>;
   readonly runOperation: (
     operation: string,
-    options?: { readonly backupId?: string; readonly confirm?: boolean },
+    options?: {
+      readonly backupId?: string;
+      readonly confirm?: boolean;
+      readonly operationId?: string;
+    },
   ) => Promise<DeploymentOperationResult>;
+  readonly loadOperationResult: (operationId: string) => Promise<DeploymentOperationResult | null>;
   readonly loadSkillCatalog: () => Promise<SkillCatalogLoadResult>;
 }
 

@@ -9,6 +9,10 @@
     "assets/icons/**/*",
     "package.json"
   ],
+  "asarUnpack": [
+    "dist/main/packaged-paths.js",
+    "dist/main/packaged-supervisor.js"
+  ],
   "extraResources": [
     {
       "from": "../../assets",

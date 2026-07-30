@@ -27,7 +27,7 @@ export class DesktopShell {
   private readonly tray: TrayController;
   private quitRequested = false;
 
-  constructor() {
+  constructor(private readonly stopPackagedSupervisor: () => Promise<void> = async () => undefined) {
     const loader = new SurfaceLoader();
     this.surfaces = new SurfaceRegistry(loader, (win, surface) => registerIPCHandlers(win, surface, {
       onAvatarAppearanceChanged: (appearance) => this.surfaces.applyPresenceAppearance(appearance),
@@ -67,6 +67,7 @@ export class DesktopShell {
     this.quitRequested = true;
     this.surfaces.markAppQuitting();
     await requestKernelShutdown();
+    await this.stopPackagedSupervisor();
     app.quit();
   }
 
@@ -104,6 +105,8 @@ export class DesktopShell {
   }
 }
 
-export function createDesktopShell(): DesktopShell {
-  return new DesktopShell();
+export function createDesktopShell(
+  stopPackagedSupervisor?: () => Promise<void>,
+): DesktopShell {
+  return new DesktopShell(stopPackagedSupervisor);
 }

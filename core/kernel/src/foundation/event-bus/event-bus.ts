@@ -90,8 +90,19 @@ export class EventBus {
           DeadLetterQueue.instance.enqueue(
             traceId ?? '',
             eventType ?? 'unknown',
-            { event_type: eventType, event_id: (e as any).event_id },
+            e,
             error as Error,
+            {
+              owner: 'kernel',
+              sourcePath: 'core/kernel/src/foundation/event-bus/event-bus.ts',
+              failurePhase: 'dispatch',
+              retryPolicy: 'owner-confirmed',
+              replayCommand: 'python core/kernel/tools/dlq.py replay kernel:<id> --confirm --dispatcher kernel.event-bus.v1',
+              redactedPayloadSummary: JSON.stringify({
+                event_type: eventType,
+                event_id: (e as any).event_id,
+              }),
+            },
           );
         } catch {
           // DLQ 自身故障不影响事件总线

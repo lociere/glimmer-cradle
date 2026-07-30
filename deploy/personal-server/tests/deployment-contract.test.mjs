@@ -84,9 +84,19 @@ test('handoff Adapter 在启动外部 owner 前创建可信结果目录', () => 
   assert.ok(prepareDirectory > 0);
   assert.ok(prepareDirectory < startOwner);
   assert.match(handoff, /mode: 0o700/);
-  for (const state of ['ready', 'started', 'committed', 'failed', 'recovery_required']) {
+  for (const state of [
+    'ready',
+    'started',
+    'committed',
+    'failed',
+    'recovery_required',
+    'owner_timeout',
+    'conflict',
+  ]) {
     assert.match(handoff, new RegExp(state));
   }
+  assert.match(handoff, /finish_owner_timeout[\s\S]*host_transaction_finish 70/);
+  assert.match(handoff, /owner timeout cleanup did not close safely/);
   assert.match(handoff, /HANDOFF_RETENTION_MS/);
   assert.match(bridge, /request\.method === 'GET'[\s\S]*readHandoffResult/);
 });

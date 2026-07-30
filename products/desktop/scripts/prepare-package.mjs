@@ -8,76 +8,93 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const stagingRoot = path.join(repoRoot, 'build', 'staging', 'desktop', 'windows-x64');
 const temporaryRoot = `${stagingRoot}.prepare-${randomUUID()}`;
 const resourcesRoot = path.join(temporaryRoot, 'resources');
+const runtimeSource = path.join(repoRoot, 'build', 'runtime', 'desktop', 'windows-x64');
 const projections = [
   {
     id: 'kernel',
     owner: 'core/kernel',
-    source: path.join(repoRoot, 'core', 'kernel', 'dist'),
-    destination: 'components/kernel',
+    staged: 'runtime/kernel',
   },
   {
     id: 'cognition',
     owner: 'core/cognition',
-    source: path.join(repoRoot, 'core', 'cognition'),
-    destination: 'components/cognition',
-    filter: sourceFilter,
+    staged: 'runtime/python/Lib/site-packages/glimmer_cradle/cognition',
   },
   {
     id: 'audio',
     owner: 'engines/audio',
-    source: path.join(repoRoot, 'engines', 'audio'),
-    destination: 'components/audio',
-    filter: sourceFilter,
+    staged: 'runtime/python/Lib/site-packages/glimmer_cradle/audio',
   },
   {
     id: 'avatar',
     owner: 'hosts/unity-avatar-host',
     source: path.join(repoRoot, 'build', 'components', 'avatar', 'unity-host', 'windows-x64'),
-    destination: 'components/avatar/unity-host',
+    staged: 'components/avatar/unity-host',
   },
   {
     id: 'extension-host',
     owner: 'packages/extension-sdk',
     source: path.join(repoRoot, 'build', 'extension-host', 'modules'),
-    destination: 'extension-host/modules',
+    staged: 'extension-host/modules',
   },
   {
     id: 'native',
     owner: 'native',
     source: path.join(repoRoot, 'build', 'components', 'native', 'composition-host', 'windows-x64'),
-    destination: 'components/native/composition-host',
+    staged: 'components/native/composition-host',
   },
 ];
 
 await fs.mkdir(resourcesRoot, { recursive: true });
 try {
+  await assertDirectory(runtimeSource, 'runtime');
+  await fs.cp(runtimeSource, path.join(resourcesRoot, 'runtime'), {
+    recursive: true,
+    dereference: false,
+  });
   for (const projection of projections) {
+    if (!projection.source) continue;
     await assertDirectory(projection.source, projection.id);
     await fs.cp(
       projection.source,
-      path.join(resourcesRoot, projection.destination),
-      { recursive: true, dereference: false, filter: projection.filter },
+      path.join(resourcesRoot, projection.staged),
+      { recursive: true, dereference: false },
     );
   }
   await fs.copyFile(
     path.join(repoRoot, 'native', 'package.manifest.json'),
     path.join(resourcesRoot, 'components', 'native', 'package.manifest.json'),
   );
+  await fs.mkdir(path.join(resourcesRoot, 'native'), { recursive: true });
+  await fs.copyFile(
+    path.join(repoRoot, 'native', 'package.manifest.json'),
+    path.join(resourcesRoot, 'native', 'package.manifest.json'),
+  );
+  await fs.mkdir(path.join(resourcesRoot, 'products', 'desktop'), { recursive: true });
+  await fs.copyFile(
+    path.join(repoRoot, 'products', 'desktop', 'product.json'),
+    path.join(resourcesRoot, 'products', 'desktop', 'product.json'),
+  );
   const components = [];
   for (const projection of projections) {
-    const files = await inventoryFiles(path.join(resourcesRoot, projection.destination), resourcesRoot);
+    const files = await inventoryFiles(path.join(resourcesRoot, projection.staged), resourcesRoot);
     if (files.length === 0) throw new Error(`Desktop component projection 为空: ${projection.id}`);
     components.push({
       id: projection.id,
       owner: projection.owner,
-      projection: projection.destination.replaceAll('\\', '/'),
+      projection: projection.staged.replaceAll('\\', '/'),
       files,
     });
   }
+  const runtimeFiles = await inventoryFiles(path.join(resourcesRoot, 'runtime'), resourcesRoot);
   const componentManifest = {
-    schema_version: 1,
+    schema_version: 2,
     platform: 'windows-x64',
     generated_by: 'products/desktop/scripts/prepare-package.mjs',
+    supervisor: 'app.asar.unpacked/dist/main/packaged-supervisor.js',
+    path_resolver: 'app.asar.unpacked/dist/main/packaged-paths.js',
+    runtime_manifest: 'runtime/runtime-manifest.json',
+    runtime_files: runtimeFiles,
     components,
   };
   await fs.writeFile(
@@ -121,9 +138,4 @@ async function inventoryFiles(root, relativeRoot) {
     }
   }
   return files.sort((left, right) => left.path.localeCompare(right.path));
-}
-
-function sourceFilter(source) {
-  const normalized = source.replaceAll('\\', '/');
-  return !/(?:^|\/)(?:\.venv|__pycache__|\.pytest_cache|tests)(?:\/|$)/.test(normalized);
 }

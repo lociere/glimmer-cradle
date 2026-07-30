@@ -7,6 +7,7 @@ import { startTracer, stopTracer } from '../../foundation/logger/tracer';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 import { EndpointRegistry } from '../../foundation/endpoints/endpoint-registry';
+import { DeadLetterQueue } from '../../foundation/event-bus/dead-letter-queue';
 
 export class FoundationRuntime implements RuntimeModule {
   public readonly name = 'foundation';
@@ -28,6 +29,7 @@ export class FoundationRuntime implements RuntimeModule {
     startTracer();
 
     await DBManager.instance.init();
+    DeadLetterQueue.instance.init();
     return {
       config: 'ready',
       logger: 'ready',

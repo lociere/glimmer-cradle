@@ -21,9 +21,7 @@ if (process.argv.includes('--dry-run')) {
     platform: 'windows-x64',
     inputs: [
       'products/desktop/dist',
-      'core/kernel/dist',
-      'core/cognition',
-      'engines/audio',
+      'build/runtime/desktop/windows-x64',
       'build/components/avatar/unity-host/windows-x64',
       'build/extension-host/modules',
       'build/components/native/composition-host/windows-x64',
@@ -39,7 +37,9 @@ if (process.argv.includes('--dry-run')) {
 if (process.platform !== 'win32') throw new Error('Desktop installer 只允许在 Windows runner 构建');
 await run('pnpm.cmd', ['build']);
 await run('pnpm.cmd', ['prepare:runtime']);
-await run('pnpm.cmd', ['avatar:build']);
+await run(process.execPath, [
+  path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-package-runtimes.mjs'),
+]);
 await run(process.execPath, [
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-package.mjs'),
 ]);

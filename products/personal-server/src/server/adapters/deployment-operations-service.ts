@@ -3,6 +3,30 @@ import http from 'node:http';
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+const DEPLOYMENT_OPERATION_ID = /^deployment_op_[A-Za-z0-9][A-Za-z0-9._-]{0,111}$/;
+const DEPLOYMENT_OPERATION_STATUSES = new Set<DeploymentOperationStatus>([
+  'unsupported',
+  'accepted',
+  'started',
+  'committed',
+  'failed',
+  'recovery_required',
+  'owner_timeout',
+  'conflict',
+  'error',
+]);
+
+export type DeploymentOperationStatus =
+  | 'unsupported'
+  | 'accepted'
+  | 'started'
+  | 'committed'
+  | 'failed'
+  | 'recovery_required'
+  | 'owner_timeout'
+  | 'conflict'
+  | 'error';
+
 export interface DeploymentBackupEntry {
   readonly backup_id: string;
   readonly created_at: string;
@@ -32,11 +56,22 @@ export interface DeploymentOperationsSnapshot {
 }
 
 export interface DeploymentOperationResult {
-  readonly status: 'success' | 'error' | 'accepted' | 'disabled' | 'preflight' | 'conflict';
+  readonly status: DeploymentOperationStatus;
   readonly message: string;
   readonly snapshot: DeploymentOperationsSnapshot;
   readonly requires_confirmation?: boolean;
+  readonly operation_id: string;
+  readonly operation?: string;
+  readonly exit_code?: number;
+  readonly recovery_action?: string;
+  readonly updated_at?: string;
+}
+
+export interface DeploymentOperationRequest {
+  readonly operation?: string;
   readonly operation_id?: string;
+  readonly backup_id?: string;
+  readonly confirm?: boolean;
 }
 
 export class DeploymentOperationsService {
@@ -44,20 +79,31 @@ export class DeploymentOperationsService {
     private readonly options: {
       readonly applicationRoot: string;
       readonly packageRoot?: string;
-      readonly fetchFn?: typeof fetch;
       readonly deploymentEnvFile?: string;
       readonly releaseSource?: string;
       readonly bridgeSocketPath?: string;
       readonly bridgeToken?: string;
+      readonly bridgeTransport?: <T>(
+        method: 'GET' | 'POST',
+        route: string,
+        body?: unknown,
+      ) => Promise<T | null>;
     },
   ) {}
 
   public async getSnapshot(availableVersion?: string): Promise<DeploymentOperationsSnapshot> {
     const bridgeSnapshot = await this.bridgeRequest<DeploymentOperationsSnapshot>('GET', '/snapshot').catch(() => null);
     if (bridgeSnapshot) {
-      return availableVersion
-        ? { ...bridgeSnapshot, update: { ...bridgeSnapshot.update, available_version: availableVersion } }
-        : bridgeSnapshot;
+      return {
+        ...bridgeSnapshot,
+        update: {
+          ...bridgeSnapshot.update,
+          check_supported: false,
+          apply_supported: false,
+          disabled_reason: '尚未建立经验证候选、固定 OCI digest 与 install-release 的不可漂移绑定。',
+          available_version: availableVersion,
+        },
+      };
     }
     const stateRoot = await this.resolveStateRoot();
     const disabledReason = '当前 Product Host 未连接部署级外部事务 owner；宿主写操作不可用。';
@@ -75,46 +121,103 @@ export class DeploymentOperationsService {
         disabled_reason: disabledReason,
       },
       update: {
-        check_supported: true,
+        check_supported: false,
         apply_supported: false,
         current_version: await this.readCurrentVersion(),
         source: this.resolveReleaseSource(),
-        disabled_reason: disabledReason,
+        disabled_reason: '尚未建立经验证候选、固定 OCI digest 与 install-release 的不可漂移绑定。',
         available_version: availableVersion,
       },
     };
   }
 
-  public async execute(request: { operation?: string; backup_id?: string; confirm?: boolean }): Promise<DeploymentOperationResult> {
-    const operation = request.operation || '';
-    if (operation === 'update.check') {
-      const availableVersion = await this.checkLatestVersion().catch(() => undefined);
-      return {
-        status: 'success',
-        message: availableVersion ? `检测到候选版本 ${availableVersion}。` : '当前未发现新的候选版本。',
-        snapshot: await this.getSnapshot(availableVersion),
-      };
+  public async execute(request: DeploymentOperationRequest): Promise<DeploymentOperationResult> {
+    const operationId = request.operation_id?.trim() || `deployment_op_${randomUUID()}`;
+    if (!DEPLOYMENT_OPERATION_ID.test(operationId)) {
+      return this.localResult(
+        'error',
+        'operation_id 无效；请求未发送给部署桥。',
+        operationId,
+        request.operation,
+      );
     }
+    const bridgeRequest = { ...request, operation_id: operationId };
 
     if (this.hasBridgeConfiguration()) {
       try {
-        const bridgeResult = await this.bridgeRequest<DeploymentOperationResult>('POST', '/operations', request);
-        if (bridgeResult) return bridgeResult;
+        const bridgeResult = await this.bridgeRequest<DeploymentOperationResult>('POST', '/operations', bridgeRequest);
+        if (bridgeResult) {
+          if (bridgeResult.operation_id !== operationId
+            || !DEPLOYMENT_OPERATION_STATUSES.has(bridgeResult.status)) {
+            return this.localResult(
+              'error',
+              '部署桥返回了不匹配的 operation_id；请求状态拒绝投影。',
+              operationId,
+              request.operation,
+            );
+          }
+          if ((request.operation === 'update.check' || request.operation === 'update.apply')
+            && bridgeResult.status !== 'unsupported') {
+            return this.localResult(
+              'error',
+              '部署桥没有按当前契约拒绝未绑定候选的更新请求；结果失败闭合。',
+              operationId,
+              request.operation,
+            );
+          }
+          return bridgeResult;
+        }
       } catch {
-        return {
-          status: 'error',
-          message: '部署级运维桥不可达；为避免重复执行，当前请求没有回退到其他执行路径。',
-          snapshot: await this.getSnapshot(),
-          operation_id: `deployment_op_${randomUUID()}`,
-        };
+        return this.localResult(
+          'error',
+          '部署级运维桥不可达；为避免重复执行，当前请求没有回退到其他执行路径。',
+          operationId,
+          request.operation,
+        );
       }
     }
 
-    return {
-      status: 'disabled',
-      message: '当前 Product Host 未连接部署级外部事务 owner；请求未执行。',
-      snapshot: await this.getSnapshot(),
-    };
+    return this.localResult(
+      request.operation === 'update.check' || request.operation === 'update.apply'
+        ? 'unsupported'
+        : 'error',
+      request.operation === 'update.check' || request.operation === 'update.apply'
+        ? '更新能力未连接可信候选 owner；请求失败闭合。'
+        : '当前 Product Host 未连接部署级外部事务 owner；请求未执行。',
+      operationId,
+      request.operation,
+    );
+  }
+
+  public async getOperation(operationId: string): Promise<DeploymentOperationResult | null> {
+    if (!DEPLOYMENT_OPERATION_ID.test(operationId) || !this.hasBridgeConfiguration()) return null;
+    try {
+      const result = await this.bridgeRequest<DeploymentOperationResult>(
+        'GET',
+        `/operations/${encodeURIComponent(operationId)}`,
+      );
+      if (!result) return null;
+      // `ready` 是 Bridge 内部的 pre-ack 状态；它不能投影成 API accepted。
+      // 调用者保留同一 operation_id 继续查询，直到 started 或规范终态出现。
+      if ((result.status as string) === 'ready' && result.operation_id === operationId) return null;
+      if (result.operation_id !== operationId
+        || !DEPLOYMENT_OPERATION_STATUSES.has(result.status)) {
+        return {
+          status: 'error',
+          message: '部署桥返回了不匹配的 operation 终态；查询结果失败闭合。',
+          snapshot: await this.getSnapshot(),
+          operation_id: operationId,
+        };
+      }
+      return result;
+    } catch {
+      return {
+        status: 'error',
+        message: '部署级运维桥不可达；operation 终态暂不可查询。',
+        snapshot: await this.getSnapshot(),
+        operation_id: operationId,
+      };
+    }
   }
 
   private async resolveStateRoot(): Promise<string | null> {
@@ -182,6 +285,9 @@ export class DeploymentOperationsService {
   }
 
   private bridgeRequest<T>(method: 'GET' | 'POST', route: string, body?: unknown): Promise<T | null> {
+    if (this.options.bridgeTransport) {
+      return this.options.bridgeTransport<T>(method, route, body);
+    }
     const socketPath = this.options.bridgeSocketPath?.trim();
     const token = this.options.bridgeToken?.trim();
     if (!socketPath || !token) return Promise.resolve(null);
@@ -202,6 +308,10 @@ export class DeploymentOperationsService {
         response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
         response.on('end', () => {
           const text = Buffer.concat(chunks).toString('utf8');
+          if (response.statusCode === 404) {
+            resolve(null);
+            return;
+          }
           if (!response.statusCode || response.statusCode >= 500) {
             reject(new Error(`operations_bridge_${response.statusCode || 'unknown'}`));
             return;
@@ -221,34 +331,27 @@ export class DeploymentOperationsService {
   }
 
   private hasBridgeConfiguration(): boolean {
-    return Boolean(this.options.bridgeSocketPath?.trim() && this.options.bridgeToken?.trim());
+    return Boolean(
+      this.options.bridgeTransport
+      || (this.options.bridgeSocketPath?.trim() && this.options.bridgeToken?.trim()),
+    );
   }
 
-  private async checkLatestVersion(): Promise<string | undefined> {
-    const source = this.resolveReleaseSource();
-    if (!source) return undefined;
-    if (source.startsWith('https://github.com/lociere/glimmer-cradle/releases/latest')) {
-      const response = await (this.options.fetchFn ?? fetch)('https://api.github.com/repos/lociere/glimmer-cradle/releases/latest', {
-        headers: { accept: 'application/vnd.github+json' },
-      });
-      if (!response.ok) return undefined;
-      const payload = await response.json() as { tag_name?: string };
-      return payload.tag_name?.replace(/^v/, '') || undefined;
-    }
-    if (source.startsWith('http://') || source.startsWith('https://')) {
-      const response = await (this.options.fetchFn ?? fetch)(`${source.replace(/\/$/, '')}/SHA256SUMS`);
-      if (!response.ok) return undefined;
-      return parseVersionFromChecksums(await response.text());
-    }
-    const localChecksums = path.join(source.replace(/^file:\/\//, ''), 'SHA256SUMS');
-    if (!await fileExists(localChecksums)) return undefined;
-    return parseVersionFromChecksums(await readFile(localChecksums, 'utf8'));
+  private async localResult(
+    status: DeploymentOperationStatus,
+    message: string,
+    operationId: string,
+    operation?: string,
+  ): Promise<DeploymentOperationResult> {
+    return {
+      status,
+      message,
+      snapshot: await this.getSnapshot(),
+      operation_id: operationId,
+      operation,
+    };
   }
 
-}
-
-function parseVersionFromChecksums(content: string): string | undefined {
-  return content.match(/glimmer-cradle-personal-server-v([0-9A-Za-z._+-]+)-linux-amd64(?:-full)?\.tar\.gz/)?.[1];
 }
 
 async function fileExists(targetPath: string): Promise<boolean> {

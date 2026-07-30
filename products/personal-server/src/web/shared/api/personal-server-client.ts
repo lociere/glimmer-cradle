@@ -126,11 +126,24 @@ export interface DeploymentOperationsSnapshot {
 }
 
 export interface DeploymentOperationResult {
-  readonly status: 'success' | 'error' | 'accepted' | 'disabled' | 'preflight' | 'conflict';
+  readonly status:
+    | 'unsupported'
+    | 'accepted'
+    | 'started'
+    | 'committed'
+    | 'failed'
+    | 'recovery_required'
+    | 'owner_timeout'
+    | 'conflict'
+    | 'error';
   readonly message: string;
   readonly snapshot: DeploymentOperationsSnapshot;
   readonly requires_confirmation?: boolean;
-  readonly operation_id?: string;
+  readonly operation_id: string;
+  readonly operation?: string;
+  readonly exit_code?: number;
+  readonly recovery_action?: string;
+  readonly updated_at?: string;
 }
 
 type SkillCatalogRequest = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
@@ -231,13 +244,19 @@ export class PersonalServerClient {
 
   public async runOperation(
     operation: string,
-    options: { readonly backupId?: string; readonly confirm?: boolean } = {},
+    options: {
+      readonly backupId?: string;
+      readonly confirm?: boolean;
+      readonly operationId?: string;
+    } = {},
   ): Promise<DeploymentOperationResult> {
+    const operationId = options.operationId || createDeploymentOperationId();
     const response = await fetch('/api/v1/operations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         operation,
+        operation_id: operationId,
         backup_id: options.backupId,
         confirm: options.confirm,
       }),
@@ -245,10 +264,24 @@ export class PersonalServerClient {
     if (response.status === 401) throw new Error('unauthorized');
     if (response.status === 403) throw new Error('forbidden');
     const payload = await response.json() as DeploymentOperationResult | { error?: string };
-    if (!response.ok) {
+    if (!response.ok && !('status' in payload)) {
       throw new Error('message' in payload && typeof payload.message === 'string'
         ? payload.message
         : `operations_${response.status}`);
+    }
+    return payload as DeploymentOperationResult;
+  }
+
+  public async getOperationResult(operationId: string): Promise<DeploymentOperationResult | null> {
+    const response = await fetch(`/api/v1/operations/${encodeURIComponent(operationId)}`, {
+      cache: 'no-store',
+    });
+    if (response.status === 401) throw new Error('unauthorized');
+    if (response.status === 403) throw new Error('forbidden');
+    if (response.status === 404) return null;
+    const payload = await response.json() as DeploymentOperationResult | { error?: string };
+    if (!response.ok && !('status' in payload)) {
+      throw new Error(`operations_${response.status}`);
     }
     return payload as DeploymentOperationResult;
   }
@@ -289,6 +322,12 @@ export class PersonalServerClient {
     }
     return payload as AccessTokenMutationResult;
   }
+}
+
+function createDeploymentOperationId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return `deployment_op_${uuid}`;
 }
 
 export class PersonalServerLogStream {

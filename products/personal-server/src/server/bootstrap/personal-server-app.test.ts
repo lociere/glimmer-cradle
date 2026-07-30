@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PersonalServerApp } from './personal-server-app';
+import { DeploymentOperationsService } from '../adapters/deployment-operations-service';
 
 test('serves recent observability logs through the authenticated control surface http api', async (t) => {
   const fixture = createPersonalServerFixture();
@@ -184,12 +192,160 @@ test('accepts local .gcex uploads into the controlled extension upload root', as
   });
 });
 
+test('operations HTTP 使用同一 operation_id 投影终态并如实记录失败审计', async (t) => {
+  const fixture = createPersonalServerFixture();
+  const snapshot = {
+    backup: { supported: true, entries: [] },
+    service: { restart_supported: true, stop_supported: true },
+    update: {
+      check_supported: false,
+      apply_supported: false,
+      current_version: '0.1.8',
+      source: 'fixture',
+    },
+  };
+  const results = new Map<string, 'committed' | 'recovery_required'>();
+  const operations = new DeploymentOperationsService({
+    applicationRoot: fixture.root,
+    bridgeTransport: async <T>(
+      method: 'GET' | 'POST',
+      route: string,
+      body?: unknown,
+    ) => {
+      if (method === 'POST') {
+        const request = body as { operation: string; operation_id: string };
+        if (request.operation.startsWith('update.')) {
+          return {
+            status: 'unsupported',
+            message: 'candidate owner unavailable',
+            operation_id: request.operation_id,
+            operation: request.operation,
+            snapshot,
+          } as T;
+        }
+        results.set(request.operation_id, request.operation === 'backup.restore'
+          ? 'recovery_required'
+          : 'committed');
+        return {
+          status: 'accepted',
+          message: 'owner started',
+          operation_id: request.operation_id,
+          operation: request.operation,
+          snapshot,
+        } as T;
+      }
+      const operationId = route.split('/').at(-1)!;
+      const status = results.get(operationId);
+      return status ? {
+        status,
+        message: status,
+        operation_id: operationId,
+        operation: status === 'recovery_required' ? 'backup.restore' : 'service.restart',
+        snapshot,
+        exit_code: status === 'committed' ? 0 : 78,
+      } as T : null;
+    },
+  });
+  await withDataRoot(fixture.dataRoot, async () => {
+    const app = new PersonalServerApp({
+      host: '127.0.0.1',
+      port: 0,
+      token: 'server-secret',
+      productManifestPath: fixture.productManifestPath,
+      cwd: fixture.root,
+      deploymentOperations: operations,
+    });
+    await app.start();
+    t.after(() => void app.stop());
+    const headers = {
+      authorization: 'Bearer server-secret',
+      'content-type': 'application/json',
+    };
+    const operationId = 'deployment_op_http_resume';
+    const accepted = await fetch(`${fixture.baseUrl(app)}/api/v1/operations`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        operation: 'service.restart',
+        operation_id: operationId,
+        confirm: true,
+      }),
+    });
+    assert.equal(accepted.status, 202);
+    assert.equal((await accepted.json() as { operation_id: string }).operation_id, operationId);
+
+    const committed = await fetch(
+      `${fixture.baseUrl(app)}/api/v1/operations/${operationId}`,
+      { headers: { authorization: 'Bearer server-secret' } },
+    );
+    assert.equal(committed.status, 200);
+    assert.equal((await committed.json() as { status: string }).status, 'committed');
+
+    const unsupported = await fetch(`${fixture.baseUrl(app)}/api/v1/operations`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        operation: 'update.check',
+        operation_id: 'deployment_op_update_check',
+      }),
+    });
+    assert.equal(unsupported.status, 422);
+    assert.equal((await unsupported.json() as { status: string }).status, 'unsupported');
+
+    const recoveryId = 'deployment_op_restore_recovery';
+    await fetch(`${fixture.baseUrl(app)}/api/v1/operations`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        operation: 'backup.restore',
+        operation_id: recoveryId,
+        backup_id: '20260729T010203Z',
+        confirm: true,
+      }),
+    });
+    const recovery = await fetch(
+      `${fixture.baseUrl(app)}/api/v1/operations/${recoveryId}`,
+      { headers: { authorization: 'Bearer server-secret' } },
+    );
+    assert.equal(recovery.status, 503);
+    assert.equal((await recovery.json() as { status: string }).status, 'recovery_required');
+
+    const forbidden = await fetch(
+      `${fixture.baseUrl(app)}/api/v1/operations/${operationId}`,
+    );
+    assert.equal(forbidden.status, 401);
+
+    const audit = readFileSync(fixture.auditLogPath, 'utf8')
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => JSON.parse(line) as {
+        action: string;
+        outcome: string;
+        attributes: { operation_status?: string };
+      })
+      .filter((record) => record.action.startsWith('operations.'));
+    assert.ok(audit.some((record) => (
+      record.attributes.operation_status === 'committed'
+      && record.outcome === 'succeeded'
+    )));
+    assert.ok(audit.some((record) => (
+      record.attributes.operation_status === 'unsupported'
+      && record.outcome === 'failed'
+    )));
+    assert.ok(audit.some((record) => (
+      record.attributes.operation_status === 'recovery_required'
+      && record.outcome === 'failed'
+    )));
+  });
+});
+
 function createPersonalServerFixture(): {
   root: string;
   dataRoot: string;
   configRoot: string;
   productManifestPath: string;
   applicationLogPath: string;
+  auditLogPath: string;
   baseUrl: (app: PersonalServerApp) => string;
 } {
   const root = mkdtempSync(path.join(tmpdir(), 'personal-server-app-'));
@@ -256,6 +412,7 @@ function createPersonalServerFixture(): {
     configRoot,
     productManifestPath,
     applicationLogPath,
+    auditLogPath,
     baseUrl: (app) => {
       const address = ((app as unknown) as { server: { address(): { port: number } | null } }).server.address();
       if (!address) throw new Error('personal server did not bind to a port');

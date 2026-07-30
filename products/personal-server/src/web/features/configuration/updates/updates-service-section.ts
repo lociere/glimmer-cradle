@@ -33,6 +33,7 @@ export function renderUpdatesServiceSection(
           <button class="quiet-button danger" type="button" data-action="stop-service" ${service?.stop_supported && !pending ? '' : 'disabled'}>停止服务</button>
         </div>
         ${lastResult?.message ? `<p>${escape(lastResult.message)}</p>` : ''}
+        ${lastResult ? `<p>operation ${escape(lastResult.operation_id)} · ${escape(lastResult.status)}</p>` : ''}
       </div>
     </section>
   `;

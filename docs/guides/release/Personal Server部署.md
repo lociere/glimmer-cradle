@@ -125,6 +125,11 @@ ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 
 当前 `v0.1.x` 网页已提供正式控制面：`对话`、`状态`、`扩展`、`日志`、`设置` 五个一级页面可在零 Provider 状态下登录使用。设置中心当前已接入 Provider/默认路由、Audio、Embedding、Memory/Experience、Skill、安全访问令牌、存储/备份、更新/服务状态等 section owner；Provider secret 仍保持 write-only，浏览器不会回显密钥，也不会直接编辑原始 YAML。若某个运维动作依赖宿主桥但当前源码直跑环境未接入，页面会显示真实 disabled reason，而不是假按钮。
 
+Web 运维请求使用可恢复的 `operation_id`。accepted/started 后页面按同一 ID 轮询；重连会继续
+查询 durable 终态。unsupported、failed、recovery_required、owner_timeout、conflict 与
+error 都是失败/需处理结果，不表示成功。当前 update check/apply 因没有固定 candidate 到
+`install-release.sh` 的不可漂移绑定而明确 unsupported，不执行独立网络检查或假更新。
+
 首次启动会把只读默认模板补充到 `/var/lib/glimmer-cradle/config/`，不会覆盖已有文件。真实 provider key 只写入：
 
 ```text
@@ -167,6 +172,10 @@ sudo glimmer-cradle restore <UTC时间戳目录名>
 `/var/lib/glimmer-cradle/transactions/current.json` 的 `recovery_action` 与 `events.jsonl`，
 完成所列人工恢复并确认服务/数据一致后再重试。`status/logs` 不获取写锁，也不会隐式 sudo
 或初始化 token/env/state。
+
+Web 显示 `owner_timeout` 时保留 operation ID，先重新查询同一 ID；不要换 ID 重复提交。
+handoff 的 request/result/ack/decision 会保留至终态 retention 到期。若迟到 owner 已赢得
+started 裁决，查询会返回 started/最终终态；若 timeout 赢得裁决，owner 不再进入 deploy。
 
 ## 开发者源码安装
 

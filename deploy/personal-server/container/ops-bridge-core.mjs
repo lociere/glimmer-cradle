@@ -7,9 +7,16 @@ const SUPPORTED_OPERATIONS = new Set([
   'backup.restore',
   'service.restart',
   'service.stop',
+  'update.check',
   'update.apply',
 ]);
-const TERMINAL_HANDOFF_STATES = new Set(['committed', 'failed', 'recovery_required']);
+const TERMINAL_HANDOFF_STATES = new Set([
+  'committed',
+  'failed',
+  'recovery_required',
+  'owner_timeout',
+  'conflict',
+]);
 
 export function createOperationController(options) {
   return {
@@ -20,31 +27,32 @@ export function createOperationController(options) {
       const snapshot = await options.snapshot();
 
       if (!SUPPORTED_OPERATIONS.has(operation) || !CANONICAL_OPERATION_ID.test(operationId)) {
-        return result('error', '未知运维操作或 operation_id 无效。', snapshot, operationId);
+        return result('error', '未知运维操作或 operation_id 无效。', snapshot, operationId, operation);
       }
-      if (operation === 'update.apply') {
+      if (operation === 'update.check' || operation === 'update.apply') {
         return result(
           'unsupported',
-          '更新应用已失败闭合：尚未建立可验证候选与 install-release 固定制品绑定。',
+          '更新能力已失败闭合：尚未建立可验证候选与 install-release 固定制品绑定。',
           snapshot,
           operationId,
+          operation,
         );
       }
       if (operation === 'backup.restore') {
         const backupId = String(body.backup_id || '');
         if (!CANONICAL_BACKUP_ID.test(backupId)) {
-          return result('error', '指定备份不存在或标识无效，无法恢复。', snapshot, operationId);
+          return result('error', '指定备份不存在或标识无效，无法恢复。', snapshot, operationId, operation);
         }
         if (!body.confirm) {
           return {
-            ...result('preflight', `恢复 ${backupId} 将中断当前服务。`, snapshot, operationId),
+            ...result('error', `恢复 ${backupId} 将中断当前服务。`, snapshot, operationId, operation),
             requires_confirmation: true,
           };
         }
       }
       if (['service.restart', 'service.stop'].includes(operation) && !body.confirm) {
         return {
-          ...result('preflight', '服务控制会中断当前连接；确认后才交给外部事务 owner。', snapshot, operationId),
+          ...result('error', '服务控制会中断当前连接；确认后才交给外部事务 owner。', snapshot, operationId, operation),
           requires_confirmation: true,
         };
       }
@@ -54,35 +62,80 @@ export function createOperationController(options) {
         handoff = await options.handoff(commandFor(operation, body), operationId, operation);
       } catch (error) {
         options.onError?.(operationId, error);
-        return result('error', '外部事务 owner 未能接管请求；未修改宿主状态。', snapshot, operationId);
+        if (String(error?.message || error).includes('transaction_handoff_id_reused')) {
+          return result(
+            'conflict',
+            'operation_id 已绑定到不同请求；没有启动第二事务。',
+            snapshot,
+            operationId,
+            operation,
+          );
+        }
+        return result('error', '外部事务 owner 未能接管请求；未修改宿主状态。', snapshot, operationId, operation);
       }
       if (handoff.status === 'conflict') {
-        return result('conflict', '宿主已有事务持有全局锁。', snapshot, operationId);
+        return result('conflict', '宿主已有事务持有全局锁。', snapshot, operationId, operation);
       }
       if (TERMINAL_HANDOFF_STATES.has(handoff.status)) {
         return {
-          ...result(handoff.status, terminalMessage(handoff.status), snapshot, operationId),
+          ...result(handoff.status, terminalMessage(handoff.status), snapshot, operationId, operation),
           exit_code: handoff.exit_code,
           recovery_action: handoff.recovery_action,
+          updated_at: handoff.updated_at,
         };
       }
       if (handoff.status === 'started') {
-        return result('accepted', acceptedMessage(operation), snapshot, operationId);
+        return result('accepted', acceptedMessage(operation), snapshot, operationId, operation);
       }
       if (handoff.status !== 'ready') {
-        return result('error', '外部事务 owner 未进入 ready；未返回 accepted。', snapshot, operationId);
+        return result('error', '外部事务 owner 未进入 ready；未返回 accepted。', snapshot, operationId, operation);
       }
 
       try {
         const started = await options.acknowledge(handoff);
         if (started.status !== 'started') {
-          return result('error', '外部事务 owner 未确认 started；未返回 accepted。', snapshot, operationId);
+          if (!TERMINAL_HANDOFF_STATES.has(started.status)) {
+            return result(
+              'error',
+              '外部事务 owner 未确认 started；未返回 accepted。',
+              snapshot,
+              operationId,
+              operation,
+            );
+          }
+          return {
+            ...result(started.status, terminalMessage(started.status), snapshot, operationId, operation),
+            exit_code: started.exit_code,
+            recovery_action: started.recovery_action,
+            updated_at: started.updated_at,
+          };
         }
       } catch (error) {
         options.onError?.(operationId, error);
-        return result('error', 'handoff ack/started 失败；未返回 accepted。', snapshot, operationId);
+        const authoritative = await options.query?.(operationId).catch(() => null);
+        if (authoritative?.status === 'started') {
+          return result('accepted', acceptedMessage(operation), snapshot, operationId, operation);
+        }
+        if (authoritative && TERMINAL_HANDOFF_STATES.has(authoritative.status)) {
+          return {
+            ...result(authoritative.status, terminalMessage(authoritative.status), snapshot, operationId, operation),
+            exit_code: authoritative.exit_code,
+            recovery_action: authoritative.recovery_action,
+            updated_at: authoritative.updated_at,
+          };
+        }
+        if (String(error?.message || error).includes('transaction_handoff_ack_conflict')) {
+          return result(
+            'conflict',
+            'handoff ack 与 operation/nonce 绑定冲突；没有启动第二事务。',
+            snapshot,
+            operationId,
+            operation,
+          );
+        }
+        return result('error', 'handoff ack/started 失败且无权威 started 结果；未返回 accepted。', snapshot, operationId, operation);
       }
-      return result('accepted', acceptedMessage(operation), snapshot, operationId);
+      return result('accepted', acceptedMessage(operation), snapshot, operationId, operation);
     },
   };
 }
@@ -104,11 +157,13 @@ function acceptedMessage(operation) {
 function terminalMessage(status) {
   if (status === 'committed') return '该 operation 已提交。';
   if (status === 'recovery_required') return '该 operation 需要人工恢复。';
+  if (status === 'owner_timeout') return '外部事务 owner 超时，operation 未开始或已失去租约。';
+  if (status === 'conflict') return '宿主已有事务持有全局锁。';
   return '该 operation 已失败。';
 }
 
-function result(status, message, snapshot, operationId) {
-  return { status, message, snapshot, operation_id: operationId };
+function result(status, message, snapshot, operationId, operation) {
+  return { status, message, snapshot, operation_id: operationId, operation };
 }
 
 function opId() {

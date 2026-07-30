@@ -5,13 +5,17 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
-  artifact-metadata: write
 
 jobs:
-  package:
+  avatar-fixed-artifact:
     runs-on: windows-2025
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      manifest_digest: ${{ steps.avatar_metadata.outputs.manifest_digest }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -20,7 +24,108 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: 验证并准备固定 Unity/Cubism toolchain
+        shell: pwsh
+        env:
+          UNITY_EDITOR_ARCHIVE_URL: ${{ secrets.UNITY_EDITOR_ARCHIVE_URL }}
+          UNITY_EDITOR_ARCHIVE_SHA256: ${{ secrets.UNITY_EDITOR_ARCHIVE_SHA256 }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          CUBISM_UNITY_SDK_ARCHIVE_URL: ${{ secrets.CUBISM_UNITY_SDK_ARCHIVE_URL }}
+          CUBISM_UNITY_SDK_ARCHIVE_SHA256: ${{ secrets.CUBISM_UNITY_SDK_ARCHIVE_SHA256 }}
+        run: |
+          foreach ($name in @(
+            'UNITY_EDITOR_ARCHIVE_URL',
+            'UNITY_EDITOR_ARCHIVE_SHA256',
+            'UNITY_LICENSE',
+            'CUBISM_UNITY_SDK_ARCHIVE_URL',
+            'CUBISM_UNITY_SDK_ARCHIVE_SHA256'
+          )) {
+            if ([string]::IsNullOrWhiteSpace((Get-Item "env:$name").Value)) {
+              throw "Desktop Avatar build prerequisite missing: $name"
+            }
+          }
+          $toolchain = Join-Path $env:RUNNER_TEMP 'glimmer-unity-toolchain'
+          New-Item -ItemType Directory -Force -Path $toolchain | Out-Null
+          $unityArchive = Join-Path $toolchain 'unity-editor.zip'
+          Invoke-WebRequest -Uri $env:UNITY_EDITOR_ARCHIVE_URL -OutFile $unityArchive
+          if ((Get-FileHash $unityArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $env:UNITY_EDITOR_ARCHIVE_SHA256.ToLowerInvariant()) {
+            throw 'Unity Editor archive digest mismatch'
+          }
+          Expand-Archive -Path $unityArchive -DestinationPath (Join-Path $toolchain 'unity') -Force
+          $unityEditor = Get-ChildItem (Join-Path $toolchain 'unity') -Filter Unity.exe -Recurse -File | Select-Object -First 1
+          if (-not $unityEditor) { throw 'Pinned Unity Editor archive missing Unity.exe' }
+          $sdkArchive = Join-Path $toolchain 'cubism-sdk.zip'
+          Invoke-WebRequest -Uri $env:CUBISM_UNITY_SDK_ARCHIVE_URL -OutFile $sdkArchive
+          if ((Get-FileHash $sdkArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $env:CUBISM_UNITY_SDK_ARCHIVE_SHA256.ToLowerInvariant()) {
+            throw 'Cubism SDK archive digest mismatch'
+          }
+          $sdkRoot = Join-Path $toolchain 'cubism-sdk'
+          Expand-Archive -Path $sdkArchive -DestinationPath $sdkRoot -Force
+          $licensePath = Join-Path $toolchain 'UnityLicense.ulf'
+          [IO.File]::WriteAllText($licensePath, $env:UNITY_LICENSE)
+          & $unityEditor.FullName -batchmode -nographics -quit -manualLicenseFile $licensePath
+          if ($LASTEXITCODE -ne 0) { throw 'Unity license activation failed' }
+          "UNITY_EDITOR=$($unityEditor.FullName)" >> $env:GITHUB_ENV
+          "GLIMMER_CRADLE_CUBISM_UNITY_SDK=$sdkRoot" >> $env:GITHUB_ENV
+      - name: 由 Avatar owner 构建 Windows 固定投影
+        run: pnpm avatar:build
+      - name: 生成 Avatar 固定制品
+        id: avatar_metadata
+        shell: pwsh
+        run: |
+          $output = node hosts/unity-avatar-host/scripts/fixed-artifact.mjs create build/artifacts/avatar-windows-x64 $env:GITHUB_SHA | ConvertFrom-Json
+          "manifest_digest=$($output.manifest_digest)" >> $env:GITHUB_OUTPUT
+      - name: 为 Avatar 固定制品生成可信 provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: build/artifacts/avatar-windows-x64/**
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-avatar-windows-x64-${{ github.sha }}
+          path: build/artifacts/avatar-windows-x64/
+          if-no-files-found: error
+
+  package:
+    needs: avatar-fixed-artifact
+    runs-on: windows-2025
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version: '0.11.28'
+          python-version: '3.12.13'
+      - run: pnpm install --frozen-lockfile
       - run: pnpm check:pr
+      - name: 下载 Avatar 固定制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-avatar-windows-x64-${{ github.sha }}
+          path: build/artifacts/avatar-windows-x64/
+      - name: 验证并投影 Avatar 固定制品
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Get-ChildItem build/artifacts/avatar-windows-x64 -File -Recurse | ForEach-Object {
+            gh attestation verify $_.FullName `
+              --repo "$env:GITHUB_REPOSITORY" `
+              --source-digest "$env:GITHUB_SHA" `
+              --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/release-desktop.yml"
+          }
+          node hosts/unity-avatar-host/scripts/fixed-artifact.mjs consume `
+            build/artifacts/avatar-windows-x64 `
+            $env:GITHUB_SHA `
+            '${{ needs.avatar-fixed-artifact.outputs.manifest_digest }}'
       - run: pnpm --filter @glimmer-cradle/desktop package
       - name: 验证固定物料存在
         id: package_metadata
@@ -34,11 +139,13 @@ jobs:
       - name: 为 Desktop 固定物料生成 GitHub Sigstore provenance
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
-          subject-path: dist/desktop/*/windows-x64/*
+          subject-path: dist/desktop/*/windows-x64/**
       - name: 以独立 GitHub identity 复验 provenance
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          Get-ChildItem "${{ steps.package_metadata.outputs.artifact_root }}" -File | ForEach-Object {
+          Get-ChildItem "${{ steps.package_metadata.outputs.artifact_root }}" -File -Recurse | ForEach-Object {
             gh attestation verify $_.FullName `
               --repo "$env:GITHUB_REPOSITORY" `
               --source-digest "$env:GITHUB_SHA" `

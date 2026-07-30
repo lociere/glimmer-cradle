@@ -16,8 +16,13 @@ export interface SupplementalControllerContext {
     readonly loadOperations: () => Promise<DeploymentOperationsSnapshot>;
     readonly runOperation: (
       operation: string,
-      options?: { readonly backupId?: string; readonly confirm?: boolean },
+      options?: {
+        readonly backupId?: string;
+        readonly confirm?: boolean;
+        readonly operationId?: string;
+      },
     ) => Promise<DeploymentOperationResult>;
+    readonly loadOperationResult: (operationId: string) => Promise<DeploymentOperationResult | null>;
     readonly loadSkillCatalog: () => Promise<SkillCatalogLoadResult>;
   };
   readonly render: () => void;
@@ -44,6 +49,9 @@ export interface SupplementalControllerContext {
     setPending: (value: boolean) => void;
   };
 }
+
+const ACTIVE_OPERATION_STORAGE_KEY = 'glimmer-cradle.personal-server.active-operation';
+const PENDING_OPERATION_STATES = new Set(['accepted', 'started']);
 
 export function bindSupplementalActions(context: SupplementalControllerContext): void {
   context.root.querySelector('[data-action="create-token"]')?.addEventListener('click', async () => {
@@ -113,6 +121,7 @@ async function refreshOperations(context: SupplementalControllerContext): Promis
     const snapshot = await context.options.loadOperations();
     context.operations.setSnapshot(snapshot);
     context.operations.setError(null);
+    await resumeDeploymentOperation(context);
   } catch (error) {
     context.operations.setError(context.asErrorMessage(error));
   }
@@ -172,16 +181,27 @@ async function runOperation(
 ): Promise<void> {
   context.operations.setPending(true);
   context.render();
+  const operationId = createOperationId();
+  let operationActive = false;
+  writeActiveOperation(operationId);
   try {
-    const result = await context.options.runOperation(operation, options);
+    const result = await context.options.runOperation(operation, { ...options, operationId });
     context.operations.setError(null);
     context.operations.setResult(result);
     context.operations.setSnapshot(result.snapshot);
+    if (PENDING_OPERATION_STATES.has(result.status)) {
+      operationActive = true;
+      void pollDeploymentOperation(context, result.operation_id);
+    } else {
+      clearActiveOperation(result.operation_id);
+    }
   } catch (error) {
     context.operations.setError(context.asErrorMessage(error));
     context.operations.setResult({
       status: 'error',
       message: context.asErrorMessage(error),
+      operation_id: operationId,
+      operation,
       snapshot: context.operations.getSnapshot() ?? {
         backup: { supported: false, entries: [] },
         service: { restart_supported: false, stop_supported: false },
@@ -194,7 +214,97 @@ async function runOperation(
       },
     });
   } finally {
-    context.operations.setPending(false);
+    if (!operationActive) context.operations.setPending(false);
     context.render();
+  }
+}
+
+export async function resumeDeploymentOperation(context: SupplementalControllerContext): Promise<void> {
+  const operationId = readActiveOperation();
+  if (!operationId) return;
+  const result = await context.options.loadOperationResult(operationId);
+  if (!result) {
+    context.operations.setPending(true);
+    context.render();
+    void pollDeploymentOperation(context, operationId);
+    return;
+  }
+  projectOperationResult(context, result);
+  if (PENDING_OPERATION_STATES.has(result.status)) {
+    void pollDeploymentOperation(context, operationId);
+  } else {
+    clearActiveOperation(operationId);
+  }
+}
+
+export async function pollDeploymentOperation(
+  context: SupplementalControllerContext,
+  operationId: string,
+  options: {
+    readonly maxAttempts?: number;
+    readonly delay?: (milliseconds: number) => Promise<void>;
+  } = {},
+): Promise<DeploymentOperationResult | null> {
+  const delay = options.delay || ((milliseconds: number) => (
+    new Promise((resolve) => setTimeout(resolve, milliseconds))
+  ));
+  const maxAttempts = options.maxAttempts ?? 600;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (readActiveOperation() !== operationId) return null;
+    const result = await context.options.loadOperationResult(operationId).catch(() => null);
+    if (result) {
+      projectOperationResult(context, result);
+      if (!PENDING_OPERATION_STATES.has(result.status)) {
+        clearActiveOperation(operationId);
+        return result;
+      }
+    }
+    await delay(1000);
+  }
+  context.operations.setError('operation 查询超时；保留 operation_id，可在重连后继续查询。');
+  context.render();
+  return null;
+}
+
+function projectOperationResult(
+  context: SupplementalControllerContext,
+  result: DeploymentOperationResult,
+): void {
+  context.operations.setError(null);
+  context.operations.setResult(result);
+  context.operations.setSnapshot(result.snapshot);
+  context.operations.setPending(PENDING_OPERATION_STATES.has(result.status));
+  context.render();
+}
+
+function createOperationId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return `deployment_op_${uuid}`;
+}
+
+function readActiveOperation(): string {
+  try {
+    return globalThis.localStorage?.getItem(ACTIVE_OPERATION_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeActiveOperation(operationId: string): void {
+  try {
+    globalThis.localStorage?.setItem(ACTIVE_OPERATION_STORAGE_KEY, operationId);
+  } catch {
+    // localStorage 不可用时仍由当前响应投影，但不能声称可跨重连恢复。
+  }
+}
+
+function clearActiveOperation(operationId: string): void {
+  try {
+    if (readActiveOperation() === operationId) {
+      globalThis.localStorage?.removeItem(ACTIVE_OPERATION_STORAGE_KEY);
+    }
+  } catch {
+    // 清理失败不会改变宿主 operation 终态。
   }
 }

@@ -129,6 +129,7 @@ function wireSettings(shell: ReturnType<typeof renderShell>): void {
     revokeAccessToken: (tokenId) => state.client.revokeAccessToken(tokenId),
     loadOperations: () => state.client.getOperationsSnapshot(),
     runOperation: (operation, options) => state.client.runOperation(operation, options),
+    loadOperationResult: (operationId) => state.client.getOperationResult(operationId),
     loadSkillCatalog: async () => {
       if (!state.surface) throw new Error('surface_unavailable');
       return state.surface.requestSkillCatalog({ request_id: `skill-catalog-${Date.now()}` });

@@ -41,6 +41,7 @@ export function renderStorageBackupSection(
           <button class="primary-button" type="button" data-action="create-backup" ${backup?.supported && !pending ? '' : 'disabled'}>创建备份</button>
         </div>
         ${lastResult?.message ? `<p>${escapeHtml(lastResult.message)}</p>` : ''}
+        ${lastResult ? `<p>operation ${escapeHtml(lastResult.operation_id)} · ${escapeHtml(lastResult.status)}</p>` : ''}
       </div>
       <div class="settings-card">
         <strong>最近备份</strong>

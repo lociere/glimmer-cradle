@@ -5,8 +5,11 @@ import io
 import json
 import sqlite3
 import stat
+import shutil
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -61,7 +64,12 @@ class DlqToolTest(unittest.TestCase):
                 "failed",
                 "kernel",
                 "source",
-                json.dumps({"token": "secret-value", "value": 1}),
+                json.dumps({
+                    "event_type": "event.test",
+                    "event_id": "event-1",
+                    "token": "secret-value",
+                    "value": 1,
+                }),
                 '{"value":1}',
                 "authorization secret-value",
                 "secret stack",
@@ -88,8 +96,10 @@ class DlqToolTest(unittest.TestCase):
             "payload=json.load(sys.stdin)\n"
             "print(json.dumps({'status':'success','receipt_id':'receipt-1',"
             "'source':payload['source'],'record_id':payload['id'],'owner':payload['owner'],"
-            "'trace_id':payload['trace_id'],'payload_digest':payload['payload_digest'],"
-            "'operation_id':payload['operation_id'],'dispatcher_id':payload['dispatcher_id']}))\n",
+            "'event_type':payload['event_type'],'trace_id':payload['trace_id'],"
+            "'payload_digest':payload['payload_digest'],'operation_id':payload['operation_id'],"
+            "'dispatcher_id':payload['dispatcher_id'],"
+            "'delivery':'kernel_event_bus_published'}))\n",
             encoding="utf-8",
         )
         self.dispatcher.chmod(self.dispatcher.stat().st_mode | stat.S_IXUSR)
@@ -122,6 +132,91 @@ class DlqToolTest(unittest.TestCase):
         self.assertEqual((status, replayed), ("replayed", 1))
         self.assertTrue(resolution.startswith("receipt:receipt-1:dlq_replay_"))
         connection.close()
+
+    def test_registered_kernel_dispatcher_delivers_payload_to_durable_ingress(self) -> None:
+        node = shutil.which("node")
+        self.assertIsNotNone(node)
+        dispatcher = MODULE_PATH.with_name("dlq-replay-dispatcher.mjs")
+        dlq.DISPATCHERS = {
+            "kernel.event-bus.v1": dlq.DispatcherRegistration(
+                "kernel.event-bus.v1",
+                "kernel",
+                ("kernel",),
+                (str(node), str(dispatcher)),
+            )
+        }
+        data_root = Path(self.temp.name) / "data"
+        delivery = threading.Thread(
+            target=self._complete_kernel_delivery,
+            args=(data_root,),
+            daemon=True,
+        )
+        delivery.start()
+        with patch.dict(
+            "os.environ",
+            {
+                "GLIMMER_CRADLE_DATA_ROOT": str(data_root),
+                "GLIMMER_CRADLE_DLQ_REPLAY_TIMEOUT_MS": "2000",
+            },
+        ):
+            self.assertEqual(
+                dlq.cmd_replay(
+                    [
+                        "kernel:1",
+                        "--confirm",
+                        "--dispatcher",
+                        "kernel.event-bus.v1",
+                    ]
+                ),
+                0,
+            )
+        delivery.join(timeout=2)
+        self.assertFalse(delivery.is_alive())
+        queued = list(
+            (data_root / "state" / "kernel" / "dlq-replay-inbox").glob("*.json")
+        )
+        self.assertEqual(len(queued), 1)
+        envelope = json.loads(queued[0].read_text(encoding="utf-8"))
+        self.assertEqual(envelope["source"], "kernel")
+        self.assertEqual(envelope["record_id"], 1)
+        self.assertEqual(envelope["event_type"], "event.test")
+        self.assertEqual(
+            json.loads(envelope["payload_json"])["event_id"],
+            "event-1",
+        )
+
+    def _complete_kernel_delivery(self, data_root: Path) -> None:
+        inbox = data_root / "state" / "kernel" / "dlq-replay-inbox"
+        deadline = time.monotonic() + 2
+        queued: Path | None = None
+        while time.monotonic() < deadline:
+            matches = list(inbox.glob("dlq_replay_*.json"))
+            if matches:
+                queued = matches[0]
+                break
+            time.sleep(0.01)
+        if queued is None:
+            return
+        envelope = json.loads(queued.read_text(encoding="utf-8"))
+        processed = inbox / "processed"
+        processed.mkdir(parents=True, exist_ok=True)
+        receipt = {
+            "status": "success",
+            "receipt_id": f"kernel_event_bus_{envelope['operation_id']}",
+            "source": envelope["source"],
+            "record_id": envelope["record_id"],
+            "owner": envelope["owner"],
+            "event_type": envelope["event_type"],
+            "trace_id": envelope["trace_id"],
+            "payload_digest": envelope["payload_digest"],
+            "operation_id": envelope["operation_id"],
+            "dispatcher_id": envelope["dispatcher_id"],
+            "delivery": "kernel_event_bus_published",
+        }
+        (processed / f"{envelope['operation_id']}.receipt.json").write_text(
+            json.dumps(receipt),
+            encoding="utf-8",
+        )
 
     def test_default_show_redacts_payload_and_stack(self) -> None:
         output = io.StringIO()

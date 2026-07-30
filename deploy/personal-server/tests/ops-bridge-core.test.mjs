@@ -7,6 +7,7 @@ import { createOperationController } from '../container/ops-bridge-core.mjs';
 import {
   acknowledgeExternalOwner,
   buildExternalOwnerArgs,
+  cleanupHandoffResults,
   handoffToExternalOwner,
   readHandoffResult,
 } from '../container/ops-bridge-handoff.mjs';
@@ -109,6 +110,24 @@ describe('Personal Server Ops Bridge external handoff', () => {
     assert.equal(result.exit_code, 0);
   });
 
+  it('重复 operation ID 绑定不同请求时返回 conflict 而非启动第二 owner', async () => {
+    const controller = createOperationController({
+      snapshot: async () => snapshot,
+      handoff: async () => {
+        throw new Error('transaction_handoff_id_reused_with_different_request');
+      },
+      acknowledge: async () => {
+        throw new Error('must not acknowledge conflict');
+      },
+    });
+    const result = await controller.prepare({
+      operation: 'backup.create',
+      operation_id: 'deployment_op_reused',
+    });
+    assert.equal(result.status, 'conflict');
+    assert.equal(result.operation_id, 'deployment_op_reused');
+  });
+
   it('重复查询已经 started 的 operation 保持幂等 accepted 且不重复 ack', async () => {
     let acknowledgements = 0;
     const controller = createOperationController({
@@ -167,7 +186,12 @@ describe('Personal Server Ops Bridge external handoff', () => {
       const ackNonce = envArg(args, 'GLIMMER_CRADLE_HANDOFF_ACK_NONCE');
       await writeResult(resultPath, operationId, 'ready', 0);
       void waitForFile(ackPath).then(async () => {
-        assert.equal((await readFile(ackPath, 'utf8')).trim(), `${operationId}:${ackNonce}`);
+        assert.deepEqual(JSON.parse(await readFile(ackPath, 'utf8')), {
+          schema_version: 1,
+          operation_id: operationId,
+          operation: 'service.restart',
+          nonce: ackNonce,
+        });
         await writeResult(resultPath, operationId, 'started', 0);
       });
     });
@@ -190,7 +214,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
     }
   });
 
-  it('已有 request 无 owner 结果时重复调用失败闭合，不启动第二 owner', async () => {
+  it('已有 request 无 owner 结果时持久化 owner_timeout，不启动第二 owner', async () => {
     const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-timeout-'))).replaceAll('\\', '/');
     const operationId = 'deployment_op_timeout';
     let starts = 0;
@@ -204,15 +228,133 @@ describe('Personal Server Ops Bridge external handoff', () => {
         command: ['restart'],
         ack_nonce: 'lost',
       }));
+      const result = await handoffToExternalOwner(config, {
+        operationId,
+        operation: 'service.restart',
+        command: ['restart'],
+      });
+      assert.equal(result.status, 'owner_timeout');
+      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+      assert.equal(starts, 0);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ack compare-or-create 只接受相同 operation+nonce，重复调用不启动第二事务', async () => {
+    const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-ack-'))).replaceAll('\\', '/');
+    const operationId = 'deployment_op_ack_idempotent';
+    const config = fixtureConfig(root, async () => undefined);
+    const handoff = {
+      ...buildExternalOwnerArgs(config, {
+        operationId,
+        operation: 'service.restart',
+        command: ['restart'],
+        ackNonce: 'same-nonce',
+      }),
+      operation_id: operationId,
+      operation: 'service.restart',
+    };
+    try {
+      await mkdir(path.dirname(handoff.ackPath), { recursive: true });
+      await writeResult(handoff.resultPath, operationId, 'started', 0);
+      assert.equal((await acknowledgeExternalOwner(config, handoff)).status, 'started');
+      assert.equal((await acknowledgeExternalOwner(config, handoff)).status, 'started');
       await assert.rejects(
-        () => handoffToExternalOwner(config, {
-          operationId,
+        () => acknowledgeExternalOwner(config, {
+          ...handoff,
+          operation: 'backup.create',
+        }),
+        /ack_conflict/,
+      );
+      await assert.rejects(
+        () => acknowledgeExternalOwner(config, {
+          ...handoff,
+          ackNonce: 'different-nonce',
+        }),
+        /ack_conflict/,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ack timeout 与迟到 started 通过 durable decision 失败闭合或返回权威 started', async () => {
+    const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-race-'))).replaceAll('\\', '/');
+    const config = { ...fixtureConfig(root, async () => undefined), startedTimeoutMs: 30 };
+    const operationId = 'deployment_op_late_started';
+    const handoff = {
+      ...buildExternalOwnerArgs(config, {
+        operationId,
+        operation: 'service.restart',
+        command: ['restart'],
+        ackNonce: 'race-nonce',
+      }),
+      operation_id: operationId,
+      operation: 'service.restart',
+    };
+    try {
+      await mkdir(path.dirname(handoff.resultPath), { recursive: true });
+      await writeResult(handoff.resultPath, operationId, 'ready', 0);
+      const timeout = await acknowledgeExternalOwner(config, handoff);
+      assert.equal(timeout.status, 'owner_timeout');
+      assert.equal((await readFile(handoff.decisionPath, 'utf8')).trim(), 'owner_timeout');
+      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+
+      const winningId = 'deployment_op_started_won';
+      const winning = {
+        ...buildExternalOwnerArgs(config, {
+          operationId: winningId,
           operation: 'service.restart',
           command: ['restart'],
+          ackNonce: 'winning-nonce',
         }),
-        /owner_timeout/,
-      );
-      assert.equal(starts, 0);
+        operation_id: winningId,
+        operation: 'service.restart',
+      };
+      await writeResult(winning.resultPath, winningId, 'ready', 0);
+      await writeFile(winning.decisionPath, 'started\n');
+      const authoritative = await acknowledgeExternalOwner(config, winning);
+      assert.equal(authoritative.status, 'started');
+      assert.equal((await readFile(winning.decisionPath, 'utf8')).trim(), 'started');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stale request/result/ack/decision 四件套先终态化再按 retention 清理', async () => {
+    const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-cleanup-'))).replaceAll('\\', '/');
+    const operationId = 'deployment_op_stale_cleanup';
+    const config = {
+      ...fixtureConfig(root, async () => undefined),
+      staleTimeoutMs: 1,
+      retentionMs: 60_000,
+    };
+    const handoffRoot = path.join(root, 'handoff');
+    try {
+      await mkdir(handoffRoot, { recursive: true });
+      await writeFile(path.join(handoffRoot, `${operationId}.request.json`), JSON.stringify({
+        schema_version: 1,
+        operation_id: operationId,
+        operation: 'service.restart',
+        command: ['restart'],
+        ack_nonce: 'stale',
+        created_at: '2020-01-01T00:00:00.000Z',
+      }));
+      await cleanupHandoffResults(config);
+      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+      await writeFile(path.join(handoffRoot, `${operationId}.ack`), 'fixture');
+      assert.equal((await readFile(
+        path.join(handoffRoot, `${operationId}.decision`),
+        'utf8',
+      )).trim(), 'owner_timeout');
+      await cleanupHandoffResults({ ...config, retentionMs: 1 }, Date.now() + 10_000);
+      for (const suffix of ['request.json', 'result.json', 'ack', 'decision']) {
+        await assert.rejects(
+          () => readFile(path.join(handoffRoot, `${operationId}.${suffix}`)),
+          (error) => error?.code === 'ENOENT',
+        );
+      }
     } finally {
       await rm(root, { recursive: true, force: true });
     }

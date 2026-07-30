@@ -106,10 +106,13 @@ export class OfficialAudioEngineClient {
     if (!this.environment) {
       throw new Error(`audio engine ${this.lane} 尚未配置`);
     }
-    const child = spawn('uv', [
-      'run', '--project', this.engineDir, '--extra', this.lane, 'glimmer-cradle-audio',
-    ], {
-      cwd: this.engineDir,
+    const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
+    const command = packagedPython || 'uv';
+    const args = packagedPython
+      ? ['-m', 'glimmer_cradle.audio.main']
+      : ['run', '--project', this.engineDir, '--extra', this.lane, 'glimmer-cradle-audio'];
+    const child = spawn(command, args, {
+      cwd: packagedPython ? resolveRepoRoot() : this.engineDir,
       env: {
         ...process.env,
         ...this.environment.secrets,
@@ -137,8 +140,8 @@ export class OfficialAudioEngineClient {
     });
     logger.info('官方音频引擎已启动', {
       lane: this.lane,
-      cwd: this.engineDir,
-      uv_extra: this.lane,
+      cwd: packagedPython ? resolveRepoRoot() : this.engineDir,
+      launch_mode: packagedPython ? 'packaged-python-runtime' : 'uv-project',
       timeout_ms: this.timeoutMs,
     });
     return child;

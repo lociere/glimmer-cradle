@@ -91,7 +91,7 @@ export class UnityAvatarHostProcess {
       return;
     }
 
-    if (!config.command.trim()) {
+    if (!(process.env.GLIMMER_CRADLE_AVATAR_HOST_COMMAND?.trim() || config.command.trim())) {
       this._state = 'failed';
       this._lastError = 'Unity Avatar Host launch_mode=managed 但未配置 command';
       logger.warn('Avatar 受管启动未配置命令');
@@ -116,12 +116,16 @@ export class UnityAvatarHostProcess {
     this._emitSnapshot();
 
     const repoRoot = resolveRepoRoot();
-    const command = resolveExecutableCommand(config.command, repoRoot);
-    const cwd = resolveWorkingDirectory(config.cwd, repoRoot);
+    const configuredCommand = process.env.GLIMMER_CRADLE_AVATAR_HOST_COMMAND?.trim()
+      || config.command;
+    const command = resolveExecutableCommand(configuredCommand, repoRoot);
+    const cwd = process.env.GLIMMER_CRADLE_AVATAR_HOST_COMMAND?.trim()
+      ? path.dirname(command)
+      : resolveWorkingDirectory(config.cwd, repoRoot);
     this._resolvedCommand = command;
     this._resolvedCwd = cwd;
 
-    if (isPathLikeCommand(config.command) && !fs.existsSync(command)) {
+    if (isPathLikeCommand(configuredCommand) && !fs.existsSync(command)) {
       this._state = 'failed';
       this._lastError = `Avatar 构建产物不存在: ${command}。请运行 pnpm avatar:build。`;
       logger.warn('Avatar 构建产物不存在', {

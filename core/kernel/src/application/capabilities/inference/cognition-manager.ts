@@ -210,12 +210,15 @@ export class CognitionManager {
       const repoRoot = resolveRepoRoot();
 
       const cognitionDir = path.resolve(repoRoot, "core", "cognition");
-      const uvCommand = process.platform === "win32" ? "uv.exe" : "uv";
-      const uvArgs = ["run", "--project", cognitionDir, "glimmer-cradle-cognition"];
+      const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
+      const uvCommand = packagedPython || (process.platform === "win32" ? "uv.exe" : "uv");
+      const uvArgs = packagedPython
+        ? ["-m", "glimmer_cradle.cognition.host.process"]
+        : ["run", "--project", cognitionDir, "glimmer-cradle-cognition"];
 
       logger.debug("Cognition 认知核运行命令已解析", {
         command: uvCommand,
-        project: cognitionDir,
+        project: packagedPython ? "packaged-python-runtime" : cognitionDir,
       });
 
       this._pythonProcess = spawn(uvCommand, uvArgs, {

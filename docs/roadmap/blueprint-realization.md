@@ -370,8 +370,9 @@ Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边�
 
 Phase 13 的核心不是整理脚本，而是让源码经 owner-local task、薄编排、CI 和固定制品
 抵达可恢复宿主，形成与运行时架构同等可靠的交付生命周期。A～F 当前处于统一审查修复后的
-fixed-state candidate，尚未独立复审或集成；更新应用与生产 DLQ dispatcher 在缺少可验证
-owner adapter 时明确失败闭合。进入门、风险覆盖和分层
+fixed-state candidate，尚未独立复审或集成；更新应用在缺少固定候选绑定时失败闭合，
+Kernel DLQ 已接 owner-local EventBus dispatcher，legacy Cognition source 仍保持不支持。
+进入门、风险覆盖和分层
 验证见 [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)，完成态目录见
 [M13 清单](./manifests/M13-目标物理清单.md)，长期取舍见
 [ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。

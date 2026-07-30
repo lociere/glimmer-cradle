@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createOperationController } from './ops-bridge-core.mjs';
 import {
   acknowledgeExternalOwner,
+  cleanupHandoffResults,
   handoffToExternalOwner,
   readHandoffResult,
 } from './ops-bridge-handoff.mjs';
@@ -56,10 +57,20 @@ const operations = createOperationController({
     { command, operationId, operation },
   ),
   acknowledge: (handoff) => acknowledgeExternalOwner(handoffConfig, handoff),
+  query: (operationId) => readHandoffResult(handoffConfig, operationId),
   onError: (operationId, error) => {
     console.error(`[ops-bridge] operation ${operationId} failed: ${error instanceof Error ? error.message : String(error)}`);
   },
 });
+await cleanupHandoffResults(handoffConfig);
+const cleanupTimer = setInterval(() => {
+  void cleanupHandoffResults(handoffConfig).catch((error) => {
+    console.error(`[ops-bridge] handoff cleanup failed: ${
+      error instanceof Error ? error.message : String(error)
+    }`);
+  });
+}, 60 * 60 * 1000);
+cleanupTimer.unref();
 
 const server = createServer(async (request, response) => {
   if (request.headers.authorization !== `Bearer ${token}`) {

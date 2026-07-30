@@ -63,6 +63,12 @@ for (const file of manifest.files) {
 const componentManifest = JSON.parse(
   await fs.readFile(path.join(root, manifest.component_manifest), 'utf8'),
 );
+if (componentManifest.schema_version !== 2
+  || componentManifest.supervisor !== 'app.asar.unpacked/dist/main/packaged-supervisor.js'
+  || componentManifest.path_resolver !== 'app.asar.unpacked/dist/main/packaged-paths.js'
+  || componentManifest.runtime_manifest !== 'runtime/runtime-manifest.json') {
+  throw new Error('Desktop component manifest 未声明正式 supervisor/path resolver/runtime');
+}
 const requiredComponents = new Set(['kernel', 'cognition', 'audio', 'avatar', 'extension-host', 'native']);
 for (const component of componentManifest.components || []) {
   requiredComponents.delete(component.id);
@@ -76,6 +82,41 @@ for (const component of componentManifest.components || []) {
       throw new Error(`Desktop installer component 未绑定: ${component.id}/${file.path}`);
     }
   }
+}
+for (const file of componentManifest.runtime_files || []) {
+  const packagedPath = `win-unpacked/resources/${file.path}`;
+  const packaged = artifactFiles.get(packagedPath);
+  if (!packaged || packaged.sha256 !== file.sha256 || packaged.size !== file.size) {
+    throw new Error(`Desktop executable runtime 未绑定: ${file.path}`);
+  }
+}
+for (const requiredPath of [
+  'GlimmerCradle-Setup.exe',
+  'win-unpacked/GlimmerCradle.exe',
+  'win-unpacked/resources/app.asar',
+  'win-unpacked/resources/app.asar.unpacked/dist/main/packaged-supervisor.js',
+  'win-unpacked/resources/app.asar.unpacked/dist/main/packaged-paths.js',
+  'win-unpacked/resources/runtime/node/node.exe',
+  'win-unpacked/resources/runtime/python/Scripts/python.exe',
+  'win-unpacked/resources/runtime/kernel/dist/index.js',
+  'win-unpacked/resources/runtime/runtime-manifest.json',
+  'win-unpacked/resources/products/desktop/product.json',
+]) {
+  if (!artifactFiles.has(requiredPath)) throw new Error(`Desktop installer 运行入口缺失: ${requiredPath}`);
+}
+for (const executablePath of [
+  'GlimmerCradle-Setup.exe',
+  'win-unpacked/GlimmerCradle.exe',
+]) {
+  const bytes = await fs.readFile(path.join(root, executablePath));
+  if (bytes.length < 64 * 1024 || bytes[0] !== 0x4d || bytes[1] !== 0x5a) {
+    throw new Error(`Desktop installer 不是可执行 Windows PE 制品: ${executablePath}`);
+  }
+}
+if (![...artifactFiles.keys()].some((file) => (
+  file.startsWith('win-unpacked/resources/runtime/kernel/node_modules/')
+))) {
+  throw new Error('Desktop installer 缺少 Kernel resolved dependencies');
 }
 if (requiredComponents.size > 0 || (sbom.packages || []).length < 6) {
   throw new Error(`Desktop runtime component 缺失: ${[...requiredComponents].join(',')}`);
