@@ -10,12 +10,12 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "tsx src/index.ts",
     "start:built": "node dist/index.js",
-    "pretypecheck": "pnpm --filter @glimmer-cradle/protocol run build",
-    "prebuild": "pnpm --filter @glimmer-cradle/protocol run build",
-    "pretest": "pnpm --filter @glimmer-cradle/protocol run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run typecheck",
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run --threads false"
+    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run build",
+    "test": "vitest run --threads false",
+    "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run test"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

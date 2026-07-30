@@ -35,36 +35,9 @@
       "to": "configs/defaults/secrets/secrets.example.yaml"
     },
     {
-      "from": "../../engines/audio",
-      "to": "engines/audio",
-      "filter": [
-        "**/*",
-        "!**/.venv/**",
-        "!**/__pycache__/**",
-        "!**/.pytest_cache/**",
-        "!**/models/**",
-        "!**/outputs/**"
-      ]
-    },
-    {
-      "from": "../../build/extension-host/modules",
-      "to": "extension-host/modules",
+      "from": "../../build/staging/desktop/windows-x64/resources",
+      "to": ".",
       "filter": ["**/*"]
-    },
-    {
-      "from": "../../build/components/avatar/unity-host/windows-x64",
-      "to": "components/avatar/unity-host",
-      "filter": ["**/*"]
-    },
-    {
-      "from": "../../native",
-      "to": "native",
-      "filter": [
-        "bin/**/*",
-        "dist/**/*",
-        "include/**/*",
-        "!build/**"
-      ]
     }
   ],
   "win": {

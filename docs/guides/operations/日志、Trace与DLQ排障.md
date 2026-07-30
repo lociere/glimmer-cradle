@@ -111,8 +111,9 @@ cleanup 后 `observability.db` 会在下一次查询时重建。
 3. 判断是契约错误、生产者错误、消费者错误、资源错误还是环境错误
 4. 如果是旧 Schema / 旧字段，走 Schema 迁移，不在消费者吞掉
 5. 修复后用同类 payload 重验
-6. replay 使用 `python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <command> [args...]`；
-   只有 dispatcher receipt 成功后记录才进入 replayed
+6. replay 使用 `python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <registered-id>`；
+   只有 owner 已注册 adapter，且绑定 source/record/trace/payload digest/operation 的 success
+   receipt 全部匹配后记录才进入 replayed；当前无生产 registration 时返回 66
 7. 人工关闭使用 `resolve <source:id> --confirm`，它不会伪装 replay
 8. `cleanup --days <N> --confirm` 只删除超过 retention 的 replay 成功记录
 

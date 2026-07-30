@@ -6,12 +6,14 @@ import { createOperationController } from './ops-bridge-core.mjs';
 import {
   acknowledgeExternalOwner,
   handoffToExternalOwner,
+  readHandoffResult,
 } from './ops-bridge-handoff.mjs';
 
 const socketPath = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET || '/run/glimmer-cradle/ops-bridge.sock';
 const token = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN || '';
 const stateRoot = process.env.GLIMMER_CRADLE_STATE_ROOT || '/var/lib/glimmer-cradle';
 const runRoot = process.env.GLIMMER_CRADLE_RUN_ROOT || '/run/glimmer-cradle';
+const hostRunRoot = process.env.GLIMMER_CRADLE_HOST_RUN_ROOT || '';
 const hostReleaseRoot = process.env.GLIMMER_CRADLE_HOST_RELEASE_ROOT || '/opt/glimmer-cradle/current';
 const hostInstallRoot = process.env.GLIMMER_CRADLE_HOST_INSTALL_ROOT || '/opt/glimmer-cradle';
 const transactionImage = process.env.GLIMMER_CRADLE_TRANSACTION_IMAGE || '';
@@ -26,24 +28,34 @@ if (!token) {
   console.error('GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN is required');
   process.exit(1);
 }
+if (!hostRunRoot || !path.posix.isAbsolute(hostRunRoot)) {
+  console.error('GLIMMER_CRADLE_HOST_RUN_ROOT is required and must be absolute');
+  process.exit(1);
+}
 
 await mkdir(path.dirname(socketPath), { recursive: true, mode: 0o770 });
 await rm(socketPath, { force: true });
 
+const handoffConfig = {
+  dockerBin,
+  image: transactionImage,
+  installRoot: hostInstallRoot,
+  stateRoot,
+  hostRunRoot,
+  bridgeRunRoot: runRoot,
+  deploymentEnvFile,
+  hostDockerBin,
+  hostComposePlugin,
+  hostDockerSocket,
+};
+
 const operations = createOperationController({
   snapshot,
-  handoff: (command, operationId, operation) => handoffToExternalOwner({
-    dockerBin,
-    image: transactionImage,
-    installRoot: hostInstallRoot,
-    stateRoot,
-    runRoot,
-    deploymentEnvFile,
-    hostDockerBin,
-    hostComposePlugin,
-    hostDockerSocket,
-  }, { command, operationId, operation }),
-  acknowledge: acknowledgeExternalOwner,
+  handoff: (command, operationId, operation) => handoffToExternalOwner(
+    handoffConfig,
+    { command, operationId, operation },
+  ),
+  acknowledge: (handoff) => acknowledgeExternalOwner(handoffConfig, handoff),
   onError: (operationId, error) => {
     console.error(`[ops-bridge] operation ${operationId} failed: ${error instanceof Error ? error.message : String(error)}`);
   },
@@ -59,12 +71,18 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, await snapshot());
       return;
     }
+    const operationResult = request.method === 'GET'
+      ? /^\/operations\/(deployment_op_[A-Za-z0-9][A-Za-z0-9._-]{0,111})$/.exec(request.url || '')
+      : null;
+    if (operationResult) {
+      const result = await readHandoffResult(handoffConfig, operationResult[1]);
+      sendJson(response, result ? 200 : 404, result || { error: 'operation_not_found' });
+      return;
+    }
     if (request.method === 'POST' && request.url === '/operations') {
       const body = await readBody(request, 8192);
-      const prepared = await operations.prepare(JSON.parse(body || '{}'));
-      const { acknowledge, ...result } = prepared;
+      const result = await operations.prepare(JSON.parse(body || '{}'));
       sendJson(response, 200, result);
-      if (acknowledge) setTimeout(() => void acknowledge(), 100);
       return;
     }
     sendJson(response, 404, { error: 'not_found' });
@@ -107,11 +125,11 @@ async function snapshot(availableVersion) {
       disabled_reason: commandAvailable ? undefined : '外部宿主事务 owner 未完整配置。',
     },
     update: {
-      check_supported: true,
-      apply_supported: commandAvailable,
+      check_supported: false,
+      apply_supported: false,
       current_version: await currentVersion(),
       source: releaseSource,
-      disabled_reason: commandAvailable ? undefined : '外部宿主事务 owner 未完整配置。',
+      disabled_reason: '尚未建立经验证候选、固定 OCI digest 与 install-release 的不可漂移绑定。',
       available_version: availableVersion,
     },
   };

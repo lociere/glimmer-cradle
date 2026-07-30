@@ -6,7 +6,7 @@
 |---|---|
 | lock | `/run/glimmer-cradle/host.lock` |
 | guard | `/run/glimmer-cradle/.host.lock.guard` |
-| handoff | `/run/glimmer-cradle/handoff/<operation-id>.{result.json,ack}` |
+| handoff | `/run/glimmer-cradle/handoff/<operation-id>.{request.json,result.json,ack}` |
 | journal | `/var/lib/glimmer-cradle/transactions/{current.json,events.jsonl}` |
 | execution phases | `acquire`、`prepare`、`replace`、`restart`、`readiness`、`bridge_readiness`、`commit` |
 | terminal states | `committed`、`failed`、`recovery_required` |
@@ -24,14 +24,20 @@
 | restore-safety | `/var/lib/glimmer-cradle/data/backups/restore-safety/` | 恢复证据，独立保留 |
 
 DLQ 命令为 `list`、`show`、`replay`、`resolve`、`cleanup`。`replay` 需要
-`--confirm --dispatcher <command> [args...]`；`resolve/cleanup/raw show` 也需要显式确认。
+`--confirm --dispatcher <registered-id>`；registration 固定 owner、允许 source 与命令，
+receipt 必须精确返回 source、record id、owner、trace id、payload SHA-256、operation ID 与
+dispatcher ID，且 status 为 `success`。仓库当前没有生产 registration，因而 replay 返回 66，
+不能退回任意命令。`resolve/cleanup/raw show` 也需要显式确认。
 cleanup 只删 `replayed=1` 且从成功 receipt 时间起超过天数门的记录；没有 receipt 时间的
 legacy 记录保留。
 
 ## Fixed artifact
 
-两个产品都产生 `artifact-manifest.json`、`provenance.json`、`sbom.spdx.json` 与
-`attestation.json`。Personal Server 路径为
+两个产品都产生 `artifact-manifest.json`、`provenance.json`、组件/依赖级
+`sbom.spdx.json` 与明确标为 unsigned 的 `build-claim.json`。可信 attestation 不存放为
+自洽 JSON；GitHub workflow 用 Sigstore 身份签发并要求 verifier 接收独立 expected
+commit、manifest digest 与 builder，Release 下载后再次用 `gh attestation verify` 核对
+repository/source/signer。Personal Server 路径为
 `dist/personal-server/<version>/linux-amd64/`；Desktop 路径为
 `dist/desktop/<version>/windows-x64/`。制品和 derived report 不进入 Git。
 

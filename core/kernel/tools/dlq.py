@@ -4,7 +4,7 @@ DLQ CLI — 死信队列查询与标记工具
 用法:
   python core/kernel/tools/dlq.py list [--limit N]
   python core/kernel/tools/dlq.py show <trace_id> [--raw --confirm]
-  python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <command> [args...]
+  python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <registered-id>
   python core/kernel/tools/dlq.py resolve <source:id> --confirm
   python core/kernel/tools/dlq.py cleanup --days N --confirm
 
@@ -15,7 +15,9 @@ source:
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import secrets
 import sqlite3
 import subprocess
 import sys
@@ -36,6 +38,14 @@ class DlqSource:
     error_column: str
 
 
+@dataclass(frozen=True)
+class DispatcherRegistration:
+    dispatcher_id: str
+    owner: str
+    sources: tuple[str, ...]
+    command: tuple[str, ...]
+
+
 SOURCES: dict[str, DlqSource] = {
     "cognition": DlqSource(
         name="cognition",
@@ -50,6 +60,11 @@ SOURCES: dict[str, DlqSource] = {
         error_column="error_message",
     ),
 }
+
+# 只有对应 owner 在代码审查中注册的 adapter 才能执行。当前仓库尚未有可在离线 CLI
+# 中正确重建 runtime event class 与订阅关系的 adapter，因此生产默认失败闭合；测试通过
+# 注入同一 registration contract 验证 receipt 绑定，不能用任意 --dispatcher 命令绕过。
+DISPATCHERS: dict[str, DispatcherRegistration] = {}
 
 
 def open_existing(source: DlqSource, *, writable: bool = False) -> sqlite3.Connection | None:
@@ -316,27 +331,46 @@ def cmd_replay(args: list[str]) -> int:
     if "--confirm" not in args:
         return 77
     if not args or "--dispatcher" not in args:
-        print("用法: python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <command> [args...]")
+        print("用法: python core/kernel/tools/dlq.py replay <source:id> --confirm --dispatcher <registered-id>")
         return 2
     dispatcher_index = args.index("--dispatcher")
-    if dispatcher_index + 1 >= len(args):
+    if dispatcher_index + 1 >= len(args) or dispatcher_index + 2 != len(args):
         return 2
+    dispatcher_id = args[dispatcher_index + 1]
+    registration = DISPATCHERS.get(dispatcher_id)
+    if registration is None or not registration.command:
+        print(json.dumps({"event": "dlq_replay_denied", "error_code": "dispatcher_not_registered"}))
+        return 66
     loaded = writable_record(args[0])
     if loaded is None:
         print("记录不存在、owner 不匹配或 DLQ 表不可用。")
         return 66
     source, record_id, conn, row = loaded
     try:
+        row_owner = row["owner"] if "owner" in row.keys() else source.name
+        if (
+            row_owner != source.name
+            or registration.owner != row_owner
+            or source.name not in registration.sources
+        ):
+            print(json.dumps({"event": "dlq_replay_denied", "error_code": "owner_mismatch"}))
+            return 77
+        raw_payload = str(row["payload"])
+        payload_digest = hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
+        operation_id = f"dlq_replay_{secrets.token_hex(16)}"
         payload = {
             "source": source.name,
             "id": record_id,
+            "owner": row_owner,
             "event_type": row["event_type"],
             "trace_id": row["trace_id"],
-            "payload": json.loads(row["payload"]),
+            "payload": json.loads(raw_payload),
+            "payload_digest": payload_digest,
+            "operation_id": operation_id,
+            "dispatcher_id": registration.dispatcher_id,
         }
-        dispatcher = args[dispatcher_index + 1 :]
         completed = subprocess.run(
-            dispatcher,
+            registration.command,
             input=json.dumps(payload, ensure_ascii=False),
             text=True,
             capture_output=True,
@@ -349,7 +383,21 @@ def cmd_replay(args: list[str]) -> int:
             receipt = json.loads(completed.stdout)
         except json.JSONDecodeError:
             return 70
-        if receipt.get("status") not in {"accepted", "success"} or not receipt.get("receipt_id"):
+        expected_receipt = {
+            "source": source.name,
+            "record_id": record_id,
+            "owner": row_owner,
+            "trace_id": row["trace_id"],
+            "payload_digest": payload_digest,
+            "operation_id": operation_id,
+            "dispatcher_id": registration.dispatcher_id,
+        }
+        if (
+            receipt.get("status") != "success"
+            or not receipt.get("receipt_id")
+            or any(receipt.get(key) != value for key, value in expected_receipt.items())
+        ):
+            print(json.dumps({"event": "dlq_replay_failed", "error_code": "receipt_mismatch"}))
             return 70
         replayed_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         if source.name == "kernel":
@@ -362,7 +410,11 @@ def cmd_replay(args: list[str]) -> int:
                        resolution = ?
                  WHERE id = ?
                 """,
-                (replayed_at, f"receipt:{receipt['receipt_id']}", record_id),
+                (
+                    replayed_at,
+                    f"receipt:{receipt['receipt_id']}:{operation_id}:{payload_digest}",
+                    record_id,
+                ),
             )
         else:
             conn.execute(f"UPDATE {source.table} SET replayed = 1 WHERE id = ?", (record_id,))

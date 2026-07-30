@@ -5,10 +5,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "prebuild": "pnpm --filter @glimmer-cradle/extension-sdk run build",
-    "pretypecheck": "pnpm --filter @glimmer-cradle/extension-sdk run build",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run typecheck"
   },
   "dependencies": {
     "@glimmer-cradle/extension-sdk": "workspace:*"
@@ -24,4 +24,3 @@
     "zod": "^3.23.0"
   }
 }
-

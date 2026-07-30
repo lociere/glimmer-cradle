@@ -369,9 +369,9 @@ Phase 12 固定的是契约脊柱、服务神经系统与可验证的物理边�
 | 验收门 | M13 六个 slice 各有独立 fixed state；审查 P1/P2 全部关闭；task contract、local/CI parity、host-global lock、数据恢复、owner-local 收口、provenance/attestation 与 Desktop 产品矩阵通过；旧入口删除；Current/Implementation/Reference/Guide 按真实实现同步。 |
 
 Phase 13 的核心不是整理脚本，而是让源码经 owner-local task、薄编排、CI 和固定制品
-抵达可恢复宿主，形成与运行时架构同等可靠的交付生命周期。Slice A 是唯一 active
-推进面，但实现状态 paused/non-reproducible；暂停 patch 不是 Current 或 accepted
-fixed state，恢复前必须由原 owner 在新 main 上复核并重放。进入门、风险覆盖和分层
+抵达可恢复宿主，形成与运行时架构同等可靠的交付生命周期。A～F 当前处于统一审查修复后的
+fixed-state candidate，尚未独立复审或集成；更新应用与生产 DLQ dispatcher 在缺少可验证
+owner adapter 时明确失败闭合。进入门、风险覆盖和分层
 验证见 [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)，完成态目录见
 [M13 清单](./manifests/M13-目标物理清单.md)，长期取舍见
 [ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)。

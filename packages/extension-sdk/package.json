@@ -69,12 +69,12 @@
     }
   },
   "scripts": {
-    "prebuild": "pnpm --filter @glimmer-cradle/protocol run build",
-    "pretypecheck": "pnpm --filter @glimmer-cradle/protocol run build",
-    "pretest": "pnpm --filter @glimmer-cradle/protocol run build",
     "build": "tsc -p tsconfig.json",
+    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --threads false"
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run typecheck",
+    "test": "vitest run src --threads false",
+    "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run test"
   },
   "dependencies": {
     "@glimmer-cradle/protocol": "workspace:*",

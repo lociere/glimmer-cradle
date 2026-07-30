@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  digestRuntimeInputs,
+  digestRuntimeOutputs,
+} from './runtime-output-manifest.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const statePath = path.join(repoRoot, 'build', 'reports', 'checks', 'runtime-output-manifest.json');
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const sharedTaskInputs = [
+  path.join(repoRoot, 'pnpm-lock.yaml'),
+  path.join(repoRoot, 'pnpm-workspace.yaml'),
+  path.join(repoRoot, 'package.json'),
+  path.join(repoRoot, '.nvmrc'),
+];
 
 const previousState = await readJson(statePath, { schema_version: 1, tasks: {} });
 const nextState = { schema_version: 1, tasks: {} };
@@ -15,6 +24,7 @@ const nextState = { schema_version: 1, tasks: {} };
 const protocolDigest = await ensureTask({
   id: 'protocol',
   inputs: [
+    ...sharedTaskInputs,
     path.join(repoRoot, 'protocol', 'src'),
     path.join(repoRoot, 'protocol', 'package.json'),
     path.join(repoRoot, 'protocol', 'tsconfig.json'),
@@ -27,6 +37,7 @@ const extensionSdkDigest = await ensureTask({
   id: 'extension-sdk',
   dependencyDigests: [protocolDigest],
   inputs: [
+    ...sharedTaskInputs,
     path.join(repoRoot, 'packages', 'extension-sdk', 'src'),
     path.join(repoRoot, 'packages', 'extension-sdk', 'package.json'),
     path.join(repoRoot, 'packages', 'extension-sdk', 'tsconfig.json'),
@@ -39,8 +50,9 @@ await ensureTask({
   id: 'extension-host-modules',
   dependencyDigests: [extensionSdkDigest],
   inputs: [
+    ...sharedTaskInputs,
     path.join(repoRoot, 'packages', 'extension-sdk', 'scripts', 'stage-host-modules.mjs'),
-    path.join(repoRoot, 'pnpm-lock.yaml'),
+    path.join(repoRoot, 'packages', 'extension-sdk', 'package.json'),
   ],
   outputs: [
     path.join(repoRoot, 'build', 'extension-host', 'modules', '@glimmer-cradle', 'extension-sdk', 'dist', 'index.js'),
@@ -51,7 +63,9 @@ await ensureTask({
 await ensureTask({
   id: 'desktop-assets',
   inputs: [
+    ...sharedTaskInputs,
     path.join(repoRoot, 'assets'),
+    path.join(repoRoot, 'products', 'desktop', 'package.json'),
     path.join(repoRoot, 'products', 'desktop', 'scripts', 'sync-assets.mjs'),
     path.join(repoRoot, 'core', 'avatar', 'scripts', 'avatar-package-catalog.mjs'),
   ],
@@ -75,8 +89,13 @@ await fs.mkdir(path.dirname(statePath), { recursive: true });
 await fs.writeFile(statePath, `${JSON.stringify(nextState, null, 2)}\n`, 'utf8');
 
 async function ensureTask(task) {
-  const digest = await digestInputs(task.inputs, task.inputFilter, task.dependencyDigests ?? []);
-  const currentOutputs = await digestOutputs(task.outputs);
+  const digest = await digestRuntimeInputs(
+    repoRoot,
+    task.inputs,
+    task.dependencyDigests ?? [],
+    task.inputFilter,
+  );
+  const currentOutputs = await digestRuntimeOutputs(repoRoot, task.outputs);
   const previousTask = previousState.tasks?.[task.id];
   if (currentOutputs && previousTask?.input_digest === digest
     && previousTask?.output_digest === currentOutputs.digest) {
@@ -85,7 +104,7 @@ async function ensureTask(task) {
     console.log(`[prepare:runtime] ${task.id} 已变化或产物缺失，开始准备`);
     await task.run();
   }
-  const outputs = await digestOutputs(task.outputs);
+  const outputs = await digestRuntimeOutputs(repoRoot, task.outputs);
   if (!outputs) {
     throw new Error(`[prepare:runtime] ${task.id} 未生成完整 outputs`);
   }
@@ -94,59 +113,7 @@ async function ensureTask(task) {
     output_digest: outputs.digest,
     outputs: outputs.entries,
   };
-  return digest;
-}
-
-async function digestOutputs(outputs) {
-  const entries = [];
-  const hash = createHash('sha256');
-  for (const output of outputs) {
-    const stat = await fs.stat(output).catch(() => null);
-    if (!stat?.isFile()) return null;
-    const bytes = await fs.readFile(output);
-    const digest = createHash('sha256').update(bytes).digest('hex');
-    const relative = path.relative(repoRoot, output).replaceAll('\\', '/');
-    entries.push({ path: relative, sha256: digest, size: bytes.length });
-    hash.update(`${relative}\0${digest}\0${bytes.length}\n`);
-  }
-  return { entries, digest: hash.digest('hex') };
-}
-
-async function digestInputs(inputs, inputFilter, dependencyDigests) {
-  const files = [];
-  for (const input of inputs) {
-    const stat = await fs.stat(input).catch(() => null);
-    if (!stat) continue;
-    if (stat.isDirectory()) {
-      files.push(...await findFiles(input, inputFilter));
-    } else if (!inputFilter || inputFilter(input)) {
-      files.push(input);
-    }
-  }
-  files.sort((left, right) => left.localeCompare(right));
-  const hash = createHash('sha256');
-  for (const dependencyDigest of dependencyDigests) hash.update(`dependency:${dependencyDigest}\n`);
-  for (const filePath of files) {
-    hash.update(`${path.relative(repoRoot, filePath).replaceAll('\\', '/')}\0`);
-    hash.update(await fs.readFile(filePath));
-    hash.update('\0');
-  }
-  return hash.digest('hex');
-}
-
-async function findFiles(root, predicate = () => true) {
-  const result = [];
-  const entries = await fs.readdir(root, { withFileTypes: true });
-  for (const entry of entries) {
-    const filePath = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
-      result.push(...await findFiles(filePath, predicate));
-    } else if (entry.isFile() && predicate(filePath)) {
-      result.push(filePath);
-    }
-  }
-  return result;
+  return outputs.digest;
 }
 
 async function readJson(filePath, fallback) {

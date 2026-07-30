@@ -6,11 +6,11 @@
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前唯一活跃推进面：M13 fixed-state 独立复审
+## 当前唯一活跃推进面：M13 fixed-state 审查修复后复审
 
 [M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1 `contracts baseline` 已集成：canonical `contracts/` baseline、离线可复现生成链、兼容基线、三语言最小 round-trip 和供应链证据已经形成。Slice 1 没有切换运行主线；当前 runtime consumers 仍使用 `protocol/`，Slice 2 尚未启动，M11 前置关系也没有因此完成。
 
-[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。该状态尚未独立复审或集成，不能写成 main 已完成。
+[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选明确把未绑定固定 candidate 的 update apply、未注册 owner adapter 的 DLQ replay 设为 unsupported/fail-closed；该状态尚未再次独立复审或集成，不能写成 main 已完成。
 
 M12/M13 的完成态目录、迁移动作和删除门分别见对应
 [M12 清单](./manifests/M12-目标物理清单.md) 与

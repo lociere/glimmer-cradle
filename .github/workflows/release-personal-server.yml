@@ -17,9 +17,14 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.release_metadata.outputs.version }}
+      manifest_digest: ${{ steps.release_metadata.outputs.manifest_digest }}
+      image_digest: ${{ steps.build_image.outputs.digest }}
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: 检出源码
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -88,6 +93,13 @@ jobs:
             PYTHON_IMAGE=${{ vars.PERSONAL_SERVER_PYTHON_IMAGE }}
             UV_IMAGE=${{ vars.PERSONAL_SERVER_UV_IMAGE }}
 
+      - name: 为 OCI digest 生成 GitHub Sigstore provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/glimmer-cradle-personal-server
+          subject-digest: ${{ steps.build_image.outputs.digest }}
+          push-to-registry: true
+
       - name: 生成部署发布包
         id: release_metadata
         run: |
@@ -104,6 +116,8 @@ jobs:
           export GLIMMER_CRADLE_SOURCE_COMMIT="$GITHUB_SHA"
           node products/personal-server/scripts/package-release.mjs "$VERSION" "$IMAGE" personal-server-linux-amd64.tar "$ARCHIVE_IMAGE" "$IMAGE_ID"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          MANIFEST="dist/personal-server/${VERSION}/linux-amd64/artifact-manifest.json"
+          echo "manifest_digest=$(sha256sum "$MANIFEST" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - name: 验证 OCI 入口组件
         run: |
@@ -112,7 +126,14 @@ jobs:
 
       - name: 验证部署发布包
         run: |
-          cd "dist/personal-server/${{ steps.release_metadata.outputs.version }}/linux-amd64"
+          ARTIFACT_ROOT="dist/personal-server/${{ steps.release_metadata.outputs.version }}/linux-amd64"
+          node products/personal-server/scripts/verify-release.mjs "$ARTIFACT_ROOT" \
+            --expected-commit "$GITHUB_SHA" \
+            --expected-manifest-digest "${{ steps.release_metadata.outputs.manifest_digest }}" \
+            --expected-builder products/personal-server/scripts/package-release.mjs \
+            --expected-issuer github-actions-sigstore \
+            --expected-oci-digest "${{ steps.build_image.outputs.digest }}"
+          cd "$ARTIFACT_ROOT"
           sha256sum --check SHA256SUMS
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64.tar.gz"
           test -f "glimmer-cradle-personal-server-v${{ steps.release_metadata.outputs.version }}-linux-amd64-full.tar.gz"
@@ -146,6 +167,12 @@ jobs:
           docker image rm "$ARCHIVE_IMAGE" >/dev/null
           docker load --input image-archive.tar >/dev/null
           test "$(docker image inspect --format '{{.Id}}' "$ARCHIVE_IMAGE")" = "$ARCHIVE_IMAGE_ID"
+          rm -rf extracted light-manifest.sha256 full-manifest.sha256 image-archive.tar
+
+      - name: 为固定发布物生成 GitHub Sigstore provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: dist/personal-server/${{ steps.release_metadata.outputs.version }}/linux-amd64/*
 
       - name: 上传固定制品
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -159,12 +186,41 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      attestations: read
+      packages: read
     steps:
+      - name: 检出 verifier
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
       - name: 下载固定制品
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: personal-server-${{ needs.build-fixed-artifact.outputs.version }}-linux-amd64
           path: dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/
+
+      - name: 重新验证固定制品与外部可信 provenance
+        env:
+          ARTIFACT_ROOT: dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node products/personal-server/scripts/verify-release.mjs "$ARTIFACT_ROOT" \
+            --expected-commit "$GITHUB_SHA" \
+            --expected-manifest-digest "${{ needs.build-fixed-artifact.outputs.manifest_digest }}" \
+            --expected-builder products/personal-server/scripts/package-release.mjs \
+            --expected-issuer github-actions-sigstore \
+            --expected-oci-digest "${{ needs.build-fixed-artifact.outputs.image_digest }}"
+          for artifact in "$ARTIFACT_ROOT"/*; do
+            gh attestation verify "$artifact" \
+              --repo "$GITHUB_REPOSITORY" \
+              --source-digest "$GITHUB_SHA" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-personal-server.yml"
+          done
+          gh attestation verify \
+            "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/glimmer-cradle-personal-server@${{ needs.build-fixed-artifact.outputs.image_digest }}" \
+            --bundle-from-oci \
+            --repo "$GITHUB_REPOSITORY" \
+            --source-digest "$GITHUB_SHA" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-personal-server.yml"
 
       - name: 仅发布已固定制品
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
@@ -181,4 +237,4 @@ jobs:
             dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/artifact-manifest.json
             dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/provenance.json
             dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/sbom.spdx.json
-            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/attestation.json
+            dist/personal-server/${{ needs.build-fixed-artifact.outputs.version }}/linux-amd64/build-claim.json

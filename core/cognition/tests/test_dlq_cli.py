@@ -124,11 +124,22 @@ def test_dlq_cli_requires_real_dispatcher_before_marking_replay(tmp_path: Path) 
     dispatcher.write_text(
         "import json,sys\n"
         "payload=json.load(sys.stdin)\n"
-        "print(json.dumps({'status':'accepted','receipt_id':'r1'}))\n",
+        "print(json.dumps({'status':'success','receipt_id':'r1',"
+        "'source':payload['source'],'record_id':payload['id'],'owner':payload['owner'],"
+        "'trace_id':payload['trace_id'],'payload_digest':payload['payload_digest'],"
+        "'operation_id':payload['operation_id'],'dispatcher_id':payload['dispatcher_id']}))\n",
         encoding="utf-8",
     )
+    dlq.DISPATCHERS = {
+        "kernel.fixture": dlq.DispatcherRegistration(
+            "kernel.fixture",
+            "kernel",
+            ("kernel",),
+            (sys.executable, str(dispatcher)),
+        )
+    }
     assert dlq.cmd_replay(
-        ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(dispatcher)]
+        ["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]
     ) == 0
 
     conn = sqlite3.connect(kernel_db)

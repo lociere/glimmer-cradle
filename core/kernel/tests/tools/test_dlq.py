@@ -86,29 +86,41 @@ class DlqToolTest(unittest.TestCase):
             "#!/usr/bin/env python3\n"
             "import json,sys\n"
             "payload=json.load(sys.stdin)\n"
-            "print(json.dumps({'status':'accepted','receipt_id':'receipt-1','trace_id':payload['trace_id']}))\n",
+            "print(json.dumps({'status':'success','receipt_id':'receipt-1',"
+            "'source':payload['source'],'record_id':payload['id'],'owner':payload['owner'],"
+            "'trace_id':payload['trace_id'],'payload_digest':payload['payload_digest'],"
+            "'operation_id':payload['operation_id'],'dispatcher_id':payload['dispatcher_id']}))\n",
             encoding="utf-8",
         )
         self.dispatcher.chmod(self.dispatcher.stat().st_mode | stat.S_IXUSR)
+        self.original_dispatchers = dlq.DISPATCHERS
+        dlq.DISPATCHERS = {
+            "kernel.fixture": dlq.DispatcherRegistration(
+                "kernel.fixture",
+                "kernel",
+                ("kernel",),
+                (sys.executable, str(self.dispatcher)),
+            )
+        }
 
     def tearDown(self) -> None:
         dlq.SOURCES = self.original_sources
+        dlq.DISPATCHERS = self.original_dispatchers
         self.temp.cleanup()
 
     def test_replay_only_marks_after_real_dispatch_receipt(self) -> None:
         self.assertEqual(
             dlq.cmd_replay(
-                ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(self.dispatcher)]
+                ["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]
             ),
             0,
         )
         connection = sqlite3.connect(self.db)
-        self.assertEqual(
-            connection.execute(
-                "SELECT status, replayed, resolution FROM dead_letters_ts WHERE id=1"
-            ).fetchone(),
-            ("replayed", 1, "receipt:receipt-1"),
-        )
+        status, replayed, resolution = connection.execute(
+            "SELECT status, replayed, resolution FROM dead_letters_ts WHERE id=1"
+        ).fetchone()
+        self.assertEqual((status, replayed), ("replayed", 1))
+        self.assertTrue(resolution.startswith("receipt:receipt-1:dlq_replay_"))
         connection.close()
 
     def test_default_show_redacts_payload_and_stack(self) -> None:
@@ -125,7 +137,7 @@ class DlqToolTest(unittest.TestCase):
         self.dispatcher.write_text("raise SystemExit(1)\n", encoding="utf-8")
         self.assertEqual(
             dlq.cmd_replay(
-                ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(self.dispatcher)]
+                ["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]
             ),
             70,
         )
@@ -141,7 +153,7 @@ class DlqToolTest(unittest.TestCase):
     def test_replay_without_confirmation_fails_closed(self) -> None:
         self.assertEqual(
             dlq.cmd_replay(
-                ["kernel:1", "--dispatcher", sys.executable, str(self.dispatcher)]
+                ["kernel:1", "--dispatcher", "kernel.fixture"]
             ),
             77,
         )
@@ -165,7 +177,7 @@ class DlqToolTest(unittest.TestCase):
     def test_cleanup_removes_only_successfully_replayed_record(self) -> None:
         self.assertEqual(
             dlq.cmd_replay(
-                ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(self.dispatcher)]
+                ["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]
             ),
             0,
         )
@@ -181,7 +193,7 @@ class DlqToolTest(unittest.TestCase):
     def test_cleanup_retention_starts_at_successful_replay(self) -> None:
         self.assertEqual(
             dlq.cmd_replay(
-                ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(self.dispatcher)]
+                ["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]
             ),
             0,
         )
@@ -191,6 +203,49 @@ class DlqToolTest(unittest.TestCase):
             connection.execute(
                 "SELECT id FROM dead_letters_ts WHERE id=1"
             ).fetchone()
+        )
+        connection.close()
+
+    def test_arbitrary_dispatcher_command_is_not_executable(self) -> None:
+        self.assertEqual(
+            dlq.cmd_replay(
+                ["kernel:1", "--confirm", "--dispatcher", sys.executable, str(self.dispatcher)]
+            ),
+            2,
+        )
+
+    def test_owner_mismatch_is_rejected_before_dispatch(self) -> None:
+        connection = sqlite3.connect(self.db)
+        connection.execute("UPDATE dead_letters_ts SET owner='cognition' WHERE id=1")
+        connection.commit()
+        connection.close()
+        self.assertEqual(
+            dlq.cmd_replay(["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]),
+            77,
+        )
+
+    def test_receipt_must_bind_record_trace_payload_and_operation(self) -> None:
+        self.dispatcher.write_text(
+            "import json,sys\n"
+            "payload=json.load(sys.stdin)\n"
+            "print(json.dumps({'status':'success','receipt_id':'forged',"
+            "'source':payload['source'],'record_id':payload['id'],"
+            "'owner':payload['owner'],'trace_id':'wrong',"
+            "'payload_digest':payload['payload_digest'],"
+            "'operation_id':payload['operation_id'],"
+            "'dispatcher_id':payload['dispatcher_id']}))\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            dlq.cmd_replay(["kernel:1", "--confirm", "--dispatcher", "kernel.fixture"]),
+            70,
+        )
+        connection = sqlite3.connect(self.db)
+        self.assertEqual(
+            connection.execute(
+                "SELECT status, replayed FROM dead_letters_ts WHERE id=1"
+            ).fetchone(),
+            ("pending", 0),
         )
         connection.close()
 

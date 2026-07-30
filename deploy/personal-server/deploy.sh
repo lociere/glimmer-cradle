@@ -9,6 +9,8 @@ ENV_TEMPLATE_FILE="${GLIMMER_CRADLE_ENV_TEMPLATE_FILE:-${SCRIPT_DIR}/.env.exampl
 DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
 RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+CONTAINER_RUN_ROOT="/run/glimmer-cradle"
+CONTAINER_OPS_BRIDGE_SOCKET="${CONTAINER_RUN_ROOT}/ops-bridge.sock"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-${SCRIPT_DIR}}"
 CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-$(dirname -- "$DEPLOYMENT_ENV_FILE")}"
 BACKUP_ROOT="${STATE_ROOT}/data/backups"
@@ -106,9 +108,9 @@ prepare_environment() {
     bridge_token="$(openssl rand -hex 32)"
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN "$bridge_token"
   fi
-  if ! grep -q '^GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=' "$DEPLOYMENT_ENV_FILE"; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock"
-  fi
+  # deployment.env is consumed by Compose inside the product container. Older releases
+  # incorrectly persisted a host path here; always migrate it to the container projection.
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "$CONTAINER_OPS_BRIDGE_SOCKET"
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"
   fi
@@ -316,10 +318,9 @@ wait_until_ready() {
 }
 
 start_ops_bridge() {
-  local image token socket_path docker_gid docker_bin compose_plugin deployment_mode release_root
+  local image token docker_gid docker_bin compose_plugin deployment_mode release_root
   image="$(read_env GLIMMER_CRADLE_IMAGE '')"
   token="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN '')"
-  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock")"
   deployment_mode="$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
   if [[ "$deployment_mode" != image ]]; then
     stop_ops_bridge
@@ -358,7 +359,8 @@ start_ops_bridge() {
     --group-add "$docker_gid" \
     --entrypoint /usr/local/bin/node \
     --env GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
-    --env GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT" \
+    --env GLIMMER_CRADLE_RUN_ROOT="$CONTAINER_RUN_ROOT" \
+    --env GLIMMER_CRADLE_HOST_RUN_ROOT="$RUN_ROOT" \
     --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE" \
     --env GLIMMER_CRADLE_HOST_RELEASE_ROOT="$release_root" \
     --env GLIMMER_CRADLE_HOST_INSTALL_ROOT="$INSTALL_ROOT" \
@@ -366,7 +368,7 @@ start_ops_bridge() {
     --env GLIMMER_CRADLE_HOST_DOCKER_BIN="$docker_bin" \
     --env GLIMMER_CRADLE_HOST_DOCKER_COMPOSE_PLUGIN="$compose_plugin" \
     --env GLIMMER_CRADLE_HOST_DOCKER_SOCKET="$DOCKER_SOCKET_PATH" \
-    --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET="$socket_path" \
+    --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET="$CONTAINER_OPS_BRIDGE_SOCKET" \
     --env GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN="$token" \
     --env GLIMMER_CRADLE_RELEASE_SOURCE="$(read_env GLIMMER_CRADLE_RELEASE_SOURCE https://github.com/lociere/glimmer-cradle/releases/latest/download)" \
     --mount type=bind,src="$DOCKER_SOCKET_PATH",dst=/var/run/docker.sock,readonly \
@@ -375,7 +377,7 @@ start_ops_bridge() {
     --mount type=bind,src="$INSTALL_ROOT",dst="$INSTALL_ROOT" \
     --mount type=bind,src="$CONFIG_ROOT",dst="$CONFIG_ROOT" \
     --mount type=bind,src="$STATE_ROOT",dst="$STATE_ROOT" \
-    --mount type=bind,src="$RUN_ROOT",dst="$RUN_ROOT" \
+    --mount type=bind,src="$RUN_ROOT",dst="$CONTAINER_RUN_ROOT" \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
     "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
   wait_until_ops_bridge_ready
@@ -396,12 +398,8 @@ wait_until_ops_bridge_ready() {
 }
 
 stop_ops_bridge() {
-  local socket_path
   "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
-  socket_path="$(read_env GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "${RUN_ROOT}/ops-bridge.sock")"
-  if [[ -n "$socket_path" && "$socket_path" == "${RUN_ROOT}/"* ]]; then
-    "${PRIVILEGED[@]}" rm -f -- "$socket_path"
-  fi
+  "${PRIVILEGED[@]}" rm -f -- "${RUN_ROOT}/ops-bridge.sock"
 }
 
 create_backup() {

@@ -5,6 +5,9 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   package:
@@ -19,6 +22,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:pr
       - run: pnpm --filter @glimmer-cradle/desktop package
+      - name: 验证固定物料存在
+        id: package_metadata
+        shell: pwsh
+        run: |
+          $root = Get-ChildItem dist/desktop/*/windows-x64 -Directory | Select-Object -First 1
+          if (-not $root) { throw "Desktop fixed artifact 缺失" }
+          $digest = (Get-FileHash "$root/artifact-manifest.json" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "artifact_root=$($root.FullName)" >> $env:GITHUB_OUTPUT
+          "manifest_digest=$digest" >> $env:GITHUB_OUTPUT
+      - name: 为 Desktop 固定物料生成 GitHub Sigstore provenance
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: dist/desktop/*/windows-x64/*
+      - name: 以独立 GitHub identity 复验 provenance
+        shell: pwsh
+        run: |
+          Get-ChildItem "${{ steps.package_metadata.outputs.artifact_root }}" -File | ForEach-Object {
+            gh attestation verify $_.FullName `
+              --repo "$env:GITHUB_REPOSITORY" `
+              --source-digest "$env:GITHUB_SHA" `
+              --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/release-desktop.yml"
+          }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desktop-windows-x64-fixed-artifact

@@ -9,6 +9,9 @@ const deploy = await readFile(path.join(root, 'deploy.sh'), 'utf8');
 const installer = await readFile(path.join(root, 'install-release.sh'), 'utf8');
 const lock = await readFile(path.join(root, 'lib', 'host-transaction.sh'), 'utf8');
 const handoff = await readFile(path.join(root, 'container', 'ops-bridge-handoff.mjs'), 'utf8');
+const bridge = await readFile(path.join(root, 'container', 'ops-bridge.mjs'), 'utf8');
+const envTemplate = await readFile(path.join(root, '.env.example'), 'utf8');
+const compose = await readFile(path.join(root, 'compose.yaml'), 'utf8');
 const contract = JSON.parse(await readFile(path.join(root, 'tests', 'transaction-contract.fixture.json'), 'utf8'));
 
 test('query dispatch 发生在 version、Docker elevation 与事务初始化之前', () => {
@@ -21,11 +24,35 @@ test('query dispatch 发生在 version、Docker elevation 与事务初始化之�
   assert.doesNotMatch(runQuery, /\bsudo\b|prepare_environment|prepare_state|chmod|chown/);
 });
 
-test('source/custom root 不伪装 Ops 支持，image mode 使用同路径 mount', () => {
+test('source mode 不伪装 Ops 支持，custom host run root 投影到容器规范路径', () => {
   assert.match(deploy, /source_mode_has_no_stable_host_owner/);
-  for (const rootName of ['INSTALL_ROOT', 'STATE_ROOT', 'RUN_ROOT']) {
+  for (const rootName of ['INSTALL_ROOT', 'STATE_ROOT']) {
     assert.match(deploy, new RegExp(`src=\\\"\\$${rootName}\\\",dst=\\\"\\$${rootName}\\\"`));
   }
+  assert.match(
+    deploy,
+    /src="\$RUN_ROOT",dst="\$CONTAINER_RUN_ROOT"/,
+  );
+  assert.match(deploy, /GLIMMER_CRADLE_HOST_RUN_ROOT="\$RUN_ROOT"/);
+});
+
+test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bind source', () => {
+  assert.match(
+    envTemplate,
+    /^GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=\/run\/glimmer-cradle\/ops-bridge\.sock$/m,
+  );
+  assert.match(
+    compose,
+    /GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET:-\/run\/glimmer-cradle\/ops-bridge\.sock/,
+  );
+  assert.match(
+    compose,
+    /\$\{GLIMMER_CRADLE_RUN_ROOT:-\.\/run\}:\/run\/glimmer-cradle/,
+  );
+  assert.match(
+    deploy,
+    /set_env_value "\$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "\$CONTAINER_OPS_BRIDGE_SOCKET"/,
+  );
 });
 
 test('可信锁拒绝 symlink/不安全 owner 并以 guard inode 防替换', () => {
@@ -53,8 +80,13 @@ test('phase contract 区分执行 commit 与终态 committed', () => {
 
 test('handoff Adapter 在启动外部 owner 前创建可信结果目录', () => {
   const prepareDirectory = handoff.indexOf('await mkdir(path.posix.dirname(launch.resultPath)');
-  const startOwner = handoff.indexOf('await runDocker(config.dockerBin, launch.args)');
+  const startOwner = handoff.indexOf('config.runDocker || runDocker');
   assert.ok(prepareDirectory > 0);
   assert.ok(prepareDirectory < startOwner);
   assert.match(handoff, /mode: 0o700/);
+  for (const state of ['ready', 'started', 'committed', 'failed', 'recovery_required']) {
+    assert.match(handoff, new RegExp(state));
+  }
+  assert.match(handoff, /HANDOFF_RETENTION_MS/);
+  assert.match(bridge, /request\.method === 'GET'[\s\S]*readHandoffResult/);
 });

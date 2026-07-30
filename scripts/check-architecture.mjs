@@ -127,6 +127,8 @@ for (const requiredFile of [
   'core/kernel/tools/telemetry.py',
   'core/cognition/tools/experience.py',
   'products/desktop/scripts/package.mjs',
+  'products/desktop/scripts/prepare-package.mjs',
+  'products/desktop/scripts/runtime-output-manifest.mjs',
   'products/desktop/scripts/release-manifest.mjs',
   'products/desktop/scripts/verify-package.mjs',
   'products/personal-server/scripts/build-image.mjs',
