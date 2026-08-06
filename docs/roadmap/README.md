@@ -14,7 +14,7 @@
 | [manifests/](./manifests/) | M12/M13 的完成态目录树、Current → Target 动作与删除门 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
-当前唯一 active 推进面是 [M13 fixed-state 独立复审](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)；A～F 已形成候选但尚未集成。[M12 Slice 1 contracts baseline](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已集成，runtime consumer 尚未迁移。进入关系与门禁以 [now.md](./now.md) 为准。
+M13 A～F 已完成，待本次合入 main。下一活跃推进面等待总控与用户选择；不自动启动 M12/M11。[M12 Slice 1 contracts baseline](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已集成，runtime consumer 尚未迁移。
 
 ## 状态规则
 
