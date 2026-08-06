@@ -240,9 +240,16 @@ describe('DlqReplayIngress', () => {
       delivery: 'kernel_event_bus_published',
     });
     const ingress = new DlqReplayIngress(root);
-
-    await expect(ingress.drainOnce()).rejects.toThrow('kernel_dlq_replay_receipt_conflict');
-    expect(await fs.pathExists(path.join(root, `${operationId}.json`))).toBe(true);
+    let effects = 0;
+    const handler = async () => { effects += 1; };
+    EventBus.instance.subscribe('Event.Forged', handler as never);
+    try {
+      await expect(ingress.drainOnce()).rejects.toThrow('event_bus_replay_ack_conflict');
+      expect(effects).toBe(1);
+      expect(await fs.pathExists(path.join(root, `${operationId}.json`))).toBe(true);
+    } finally {
+      EventBus.instance.unsubscribe('Event.Forged', handler as never);
+    }
   });
 });
 

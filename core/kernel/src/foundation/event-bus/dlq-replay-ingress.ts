@@ -81,12 +81,6 @@ export class DlqReplayIngress {
     const processedRoot = path.join(this.inboxRoot, 'processed');
     const processedPath = path.join(processedRoot, path.basename(filePath));
     const receiptPath = path.join(processedRoot, `${envelope.operation_id}.receipt.json`);
-    const existingReceipt = await readJson(receiptPath);
-    if (existingReceipt) {
-      validateReceipt(existingReceipt, envelope);
-      await archiveEnvelope(filePath, processedPath, envelope);
-      return true;
-    }
     const event = JSON.parse(envelope.payload_json) as Record<string, unknown>;
     if (!event || Array.isArray(event) || event.event_type !== envelope.event_type) {
       throw new Error('kernel_dlq_replay_event_mismatch');
@@ -99,6 +93,7 @@ export class DlqReplayIngress {
         trace_id: envelope.trace_id,
         payload_digest: envelope.payload_digest,
         ack_path: receiptPath,
+        effect_ledger_path: path.join(processedRoot, 'effects', `${envelope.operation_id}.json`),
       },
     });
     const receipt = await readJson(receiptPath);

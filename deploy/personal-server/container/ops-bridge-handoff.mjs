@@ -128,6 +128,30 @@ set -e
 exit "$code"
 `;
 
+const RECOVERY_AUTHORITY_COMMAND = String.raw`
+set -Eeuo pipefail
+source "$GLIMMER_CRADLE_INSTALL_ROOT/current/lib/host-transaction.sh"
+write_terminal() {
+  temporary="$GLIMMER_CRADLE_HANDOFF_RESULT.$$.new"
+  printf '{"schema_version":1,"operation_id":"%s","operation":"%s","status":"owner_timeout","exit_code":70,"updated_at":"%s","recovery_action":"retry query with the same operation_id; recovery authority closed an unacknowledged owner"}\n' \
+    "$GLIMMER_CRADLE_TRANSACTION_REQUEST_ID" "$GLIMMER_CRADLE_HANDOFF_OPERATION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$temporary"
+  chmod 0600 "$temporary"
+  mv -f -- "$temporary" "$GLIMMER_CRADLE_HANDOFF_RESULT"
+}
+IFS= read -r decision <"$GLIMMER_CRADLE_HANDOFF_DECISION" || exit 70
+[ "$decision" = "owner_timeout" ] || exit 70
+set +e
+host_transaction_acquire "$GLIMMER_CRADLE_HANDOFF_OPERATION"
+code=$?
+set -e
+[ "$code" -eq 0 ] || exit "$code"
+if host_transaction_finish 70; then
+  write_terminal
+  exit 70
+fi
+exit 78
+`;
+
 export function buildExternalOwnerArgs(config, request) {
   if (!OPERATION_ID.test(request.operationId)) throw new Error('transaction_handoff_id_invalid');
   const {
@@ -348,7 +372,24 @@ async function settleOwnerTimeout(config, handoff, authoritative = null) {
   // stable recovery authority is allowed to publish the terminal result.
   const result = await readJson(handoff.resultPath);
   if (result && (result.status === 'started' || TERMINAL_STATES.has(result.status))) return result;
-  throw new Error('transaction_handoff_owner_timeout_pending');
+  await (config.recoverExternalOwner || launchRecoveryAuthority)(config, handoff);
+  return waitForResult(config, handoff.operation_id, config.recoveryTimeoutMs || OWNER_STARTED_TIMEOUT_MS,
+    (value) => value.status === 'started' || TERMINAL_STATES.has(value.status));
+}
+
+async function launchRecoveryAuthority(config, handoff) {
+  const request = await readJson(handoff.requestPath);
+  if (!request || !Array.isArray(request.command)) throw new Error('transaction_handoff_recovery_request_missing');
+  const launch = buildExternalOwnerArgs(config, {
+    operationId: handoff.operation_id,
+    operation: request.operation,
+    command: request.command,
+    ackNonce: request.ack_nonce,
+  });
+  const commandIndex = launch.args.indexOf(OWNER_COMMAND);
+  if (commandIndex < 0) throw new Error('transaction_handoff_recovery_command_missing');
+  launch.args[commandIndex] = RECOVERY_AUTHORITY_COMMAND;
+  await (config.runDocker || runDocker)(config.dockerBin, launch.args);
 }
 
 async function claimDecision(filePath, requested) {

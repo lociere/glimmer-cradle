@@ -253,6 +253,12 @@ async function probeRuntimeReadinessCatalog(endpoint: string): Promise<ProbeRead
 function classifyRuntimeReadiness(value: unknown): ProbeReadiness {
   const runtimes = (value as { runtimes?: unknown })?.runtimes;
   if (!Array.isArray(runtimes)) return 'waiting';
+  const observed = runtimes.filter((runtime): runtime is { blocking: boolean; state: string } => (
+    Boolean(runtime)
+    && typeof runtime === 'object'
+    && typeof (runtime as { blocking?: unknown }).blocking === 'boolean'
+    && typeof (runtime as { state?: unknown }).state === 'string'
+  ));
   const blocking = runtimes.filter((runtime): runtime is { blocking: boolean; state: string } => (
     Boolean(runtime)
     && typeof runtime === 'object'
@@ -262,19 +268,22 @@ function classifyRuntimeReadiness(value: unknown): ProbeReadiness {
   if (blocking.length === 0) return 'waiting';
   if (blocking.some((runtime) => runtime.state === 'failed' || runtime.state === 'stopped')) return 'failed';
   if (!blocking.every((runtime) => runtime.state === 'ready' || runtime.state === 'degraded')) return 'waiting';
-  return blocking.some((runtime) => runtime.state === 'degraded') ? 'degraded' : 'ready';
+  return observed.some((runtime) => runtime.state === 'failed' || runtime.state === 'degraded')
+    ? 'degraded'
+    : 'ready';
 }
 
 async function terminateTree(child: SupervisorChild): Promise<void> {
   if (process.platform === 'win32' && child.pid) {
-    await new Promise<void>((resolve) => {
+    const terminated = await new Promise<boolean>((resolve) => {
       const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
         windowsHide: true,
         stdio: 'ignore',
       });
-      killer.once('error', () => resolve());
-      killer.once('exit', () => resolve());
+      killer.once('error', () => resolve(false));
+      killer.once('exit', (code) => resolve(code === 0));
     });
+    if (!terminated) throw new Error('desktop_packaged_supervisor_taskkill_failed');
     return;
   }
   child.kill('SIGTERM');

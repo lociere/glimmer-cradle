@@ -80,9 +80,10 @@ export class EventBus {
     }
 
     if (replay) {
-      const existing = await readReplayAck(replay.ack_path);
+      const existing = await readReplayEffect(replay.effect_ledger_path);
       if (existing) {
-        validateReplayAck(existing, replay, eventType);
+        validateReplayEffect(existing, replay, eventType);
+        await writeReplayAck(replay, eventType);
         return;
       }
     }
@@ -135,7 +136,10 @@ export class EventBus {
       if (replay) throw new Error(`event_bus_handler_failed:${failures.length}`);
       return;
     }
-    if (replay) await writeReplayAck(replay, eventType);
+    if (replay) {
+      await writeReplayEffect(replay, eventType);
+      await writeReplayAck(replay, eventType);
+    }
   }
 
   public async shutdown(): Promise<void> {
@@ -151,6 +155,7 @@ interface ReplayContext {
   readonly trace_id: string;
   readonly payload_digest: string;
   readonly ack_path: string;
+  readonly effect_ledger_path: string;
 }
 
 function getReplayContext(event: DomainEvent): ReplayContext | null {
@@ -158,15 +163,23 @@ function getReplayContext(event: DomainEvent): ReplayContext | null {
   if (!value) return null;
   const operationId = value.operation_id || '';
   const ackPath = value.ack_path || '';
+  const effectLedgerPath = value.effect_ledger_path || '';
   if (!/^dlq_replay_[0-9a-f]{32}$/.test(operationId)
     || !Number.isInteger(value.source_record_id)
     || typeof value.trace_id !== 'string'
     || !/^[0-9a-f]{64}$/.test(value.payload_digest || '')
     || typeof value.ack_path !== 'string'
-    || !isReplayAckPath(ackPath, operationId)) {
+    || typeof value.effect_ledger_path !== 'string'
+    || !isReplayAckPath(ackPath, operationId)
+    || !isReplayEffectPath(effectLedgerPath, operationId)) {
     throw new Error('event_bus_replay_context_invalid');
   }
   return value as ReplayContext;
+}
+
+function isReplayEffectPath(effectLedgerPath: string, operationId: string): boolean {
+  const processedRoot = path.resolve(resolveStatePath('kernel/dlq-replay-inbox/processed'));
+  return path.resolve(effectLedgerPath) === path.join(processedRoot, 'effects', `${operationId}.json`);
 }
 
 function isReplayAckPath(ackPath: string, operationId: string): boolean {
@@ -207,6 +220,47 @@ async function writeReplayAck(replay: ReplayContext, eventType: string): Promise
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
     const existing = await readReplayAck(replay.ack_path);
     validateReplayAck(existing, replay, eventType);
+  }
+}
+
+async function readReplayEffect(effectLedgerPath: string): Promise<Record<string, unknown> | null> {
+  return readReplayAck(effectLedgerPath);
+}
+
+async function writeReplayEffect(replay: ReplayContext, eventType: string): Promise<void> {
+  const effect = {
+    status: 'committed',
+    owner: 'kernel.event-bus',
+    event_type: eventType,
+    record_id: replay.source_record_id,
+    trace_id: replay.trace_id,
+    payload_digest: replay.payload_digest,
+    operation_id: replay.operation_id,
+  };
+  await mkdir(path.dirname(replay.effect_ledger_path), { recursive: true });
+  try {
+    await writeFile(replay.effect_ledger_path, `${JSON.stringify(effect, null, 2)}\n`, {
+      flag: 'wx', mode: 0o600,
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    validateReplayEffect(await readReplayEffect(replay.effect_ledger_path), replay, eventType);
+  }
+}
+
+function validateReplayEffect(
+  effect: Record<string, unknown> | null,
+  replay: ReplayContext,
+  eventType: string,
+): void {
+  if (effect?.status !== 'committed'
+    || effect.owner !== 'kernel.event-bus'
+    || effect.event_type !== eventType
+    || effect.record_id !== replay.source_record_id
+    || effect.trace_id !== replay.trace_id
+    || effect.payload_digest !== replay.payload_digest
+    || effect.operation_id !== replay.operation_id) {
+    throw new Error('event_bus_replay_effect_conflict');
   }
 }
 
