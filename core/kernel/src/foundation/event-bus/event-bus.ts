@@ -8,6 +8,9 @@
 import { DomainEvent, EventType } from './events';
 import { getLogger } from "../logger/logger";
 import { DeadLetterQueue } from "./dead-letter-queue";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { resolveStatePath } from '../utils/path-utils';
 
 const logger = getLogger("event-bus");
 
@@ -57,12 +60,14 @@ export class EventBus {
   public async publish<T extends DomainEvent>(event: T): Promise<void> {
     if (this._isShuttingDown) {
       logger.warn("事件总线正在关闭，拒绝新的事件发布", { event_type: (event as any).event_type, event_id: (event as any).event_id });
+      if (getReplayContext(event)) throw new Error('event_bus_shutting_down');
       return;
     }
 
     const eventType = (event as any).event_type;
     const traceId = (event as any).trace_context?.trace_id;
     const isStateSyncEvent = eventType === "StateSyncEvent";
+    const replay = getReplayContext(event);
 
     const handlers = [
       ...(this._handlers.get(eventType) || []),
@@ -70,12 +75,22 @@ export class EventBus {
     ];
 
     if (handlers.length === 0) {
+      if (replay) throw new Error(`event_bus_no_handler:${eventType ?? 'unknown'}`);
       return;
     }
 
-    const wrapHandler = async (handler: EventHandler, e: T) => {
+    if (replay) {
+      const existing = await readReplayAck(replay.ack_path);
+      if (existing) {
+        validateReplayAck(existing, replay, eventType);
+        return;
+      }
+    }
+
+    const wrapHandler = async (handler: EventHandler, e: T): Promise<Error | null> => {
       try {
         await handler(e);
+        return null;
       } catch (error) {
         logger.error("事件处理器执行异常", {
           event_type: eventType,
@@ -104,9 +119,8 @@ export class EventBus {
               }),
             },
           );
-        } catch {
-          // DLQ 自身故障不影响事件总线
-        }
+        } catch { /* DLQ 自身故障不替代 handler failure */ }
+        return error instanceof Error ? error : new Error(String(error));
       }
     };
 
@@ -114,12 +128,104 @@ export class EventBus {
       logger.debug("发布事件", { event_type: eventType, handler_count: handlers.length, trace_id: traceId });
     }
 
-    await Promise.all(handlers.map((h) => wrapHandler(h, event)));
+    const failures = (await Promise.all(handlers.map((h) => wrapHandler(h, event)))).filter(
+      (failure): failure is Error => failure !== null,
+    );
+    if (failures.length > 0) {
+      if (replay) throw new Error(`event_bus_handler_failed:${failures.length}`);
+      return;
+    }
+    if (replay) await writeReplayAck(replay, eventType);
   }
 
   public async shutdown(): Promise<void> {
     this._isShuttingDown = true;
     this._handlers.clear();
     logger.info("事件总线已关闭");
+  }
+}
+
+interface ReplayContext {
+  readonly operation_id: string;
+  readonly source_record_id: number;
+  readonly trace_id: string;
+  readonly payload_digest: string;
+  readonly ack_path: string;
+}
+
+function getReplayContext(event: DomainEvent): ReplayContext | null {
+  const value = (event as unknown as { replay_context?: Partial<ReplayContext> }).replay_context;
+  if (!value) return null;
+  const operationId = value.operation_id || '';
+  const ackPath = value.ack_path || '';
+  if (!/^dlq_replay_[0-9a-f]{32}$/.test(operationId)
+    || !Number.isInteger(value.source_record_id)
+    || typeof value.trace_id !== 'string'
+    || !/^[0-9a-f]{64}$/.test(value.payload_digest || '')
+    || typeof value.ack_path !== 'string'
+    || !isReplayAckPath(ackPath, operationId)) {
+    throw new Error('event_bus_replay_context_invalid');
+  }
+  return value as ReplayContext;
+}
+
+function isReplayAckPath(ackPath: string, operationId: string): boolean {
+  const processedRoot = path.resolve(resolveStatePath('kernel/dlq-replay-inbox/processed'));
+  const expectedPath = path.join(processedRoot, `${operationId}.receipt.json`);
+  return path.resolve(ackPath) === expectedPath;
+}
+
+async function readReplayAck(ackPath: string): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await readFile(ackPath, 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function writeReplayAck(replay: ReplayContext, eventType: string): Promise<void> {
+  const ack = {
+    schema_version: 1,
+    status: 'success',
+    receipt_id: `kernel_event_bus_${replay.operation_id}`,
+    source: 'kernel',
+    record_id: replay.source_record_id,
+    owner: 'kernel',
+    event_type: eventType,
+    trace_id: replay.trace_id,
+    payload_digest: replay.payload_digest,
+    operation_id: replay.operation_id,
+    dispatcher_id: 'kernel.event-bus.v1',
+    delivery: 'kernel_event_bus_published',
+    delivered_at: new Date().toISOString(),
+  };
+  await mkdir(path.dirname(replay.ack_path), { recursive: true });
+  try {
+    await writeFile(replay.ack_path, `${JSON.stringify(ack, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const existing = await readReplayAck(replay.ack_path);
+    validateReplayAck(existing, replay, eventType);
+  }
+}
+
+function validateReplayAck(
+  ack: Record<string, unknown> | null,
+  replay: ReplayContext,
+  eventType: string,
+): void {
+  if (ack?.status !== 'success'
+    || ack.receipt_id !== `kernel_event_bus_${replay.operation_id}`
+    || ack.source !== 'kernel'
+    || ack.record_id !== replay.source_record_id
+    || ack.owner !== 'kernel'
+    || ack.event_type !== eventType
+    || ack.trace_id !== replay.trace_id
+    || ack.payload_digest !== replay.payload_digest
+    || ack.operation_id !== replay.operation_id
+    || ack.dispatcher_id !== 'kernel.event-bus.v1'
+    || ack.delivery !== 'kernel_event_bus_published') {
+    throw new Error('event_bus_replay_ack_conflict');
   }
 }

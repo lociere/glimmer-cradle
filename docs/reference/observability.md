@@ -220,7 +220,8 @@ python core/kernel/tools/telemetry.py
 Kernel `kernel.event-bus.v1` replay 的运行投影为
 `data/state/kernel/dlq-replay-inbox/<operation-id>.json`。owner-local ingress 只接受
 source/owner/dispatcher/digest 全部匹配的 envelope；EventBus publish 成功后把 envelope 与
-绑定 receipt 移入 `processed/`。CLI 只有在 receipt 同时绑定 source、record、event type、
+绑定 receipt 移入 `processed/`。成功要求所有 handler 完成；无 handler、任一 handler failure、
+partial delivery、receipt 持久化失败或 receipt binding 漂移都不能归档。CLI 只有在 receipt 同时绑定 source、record、event type、
 trace、payload digest、operation 与 dispatcher 时才标记 `replayed`。owner/state 不匹配、
 receipt 漂移、下游 timeout 或未注册 source 都保留原始记录。
 

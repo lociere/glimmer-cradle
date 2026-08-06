@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { WebSocketServer } from 'ws';
 import { resolvePackagedDesktopPaths } from '../src/main/packaged-paths.ts';
-import { PackagedSupervisor } from '../src/main/packaged-supervisor.ts';
+import { PackagedSupervisor, probePackagedKernelReadiness } from '../src/main/packaged-supervisor.ts';
 
 test('package→安装投影→正式 resolver/supervisor 首启 ready 并清理', async () => {
   const fixture = await createInstallProjection();
@@ -87,6 +89,89 @@ test('正式 supervisor 投影 degraded，并在缺运行组件时首启失败�
       }),
       /runtime/,
     );
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('readiness 必须绑定本次 launch session/PID 并消费真实 runtime catalog', async () => {
+  const fixture = await createInstallProjection();
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  try {
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+    server.on('connection', (socket) => {
+      socket.send(JSON.stringify({
+        kind: 'runtime_readiness',
+        runtime_readiness: {
+          updated_at: Date.now(),
+          runtimes: [{
+            runtime_id: 'kernel.ingress',
+            owner: 'kernel',
+            phase: 'ready',
+            state: 'ready',
+            blocking: true,
+            summary: 'ready',
+          }],
+        },
+      }));
+    });
+    const paths = await resolvePackagedDesktopPaths({
+      resourcesPath: fixture.resources,
+      userDataPath: fixture.userData,
+    });
+    const launchSession = randomUUID();
+    const endpoint = `ws://127.0.0.1:${address.port}`;
+    await mkdir(path.join(paths.runRoot, 'host'), { recursive: true });
+    await writeFile(path.join(paths.runRoot, 'host', 'endpoints.json'), JSON.stringify({
+      schema_version: 1,
+      generation: launchSession,
+      owner_pid: 4901,
+      published_at: new Date().toISOString(),
+      endpoints: [{
+        id: 'kernel:control-surface',
+        owner: 'kernel',
+        owner_pid: 4901,
+        generation: launchSession,
+        purpose: 'control-surface',
+        endpoint,
+        published_at: new Date().toISOString(),
+      }],
+    }));
+    assert.equal(
+      await probePackagedKernelReadiness(paths, new FakeChild(4901), launchSession),
+      'ready',
+    );
+    assert.equal(
+      await probePackagedKernelReadiness(paths, new FakeChild(4901), randomUUID()),
+      'waiting',
+    );
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('stop 未确认进程树退出时保持 failed，不伪造 stopped', async () => {
+  const fixture = await createInstallProjection();
+  try {
+    const paths = await resolvePackagedDesktopPaths({
+      resourcesPath: fixture.resources,
+      userDataPath: fixture.userData,
+    });
+    const child = new FakeChild(4299);
+    const supervisor = new PackagedSupervisor(paths, {
+      spawnChild: () => child,
+      probe: async () => 'ready',
+      pollIntervalMs: 1,
+      stopTimeoutMs: 5,
+      terminateTree: async () => undefined,
+    });
+    assert.equal((await supervisor.start()).state, 'ready');
+    await supervisor.stop();
+    assert.equal(supervisor.getSnapshot().state, 'failed');
+    assert.equal(JSON.parse(await readFile(path.join(paths.runRoot, 'desktop-supervisor.json'), 'utf8')).state, 'failed');
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
   }

@@ -214,7 +214,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
     }
   });
 
-  it('已有 request 无 owner 结果时持久化 owner_timeout，不启动第二 owner', async () => {
+  it('已有 request 无 external owner 结果时只持久化 decision，不伪造 terminal result', async () => {
     const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-timeout-'))).replaceAll('\\', '/');
     const operationId = 'deployment_op_timeout';
     let starts = 0;
@@ -228,13 +228,19 @@ describe('Personal Server Ops Bridge external handoff', () => {
         command: ['restart'],
         ack_nonce: 'lost',
       }));
-      const result = await handoffToExternalOwner(config, {
-        operationId,
-        operation: 'service.restart',
-        command: ['restart'],
-      });
-      assert.equal(result.status, 'owner_timeout');
-      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+      await assert.rejects(
+        () => handoffToExternalOwner(config, {
+          operationId,
+          operation: 'service.restart',
+          command: ['restart'],
+        }),
+        /transaction_handoff_owner_timeout_pending/,
+      );
+      assert.equal((await readFile(path.join(root, 'handoff', `${operationId}.decision`), 'utf8')).trim(), 'owner_timeout');
+      await assert.rejects(
+        () => readFile(path.join(root, 'handoff', `${operationId}.result.json`)),
+        (error) => error?.code === 'ENOENT',
+      );
       assert.equal(starts, 0);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -279,7 +285,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
     }
   });
 
-  it('ack timeout 与迟到 started 通过 durable decision 失败闭合或返回权威 started', async () => {
+  it('ack timeout 仅记录 durable decision，迟到 started 必须由 external owner 写入', async () => {
     const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-race-'))).replaceAll('\\', '/');
     const config = { ...fixtureConfig(root, async () => undefined), startedTimeoutMs: 30 };
     const operationId = 'deployment_op_late_started';
@@ -296,10 +302,12 @@ describe('Personal Server Ops Bridge external handoff', () => {
     try {
       await mkdir(path.dirname(handoff.resultPath), { recursive: true });
       await writeResult(handoff.resultPath, operationId, 'ready', 0);
-      const timeout = await acknowledgeExternalOwner(config, handoff);
-      assert.equal(timeout.status, 'owner_timeout');
+      await assert.rejects(
+        () => acknowledgeExternalOwner(config, handoff),
+        /transaction_handoff_owner_timeout_pending/,
+      );
       assert.equal((await readFile(handoff.decisionPath, 'utf8')).trim(), 'owner_timeout');
-      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+      assert.equal(JSON.parse(await readFile(handoff.resultPath, 'utf8')).status, 'ready');
 
       const winningId = 'deployment_op_started_won';
       const winning = {
@@ -312,7 +320,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
         operation_id: winningId,
         operation: 'service.restart',
       };
-      await writeResult(winning.resultPath, winningId, 'ready', 0);
+      await writeResult(winning.resultPath, winningId, 'started', 0);
       await writeFile(winning.decisionPath, 'started\n');
       const authoritative = await acknowledgeExternalOwner(config, winning);
       assert.equal(authoritative.status, 'started');
@@ -322,7 +330,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
     }
   });
 
-  it('stale request/result/ack/decision 四件套先终态化再按 retention 清理', async () => {
+  it('stale incomplete handoff 保留证据，Bridge 不写 terminal result 或清理', async () => {
     const root = (await mkdtemp(path.join(os.tmpdir(), 'glimmer-handoff-cleanup-'))).replaceAll('\\', '/');
     const operationId = 'deployment_op_stale_cleanup';
     const config = {
@@ -342,18 +350,18 @@ describe('Personal Server Ops Bridge external handoff', () => {
         created_at: '2020-01-01T00:00:00.000Z',
       }));
       await cleanupHandoffResults(config);
-      assert.equal((await readHandoffResult(config, operationId)).status, 'owner_timeout');
+      await assert.rejects(
+        () => readFile(path.join(handoffRoot, `${operationId}.result.json`)),
+        (error) => error?.code === 'ENOENT',
+      );
       await writeFile(path.join(handoffRoot, `${operationId}.ack`), 'fixture');
       assert.equal((await readFile(
         path.join(handoffRoot, `${operationId}.decision`),
         'utf8',
       )).trim(), 'owner_timeout');
       await cleanupHandoffResults({ ...config, retentionMs: 1 }, Date.now() + 10_000);
-      for (const suffix of ['request.json', 'result.json', 'ack', 'decision']) {
-        await assert.rejects(
-          () => readFile(path.join(handoffRoot, `${operationId}.${suffix}`)),
-          (error) => error?.code === 'ENOENT',
-        );
+      for (const suffix of ['request.json', 'ack', 'decision']) {
+        assert.notEqual(await readFile(path.join(handoffRoot, `${operationId}.${suffix}`), 'utf8').catch(() => null), null);
       }
     } finally {
       await rm(root, { recursive: true, force: true });

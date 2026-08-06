@@ -136,7 +136,7 @@ local surface scene (`scene:desktop-ui:*` / `conversation:desktop-ui:*` / `scene
 
 Unity 只消费 Avatar 协议和模型 catalog 投影，不读取 Kernel 内部配置。项目 Assembly Definition 固化 `Contracts / Domain -> Application、Infrastructure -> Host -> Editor` 的单向引用；只有 Infrastructure 可以引用第三方 `Live2D.Cubism`。`protocol/codegen/gen-cs.ts` 从 `PresentationDownstreamFrame.schema.json` 与 `PresentationUpstreamFrame.schema.json` 生成 `PresentationFrames.g.cs`，手写 frame 镜像已经删除。模型投影和 StreamingAssets 是构建/同步产物，不是手工事实源。
 
-Kernel Avatar WebSocket 绑定动态回环端点，并通过 `GLIMMER_CRADLE_AVATAR_WS_URL` 注入受管 Unity Host；`avatar-host.json` 不保存端口。Desktop main 同样从 `data/run/host/endpoints.json` 发现 `control-surface`，校验 owner PID 和回环地址后连接。开发态 `dev-electron.mjs` 等待同一目录，不保留独立固定端口逻辑。
+Kernel Avatar WebSocket 绑定动态回环端点，并通过 `GLIMMER_CRADLE_AVATAR_WS_URL` 注入受管 Unity Host；`avatar-host.json` 不保存端口。Desktop main 同样从 `data/run/host/endpoints.json` 发现 `control-surface`，校验 owner PID 和回环地址后连接。安装态 `PackagedSupervisor` 还会把本次 `launch_session` 注入 Kernel，要求 endpoint catalog 的 generation 与 PID 同时匹配，并通过 control-surface 首帧的 `runtime_readiness` 验证所有 blocking runtime；端点存在本身不能宣称 ready。timeout 或 stop 只有确认进程树退出后才能投影 `stopped`，否则保留 `failed` 诊断。开发态 `dev-electron.mjs` 等待同一目录，不保留独立固定端口逻辑。
 
 Cubism `.unitypackage` 是 `data/packages/avatar-sdks/` 下的本机供应包。`hosts/unity-avatar-host/scripts/unitypackage-projector.mjs` 在 Unity 启动前解析包内容，只把 catalog `projectionScopes` 明确允许的目录树或单文件写入工程，保留 `.meta` GUID；供应包 SHA-256、SDK 版本、投影规则和投影器版本共同形成 `Library/GlimmerCradle/sdk-projections/` 下的有效性戳。版本标记与有效性戳不同时先使旧戳失效再重建，避免 Unity 在依赖尚未导入时先编译项目代码，也不把中断残留当作完整 SDK。
 

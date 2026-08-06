@@ -26,7 +26,11 @@ export interface LocalEndpointCatalog {
 /** Kernel-owned catalog for ephemeral, loopback-only process endpoints. */
 export class EndpointRegistry {
   private static _instance: EndpointRegistry | null = null;
-  private readonly generation = randomUUID();
+  // Desktop binds readiness to the launch session it created for this Kernel.
+  // Standalone launches retain a fresh generation when no supervisor supplied one.
+  private readonly generation = isLaunchSession(process.env.GLIMMER_CRADLE_LAUNCH_SESSION)
+    ? process.env.GLIMMER_CRADLE_LAUNCH_SESSION!
+    : randomUUID();
   private readonly records = new Map<LocalEndpointPurpose, LocalEndpointRecord>();
 
   public static get instance(): EndpointRegistry {
@@ -87,6 +91,10 @@ export class EndpointRegistry {
     await writeFile(temporaryPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
     await rename(temporaryPath, this.catalogPath);
   }
+}
+
+function isLaunchSession(value: string | undefined): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function assertLoopbackEndpoint(endpoint: string): void {

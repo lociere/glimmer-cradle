@@ -96,33 +96,14 @@ export class DlqReplayIngress {
       replay_context: {
         operation_id: envelope.operation_id,
         source_record_id: envelope.record_id,
-        payload_digest: envelope.payload_digest,
-      },
-    });
-    await mkdir(processedRoot, { recursive: true });
-    const receipt = {
-        status: 'success',
-        receipt_id: `kernel_event_bus_${envelope.operation_id}`,
-        source: envelope.source,
-        record_id: envelope.record_id,
-        owner: envelope.owner,
-        event_type: envelope.event_type,
         trace_id: envelope.trace_id,
         payload_digest: envelope.payload_digest,
-        operation_id: envelope.operation_id,
-        dispatcher_id: envelope.dispatcher_id,
-        delivery: 'kernel_event_bus_published',
-        delivered_at: new Date().toISOString(),
-    };
-    try {
-      await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, {
-        flag: 'wx',
-        mode: 0o600,
-      });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      validateReceipt(await readJson(receiptPath), envelope);
-    }
+        ack_path: receiptPath,
+      },
+    });
+    const receipt = await readJson(receiptPath);
+    if (!receipt) throw new Error('kernel_dlq_replay_ack_missing');
+    validateReceipt(receipt, envelope);
     await archiveEnvelope(filePath, processedPath, envelope);
     logger.info('DLQ payload 已交付 Kernel EventBus', {
       trace_id: envelope.trace_id,

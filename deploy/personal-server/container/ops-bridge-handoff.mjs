@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const OPERATION_ID = /^deployment_op_[A-Za-z0-9][A-Za-z0-9._-]{0,111}$/;
@@ -297,7 +297,12 @@ export async function cleanupHandoffResults(config, now = Date.now()) {
       const created = Date.parse(request?.created_at)
         || await fileTimestamp(paths.requestPath);
       if (Number.isFinite(created) && now - created > (config.staleTimeoutMs || OWNER_STALE_TIMEOUT_MS)) {
-        result = await settleOwnerTimeout(config, { ...paths, operation_id: operationId });
+        try {
+          result = await settleOwnerTimeout(config, { ...paths, operation_id: operationId });
+        } catch (error) {
+          if (isOwnerTerminalPending(error)) continue;
+          throw error;
+        }
       }
     }
     const updated = Date.parse(result?.updated_at);
@@ -307,6 +312,12 @@ export async function cleanupHandoffResults(config, now = Date.now()) {
       await rm(path.posix.join(root, `${operationId}.${suffix}`), { force: true });
     }
   }
+}
+
+function isOwnerTerminalPending(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === 'transaction_handoff_owner_timeout_pending'
+    || message === 'transaction_handoff_started_pending';
 }
 
 async function waitForResult(config, operationId, timeoutMs, predicate) {
@@ -327,33 +338,17 @@ async function settleOwnerTimeout(config, handoff, authoritative = null) {
   const decision = await claimDecision(handoff.decisionPath, 'owner_timeout\n');
   if (decision.trim() === 'started') {
     const started = await readJson(handoff.resultPath);
-    return started?.status === 'started' || TERMINAL_STATES.has(started?.status)
-      ? started
-      : {
-        schema_version: 1,
-        operation_id: handoff.operation_id,
-        operation: current?.operation || (await readJson(handoff.requestPath))?.operation,
-        status: 'started',
-        exit_code: 0,
-        updated_at: new Date().toISOString(),
-        recovery_action: 'none',
-      };
+    if (started?.status === 'started' || TERMINAL_STATES.has(started?.status)) return started;
+    throw new Error('transaction_handoff_started_pending');
   }
   if (decision.trim() !== 'owner_timeout') {
     throw new Error('transaction_handoff_decision_conflict');
   }
-  const request = await readJson(handoff.requestPath);
-  const timeoutResult = {
-    schema_version: 1,
-    operation_id: handoff.operation_id,
-    operation: current?.operation || request?.operation,
-    status: 'owner_timeout',
-    exit_code: 70,
-    updated_at: new Date().toISOString(),
-    recovery_action: 'retry query with the same operation_id; no deploy command was acknowledged',
-  };
-  await writeJsonAtomic(handoff.resultPath, timeoutResult);
-  return timeoutResult;
+  // Bridge may claim an immutable decision, but only the external owner or a
+  // stable recovery authority is allowed to publish the terminal result.
+  const result = await readJson(handoff.resultPath);
+  if (result && (result.status === 'started' || TERMINAL_STATES.has(result.status))) return result;
+  throw new Error('transaction_handoff_owner_timeout_pending');
 }
 
 async function claimDecision(filePath, requested) {
@@ -376,12 +371,6 @@ async function compareOrCreate(filePath, expected, conflictCode) {
     if (actual !== expected) throw new Error(conflictCode);
     return actual;
   }
-}
-
-async function writeJsonAtomic(filePath, value) {
-  const temporary = `${filePath}.${process.pid}.${randomBytes(8).toString('hex')}.new`;
-  await writeFile(temporary, `${JSON.stringify(value)}\n`, { mode: 0o600, flag: 'wx' });
-  await rename(temporary, filePath);
 }
 
 function operationPaths(config, operationId) {
