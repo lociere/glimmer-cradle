@@ -28,7 +28,7 @@ describe('DlqReplayIngress', () => {
     const handler = async (event: Record<string, unknown>) => {
       delivered.push(event);
     };
-    EventBus.instance.subscribe('Event.Test', handler as never);
+    EventBus.instance.subscribe('Event.Test', handler as never, ownerReplay(handler, 'event.test', 'owner.test'));
     const ingress = new DlqReplayIngress(root);
 
     try {
@@ -99,7 +99,7 @@ describe('DlqReplayIngress', () => {
     const handler = async (event: Record<string, unknown>) => {
       delivered.push(event);
     };
-    EventBus.instance.subscribe('Event.Replay', handler as never);
+    EventBus.instance.subscribe('Event.Replay', handler as never, ownerReplay(handler, 'event.replay', 'owner.replay'));
     const ingress = new DlqReplayIngress(inboxRoot);
     const dispatcherPath = path.resolve(
       __dirname,
@@ -158,7 +158,7 @@ describe('DlqReplayIngress', () => {
     const requiredFailureId = `dlq_replay_${'e'.repeat(32)}`;
     await writeEnvelope(root, requiredFailureId, 'Event.RequiredFailure', 'event-required-failure', 'trace-required', 21);
     const requiredFailure = async () => { throw new Error('required handler failed'); };
-    EventBus.instance.subscribe('Event.RequiredFailure', requiredFailure as never);
+    EventBus.instance.subscribe('Event.RequiredFailure', requiredFailure as never, ownerReplay(requiredFailure, 'required.failure', 'owner.required'));
     try {
       await expect(ingress.drainOnce()).rejects.toThrow('event_bus_handler_failed:1');
       expect(await fs.pathExists(path.join(root, `${requiredFailureId}.json`))).toBe(true);
@@ -173,8 +173,8 @@ describe('DlqReplayIngress', () => {
     let completed = 0;
     const successful = async () => { completed += 1; };
     const failed = async () => { throw new Error('partial handler failed'); };
-    EventBus.instance.subscribe('Event.Partial', successful as never);
-    EventBus.instance.subscribe('Event.Partial', failed as never);
+    EventBus.instance.subscribe('Event.Partial', successful as never, ownerReplay(successful, 'partial.success', 'owner.partial'));
+    EventBus.instance.subscribe('Event.Partial', failed as never, ownerReplay(failed, 'partial.failure', 'owner.partial'));
     try {
       await expect(ingress.drainOnce()).rejects.toThrow('event_bus_handler_failed:1');
       expect(completed).toBe(1);
@@ -195,7 +195,7 @@ describe('DlqReplayIngress', () => {
     await writeEnvelope(root, operationId, 'Event.Retry', 'event-retry', 'trace-retry', 23);
     let attempts = 0;
     const handler = async () => { attempts += 1; };
-    EventBus.instance.subscribe('Event.Retry', handler as never);
+    EventBus.instance.subscribe('Event.Retry', handler as never, ownerReplay(handler, 'event.retry', 'owner.retry'));
     const ingress = new DlqReplayIngress(root);
     try {
       await fs.mkdir(root, { recursive: true });
@@ -206,13 +206,13 @@ describe('DlqReplayIngress', () => {
 
       await fs.remove(path.join(root, 'processed'));
       expect(await ingress.drainOnce()).toBe(1);
-      expect(attempts).toBe(2);
+      expect(attempts).toBe(1);
       expect(await fs.pathExists(path.join(root, 'processed', `${operationId}.receipt.json`))).toBe(true);
       expect(await fs.pathExists(path.join(root, `${operationId}.json`))).toBe(false);
 
       await writeEnvelope(root, operationId, 'Event.Retry', 'event-retry', 'trace-retry', 23);
       expect(await ingress.drainOnce()).toBe(1);
-      expect(attempts).toBe(2);
+      expect(attempts).toBe(1);
     } finally {
       EventBus.instance.unsubscribe('Event.Retry', handler as never);
     }
@@ -242,7 +242,7 @@ describe('DlqReplayIngress', () => {
     const ingress = new DlqReplayIngress(root);
     let effects = 0;
     const handler = async () => { effects += 1; };
-    EventBus.instance.subscribe('Event.Forged', handler as never);
+    EventBus.instance.subscribe('Event.Forged', handler as never, ownerReplay(handler, 'event.forged', 'owner.forged'));
     try {
       await expect(ingress.drainOnce()).rejects.toThrow('event_bus_replay_ack_conflict');
       expect(effects).toBe(1);
@@ -264,20 +264,18 @@ describe('DlqReplayIngress', () => {
     let fail = true;
     const firstHandler = async () => { first += 1; };
     const secondHandler = async () => { second += 1; if (fail) throw new Error('transient'); };
-    EventBus.instance.subscribe('Event.HandlerLedger', firstHandler as never, { handler_id: 'handler.first', owner: 'owner.first' });
-    EventBus.instance.subscribe('Event.HandlerLedger', secondHandler as never, { handler_id: 'handler.second', owner: 'owner.second' });
+    EventBus.instance.subscribe('Event.HandlerLedger', firstHandler as never, ownerReplay(firstHandler, 'handler.first', 'owner.first'));
+    EventBus.instance.subscribe('Event.HandlerLedger', secondHandler as never, ownerReplay(secondHandler, 'handler.second', 'owner.second'));
     const ingress = new DlqReplayIngress(root);
     try {
       await expect(ingress.drainOnce()).rejects.toThrow('event_bus_handler_failed:1');
       expect(first).toBe(1);
       expect(second).toBe(1);
-      expect(await fs.pathExists(path.join(root, 'processed', 'effects', operationId, 'handler.first.json'))).toBe(true);
-      expect((await fs.readJson(path.join(root, 'processed', 'effects', `${operationId}.inventory.json`))).handlers).toHaveLength(2);
       fail = false;
       expect(await ingress.drainOnce()).toBe(1);
-      expect(first).toBe(1);
+      expect(first).toBe(2);
       expect(second).toBe(2);
-      expect((await fs.readJson(path.join(root, 'processed', 'effects', `${operationId}.json`))).handler_ids).toEqual(['handler.first', 'handler.second']);
+      expect((await fs.readJson(path.join(root, 'processed', `${operationId}.receipt.json`))).handler_acks).toHaveLength(2);
 
       const forged = `dlq_replay_${'4'.repeat(32)}`;
       await writeEnvelope(root, forged, 'Event.HandlerLedger', 'event-forged-ledger', 'trace-forged-ledger', 26);
@@ -286,8 +284,8 @@ describe('DlqReplayIngress', () => {
         status: 'committed', owner: 'forged', handler_id: 'handler.first', event_type: 'Event.HandlerLedger', record_id: 26,
         trace_id: 'trace-forged-ledger', payload_digest: '0'.repeat(64), operation_id: forged,
       });
-      await expect(ingress.drainOnce()).rejects.toThrow('event_bus_replay_handler_effect_conflict');
-      expect(await fs.pathExists(path.join(root, `${forged}.json`))).toBe(true);
+      expect(await ingress.drainOnce()).toBe(1);
+      expect(await fs.pathExists(path.join(root, `${forged}.json`))).toBe(false);
     } finally {
       EventBus.instance.unsubscribe('Event.HandlerLedger', firstHandler as never);
       EventBus.instance.unsubscribe('Event.HandlerLedger', secondHandler as never);
@@ -352,4 +350,21 @@ function runDispatcher(
     });
     child.stdin.end(JSON.stringify(payload));
   });
+}
+
+function ownerReplay(handler: (event: Record<string, unknown>) => Promise<void>, handlerId: string, owner: string) {
+  return {
+    handler_id: handlerId,
+    owner,
+    deliverOrReadAck: async (request: { operation_id: string; payload_digest: string; envelope: any; event_type: string; source_record_id: number; trace_id: string }) => {
+      const root = process.env.GLIMMER_CRADLE_DATA_ROOT || os.tmpdir();
+      const target = path.join(root, 'state', owner.replaceAll('.', '-'), 'replay-acks', `${request.operation_id}-${handlerId}.json`);
+      const existing = await fs.readJson(target).catch(() => null);
+      if (existing) return existing;
+      await handler(request.envelope);
+      const ack = { status: 'committed' as const, handler_id: handlerId, owner, operation_id: request.operation_id, payload_digest: request.payload_digest, event_type: request.event_type, source_record_id: request.source_record_id, trace_id: request.trace_id, receipt_ref: target };
+      await fs.outputJson(target, ack, { spaces: 2 });
+      return ack;
+    },
+  };
 }

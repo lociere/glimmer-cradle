@@ -215,17 +215,23 @@ export class PackagedSupervisor {
 
   private async terminateActiveTree(): Promise<boolean> {
     const child = this.child;
+    if (this.processTree) {
+      try {
+        const result = await this.processTree.stop();
+        if (!result.terminated || result.active_process_count !== 0) return false;
+        this.child = null;
+        return true;
+      } catch (error) {
+        await this.project('failed', `安装态进程树终止失败: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+      }
+    }
     if (!child || hasExited(child)) {
       if (this.child === child) this.child = null;
       return true;
     }
     try {
-      if (this.processTree) {
-        const result = await this.processTree.stop();
-        if (!result.terminated || result.active_process_count !== 0) return false;
-      } else {
-        await (this.options.terminateTree || terminateTree)(child);
-      }
+      await (this.options.terminateTree || terminateTree)(child);
     } catch (error) {
       await this.project('failed', `安装态进程树终止失败: ${error instanceof Error ? error.message : String(error)}`);
       return false;

@@ -93,7 +93,6 @@ export class DlqReplayIngress {
         trace_id: envelope.trace_id,
         payload_digest: envelope.payload_digest,
         ack_path: receiptPath,
-        effect_ledger_path: path.join(processedRoot, 'effects', `${envelope.operation_id}.json`),
       },
     });
     const receipt = await readJson(receiptPath);
