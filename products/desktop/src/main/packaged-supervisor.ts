@@ -128,7 +128,7 @@ export class PackagedSupervisor {
     if (this.options.spawnChild) {
       child = this.options.spawnChild(this.paths.nodeExecutable, [this.paths.kernelEntry], launchOptions);
     } else {
-      this.processTree = this.options.processTree || new NativeProcessTreeAuthority(this.paths.processTreeHelper);
+      this.processTree = this.options.processTree || createNativeProcessTreeAuthority(this.paths.processTreeHelper);
       child = await this.processTree.start({
         program: this.paths.nodeExecutable,
         args: [this.paths.kernelEntry],
@@ -357,4 +357,9 @@ function hasExited(child: SupervisorChild): boolean {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function createNativeProcessTreeAuthority(helperPath: string): ProcessTreeAuthority {
+  // The emitted main bundle is CommonJS; lazy loading preserves transform-types test compatibility.
+  return new (require('./process-tree-bridge') as { NativeProcessTreeAuthority: new (path: string) => ProcessTreeAuthority }).NativeProcessTreeAuthority(helperPath);
 }
