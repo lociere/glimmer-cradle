@@ -42,7 +42,7 @@ products/desktop/src/
 └── renderer/
 ```
 
-Kernel 使用独立 `AvatarRuntime` 监督 Avatar Host；`PresentationRuntime` 负责 ActionStream、Presentation 路由和 Desktop Surface。Windows Native Launcher 通过 kill-on-close Job Object 持有 Unity 与 CrashHandler 整棵子树，父进程异常结束也不能留下 Live2D 窗口。`configs/system/avatar.yaml` 与 `configs/system/surfaces.yaml` 分别由 Avatar 与 Surface owner 消费。
+Kernel 使用独立 `AvatarRuntime` 监督 Avatar Host；`PresentationRuntime` 负责 ActionStream、Presentation 路由和 Desktop Surface。Desktop packaged supervisor 通过同包 `DesktopProcessTreeBridge.exe` 持有 Kernel 及其子树的 kill-on-close Job Object；Unity Native Launcher 只负责 Avatar 窗口隔离，不拥有 Desktop 进程树 authority。`configs/system/avatar.yaml` 与 `configs/system/surfaces.yaml` 分别由 Avatar 与 Surface owner 消费。
 
 ## 边界
 

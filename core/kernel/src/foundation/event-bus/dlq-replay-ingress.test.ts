@@ -251,6 +251,48 @@ describe('DlqReplayIngress', () => {
       EventBus.instance.unsubscribe('Event.Forged', handler as never);
     }
   });
+
+  it('按 stable handler_id 记录逐 handler ledger，partial 重试跳过已提交效果并拒绝 inventory 漂移', async () => {
+    const dataRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kernel-dlq-handler-ledger-'));
+    roots.push(dataRoot);
+    process.env.GLIMMER_CRADLE_DATA_ROOT = dataRoot;
+    const root = path.join(dataRoot, 'state', 'kernel', 'dlq-replay-inbox');
+    const operationId = `dlq_replay_${'3'.repeat(32)}`;
+    await writeEnvelope(root, operationId, 'Event.HandlerLedger', 'event-handler-ledger', 'trace-handler-ledger', 25);
+    let first = 0;
+    let second = 0;
+    let fail = true;
+    const firstHandler = async () => { first += 1; };
+    const secondHandler = async () => { second += 1; if (fail) throw new Error('transient'); };
+    EventBus.instance.subscribe('Event.HandlerLedger', firstHandler as never, { handler_id: 'handler.first', owner: 'owner.first' });
+    EventBus.instance.subscribe('Event.HandlerLedger', secondHandler as never, { handler_id: 'handler.second', owner: 'owner.second' });
+    const ingress = new DlqReplayIngress(root);
+    try {
+      await expect(ingress.drainOnce()).rejects.toThrow('event_bus_handler_failed:1');
+      expect(first).toBe(1);
+      expect(second).toBe(1);
+      expect(await fs.pathExists(path.join(root, 'processed', 'effects', operationId, 'handler.first.json'))).toBe(true);
+      expect((await fs.readJson(path.join(root, 'processed', 'effects', `${operationId}.inventory.json`))).handlers).toHaveLength(2);
+      fail = false;
+      expect(await ingress.drainOnce()).toBe(1);
+      expect(first).toBe(1);
+      expect(second).toBe(2);
+      expect((await fs.readJson(path.join(root, 'processed', 'effects', `${operationId}.json`))).handler_ids).toEqual(['handler.first', 'handler.second']);
+
+      const forged = `dlq_replay_${'4'.repeat(32)}`;
+      await writeEnvelope(root, forged, 'Event.HandlerLedger', 'event-forged-ledger', 'trace-forged-ledger', 26);
+      await fs.mkdir(path.join(root, 'processed', 'effects', forged), { recursive: true });
+      await fs.writeJson(path.join(root, 'processed', 'effects', forged, 'handler.first.json'), {
+        status: 'committed', owner: 'forged', handler_id: 'handler.first', event_type: 'Event.HandlerLedger', record_id: 26,
+        trace_id: 'trace-forged-ledger', payload_digest: '0'.repeat(64), operation_id: forged,
+      });
+      await expect(ingress.drainOnce()).rejects.toThrow('event_bus_replay_handler_effect_conflict');
+      expect(await fs.pathExists(path.join(root, `${forged}.json`))).toBe(true);
+    } finally {
+      EventBus.instance.unsubscribe('Event.HandlerLedger', firstHandler as never);
+      EventBus.instance.unsubscribe('Event.HandlerLedger', secondHandler as never);
+    }
+  });
 });
 
 async function writeEnvelope(

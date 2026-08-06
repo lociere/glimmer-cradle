@@ -8,6 +8,11 @@
     "darwin": "libplatform_native.dylib",
     "linux": "libplatform_native.so"
   },
+  "desktopProcessTreeAuthority": {
+    "owner": "products/desktop",
+    "win32": "DesktopProcessTreeBridge.exe",
+    "source": "products/desktop/native/process-tree-bridge/DesktopProcessTreeBridge.cpp"
+  },
   "source": "native/",
   "license": "仓库自有 native 组件源码；运行时若依赖系统图形栈或第三方 SDK，遵循对应平台和上游许可。"
 }

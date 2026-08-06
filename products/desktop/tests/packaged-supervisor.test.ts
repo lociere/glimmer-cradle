@@ -177,6 +177,28 @@ test('stop 未确认进程树退出时保持 failed，不伪造 stopped', async 
   }
 });
 
+test('Desktop native authority protocol 缺省走 Job bridge，并要求 terminated/active=0 才 stopped', async () => {
+  const fixture = await createInstallProjection();
+  try {
+    const paths = await resolvePackagedDesktopPaths({ resourcesPath: fixture.resources, userDataPath: fixture.userData });
+    const child = new FakeChild(4301);
+    let started = false;
+    let stopped = false;
+    const authority = {
+      start: async () => { started = true; return child; },
+      stop: async () => { stopped = true; child.signalCode = 'SIGTERM'; child.emit('exit', null, 'SIGTERM'); return { terminated: true, active_process_count: 0 }; },
+    };
+    const supervisor = new PackagedSupervisor(paths, { processTree: authority, probe: async () => 'ready', pollIntervalMs: 1 });
+    assert.equal((await supervisor.start()).state, 'ready');
+    assert.equal(started, true);
+    await supervisor.stop();
+    assert.equal(stopped, true);
+    assert.equal(supervisor.getSnapshot().state, 'stopped');
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 class FakeChild extends EventEmitter {
   public exitCode: number | null = null;
   public signalCode: NodeJS.Signals | null = null;
@@ -207,6 +229,7 @@ async function createInstallProjection(): Promise<{
     ['products/desktop/product.json', '{}'],
     ['components/avatar/unity-host/UnityAvatarHostLauncher.exe', 'avatar'],
     ['components/native/composition-host/platform_native.dll', 'native'],
+    ['components/native/composition-host/DesktopProcessTreeBridge.exe', 'native-helper'],
     ['configs/defaults/runtime.yaml', 'mode: packaged\n'],
   ]);
   for (const [relative, content] of files) {

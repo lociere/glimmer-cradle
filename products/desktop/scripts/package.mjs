@@ -25,6 +25,7 @@ if (process.argv.includes('--dry-run')) {
       'build/components/avatar/unity-host/windows-x64',
       'build/extension-host/modules',
       'build/components/native/composition-host/windows-x64',
+      'products/desktop/native/process-tree-bridge/DesktopProcessTreeBridge.cpp',
     ],
     output,
     command: 'pnpm',
@@ -37,6 +38,9 @@ if (process.argv.includes('--dry-run')) {
 if (process.platform !== 'win32') throw new Error('Desktop installer 只允许在 Windows runner 构建');
 await run('pnpm.cmd', ['build']);
 await run('pnpm.cmd', ['prepare:runtime']);
+await run(process.execPath, [
+  path.join(repoRoot, 'products', 'desktop', 'scripts', 'build-native-process-tree.mjs'),
+]);
 await run(process.execPath, [
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-package-runtimes.mjs'),
 ]);

@@ -38,6 +38,18 @@ publish 并落 durable receipt 后才成功。legacy Cognition source 未注册�
 cleanup 只删 `replayed=1` 且从成功 receipt 时间起超过天数门的记录；没有 receipt 时间的
 legacy 记录保留。
 
+Replay-capable handler 必须注册稳定 `handler_id` 与 owner。EventBus 在
+`data/state/kernel/dlq-replay-inbox/processed/effects/<operation-id>/<handler-id>.json`
+逐 handler 原子写入 committed effect；重试只执行未提交 handler。所有当前 inventory 的
+ledger 校验通过后才写 aggregate effect 和 receipt；owner、handler、payload digest 或
+inventory 漂移都失败闭合并保留原始 envelope。
+
+Desktop Windows 的 Kernel 进程树由产品自有 `DesktopProcessTreeBridge.exe` 持有 Job
+Object（`KILL_ON_JOB_CLOSE`），不依赖 Unity Avatar launcher。启动顺序固定为 suspended、
+AssignProcessToJobObject、resume；root exit 不释放 authority，stop/timeout 只有 helper
+返回 `terminated` 且 active count 为零时才允许 stopped，缺少 helper projection 直接
+failed closed。
+
 ## Fixed artifact
 
 两个产品都产生 `artifact-manifest.json`、`provenance.json`、组件/依赖级

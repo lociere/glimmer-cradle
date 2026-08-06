@@ -60,6 +60,9 @@ try {
       path.join(resourcesRoot, projection.staged),
       { recursive: true, dereference: false },
     );
+    if (projection.id === 'native') {
+      await assertFile(path.join(resourcesRoot, projection.staged, 'DesktopProcessTreeBridge.exe'), 'Desktop process-tree authority');
+    }
   }
   await fs.copyFile(
     path.join(repoRoot, 'native', 'package.manifest.json'),
@@ -119,6 +122,11 @@ async function assertDirectory(target, componentId) {
   if (!stat?.isDirectory() || stat.isSymbolicLink()) {
     throw new Error(`Desktop component projection 缺失或不可信: ${componentId} (${target})`);
   }
+}
+
+async function assertFile(target, componentId) {
+  const stat = await fs.lstat(target).catch(() => null);
+  if (!stat?.isFile() || stat.isSymbolicLink()) throw new Error(`Desktop component projection 缺失或不可信: ${componentId} (${target})`);
 }
 
 async function inventoryFiles(root, relativeRoot) {

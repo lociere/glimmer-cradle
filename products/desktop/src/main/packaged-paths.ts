@@ -13,6 +13,7 @@ export interface PackagedDesktopPaths {
   readonly extensionModuleRoot: string;
   readonly avatarHostExecutable: string;
   readonly nativeLibrary: string;
+  readonly processTreeHelper: string;
 }
 
 export async function resolvePackagedDesktopPaths(options: {
@@ -39,6 +40,10 @@ export async function resolvePackagedDesktopPaths(options: {
       appRoot,
       'components/native/composition-host/platform_native.dll',
     ),
+    processTreeHelper: trustedResource(
+      appRoot,
+      'components/native/composition-host/DesktopProcessTreeBridge.exe',
+    ),
   };
   for (const required of [
     paths.nodeExecutable,
@@ -48,6 +53,7 @@ export async function resolvePackagedDesktopPaths(options: {
     paths.extensionModuleRoot,
     paths.avatarHostExecutable,
     paths.nativeLibrary,
+    paths.processTreeHelper,
   ]) {
     const entry = await lstat(required).catch(() => null);
     if (!entry || entry.isSymbolicLink()) {

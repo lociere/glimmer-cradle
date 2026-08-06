@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { spawn, type SpawnOptions } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -31,6 +32,38 @@ interface SupervisorChild {
   kill(signal?: NodeJS.Signals): boolean;
 }
 
+interface ProcessTreeAuthority { start(request: { program: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; session: string }): Promise<SupervisorChild>; stop(): Promise<{ terminated: boolean; active_process_count: number; session?: string }>; }
+
+class NativeProcessTreeAuthority implements ProcessTreeAuthority {
+  private helper: ReturnType<typeof spawn> | null = null;
+  private buffer = '';
+  private pending = new Map<string, (value: Record<string, unknown>) => void>();
+  private sequence = 0;
+  private session = '';
+  public constructor(private readonly helperPath: string) {}
+  public async start(request: { program: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; session: string }): Promise<SupervisorChild> {
+    this.session = request.session;
+    await this.ensureHelper(request.cwd, request.env);
+    const response = await this.request({ op: 'start', session: request.session, command_line: [request.program, ...request.args].map((value) => `\"${value.replaceAll('\\', '\\\\').replaceAll('\"', '\\\"')}\"`).join(' ') });
+    if (response.status !== 'started' || typeof response.root_pid !== 'number') throw new Error('desktop_process_tree_start_failed');
+    return new BridgeChild(response.root_pid, this);
+  }
+  public async stop(): Promise<{ terminated: boolean; active_process_count: number }> {
+    if (!this.helper) return { terminated: true, active_process_count: 0 };
+    const result = await this.request({ op: 'stop', session: this.session });
+    this.helper.stdin?.end(); this.helper = null;
+    return { terminated: result.status === 'terminated', active_process_count: Number(result.active_process_count ?? -1) };
+  }
+  private async ensureHelper(cwd: string, env: NodeJS.ProcessEnv): Promise<void> {
+    if (this.helper) return;
+    const helper = spawn(this.helperPath, [], { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+    this.helper = helper;
+    helper.stdout?.on('data', (chunk) => { this.buffer += chunk.toString(); let index = this.buffer.indexOf('\n'); while (index >= 0) { const line = this.buffer.slice(0, index); this.buffer = this.buffer.slice(index + 1); index = this.buffer.indexOf('\n'); try { const message = JSON.parse(line) as Record<string, unknown>; const resolve = this.pending.get(String(message.request_id ?? '')); if (resolve) { this.pending.delete(String(message.request_id)); resolve(message); } } catch { /* protocol timeout fails closed */ } } });
+  }
+  private request(payload: Record<string, unknown>): Promise<Record<string, unknown>> { if (!this.helper) return Promise.reject(new Error('desktop_process_tree_helper_unavailable')); const requestId = `req-${++this.sequence}`; return new Promise((resolve, reject) => { const timer = setTimeout(() => { this.pending.delete(requestId); reject(new Error('desktop_process_tree_protocol_timeout')); }, 10_000); this.pending.set(requestId, (value) => { clearTimeout(timer); resolve(value); }); this.helper!.stdin!.write(`${JSON.stringify({ ...payload, request_id: requestId })}\n`); }); }
+}
+class BridgeChild extends EventEmitter implements SupervisorChild { public exitCode: number | null = null; public signalCode: NodeJS.Signals | null = null; public constructor(public readonly pid: number, private readonly authority: ProcessTreeAuthority) { super(); } public kill(signal: NodeJS.Signals = 'SIGTERM'): boolean { void this.authority.stop().then(() => { this.signalCode = signal; this.emit('exit', null, signal); }); return true; } }
+
 export class PackagedSupervisor {
   private child: SupervisorChild | null = null;
   private snapshot: PackagedSupervisorSnapshot = {
@@ -39,6 +72,7 @@ export class PackagedSupervisor {
   };
   private stopRequested = false;
   private launchSession: string | null = null;
+  private processTree: ProcessTreeAuthority | null = null;
 
   public constructor(
     private readonly paths: PackagedDesktopPaths,
@@ -57,6 +91,7 @@ export class PackagedSupervisor {
       readonly pollIntervalMs?: number;
       readonly stopTimeoutMs?: number;
       readonly terminateTree?: (child: SupervisorChild) => Promise<void>;
+      readonly processTree?: ProcessTreeAuthority;
     } = {},
   ) {}
 
@@ -69,13 +104,7 @@ export class PackagedSupervisor {
     this.stopRequested = false;
     this.launchSession = randomUUID();
     await this.project('starting', '正在启动安装态 Kernel supervisor');
-    const spawnChild = this.options.spawnChild || ((command, args, options) => (
-      spawn(command, args, options) as ChildProcess
-    ));
-    const child = spawnChild(
-      this.paths.nodeExecutable,
-      [this.paths.kernelEntry],
-      {
+    const launchOptions: SpawnOptions = {
         cwd: this.paths.appRoot,
         windowsHide: true,
         stdio: 'inherit',
@@ -94,8 +123,20 @@ export class PackagedSupervisor {
           GLIMMER_CRADLE_SUPERVISOR_PID: String(process.pid),
           GLIMMER_CRADLE_LAUNCH_SESSION: this.launchSession,
         },
-      },
-    );
+      };
+    let child: SupervisorChild;
+    if (this.options.spawnChild) {
+      child = this.options.spawnChild(this.paths.nodeExecutable, [this.paths.kernelEntry], launchOptions);
+    } else {
+      this.processTree = this.options.processTree || new NativeProcessTreeAuthority(this.paths.processTreeHelper);
+      child = await this.processTree.start({
+        program: this.paths.nodeExecutable,
+        args: [this.paths.kernelEntry],
+        cwd: this.paths.appRoot,
+        env: launchOptions.env || process.env,
+        session: this.launchSession,
+      });
+    }
     this.child = child;
     child.once('error', (error) => {
       if (this.child !== child) return;
@@ -179,7 +220,12 @@ export class PackagedSupervisor {
       return true;
     }
     try {
-      await (this.options.terminateTree || terminateTree)(child);
+      if (this.processTree) {
+        const result = await this.processTree.stop();
+        if (!result.terminated || result.active_process_count !== 0) return false;
+      } else {
+        await (this.options.terminateTree || terminateTree)(child);
+      }
     } catch (error) {
       await this.project('failed', `安装态进程树终止失败: ${error instanceof Error ? error.message : String(error)}`);
       return false;

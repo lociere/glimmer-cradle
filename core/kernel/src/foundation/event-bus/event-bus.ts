@@ -9,6 +9,7 @@ import { DomainEvent, EventType } from './events';
 import { getLogger } from "../logger/logger";
 import { DeadLetterQueue } from "./dead-letter-queue";
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { resolveStatePath } from '../utils/path-utils';
 
@@ -16,6 +17,11 @@ const logger = getLogger("event-bus");
 
 // 事件处理器类型
 type EventHandler<T extends DomainEvent = DomainEvent> = (event: T) => Promise<void>;
+export interface EventHandlerRegistration {
+  readonly handler_id: string;
+  readonly owner: string;
+}
+interface RegisteredHandler { readonly fn: EventHandler; readonly registration: EventHandlerRegistration; }
 
 /**
  * 全局事件总线
@@ -23,7 +29,7 @@ type EventHandler<T extends DomainEvent = DomainEvent> = (event: T) => Promise<v
  */
 export class EventBus {
   private static _instance: EventBus | null = null;
-  private _handlers: Map<string, EventHandler[]> = new Map();
+  private _handlers: Map<string, RegisteredHandler[]> = new Map();
   private _isShuttingDown: boolean = false;
 
   public static get instance(): EventBus {
@@ -37,7 +43,7 @@ export class EventBus {
     logger.info("全局事件总线初始化完成");
   }
 
-  public subscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>): void {
+  public subscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>, options?: Partial<EventHandlerRegistration>): void {
     if (this._isShuttingDown) {
       logger.warn("事件总线正在关闭，拒绝新的订阅", { event_type: eventType });
       return;
@@ -46,13 +52,15 @@ export class EventBus {
     if (!this._handlers.has(eventType)) {
       this._handlers.set(eventType, []);
     }
-    this._handlers.get(eventType)!.push(handler as EventHandler);
+    const list = this._handlers.get(eventType)!;
+    const stable = options?.handler_id || `${eventType}:${createHash('sha256').update(String(handler)).digest('hex').slice(0, 16)}:${list.length}`;
+    list.push({ fn: handler as EventHandler, registration: { handler_id: stable, owner: options?.owner || 'kernel' } });
   }
 
   public unsubscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>): void {
     if (!this._handlers.has(eventType)) return;
     const handlers = this._handlers.get(eventType)!;
-    const index = handlers.indexOf(handler as EventHandler);
+    const index = handlers.findIndex((entry) => entry.fn === handler);
     if (index > -1) handlers.splice(index, 1);
     if (handlers.length === 0) this._handlers.delete(eventType);
   }
@@ -80,19 +88,27 @@ export class EventBus {
     }
 
     if (replay) {
-      const existing = await readReplayEffect(replay.effect_ledger_path);
-      if (existing) {
-        validateReplayEffect(existing, replay, eventType);
-        await writeReplayAck(replay, eventType);
-        return;
-      }
+      const aggregate = await readReplayEffect(replay.effect_ledger_path);
+      if (aggregate) validateReplayEffect(aggregate, replay, eventType, handlers);
+      await prepareReplayInventory(replay, eventType, handlers);
+      await validateReplayInventory(replay, handlers);
     }
 
-    const wrapHandler = async (handler: EventHandler, e: T): Promise<Error | null> => {
+    const wrapHandler = async (entry: RegisteredHandler, e: T): Promise<Error | null> => {
+      const handler = entry.fn;
+      if (replay) {
+        const existing = await readReplayHandlerEffect(replay, entry.registration.handler_id);
+        if (existing) {
+          validateHandlerEffect(existing, replay, eventType, entry.registration);
+          return null;
+        }
+      }
       try {
         await handler(e);
+        if (replay) await writeReplayHandlerEffect(replay, eventType, entry.registration);
         return null;
       } catch (error) {
+        if (replay) await writeReplayInventory(replay, eventType, entry.registration).catch(() => undefined);
         logger.error("事件处理器执行异常", {
           event_type: eventType,
           event_id: (e as any).event_id,
@@ -137,7 +153,7 @@ export class EventBus {
       return;
     }
     if (replay) {
-      await writeReplayEffect(replay, eventType);
+      await writeReplayEffect(replay, eventType, handlers);
       await writeReplayAck(replay, eventType);
     }
   }
@@ -227,10 +243,11 @@ async function readReplayEffect(effectLedgerPath: string): Promise<Record<string
   return readReplayAck(effectLedgerPath);
 }
 
-async function writeReplayEffect(replay: ReplayContext, eventType: string): Promise<void> {
+async function writeReplayEffect(replay: ReplayContext, eventType: string, handlers: RegisteredHandler[]): Promise<void> {
   const effect = {
     status: 'committed',
     owner: 'kernel.event-bus',
+    handler_ids: handlers.map((entry) => entry.registration.handler_id).sort(),
     event_type: eventType,
     record_id: replay.source_record_id,
     trace_id: replay.trace_id,
@@ -244,7 +261,7 @@ async function writeReplayEffect(replay: ReplayContext, eventType: string): Prom
     });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    validateReplayEffect(await readReplayEffect(replay.effect_ledger_path), replay, eventType);
+    validateReplayEffect(await readReplayEffect(replay.effect_ledger_path), replay, eventType, handlers);
   }
 }
 
@@ -252,6 +269,7 @@ function validateReplayEffect(
   effect: Record<string, unknown> | null,
   replay: ReplayContext,
   eventType: string,
+  handlers: RegisteredHandler[],
 ): void {
   if (effect?.status !== 'committed'
     || effect.owner !== 'kernel.event-bus'
@@ -259,9 +277,63 @@ function validateReplayEffect(
     || effect.record_id !== replay.source_record_id
     || effect.trace_id !== replay.trace_id
     || effect.payload_digest !== replay.payload_digest
-    || effect.operation_id !== replay.operation_id) {
+    || effect.operation_id !== replay.operation_id
+    || JSON.stringify(effect.handler_ids) !== JSON.stringify(handlers.map((entry) => entry.registration.handler_id).sort())) {
     throw new Error('event_bus_replay_effect_conflict');
   }
+}
+
+async function readReplayHandlerEffect(replay: ReplayContext, handlerId: string): Promise<Record<string, unknown> | null> {
+  return readReplayAck(path.join(path.dirname(replay.effect_ledger_path), path.basename(replay.effect_ledger_path, '.json'), `${encodeURIComponent(handlerId)}.json`));
+}
+
+async function writeReplayHandlerEffect(replay: ReplayContext, eventType: string, registration: EventHandlerRegistration): Promise<void> {
+  const target = path.join(path.dirname(replay.effect_ledger_path), path.basename(replay.effect_ledger_path, '.json'), `${encodeURIComponent(registration.handler_id)}.json`);
+  const effect = { status: 'committed', owner: registration.owner, handler_id: registration.handler_id, event_type: eventType, record_id: replay.source_record_id, trace_id: replay.trace_id, payload_digest: replay.payload_digest, operation_id: replay.operation_id };
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeReplayInventory(replay, eventType, registration);
+  try { await writeFile(target, `${JSON.stringify(effect, null, 2)}\n`, { flag: 'wx', mode: 0o600 }); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; validateHandlerEffect(await readReplayAck(target), replay, eventType, registration); }
+}
+
+async function writeReplayInventory(replay: ReplayContext, eventType: string, registration: EventHandlerRegistration): Promise<void> {
+  const target = path.join(path.dirname(replay.effect_ledger_path), `${path.basename(replay.effect_ledger_path, '.json')}.inventory.json`);
+  const existing = await readReplayAck(target);
+  const inventory = { status: 'registered', owner: 'kernel.event-bus', event_type: eventType, operation_id: replay.operation_id, handlers: [{ handler_id: registration.handler_id, owner: registration.owner }] };
+  let current = existing;
+  if (!current) {
+    try { await writeFile(target, `${JSON.stringify(inventory, null, 2)}\n`, { flag: 'wx', mode: 0o600 }); return; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; current = await readReplayAck(target); }
+  }
+  if (!current) throw new Error('event_bus_replay_inventory_missing');
+  const handlers = Array.isArray(current.handlers) ? current.handlers as Array<Record<string, unknown>> : [];
+  if (!handlers.some((handler) => handler.handler_id === registration.handler_id && handler.owner === registration.owner)) {
+    handlers.push({ handler_id: registration.handler_id, owner: registration.owner });
+    handlers.sort((left, right) => String(left.handler_id).localeCompare(String(right.handler_id)));
+    await writeFile(target, `${JSON.stringify({ ...current, handlers }, null, 2)}\n`);
+  }
+}
+
+async function prepareReplayInventory(replay: ReplayContext, eventType: string, handlers: RegisteredHandler[]): Promise<void> {
+  const effectsRoot = path.join(path.dirname(replay.effect_ledger_path), path.basename(replay.effect_ledger_path, '.json'));
+  try { await mkdir(effectsRoot, { recursive: true }); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOTDIR') return; throw error; }
+  const target = path.join(path.dirname(replay.effect_ledger_path), `${path.basename(replay.effect_ledger_path, '.json')}.inventory.json`);
+  const inventory = { status: 'registered', owner: 'kernel.event-bus', event_type: eventType, operation_id: replay.operation_id, handlers: handlers.map((entry) => ({ handler_id: entry.registration.handler_id, owner: entry.registration.owner })).sort((left, right) => left.handler_id.localeCompare(right.handler_id)) };
+  const existing = await readReplayAck(target);
+  if (!existing) { await writeFile(target, `${JSON.stringify(inventory, null, 2)}\n`, { flag: 'wx', mode: 0o600 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error; }); return; }
+}
+
+async function validateReplayInventory(replay: ReplayContext, handlers: RegisteredHandler[]): Promise<void> {
+  const target = path.join(path.dirname(replay.effect_ledger_path), `${path.basename(replay.effect_ledger_path, '.json')}.inventory.json`);
+  const existing = await readReplayAck(target);
+  if (!existing) return;
+  const expected = handlers.map((entry) => `${entry.registration.handler_id}:${entry.registration.owner}`).sort();
+  const actual = (Array.isArray(existing.handlers) ? existing.handlers : []).map((entry) => `${(entry as Record<string, unknown>).handler_id}:${(entry as Record<string, unknown>).owner}`).sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('event_bus_replay_handler_inventory_drift');
+}
+
+function validateHandlerEffect(effect: Record<string, unknown> | null, replay: ReplayContext, eventType: string, registration: EventHandlerRegistration): void {
+  if (effect?.status !== 'committed' || effect.owner !== registration.owner || effect.handler_id !== registration.handler_id || effect.event_type !== eventType || effect.record_id !== replay.source_record_id || effect.trace_id !== replay.trace_id || effect.payload_digest !== replay.payload_digest || effect.operation_id !== replay.operation_id) throw new Error('event_bus_replay_handler_effect_conflict');
 }
 
 function validateReplayAck(

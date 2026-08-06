@@ -102,6 +102,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       ['avatar', 'components/avatar/unity-host/UnityAvatarHostLauncher.exe'],
       ['extension-host', 'extension-host/modules/host.mjs'],
       ['native', 'components/native/composition-host/platform_native.dll'],
+      ['native-helper', 'components/native/composition-host/DesktopProcessTreeBridge.exe'],
     ]);
     const runtimeFiles = [];
     for (const [id, relative] of componentPaths) {
