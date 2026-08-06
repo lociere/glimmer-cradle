@@ -106,8 +106,6 @@ export class LifeClockManager {
         this.restartLoop();
       }
     };
-    EventBus.instance.subscribe('StateSyncEvent', this._stateSyncHandler);
-
     logger.info("生命时钟管理器初始化完成", {
       heartbeat_enabled: this._heartbeatEnabled,
       heartbeat_interval_ms: this._heartbeatIntervalMs,
@@ -115,6 +113,11 @@ export class LifeClockManager {
       focus_on_any_chat: this._focusOnAnyChat,
       summon_keywords: this._summonKeywords,
     });
+  }
+
+  public getStateSyncHandler(): (event: StateSyncEvent) => Promise<void> {
+    if (!this._stateSyncHandler) throw new Error('life_clock_state_sync_handler_not_initialized');
+    return this._stateSyncHandler;
   }
 
   /**

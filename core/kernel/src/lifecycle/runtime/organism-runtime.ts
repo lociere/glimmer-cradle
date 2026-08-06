@@ -4,6 +4,8 @@ import { AttentionSessionManager } from '../../domain/attention/attention-sessio
 import { LifeClockManager } from '../../domain/organism/life-clock/life-clock-manager';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
+import { EventBus } from '../../foundation/event-bus/event-bus';
+import { createLifeClockReplayAdapter } from '../../infrastructure/organism/life-clock-replay-adapter';
 
 export class OrganismRuntime implements RuntimeModule {
   public readonly name = 'organism-runtime';
@@ -11,6 +13,7 @@ export class OrganismRuntime implements RuntimeModule {
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     AttentionSessionManager.instance.init(AIProxy.instance, ActionStreamManager.instance);
     await LifeClockManager.instance.init(AIProxy.instance);
+    EventBus.instance.subscribe('StateSyncEvent', LifeClockManager.instance.getStateSyncHandler(), createLifeClockReplayAdapter(LifeClockManager.instance.getStateSyncHandler()));
     LifeClockManager.instance.start();
     return {
       attention: 'ready',
