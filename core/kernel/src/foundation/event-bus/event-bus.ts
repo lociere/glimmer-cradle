@@ -42,6 +42,7 @@ export class EventBus {
     const handlers = [...(this._handlers.get(eventType) || []), ...(this._handlers.get('*') || [])];
     if (!handlers.length) { if (replay) throw new Error(`event_bus_no_handler:${eventType}`); return; }
     if (replay) {
+      await ensureReplayInventory(replay, handlers);
       const results = await Promise.allSettled(handlers.map(async (entry) => {
         if (!entry.replay) throw new Error('event_bus_replay_unsupported:handler_not_registered');
         if ('replay' in entry.replay) throw new Error(`event_bus_replay_unsupported:${entry.replay.reason}`);
@@ -81,4 +82,19 @@ async function writeReplayAck(replay: ReplayContext, eventType: string, handlerA
   await mkdir(path.dirname(replay.ack_path), { recursive: true });
   try { await writeFile(replay.ack_path, `${JSON.stringify(ack, null, 2)}\n`, { flag: 'wx', mode: 0o600 }); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; const existing = await readJson(replay.ack_path); if (JSON.stringify(existing?.handler_acks) !== JSON.stringify(ack.handler_acks) || existing?.payload_digest !== replay.payload_digest || existing?.operation_id !== replay.operation_id) throw new Error('event_bus_replay_ack_conflict'); }
+}
+
+async function ensureReplayInventory(replay: ReplayContext, handlers: RegisteredHandler[]): Promise<void> {
+  const inventoryPath = replay.ack_path.replace(/\.receipt\.json$/, '.inventory.json');
+  const inventory = handlers.map((entry) => {
+    if (!entry.replay || 'replay' in entry.replay) throw new Error('event_bus_replay_unsupported:handler_inventory_unavailable');
+    return { handler_id: entry.replay.handler_id, owner: entry.replay.owner };
+  }).sort((left, right) => `${left.handler_id}:${left.owner}`.localeCompare(`${right.handler_id}:${right.owner}`));
+  await mkdir(path.dirname(inventoryPath), { recursive: true });
+  try { await writeFile(inventoryPath, `${JSON.stringify({ schema_version: 1, operation_id: replay.operation_id, payload_digest: replay.payload_digest, handlers: inventory })}\n`, { flag: 'wx', mode: 0o600 }); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const existing = await readJson(inventoryPath);
+    if (existing?.operation_id !== replay.operation_id || existing.payload_digest !== replay.payload_digest || JSON.stringify(existing.handlers) !== JSON.stringify(inventory)) throw new Error('event_bus_replay_handler_inventory_drift');
+  }
 }

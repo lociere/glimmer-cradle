@@ -201,7 +201,7 @@ describe('DlqReplayIngress', () => {
       await fs.mkdir(root, { recursive: true });
       await fs.writeFile(path.join(root, 'processed'), 'blocks durable receipt');
       await expect(ingress.drainOnce()).rejects.toThrow();
-      expect(attempts).toBe(1);
+      expect(attempts).toBe(0);
       expect(await fs.pathExists(path.join(root, `${operationId}.json`))).toBe(true);
 
       await fs.remove(path.join(root, 'processed'));
@@ -271,6 +271,10 @@ describe('DlqReplayIngress', () => {
       await expect(ingress.drainOnce()).rejects.toThrow('event_bus_handler_failed:1');
       expect(first).toBe(1);
       expect(second).toBe(1);
+      expect((await fs.readJson(path.join(root, 'processed', `${operationId}.inventory.json`))).handlers).toEqual([
+        { handler_id: 'handler.first', owner: 'owner.first' },
+        { handler_id: 'handler.second', owner: 'owner.second' },
+      ]);
       fail = false;
       expect(await ingress.drainOnce()).toBe(1);
       expect(first).toBe(1);
