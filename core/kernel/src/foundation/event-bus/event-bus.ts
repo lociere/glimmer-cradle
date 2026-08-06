@@ -10,7 +10,8 @@ type EventHandler<T extends DomainEvent = DomainEvent> = (event: T) => Promise<v
 export interface ReplayDeliveryRequest { readonly operation_id: string; readonly payload_digest: string; readonly envelope: DomainEvent; readonly event_type: string; readonly source_record_id: number; readonly trace_id: string; }
 export interface ReplayDeliveryAck { readonly status: 'committed'; readonly handler_id: string; readonly owner: string; readonly operation_id: string; readonly payload_digest: string; readonly event_type: string; readonly source_record_id: number; readonly trace_id: string; readonly receipt_ref: string; }
 export interface ReplayHandlerRegistration { readonly handler_id: string; readonly owner: string; readonly deliverOrReadAck: (request: ReplayDeliveryRequest) => Promise<ReplayDeliveryAck>; }
-interface RegisteredHandler { readonly fn: EventHandler; readonly replay?: ReplayHandlerRegistration; }
+export interface ReplayUnsupportedRegistration { readonly replay: 'unsupported'; readonly reason: string; }
+interface RegisteredHandler { readonly fn: EventHandler; readonly replay?: ReplayHandlerRegistration | ReplayUnsupportedRegistration; }
 interface ReplayContext { readonly operation_id: string; readonly source_record_id: number; readonly trace_id: string; readonly payload_digest: string; readonly ack_path: string; }
 
 export class EventBus {
@@ -20,12 +21,13 @@ export class EventBus {
   public static get instance(): EventBus { return EventBus._instance || (EventBus._instance = new EventBus()); }
   private constructor() { logger.info('全局事件总线初始化完成'); }
 
-  public subscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>, replay?: ReplayHandlerRegistration): void {
+  public subscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>, replay?: ReplayHandlerRegistration | ReplayUnsupportedRegistration): void {
     if (this._isShuttingDown) return;
-    if (replay && (!replay.handler_id || !replay.owner || typeof replay.deliverOrReadAck !== 'function')) throw new Error('event_bus_replay_registration_invalid');
+    if (replay && 'replay' in replay && (!replay.reason || replay.replay !== 'unsupported')) throw new Error('event_bus_replay_registration_invalid');
+    if (replay && !('replay' in replay) && (!replay.handler_id || !replay.owner || typeof replay.deliverOrReadAck !== 'function')) throw new Error('event_bus_replay_registration_invalid');
     const list = this._handlers.get(eventType) || [];
-    if (replay && list.some((entry) => entry.replay?.handler_id === replay.handler_id)) throw new Error('event_bus_replay_handler_id_duplicate');
-    list.push({ fn: handler as EventHandler, ...(replay ? { replay } : {}) });
+    if (replay && !('replay' in replay) && list.some((entry) => entry.replay && !('replay' in entry.replay) && entry.replay.handler_id === replay.handler_id)) throw new Error('event_bus_replay_handler_id_duplicate');
+    list.push({ fn: handler as EventHandler, replay: replay || { replay: 'unsupported', reason: 'owner_durable_replay_ack_missing' } });
     this._handlers.set(eventType, list);
   }
   public unsubscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>): void {
@@ -40,13 +42,16 @@ export class EventBus {
     const handlers = [...(this._handlers.get(eventType) || []), ...(this._handlers.get('*') || [])];
     if (!handlers.length) { if (replay) throw new Error(`event_bus_no_handler:${eventType}`); return; }
     if (replay) {
-      let acks: ReplayDeliveryAck[];
-      try { acks = await Promise.all(handlers.map(async (entry) => {
-        if (!entry.replay) throw new Error('event_bus_replay_contract_missing');
+      const results = await Promise.allSettled(handlers.map(async (entry) => {
+        if (!entry.replay) throw new Error('event_bus_replay_unsupported:handler_not_registered');
+        if ('replay' in entry.replay) throw new Error(`event_bus_replay_unsupported:${entry.replay.reason}`);
         const ack = await entry.replay.deliverOrReadAck({ ...replay, envelope: event, event_type: eventType });
         validateOwnerAck(ack, replay, eventType, entry.replay);
         return ack;
-      })); } catch (error) { throw new Error(`event_bus_handler_failed:1:${error instanceof Error ? error.message : String(error)}`); }
+      }));
+      const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (rejected.length) throw new Error(`event_bus_handler_failed:${rejected.length}:${rejected[0].reason instanceof Error ? rejected[0].reason.message : String(rejected[0].reason)}`);
+      const acks = results.map((result) => (result as PromiseFulfilledResult<ReplayDeliveryAck>).value);
       await writeReplayAck(replay, eventType, acks);
       return;
     }

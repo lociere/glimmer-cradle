@@ -273,7 +273,7 @@ describe('DlqReplayIngress', () => {
       expect(second).toBe(1);
       fail = false;
       expect(await ingress.drainOnce()).toBe(1);
-      expect(first).toBe(2);
+      expect(first).toBe(1);
       expect(second).toBe(2);
       expect((await fs.readJson(path.join(root, 'processed', `${operationId}.receipt.json`))).handler_acks).toHaveLength(2);
 
