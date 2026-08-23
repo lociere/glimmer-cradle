@@ -17,9 +17,9 @@
 import { VisualCommandDispatchEvent, ActionStreamStartedEvent, ActionStreamCompletedEvent, ActionStreamCancelledEvent } from '../../../domain/events';
 import type { AvatarConfig, VisualCommand } from '@glimmer-cradle/protocol';
 import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../domain/events';
-import { EventBus } from "../../../adapters/events/event-bus";
-import { ConfigManager } from "../../../adapters/config/config-manager";
-import { getLogger } from "../../../adapters/observability/logger";
+import { EventBus } from '../../../ports/kernel-side-effects.port';
+import { ConfigManager } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 import { isLocalAvatarSurfaceScene } from './surface-scene-scope';
 
 const logger = getLogger("visual-command-dispatcher");
@@ -52,15 +52,15 @@ export class VisualCommandDispatcher {
 
     this._emotionMapping = ConfigManager.instance.getConfig().system.avatar.emotion_mapping;
 
-    EventBus.instance.subscribe("ActionStreamStartedEvent", async (event) => {
+    EventBus.instance.subscribe("ActionStreamStartedEvent", async (event: any) => {
       await this._onStreamStarted((event as ActionStreamStartedEvent).payload);
     });
 
-    EventBus.instance.subscribe("ActionStreamCompletedEvent", async (event) => {
+    EventBus.instance.subscribe("ActionStreamCompletedEvent", async (event: any) => {
       await this._onStreamCompleted((event as ActionStreamCompletedEvent).payload);
     });
 
-    EventBus.instance.subscribe("ActionStreamCancelledEvent", async (event) => {
+    EventBus.instance.subscribe("ActionStreamCancelledEvent", async (event: any) => {
       await this._onStreamCancelled((event as ActionStreamCancelledEvent).payload);
     });
 

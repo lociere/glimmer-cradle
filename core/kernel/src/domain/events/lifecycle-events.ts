@@ -3,7 +3,7 @@
  * 用于内核启动/停止流程中的状态广播。
  */
 import { DomainEvent } from "./domain-events";
-import type { TraceContext } from "@glimmer-cradle/protocol";
+import type { TraceContext } from "../kernel-contracts";
 
 export enum AppLifecycleState {
   UNINITIALIZED = "UNINITIALIZED",

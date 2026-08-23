@@ -1,4 +1,4 @@
-import { getLogger } from '../../adapters/observability/logger';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import { SkillCatalogAppService } from '../../application/use-cases/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../../application/use-cases/skill-planning-app.service';
 import { PerceptionAppService } from '../../application/use-cases/perception-app.service';

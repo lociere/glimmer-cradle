@@ -2,7 +2,7 @@ import {
   RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
   RECOVERY_REQUIRED_ERROR_CODE,
   type RecoveryAction,
-} from '@glimmer-cradle/protocol';
+} from '../kernel-contracts';
 
 export { RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE };
 export type { RecoveryAction };

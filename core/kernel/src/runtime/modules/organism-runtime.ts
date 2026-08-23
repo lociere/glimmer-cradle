@@ -4,8 +4,8 @@ import { AttentionSessionManager } from '../../application/attention/attention-s
 import { LifeClockManager } from '../../application/organism/life-clock/life-clock-manager';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
-import { EventBus } from '../../adapters/events/event-bus';
-import { createLifeClockReplayAdapter } from '../../adapters/organism/life-clock-replay-adapter';
+import { EventBus } from '../../ports/kernel-side-effects.port';
+import { createLifeClockReplayAdapter } from '../../ports/kernel-side-effects.port';
 
 export class OrganismRuntime implements RuntimeModule {
   public readonly name = 'organism-runtime';

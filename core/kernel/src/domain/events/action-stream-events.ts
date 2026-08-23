@@ -1,5 +1,5 @@
 import { DomainEvent } from "./domain-events";
-import type { TraceContext, VisualCommand } from "@glimmer-cradle/protocol";
+import type { TraceContext, VisualCommand } from "../kernel-contracts";
 
 export interface ActionStreamBasePayload {
   scene_id: string;

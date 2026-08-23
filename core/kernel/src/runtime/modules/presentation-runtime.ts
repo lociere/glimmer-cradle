@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '../../adapters/config/config-schema';
+import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
 import { ActionStreamManager } from '../../application/capabilities/action-stream/action-stream-manager';
 import { VisualCommandDispatcher } from '../../application/capabilities/action-stream/visual-command-dispatcher';
 import { ControlSurfaceGateway } from '../../application/capabilities/control-surface/control-surface-gateway';
@@ -7,7 +7,7 @@ import { CognitionManager } from '../../application/capabilities/inference/cogni
 import { PerceptionAppService } from '../../application/use-cases/perception-app.service';
 import { ConfigApplicationService } from '../../application/use-cases/config-application.service';
 import { SkillCatalogAppService } from '../../application/use-cases/skill-catalog-app.service';
-import { ConfigManager } from '../../adapters/config/config-manager';
+import { ConfigManager } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 

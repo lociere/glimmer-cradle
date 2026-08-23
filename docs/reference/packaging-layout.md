@@ -35,7 +35,7 @@
 
 当前开发期 Avatar 可由 `pnpm avatar:build` 生成到本机投影：`build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe` 是 Kernel 受管入口，负责在 HWND 创建阶段隔离 worker；同目录 `UnityAvatarHost.exe` 是 Unity Player。打包暂存进入 `build/staging/desktop/<platform>/resources/components/avatar/unity-host/`，最终 Desktop 分发物进入 `dist/desktop/`。Unity 正式身体的源资产来自 `assets/avatar/avatar-packages/*/avatar-package.json`，同步脚本生成 Unity project 投影和 `avatar-package-registry.json`；私人模型内容不进入 Git。
 
-当前开发链路中，Desktop main 通过 `products/desktop/src/main/avatar-paths.ts` 解析 Unity project、Avatar Package Registry、SDK catalog、受管 Host 包和构建日志；脚本侧通过 `core/avatar/scripts/avatar-paths.mjs` 生成同一套开发期物理位置。Kernel 运行时资源投影再通过 `core/kernel/src/foundation/resource-resolver.ts` 把 Avatar Package Registry、Host executable、workdir 和 `avatar.sdk.*` SDK 状态并入 `avatar.host.reconciler.resources`。新增 Avatar 相关入口时，必须先扩展 resolver，不再直接散落仓库相对路径。
+当前开发链路中，Desktop main 通过 `products/desktop/src/main/avatar-paths.ts` 解析 Unity project、Avatar Package Registry、SDK catalog、受管 Host 包和构建日志；脚本侧通过 `core/avatar/scripts/avatar-paths.mjs` 生成同一套开发期物理位置。Kernel 运行时资源投影再通过 `core/kernel/src/adapters/filesystem/resource-resolver.ts` 把 Avatar Package Registry、Host executable、workdir 和 `avatar.sdk.*` SDK 状态并入 `avatar.host.reconciler.resources`。新增 Avatar 相关入口时，必须先扩展 resolver，不再直接散落仓库相对路径。
 
 打包验收必须覆盖：UnityAvatarHost 可启动、`host_hello`、`host_ready`、首帧 present、透明命中、拖动、DPI、多显示器、退出回收和 process log。
 

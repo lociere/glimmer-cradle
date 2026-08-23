@@ -3,12 +3,12 @@ import {
   strongestRuntimeReadinessState,
   type RuntimeReadinessSnapshot,
   type RuntimeReadinessState,
-} from '../../runtime/readiness';
+} from '../../ports/runtime-readiness.port';
 import {
   strongestRuntimeResourceState,
   type RuntimeResourceSnapshot,
   type RuntimeResourceState,
-} from '../../runtime/reconciler';
+} from '../../ports/runtime-reconciliation.port';
 
 export function buildExtensionRuntimeReadinessSnapshots(
   projections: readonly ExtensionRuntimeProjection[],

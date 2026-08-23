@@ -1,4 +1,4 @@
-import { getLogger } from "../../adapters/observability/logger";
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import { PerceptionEvent } from "@glimmer-cradle/protocol";
 
 const logger = getLogger("channel-state");

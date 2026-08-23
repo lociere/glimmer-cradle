@@ -64,4 +64,4 @@ function isRuntimeReadinessSnapshot(value: unknown): value is RuntimeReadinessSn
     && typeof snapshot.blocking === 'boolean'
     && typeof snapshot.summary === 'string';
 }
-import type { RuntimeReconcilerSnapshot } from './reconciler';
+import type { RuntimeReconcilerSnapshot } from './runtime-reconciliation.port';

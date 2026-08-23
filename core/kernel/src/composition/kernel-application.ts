@@ -31,6 +31,7 @@ import { OrganismRuntime } from '../runtime/modules/organism-runtime';
 import { DlqReplayRuntime } from '../runtime/modules/dlq-replay-runtime';
 import { loadProductComposition } from './product-composition';
 import { currentExtensionPlatform } from '../application/skill-plane/availability';
+import { installKernelCompositionPorts } from './kernel-side-effects';
 
 const logger = getLogger('app-root');
 
@@ -48,7 +49,9 @@ export class App {
     return App._instance;
   }
 
-  private constructor() {}
+  private constructor() {
+    installKernelCompositionPorts();
+  }
 
   public get state(): AppLifecycleState {
     return this._state;

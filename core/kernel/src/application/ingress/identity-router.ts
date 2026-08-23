@@ -12,8 +12,8 @@
  *   - 灵魂纯净：此网关之后的一切代码，不应看到任何平台私有字段
  *   - 位于 IngressGate 之前，是数据进入系统的第一道净化关卡
  */
-import { randomUUID } from 'crypto';
-import { getLogger } from '../../adapters/observability/logger';
+import { randomUUID } from '../../ports/kernel-side-effects.port';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import type { PerceptionEvent, PerceptionModalityItem } from '@glimmer-cradle/protocol';
 import { ConversationDirectory } from '../../application/capabilities/conversation/conversation-directory';
 

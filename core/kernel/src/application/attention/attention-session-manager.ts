@@ -1,10 +1,10 @@
 import type { PerceptionEvent } from '@glimmer-cradle/protocol';
 import type { PerceptionCancelRequest } from '../../ports/cognition-service-port';
 import { IAICapabilityPort, IActionStreamPort } from '../../ports';
-import { withTrace } from '../../adapters/observability/trace-context';
-import { ConfigManager } from '../../adapters/config/config-manager';
-import { getLogger } from '../../adapters/observability/logger';
-import { histogram, span } from '../../adapters/observability/telemetry';
+import { withTrace } from '../../ports/kernel-side-effects.port';
+import { ConfigManager } from '../../ports/kernel-side-effects.port';
+import { getLogger } from '../../ports/kernel-side-effects.port';
+import { histogram, span } from '../../ports/kernel-side-effects.port';
 import { AttentionLeaseStore, AttentionProjectionMode } from '../../domain/attention/attention-lease-store';
 
 const logger = getLogger('attention-session-manager');
@@ -238,7 +238,7 @@ export class AttentionSessionManager {
     state.cancelRequested = false;
 
     await withTrace(traceId, async () => {
-      await span('attention.flush', async (flushSpan) => {
+      await span('attention.flush', async (flushSpan: any) => {
         flushSpan.setAttribute('scene_id', source);
         flushSpan.setAttribute('batch_size', batch.length);
         flushSpan.setAttribute('dropped_count', overflowCount);
@@ -267,7 +267,7 @@ export class AttentionSessionManager {
         try {
           await span(
             'attention.ipc.perception_message',
-            async (ipcSpan) => {
+            async (ipcSpan: any) => {
               ipcSpan.setAttribute('scene_id', source);
               ipcSpan.setAttribute('request_id', mergedRequest.id);
               const operation = await this._aiProxy.sendPerceptionMessage(mergedRequest, traceId);

@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
-import type { AddressInfo } from 'node:net';
-import { EventBus } from '../../../adapters/events/event-bus';
-import { getLogger } from '../../../adapters/observability/logger';
+import type { AddressInfo } from '../../../ports/kernel-side-effects.port';
+import { EventBus } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 import {
   VisualCommandDispatchEvent,
   AvatarActionStateChangedEvent,
@@ -17,15 +17,15 @@ import type {
   AvatarHostReadyPayload,
   VisualCommand,
 } from '@glimmer-cradle/protocol';
-import type { RuntimeReadinessSnapshot } from '../../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../../ports/runtime-readiness.port';
 import {
   strongestRuntimeResourceState,
   type RuntimeResourceSnapshot,
-} from '../../../runtime/reconciler';
+} from '../../../ports/runtime-reconciliation.port';
 import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
 import { UnityAvatarHostProcess } from './unity-avatar-host-process';
 import { buildAvatarResourceSnapshots } from './avatar-resource-catalog';
-import { EndpointRegistry } from '../../../adapters/endpoints/endpoint-registry';
+import { EndpointRegistry } from '../../../ports/kernel-side-effects.port';
 
 const logger = getLogger('avatar-engine');
 const AVATAR_RUNTIME_MODULE_NAME = 'avatar-runtime';
@@ -106,13 +106,13 @@ export class AvatarController {
         this._emitStatusIfChanged('disconnected');
       });
 
-      ws.on('error', (err) => {
+      ws.on('error', (err: any) => {
         logger.error('Avatar WebSocket 错误', { err });
         this._syncRuntimeReadiness();
       });
     });
 
-    EventBus.instance.subscribe('VisualCommandDispatchEvent', async (event) => {
+    EventBus.instance.subscribe('VisualCommandDispatchEvent', async (event: any) => {
       const payload = (event as VisualCommandDispatchEvent).payload;
       await this.sendVisualCommand(payload);
     });
@@ -485,7 +485,7 @@ export class AvatarController {
         }
         void EventBus.instance.publish(
           new AvatarActionStateChangedEvent(frame.avatar_action_state),
-        ).catch((err) => logger.error('AvatarActionStateChangedEvent publish 失败', { err }));
+        ).catch((err: any) => logger.error('AvatarActionStateChangedEvent publish 失败', { err }));
         break;
       case 'error':
         this._lastErrorByClient.set(
@@ -552,7 +552,7 @@ export class AvatarController {
         hostKind: current ? 'unity' : 'offline',
         reason,
       }),
-    ).catch((err) => logger.error('AvatarStatusChangedEvent publish 失败', { err }));
+    ).catch((err: any) => logger.error('AvatarStatusChangedEvent publish 失败', { err }));
   }
 
   private _syncRuntimeReadiness(): void {

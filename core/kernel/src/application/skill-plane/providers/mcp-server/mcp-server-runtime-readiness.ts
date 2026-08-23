@@ -1,8 +1,8 @@
-import type { RuntimeReadinessSnapshot } from '../../../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../../../ports/runtime-readiness.port';
 import {
   strongestRuntimeResourceState,
   type RuntimeResourceSnapshot,
-} from '../../../../runtime/reconciler';
+} from '../../../../ports/runtime-reconciliation.port';
 import type { SkillProviderRuntimeSnapshot } from '../../types';
 
 export function buildMcpRuntimeReadinessSnapshots(

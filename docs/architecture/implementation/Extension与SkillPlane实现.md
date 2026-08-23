@@ -1,7 +1,7 @@
 # Extension 与 Skill Plane 实现
 
 > 范围：Extension SDK、Extension Host、Skill Registry、Policy、Invocation Gateway、Core/Extension/MCP/User Provider 和 Adapter 如何在代码中接线；不写 SDK 字段全表。
-> 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/host/extension-manager.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
+> 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/application/extension-supervision/extension-manager.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
 > 维护触发：SDK API、manifest、permissions/requires、activation、provider 生命周期、MCP、Policy、Gateway、catalog、confirmation 或 audit 变化。
 
 ## 目录
@@ -25,13 +25,13 @@
 | `host/` | Host port 类型 |
 | `utilities/websocket/` | 扩展侧 WebSocket bridge |
 | `protocol/src/schemas/models/ExtensionRuntimeProjection.schema.json` | Extension Host 运行投影的跨进程契约 |
-| `core/kernel/src/host/extension-manager.ts` | Kernel ExtensionManager |
-| `core/kernel/src/host/process/extension-process-host.ts` | Kernel 侧独立 Host 监督、权限和 Port RPC |
-| `core/kernel/src/host/process/extension-host-worker.ts` | 扩展入口唯一加载点与 SDK Context bridge |
+| `core/kernel/src/application/extension-supervision/extension-manager.ts` | Kernel ExtensionManager |
+| `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧独立 Host 监督、权限和 Port RPC |
+| `core/kernel/src/adapters/extension-host/extension-host-worker.ts` | 扩展入口唯一加载点与 SDK Context bridge |
 | `packages/extension-sdk/src/host/process-protocol.ts` | Host/Worker 双向进程消息 |
-| `core/kernel/src/host/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
-| `core/kernel/src/host/extension-dependency-installer.ts` | Extension 外部依赖准备、下载缓存和解压安装 |
-| `core/kernel/src/host/managed-resource-supervisor.ts` | Extension 受管资源 readiness gate 检查，并产出 Capability Graph 节点 |
+| `core/kernel/src/application/extension-supervision/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
+| `core/kernel/src/adapters/extension-host/extension-dependency-installer.ts` | Extension 外部依赖准备、下载缓存和解压安装 |
+| `core/kernel/src/adapters/extension-host/managed-resource-supervisor.ts` | Extension 受管资源 readiness gate 检查，并产出 Capability Graph 节点 |
 | `application/services/extension-host-app.service.ts` | Extension Host application service |
 | `application/services/extension-runtime-registry.ts` | Host-owned Contribution Point Registry 到 Capability Graph projection 的转换器 |
 

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from '../../../ports/kernel-side-effects.port';
 import type { ConversationAddress, ConversationContext } from '@glimmer-cradle/protocol';
 
 export interface ResolvedConversation {

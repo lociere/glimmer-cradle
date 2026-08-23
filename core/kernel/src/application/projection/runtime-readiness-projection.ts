@@ -4,7 +4,7 @@ import type {
   RuntimeReconcilerSnapshot as ProtocolRuntimeReconcilerSnapshot,
   RuntimeResourceSnapshot as ProtocolRuntimeResourceSnapshot,
 } from '@glimmer-cradle/protocol';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 
 type RuntimeReadinessListener = (catalog: RuntimeReadinessCatalog) => void;
 

@@ -1,5 +1,5 @@
 import { DomainEvent } from './domain-events';
-import type { ChannelReplyPayload, TraceContext } from '@glimmer-cradle/protocol';
+import type { ChannelReplyPayload, TraceContext } from '../kernel-contracts';
 
 export interface ExtensionEventPayload {
   [key: string]: unknown;

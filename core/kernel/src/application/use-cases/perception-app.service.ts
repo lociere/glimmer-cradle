@@ -4,7 +4,7 @@ import { AudioService } from "../capabilities/audio/audio-service";
 
 import { ChannelStateStore } from "../channel/channel-state-store";
 
-import { getLogger } from "../../adapters/observability/logger";
+import { getLogger } from '../../ports/kernel-side-effects.port';
 
 import { TTSSynthesizeRequest, TTSSynthesizeResponse, ASRRecognizeRequest, ASRRecognizeResponse, PerceptionEvent, AudioStatusPayload } from '@glimmer-cradle/protocol';
 import { AttentionSessionManager } from "../../application/attention/attention-session-manager";

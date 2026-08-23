@@ -8,14 +8,14 @@ import {
 } from './skill-registry';
 import type { SkillDescriptor, SkillPolicy, SkillProviderKind } from './types';
 import type { SkillPolicyDecision } from './skill-policy-engine';
-import { counter, histogram } from '../../adapters/observability/metrics';
-import { getCurrentTraceId, newTraceId, withTrace } from '../../adapters/observability/trace-context';
-import { getLogger } from '../../adapters/observability/logger';
+import { counter, histogram } from '../../ports/kernel-side-effects.port';
+import { getCurrentTraceId, newTraceId, withTrace } from '../../ports/kernel-side-effects.port';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import {
   OBSERVABILITY_EVENT_TYPES,
   appendAuditRecord,
   recordObservabilityEvent,
-} from '../../adapters/observability/plane/plane';
+} from '../../ports/kernel-side-effects.port';
 import type { ConversationContext } from '@glimmer-cradle/protocol';
 import { isCapabilityScopeVisible } from './scope';
 import { RecoveryRequiredError } from '../../domain/errors';

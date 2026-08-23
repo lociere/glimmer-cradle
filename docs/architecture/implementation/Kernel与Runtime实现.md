@@ -26,7 +26,7 @@
 | `core/kernel/src/index.ts` | 包级导出边界 |
 | `core/kernel/src/runtime/modules/lifecycle-orchestrator.ts` | runtime module 注册、依赖排序、启动/停止、状态聚合 |
 
-`app.ts` 是跨层具体实现的集中组装点。普通业务对象不应自行 new logger、storage、process supervisor、gRPC application/extension-supervision/client 或 provider manager；需要替换实现时应通过 root/factory/port 完成。
+`composition/kernel-application.ts` 与 `composition/kernel-side-effects.ts` 是跨层具体实现的集中组装点。普通业务对象不应自行 new logger、storage、process supervisor、gRPC application/extension-supervision/client 或 provider manager；需要替换实现时应通过 root/factory/port 完成。
 
 ## 开发启动编排
 
@@ -157,9 +157,9 @@ Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能
 
 `avatar-runtime` 的 `avatar.host` 不再只在模块启动时写一次 catalog。`UnityAvatarHostProcess` 会把受管进程状态变化推给 `AvatarController`，后者在 `connected / host_hello / host_ready / heartbeat_timeout / disconnect / process exit` 各阶段都覆写 `RuntimeReadinessCatalogStore` 里的 `avatar-runtime` 快照。这样 Desktop 诊断看到的 `avatar.host.reconciler.actual` 会随着 `waiting-manual-launch -> connected-waiting-ready-gates -> connected-first-frame-presented` 实时变化，而不是停留在启动瞬间的陈旧状态。
 
-`adapters/endpoints/endpoint-registry.ts` 是内部地址唯一目录。Kernel Control Service、Control Surface Gateway 和 Avatar WebSocket 先绑定动态回环端点，取得真实地址后发布 `cognition-rpc`、`control-surface`、`avatar-host`。目录位于 `data/run/application/extension-supervision/endpoints.json`，包含 Kernel PID 与 generation；安装态 Desktop 通过 `GLIMMER_CRADLE_LAUNCH_SESSION` 将该 generation 绑定到本次受管启动，其他启动保留随机 generation。Desktop main、Personal Server、开发启动器和 Unity 只接受存活 owner 的本代回环端点。Kernel Control Service 地址与 generation 由 Kernel 直接注入 Cognition 子进程；Cognition Service 亦绑定 `127.0.0.1:0` 并通过受监注册回传，不经磁盘发现。
+`adapters/endpoints/endpoint-registry.ts` 是内部地址唯一目录。Kernel Control Service、Control Surface Gateway 和 Avatar WebSocket 先绑定动态回环端点，取得真实地址后发布 `cognition-rpc`、`control-surface`、`avatar-host`。目录位于 `data/run/host/endpoints.json`，包含 Kernel PID 与 generation；安装态 Desktop 通过 `GLIMMER_CRADLE_LAUNCH_SESSION` 将该 generation 绑定到本次受管启动，其他启动保留随机 generation。Desktop main、Personal Server、开发启动器和 Unity 只接受存活 owner 的本代回环端点。Kernel Control Service 地址与 generation 由 Kernel 直接注入 Cognition 子进程；Cognition Service 亦绑定 `127.0.0.1:0` 并通过受监注册回传，不经磁盘发现。
 
-`capability-runtime` 不再等待 Audio model warmup 后才返回。它先配置 AudioService，再把资源准备作为有 owner 的后台任务运行，并持续覆写 readiness 与 Desktop audio status；停机由 AudioService 统一取消和回收 lane。`app.ts` 在 Cognition 与必要传输完成后开放 Ingress，Extension activation 和 Organism 启动不再决定直接文本对话能否开始。
+`capability-runtime` 不再等待 Audio model warmup 后才返回。它先配置 AudioService，再把资源准备作为有 owner 的后台任务运行，并持续覆写 readiness 与 Desktop audio status；停机由 AudioService 统一取消和回收 lane。composition root 在 Cognition 与必要传输完成后开放 Ingress，Extension activation 和 Organism 启动不再决定直接文本对话能否开始。
 同一条 `avatar.host.reconciler` 现在也承载 Avatar Package 相关资源投影：`avatar-package-registry.json`、受管 Host 可执行产物/工作目录，以及按 Avatar Package 反推出来的 `avatar.sdk.*` Unity SDK 导入状态都由 Kernel 检查并进入 `resources`。这样“缺 Avatar Package Registry / 缺 UnityAvatarHost.exe / Cubism SDK 只准备未导入”属于正式 runtime reconciler 事实，而不是 Desktop 专用的第二套判断。
 
 `application-runtime` 当前还负责把 MCP Provider 接入同一 catalog：启动时返回 `McpServerSkillProvider.instance.getReadinessSnapshots()` 作为初始快照，后续 `McpServerSkillProvider.setStatus()` 会继续覆写 `application` 模块的 runtime snapshots。这样 Control Center 诊断页看到的是正式 lifecycle 主线里的 `mcp.host` / `mcp.<server-id>`，而不是只看 Skill catalog 的 provider runtime 文案。

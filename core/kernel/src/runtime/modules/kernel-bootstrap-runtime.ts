@@ -1,13 +1,13 @@
-import type { GlobalConfig } from '../../adapters/config/config-schema';
-import { ConfigManager } from '../../adapters/config/config-manager';
-import { DBManager } from '../../adapters/storage/db-manager';
-import { initLogger } from '../../adapters/observability/logger';
-import { startMetrics, stopMetrics } from '../../adapters/observability/metrics';
-import { startTracer, stopTracer } from '../../adapters/observability/tracer';
+import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
+import { ConfigManager } from '../../ports/kernel-side-effects.port';
+import { DBManager } from '../../ports/kernel-side-effects.port';
+import { initLogger } from '../../ports/kernel-side-effects.port';
+import { startMetrics, stopMetrics } from '../../ports/kernel-side-effects.port';
+import { startTracer, stopTracer } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
-import { EndpointRegistry } from '../../adapters/endpoints/endpoint-registry';
-import { DeadLetterQueue } from '../../adapters/events/dead-letter-queue';
+import { EndpointRegistry } from '../../ports/kernel-side-effects.port';
+import { DeadLetterQueue } from '../../ports/kernel-side-effects.port';
 
 export class KernelBootstrapRuntime implements RuntimeModule {
   public readonly name = 'foundation';
@@ -22,8 +22,9 @@ export class KernelBootstrapRuntime implements RuntimeModule {
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     await ConfigManager.instance.init();
-    this._config = ConfigManager.instance.getConfig();
-    initLogger(this._config.system);
+    const config = ConfigManager.instance.getConfig() as Readonly<GlobalConfig>;
+    this._config = config;
+    initLogger(config.system);
 
     startMetrics();
     startTracer();

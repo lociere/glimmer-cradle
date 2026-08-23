@@ -15,7 +15,7 @@
  *   - 全局配置：参数来自 configs/system/kernel.yaml ingress 节
  */
 import type { IngressGateConfig } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../adapters/observability/logger';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 
 const logger = getLogger('ingress-gate');
 

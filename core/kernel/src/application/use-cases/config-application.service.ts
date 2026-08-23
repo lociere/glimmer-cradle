@@ -1,16 +1,13 @@
-import { createHash, randomUUID } from 'node:crypto';
-import path from 'node:path';
-import fs from 'fs-extra';
+import { createHash, fs, path, randomUUID, type GlobalConfig } from '../../ports/kernel-side-effects.port';
 import yaml from 'yaml';
 import {
   appendAuditRecord,
-} from '../../adapters/observability/plane/plane';
+} from '../../ports/kernel-side-effects.port';
 import {
   resolveConfigDir,
   resolveDataDir,
   resolveStateDir,
-} from '../../adapters/filesystem/path-utils';
-import type { GlobalConfig } from '../../adapters/config/config-schema';
+} from '../../ports/kernel-side-effects.port';
 import {
   type AudioConfig,
   validateConfig,

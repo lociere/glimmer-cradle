@@ -1,6 +1,6 @@
 import { CognitionManager } from '../../application/capabilities/inference/cognition-manager';
-import { CognitionClient } from '../../adapters/cognition/cognition-client';
-import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
+import { CognitionClient } from '../../ports/kernel-side-effects.port';
+import { KernelCognitionTransport } from '../../ports/kernel-side-effects.port';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { CognitionLifecycleState } from '../../ports/cognition-service-port';
 import type { KernelTransportRuntime } from './kernel-transport-runtime';

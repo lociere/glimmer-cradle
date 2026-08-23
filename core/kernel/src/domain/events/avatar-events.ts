@@ -10,7 +10,7 @@
  * 加 host_hello / scene_loaded 等更多事件类型。
  */
 import { DomainEvent } from './domain-events';
-import type { PresentationUpstreamFrame } from '@glimmer-cradle/protocol';
+import type { PresentationUpstreamFrame } from '../kernel-contracts';
 
 /** Kernel 视角下可观察的 shell 状态。 */
 export type AvatarPresence = 'unity' | 'offline';

@@ -1,7 +1,4 @@
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { promisify } from 'node:util';
-import path from 'node:path';
-import fs from 'fs-extra';
+import { execFile, fs, path, promisify, spawn, type ChildProcess } from '../../../ports/kernel-side-effects.port';
 import type { PerceptionEvent } from '@glimmer-cradle/protocol';
 import type {
   AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse,
@@ -10,12 +7,12 @@ import type {
   PerceptionOperationHandle, PerceptionOperationResult,
   CognitionProcessTransportPort, CognitionRequestPort, CognitionLifecycleObserver,
 } from '../../../ports/cognition-service-port';
-import { ConfigManager } from '../../../adapters/config/config-manager';
+import { ConfigManager } from '../../../ports/kernel-side-effects.port';
 import { CoreException } from '../../../domain/errors';
-import { createTraceContext } from '../../../adapters/observability/trace-context';
-import { getLogger } from '../../../adapters/observability/logger';
-import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../../../adapters/filesystem/path-utils';
-import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../../../adapters/process/process-supervisor';
+import { createTraceContext } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
+import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../../../ports/kernel-side-effects.port';
+import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../../../ports/kernel-side-effects.port';
 
 const logger = getLogger('cognition-manager');
 const PROCESS_LOG = 'cognition.console.log';
@@ -293,7 +290,7 @@ export class CognitionManager {
   private attachProcessObservers(child: ChildProcess): void {
     child.stdout?.on('data', (data: Buffer) => this.consumeOutput(data, false));
     child.stderr?.on('data', (data: Buffer) => this.consumeOutput(data, true));
-    child.on('exit', (code, signal) => {
+    child.on('exit', (code: any, signal: any) => {
       this.flushOutput();
       const interrupted = code === 0xC000013A;
       const intentional = this.stopping || interrupted;
@@ -315,7 +312,7 @@ export class CognitionManager {
         void this.recoverAfterUnexpectedExit(invalidation, recoveryGeneration);
       }
     });
-    child.on('error', (error) => {
+    child.on('error', (error: any) => {
       if (this.child === child) this.child = null;
       this.running = false;
       this.ready = false;
@@ -377,7 +374,7 @@ function routeProcessLine(line: string, stderr: boolean): void {
   const record = { timestamp: String(parsed?.timestamp ?? new Date().toISOString()), level, source: 'cognition', stream: stderr ? 'stderr' : 'stdout', message: event, ...(parsed ?? {}) };
   fs.ensureDir(processLogDir)
     .then(() => fs.appendFile(path.join(processLogDir, PROCESS_LOG), `${JSON.stringify(record)}\n`, 'utf8'))
-    .catch((error) => console.error('写入 Cognition 子进程日志失败', error));
+    .catch((error: any) => console.error('写入 Cognition 子进程日志失败', error));
   if (level === 'error' || level === 'critical') logger.error('Cognition 子进程错误', { child_event: event, trace_id: parsed?.trace_id });
 }
 

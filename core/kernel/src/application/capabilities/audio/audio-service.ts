@@ -1,6 +1,4 @@
-import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { createHash, nodeFs as fs, path } from '../../../ports/kernel-side-effects.port';
 import type {
   ASRRecognizeRequest,
   ASRRecognizeResponse,
@@ -10,17 +8,17 @@ import type {
   TTSSynthesizeResponse,
   VoiceConfig,
 } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../adapters/observability/logger';
-import type { RuntimeReadinessSnapshot } from '../../../runtime/readiness';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
+import type { RuntimeReadinessSnapshot } from '../../../ports/runtime-readiness.port';
 import {
   strongestRuntimeResourceState,
   type RuntimeReconcilerSnapshot,
   type RuntimeResourceSnapshot,
-} from '../../../runtime/reconciler';
+} from '../../../ports/runtime-reconciliation.port';
 import {
   resolveCachePath,
   resolveConfiguredProjectPath,
-} from '../../../adapters/filesystem/path-utils';
+} from '../../../ports/kernel-side-effects.port';
 import {
   configureOfficialAudioEngine,
   probeOfficialAudioEngine,

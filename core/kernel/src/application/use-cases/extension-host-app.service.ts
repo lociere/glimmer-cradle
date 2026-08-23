@@ -6,7 +6,7 @@ import type {
   ExtensionSkillContribution,
   PerceptionEvent,
 } from '@glimmer-cradle/protocol';
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from '../../ports/kernel-side-effects.port';
 import { SourceAttentionPolicy } from '../../application/organism/life-clock/life-clock-manager';
 import { DomainEvent } from '../../domain/events';
 import {
@@ -24,12 +24,12 @@ import {
   IExtensionHostService,
   IExtensionSystemConfig,
 } from '../../ports';
-import { createTraceContext } from '../../adapters/observability/trace-context';
-import { ConfigManager } from '../../adapters/config/config-manager';
-import { EventBus } from '../../adapters/events/event-bus';
-import { getLogger } from '../../adapters/observability/logger';
-import { ExtensionStorageRepository } from '../../adapters/storage/repositories/extension-storage-repository';
-import { resolveRepoRoot } from '../../adapters/filesystem/path-utils';
+import { createTraceContext } from '../../ports/kernel-side-effects.port';
+import { ConfigManager } from '../../ports/kernel-side-effects.port';
+import { EventBus } from '../../ports/kernel-side-effects.port';
+import { getLogger } from '../../ports/kernel-side-effects.port';
+import { ExtensionStorageRepository } from '../../ports/kernel-side-effects.port';
+import { resolveRepoRoot } from '../../ports/kernel-side-effects.port';
 import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
 import { LifeClockManager } from '../../application/organism/life-clock/life-clock-manager';
 import {

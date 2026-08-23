@@ -1,5 +1,4 @@
-import fs from 'fs-extra';
-import path from 'node:path';
+import { fs, path, type ExtensionInstallPreview, type ExtensionInstallResult, type ExtensionInstallSource } from '../../ports/kernel-side-effects.port';
 import { gte, rcompare, satisfies, valid, validRange } from 'semver';
 import yaml from 'yaml';
 import {
@@ -20,23 +19,20 @@ import {
   type ExtensionRuntimeProjection,
   type ExtensionSkillContribution,
 } from '@glimmer-cradle/protocol';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import { ExtensionErrorEvent, ExtensionLoadedEvent, ExtensionStartedEvent, ExtensionStoppedEvent } from '../../domain/events';
 import type { ActiveExtensionSelection, Disposable, IExtensionHostService } from '../../ports';
 import { ExtensionException } from '../../domain/errors';
-import { createTraceContext } from '../../adapters/observability/trace-context';
+import { createTraceContext } from '../../ports/kernel-side-effects.port';
 import { RuntimeReadinessProjectionMapper } from '../projection/runtime-readiness-projection';
-import { resolveConfigPath, resolveConfiguredProjectPath } from '../../adapters/filesystem/path-utils';
+import { resolveConfigPath, resolveConfiguredProjectPath } from '../../ports/kernel-side-effects.port';
 import { buildExtensionRuntimeReadinessSnapshots } from './extension-runtime-readiness';
-import { ExtensionDependencyInstaller } from '../../adapters/extension-host/extension-dependency-installer';
+import { ExtensionDependencyInstaller } from '../../ports/kernel-side-effects.port';
 import {
   ExtensionPackageManager,
-  type ExtensionInstallPreview,
-  type ExtensionInstallResult,
-  type ExtensionInstallSource,
-} from '../../adapters/extension-installation/extension-package-manager';
-import { ManagedResourceSupervisor } from '../../adapters/extension-host/managed-resource-supervisor';
-import { ExtensionProcessHost } from '../../adapters/extension-host/extension-process-host';
+} from '../../ports/kernel-side-effects.port';
+import { ManagedResourceSupervisor } from '../../ports/kernel-side-effects.port';
+import { ExtensionProcessHost } from '../../ports/kernel-side-effects.port';
 import { currentExtensionPlatform } from '../skill-plane/availability';
 
 type ExtensionManifestRecord = {

@@ -3,7 +3,7 @@
  * 发布 Kernel attention projection 派生出的有机体注意力状态。
  */
 import { DomainEvent } from './domain-events';
-import type { TraceContext } from "@glimmer-cradle/protocol";
+import type { TraceContext } from "../kernel-contracts";
 
 /**
  * 有机体注意力状态变化事件

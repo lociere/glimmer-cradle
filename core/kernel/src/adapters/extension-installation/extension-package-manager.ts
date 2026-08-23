@@ -180,13 +180,17 @@ export class ExtensionPackageManager {
     if (!pending) throw new Error('扩展安装事务不存在或已经过期');
     assertSameStringSet(pending.preview.extension.permissions, approvedPermissions, '用户确认的权限与安装预览不一致');
 
+    const targetDir = path.join(this.extensionRoot, pending.verified.manifest.id, pending.verified.manifest.version);
+    const existingManifestPath = path.join(targetDir, 'extension-manifest.yaml');
+    if (!(await fs.pathExists(existingManifestPath)) && await fs.pathExists(targetDir)) {
+      throw new Error(`扩展安装目标已存在: ${targetDir}`);
+    }
+
     const verified = await verifyExtensionPackage(pending.packagePath, { maxArchiveBytes: MAX_PACKAGE_BYTES });
     if (verified.archiveSha256 !== pending.preview.artifact.sha256) {
       throw new Error('扩展包在用户确认后发生变化，安装已取消');
     }
 
-    const targetDir = path.join(this.extensionRoot, verified.manifest.id, verified.manifest.version);
-    const existingManifestPath = path.join(targetDir, 'extension-manifest.yaml');
     if (await fs.pathExists(existingManifestPath)) {
       const metadata = await this.readInstallationMetadata(verified.manifest.id, verified.manifest.version);
       if (metadata?.artifact_sha256 !== verified.archiveSha256) {
@@ -207,7 +211,6 @@ export class ExtensionPackageManager {
     try {
       await extractVerifiedExtensionPackage(verified, stagingDir);
       await fs.ensureDir(path.dirname(targetDir));
-      if (await fs.pathExists(targetDir)) throw new Error(`扩展安装目标已存在: ${targetDir}`);
       await fs.move(stagingDir, targetDir, { overwrite: false });
       movedToTarget = true;
       await this.writeInstallationMetadata(verified.manifest, pending.preview);

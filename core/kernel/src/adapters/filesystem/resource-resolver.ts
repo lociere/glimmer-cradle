@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
-import type { RuntimeResourceSnapshot, RuntimeResourceState } from '../../runtime/reconciler';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
+import type { RuntimeResourceSnapshot, RuntimeResourceState } from '../../ports/runtime-reconciliation.port';
 
 export type RuntimeResourceKind = 'file' | 'directory';
 

@@ -1,19 +1,16 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import path from 'node:path';
-import readline from 'node:readline';
-import fs from 'fs-extra';
+import { fs, path, readline, spawn, type ChildProcess } from '../../../ports/kernel-side-effects.port';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../adapters/observability/logger';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 import {
   resolveConfiguredProjectPath,
   resolveLogDir,
   resolveRepoRoot,
   resolveStatePath,
-} from '../../../adapters/filesystem/path-utils';
+} from '../../../ports/kernel-side-effects.port';
 import {
   forceTerminateManagedProcessTree,
   waitForManagedProcessExit,
-} from '../../../adapters/process/process-supervisor';
+} from '../../../ports/kernel-side-effects.port';
 
 type UnityAvatarHostConfig = AvatarConfig['host'];
 type UnityAvatarHostProcessState = 'manual' | 'disabled' | 'starting' | 'running' | 'exited' | 'failed' | 'stopped';
@@ -36,7 +33,7 @@ function appendUnityAvatarHostProcessLog(record: Record<string, unknown>): void 
   });
   fs.ensureDir(avatarHostProcessLogDir)
     .then(() => fs.appendFile(path.join(avatarHostProcessLogDir, PROCESS_LOG_FILE), `${line}\n`, 'utf8'))
-    .catch((error) => {
+    .catch((error: any) => {
       // 不能再走 logger，避免日志 sink 失败时递归写日志。
       console.error('写入 Avatar 子进程日志失败', error);
     });
@@ -156,12 +153,12 @@ export class UnityAvatarHostProcess {
     this._emitSnapshot();
 
     const stdout = readline.createInterface({ input: child.stdout });
-    stdout.on('line', (line) => this.handleProcessLine('stdout', line));
+    stdout.on('line', (line: any) => this.handleProcessLine('stdout', line));
 
     const stderr = readline.createInterface({ input: child.stderr });
-    stderr.on('line', (line) => this.handleProcessLine('stderr', line));
+    stderr.on('line', (line: any) => this.handleProcessLine('stderr', line));
 
-    child.on('error', (error) => {
+    child.on('error', (error: any) => {
       this._state = 'failed';
       this._lastError = error.message;
       appendUnityAvatarHostProcessLog({ level: 'error', stream: 'process', message: error.message });
@@ -169,7 +166,7 @@ export class UnityAvatarHostProcess {
       this._emitSnapshot();
     });
 
-    child.on('exit', (code, signal) => {
+    child.on('exit', (code: any, signal: any) => {
       this._process = null;
       this._lastExitCode = code;
       this._lastExitSignal = signal;

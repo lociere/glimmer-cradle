@@ -1,5 +1,5 @@
 import type { TraceContext } from '@glimmer-cradle/protocol';
-import { DlqReplayIngress } from '../../adapters/events/dlq-replay-ingress';
+import { DlqReplayIngress } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
 
 export class DlqReplayRuntime implements RuntimeModule {

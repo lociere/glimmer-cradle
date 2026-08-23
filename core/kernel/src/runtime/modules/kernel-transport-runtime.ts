@@ -1,8 +1,8 @@
-import type { GlobalConfig } from '../../adapters/config/config-schema';
-import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
+import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
+import { KernelCognitionTransport } from '../../ports/kernel-side-effects.port';
 import { IngressGateManager } from '../../application/ingress/ingress-gate-manager';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 import type { CognitionActionHandler } from '../../ports/cognition-service-port';

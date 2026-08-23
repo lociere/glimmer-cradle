@@ -1,6 +1,6 @@
-import { EventBus } from '../../adapters/events/event-bus';
+import { EventBus } from '../../ports/kernel-side-effects.port';
 import { ModuleStartedEvent, ModuleStoppedEvent } from '../../domain/events';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 
 export interface RuntimeModuleStartDetails extends Record<string, unknown> {

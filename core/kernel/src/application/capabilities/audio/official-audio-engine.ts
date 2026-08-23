@@ -1,20 +1,17 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import path from 'node:path';
-import readline from 'node:readline';
-import fs from 'fs-extra';
+import { fs, path, readline, spawn, type ChildProcessWithoutNullStreams } from '../../../ports/kernel-side-effects.port';
 import type {
   AudioConfig,
   AudioEngineCommand,
   AudioEngineResponse,
   VoiceConfig,
 } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../adapters/observability/logger';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 import {
   forceTerminateManagedProcessTree,
   stopManagedProcess,
   waitForManagedProcessExit,
-} from '../../../adapters/process/process-supervisor';
-import { resolveLogDir, resolveRepoRoot } from '../../../adapters/filesystem/path-utils';
+} from '../../../ports/kernel-side-effects.port';
+import { resolveLogDir, resolveRepoRoot } from '../../../ports/kernel-side-effects.port';
 
 const logger = getLogger('official-audio-engine');
 type AudioCommandName = AudioEngineCommand['command'];
@@ -52,7 +49,7 @@ function appendAudioProcessLog(lane: AudioEngineLane, record: Record<string, unk
   });
   fs.ensureDir(audioProcessLogDir)
     .then(() => fs.appendFile(path.join(audioProcessLogDir, `audio-${lane}.console.log`), `${line}\n`, 'utf8'))
-    .catch((error) => console.error('写入官方音频子进程日志失败', error));
+    .catch((error: any) => console.error('写入官方音频子进程日志失败', error));
 }
 
 export class OfficialAudioEngineClient {
@@ -92,7 +89,7 @@ export class OfficialAudioEngineClient {
         if (options?.resetProcessOnTimeout !== false) this.resetProcess(error);
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
-      child.stdin.write(`${JSON.stringify(message)}\n`, 'utf8', (error) => {
+      child.stdin.write(`${JSON.stringify(message)}\n`, 'utf8', (error: any) => {
         if (!error) return;
         clearTimeout(timer);
         this.pending.delete(id);
@@ -124,10 +121,10 @@ export class OfficialAudioEngineClient {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.process = child;
-    readline.createInterface({ input: child.stdout }).on('line', (line) => this.handleLine(line));
-    readline.createInterface({ input: child.stderr }).on('line', (line) => this.handleProcessLogLine('stderr', line));
-    child.on('error', (error) => this.failAll(error));
-    child.on('exit', (code, signal) => {
+    readline.createInterface({ input: child.stdout }).on('line', (line: any) => this.handleLine(line));
+    readline.createInterface({ input: child.stderr }).on('line', (line: any) => this.handleProcessLogLine('stderr', line));
+    child.on('error', (error: any) => this.failAll(error));
+    child.on('exit', (code: any, signal: any) => {
       const expected = this.stoppingProcess === child;
       if (expected && code === 0) {
         logger.info('官方音频引擎已正常退出', { lane: this.lane, code, signal });

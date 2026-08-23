@@ -7,10 +7,10 @@ import type {
   SkillRegistrationTarget,
 } from '../../types';
 import type { McpServerConfig } from '@glimmer-cradle/protocol';
-import { ConfigManager } from '../../../../adapters/config/config-manager';
-import { getLogger } from '../../../../adapters/observability/logger';
+import { ConfigManager } from '../../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../../ports/kernel-side-effects.port';
 import { RuntimeReadinessProjectionMapper } from '../../../../application/projection/runtime-readiness-projection';
-import type { RuntimeReadinessSnapshot } from '../../../../runtime/readiness';
+import type { RuntimeReadinessSnapshot } from '../../../../ports/runtime-readiness.port';
 import {
   McpServerConnection,
   type McpCapabilitySnapshot,

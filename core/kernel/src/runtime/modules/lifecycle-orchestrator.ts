@@ -6,12 +6,12 @@
  * 只负责自己的组装细节，不再各自抢着宣布全局启动成功。
  */
 import type { TraceContext } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../adapters/observability/logger';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import {
   normalizeRuntimeReadiness,
   strongestRuntimeReadinessState,
   summarizeRuntimeReadiness,
-} from '../../runtime/readiness';
+} from '../../ports/runtime-readiness.port';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { RuntimeModule } from './runtime-module';
 import { startRuntimeModule, stopRuntimeModule } from './runtime-module';

@@ -4,7 +4,7 @@
  * 这些是 TypeScript 端 ``Error`` 子类、运行时实现 —— 跨语言无法序列化（JS Error 不可迁移）。
  * ErrorCode 枚举本身是 schema 契约（schemas/enums/ErrorCode），跨语言；这里只装类。
  */
-import type { ErrorCode } from '@glimmer-cradle/protocol';
+import type { ErrorCode } from '../kernel-contracts';
 
 export class CoreException extends Error {
   public readonly code: ErrorCode;

@@ -11,9 +11,9 @@ import type {
   CognitionActionResult,
 } from '../../ports/cognition-service-port';
 import { ChannelReplyEvent } from '../../domain/events';
-import { EventBus } from '../../adapters/events/event-bus';
-import { getLogger } from '../../adapters/observability/logger';
-import { createTraceContext } from '../../adapters/observability/trace-context';
+import { EventBus } from '../../ports/kernel-side-effects.port';
+import { getLogger } from '../../ports/kernel-side-effects.port';
+import { createTraceContext } from '../../ports/kernel-side-effects.port';
 import { AIProxy } from '../capabilities/inference/ai-proxy';
 import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { RecoveryRequiredError } from '../../domain/errors';

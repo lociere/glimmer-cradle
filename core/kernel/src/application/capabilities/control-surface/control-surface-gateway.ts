@@ -1,12 +1,9 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { AddressInfo } from 'node:net';
-import path from 'node:path';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
-import { EventBus } from '../../../adapters/events/event-bus';
-import { getLogger } from '../../../adapters/observability/logger';
+import { mkdir, path, pathToFileURL, readFile, writeFile, type AddressInfo } from '../../../ports/kernel-side-effects.port';
+import { EventBus } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
-import { resolveWorkDir } from '../../../adapters/filesystem/path-utils';
+import { resolveWorkDir } from '../../../ports/kernel-side-effects.port';
 import { PerceptionAppService } from '../../use-cases/perception-app.service';
 import { AvatarController } from '../avatar/avatar-controller';
 import { isLocalAvatarSurfaceScene } from '../action-stream/surface-scene-scope';
@@ -52,7 +49,7 @@ import type {
   RuntimeReadinessCatalog,
 } from '@glimmer-cradle/protocol';
 import type { SkillConfirmationRequest } from '../../skill-plane/skill-invocation-gateway';
-import { EndpointRegistry } from '../../../adapters/endpoints/endpoint-registry';
+import { EndpointRegistry } from '../../../ports/kernel-side-effects.port';
 import {
   RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
   RecoveryRequiredError,

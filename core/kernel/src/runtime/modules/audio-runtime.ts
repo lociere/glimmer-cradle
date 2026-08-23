@@ -1,8 +1,8 @@
-import { getLogger } from '../../adapters/observability/logger';
+import { getLogger } from '../../ports/kernel-side-effects.port';
 import { AudioService } from '../../application/capabilities/audio/audio-service';
 import { ControlSurfaceGateway } from '../../application/capabilities/control-surface/control-surface-gateway';
-import { ConfigManager } from '../../adapters/config/config-manager';
-import { resolveLogDir } from '../../adapters/filesystem/path-utils';
+import { ConfigManager } from '../../ports/kernel-side-effects.port';
+import { resolveLogDir } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
 import type { AudioConfig, ProductComposition, TraceContext } from '@glimmer-cradle/protocol';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';

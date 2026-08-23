@@ -1,8 +1,8 @@
 import { ActionStreamCancelledEvent, ActionStreamCompletedEvent, ActionStreamStartedEvent } from '../../../domain/events';
-import { createTraceContext } from '../../../adapters/observability/trace-context';
-import { ConfigManager } from "../../../adapters/config/config-manager";
-import { EventBus } from "../../../adapters/events/event-bus";
-import { getLogger } from "../../../adapters/observability/logger";
+import { createTraceContext } from '../../../ports/kernel-side-effects.port';
+import { ConfigManager } from '../../../ports/kernel-side-effects.port';
+import { EventBus } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
 
 const logger = getLogger("action-stream-manager");
 

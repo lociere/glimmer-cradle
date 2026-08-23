@@ -3,9 +3,9 @@
  * 定期探测 Cognition 活性，并发布 Kernel 侧生命时钟事件。
  * 认知节拍和主动性完全由 Cognition Cognitive Activity 管理。
  */
-import { ConfigManager } from "../../../adapters/config/config-manager";
-import { getLogger } from "../../../adapters/observability/logger";
-import { EventBus } from "../../../adapters/events/event-bus";
+import { ConfigManager } from '../../../ports/kernel-side-effects.port';
+import { getLogger } from '../../../ports/kernel-side-effects.port';
+import { EventBus } from '../../../ports/kernel-side-effects.port';
 /**
  * 来源注意力策略 —— 由插件通过 registerSourcePolicies 注入，kernel 内部使用，
  * 不进 YAML 配置故不进 schemas/config/。原为 Zod 推断类型，P.4b 改 ajv 后改为
@@ -20,7 +20,7 @@ export type SourceAttentionPolicy =
 import { OrganismAttentionChangedEvent, OrganismAttentionMode, StateSyncEvent } from '../../../domain/events';
 import type { CognitiveActivitySnapshot } from '@glimmer-cradle/protocol';
 import { IAICapabilityPort } from '../../../ports';
-import { createTraceContext } from '../../../adapters/observability/trace-context';
+import { createTraceContext } from '../../../ports/kernel-side-effects.port';
 import { AttentionLeaseChange, AttentionLeaseStore } from '../../../domain/attention/attention-lease-store';
 import { AttentionTrigger, AttentionTriggerResult } from "./triggers/attention-trigger";
 import { WakeKeywordTrigger } from "./triggers/wake-keyword-trigger";

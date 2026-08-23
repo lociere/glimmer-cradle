@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RuntimeReadinessSnapshot } from '../../runtime/readiness';
-import type { RuntimeResourceSnapshot } from '../../runtime/reconciler';
-import { strongestRuntimeResourceState } from '../../runtime/reconciler';
+import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
+import type { RuntimeResourceSnapshot } from '../../ports/runtime-reconciliation.port';
+import { strongestRuntimeResourceState } from '../../ports/runtime-reconciliation.port';
 import {
   inspectRuntimeDirectoryResource,
   inspectRuntimeFileResource,

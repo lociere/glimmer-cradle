@@ -1,7 +1,7 @@
-import type { GlobalConfig } from '../../adapters/config/config-schema';
+import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
 import { AvatarController } from '../../application/capabilities/avatar/avatar-controller';
 import { setUnityAvatarHostProcessLogRoot } from '../../application/capabilities/avatar/unity-avatar-host-process';
-import { resolveLogDir } from '../../adapters/filesystem/path-utils';
+import { resolveLogDir } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 

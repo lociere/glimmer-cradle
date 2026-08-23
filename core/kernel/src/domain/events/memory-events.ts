@@ -5,7 +5,7 @@
  * 记忆事实由 Cognition 的 data/state/cognition/memory/memory.db 独占，不跨进程复制到 Kernel。
  */
 import { DomainEvent } from "./domain-events";
-import type { TraceContext } from "@glimmer-cradle/protocol";
+import type { TraceContext } from "../kernel-contracts";
 
 export interface StateSyncPayload {
   state: Record<string, any>;

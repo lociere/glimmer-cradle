@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installKernelSideEffectPorts, kernelSideEffectPorts } from '../../../ports/kernel-side-effects.port';
 import type {
   CognitionLifecycleObserver,
   CognitionProcessBootstrap,
@@ -68,6 +69,25 @@ class FakeChild extends EventEmitter {
 
 describe('CognitionManager process capability invalidation', () => {
   const previousRuntime = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME;
+  const compositionPorts = kernelSideEffectPorts();
+
+  beforeEach(() => {
+    installKernelSideEffectPorts({
+      ...compositionPorts,
+      spawn,
+      ConfigManager: {
+        instance: {
+          getConfig: () => ({
+            character: {},
+            system: { cognition_service: { request_timeout_ms: 100, registration_timeout_ms: 100 }, memory: {}, embedding: {}, observability: {} },
+          }),
+          loadDashScopeSecretEnvironment: async () => ({}),
+          loadKnowledgeBaseConfig: async () => ({}),
+          freezeCoreConfig: () => undefined,
+        },
+      },
+    });
+  });
 
   afterEach(async () => {
     vi.mocked(spawn).mockReset();
@@ -81,6 +101,7 @@ describe('CognitionManager process capability invalidation', () => {
     manager.stopping = false;
     if (previousRuntime === undefined) delete process.env.GLIMMER_CRADLE_PYTHON_RUNTIME;
     else process.env.GLIMMER_CRADLE_PYTHON_RUNTIME = previousRuntime;
+    installKernelSideEffectPorts(compositionPorts);
   });
 
   it('invalidates the FD3 secret when spawn returns no PID and emits ENOENT', async () => {
