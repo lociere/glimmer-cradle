@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from uuid import uuid4
 from typing import ClassVar, Generic, TypeVar
-from glimmer_cradle.cognition.observability.logger import get_logger
+from glimmer_cradle.cognition.ports.observability import get_logger
 
 # 泛型定义：输入/输出类型
 Input = TypeVar("Input")

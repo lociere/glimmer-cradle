@@ -4,47 +4,52 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from glimmer_cradle.cognition.activity import CognitiveActivityController
+from glimmer_cradle.cognition.application.activity import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
-from glimmer_cradle.cognition.context import ContextAssembly
-from glimmer_cradle.cognition.conversation import ConversationController, ConversationStore
-from glimmer_cradle.cognition.context.sources import (
+from glimmer_cradle.cognition.application.context import ContextAssembly
+from glimmer_cradle.cognition.application.conversation import ConversationController
+from glimmer_cradle.cognition.adapters.persistence.conversation import ConversationStore
+from glimmer_cradle.cognition.application.context.sources import (
     EpisodicMemorySource,
     KnowledgeSource,
     RecentExperienceSource,
     RelationshipSource,
 )
-from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.cycle.providers import (
+from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.application.cycle.providers import (
     AffectProvider,
     DriveProvider,
     MemoryProvider,
     PerceptionProvider,
     SocialProvider,
 )
-from glimmer_cradle.cognition.experience.episodes import EpisodeProjection
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
-from glimmer_cradle.cognition.foundation.config import CharacterRuntimeConfig, CognitionConfig, MemoryConfig
-from glimmer_cradle.cognition.foundation.path_utils import resolve_episode_projection_path, resolve_experience_dir
-from glimmer_cradle.cognition.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.inference.cloud import CloudReasoning
-from glimmer_cradle.cognition.inference.embedding import EmbeddingEngine
-from glimmer_cradle.cognition.inference.gateway import LLMEngine
-from glimmer_cradle.cognition.inference.multimodal import MultimodalRouter
-from glimmer_cradle.cognition.inference.service import ReasoningService
-from glimmer_cradle.cognition.memory.consolidation import ConsolidationCoordinator
-from glimmer_cradle.cognition.maintenance import MaintenanceScheduler
-from glimmer_cradle.cognition.memory.relationship_projection import RelationshipProjection
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.knowledge_repo import KnowledgeRepository
-from glimmer_cradle.cognition.memory.storage.memory_repo import MemoryRepository
-from glimmer_cradle.cognition.memory.storage.consolidation_job_repo import ConsolidationJobRepository
-from glimmer_cradle.cognition.memory.storage.relationship_repo import RelationshipRepository
-from glimmer_cradle.cognition.memory.storage.vector_repo import VectorRepository
-from glimmer_cradle.cognition.observability.logger import get_logger
+from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
+from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.adapters.clock import SystemClock
+from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
+from glimmer_cradle.cognition.adapters.paths import resolve_episode_projection_path, resolve_experience_dir
+from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
+from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
+from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
+from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
+from glimmer_cradle.cognition.application.inference.service import ReasoningService
+from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
+from glimmer_cradle.cognition.application.memory import KnowledgeBase, MemorySubstrate
+from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
+from glimmer_cradle.cognition.adapters.observability.logger import get_logger
+from glimmer_cradle.cognition.adapters.observability.binding import bind_file_observability
 from glimmer_cradle.cognition.adapters.kernel import (
     CognitionGrpcHost,
     KernelEventInboundAdapter,
@@ -64,6 +69,8 @@ class CognitionComponents:
     cognition_grpc_host: CognitionGrpcHost
     outbound_adapter: KernelEventOutboundAdapter
     experience_recorder: ExperienceRecorder
+    memory_substrate: MemorySubstrate
+    knowledge_base: KnowledgeBase
     activity_controller: CognitiveActivityController
     cognition_database: CognitionDatabase
     conversation_controller: ConversationController
@@ -72,7 +79,7 @@ class CognitionComponents:
 
 
 def compose_cognition(
-    config: CharacterRuntimeConfig,
+    config: CharacterRuntimeSettings,
     *,
     generation: str,
     registration_nonce: str,
@@ -82,11 +89,13 @@ def compose_cognition(
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     logger.info("Cognition Composition 开始组装")
 
-    memory_config = config.memory or MemoryConfig()
+    bind_file_observability()
+    memory_config = config.memory
     experience_config = memory_config.experience
-    cognition_config = config.cognition or CognitionConfig()
+    cognition_config = config.cognition
 
-    experience_recorder = ExperienceRecorder(
+    clock = SystemClock()
+    experience_recorder = build_experience_recorder(
         resolve_experience_dir(),
         enabled=experience_config.enabled,
         pack_max_size_mb=experience_config.pack_max_size_mb,
@@ -104,13 +113,20 @@ def compose_cognition(
         working_config=memory_config.working,
     )
 
+    memory_substrate = MemorySubstrate(
+        token_budget=memory_config.retrieval.token_budget,
+        candidate_limit=memory_config.retrieval.candidate_limit,
+        result_limit=memory_config.retrieval.result_limit,
+    )
+    knowledge_base = KnowledgeBase()
     self_entity = SelfEntity(
         manifest_config=config.manifest,
         inference_config=config.inference,
         profile_config=config.profile,
         dialogue_config=config.dialogue,
         safety_config=config.safety,
-        memory_config=memory_config,
+        memory=memory_substrate,
+        knowledge_base=knowledge_base,
     )
     self_entity.persona_injector.init(
         manifest_config=config.manifest,
@@ -118,12 +134,13 @@ def compose_cognition(
         dialogue_config=config.dialogue,
         safety_config=config.safety,
     )
-    self_entity.memory.bind_repository(memory_repository)
-    self_entity.knowledge_base.bind_repository(knowledge_repository)
-    self_entity.knowledge_base.bind_vector_repository(vector_repository)
+    memory_substrate.bind_repository(memory_repository)
+    knowledge_base.bind_repository(knowledge_repository)
+    knowledge_base.bind_vector_repository(vector_repository)
 
     activity_controller = CognitiveActivityController(
         experience_recorder=experience_recorder,
+        clock=clock,
         affect_activation_provider=lambda: float(
             self_entity.emotion_system.get_state().get("intensity", 0.0)
         ),
@@ -133,8 +150,8 @@ def compose_cognition(
     llm_engine = LLMEngine(self_entity=self_entity, llm_config=config.llm)
     multimodal_router = MultimodalRouter(inference_config=config.inference)
     multimodal_router.set_llm_engine(llm_engine)
-    embedding_engine = _build_embedding_engine(config, self_entity)
-    self_entity.memory.bind_vector_search(
+    embedding_engine = _build_embedding_engine(config, knowledge_base)
+    memory_substrate.bind_vector_search(
         engine=embedding_engine,
         repository=vector_repository,
         semantic_weight=memory_config.retrieval.semantic_weight,
@@ -167,8 +184,8 @@ def compose_cognition(
     )
     context_assembly = ContextAssembly(sources=[
         RecentExperienceSource(experience_recorder),
-        EpisodicMemorySource(self_entity.memory),
-        KnowledgeSource(self_entity.knowledge_base),
+        EpisodicMemorySource(memory_substrate),
+        KnowledgeSource(knowledge_base),
         RelationshipSource(relationship_repository),
     ])
     reasoning = ReasoningService(cloud=CloudReasoning(llm_engine), local=None)
@@ -182,9 +199,10 @@ def compose_cognition(
     consolidation_config = memory_config.consolidation
     consolidation_coordinator = ConsolidationCoordinator(
         episodes=episode_projection,
-        memory=self_entity.memory,
+        memory=memory_substrate,
         jobs=ConsolidationJobRepository(cognition_database),
         llm=llm_engine,
+        clock=clock,
         relationship_projection=relationship_projection,
         enabled=consolidation_config.enabled,
         batch_size=consolidation_config.batch_size,
@@ -249,6 +267,8 @@ def compose_cognition(
         cognition_grpc_host=cognition_grpc_host,
         outbound_adapter=outbound_adapter,
         experience_recorder=experience_recorder,
+        memory_substrate=memory_substrate,
+        knowledge_base=knowledge_base,
         activity_controller=activity_controller,
         cognition_database=cognition_database,
         conversation_controller=conversation_controller,
@@ -258,8 +278,8 @@ def compose_cognition(
 
 
 def _build_embedding_engine(
-    config: CharacterRuntimeConfig, self_entity: SelfEntity
+    config: CharacterRuntimeSettings, knowledge_base: KnowledgeBase
 ) -> EmbeddingEngine:
     engine = EmbeddingEngine(config.embedding)
-    self_entity.knowledge_base.set_embedding_engine(engine)
+    knowledge_base.set_embedding_engine(engine)
     return engine

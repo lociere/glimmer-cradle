@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.cycle.providers import Provider
-from glimmer_cradle.cognition.cycle.workspace import WorkspaceItem, make_item
-from glimmer_cradle.cognition.context.sources.episodic_source import RecentExperienceSource
-from glimmer_cradle.cognition.experience.ledger import ExperienceLedger
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
-from glimmer_cradle.cognition.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
+from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+from glimmer_cradle.cognition.application.cycle.providers import Provider
+from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
+from glimmer_cradle.cognition.adapters.persistence.experience.ledger import ExperienceLedger
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
 
 
 def read_ledger_moments(path):
@@ -104,7 +104,7 @@ async def test_tick_runs_all_providers(tmp_path: Path) -> None:
                                                  content={"v": 1}, salience=0.8)])
     p2 = _FixedProvider("affect", [make_item(source="affect",
                                              content={"v": 2}, salience=0.3)])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[p1, p2],
                          experience_recorder=recorder)
@@ -124,7 +124,7 @@ async def test_internal_broadcast_does_not_become_thought_moment(tmp_path: Path)
     ws = GlobalWorkspace(capacity=3)
     p = _FixedProvider("drive", [make_item(source="drive",
                                            content={"drive": "curiosity"}, salience=0.9)])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[p], experience_recorder=recorder)
     try:
@@ -144,7 +144,7 @@ async def test_perception_broadcast_writes_no_thought_moment(tmp_path: Path) -> 
     p = _FixedProvider("perception", [make_item(source="perception",
                                                 content={"text": "hi", "scene_id": "s",
                                                          "trace_id": "t"}, salience=0.9)])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[p], experience_recorder=recorder)
     try:
@@ -163,7 +163,7 @@ async def test_tick_no_broadcast_writes_no_moment(tmp_path: Path) -> None:
     经历之流只收真实的一刻，不被"她什么都没想"灌满。"""
     ws = GlobalWorkspace(capacity=3)
     p = _FixedProvider("drive", [])  # 没有候选
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[p], experience_recorder=recorder)
     try:
@@ -187,7 +187,7 @@ async def test_crashing_provider_does_not_break_loop(tmp_path: Path) -> None:
     crasher = _CrashingProvider()
     good = _FixedProvider("affect", [make_item(source="affect",
                                                content={"v": 1}, salience=0.5)])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[crasher, good],
                          experience_recorder=recorder)
@@ -208,7 +208,7 @@ async def test_compete_picks_highest_salience(tmp_path: Path) -> None:
                                                 content={"v": "low"}, salience=0.2)])
     p_high = _FixedProvider("affect", [make_item(source="affect",
                                                  content={"v": "high"}, salience=0.9)])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[p_low, p_high],
                          experience_recorder=recorder)
@@ -227,7 +227,7 @@ async def test_compete_picks_highest_salience(tmp_path: Path) -> None:
 
 async def test_start_stop_no_providers(tmp_path: Path) -> None:
     ws = GlobalWorkspace()
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[],
                          experience_recorder=recorder,
@@ -246,7 +246,7 @@ async def test_notify_external_input_interrupts_long_sleep(tmp_path: Path) -> No
     """外部输入应打断长睡眠，让入站感知不再等 dormant 的下一次自然 tick。"""
     ws = GlobalWorkspace()
     provider = _FixedProvider("drive", [])
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(
         workspace=ws,
@@ -274,7 +274,7 @@ async def _wait_until(predicate) -> None:
 
 async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
     """perception 广播 → Deliberate 调 reasoning 生成 → reply intent 用生成文本。"""
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -285,7 +285,7 @@ async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
                               salience=0.9)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -303,7 +303,7 @@ async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
 
 async def test_deliberate_no_reasoning_no_reply(tmp_path: Path) -> None:
     """无 reasoning 注入 → 不生成 → perception 不产 reply intent（沉默）。"""
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -314,7 +314,7 @@ async def test_deliberate_no_reasoning_no_reply(tmp_path: Path) -> None:
                               salience=0.9)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -331,7 +331,7 @@ async def test_deliberate_no_reasoning_no_reply(tmp_path: Path) -> None:
 
 async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
     """生成内容越过人设红线 → boundary_validator 拦截 → 不回复。"""
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -342,7 +342,7 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
                               salience=0.9)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -361,8 +361,8 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
 
 async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
     """Deliberate 按 activity profile.model_tier 选档。"""
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
-    from glimmer_cradle.cognition.inference.service import ModelTierEnum
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.inference.service import ModelTierEnum
 
     class _Fixed(Provider):
         name = "perception"
@@ -379,7 +379,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
 
     fake = _FakeReasoning("回复")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -398,9 +398,9 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
 
 async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     """perception 广播 → reply intent → Act 推 ActionCommand 经 sink。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -418,7 +418,7 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
         emitted.append(cmd)
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -442,9 +442,9 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
 
 async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path) -> None:
     """结构化 ActionPlan 判定需要外部能力时发 skill_request。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -472,7 +472,7 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
         ),
     ])
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -513,8 +513,8 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
 )
 async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, capability_kind: str) -> None:
     """自然表达经 ActionPlan 进入 Skill，不依赖关键词 gate。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -536,7 +536,7 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
         _action_plan_json("skill_request", user_text, capability_kind, "需要外部能力", 0.91),
     ])
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -565,8 +565,8 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
 )
 async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user_text: str) -> None:
     """解释概念、禁止执行和普通互动不触发 Skill。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -589,7 +589,7 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
         "可以，我直接告诉你。",
     ])
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -612,8 +612,8 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
 
 async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: Path) -> None:
     """ActionPlan=noop 是显式沉默，不会落入普通回复生成。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -636,7 +636,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
         "这条普通回复不应该被消费",
     ])
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -664,8 +664,8 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
 
 async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: Path) -> None:
     """ActionPlan=ask_clarification 生成显式澄清回复，不走普通 reply fallback。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -695,7 +695,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
         "这条普通回复不应该被消费",
     ])
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -717,8 +717,8 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
 
 async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: Path) -> None:
     """ReasoningService 不可用时不能靠关键词或副作用兜底执行 Skill。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -737,7 +737,7 @@ async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: 
         emitted.append(cmd)
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -755,7 +755,7 @@ async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: 
 
 async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> None:
     """外部 perception 是事件：处理完应从工作区移除，不在下一拍重复回复。"""
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Once(Provider):
         name = "perception"
@@ -781,7 +781,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
 
     reasoning = _FakeReasoning("你好呀")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -802,9 +802,9 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
 
 async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
     """直接外部输入应在同一拍即时唤醒，再进入 Deliberate/Volition。"""
-    from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-    from glimmer_cradle.cognition.cycle.providers.perception import PerceptionProvider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+    from glimmer_cradle.cognition.application.cycle.providers.perception import PerceptionProvider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Activity:
         def __init__(self) -> None:
@@ -845,7 +845,7 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
     ))
     reasoning = _FakeReasoning("你好呀")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         activity.engage("direct_perception")
@@ -870,9 +870,9 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
 
 async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: Path) -> None:
     """工作区被 drive 填满时，直接对话仍应成为本拍广播并回复。"""
-    from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-    from glimmer_cradle.cognition.cycle.providers.perception import PerceptionProvider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+    from glimmer_cradle.cognition.application.cycle.providers.perception import PerceptionProvider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     emitted: list[dict] = []
 
@@ -898,7 +898,7 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
         content={"drive": "companionship", "level": 1.0},
         salience=1.0,
     ))
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -922,9 +922,9 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
 
 async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
     """无 action_sink → Act 不推送，不报错（沉默默认）。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -934,7 +934,7 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
                               salience=0.9)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -949,9 +949,9 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
 
 async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     """Deliberate 生成空文本 → 无 reply intent → 不推 ActionCommand（沉默）。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -967,7 +967,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
         emitted.append(cmd)
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -984,9 +984,9 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
 
 async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     """sink 抛错 → 隔离，不连坐 tick。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1000,7 +1000,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
         raise RuntimeError("ipc down")
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1017,9 +1017,9 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
 
 async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     """有 emotion_system → ActionCommand 带 emotion_state。"""
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1039,7 +1039,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
         emitted.append(cmd)
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1061,9 +1061,9 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
 
 async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> None:
     """perception 入站 → Appraise 调 update_by_input + 写 PERCEPTION/EMOTION Moment。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
-    from glimmer_cradle.cognition.experience.events import MomentKind
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.experience.events import MomentKind
 
     class _Fixed(Provider):
         name = "perception"
@@ -1084,7 +1084,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
 
     emo = _Emotion()
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1117,8 +1117,8 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
 
 async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
     """无 perception 广播 → 情绪不动、不写 PERCEPTION/EMOTION Moment。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.experience.events import MomentKind
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.experience.events import MomentKind
 
     class _DriveOnly(Provider):
         name = "drive"
@@ -1137,7 +1137,7 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
 
     emo = _Emotion()
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1156,8 +1156,8 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
 
 async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> None:
     """用户输入与真实回复只写 Experience，供 Conversation 投影重建。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1174,7 +1174,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
                               salience=0.95)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1194,8 +1194,8 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
 
 async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: Path) -> None:
     """回复未通过仲裁时只保留感知与沉默事实。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1211,7 +1211,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
                               salience=0.5)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1249,8 +1249,8 @@ class _CapturingReasoning:
 
 async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     """Deliberate 按固定分区装配会话状态、历史片段、记忆与知识。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1293,7 +1293,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
 
     cap = _CapturingReasoning("我在呀")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1319,9 +1319,9 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
 
 async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: Path) -> None:
     """本地私聊不能召回扩展群聊的 space-local 经历。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
-    from glimmer_cradle.cognition.experience.events import MomentKind
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+    from glimmer_cradle.cognition.domain.experience.events import MomentKind
 
     class _Fixed(Provider):
         name = "perception"
@@ -1361,7 +1361,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
 
     cap = _CapturingReasoning("我看到了")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         recorder.record(
@@ -1396,7 +1396,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
 
 async def test_recent_experience_digest_does_not_duplicate_speaker_tag(tmp_path: Path) -> None:
     """NapCat 文本已带群成员标签时，不再额外重复 actor_name。"""
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         recorder.record(
@@ -1429,8 +1429,8 @@ async def test_recent_experience_digest_does_not_duplicate_speaker_tag(tmp_path:
 
 async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
     """perception→回复 一拍走完：PERCEPTION→EMOTION→REPLY 因果链成形。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1445,7 +1445,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
         def get_state(self): return {"emotion_type": "开心", "intensity": 0.7}
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1474,8 +1474,8 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
 
 async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> None:
     """收到输入但回复被压制 → SILENCE Moment 链回 perception（沉默不等于无感）。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1486,7 +1486,7 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
                               salience=0.5)]
 
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1511,8 +1511,8 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
 
 async def test_observe_only_perception_records_without_reasoning(tmp_path: Path) -> None:
     """observe_only 进入经历链路，但 Deliberate 不调用推理、不生成回复。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1530,7 +1530,7 @@ async def test_observe_only_perception_records_without_reasoning(tmp_path: Path)
 
     reasoning = _FakeReasoning("不应该生成")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1583,8 +1583,8 @@ class _FakeRouter:
 
 async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> None:
     """specialist_then_core：图片描述（semantic_text）进 system prompt。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1598,7 +1598,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
     router = _FakeRouter(_Route(primary_text="", semantic_text="一张开心的表情包"))
     cap = _CapturingReasoning("哈哈")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -1618,8 +1618,8 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
 
 async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -> None:
     """core_direct：vision 消息随 ReasoningRequest 直发主模型 + 带 provider_key。"""
-    from glimmer_cradle.cognition.cycle.providers import Provider
-    from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1643,7 +1643,7 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
     router = _FakeRouter(route)
     cap = _CapturingReasoning("好看")
     ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(

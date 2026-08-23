@@ -49,3 +49,10 @@ build-backend = "setuptools.build_meta"
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.mypy]
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_optional = false

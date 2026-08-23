@@ -1,10 +1,10 @@
 from pathlib import Path
 from datetime import timedelta
 
-from glimmer_cradle.cognition.cycle.providers import DriveProvider, SocialProvider
-from glimmer_cradle.cognition.cycle.workspace import make_item
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.relationship_repo import RelationshipRepository
+from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, SocialProvider
+from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 
 
 async def test_drive_accumulates_and_can_propose() -> None:

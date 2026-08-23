@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from glimmer_cradle.cognition.foundation.path_utils import (
+from glimmer_cradle.cognition.adapters.paths import (
     resolve_global_data_dir,
     resolve_repo_root,
     resolve_run_dir,

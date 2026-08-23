@@ -6,14 +6,14 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from glimmer_cradle.cognition.context import (
+from glimmer_cradle.cognition.application.context import (
     ContextAssembly,
     ContextItem,
     ContextQuery,
     ContextSource,
 )
-from glimmer_cradle.cognition.context.sources.base import estimate_tokens
-from glimmer_cradle.cognition.context.sources.episodic_source import EpisodicMemorySource
+from glimmer_cradle.cognition.application.context.sources.base import estimate_tokens
+from glimmer_cradle.cognition.application.context.sources.episodic_source import EpisodicMemorySource
 
 
 class _FixedSource(ContextSource):

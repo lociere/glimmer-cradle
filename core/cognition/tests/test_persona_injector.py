@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from glimmer_cradle.cognition.foundation.config import (
-    CharacterManifestConfig,
-    CharacterProfileConfig,
-    DialoguePolicyConfig,
-    SafetyConfig,
+from glimmer_cradle.cognition.domain.configuration import (
+    CharacterManifestSettings,
+    CharacterProfileSettings,
+    DialoguePolicySettings,
+    SafetySettings,
 )
-from glimmer_cradle.cognition.persona.persona_injector import PersonaInjector
+from glimmer_cradle.cognition.domain.persona.persona_injector import PersonaInjector
 
 
-def _manifest_config() -> CharacterManifestConfig:
-    return CharacterManifestConfig.model_validate({
+def _manifest_config() -> CharacterManifestSettings:
+    return CharacterManifestSettings.model_validate({
         "character_id": "selrena",
         "base": {"name": "Selrena", "nickname": "月见"},
         "persona_mode": "api",
@@ -20,16 +20,16 @@ def _manifest_config() -> CharacterManifestConfig:
     })
 
 
-def _safety_config() -> SafetyConfig:
-    return SafetyConfig.model_validate({
+def _safety_config() -> SafetySettings:
+    return SafetySettings.model_validate({
         "taboos": "不要自称 AI。",
         "forbidden_phrases": ["我是AI"],
         "forbidden_regex": [r"(AI|人工智能|语言模型).{0,10}(助手|程序)"],
     })
 
 
-def _profile_config() -> CharacterProfileConfig:
-    return CharacterProfileConfig.model_validate({
+def _profile_config() -> CharacterProfileSettings:
+    return CharacterProfileSettings.model_validate({
         "identity": {
             "summary": "月见重视真实和边界。",
             "appearance": "银白长发少女。",
@@ -58,8 +58,8 @@ def _profile_config() -> CharacterProfileConfig:
     })
 
 
-def _dialogue_config() -> DialoguePolicyConfig:
-    return DialoguePolicyConfig.model_validate({
+def _dialogue_config() -> DialoguePolicySettings:
+    return DialoguePolicySettings.model_validate({
         "presentation": {
             "forbid_stage_directions": True,
             "forbid_emotion_labels": True,

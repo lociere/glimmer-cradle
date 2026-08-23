@@ -2,10 +2,9 @@
 gen-py.py —— Schema-First Python 端 codegen
 
 设计原则：
-- 从 protocol/src/schemas/<rel>/X.schema.json 生成 Pydantic v2 模型到
-  core/cognition/src/glimmer_cradle/cognition/protocol/generated/<rel>/x.py（snake_case）
+- 迁移期只从 protocol/src/schemas/engine/ 生成 Audio Pydantic v2 模型；
+  Cognition 的旧 Python 全量投影已在 M12 Slice 4 删除
 - 调 datamodel-code-generator 子进程（Python 生态原生工具，从 Python 调最自然）
-- config/ 子目录注入 frozen=True（配置不可篡改语义）
 - --disable-timestamp 消除每次跑都改 git 的噪声
 - 自动产 __init__.py 子目录与根聚合
 
@@ -33,7 +32,6 @@ THIS_FILE = Path(__file__).resolve()
 PROTOCOL_ROOT = THIS_FILE.parent.parent
 REPO_ROOT = PROTOCOL_ROOT.parent
 SCHEMA_DIR = PROTOCOL_ROOT / "src" / "schemas"
-COGNITION_OUT_DIR = REPO_ROOT / "core" / "cognition" / "src" / "glimmer_cradle" / "cognition" / "protocol" / "generated"
 AUDIO_ENGINE_OUT_DIR = REPO_ROOT / "engines" / "audio" / "src" / "glimmer_cradle" / "audio" / "generated"
 
 
@@ -43,40 +41,16 @@ def _to_snake_case(name: str) -> str:
 
 
 def _iter_schemas(schema_dir: Path):
-    """递归遍历所有 schema 文件，跳过隐藏目录与 .checksum。"""
-    for path in sorted(schema_dir.rglob("*.schema.json")):
+    """只遍历尚未迁移的 Audio engine Schema。"""
+    for path in sorted((schema_dir / "engine").rglob("*.schema.json")):
         if any(part.startswith(".") for part in path.relative_to(schema_dir).parts):
             continue
         yield path
 
 
-def _output_root_for(schema_path: Path) -> Path:
-    rel = schema_path.relative_to(SCHEMA_DIR)
-    return AUDIO_ENGINE_OUT_DIR if rel.parts[:1] == ("engine",) else COGNITION_OUT_DIR
-
-
 def _py_out_for(schema_path: Path) -> Path:
-    rel = schema_path.relative_to(SCHEMA_DIR)
-    stem = rel.stem.replace(".schema", "")
-    root = _output_root_for(schema_path)
-    parent = Path() if root == AUDIO_ENGINE_OUT_DIR else rel.parent
-    return root / parent / f"{_to_snake_case(stem)}.py"
-
-
-def _inject_frozen(py_file: Path) -> None:
-    """把 ConfigDict(extra='forbid',) 替换为含 frozen=True 的形态。
-
-    仅作用于 config/ 子目录 —— 配置一经注入运行时不可篡改（与 Pydantic 旧手写
-    模型一致的 frozen 语义）。其余 schema（models / ipc / enums）保留默认可变性，
-    业务代码可能要构造它们。
-    """
-    text = py_file.read_text(encoding="utf-8")
-    new = text.replace(
-        "ConfigDict(\n        extra='forbid',\n    )",
-        "ConfigDict(\n        extra='forbid',\n        frozen=True,\n    )",
-    )
-    if new != text:
-        py_file.write_text(new, encoding="utf-8")
+    stem = schema_path.stem.replace(".schema", "")
+    return AUDIO_ENGINE_OUT_DIR / f"{_to_snake_case(stem)}.py"
 
 
 def generate_schema_py(schema_file: Path) -> None:
@@ -114,11 +88,6 @@ def generate_schema_py(schema_file: Path) -> None:
         temp_dir.cleanup()
     if result.returncode != 0:
         raise RuntimeError(f"Python 生成失败 {schema_file.name}: {result.stderr.strip()}")
-
-    # config/ 子目录注入 frozen=True
-    if schema_file.relative_to(SCHEMA_DIR).parts[:1] == ("config",):
-        _inject_frozen(out_file)
-
 
 def _resolve_local_refs(value, base_dir: Path):
     """内联仓库内 Schema 引用，避免 Python 生成器按远程 ``$id`` 下载。"""
@@ -177,14 +146,12 @@ def main() -> None:
         sys.exit(1)
 
     print(f"📜 扫描 Schema: {SCHEMA_DIR.relative_to(REPO_ROOT)}（共 {len(schemas)} 份）")
-    for output_dir in (COGNITION_OUT_DIR, AUDIO_ENGINE_OUT_DIR):
-        shutil.rmtree(output_dir, ignore_errors=True)
-        output_dir.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(AUDIO_ENGINE_OUT_DIR, ignore_errors=True)
+    AUDIO_ENGINE_OUT_DIR.mkdir(parents=True, exist_ok=True)
     print("── 生成 Python Pydantic 模型 ──")
     for sch in schemas:
         generate_schema_py(sch)
     print("── 生成索引文件 ──")
-    generate_indices(COGNITION_OUT_DIR)
     generate_indices(AUDIO_ENGINE_OUT_DIR)
     print("✅ Python 契约同步完成")
 

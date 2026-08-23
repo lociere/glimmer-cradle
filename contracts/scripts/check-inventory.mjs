@@ -15,7 +15,7 @@ const inventory = readFileSync(inventoryPath, 'utf8');
 const required = [
   'protocol/src/schemas/',
   'protocol/src/generated/',
-  'core/cognition/src/glimmer_cradle/cognition/protocol/generated/',
+  'Cognition legacy Python projection 已删除',
   'core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs',
   '配置 consumers',
   'SDK consumers',

@@ -18,14 +18,25 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from glimmer_cradle.cognition.foundation.path_utils import resolve_experience_dir
-from glimmer_cradle.cognition.experience.events import Moment
-from glimmer_cradle.cognition.experience.replay import (
-    iter_moments,
-    replay_causation,
-    replay_trace,
-    verify,
-)
+from glimmer_cradle.cognition.adapters.paths import resolve_experience_dir
+from glimmer_cradle.cognition.adapters.persistence.experience.ledger import ExperienceLedger
+from glimmer_cradle.cognition.domain.experience.events import Moment
+
+
+def iter_moments(base_dir: Path) -> list[Moment]:
+    return ExperienceLedger(base_dir).query()
+
+
+def replay_trace(base_dir: Path, trace_id: str) -> list[Moment]:
+    return [item for item in iter_moments(base_dir) if item.trace_id == trace_id]
+
+
+def replay_causation(base_dir: Path, moment_id: str) -> list[Moment]:
+    return [item for item in iter_moments(base_dir) if moment_id in item.causation_ids]
+
+
+def verify(base_dir: Path) -> dict[str, object]:
+    return ExperienceLedger(base_dir).verify()
 
 
 def _print_moment(m: Moment) -> None:

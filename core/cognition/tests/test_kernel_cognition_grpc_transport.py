@@ -7,13 +7,13 @@ from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
-from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.cycle import CycleController
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.providers import PerceptionProvider
-from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
-from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace
+from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
+from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace
 from glimmer_cradle.cognition.ports.kernel.models import AgentPlanResult
 
 
@@ -253,7 +253,7 @@ async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> N
     queue = PerceptionEventQueue(max_size=10)
     operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=5)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     cycle = CycleController(
         workspace=workspace,

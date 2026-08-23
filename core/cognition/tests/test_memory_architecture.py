@@ -4,16 +4,19 @@ import json
 
 import pytest
 
-from glimmer_cradle.cognition.memory.substrate import MemorySubstrate
-from glimmer_cradle.cognition.memory.consolidation import ConsolidationCoordinator
-from glimmer_cradle.cognition.maintenance import MaintenanceScheduler
-from glimmer_cradle.cognition.memory.relationship_projection import RelationshipProjection
-from glimmer_cradle.cognition.experience import EpisodeProjection, ExperienceRecorder, Moment, MomentKind
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.memory_repo import MemoryRepository
-from glimmer_cradle.cognition.memory.storage.consolidation_job_repo import ConsolidationJobRepository
-from glimmer_cradle.cognition.memory.storage.relationship_repo import RelationshipRepository
-from glimmer_cradle.cognition.protocol.generated.enums.memory_kind import MemoryKind
+from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate
+from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
+from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
+from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.adapters.clock import SystemClock
+from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
+from glimmer_cradle.cognition.domain.memory import MemoryKind
 
 
 @pytest.fixture
@@ -99,7 +102,7 @@ async def test_relationship_counters_are_deterministic_and_summary_has_evidence(
 
 
 async def test_relationship_projection_is_idempotent_from_ledger(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -168,6 +171,7 @@ async def test_maintenance_scheduler_is_independent_and_quiescent_forces_seal() 
         memory=object(),
         jobs=_SchedulingJobs(),
         llm=None,
+        clock=SystemClock(),
     )
     state = "engaged"
     scheduler = MaintenanceScheduler(
@@ -195,6 +199,7 @@ async def test_terminal_moment_wakes_maintenance_without_forced_seal() -> None:
         memory=object(),
         jobs=_SchedulingJobs(),
         llm=None,
+        clock=SystemClock(),
     )
     scheduler = MaintenanceScheduler(
         consolidation=coordinator,
@@ -212,7 +217,7 @@ async def test_terminal_moment_wakes_maintenance_without_forced_seal() -> None:
 async def test_running_scheduler_consolidates_semantic_boundary_without_shutdown(
     tmp_path: Path,
 ) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     database = CognitionDatabase(tmp_path / "memory" / "memory.db")
     await database.connect()
@@ -228,6 +233,7 @@ async def test_running_scheduler_consolidates_semantic_boundary_without_shutdown
         memory=memory,
         jobs=ConsolidationJobRepository(database),
         llm=llm,
+        clock=SystemClock(),
         minimum_salience=0.1,
         debounce_seconds=0,
     )
@@ -280,7 +286,7 @@ async def test_running_scheduler_consolidates_semantic_boundary_without_shutdown
 
 
 async def test_episode_consolidation_writes_evidence_backed_memory(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     moment = recorder.record(
         MomentKind.PERCEPTION,
@@ -310,7 +316,7 @@ async def test_episode_consolidation_writes_evidence_backed_memory(tmp_path: Pat
     }]}, ensure_ascii=False))
     coordinator = ConsolidationCoordinator(
         episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
-        llm=llm, minimum_salience=0.1, debounce_seconds=0)
+        llm=llm, clock=SystemClock(), minimum_salience=0.1, debounce_seconds=0)
     await coordinator.start()
 
     assert await coordinator.consolidate(force_seal=True) == 1
@@ -323,7 +329,7 @@ async def test_episode_consolidation_writes_evidence_backed_memory(tmp_path: Pat
 
 
 async def test_invalid_consolidation_evidence_remains_retryable(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(MomentKind.PERCEPTION, {"text": "候选"}, interaction_id="turn-1",
                     retention_ceiling="memory_candidate", importance=0.9)
@@ -340,7 +346,7 @@ async def test_invalid_consolidation_evidence_remains_retryable(tmp_path: Path) 
     )
     coordinator = ConsolidationCoordinator(
         episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
-        llm=llm, minimum_salience=0.1, debounce_seconds=0)
+        llm=llm, clock=SystemClock(), minimum_salience=0.1, debounce_seconds=0)
     await coordinator.start()
 
     assert await coordinator.consolidate(force_seal=True) == 0
@@ -354,7 +360,7 @@ async def test_invalid_consolidation_evidence_remains_retryable(tmp_path: Path) 
 async def test_consolidation_batches_are_partitioned_by_permission_domain(
     tmp_path: Path,
 ) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     for interaction_id, conversation_id, scope in (
         ("private-turn", "conversation:private", "conversation_private"),
@@ -384,6 +390,7 @@ async def test_consolidation_batches_are_partitioned_by_permission_domain(
         memory=memory,
         jobs=ConsolidationJobRepository(database),
         llm=llm,
+        clock=SystemClock(),
         minimum_salience=0.1,
         debounce_seconds=0,
         batch_size=8,

@@ -1,7 +1,7 @@
 """Provider 基类 + 5 个 stub 的接口契约测试（阶段 5.2）。"""
 import pytest
 
-from glimmer_cradle.cognition.cycle.providers import (
+from glimmer_cradle.cognition.application.cycle.providers import (
     ALL_PROVIDER_CLASSES,
     AffectProvider,
     DriveProvider,

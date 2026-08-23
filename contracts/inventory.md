@@ -21,7 +21,7 @@
 |---|---|---|---|---|---|
 | `protocol/src/schemas/` | JSON Schema 共 106 份：`config` 22、`engine` 2、`enums` 9、`extension` 7、`ipc` 8、`models` 58。 | Protocol owner | `protocol/src/schemas/` | Slice 1 冻结；Slice 2-9 逐边界迁移 | Slice 9 中所有 runtime consumer、生成链、配置/SDK 引用归零后删除；Slice 1 不修改、不删除。 |
 | `protocol/src/generated/` | TypeScript 生成物共 112 个 `.ts`：`config` 23、`engine` 3、`enums` 10、`extension` 8、`ipc` 9、`models` 59。 | Protocol owner | `protocol/codegen/gen-ts.ts` 从旧 JSON Schema 生成 | Slice 2-9 按 consumer 迁移 | 对应消费者不再 import `@glimmer-cradle/protocol` 旧 DTO，且新 Adapter contract test 通过后按切片删除。 |
-| `core/cognition/src/glimmer_cradle/cognition/protocol/generated/` | Python 生成物共 109 个 `.py`：`config` 23、`enums` 10、`extension` 8、`ipc` 9、`models` 59；存在 `__pycache__` 本地缓存。 | Cognition boundary adapter owner | `protocol/codegen/gen-py.py` 从旧 JSON Schema 生成 | Slice 2、Slice 4 | Cognition transport Adapter 切到 generated contract edge，心智内部无 `protocol/generated/` 领域依赖后删除。 |
+| `core/cognition/src/glimmer_cradle/cognition/protocol/generated/` | **Cognition legacy Python projection 已删除**；源码、测试、fixture、构建与打包 consumer 均归零。Kernel↔Cognition generated DTO/stub 只由 `contracts/generated/python/glimmer/` 提供，并仅在 Cognition Kernel contract Adapter 边缘消费。 | Cognition boundary adapter owner | `contracts/proto/` + `contracts/generated/python/` | Slice 2、Slice 4 已完成候选 | 删除门已满足；后续不得恢复旧目录、手写镜像或双生成主线。 |
 | `core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs` | Unity C# Presentation frame 生成物，只读；由 `protocol/codegen/gen-cs.ts` 生成。 | Avatar Host boundary adapter owner | `PresentationDownstreamFrame` / `PresentationUpstreamFrame` JSON Schema | Slice 5 | Core Avatar 与 UnityAvatarHost 分离、Host Adapter mapping 与 Unity build 通过，旧六 asmdef/旧目录/复制源码扫描归零后删除旧生成入口。 |
 | `protocol/src/runtime/` | TS runtime validator、normalizer、reply/avatar helper；配置校验通过 `validateConfig` 暴露给 Kernel。 | Protocol runtime helper owner | `protocol/src/runtime/` 与 `protocol/src/config-schemas.ts` | Slice 1 冻结；配置 Document 迁移另行切片 | 所有配置/运行时 validator consumer 有新的 JSON Schema Document owner 与替代入口后删除；Slice 1 不迁移配置运行时。 |
 
@@ -31,7 +31,7 @@
 |---|---|---|---|---|---|
 | `pnpm sync:contracts` | root script 指向 `pnpm --filter @glimmer-cradle/protocol gen:all`。 | Protocol owner | root `package.json` | Slice 9 | 所有旧 protocol consumer 归零，`contracts/` 生成链成为运行事实后删除或改名；Slice 1 保留。 |
 | `protocol/package.json gen:all` | 顺序运行 `gen:ts`、`gen:py`、`gen:cs`。 | Protocol owner | `protocol/package.json` | Slice 2-9 | 对应旧语言投影消费者迁移完成后删除。 |
-| `protocol/codegen/{gen-ts.ts,gen-py.py,gen-cs.ts}` | JSON Schema -> TypeScript/Python/C# 的旧生成器。 | Protocol owner | `protocol/codegen/` | Slice 2-9 | 所有旧生成物消费者归零，且新 Buf/JSON Schema 门覆盖后删除。 |
+| `protocol/codegen/{gen-ts.ts,gen-py.py,gen-cs.ts}` | JSON Schema -> TypeScript/Python/C# 的旧生成器；Slice 4 后 `gen-py.py` 只读取 `schemas/engine/` 并生成 Audio projection，不再生成 Cognition projection。 | Protocol owner | `protocol/codegen/` | Slice 2-9 | 各语言旧生成物消费者归零且 Contract Spine/JSON Schema 门覆盖后，按对应切片删除；Audio Python projection 属于 Slice 8。 |
 | `@bufbuild/buf` in `protocol/package.json` | 当前锁定解析为 `1.66.1`，但旧 protocol 生成链不使用 Protobuf Service baseline。 | Protocol owner | `pnpm-lock.yaml` | Slice 1 建立新 baseline | 新 `contracts/` 使用本地 Buf CLI；旧 protocol 是否保留由 Slice 9 决定。 |
 | `ajv` / `ajv-formats` | 旧 JSON Schema validator runtime 位于 `@glimmer-cradle/protocol`。 | Protocol runtime helper owner | `protocol/src/runtime/validator.ts` | Document 迁移相关切片 | 配置/manifest/package/dynamic params 均有 `contracts/json-schema` owner、兼容门和 runtime adapter 后迁移。 |
 | root build/package consumers | `build:all`、Kernel/Desktop/Personal Server/Extension SDK prebuild/pretypecheck/pretest 均先 build `@glimmer-cradle/protocol`。 | 对应 package owner | root 和各 package `package.json` | Slice 2-9 | 对应 package 不再消费旧 protocol runtime 或 DTO，并有替代 contract edge 后删除。 |
@@ -41,7 +41,7 @@
 | 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
 |---|---|---|---|---|---|
 | system config schema | `protocol/src/schemas/config/*.schema.json` 定义 `AppConfig`、`AudioConfig`、`AvatarConfig`、`CognitionConfig`、`ExtensionConfig`、`SkillPlaneConfig` 等 22 份配置契约。 | Config Application / Protocol owner | `protocol/src/schemas/config/` | M12 后续 Document 切片；Slice 1 不迁移 | 新 `contracts/json-schema` Document schema、normalizer、默认模板、Guide 和 compatibility 门落地，旧 imports 归零后删除。 |
-| Kernel ConfigManager | `core/kernel/src/foundation/config/config-manager.ts` import `validateConfig`、`normalizeSystemYamlNulls` 与 config types。 | Kernel Config Application owner | `@glimmer-cradle/protocol` runtime helper | 后续配置 Document 迁移切片 | Kernel config adapter 改用 `contracts/json-schema` 入口且测试通过后删除旧 runtime 依赖。 |
+| Kernel ConfigManager | `core/kernel/src/adapters/config/config-manager.ts` import `validateConfig`、`normalizeSystemYamlNulls` 与 config types。 | Kernel Config Application owner | `@glimmer-cradle/protocol` runtime helper | 后续配置 Document 迁移切片 | Kernel config adapter 改用 `contracts/json-schema` 入口且测试通过后删除旧 runtime 依赖。 |
 | Product composition | `docs/reference/product-compositions.md` 记录 `products/` 清单遵循 `protocol/src/schemas/models/ProductComposition.schema.json`。 | Product Composition owner | `protocol/src/schemas/models/ProductComposition.schema.json` | Surface/Product 相关切片 | Product composition Document owner 与 validator 迁移后删除旧 schema。 |
 
 ## SDK consumers

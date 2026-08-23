@@ -1,6 +1,6 @@
-from glimmer_cradle.cognition.cycle.providers import AffectProvider, MemoryProvider
-from glimmer_cradle.cognition.cycle.workspace import make_item
-from glimmer_cradle.cognition.context.sources.base import ContextItem
+from glimmer_cradle.cognition.application.cycle.providers import AffectProvider, MemoryProvider
+from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.application.context.sources.base import ContextItem
 
 
 class _Emotion:

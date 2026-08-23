@@ -1,12 +1,14 @@
 from pathlib import Path
 import sqlite3
 
-from glimmer_cradle.cognition.observability import trace_context
-from glimmer_cradle.cognition.experience import EpisodeProjection, ExperienceRecorder, MomentKind
+from glimmer_cradle.cognition.ports import trace_context
+from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.domain.experience import MomentKind
 
 
 async def test_ledger_restart_causation_and_episode_projection(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     with trace_context.TraceContext("trace-xyz"):
         perception = recorder.record(
@@ -16,7 +18,7 @@ async def test_ledger_restart_causation_and_episode_projection(tmp_path: Path) -
                         interaction_id="interaction", causation_ids=[perception.moment_id])
     await recorder.stop()
 
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     third = recorder.record(MomentKind.EMOTION, {"emotion_type": "calm"})
     await recorder.flush()
@@ -36,7 +38,7 @@ async def test_ledger_restart_causation_and_episode_projection(tmp_path: Path) -
 
 
 async def test_disabled_recorder_has_no_physical_storage(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience", enabled=False)
+    recorder = build_experience_recorder(tmp_path / "experience", enabled=False)
     await recorder.start()
     assert recorder.record(MomentKind.PERCEPTION, {}) is None
     await recorder.stop()
@@ -44,7 +46,7 @@ async def test_disabled_recorder_has_no_physical_storage(tmp_path: Path) -> None
 
 
 async def test_late_moment_starts_new_episode_after_boundary(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(MomentKind.PERCEPTION, {"text": "第一轮"}, scene_id="scene",
                     interaction_id="same-interaction")
@@ -66,7 +68,7 @@ async def test_late_moment_starts_new_episode_after_boundary(tmp_path: Path) -> 
 
 
 async def test_terminal_moment_seals_episode_at_semantic_boundary(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -91,7 +93,7 @@ async def test_terminal_moment_seals_episode_at_semantic_boundary(tmp_path: Path
 
 
 async def test_episode_never_crosses_conversation_permission_domain(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -127,7 +129,7 @@ async def test_episode_never_crosses_conversation_permission_domain(tmp_path: Pa
 
 
 async def test_projection_restart_seals_interrupted_episode(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -153,7 +155,7 @@ async def test_projection_restart_seals_interrupted_episode(tmp_path: Path) -> N
 async def test_restart_projects_terminal_moment_before_interruption_recovery(
     tmp_path: Path,
 ) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -188,7 +190,7 @@ async def test_restart_projects_terminal_moment_before_interruption_recovery(
 
 
 async def test_idle_episode_is_sealed_without_new_moments(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,
@@ -219,16 +221,16 @@ async def test_idle_episode_is_sealed_without_new_moments(tmp_path: Path) -> Non
 
 async def test_ledger_rebuilds_catalog_from_packs(tmp_path: Path) -> None:
     base_dir = tmp_path / "experience"
-    recorder = ExperienceRecorder(base_dir)
+    recorder = build_experience_recorder(base_dir)
     await recorder.start()
     recorder.record(MomentKind.PERCEPTION, {"text": "保留在 pack"})
     await recorder.stop()
     (base_dir / "catalog.db").unlink()
 
-    recorder = ExperienceRecorder(base_dir)
+    recorder = build_experience_recorder(base_dir)
     await recorder.start()
     second = recorder.record(MomentKind.REPLY, {"text": "重建后继续"})
     await recorder.stop()
 
     assert second.seq == 2
-    assert ExperienceRecorder(base_dir).ledger.query()[0].content["text"] == "保留在 pack"
+    assert build_experience_recorder(base_dir).ledger.query()[0].content["text"] == "保留在 pack"

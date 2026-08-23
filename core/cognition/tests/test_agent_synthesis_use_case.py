@@ -7,7 +7,8 @@ from glimmer_cradle.cognition.application.agent_synthesis_use_case import (
     AgentSynthesisInput,
     AgentSynthesisUseCase,
 )
-from glimmer_cradle.cognition.experience import ExperienceRecorder, MomentKind
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.domain.experience import MomentKind
 
 
 class _FakePersonaInjector:
@@ -94,7 +95,7 @@ async def test_agent_synthesis_error_result_prompt_does_not_pretend_success() ->
 
 @pytest.mark.asyncio
 async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     use_case = AgentSynthesisUseCase(
         self_entity=_self_entity(),

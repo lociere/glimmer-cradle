@@ -1,7 +1,7 @@
 # Protocol 契约层实现
 
 > 范围：迁移期现有 runtime Protocol 与 M12 Contract Spine 如何分 owner 定义、生成、校验和消费；不列全部字段。
-> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/`、Cognition `protocol/generated/`、`contracts/`。
+> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/` 与 `contracts/`。
 > 维护触发：Schema、IPC 消息、Avatar frame、配置模型、生成脚本、runtime helper、跨语言消费者或错误码变化。
 
 ## 目录与生成链
@@ -14,8 +14,8 @@ protocol/src/
 ├── models/ ipc/ utils/                  # 手写 runtime helper 和便利模型
 └── config-schemas.ts                    # config schema 聚合入口
 
-core/cognition/src/glimmer_cradle/cognition/protocol/generated/
-└── Python 生成投影
+engines/audio/src/glimmer_cradle/audio/protocol/generated/
+└── Audio legacy Python 生成投影；Cognition legacy Python projection 已删除
 ```
 
 对应 M12 迁移切片尚未开始的现有 runtime 跨语言结构先改 `protocol/src/schemas/`，再运行：
@@ -49,7 +49,7 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；其旧 ZMQ、通用 envelope、IPC payload 生成物和配置已删除。Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。其旧 ZMQ、通用 envelope、IPC payload 生成物、配置与 Cognition legacy Python projection 已删除。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
 
 Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
 environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地
@@ -104,7 +104,7 @@ Protocol 的 runtime helper 负责：
 | 运行时报未知字段 | validator、producer payload、consumer 版本 |
 | 配置读不出 | config schema、normalizer、默认值和实际 YAML |
 | Avatar frame 不兼容 | `PresentationUpstreamFrame`/`DownstreamFrame` schema 与 runtime helper |
-| Cognition payload 解析失败 | Python generated model、inbound adapter、错误 code |
+| Cognition payload 解析失败 | Contract Spine Python DTO、Kernel contract adapter、错误 code |
 
 ## 验证
 

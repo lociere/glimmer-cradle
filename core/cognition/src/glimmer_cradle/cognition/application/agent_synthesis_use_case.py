@@ -11,12 +11,12 @@ from dataclasses import dataclass, field
 from typing import Any, List
 
 from .base_use_case import BaseUseCase
-from glimmer_cradle.cognition.cycle.reply_text import normalize_reply_text
-from glimmer_cradle.cognition.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.inference.gateway import LLMEngine, LLMMessage, LLMRequest
-from glimmer_cradle.cognition.observability.logger import get_logger
-from glimmer_cradle.cognition.experience.events import MomentKind, SourceDescriptor
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
+from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
+from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
+from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.domain.experience.events import MomentKind, SourceDescriptor
+from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
 
 logger = get_logger("agent_synthesis_use_case")
 
@@ -51,7 +51,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
 
     lifecycle_log_level = "debug"
     self_entity: SelfEntity
-    llm_engine: LLMEngine
+    llm_engine: LLMPort
     persona_injector: Any | None = None
     experience_recorder: ExperienceRecorder | None = None
     activity_controller: Any | None = None

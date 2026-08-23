@@ -21,18 +21,18 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
-from glimmer_cradle.cognition.activity import CognitiveActivityController
+from glimmer_cradle.cognition.application.activity import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
-from glimmer_cradle.cognition.cycle import CycleController
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.perception_operations import (
+from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.application.cycle.perception_operations import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )
-from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace
-from glimmer_cradle.cognition.observability.logger import get_logger
-from glimmer_cradle.cognition.observability.trace_context import TraceContext, new_trace_id
+from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace
+from glimmer_cradle.cognition.adapters.observability.logger import get_logger
+from glimmer_cradle.cognition.ports.trace_context import TraceContext, new_trace_id
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.ports.kernel.models import (
     ConversationHistoryQuery,
@@ -419,7 +419,7 @@ class CognitionGrpcHost:
         async def operation(trace_id: str) -> Any:
             duplicate = self._is_completed(request.call)
             if not duplicate:
-                asyncio.create_task(self._shutdown())
+                asyncio.ensure_future(self._shutdown())
                 self._mark_completed(request.call)
             return cognition_pb.ShutdownResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "accepted", duplicate=duplicate)
         return await self._invoke(request, context, operation)

@@ -2,17 +2,11 @@
 
 import pytest
 
-from glimmer_cradle.cognition.foundation.config import LLMConfig
-from glimmer_cradle.cognition.foundation.exceptions import InferenceException
-from glimmer_cradle.cognition.inference.gateway import LLMEngine, LLMMessage, LLMRequest
-from glimmer_cradle.cognition.inference.multimodal import MultimodalRouter
-from glimmer_cradle.cognition.protocol.generated.config.inference_config import (
-    ActionStreamConfig,
-    InferenceConfig,
-    LifeClockConfig,
-    ModelConfig,
-    MultimodalConfig,
-)
+from glimmer_cradle.cognition.domain.configuration import InferenceSettings, LLMSettings, SettingsNode
+from glimmer_cradle.cognition.domain.exceptions import InferenceException
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, LLMMessage, LLMRequest
+from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
+ActionStreamConfig = LifeClockConfig = ModelConfig = MultimodalConfig = SettingsNode
 
 
 class _SelfEntity:
@@ -24,7 +18,7 @@ class _SelfEntity:
 
 def test_llm_provider_resolution_uses_models_contract() -> None:
     """解析 provider 后仍返回新契约 models，不再写旧 model 字段。"""
-    llm_config = LLMConfig(
+    llm_config = LLMSettings(
         api_type="deepseek",
         api_key="test-key",
         base_url="https://api.deepseek.com",
@@ -61,7 +55,7 @@ def test_llm_gateway_without_real_provider_fails_explicitly() -> None:
 def test_unknown_provider_does_not_fallback_to_default() -> None:
     engine = LLMEngine(
         _SelfEntity(),
-        LLMConfig(
+        LLMSettings(
             api_type="openai",
             api_key="test-key",
             models={"chat": "test-model"},
@@ -77,10 +71,10 @@ def test_unknown_provider_does_not_fallback_to_default() -> None:
 
 def test_multimodal_router_accepts_text_input_with_null_items() -> None:
     """纯文本 model_input 的 items=None 是合法空媒体，不应触发异常回落。"""
-    inference = InferenceConfig(
+    inference = InferenceSettings(
         model=ModelConfig(),
         life_clock=LifeClockConfig(),
-        multimodal=MultimodalConfig(enabled=True),
+        multimodal=MultimodalConfig(enabled=True, strategy="core_direct"),
         action_stream=ActionStreamConfig(),
     )
     router = MultimodalRouter(inference)

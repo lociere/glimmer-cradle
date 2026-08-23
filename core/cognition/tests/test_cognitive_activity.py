@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.activity import (
+from glimmer_cradle.cognition.application.activity import (
     ActivityTransitionConfig,
     CognitiveActivityController,
     CognitiveActivityState,
@@ -12,9 +12,10 @@ from glimmer_cradle.cognition.activity import (
     evaluate_transition,
     policy_for,
 )
-from glimmer_cradle.cognition.activity.projection import project_activity_history
-from glimmer_cradle.cognition.experience.events import MomentKind
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
+from glimmer_cradle.cognition.application.activity.projection import project_activity_history
+from glimmer_cradle.cognition.domain.experience.events import MomentKind
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.adapters.clock import SystemClock
 
 CFG = ActivityTransitionConfig(
     engaged_to_ambient_idle_s=120,
@@ -108,10 +109,11 @@ def test_policy_table_covers_all_states() -> None:
 
 @pytest.mark.asyncio
 async def test_transitions_do_not_write_experience(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     controller = CognitiveActivityController(
         experience_recorder=recorder,
+        clock=SystemClock(),
         affect_activation_provider=lambda: 0.0,
         tick_interval_s=60,
     )
@@ -127,7 +129,7 @@ async def test_transitions_do_not_write_experience(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_projection_uses_real_experience_only(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     recorder.record(
         MomentKind.PERCEPTION,

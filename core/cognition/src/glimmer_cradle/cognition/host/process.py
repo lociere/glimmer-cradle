@@ -4,20 +4,19 @@ import argparse
 import base64
 import json
 import os
-import sys
 from typing import Final
 
-from glimmer_cradle.cognition.foundation.config import CharacterRuntimeConfig
+from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
+from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
 from glimmer_cradle.cognition.host.composition import CognitionComponents, compose_cognition
-from glimmer_cradle.cognition.foundation.lifecycle import Lifecycle
-from glimmer_cradle.cognition.observability.logger import get_logger
-from glimmer_cradle.cognition.observability.trace_context import new_boot_id, set_boot_id
-from glimmer_cradle.cognition.foundation.path_utils import (
+from glimmer_cradle.cognition.adapters.observability.logger import get_logger
+from glimmer_cradle.cognition.ports.trace_context import new_boot_id, set_boot_id
+from glimmer_cradle.cognition.adapters.paths import (
     resolve_metrics_dir,
     resolve_traces_dir,
 )
-from glimmer_cradle.cognition.observability.metrics import start_metrics, stop_metrics
-from glimmer_cradle.cognition.observability.tracer import start_tracer, stop_tracer
+from glimmer_cradle.cognition.adapters.observability.metrics import start_metrics, stop_metrics
+from glimmer_cradle.cognition.adapters.observability.tracer import start_tracer, stop_tracer
 
 # 初始化模块日志器
 logger = get_logger("cognition_host")
@@ -29,14 +28,14 @@ STATE_SYNC_LOOP_INTERVAL_S = 5.0
 # ======================================
 # Cognition 认知核主类
 # ======================================
-class CognitionHost(Lifecycle):
+class CognitionHost:
     """
     Cognition 认知核主类，管理整个认知层的完整生命周期。
     核心作用：作为认知层根节点，统一管理所有模块的启动、运行、停止。
     """
     def __init__(
         self,
-        config: CharacterRuntimeConfig,
+        config: CharacterRuntimeSettings,
         kernel_endpoint: str,
         generation: str,
         registration_nonce: str,
@@ -52,7 +51,7 @@ class CognitionHost(Lifecycle):
             ConfigException: 配置校验失败时抛出
         """
         # 全局冻结配置，会话期不可修改
-        self.config: Final[CharacterRuntimeConfig] = config
+        self.config: Final[CharacterRuntimeSettings] = config
         self.kernel_endpoint: Final[str] = kernel_endpoint
         self.generation: Final[str] = generation
         self.registration_nonce: Final[str] = registration_nonce
@@ -116,8 +115,8 @@ class CognitionHost(Lifecycle):
             cognition_database = components.cognition_database
             await cognition_database.connect()
             await components.conversation_controller.connect()
-            await components.self_entity.memory.load()
-            await components.self_entity.knowledge_base.load_persisted()
+            await components.memory_substrate.load()
+            await components.knowledge_base.load_persisted()
             await components.maintenance_scheduler.start()
 
             # 1.67 启动认知循环。
@@ -386,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("缺少 Cognition 启动配置、Kernel gRPC endpoint 或 generation")
 
         config_dict = json.loads(config_json)
-        config = CharacterRuntimeConfig(**config_dict)
+        config = map_character_runtime_document(config_dict)
     except Exception as e:
         if registration_secret is not None:
             registration_secret[:] = b"\0" * len(registration_secret)

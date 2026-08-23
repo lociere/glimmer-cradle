@@ -30,7 +30,7 @@
 | `protocol/src/schemas/config/` | 配置结构的可校验契约 |
 | `protocol/src/schemas/enums/` | 跨语言枚举，如 error、moment、metric |
 | `protocol/src/generated/` | TypeScript 生成物，只读 |
-| `core/cognition/src/glimmer_cradle/cognition/protocol/generated/` | Python 生成物，只读 |
+| `engines/audio/src/glimmer_cradle/audio/protocol/generated/` | Audio legacy Python 生成物，只读；Cognition legacy projection 已删除 |
 | `core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs` | Unity C# Presentation Frame 生成物，只读 |
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 
@@ -48,7 +48,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
 | `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
 
-迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力由 `contracts/` 拥有，其他尚未迁移运行结构仍由 `protocol/` 拥有。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力由 `contracts/` 拥有，其他尚未迁移运行结构仍由 `protocol/` 拥有。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Cognition 的 Contract Spine DTO/stub 只在 Kernel contract Adapter 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
 
 ## Accepted 目标与当前差距
 

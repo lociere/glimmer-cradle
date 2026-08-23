@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.vector_repo import VectorRepository
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
 
 
 async def _open(tmp_path: Path) -> CognitionDatabase:

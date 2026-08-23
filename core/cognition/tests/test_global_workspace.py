@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace, make_item, now_iso_ms
+from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace, make_item, now_iso_ms
 
 
 def _item(source: str, salience: float, *, decay_in_seconds: float | None = None,

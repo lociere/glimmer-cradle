@@ -1,8 +1,11 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from glimmer_cradle.cognition.conversation import ConversationController, ConversationStore
-from glimmer_cradle.cognition.experience import ExperienceRecorder, Moment, MomentKind
+from glimmer_cradle.cognition.application.conversation import ConversationController
+from glimmer_cradle.cognition.adapters.persistence.conversation import ConversationStore
+from glimmer_cradle.cognition.application.experience import ExperienceRecorder
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
 
 
 def projection_config():
@@ -53,7 +56,7 @@ async def record_dialogue(recorder: ExperienceRecorder) -> None:
 
 
 async def test_conversation_projection_rebuilds_from_experience(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     await record_dialogue(recorder)
     db_path = tmp_path / "conversation" / "conversation.db"
@@ -95,7 +98,7 @@ async def test_conversation_projection_rebuilds_from_experience(tmp_path: Path) 
 
 
 async def test_conversation_projection_filters_before_prompt_assembly(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     await record_dialogue(recorder)
     controller = ConversationController(
@@ -120,7 +123,7 @@ async def test_conversation_projection_filters_before_prompt_assembly(tmp_path: 
 
 
 async def test_conversation_history_page_uses_stable_cursor_and_actor_scope(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     await record_dialogue(recorder)
     controller = ConversationController(
@@ -169,7 +172,7 @@ async def test_conversation_history_page_uses_stable_cursor_and_actor_scope(tmp_
 
 
 async def test_conversation_projection_rejects_identity_or_scope_drift(tmp_path: Path) -> None:
-    recorder = ExperienceRecorder(tmp_path / "experience")
+    recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
     common = {
         "scene_id": "scene:shared",

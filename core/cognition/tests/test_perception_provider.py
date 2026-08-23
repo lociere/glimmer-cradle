@@ -1,9 +1,9 @@
 """PerceptionProvider + PerceptionEventQueue 测试（阶段 5.6c）。"""
 import pytest
 
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.providers import PerceptionProvider
-from glimmer_cradle.cognition.cycle.providers.perception import salience_for_perception
+from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
+from glimmer_cradle.cognition.application.cycle.providers.perception import salience_for_perception
 
 
 def _entry(*, address_mode="direct", familiarity=5, text="hi",

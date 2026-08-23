@@ -6,9 +6,9 @@
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进面：M12 Slice 3 candidate 与 M13 fixed-state 复审
+## 当前推进面：M12 Slice 4 candidate 与 M13 fixed-state 复审
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1 与 Slice 2 已集成：`contracts/` baseline、三语言生成/兼容链、Kernel↔Cognition v1 Service 与受 Kernel 监督的动态回环 gRPC 已落地，该边界旧 ZMQ/envelope 主线已删除。Slice 3 已在当前分支形成独立审查修复后的 clean candidate：Kernel 物理分层、Clock/Timer 等强类型 Ports、无 concrete runtime-module 注入、真实 production composition bootstrap 与 architecture gate 已收口；该 candidate 尚待复审和集成。Slice 4～9 尚未启动；M11 仍暂停/延期且未完成。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～3 已集成：`contracts/` baseline、Kernel↔Cognition v1 Service、受 Kernel 监督的动态回环 gRPC 与 Kernel 物理分层均已落到 `main`。Slice 4 已在当前分支形成 clean candidate：Cognition 真实收口为 `domain/application/ports/adapters/host`，旧平级目录和 Cognition legacy Python projection 已删除，Contract Spine generated DTO 只留在 Kernel contract Adapter。该 candidate 尚待独立只读审查和集成；Slice 5～9 尚未启动，M11 仍暂停/延期且未完成。
 
 [M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成第二轮审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选继续把未绑定固定 candidate 的 update check/apply 设为 unsupported/fail-closed；Kernel DLQ 已有 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍未注册 replay。该状态尚未再次独立复审或集成，不能写成 main 已完成。
 

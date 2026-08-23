@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-import glimmer_cradle.cognition.inference.gateway as llm_module
-from glimmer_cradle.cognition.foundation.config import LLMConfig
-from glimmer_cradle.cognition.inference.gateway import LLMApiResult, LLMEngine, LLMMessage, LLMRequest
-from glimmer_cradle.cognition.protocol.generated.config.inference_config import ModelConfig
+import glimmer_cradle.cognition.adapters.inference.gateway as llm_module
+from glimmer_cradle.cognition.domain.configuration import LLMSettings, SettingsNode
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMApiResult, LLMEngine, LLMMessage, LLMRequest
+ModelConfig = SettingsNode
 
 
 class _SelfEntity:
@@ -43,7 +43,7 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, capture_mo
     monkeypatch.setattr(llm_module, "logger", fake_logger)
     return LLMEngine(
         _SelfEntity(),
-        LLMConfig(
+        LLMSettings(
             api_type="openai",
             api_key="sk-top-secret",
             base_url="https://example.com",

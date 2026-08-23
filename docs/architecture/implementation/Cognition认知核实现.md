@@ -1,7 +1,7 @@
 # Cognition 认知核实现
 
 > 范围：Python Cognition 如何实现人格、情绪、认知活动、后台维护、经历、记忆、上下文、推理、认知循环和 Kernel Service 边界；不写 LLM prompt 全文或字段全表。
-> 源码依据：`core/cognition/src/glimmer_cradle/cognition/host/`、`adapters/kernel/`、`foundation/`、`activity/`、`maintenance/`、`cycle/`、`context/`、`inference/`、`memory/`、`experience/`、`ports/kernel/`。
+> 源码依据：`core/cognition/src/glimmer_cradle/cognition/{domain,application,ports,adapters,host}/`。
 > 维护触发：认知循环、DI、上下文来源、推理 provider、记忆/经历持久化、Kernel Service transport、协议生成物或测试入口变化。
 
 ## 目录
@@ -21,7 +21,7 @@
 | 入口 | 职责 |
 |---|---|
 | `host/process.py` | Python 进程入口、配置加载、Cognition Service host、生命周期监督 |
-| `host/composition.py` | 唯一组装点，连接 event bus、DB、memory、inference、cycle、adapters |
+| `host/composition.py` | 唯一组装点，绑定 external Ports、persistence、memory、inference、cycle 与 adapters |
 | `adapters/kernel/inbound_adapter.py` | Cognition Service DTO 到应用端口的入站映射 |
 | `adapters/kernel/outbound_adapter.py` | 行动、状态和日志经 Kernel Control Service 回传 |
 | `adapters/kernel/grpc_transport.py` | 动态回环 gRPC host/client、deadline、取消、typed detail 与 generation 校验 |
@@ -31,244 +31,57 @@ Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 
 
 ## 代码结构地图
 
-以下是 Cognition 当前物理结构。Contract Spine 生成物位于仓库根 `contracts/generated/python/`，只能由 Adapter 引用，不得在 Cognition 侧手改。
+Cognition 只保留五个源码职责根。Contract Spine 生成物位于仓库根
+`contracts/generated/python/`，只能由 Kernel contract Adapter 引用，不得在 Cognition
+侧手改或向 Application/Domain 泄漏。
 
 ```text
 core/cognition/
-├── .flake8
 ├── pyproject.toml
 ├── uv.lock
 ├── src/glimmer_cradle/cognition/
 │   ├── __init__.py
-│   ├── host/
-│   │   ├── __init__.py
-│   │   ├── process.py                 # 进程生命周期监督
-│   │   └── composition.py             # 唯一 Composition Root 与冻结组件图
-│   ├── adapters/
-│   │   └── kernel/
-│   │       ├── grpc_transport.py          # Cognition Service host / Kernel Control client
-│   │       ├── inbound_adapter.py         # Protobuf DTO -> application port
-│   │       └── outbound_adapter.py        # application event -> Protobuf DTO
-│   ├── foundation/
-│   │   ├── __init__.py
-│   │   ├── config.py                  # 生成配置的进程聚合根
-│   │   ├── exceptions.py
-│   │   ├── lifecycle.py
-│   │   └── path_utils.py              # Cognition 数据路径解析
-│   ├── activity/
-│   │   ├── __init__.py
-│   │   ├── controller.py              # 活动信号、状态生命周期与受控投影
-│   │   ├── transition.py              # 无副作用状态转换
-│   │   ├── policy.py                  # 三档资源策略与转换阈值
-│   │   └── projection.py              # 从真实 Experience 重建活动时间线
-│   ├── ports/
-│   │   ├── __init__.py
-│   │   └── kernel/
-│   │       ├── __init__.py
-│   │       ├── models.py                  # 进程内边界模型
-│   │       ├── inbound/
-│   │       │   ├── __init__.py
-│   │       │   └── kernel_request_port.py # 请求型应用端口
-│   │       └── outbound/
-│   │           ├── __init__.py
-│   │           └── kernel_event_port.py
-│   ├── cycle/
-│   │   ├── __init__.py
-│   │   ├── controller.py              # 九阶段顺序、竞争与 Volition
-│   │   ├── turn.py                    # 单拍临时状态
-│   │   ├── appraisal.py               # 多模态感知、情绪评价、感知 Moment
-│   │   ├── deliberation.py            # ActionPlan 与角色回复推理
-│   │   ├── action_planner.py          # 结构化行动语义规划
-│   │   ├── action_emitter.py          # Intent -> ActionCommand
-│   │   ├── continuity.py              # 会话与经历连续性提交
-│   │   ├── reply_context.py           # 回复上下文分区装配
-│   │   ├── reply_text.py              # 外发/历史共用文本归一化
-│   │   ├── perception_queue.py
-│   │   ├── workspace.py
-│   │   ├── providers/
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py
-│   │   │   ├── perception.py
-│   │   │   ├── affect.py
-│   │   │   ├── memory.py
-│   │   │   ├── drive.py
-│   │   │   └── social.py
-│   │   └── volition/
-│   │       ├── __init__.py
-│   │       ├── willingness.py
-│   │       └── arbiter.py
-│   ├── identity/
-│   │   ├── __init__.py
-│   │   └── self_entity.py             # 当前角色领域根，由组件图独占
-│   ├── persona/
-│   │   ├── __init__.py
-│   │   ├── persona_injector.py
-│   │   ├── profile_compiler.py
-│   │   ├── dialogue_policy_builder.py
-│   │   └── prompt_assembler.py
-│   ├── affect/
-│   │   ├── __init__.py
-│   │   ├── emotion.py
-│   │   └── rules.py
-│   ├── context/
-│   │   ├── __init__.py
-│   │   ├── assembly.py
-│   │   └── sources/
-│   │       ├── __init__.py
-│   │       ├── base.py
-│   │       ├── episodic_source.py
-│   │       ├── knowledge_source.py
-│   │       └── relationship_source.py
-│   ├── inference/
-│   │   ├── __init__.py
-│   │   ├── service.py                 # 按活动策略选择真实后端
-│   │   ├── cloud.py
-│   │   ├── gateway.py                 # LLM provider gateway
-│   │   ├── content.py
-│   │   ├── multimodal.py
-│   │   └── embedding.py
-│   ├── experience/
-│   │   ├── __init__.py
-│   │   ├── events.py                  # Moment/SourceDescriptor
-│   │   ├── ledger.py                  # 不可变事实账本
-│   │   ├── recorder.py                # 单写者门面
-│   │   ├── episodes.py                # 可重建 Episode Projection
-│   │   └── narrative.py               # 零 token 叙事投影
-│   ├── conversation/
-│   │   ├── controller.py              # Ledger 增量投影、恢复与 Prompt 查询门面
-│   │   ├── store.py                   # 消息、Chapter、Segment、State SQLite 投影
-│   │   └── models.py                  # Working Set 与查询模型
-│   ├── memory/
-│   │   ├── __init__.py
-│   │   ├── substrate.py               # 版本化记忆与有界召回
-│   │   ├── consolidation.py           # Episode 巩固协调器
-│   │   ├── relationship_projection.py
-│   │   ├── knowledge_base.py
-│   │   └── storage/
-│   │       ├── __init__.py
-│   │       ├── database.py
-│   │       ├── consolidation_job_repo.py
-│   │       ├── memory_repo.py
-│   │       ├── relationship_repo.py
-│   │       ├── knowledge_repo.py
-│   │       └── vector_repo.py
-│   ├── maintenance/
-│   │   ├── __init__.py
-│   │   └── scheduler.py                # 语义边界唤醒、周期补偿与独立 Memory 维护任务
-│   ├── application/
-│   │   ├── base_use_case.py
-│   │   ├── agent_plan_use_case.py
-│   │   └── agent_synthesis_use_case.py
-│   ├── observability/
-│   │   ├── __init__.py
-│   │   ├── logger.py
-│   │   ├── trace_context.py
-│   │   ├── tracer.py
-│   │   ├── metrics.py
-│   │   ├── model_invocations.py
-│   │   └── telemetry.py
-│   └── protocol/
-│       ├── __init__.py
-│       └── generated/
-│           ├── __init__.py
-│           ├── config/
-│           │   ├── __init__.py
-│           │   ├── app_config.py
-│           │   ├── audio_config.py
-│           │   ├── avatar_config.py
-│           │   ├── character_manifest_config.py
-│           │   ├── character_profile_config.py
-│           │   ├── cognition_config.py
-│           │   ├── dialogue_policy_config.py
-│           │   ├── extension_config.py
-│           │   ├── inference_config.py
-│           │   ├── ingress_gate_config.py
-│           │   ├── cognition_service_config.py
-│           │   ├── knowledge_base_config.py
-│           │   ├── knowledge_index_config.py
-│           │   ├── lifecycle_config.py
-│           │   ├── llm_config.py
-│           │   ├── memory_config.py
-│           │   ├── observability_config.py
-│           │   ├── safety_config.py
-│           │   ├── skill_plane_config.py
-│           │   └── surface_config.py
-│           ├── enums/
-│           │   ├── __init__.py
-│           │   ├── cognitive_activity_state.py
-│           │   ├── error_code.py
-│           │   ├── event_outcome.py
-│           │   ├── model_invocation_capture_mode.py
-│           │   ├── memory_kind.py
-│           │   ├── memory_status.py
-│           │   ├── metric_kind.py
-│           │   └── moment_kind.py
-│           └── models/
-│               ├── __init__.py
-│               ├── action_command.py
-│               ├── cognitive_activity_policy.py
-│               ├── cognitive_activity_snapshot.py
-│               ├── audit_record.py
-│               ├── avatar_action_state_document.py
-│               ├── channel_reply_payload.py
-│               ├── extension_runtime_projection.py
-│               ├── intent.py
-│               ├── model_invocations_record.py
-│               ├── observability_event.py
-│               ├── perception_event.py
-│               ├── presentation_downstream_frame.py
-│               ├── presentation_upstream_frame.py
-│               ├── runtime_readiness_catalog.py
-│               ├── skill_catalog_snapshot.py
-│               ├── trace_context.py
-│               ├── visual_command.py
-│               └── workspace_item.py
+│   ├── domain/                         # 心智模型、不变量与内部模块 API
+│   │   ├── activity/ affect/ conversation/
+│   │   ├── experience/ identity/ persona/ volition/
+│   │   └── configuration.py, memory.py, workspace.py
+│   ├── application/                    # 认知循环、查询、维护与本地事务编排
+│   │   ├── activity/ context/ conversation/ cycle/
+│   │   ├── experience/ inference/ maintenance/ memory/
+│   │   └── *_use_case.py
+│   ├── ports/                          # 仅 Cognition 真实外部能力边界
+│   │   ├── kernel/
+│   │   └── clock.py, inference.py, observability.py,
+│   │       persistence.py, trace_context.py
+│   ├── adapters/                       # 外部能力与 contract edge 的具体实现
+│   │   ├── kernel/ inference/ observability/ persistence/
+│   │   └── clock.py, configuration.py, paths.py
+│   └── host/
+│       ├── process.py                  # 唯一 Python 进程入口与生命周期接入
+│       └── composition.py              # 唯一 Composition Root
 └── tests/
-    ├── test_affect_memory_providers.py
-    ├── test_agent_plan_use_case.py
-    ├── test_agent_synthesis_use_case.py
-    ├── test_cognitive_activity.py
-    ├── test_context_assembly.py
-    ├── test_cycle_controller.py
-    ├── test_dlq_cli.py
-    ├── test_drive_social_providers.py
-    ├── test_experience_architecture.py
-    ├── test_global_workspace.py
-    ├── test_inference_gateway.py
-    ├── test_knowledge_base_persist.py
-    ├── test_model_invocations.py
-    ├── test_memory_architecture.py
-    ├── test_metrics.py
-    ├── test_perception_cycle.py
-    ├── test_perception_provider.py
-    ├── test_persona_injector.py
-    ├── test_provider_contracts.py
-    ├── test_reasoning_service.py
-    ├── test_reply_text.py
-    ├── test_telemetry_facade.py
-    ├── test_trace_context.py
-    ├── test_tracer.py
-    ├── test_vector_repo.py
-    └── test_volition.py
+    └── test_architecture_layout.py     # 真实 import/dynamic-import 分层门
 ```
 
-`.venv/`、`.pytest_cache/`、`__pycache__/`、构建输出和本地数据均为可重建产物，不属于认知核源码架构，因此不纳入上树。
+`host/process.py` 接受 Kernel 注入且已校验的原始配置 Document，再由
+`adapters/configuration.py` 映射为 `domain/configuration.py` 的 immutable settings；
+Character/Config/Memory canonical JSON Schema 仍由现有跨 owner consumer 持有，本切片没有
+复制或迁移它们。provider、SQLite/file persistence、clock、path 与 observability concrete
+全部在 Adapter；Host 只绑定 concrete、启动组件并执行 `start/ready/degraded/failed/restart/
+stop/dispose` 生命周期。
 
-已删除且不得恢复的旧物理入口包括：`main.py`、`container.py`、`core/`、`ipc_server/`、`cognition/`、`reasoning/`、`llm_engine/`、`multimodal/`、`emotion_matrix/`、`arousal/`、`persistence/`、`narrative/`、`thought/`，以及 Kernel 驱动的并行主动思维用例。进程内唯一性由 `CognitionComponents` 所有权保证，不使用 `SelfEntity`、`PersonaInjector` 或 `KnowledgeBase` Singleton。旧 `KernelBridge`、ZMQ host 与通用 envelope adapter 已删除，不得恢复。
+旧平级领域/技术目录、`foundation/`、Cognition `protocol/generated/`、旧 import/re-export
+与兼容入口均已删除。内部 identity/persona/affect/experience/memory/conversation/context/
+deliberation/volition 仍是同一进程、同一一致性边界中的领域模块，不为其制造逐模块 Port、
+伪 RPC 或万能 EventBus。
 
-| 目录 | 职责 | 关键风险 |
+| 层 | 职责 | 依赖约束 |
 |---|---|---|
-| `activity/` | 活动信号投影、三档状态与资源策略 | 把情感激活、外部焦点或 Experience 混入调度状态 |
-| `cycle/` | controller、turn、workspace、perception queue、provider、volition、action emitter、continuity | 出现第二条回复主线或控制器重新吸收组件职责 |
-| `context/` | episodic/knowledge/relationship 等上下文来源和预算装配 | prompt 拼接绕过预算 |
-| `inference/` | ReasoningService、cloud provider、LLM gateway、可选 embedding 增强、多模态 | provider 错误无诊断、模型 ready 假阳性或生产 mock |
-| `conversation/` | Ledger 派生的长期 Conversation、Chapter、Segment、State 与有界 Working Set | 把投影当事实源或在 scope 过滤前召回 |
-| `memory/` | 版本化长期记忆、knowledge、relationship、consolidator | 状态写错 owner或跨权限域对账 |
-| `memory/storage/` | cognition DB、repo、migration、vector/graph | 迁移不可重复或破坏数据 |
-| `maintenance/` | Episode/Relationship projection 与 Memory 巩固的独立生命周期 | 重新挂回每拍认知循环或伪装成 Dreaming 人格状态 |
-| `experience/` | Moment、recorder、log writer、snapshot、replay | 把日志当经历 |
-| `identity/ persona/ affect/` | 自我实体、人设、情绪与情感激活 | 被 Kernel/UI 反向驱动 |
-| `application/` | agent plan、agent synthesis 请求型用例 | 独立聊天回复主线复活 |
+| `domain/` | 心智模型、不变量、内部模块 API 与领域事件 | 不依赖 generated、transport、Adapter、Host 或 IO concrete |
+| `application/` | Cycle、维护、查询、跨领域 use case 与本地事务 | 依赖 Domain 与 Ports，不依赖 generated、transport 或 concrete |
+| `ports/` | Kernel、推理、持久化、时钟、观测等真实外部能力 | 不为内部模块造 Port，不暴露 concrete |
+| `adapters/` | gRPC、provider、persistence、config/path、clock、observability | 映射外部 DTO/Document 后再调用 Application/Domain |
+| `host/` | 进程入口、composition 与受监督生命周期 | 唯一 concrete graph owner，不承载心智判断 |
 
 ## 入站链路
 
@@ -289,7 +102,7 @@ Kernel CognitionService request
 
 ## 唯一认知循环
 
-`cycle/controller.py` 的 `CycleController` 是感知到行动的主线，但不再持有所有阶段实现：
+`application/cycle/controller.py` 的 `CycleController` 是感知到行动的主线，但不再持有所有阶段实现：
 
 1. perception queue；
 2. affect/activity/emotion/persona/profile/dialogue/identity；
@@ -300,23 +113,23 @@ Kernel CognitionService request
 7. experience recorder；
 8. outbound kernel event port。
 
-单拍临时状态全部进入 `cycle/turn.py` 的 `CycleTurn`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。
+单拍临时状态全部进入 `application/cycle/turn.py` 的 `CycleTurn`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。
 
 旧的“收到消息直接生成聊天回复”通路不得恢复。内部驱动只能通过 Provider 进入 Cycle；工具规划、记忆巩固和合成必须以主循环或明确请求型 use case 接入，且不能对同一感知重复产生互相冲突的 action。
 
-当前 `CycleController` 的 Deliberate 阶段以 `cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；ReasoningService 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
+当前 `CycleController` 的 Deliberate 阶段以 `application/cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；ReasoningService 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
 
 `AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaInjector.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
-`activity/` 是认知资源调度的唯一 owner。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
+`application/activity/` 是认知资源调度的唯一 owner；状态模型与纯转换位于 `domain/activity/`。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
 
-`maintenance/scheduler.py` 拥有独立异步任务和配置间隔。`ExperienceRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`CycleController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
+`application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。`ExperienceRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`CycleController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
 
 ## 上下文与推理
 
 ```text
 ContextAssembly
-  -> context/sources/*
+  -> application/context/sources/*
   -> memory / knowledge / relationship / episodic
   -> budget and ranking
   -> ReasoningService
@@ -329,7 +142,7 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 
 出站回复会先经过 `reply_text.py` 归一化：剥除情绪标签、移除高置信度括号动作，并为普通闲聊生成 `payload.messages` 自然分段；完整语义仍保留在 `payload.text`。代码块、列表、表格等结构化输出不做聊天式拆分。
 
-角色 prompt 分层由 `persona/` 下三类组件完成：
+角色 prompt 分层由 `domain/persona/` 下三类组件完成：
 
 | 组件 | 输入 | 输出 |
 |---|---|---|
@@ -337,21 +150,21 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 | `DialoguePolicyBuilder` | `dialogue.yaml` / `DialoguePolicyConfig` | 对外回复呈现策略，包括短句、括号动作、Markdown 与代码规则 |
 | `PromptAssembler` | persona/profile/dialogue、当前情绪、场景行为和动态上下文 | 每轮 system prompt |
 
-`PersonaInjector` 是对话人格装配门面，不提供知识库 persona 或旧 reflection persona 编译入口。`KnowledgeInitPayload` 只进入 `memory/knowledge_base.py`。
+`PersonaInjector` 是对话人格装配门面，不提供知识库 persona 或旧 reflection persona 编译入口。`KnowledgeInitPayload` 只进入 `application/memory/knowledge_base.py`。
 
 ## 记忆、经历与持久化
 
 | 组件 | 实现位置 | 语义 |
 |---|---|---|
-| Experience Ledger | `experience/events.py`、`ledger.py`、`recorder.py` | 不可变 Moment、月度 SQLite pack、全局 position、来源与因果 |
-| Conversation Projection | `conversation/controller.py`、`store.py` | 可重建的消息、Chapter、Segment、Conversation State 与进程 Working Set |
-| Episode Projection | `experience/episodes.py` | interaction/scene 分段、封口、待巩固队列与可重建投影 |
-| Memory Substrate | `memory/substrate.py`、`memory/storage/memory_repo.py` | 版本化记忆、证据、时间有效修订与有预算召回 |
-| Consolidation | `memory/consolidation.py`、`memory/storage/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试 |
-| Relationship | `memory/relationship_projection.py`、`memory/storage/relationship_repo.py` | 从 Ledger 幂等派生互动计数、熟悉度与证据修订 |
-| Knowledge | `memory/knowledge_base.py`、`memory/storage/knowledge_repo.py` | 知识条目 |
-| Vector | `memory/storage/vector_repo.py` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
-| Memory Database | `memory/storage/database.py` | `data/state/cognition/memory/memory.db` |
+| Experience Ledger | `domain/experience/events.py`、`adapters/persistence/experience/ledger.py`、`application/experience/recorder.py` | 不可变 Moment、月度 SQLite pack、全局 position、来源与因果 |
+| Conversation Projection | `application/conversation/controller.py`、`adapters/persistence/conversation/store.py` | 可重建的消息、Chapter、Segment、Conversation State 与进程 Working Set |
+| Episode Projection | `adapters/persistence/experience/episodes.py` | interaction/scene 分段、封口、待巩固队列与可重建投影 |
+| Memory Substrate | `application/memory/substrate.py`、`adapters/persistence/memory/memory_repo.py` | 版本化记忆、证据、时间有效修订与有预算召回 |
+| Consolidation | `application/memory/consolidation.py`、`adapters/persistence/memory/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试 |
+| Relationship | `adapters/persistence/memory/relationship_projection.py`、`relationship_repo.py` | 从 Ledger 幂等派生互动计数、熟悉度与证据修订 |
+| Knowledge | `application/memory/knowledge_base.py`、`adapters/persistence/memory/knowledge_repo.py` | 知识条目 |
+| Vector | `adapters/persistence/memory/vector_repo.py` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
+| Memory Database | `adapters/persistence/memory/database.py` | `data/state/cognition/memory/memory.db` |
 
 长期连续性由 Cognition 拥有。Kernel 可以收到投影或行动结果，但不直接写 Cognition DB。
 
@@ -408,7 +221,7 @@ CycleController / use case
 | Cognition 进程未 ready | `host/process.py` 启动、配置、DB、provider warmup、generation/PID 注册、gRPC readiness |
 | 输入进来但无行动 | inbound adapter、perception queue、`CycleController` tick、volition |
 | 回复空或异常 | context assembly、ReasoningService、LLMEngine、provider 错误 |
-| 记忆异常 | `memory/storage/database.py`、`memory_repo.py`、`memory/substrate.py`、consolidation run |
+| 记忆异常 | `adapters/persistence/memory/database.py`、`memory_repo.py`、`application/memory/substrate.py`、consolidation run |
 | trace 断裂 | inbound gRPC metadata/DTO、context/reasoning span、outbound adapter |
 | 重启后状态丢失 | `data/state/cognition/`、Experience catalog/pack、Episode Projection、Memory revision |
 
