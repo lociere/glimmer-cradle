@@ -125,9 +125,11 @@ def test_dlq_cli_requires_real_dispatcher_before_marking_replay(tmp_path: Path) 
         "import json,sys\n"
         "payload=json.load(sys.stdin)\n"
         "print(json.dumps({'status':'success','receipt_id':'r1',"
-        "'source':payload['source'],'record_id':payload['id'],'owner':payload['owner'],"
-        "'trace_id':payload['trace_id'],'payload_digest':payload['payload_digest'],"
-        "'operation_id':payload['operation_id'],'dispatcher_id':payload['dispatcher_id']}))\n",
+            "'source':payload['source'],'record_id':payload['id'],'owner':payload['owner'],"
+            "'trace_id':payload['trace_id'],'payload_digest':payload['payload_digest'],"
+            "'event_type':payload['event_type'],'operation_id':payload['operation_id'],"
+            "'dispatcher_id':payload['dispatcher_id'],"
+            "'delivery':'kernel_event_bus_published'}))\n",
         encoding="utf-8",
     )
     dlq.DISPATCHERS = {

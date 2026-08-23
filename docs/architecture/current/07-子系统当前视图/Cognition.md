@@ -12,32 +12,23 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 
 | 职责 | 当前事实源 | 不承担 |
 |---|---|---|
-| 身份与人格 | `identity/`、`persona/`、`configs/characters/<character-id>/{persona,profile,dialogue}.yaml` | 平台账号、窗口状态、Extension 生命周期 |
-| 情绪与觉醒 | `affect/` | UI 动画本地推断 |
-| 经历之流 | `experience/`、`data/state/cognition/experience/` | 普通日志或聊天界面状态替代经历 |
-| 记忆与知识 | `memory/`、`memory/storage/`、`data/state/cognition/memory/memory.db` | Kernel 记忆副本或 Extension 私写记忆 |
-| 上下文装配 | `context/`、`PersonaProfileCompiler`、`DialoguePolicyBuilder`、`PromptAssembler` | 简单 prompt 拼接或知识库人格注入 |
-| 推理与多模态 | `inference/` | provider key 管理或桌面 IO |
-| 行动语义 | `cycle/controller.py`、`application/agent_*`、outbound adapter | 平台 payload、窗口控制、权限执行 |
+| 身份与人格 | `domain/{identity,persona}/`、`configs/characters/<character-id>/{persona,profile,dialogue}.yaml` | 平台账号、窗口状态、Extension 生命周期 |
+| 情绪与觉醒 | `domain/affect/` | UI 动画本地推断 |
+| 经历之流 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` | 普通日志或聊天界面状态替代经历 |
+| 记忆与知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` | Kernel 记忆副本或 Extension 私写记忆 |
+| 上下文装配 | `application/context/`、`PersonaProfileCompiler`、`DialoguePolicyBuilder`、`PromptAssembler` | 简单 prompt 拼接或知识库人格注入 |
+| 推理与多模态 | `application/inference/`、`ports/inference.py`、`adapters/inference/` | provider key 管理或桌面 IO |
+| 行动语义 | `application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | 平台 payload、窗口控制、权限执行 |
 
 ## 当前结构
 
 ```text
 core/cognition/src/glimmer_cradle/cognition/
-├── host/{process,composition}.py      # 进程生命周期与唯一依赖组装
-├── foundation/                        # config、event bus、path 等基础能力
-├── adapters/kernel/                   # Protobuf DTO mapping、gRPC host/client
-├── ports/kernel/                      # 与传输无关的 Kernel 应用 Port/内部模型
-├── observability/                     # logger、trace、metrics、模型调用观测
-├── protocol/generated/                # protocol schema 生成的 Python 投影
-├── cycle/                             # controller、turn、providers、volition、行动出口
-├── context/                           # 上下文装配与来源
-├── conversation/                      # Ledger 派生的会话、章节、片段与工作集投影
-├── inference/                         # 推理服务、LLM、embedding、多模态
-├── identity/ persona/ affect/
-├── memory/ maintenance/               # 版本化记忆、持久巩固任务与独立维护调度
-├── experience/                        # Ledger、Episode 与叙事投影
-└── application/                       # agent plan/synthesis 请求型应用用例
+├── domain/                            # 心智模型、不变量和内部模块 API
+├── application/                       # Cycle、维护、查询和本地事务编排
+├── ports/                             # Kernel/provider/persistence/clock/observability 外部能力
+├── adapters/                          # gRPC、provider、persistence、config/path 与观测 concrete
+└── host/{process,composition}.py      # 唯一进程入口、组装与受监督生命周期
 ```
 
 `host/composition.py` 是 Cognition 唯一组装点，`host/process.py` 只监督进程生命周期。Kernel–Cognition 跨边界 DTO 来自 `contracts/generated/python/glimmer/{common,cognition,kernel}/v1/`，只允许 `adapters/kernel/` import；心智内部使用自己的应用模型，不得 import gRPC/Protobuf 或手写 TypeScript 镜像。
@@ -51,7 +42,7 @@ core/cognition/src/glimmer_cradle/cognition/
 
 ## 唯一认知主线
 
-当前认知主线是 `cycle/controller.py` 的 `CycleController`。控制器只编排阶段顺序：`CycleTurn` 持有单拍状态，`ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。它把感知处理为行动的基本语义顺序是：
+当前认知主线是 `application/cycle/controller.py` 的 `CycleController`。控制器只编排阶段顺序：`CycleTurn` 持有单拍状态，`ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。它把感知处理为行动的基本语义顺序是：
 
 ```text
 Perception
@@ -84,7 +75,7 @@ Perception
 | 域 | Owner | 语义 |
 |---|---|---|
 | Conversation Working Set | `ConversationController` | 从持久 Conversation Store 恢复的有界进程缓存；不是事实源，重启后可恢复 |
-| Conversation Store | `conversation/`、`data/state/cognition/conversations/conversations.db` | 从 Ledger 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建 |
+| Conversation Store | `application/conversation/`、`adapters/persistence/conversation/`、`data/state/cognition/conversations/conversations.db` | 从 Ledger 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建 |
 | Experience Ledger | `ExperienceRecorder` / `ExperienceLedger` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
 | Episode Projection | `EpisodeProjection` | 按 interaction + scene 从 Ledger 派生的边界单元；可删除、可重建、可封口 |
 | Memory Substrate | `MemorySubstrate` / repositories | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其状态 |
@@ -123,9 +114,9 @@ Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `Co
 
 ## 情感激活、认知活动、维护与外部注意力
 
-`affect/` 维护 Emotion 与连续的 affect activation；`activity/` 维护 `engaged / ambient / quiescent` 三档 `CognitiveActivityState` 和对应资源策略。直接互动进入 `engaged`，背景观察最多进入 `ambient`，无活动时受最短驻留和 affect activation hold 约束逐级衰减。自动迁移只进入 metrics、结构化日志和 span，不写 Experience，也没有 `arousal` Moment。
+`domain/affect/` 维护 Emotion 与连续的 affect activation；`domain/activity/` 维护 `engaged / ambient / quiescent` 三档 `CognitiveActivityState` 和对应资源策略。直接互动进入 `engaged`，背景观察最多进入 `ambient`，无活动时受最短驻留和 affect activation hold 约束逐级衰减。自动迁移只进入 metrics、结构化日志和 span，不写 Experience，也没有 `arousal` Moment。
 
-`maintenance/` 的 `MaintenanceScheduler` 拥有独立任务和间隔，串行调用 Episode/Relationship projection 与 `ConsolidationCoordinator`。终结 Moment 提供低延迟唤醒，sealed Episode 提供持久可恢复工作项，周期扫描提供补偿；`quiescent` 只提供一次强制封口提示。不存在 Dreaming 活动态，也不把维护运行解释为角色正在做梦。Global Workspace 广播同样是易失注意力过程，当前通用链路不会把它写成 Thought。
+`application/maintenance/` 的 `MaintenanceScheduler` 拥有独立任务和间隔，串行调用 Episode/Relationship projection 与 `ConsolidationCoordinator`。终结 Moment 提供低延迟唤醒，sealed Episode 提供持久可恢复工作项，周期扫描提供补偿；`quiescent` 只提供一次强制封口提示。不存在 Dreaming 活动态，也不把维护运行解释为角色正在做梦。Global Workspace 广播同样是易失注意力过程，当前通用链路不会把它写成 Thought。
 
 外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`CognitionService.Heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `CycleController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
 

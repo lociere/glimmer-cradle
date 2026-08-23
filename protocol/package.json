@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
     "gen:ts": "tsx codegen/gen-ts.ts",
-    "gen:py": "uv run --project ../core/cognition --extra dev python codegen/gen-py.py",
+    "gen:py": "uv run --project ../engines/audio --extra dev python codegen/gen-py.py",
     "gen:cs": "tsx codegen/gen-cs.ts",
     "gen:all": "pnpm gen:ts && pnpm gen:py && pnpm gen:cs"
   },

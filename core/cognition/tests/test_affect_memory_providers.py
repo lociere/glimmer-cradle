@@ -1,6 +1,7 @@
-from glimmer_cradle.cognition.cycle.providers import AffectProvider, MemoryProvider
-from glimmer_cradle.cognition.cycle.workspace import make_item
-from glimmer_cradle.cognition.context.sources.base import ContextItem
+from glimmer_cradle.cognition.application.cycle.providers import AffectProvider, MemoryProvider
+from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.application.context.sources.base import ContextItem
+from tests.support import CLOCK, IDS
 
 
 class _Emotion:
@@ -20,19 +21,20 @@ class _Assembly:
 
 
 async def test_affect_proposes_current_emotion() -> None:
-    items = await AffectProvider(_Emotion()).propose([])
+    items = await AffectProvider(_Emotion(), clock=CLOCK, ids=IDS).propose([])
     assert items and items[0].content["emotion_type"] == "curious"
 
 
 async def test_memory_uses_context_assembly_with_actor_and_scene() -> None:
     assembly = _Assembly()
-    provider = MemoryProvider(assembly)
+    provider = MemoryProvider(assembly, clock=CLOCK, ids=IDS)
     focus = make_item(source="perception", content={"text": "雨天", "actor_id": "u1",
-                                                    "scene_id": "s1"}, salience=1)
+                                                    "scene_id": "s1"}, salience=1,
+                      clock=CLOCK, ids=IDS)
     items = await provider.propose([focus])
     assert items[0].content["source_kind"] == "episodic"
     assert assembly.query.actor_id == "u1" and assembly.query.scene_id == "s1"
 
 
 async def test_memory_skips_without_focus() -> None:
-    assert await MemoryProvider(_Assembly()).propose([]) == []
+    assert await MemoryProvider(_Assembly(), clock=CLOCK, ids=IDS).propose([]) == []

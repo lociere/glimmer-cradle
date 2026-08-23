@@ -1,13 +1,14 @@
 """知识库通过 Cognition memory.db Repository 持久化。"""
 from pathlib import Path
 
-from glimmer_cradle.cognition.memory.knowledge_base import KnowledgeBase
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.knowledge_repo import KnowledgeRepository
+from glimmer_cradle.cognition.application.memory.knowledge_base import KnowledgeBase
+from tests.support import OBSERVABILITY
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
 
 
 def _fresh_kb() -> KnowledgeBase:
-    return KnowledgeBase()
+    return KnowledgeBase(observability=OBSERVABILITY)
 
 
 async def test_load_persisted_populates_entries(tmp_path: Path) -> None:

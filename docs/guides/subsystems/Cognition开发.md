@@ -10,13 +10,13 @@
 | 进程入口/组装 | `host/process.py`、`host/composition.py` |
 | Kernel Service Adapter | `adapters/kernel/` |
 | Kernel 应用 Port | `ports/kernel/` |
-| 认知主循环 | `cycle/controller.py`、`perception_queue.py`、`workspace.py` |
-| Volition/巩固 | `cycle/volition/`、`memory/consolidation.py`、`experience/episodes.py` |
-| 上下文 | `context/assembly.py`、`context/sources/` |
-| 推理/LLM | `inference/` |
-| 记忆/知识 | `memory/`、`memory/storage/` |
-| 经历 | `experience/` |
-| 身份/人格/情绪/觉醒 | `identity/`、`persona/`、`affect/` |
+| 认知主循环 | `application/cycle/`、`domain/workspace.py`、`domain/volition/` |
+| Volition/巩固 | `domain/volition/`、`application/memory/consolidation.py`、`adapters/persistence/experience/episodes.py` |
+| 上下文 | `application/context/` |
+| 推理/LLM | `ports/inference.py`、`application/inference/`、`adapters/inference/` |
+| 记忆/知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` |
+| 经历 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` |
+| 身份/人格/情绪/觉醒 | `domain/identity/`、`domain/persona/`、`domain/affect/` |
 | Kernel–Cognition 契约投影 | `contracts/generated/python/glimmer/`（只在 Adapter 使用） |
 
 ## 标准步骤
@@ -32,6 +32,8 @@
 ## 禁止项
 
 - Cognition 直接读取 QQ/NapCat、Electron、窗口、剪贴板或 Extension handler。
+- Domain/Application import generated DTO、gRPC/transport、Adapter/Host concrete 或 IO concrete。
+- 为内部模块逐一创建 Port、伪 RPC、万能 EventBus 或 service locator。
 - 在应用用例里复活旧 `ChatUseCase` 式并行回复主线。
 - 把日志、trace 或 UI 聊天记录当作经历/记忆事实源。
 - 在 Python 端手写跨语言镜像模型。
@@ -64,6 +66,9 @@
 ```powershell
 cd core/cognition
 uv run pytest -q
+uv run ruff check src tests tools
+uv run mypy src
+uv run pytest -q tests/test_architecture_layout.py
 ```
 
 涉及 Kernel–Cognition Contract Spine 时：

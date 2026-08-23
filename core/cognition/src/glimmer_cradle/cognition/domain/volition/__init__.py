@@ -1,0 +1,55 @@
+"""
+意志层（Volition）。
+
+把"意识广播"翻译成"行动意愿"，再经仲裁选出本拍的胜出意图。
+
+- ``willingness.py``  连续意愿值计算（蓝图 §4.7 加权公式）
+- ``arbiter.py``      多意图仲裁（阈值 + proactive 闸 + 去重）
+
+输出由 Protocol 生成的 Intent，并在 CycleController 中进入仲裁与 ActionEmitter。
+"""
+from glimmer_cradle.cognition.domain.volition.models import Initiative, Intent, IntentType
+
+from glimmer_cradle.cognition.domain.volition.willingness import (
+    WillingnessConfig,
+    WillingnessInputs,
+    compute_willingness,
+    threshold_for,
+)
+from glimmer_cradle.cognition.domain.volition.arbiter import ArbitrationResult, arbitrate
+
+
+def make_intent(
+    *,
+    type: str,
+    initiative: str,
+    willingness: float,
+    payload: dict | None = None,
+    causation_ids: list[str] | None = None,
+    intent_id: str,
+    created_at: str,
+) -> Intent:
+    """用 Application 注入的 ID 与时间构造 Intent。"""
+    return Intent(
+        intent_id=intent_id,
+        type=IntentType(type),
+        initiative=Initiative(initiative),
+        willingness=max(0.0, min(1.0, float(willingness))),
+        payload=payload or {},
+        causation_ids=list(causation_ids or []),
+        created_at=created_at,
+    )
+
+
+__all__ = [
+    "WillingnessConfig",
+    "WillingnessInputs",
+    "compute_willingness",
+    "threshold_for",
+    "ArbitrationResult",
+    "arbitrate",
+    "Intent",
+    "IntentType",
+    "Initiative",
+    "make_intent",
+]

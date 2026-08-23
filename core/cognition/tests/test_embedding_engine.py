@@ -4,13 +4,13 @@ import json
 import numpy as np
 import pytest
 
-from glimmer_cradle.cognition.inference import embedding as embedding_module
-from glimmer_cradle.cognition.inference.embedding import EmbeddingEngine
-from glimmer_cradle.cognition.protocol.generated.config.embedding_config import EmbeddingConfig
+from glimmer_cradle.cognition.adapters.inference import embedding as embedding_module
+from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
+from glimmer_cradle.cognition.domain.configuration import EmbeddingSettings
 
 
-def _config(*, enabled: bool = True, provider: str = "dashscope-text-embedding") -> EmbeddingConfig:
-    return EmbeddingConfig.model_validate({
+def _config(*, enabled: bool = True, provider: str = "dashscope-text-embedding") -> EmbeddingSettings:
+    return EmbeddingSettings.model_validate({
         "enabled": enabled,
         "route": {"provider": provider},
         "providers": {

@@ -368,8 +368,9 @@ for (const filePath of walkFiles(desktopMainRoot)) {
 const protocolPackage = JSON.parse(
   fs.readFileSync(path.join(repoRoot, 'protocol/package.json'), 'utf8'),
 );
-if (!String(protocolPackage.scripts?.['gen:py'] ?? '').startsWith('uv run --project ')) {
-  violations.push('protocol/package.json: gen:py 必须由 Cognition uv project 提供解释器和依赖');
+if (protocolPackage.scripts?.['gen:py']
+  !== 'uv run --project ../engines/audio --extra dev python codegen/gen-py.py') {
+  violations.push('protocol/package.json: gen:py 必须由 Audio uv project 提供解释器和依赖');
 }
 
 const extensionSdkPackage = JSON.parse(

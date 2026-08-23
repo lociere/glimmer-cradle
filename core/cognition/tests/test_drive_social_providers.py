@@ -1,14 +1,15 @@
 from pathlib import Path
 from datetime import timedelta
 
-from glimmer_cradle.cognition.cycle.providers import DriveProvider, SocialProvider
-from glimmer_cradle.cognition.cycle.workspace import make_item
-from glimmer_cradle.cognition.memory.storage.database import CognitionDatabase
-from glimmer_cradle.cognition.memory.storage.relationship_repo import RelationshipRepository
+from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, SocialProvider
+from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
+from tests.support import CLOCK, IDS
 
 
 async def test_drive_accumulates_and_can_propose() -> None:
-    provider = DriveProvider()
+    provider = DriveProvider(clock=CLOCK, ids=IDS)
     await provider.propose([])
     provider._last_tick_at -= timedelta(seconds=7200)
     items = await provider.propose([])
@@ -19,10 +20,10 @@ async def test_social_projects_deterministic_relationship(tmp_path: Path) -> Non
     database = CognitionDatabase(tmp_path / "memory.db")
     await database.connect()
     repository = RelationshipRepository(database)
-    provider = SocialProvider(repository)
+    provider = SocialProvider(repository, clock=CLOCK, ids=IDS)
     focus = make_item(source="perception", content={"actor_id": "u1", "actor_name": "小林",
                                                      "address_mode": "direct", "text": "你好"},
-                      salience=1)
+                      salience=1, clock=CLOCK, ids=IDS)
     await repository.observe("u1", kind="direct", evidence_moment_id="m1", display_name="小林")
     first = (await provider.propose([focus]))[0]
     await repository.observe("u1", kind="direct", evidence_moment_id="m2", display_name="小林")

@@ -2,9 +2,9 @@
 
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanOutput, AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput, AgentSynthesisOutput, AgentSynthesisUseCase
-from glimmer_cradle.cognition.conversation.controller import ConversationController
-from glimmer_cradle.cognition.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.observability.logger import get_logger
+from glimmer_cradle.cognition.application.conversation.controller import ConversationController
+from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
+from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.ports.kernel.models import (
     ConversationHistoryEntry,

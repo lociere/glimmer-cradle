@@ -1,16 +1,23 @@
 """Volition：willingness 公式 + arbiter 仲裁 测试（阶段 5.7）。"""
 import pytest
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
+from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
 
-from glimmer_cradle.cognition.cycle.volition import (
+from glimmer_cradle.cognition.domain.volition import (
     Intent,
     WillingnessConfig,
     WillingnessInputs,
     arbitrate,
     compute_willingness,
-    make_intent,
+    make_intent as domain_make_intent,
     threshold_for,
 )
+from tests.support import CLOCK, IDS, OBSERVABILITY, recorder_args
+
+
+def make_intent(**values) -> Intent:
+    return domain_make_intent(
+        **values, intent_id=IDS.new(), created_at=CLOCK.now_iso()
+    )
 
 
 # ═════════════════════════════ Willingness ═══════════════════════════════
@@ -202,11 +209,11 @@ def test_arbitrate_proactive_blocked_dormant_scenario() -> None:
 
 async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> None:
     """CycleController 接 Volition 后：perception 广播 → reply intent。"""
-    from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
+    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
 
-    from glimmer_cradle.cognition.inference.service import ReasoningResponse
+    from glimmer_cradle.cognition.application.inference.service import ReasoningResponse
 
     class _Fixed(Provider):
         name = "perception"
@@ -216,14 +223,15 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
                 content={"text": "你好", "address_mode": "direct",
                          "familiarity": 8, "scene_id": "s"},
                 salience=0.9,
+                clock=CLOCK, ids=IDS,
             )]
 
     class _FakeReasoning:
         async def request(self, req, *, tier):
             return ReasoningResponse(text="你好呀", tier_used=tier)
 
-    ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
+    recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:
         # 默认 awake 阈值 0.4；纯 direct address（0.3）+ 默认外向（0.05）= 0.35
@@ -233,7 +241,8 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
         loop = CycleController(workspace=ws, providers=[_Fixed()],
                              experience_recorder=recorder,
                              willingness_config=cfg,
-                             reasoning=_FakeReasoning())  # 阶段 7.2 生成回复
+                             reasoning=_FakeReasoning(), clock=CLOCK, ids=IDS,
+                             observability=OBSERVABILITY)  # 阶段 7.2 生成回复
         await loop.tick_once()
         result = loop.last_arbitration
         assert result is not None
@@ -249,14 +258,15 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
 
 async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
     """无广播（providers 全空）→ 无意图。"""
-    from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
+    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
 
-    ws = GlobalWorkspace()
-    recorder = ExperienceRecorder(tmp_path)
+    ws = GlobalWorkspace(clock=CLOCK)
+    recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:
         loop = CycleController(workspace=ws, providers=[],
-                             experience_recorder=recorder)
+                             experience_recorder=recorder, clock=CLOCK, ids=IDS,
+                             observability=OBSERVABILITY)
         await loop.tick_once()
         result = loop.last_arbitration
         assert result is not None
@@ -268,9 +278,9 @@ async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
 
 async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
     """drive(curiosity) 广播 → thought intent；不是 reply。"""
-    from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-    from glimmer_cradle.cognition.cycle.workspace import make_item
-    from glimmer_cradle.cognition.cycle.providers import Provider
+    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
 
     class _Fixed(Provider):
         name = "drive"
@@ -280,17 +290,18 @@ async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
                 content={"drive": "curiosity", "level": 0.8,
                          "all_levels": {"curiosity": 0.8, "companionship": 0.2, "rest": 0.1}},
                 salience=0.8,
+                clock=CLOCK, ids=IDS,
             )]
 
-    ws = GlobalWorkspace(capacity=3)
-    recorder = ExperienceRecorder(tmp_path)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
+    recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:
         loop = CycleController(workspace=ws, providers=[_Fixed()],
                              experience_recorder=recorder,
                              willingness_config=WillingnessConfig(
                                  threshold_by_activity={"engaged": 0.0},  # 直放
-                             ))
+                             ), clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
         await loop.tick_once()
         result = loop.last_arbitration
         assert result is not None

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from glimmer_cradle.cognition.cycle.reply_text import build_reply_messages, normalize_reply_text
+from glimmer_cradle.cognition.application.cycle.reply_text import build_reply_messages, normalize_reply_text
 
 
 def test_normalize_reply_text_removes_emotion_tags_and_stage_directions() -> None:

@@ -1,0 +1,13 @@
+"""认知调度使用的时钟与等待外部能力。"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Protocol
+
+
+class ClockPort(Protocol):
+    def now(self) -> datetime: ...
+    def now_iso(self) -> str: ...
+    def monotonic(self) -> float: ...
+    async def wait(self, seconds: float) -> None: ...

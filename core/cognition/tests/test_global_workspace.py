@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace, make_item, now_iso_ms
+from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace, make_item, now_iso_ms
+from tests.support import CLOCK, IDS
 
 
 def _item(source: str, salience: float, *, decay_in_seconds: float | None = None,
@@ -17,19 +18,21 @@ def _item(source: str, salience: float, *, decay_in_seconds: float | None = None
         content=content or {"v": source},
         salience=salience,
         decay_at=decay_at,
+        clock=CLOCK,
+        ids=IDS,
     )
 
 
 # ── 容量未满：接纳 ───────────────────────────────────────────────────────
 
 async def test_propose_under_capacity_accepts() -> None:
-    ws = GlobalWorkspace(capacity=3)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
     assert await ws.propose(_item("perception", 0.5)) is True
     assert await ws.size() == 1
 
 
 async def test_multiple_propose_fills_to_capacity() -> None:
-    ws = GlobalWorkspace(capacity=3)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
     for s in [0.1, 0.5, 0.9]:
         assert await ws.propose(_item("memory", s)) is True
     assert await ws.size() == 3
@@ -38,7 +41,7 @@ async def test_multiple_propose_fills_to_capacity() -> None:
 # ── 容量已满：按 salience 淘汰最低 ───────────────────────────────────────
 
 async def test_propose_at_capacity_evicts_lowest() -> None:
-    ws = GlobalWorkspace(capacity=3)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
     await ws.propose(_item("memory", 0.1))
     await ws.propose(_item("memory", 0.5))
     await ws.propose(_item("memory", 0.9))
@@ -50,7 +53,7 @@ async def test_propose_at_capacity_evicts_lowest() -> None:
 
 
 async def test_propose_rejected_when_weaker_than_lowest() -> None:
-    ws = GlobalWorkspace(capacity=2)
+    ws = GlobalWorkspace(capacity=2, clock=CLOCK)
     await ws.propose(_item("memory", 0.7))
     await ws.propose(_item("memory", 0.8))
     # 新项 0.3 < 现存最低 0.7 → 拒收
@@ -61,7 +64,7 @@ async def test_propose_rejected_when_weaker_than_lowest() -> None:
 
 async def test_direct_perception_replaces_equal_drive_at_capacity() -> None:
     """直接对话是互动义务：同等 salience 下应压过长驻 drive。"""
-    ws = GlobalWorkspace(capacity=2)
+    ws = GlobalWorkspace(capacity=2, clock=CLOCK)
     await ws.propose(_item("drive", 1.0, content={"drive": "curiosity"}))
     await ws.propose(_item("drive", 1.0, content={"drive": "companionship"}))
 
@@ -80,12 +83,12 @@ async def test_direct_perception_replaces_equal_drive_at_capacity() -> None:
 # ── 广播 ─────────────────────────────────────────────────────────────────
 
 async def test_broadcast_empty_returns_none() -> None:
-    ws = GlobalWorkspace()
+    ws = GlobalWorkspace(clock=CLOCK)
     assert await ws.broadcast() is None
 
 
 async def test_broadcast_returns_highest_salience() -> None:
-    ws = GlobalWorkspace(capacity=5)
+    ws = GlobalWorkspace(capacity=5, clock=CLOCK)
     await ws.propose(_item("memory", 0.3, content={"v": "memo"}))
     await ws.propose(_item("affect", 0.7, content={"v": "feel"}))
     await ws.propose(_item("drive", 0.5, content={"v": "drive"}))
@@ -96,7 +99,7 @@ async def test_broadcast_returns_highest_salience() -> None:
 
 
 async def test_broadcast_tie_prefers_direct_perception_over_drive() -> None:
-    ws = GlobalWorkspace(capacity=5)
+    ws = GlobalWorkspace(capacity=5, clock=CLOCK)
     await ws.propose(_item("drive", 1.0, content={"drive": "companionship"}))
     await ws.propose(_item(
         "perception",
@@ -114,7 +117,7 @@ async def test_broadcast_tie_prefers_direct_perception_over_drive() -> None:
 # ── 衰减 ─────────────────────────────────────────────────────────────────
 
 async def test_expired_items_pruned_on_access() -> None:
-    ws = GlobalWorkspace(capacity=5)
+    ws = GlobalWorkspace(capacity=5, clock=CLOCK)
     await ws.propose(_item("memory", 0.9, decay_in_seconds=-1))  # 已过期
     await ws.propose(_item("memory", 0.4))  # 未过期
     # broadcast 会先 prune
@@ -125,7 +128,7 @@ async def test_expired_items_pruned_on_access() -> None:
 
 async def test_prune_expired_returns_count() -> None:
     import asyncio
-    ws = GlobalWorkspace(capacity=5)
+    ws = GlobalWorkspace(capacity=5, clock=CLOCK)
     # 投放时尚未过期，propose 不会剪掉；之后小睡使其过期，再显式 prune
     await ws.propose(_item("memory", 0.1, decay_in_seconds=0.05))
     await ws.propose(_item("affect", 0.2, decay_in_seconds=0.05))
@@ -139,7 +142,7 @@ async def test_prune_expired_returns_count() -> None:
 # ── snapshot 是副本 ──────────────────────────────────────────────────────
 
 async def test_snapshot_returns_copy() -> None:
-    ws = GlobalWorkspace(capacity=3)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
     await ws.propose(_item("memory", 0.5))
     snap = await ws.snapshot()
     snap.clear()  # 修改 snapshot 不影响 workspace
@@ -149,7 +152,7 @@ async def test_snapshot_returns_copy() -> None:
 # ── 杂项 ─────────────────────────────────────────────────────────────────
 
 async def test_clear_empties_workspace() -> None:
-    ws = GlobalWorkspace(capacity=3)
+    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
     await ws.propose(_item("memory", 0.5))
     await ws.propose(_item("memory", 0.5))
     await ws.clear()
@@ -158,17 +161,18 @@ async def test_clear_empties_workspace() -> None:
 
 def test_invalid_capacity_raises() -> None:
     with pytest.raises(ValueError):
-        GlobalWorkspace(capacity=0)
+        GlobalWorkspace(capacity=0, clock=CLOCK)
 
 
 def test_make_item_fills_id_and_created_at() -> None:
-    it = make_item(source="perception", content={"text": "hi"}, salience=0.5)
-    assert it.item_id and len(it.item_id) >= 32  # UUID hex
+    it = make_item(source="perception", content={"text": "hi"}, salience=0.5,
+                   clock=CLOCK, ids=IDS)
+    assert it.item_id
     assert it.created_at.endswith("Z")
     assert it.salience == 0.5
     assert it.source == "perception"
 
 
 def test_now_iso_ms_format() -> None:
-    s = now_iso_ms()
+    s = now_iso_ms(CLOCK)
     assert s.endswith("Z") and "T" in s

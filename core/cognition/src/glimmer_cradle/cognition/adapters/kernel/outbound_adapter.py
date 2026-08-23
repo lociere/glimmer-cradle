@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import KernelGrpcClient
-from glimmer_cradle.cognition.observability.logger import get_logger
+from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.ports.kernel.outbound.kernel_event_port import KernelEventPort
 
 logger = get_logger("kernel_service_outbound_adapter")

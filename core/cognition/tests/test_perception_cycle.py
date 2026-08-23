@@ -1,33 +1,53 @@
 """感知进入 CycleController 唯一主线的端到端验证。"""
 from __future__ import annotations
 
-from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.cycle.providers import PerceptionProvider
-from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
-from glimmer_cradle.cognition.foundation.config import CognitionConfig
-from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
+from glimmer_cradle.cognition.application.cycle import (
+    CycleController as _CycleController,
+    GlobalWorkspace as _GlobalWorkspace,
+)
+from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
+from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+from glimmer_cradle.cognition.domain.configuration import CognitionSettings
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+
+
+def GlobalWorkspace(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    return _GlobalWorkspace(*args, **kwargs)
+
+
+def PerceptionProvider(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    return _PerceptionProvider(*args, **kwargs)
+
+
+def CycleController(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _CycleController(*args, **kwargs)
 
 
 # ─────────────────────────────── 配置默认值 ───────────────────────────────
 
-def test_cognition_config_defaults() -> None:
-    """CognitionConfig 默认值（workspace_capacity / tick interval）。"""
-    cfg = CognitionConfig()
+def test_cognition_config_requires_normalized_values() -> None:
+    cfg = CognitionSettings(workspace_capacity=7, default_tick_interval_ms=5000)
     assert cfg.workspace_capacity == 7
     assert cfg.default_tick_interval_ms == 5000
 
 
 def test_cognition_config_frozen() -> None:
     """配置 frozen=True，运行时不可篡改。"""
-    cfg = CognitionConfig()
+    cfg = CognitionSettings(workspace_capacity=7, default_tick_interval_ms=5000)
     import pydantic
     try:
         cfg.workspace_capacity = 99  # type: ignore[misc]
     except (pydantic.ValidationError, TypeError, AttributeError):
         return
-    raise AssertionError("CognitionConfig 应当是 frozen")
+    raise AssertionError("CognitionSettings 应当是 frozen")
 
 
 # ─────────────── 端到端：队列 → loop tick → reply intent ───────────────
@@ -48,14 +68,14 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         trace_id="trace-1",
     ))
 
-    from glimmer_cradle.cognition.inference.service import ReasoningResponse
+    from glimmer_cradle.cognition.application.inference.service import ReasoningResponse
 
     class _FakeReasoning:
         async def request(self, req, *, tier):
             return ReasoningResponse(text="你好呀，我在", tier_used=tier)
 
     ws = GlobalWorkspace(capacity=5)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         provider = PerceptionProvider(queue)
@@ -106,7 +126,7 @@ async def test_new_input_cancels_real_inference_operation_before_action(tmp_path
     ))
     operations = PerceptionOperationRegistry()
     operation, _ = operations.accept("perception:cancel-real", "trace-cancel-real")
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
@@ -143,8 +163,8 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
         → _pending_reply → Intend(reply) → Act → action_sink
     action_sink 收到的 dict 形状即内核 ACTION_COMMAND handler 读取的契约。
     """
-    from glimmer_cradle.cognition.inference.cloud import CloudReasoning
-    from glimmer_cradle.cognition.inference.service import ReasoningService
+    from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
+    from glimmer_cradle.cognition.application.inference.service import ReasoningService
 
     # ── stub LLMEngine：记录收到的 prompt，返回固定回复（鸭子类型 .generate）──
     captured: dict = {}
@@ -198,10 +218,11 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     reasoning = ReasoningService(
         cloud=CloudReasoning(_StubLLM()),  # type: ignore[arg-type]
         local=None,
+        observability=OBSERVABILITY,
     )
 
     ws = GlobalWorkspace(capacity=5)
-    recorder = ExperienceRecorder(tmp_path)
+    recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
