@@ -179,41 +179,62 @@ export class CognitionManager {
   public async stop(): Promise<void> {
     this.recoveryGeneration += 1;
     const child = this.child;
-    if (!this.running && !child) return;
     this.stopping = true;
     this.ready = false;
+    if (!this.running && !child) {
+      try {
+        await this.transport.invalidateProcess(undefined, new Error('Cognition 生命周期已停止'));
+      } finally {
+        this.inFlightPerceptions.clear();
+        this.stopping = false;
+      }
+      return;
+    }
     if (child && !child.pid) {
-      this.child = null;
-      this.running = false;
-      this.inFlightPerceptions.clear();
-      this.stopping = false;
+      try {
+        await this.transport.invalidateProcess(undefined, new Error('Cognition 子进程未取得 PID'));
+      } finally {
+        this.child = null;
+        this.running = false;
+        this.inFlightPerceptions.clear();
+        this.stopping = false;
+      }
       this.lifecycleObserver('stopped', 'Cognition 未完成启动的子进程已释放');
       return;
     }
-    let accepted = false;
-    if (child && this.transport.isRegistered) {
+    try {
+      let accepted = false;
+      if (child && this.transport.isRegistered) {
+        try {
+          await this.client.shutdown('kernel_lifecycle_stop', 1000);
+          accepted = true;
+        } catch (error) {
+          logger.warn('Cognition gRPC 停机请求失败，转入受管进程回收', { error: normalizeError(error) });
+        }
+      }
+      if (child && accepted) {
+        if (!await waitForManagedProcessExit(child, 2500)) {
+          await forceTerminateManagedProcessTree(child, 'Cognition 认知核', 1000, process.platform !== 'win32');
+        }
+      } else {
+        await stopManagedProcess(child, {
+          label: 'Cognition 认知核', gracefulTimeoutMs: 2500, forceTimeoutMs: 1000,
+          ownsProcessGroup: process.platform !== 'win32',
+        });
+      }
+    } finally {
       try {
-        await this.client.shutdown('kernel_lifecycle_stop', 1000);
-        accepted = true;
-      } catch (error) {
-        logger.warn('Cognition gRPC 停机请求失败，转入受管进程回收', { error: normalizeError(error) });
+        await this.transport.invalidateProcess(
+          child?.pid,
+          new Error('Cognition 受监督进程生命周期已结束'),
+        );
+      } finally {
+        this.running = false;
+        this.inFlightPerceptions.clear();
+        this.child = null;
+        this.stopping = false;
       }
     }
-    if (child && accepted) {
-      if (!await waitForManagedProcessExit(child, 2500)) {
-        await forceTerminateManagedProcessTree(child, 'Cognition 认知核', 1000, process.platform !== 'win32');
-      }
-    } else {
-      await stopManagedProcess(child, {
-        label: 'Cognition 认知核', gracefulTimeoutMs: 2500, forceTimeoutMs: 1000,
-        ownsProcessGroup: process.platform !== 'win32',
-      });
-    }
-    if (child?.pid) await this.transport.invalidateProcess(child.pid);
-    this.running = false;
-    this.inFlightPerceptions.clear();
-    this.child = null;
-    this.stopping = false;
     logger.info('Cognition 认知核停止完成');
     this.lifecycleObserver('stopped', 'Cognition 已停止');
   }
@@ -280,10 +301,10 @@ export class CognitionManager {
       if (this.child === child) this.child = null;
       this.running = false;
       this.ready = false;
-      const invalidation = child.pid ? this.transport.invalidateProcess(
+      const invalidation = this.transport.invalidateProcess(
         child.pid,
-        new Error('受监督 Cognition 进程在注册前退出'),
-      ) : Promise.resolve();
+        new Error('受监督 Cognition 进程退出'),
+      );
       logger[code === 0 || interrupted ? 'info' : 'warn']('Cognition 认知核进程退出', { code, signal });
       if (!intentional) {
         this.inFlightPerceptions.clear();
@@ -300,6 +321,11 @@ export class CognitionManager {
       this.ready = false;
       this.lifecycleObserver('failed', 'Cognition 子进程启动失败');
       logger.error('Cognition 子进程启动失败', { error: error.message });
+      void this.transport.invalidateProcess(child.pid, error).catch((invalidationError) => {
+        logger.error('Cognition 子进程错误后的 transport 失效失败', {
+          error: normalizeError(invalidationError),
+        });
+      });
     });
   }
 

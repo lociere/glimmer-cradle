@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/common/v1/service_contract.proto.
  */
 export const file_glimmer_common_v1_service_contract: GenFile = /*@__PURE__*/
-  fileDesc("CihnbGltbWVyL2NvbW1vbi92MS9zZXJ2aWNlX2NvbnRyYWN0LnByb3RvEhFnbGltbWVyLmNvbW1vbi52MSKMAQoMQ2FsbE1ldGFkYXRhEhAKCHRyYWNlX2lkGAEgASgJEg8KB3NwYW5faWQYAiABKAkSFAoMY2F1c2F0aW9uX2lkGAMgASgJEhYKDmNvcnJlbGF0aW9uX2lkGAQgASgJEhIKCmdlbmVyYXRpb24YBSABKAkSFwoPaWRlbXBvdGVuY3lfa2V5GAYgASgJIp8BChJTZXJ2aWNlRXJyb3JEZXRhaWwSMQoEY29kZRgBIAEoDjIjLmdsaW1tZXIuY29tbW9uLnYxLlNlcnZpY2VFcnJvckNvZGUSFAoMc2FmZV9tZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCBItCgRjYWxsGAQgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhIkgKDUNvbW1hbmRSZXN1bHQSFAoMb3BlcmF0aW9uX2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRIRCglkdXBsaWNhdGUYAyABKAgqvQIKEFNlcnZpY2VFcnJvckNvZGUSIgoeU0VSVklDRV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASJgoiU0VSVklDRV9FUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBABEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9OT1RfUkVBRFkQAhIqCiZTRVJWSUNFX0VSUk9SX0NPREVfR0VORVJBVElPTl9NSVNNQVRDSBADEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9DQU5DRUxMRUQQBBIoCiRTRVJWSUNFX0VSUk9SX0NPREVfREVBRExJTkVfRVhDRUVERUQQBRIfChtTRVJWSUNFX0VSUk9SX0NPREVfSU5URVJOQUwQBhIiCh5TRVJWSUNFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQB0IsqgIpR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Db21tb24uVjFiBnByb3RvMw");
+  fileDesc("CihnbGltbWVyL2NvbW1vbi92MS9zZXJ2aWNlX2NvbnRyYWN0LnByb3RvEhFnbGltbWVyLmNvbW1vbi52MSKMAQoMQ2FsbE1ldGFkYXRhEhAKCHRyYWNlX2lkGAEgASgJEg8KB3NwYW5faWQYAiABKAkSFAoMY2F1c2F0aW9uX2lkGAMgASgJEhYKDmNvcnJlbGF0aW9uX2lkGAQgASgJEhIKCmdlbmVyYXRpb24YBSABKAkSFwoPaWRlbXBvdGVuY3lfa2V5GAYgASgJIvkBChJTZXJ2aWNlRXJyb3JEZXRhaWwSMQoEY29kZRgBIAEoDjIjLmdsaW1tZXIuY29tbW9uLnYxLlNlcnZpY2VFcnJvckNvZGUSFAoMc2FmZV9tZXNzYWdlGAIgASgJEhEKCXJldHJ5YWJsZRgDIAEoCBItCgRjYWxsGAQgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEkIKEHJlY292ZXJ5X2FjdGlvbnMYBSADKA4yKC5nbGltbWVyLmNvbW1vbi52MS5TZXJ2aWNlUmVjb3ZlcnlBY3Rpb24SFAoMb3BlcmF0aW9uX2lkGAYgASgJIkgKDUNvbW1hbmRSZXN1bHQSFAoMb3BlcmF0aW9uX2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRIRCglkdXBsaWNhdGUYAyABKAgq5wIKEFNlcnZpY2VFcnJvckNvZGUSIgoeU0VSVklDRV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASJgoiU0VSVklDRV9FUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBABEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9OT1RfUkVBRFkQAhIqCiZTRVJWSUNFX0VSUk9SX0NPREVfR0VORVJBVElPTl9NSVNNQVRDSBADEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9DQU5DRUxMRUQQBBIoCiRTRVJWSUNFX0VSUk9SX0NPREVfREVBRExJTkVfRVhDRUVERUQQBRIfChtTRVJWSUNFX0VSUk9SX0NPREVfSU5URVJOQUwQBhIiCh5TRVJWSUNFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQBxIoCiRTRVJWSUNFX0VSUk9SX0NPREVfUkVDT1ZFUllfUkVRVUlSRUQQCCp3ChVTZXJ2aWNlUmVjb3ZlcnlBY3Rpb24SJwojU0VSVklDRV9SRUNPVkVSWV9BQ1RJT05fVU5TUEVDSUZJRUQQABI1CjFTRVJWSUNFX1JFQ09WRVJZX0FDVElPTl9DT05GSVJNX1NJREVfRUZGRUNUX1NUQVRFEAFCLKoCKUdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ29tbW9uLlYxYgZwcm90bzM");
 
 /**
  * @generated from message glimmer.common.v1.CallMetadata
@@ -77,6 +77,16 @@ export type ServiceErrorDetail = Message<"glimmer.common.v1.ServiceErrorDetail">
    * @generated from field: glimmer.common.v1.CallMetadata call = 4;
    */
   call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: repeated glimmer.common.v1.ServiceRecoveryAction recovery_actions = 5;
+   */
+  recoveryActions: ServiceRecoveryAction[];
+
+  /**
+   * @generated from field: string operation_id = 6;
+   */
+  operationId: string;
 };
 
 /**
@@ -156,6 +166,11 @@ export enum ServiceErrorCode {
    * @generated from enum value: SERVICE_ERROR_CODE_UNAVAILABLE = 7;
    */
   UNAVAILABLE = 7,
+
+  /**
+   * @generated from enum value: SERVICE_ERROR_CODE_RECOVERY_REQUIRED = 8;
+   */
+  RECOVERY_REQUIRED = 8,
 }
 
 /**
@@ -163,3 +178,24 @@ export enum ServiceErrorCode {
  */
 export const ServiceErrorCodeSchema: GenEnum<ServiceErrorCode> = /*@__PURE__*/
   enumDesc(file_glimmer_common_v1_service_contract, 0);
+
+/**
+ * @generated from enum glimmer.common.v1.ServiceRecoveryAction
+ */
+export enum ServiceRecoveryAction {
+  /**
+   * @generated from enum value: SERVICE_RECOVERY_ACTION_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE = 1;
+   */
+  CONFIRM_SIDE_EFFECT_STATE = 1,
+}
+
+/**
+ * Describes the enum glimmer.common.v1.ServiceRecoveryAction.
+ */
+export const ServiceRecoveryActionSchema: GenEnum<ServiceRecoveryAction> = /*@__PURE__*/
+  enumDesc(file_glimmer_common_v1_service_contract, 1);

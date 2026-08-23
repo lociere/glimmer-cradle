@@ -101,12 +101,17 @@ reply 的 committed 状态：提交后的重试只恢复未完成步骤，不能
 provider 返回“需要人工恢复”，拒绝自动重放。响应只允许 `completed` 或 `duplicate`；transport
 只有在 handler 正常完成或步骤账本确认副作用已提交后才记录幂等完成，并发同键调用合并为一次
 执行。typed failure 通过 gRPC status 与 `ServiceErrorDetail` 的完整受控 `CallMetadata` 返回，对外
-message 不携带内部异常。
+message 不携带内部异常。不可安全重放固定使用 `RECOVERY_REQUIRED`，并由
+`recovery_actions=[CONFIRM_SIDE_EFFECT_STATE]` 与 `operation_id` 给出可程序化恢复投影；Desktop
+response、Control Surface、Skill Action、Kernel Service 与 Python client 都按这些稳定字段映射，
+不得解析 message 判定恢复语义。
 
 Cognition 注册使用 Kernel 通过匿名 bootstrap pipe 单次交付的 nonce/capability secret。HMAC
 proof 绑定 generation、nonce、Cognition 动态回环 endpoint、Service PID 与受监督子进程 PID；
 注册成功或任一注册校验失败都立即清零并作废 secret/nonce。PID 字段只参与已认证 proof 和监督树
-关系校验，不再被当作独立身份凭据。
+关系校验，不再被当作独立身份凭据。分配下一世代前会先原地清零旧 secret Buffer 并拒绝旧注册
+waiter；启动失败、未取得 PID、无 child 的提前 stop、child error/exit 与正常 stop 都统一撤销
+本代 endpoint/capability。
 
 `PerceptionEvent` 的寻址和响应策略分层表达：
 

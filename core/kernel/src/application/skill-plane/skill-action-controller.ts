@@ -16,7 +16,7 @@ import { getLogger } from '../../foundation/logger/logger';
 import { createTraceContext } from '../../foundation/logger/trace-context';
 import { AIProxy } from '../capabilities/inference/ai-proxy';
 import { SkillPlanningAppService } from '../services/skill-planning-app.service';
-import { SkillInvocationRecoveryRequiredError } from './skill-invocation-gateway';
+import { RecoveryRequiredError } from '../../foundation/exceptions';
 
 const logger = getLogger('skill-action-controller');
 
@@ -31,7 +31,7 @@ type ActionExecutionJournal = {
   readonly toolResults: Map<string, AgentToolResult>;
   synthesis?: AgentSynthesisResponse;
   replyCommitted: boolean;
-  recoveryRequired?: SkillInvocationRecoveryRequiredError;
+  recoveryRequired?: RecoveryRequiredError;
 };
 
 export interface ChannelReplyPublishRequest {
@@ -247,7 +247,7 @@ export class SkillActionController {
         options.journal.toolResults.set(invocationId, toolResult);
         results.push(toolResult);
       } catch (error) {
-        if (error instanceof SkillInvocationRecoveryRequiredError) {
+        if (error instanceof RecoveryRequiredError) {
           options.journal.recoveryRequired = error;
           throw error;
         }

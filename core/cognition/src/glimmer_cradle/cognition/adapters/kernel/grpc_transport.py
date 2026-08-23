@@ -78,12 +78,23 @@ class ServiceFault(Exception):
 class KernelServiceError(Exception):
     """Kernel 返回的受控 typed failure；不暴露远端内部异常文本。"""
 
-    def __init__(self, code: int, safe_message: str, *, retryable: bool = False, call: Any = None) -> None:
+    def __init__(
+        self,
+        code: int,
+        safe_message: str,
+        *,
+        retryable: bool = False,
+        call: Any = None,
+        recovery_actions: tuple[int, ...] = (),
+        operation_id: str = "",
+    ) -> None:
         super().__init__(safe_message)
         self.code = code
         self.safe_message = safe_message
         self.retryable = retryable
         self.call = call
+        self.recovery_actions = recovery_actions
+        self.operation_id = operation_id
 
 
 def _grpc_status(code: int) -> grpc.StatusCode:
@@ -94,6 +105,7 @@ def _grpc_status(code: int) -> grpc.StatusCode:
         common_pb.SERVICE_ERROR_CODE_CANCELLED: grpc.StatusCode.CANCELLED,
         common_pb.SERVICE_ERROR_CODE_DEADLINE_EXCEEDED: grpc.StatusCode.DEADLINE_EXCEEDED,
         common_pb.SERVICE_ERROR_CODE_UNAVAILABLE: grpc.StatusCode.UNAVAILABLE,
+        common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED: grpc.StatusCode.FAILED_PRECONDITION,
     }.get(code, grpc.StatusCode.INTERNAL)
 
 
@@ -532,6 +544,8 @@ class KernelGrpcClient:
                         detail.safe_message or "Kernel 请求失败",
                         retryable=detail.retryable,
                         call=detail.call if detail.HasField("call") else None,
+                        recovery_actions=tuple(detail.recovery_actions),
+                        operation_id=detail.operation_id,
                     ) from None
             code = {
                 grpc.StatusCode.CANCELLED: common_pb.SERVICE_ERROR_CODE_CANCELLED,

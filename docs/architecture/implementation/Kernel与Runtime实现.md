@@ -107,12 +107,19 @@ Cognition outbound action/reply/status
 
 `CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID。启动时 Kernel 经 FD 3 匿名 pipe 单次交付 generation、动态 control endpoint、nonce 和 capability secret；Cognition 的 HMAC proof 绑定上述 challenge、实际 Service PID 与受监督子进程 PID。注册成功或校验失败后两端都会清零/作废 secret；Python 入口解码后只短暂持有可覆写 `bytearray`，不把原始 secret 字符串保留在 Host 生命周期。Windows 的 venv launcher 与解释器 PID 可不同，因此监督树关系与已认证 proof 共同校验，绝不把自报 PID 单独当身份。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
 
+`prepareProcess()` 覆盖能力前先原地清零旧 secret Buffer，并以新 generation/nonce 使旧 bootstrap
+不可再注册。`CognitionManager` 在 spawn 失败、无 PID、无 child 的提前 stop、child error/exit
+和正常 stop 的 finally 路径都调用同一个 `invalidateProcess()`；因此 capability、注册 waiter、
+client 与 `cognition-rpc` endpoint 不会在异常分支残留。
+
 `KernelControlService.PublishAction` 的 deadline 由 Kernel transport 持有，RPC cancellation 与
 deadline 转成 `AbortSignal` 贯穿 `SkillActionController -> SkillPlanningAppService ->
 SkillInvocationGateway -> tool handler`，并继续传入 Cognition `Synthesize` unary call。action
 operation 派生稳定 invocation id；Controller 的步骤账本与 Control Surface 实际副作用 owner
 共同去重已提交工具/reply。若 deadline 在提交后到达，handler 以 committed 结果让 transport
 安全写 completed；若不可逆 handler 在取消点的终态不明，则固定为“需要人工恢复”并拒绝重放。
+该终态经 `ServiceErrorDetail.code=RECOVERY_REQUIRED`、`operation_id` 与
+`recovery_actions=CONFIRM_SIDE_EFFECT_STATE` 投影给 Cognition Python client，message 只作受控显示。
 提交前失败才释放未完成步骤供重试。transport 停机也会 abort 活跃 action。
 
 ## Skill Plane 与 Extension 接线

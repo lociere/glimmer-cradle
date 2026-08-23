@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, toBinary, type JsonObject } from '@bufbuild/protobuf';
 import {
   ServiceErrorCode,
+  ServiceRecoveryAction,
   ServiceErrorDetailSchema,
   type CallMetadata,
 } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
@@ -46,6 +47,7 @@ import { EndpointRegistry } from '../../foundation/endpoints/endpoint-registry';
 import { getLogger } from '../../foundation/logger/logger';
 import { createTraceContext, withTrace } from '../../foundation/logger/trace-context';
 import type { CognitionActionHandler, CognitionProcessBootstrap } from '../../foundation/ports/cognition-service-port';
+import { RecoveryRequiredError } from '../../foundation/exceptions';
 import { serviceDefinition, unaryMethod } from './grpc-contract';
 
 const logger = getLogger('kernel-cognition-transport');
@@ -88,6 +90,8 @@ export class CognitionTransportError extends Error {
     public readonly retryable: boolean,
     public readonly traceId?: string,
     public readonly call?: CallMetadata,
+    public readonly recoveryActions: readonly ServiceRecoveryAction[] = [],
+    public readonly operationId?: string,
   ) {
     super(message);
     this.name = 'CognitionTransportError';
@@ -154,6 +158,14 @@ export class KernelCognitionTransport {
 
   public prepareProcess(): CognitionProcessBootstrap {
     this.invalidateClient();
+    this.registrationSecret?.fill(0);
+    const superseded = new CognitionTransportError(
+      'Cognition 注册能力已被新世代替换',
+      ServiceErrorCode.GENERATION_MISMATCH,
+      false,
+    );
+    for (const waiter of this.registrationWaiters) waiter(superseded);
+    this.registrationWaiters.clear();
     this.expectedProcessId = null;
     this.processGeneration = randomUUID();
     this.registrationNonce = randomUUID();
@@ -392,7 +404,7 @@ export class KernelCognitionTransport {
         if (
           abortController.signal.aborted
           && !(error instanceof CognitionTransportError)
-          && !(error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError')
+          && !(error instanceof RecoveryRequiredError)
         ) {
           throw serviceFault(
             deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
@@ -406,14 +418,17 @@ export class KernelCognitionTransport {
           trace_id: traceId,
           error_kind: error instanceof Error ? error.name : 'unknown',
         });
-        throw serviceFault(
-          ServiceErrorCode.INTERNAL,
-          error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError'
-            ? 'Kernel action 副作用终态不明，需要人工恢复'
-            : 'Kernel action 执行失败',
-          false,
-          request.call,
-        );
+        if (error instanceof RecoveryRequiredError) {
+          throw serviceFault(
+            ServiceErrorCode.RECOVERY_REQUIRED,
+            'Kernel action 副作用终态不明，需要人工恢复',
+            false,
+            request.call,
+            [ServiceRecoveryAction.CONFIRM_SIDE_EFFECT_STATE],
+            error.operationId,
+          );
+        }
+        throw serviceFault(ServiceErrorCode.INTERNAL, 'Kernel action 执行失败', false, request.call);
       } finally {
         if (key) this.inFlightCommands.delete(key);
       }
@@ -518,20 +533,39 @@ export function structToObject(value: unknown): Record<string, unknown> {
   return objectToStruct(value);
 }
 
-function serviceFault(code: ServiceErrorCode, message: string, retryable: boolean, call?: CallMetadata) {
-  return new CognitionTransportError(message, code, retryable, call?.traceId, call);
+function serviceFault(
+  code: ServiceErrorCode,
+  message: string,
+  retryable: boolean,
+  call?: CallMetadata,
+  recoveryActions: readonly ServiceRecoveryAction[] = [],
+  operationId?: string,
+) {
+  return new CognitionTransportError(
+    message,
+    code,
+    retryable,
+    call?.traceId,
+    call,
+    recoveryActions,
+    operationId,
+  );
 }
 
 function toServiceError(error: unknown): grpc.ServiceError {
   const fault = error instanceof CognitionTransportError
     ? error
-    : new CognitionTransportError(
-      error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError'
-        ? 'Kernel action 副作用终态不明，需要人工恢复'
-        : 'Kernel action 执行失败',
-      ServiceErrorCode.INTERNAL,
-      false,
-    );
+    : error instanceof RecoveryRequiredError
+      ? new CognitionTransportError(
+        'Kernel action 副作用终态不明，需要人工恢复',
+        ServiceErrorCode.RECOVERY_REQUIRED,
+        false,
+        undefined,
+        undefined,
+        [ServiceRecoveryAction.CONFIRM_SIDE_EFFECT_STATE],
+        error.operationId,
+      )
+      : new CognitionTransportError('Kernel action 执行失败', ServiceErrorCode.INTERNAL, false);
   if (!(error instanceof CognitionTransportError)) {
     logger.error('Kernel action handler 返回未受控异常', {
       error_kind: error instanceof Error ? error.name : 'unknown',
@@ -543,6 +577,8 @@ function toServiceError(error: unknown): grpc.ServiceError {
     safeMessage: fault.message,
     retryable: fault.retryable,
     call: fault.call ?? (fault.traceId ? create(CallMetadataSchema, { traceId: fault.traceId }) : undefined),
+    recoveryActions: [...fault.recoveryActions],
+    operationId: fault.operationId ?? '',
   }))));
   return Object.assign(new Error(fault.message), {
     code: grpcStatusFor(fault.code),
@@ -562,6 +598,8 @@ function parseServiceError(error: grpc.ServiceError, traceId?: string): Cognitio
         detail.retryable,
         detail.call?.traceId || traceId,
         detail.call,
+        detail.recoveryActions,
+        detail.operationId || undefined,
       );
     } catch {
       // 远端 detail 损坏时保留 gRPC 通用语义。
@@ -588,6 +626,7 @@ function grpcStatusFor(code: ServiceErrorCode): grpc.status {
     case ServiceErrorCode.CANCELLED: return grpc.status.CANCELLED;
     case ServiceErrorCode.DEADLINE_EXCEEDED: return grpc.status.DEADLINE_EXCEEDED;
     case ServiceErrorCode.UNAVAILABLE: return grpc.status.UNAVAILABLE;
+    case ServiceErrorCode.RECOVERY_REQUIRED: return grpc.status.FAILED_PRECONDITION;
     default: return grpc.status.INTERNAL;
   }
 }

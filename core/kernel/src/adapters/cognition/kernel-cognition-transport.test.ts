@@ -1,7 +1,11 @@
 import * as grpc from '@grpc/grpc-js';
 import { createHmac } from 'node:crypto';
 import { create, fromBinary } from '@bufbuild/protobuf';
-import { ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import {
+  ServiceErrorCode,
+  ServiceErrorDetailSchema,
+  ServiceRecoveryAction,
+} from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
   PublishActionRequestSchema,
   PublishActionResponseSchema,
@@ -11,6 +15,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unaryMethod } from './grpc-contract';
 import { KernelCognitionTransport } from './kernel-cognition-transport';
+import { RecoveryRequiredError } from '../../foundation/exceptions';
 
 const registerMethod = unaryMethod(
   '/glimmer.kernel.v1.KernelControlService/RegisterCognition',
@@ -119,6 +124,33 @@ describe('KernelCognitionTransport', () => {
       supervisorProcessId: 0n,
       registrationNonce: bootstrap.registrationNonce,
       authProof: validProofAfterFailure,
+    }))).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    client.close();
+  });
+
+  it('zeros the previous FD3 capability before preparing a new process generation', async () => {
+    await transport.start();
+    const first = transport.prepareProcess();
+    const oldSecret = (transport as unknown as { registrationSecret: Buffer }).registrationSecret;
+    const second = transport.prepareProcess();
+
+    expect(oldSecret.every((value) => value === 0)).toBe(true);
+    expect(second.generation).not.toBe(first.generation);
+    expect(second.registrationNonce).not.toBe(first.registrationNonce);
+    expect(second.registrationSecret).not.toBe(first.registrationSecret);
+    transport.expectProcess(654);
+    const endpoint = 'grpc://127.0.0.1:45654';
+    const staleProof = createHmac('sha256', Buffer.from(first.registrationSecret, 'base64url'))
+      .update(`${first.generation}\n${first.registrationNonce}\n${endpoint}\n654\n0`)
+      .digest();
+    const client = new grpc.Client(transport.controlEndpoint.slice('grpc://'.length), grpc.credentials.createInsecure());
+    await expect(rawCall(client, registerMethod, create(RegisterCognitionRequestSchema, {
+      call: transport.makeCallMetadata({ traceId: 'stale-fd3-capability' }),
+      endpoint,
+      processId: 654n,
+      supervisorProcessId: 0n,
+      registrationNonce: first.registrationNonce,
+      authProof: staleProof,
     }))).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
     client.close();
   });
@@ -261,6 +293,54 @@ describe('KernelCognitionTransport', () => {
       correlationId: 'safe-correlation', idempotencyKey: 'safe-key',
       generation: call.generation,
     });
+    client.close();
+  });
+
+  it('projects manual recovery as a stable Service terminal across repeated requests', async () => {
+    await transport.start();
+    const client = await registerTransport(transport, 783);
+    const handler = vi.fn(async () => {
+      throw new RecoveryRequiredError('action:unsafe:tool:0');
+    });
+    transport.setActionHandler(handler);
+    const call = transport.makeCallMetadata({
+      traceId: 'recovery-trace',
+      spanId: 'recovery-span',
+      causationId: 'recovery-cause',
+      correlationId: 'recovery-correlation',
+      idempotencyKey: 'action:unsafe',
+    });
+    const action = create(PublishActionRequestSchema, {
+      call,
+      actionType: 'skill_request', targetSceneId: 'scene-1', text: 'unsafe',
+    });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let error!: grpc.ServiceError;
+      try {
+        await rawCall(client, actionMethod, action);
+        throw new Error('expected recovery-required failure');
+      } catch (caught) {
+        error = caught as grpc.ServiceError;
+      }
+      expect(error.code).toBe(grpc.status.FAILED_PRECONDITION);
+      const detail = fromBinary(ServiceErrorDetailSchema, error.metadata.get('glimmer-error-bin')[0] as Buffer);
+      expect(detail).toMatchObject({
+        code: ServiceErrorCode.RECOVERY_REQUIRED,
+        retryable: false,
+        operationId: 'action:unsafe:tool:0',
+        recoveryActions: [ServiceRecoveryAction.CONFIRM_SIDE_EFFECT_STATE],
+        call: {
+          traceId: 'recovery-trace',
+          spanId: 'recovery-span',
+          causationId: 'recovery-cause',
+          correlationId: 'recovery-correlation',
+          generation: call.generation,
+          idempotencyKey: 'action:unsafe',
+        },
+      });
+    }
+    expect(handler).toHaveBeenCalledTimes(2);
     client.close();
   });
 

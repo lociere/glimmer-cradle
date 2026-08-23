@@ -414,6 +414,45 @@ async def test_kernel_typed_error_preserves_safe_metadata_without_raw_details():
 
 
 @pytest.mark.asyncio
+async def test_kernel_manual_recovery_is_programmatic_and_not_message_driven():
+    detail = common_pb.ServiceErrorDetail(
+        code=common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED,
+        safe_message="localized text may change",
+        retryable=False,
+        call=_metadata("generation-1", "trace-recovery"),
+        recovery_actions=[common_pb.SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE],
+        operation_id="action:unsafe:tool:0",
+    )
+
+    class _Channel:
+        def unary_unary(self, *_args, **_kwargs):
+            async def invoke(_request, timeout=None):
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    trailing_metadata=(("glimmer-error-bin", detail.SerializeToString()),),
+                    details="untrusted transport text",
+                )
+            return invoke
+
+    client = KernelGrpcClient("generation-1", "nonce", "AA")
+    client._channel = _Channel()  # type: ignore[assignment]
+    with pytest.raises(KernelServiceError) as caught:
+        await client._call(
+            "PublishAction",
+            kernel_pb.PublishActionRequest(),
+            kernel_pb.PublishActionRequest,
+            kernel_pb.PublishActionResponse,
+        )
+    assert caught.value.code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED
+    assert caught.value.retryable is False
+    assert caught.value.operation_id == "action:unsafe:tool:0"
+    assert caught.value.recovery_actions == (
+        common_pb.SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
+    )
+    assert caught.value.call.trace_id == "trace-recovery"
+
+
+@pytest.mark.asyncio
 async def test_registration_secret_is_zeroed_on_client_registration_failure() -> None:
     secret = bytearray(b"registration-capability")
     client = KernelGrpcClient("generation-1", "nonce", secret)

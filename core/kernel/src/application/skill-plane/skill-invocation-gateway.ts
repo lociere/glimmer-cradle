@@ -18,6 +18,7 @@ import {
 } from '../../foundation/observability/plane';
 import type { ConversationContext } from '@glimmer-cradle/protocol';
 import { isCapabilityScopeVisible } from './scope';
+import { RecoveryRequiredError } from '../../foundation/exceptions';
 
 export interface SkillInvocationRequest {
   skillId: string;
@@ -30,10 +31,11 @@ export interface SkillInvocationRequest {
   invocationId?: string;
 }
 
-export class SkillInvocationRecoveryRequiredError extends Error {
+export class SkillInvocationRecoveryRequiredError extends RecoveryRequiredError {
   public constructor(public readonly invocationId: string) {
-    super(`技能副作用终态不明，需要人工恢复（invocation_id=${invocationId}）`);
+    super(invocationId, undefined, `技能副作用终态不明，需要人工恢复（invocation_id=${invocationId}）`);
     this.name = 'SkillInvocationRecoveryRequiredError';
+    Object.setPrototypeOf(this, SkillInvocationRecoveryRequiredError.prototype);
   }
 }
 

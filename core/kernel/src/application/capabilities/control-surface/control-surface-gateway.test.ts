@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ControlSurfaceGateway } from './control-surface-gateway';
 import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/protocol';
 import type { ConversationHistoryService } from './conversation-history-service';
+import { RecoveryRequiredError } from '../../../foundation/exceptions';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
 
@@ -51,6 +52,39 @@ describe('ControlSurfaceGateway', () => {
 
     expect(sent).toHaveLength(1);
     expect(sent[0].request_id).toBe('action:1:tool:0');
+  });
+
+  it('maps a Desktop manual-recovery projection to a programmatic terminal error', async () => {
+    const gateway = ControlSurfaceGateway.instance as unknown as {
+      _clients: Set<unknown>;
+      _handleCoreSkillResponse(data: unknown): void;
+      requestCoreSkillAction(action: string, payload: Record<string, unknown>, invocationId?: string): Promise<unknown>;
+    };
+    gateway._clients.add({
+      readyState: 1,
+      send(data: string) {
+        const frame = JSON.parse(data) as Record<string, unknown>;
+        queueMicrotask(() => gateway._handleCoreSkillResponse({
+          kind: 'core_skill_action_response',
+          request_id: frame.request_id,
+          status: 'error',
+          message: 'arbitrary localized text',
+          error_code: 'recovery_required',
+          operation_id: frame.request_id,
+          recovery_actions: ['confirm_side_effect_state'],
+        }));
+      },
+    });
+
+    const error = await gateway.requestCoreSkillAction(
+      'clipboard.write', { text: 'uncertain' }, 'action:unsafe:tool:0',
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RecoveryRequiredError);
+    expect(error).toMatchObject({
+      code: 'recovery_required',
+      operationId: 'action:unsafe:tool:0',
+      recoveryActions: ['confirm_side_effect_state'],
+    });
   });
 
   it('returns an explicit conversation notice when no usable LLM route is configured', () => {

@@ -51,6 +51,11 @@ import {
   queryObservabilityTrace,
 } from './observability-query';
 import type { SurfaceId } from './surface-registry';
+import {
+  buildCoreSkillResponseFrame,
+  manualRecoveryProjection,
+  type CoreSkillFailureProjection,
+} from './core-skill-response';
 
 const RECONNECT_INTERVAL_MS = 3000;
 const PROJECT_ROOTS = resolveDesktopProjectRoots({
@@ -2988,6 +2993,7 @@ async function handleCoreSkillActionRequest(frame: Record<string, unknown>): Pro
       'error',
       undefined,
       '本地 Skill 副作用终态不明，需要人工确认，拒绝自动重放',
+      manualRecoveryProjection(requestId),
     );
     return;
   }
@@ -3090,16 +3096,17 @@ function sendCoreSkillResponse(
   status: 'success' | 'error',
   result?: unknown,
   message?: string,
+  failure?: CoreSkillFailureProjection,
 ): void {
   if (kernelSocket?.readyState !== WebSocket.OPEN || !requestId) return;
-  kernelSocket.send(JSON.stringify({
+  kernelSocket.send(JSON.stringify(buildCoreSkillResponseFrame(
     kind,
-    request_id: requestId,
+    requestId,
     status,
     result,
     message,
-    timestamp: Date.now(),
-  }));
+    failure,
+  )));
 }
 
 function buildObservabilityQueryContext(): {

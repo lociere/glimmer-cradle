@@ -126,7 +126,10 @@ skill_request ActionCommand
 反向 action 的 operation id 会派生每个工具步骤的稳定 invocation id，并一路传到 Core Platform
 Bridge 与 Desktop 实际副作用 owner。Controller 只复用已 committed 的步骤结果；合成等待期的
 deadline/cancel 会取消 gRPC 且原样上抛，不发布 fallback。若不可逆 provider 在取消点无法证明
-是否提交，Gateway 固定返回人工恢复终态，后续同 operation 不再自动调用 handler。
+是否提交，Desktop response 固定携带 `error_code=recovery_required`、稳定 `operation_id` 与
+`recovery_actions=[confirm_side_effect_state]`；`ControlSurfaceGateway` 将其映射为应用层
+`RecoveryRequiredError`，Controller 记录后让同 operation 的重试直接拒绝，不再自动调用 handler。
+后续 Kernel Service Adapter 再映射到 canonical Protobuf code/action，Application 不 import generated DTO。
 
 Control Center 的能力目录通过 Desktop bridge 的 `skill_catalog_request` 读取同一个 `SkillCatalogAppService.getCatalogSnapshot()`，Electron main 只转发受控快照，不在 Desktop 进程中 import Kernel service 或重新构造注册表。`SkillCatalogSnapshot` 现在除了人物可用 skill 条目，还会带 `providerRuntimes`：Kernel 统一投影 core / extension / MCP / user provider 的运行态、契约-only、连接失败和恢复动作，Desktop 能力页只消费这份投影，不探测本地 MCP 端点。Extension 运行态不再停留在 `ExtensionRuntimeProjection` 支线里；`ExtensionHostAppService` 会把 Host 侧 manifest/lifecycle/capability graph/diagnostics 同步映射成 `provider.kind=extension` 的 provider runtime，因此即使一个扩展暂时没有人物可用 skill，Control Center 也能在同一能力目录里看到它是 `contract_only`、`connecting`、`ready`、`degraded` 还是 `unavailable`。Skill Plane 不消失，但收敛为 Host-Owned Capability Plane 上的人物可用调用层：`glimmer.skill` 是内建 contribution point，只有 character audience 的 skill/tool/resource/prompt 进入人物 Skill catalog；管理动作从 `ExtensionRuntimeProjection.actions` 的 user audience action intent 触发，不能混入 `SkillPlanningAppService.available_tools`。
 

@@ -30,27 +30,33 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             "YXVzYXRpb25faWQYAyABKAlSC2NhdXNhdGlvbklkEiUKDmNvcnJlbGF0aW9u",
             "X2lkGAQgASgJUg1jb3JyZWxhdGlvbklkEh4KCmdlbmVyYXRpb24YBSABKAlS",
             "CmdlbmVyYXRpb24SJwoPaWRlbXBvdGVuY3lfa2V5GAYgASgJUg5pZGVtcG90",
-            "ZW5jeUtleSLDAQoSU2VydmljZUVycm9yRGV0YWlsEjcKBGNvZGUYASABKA4y",
+            "ZW5jeUtleSK7AgoSU2VydmljZUVycm9yRGV0YWlsEjcKBGNvZGUYASABKA4y",
             "Iy5nbGltbWVyLmNvbW1vbi52MS5TZXJ2aWNlRXJyb3JDb2RlUgRjb2RlEiEK",
             "DHNhZmVfbWVzc2FnZRgCIAEoCVILc2FmZU1lc3NhZ2USHAoJcmV0cnlhYmxl",
             "GAMgASgIUglyZXRyeWFibGUSMwoEY2FsbBgEIAEoCzIfLmdsaW1tZXIuY29t",
-            "bW9uLnYxLkNhbGxNZXRhZGF0YVIEY2FsbCJoCg1Db21tYW5kUmVzdWx0EiEK",
-            "DG9wZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIg",
-            "ASgJUgZzdGF0dXMSHAoJZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUqvQIK",
-            "EFNlcnZpY2VFcnJvckNvZGUSIgoeU0VSVklDRV9FUlJPUl9DT0RFX1VOU1BF",
-            "Q0lGSUVEEAASJgoiU0VSVklDRV9FUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVT",
-            "VBABEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9OT1RfUkVBRFkQAhIqCiZTRVJW",
-            "SUNFX0VSUk9SX0NPREVfR0VORVJBVElPTl9NSVNNQVRDSBADEiAKHFNFUlZJ",
-            "Q0VfRVJST1JfQ09ERV9DQU5DRUxMRUQQBBIoCiRTRVJWSUNFX0VSUk9SX0NP",
-            "REVfREVBRExJTkVfRVhDRUVERUQQBRIfChtTRVJWSUNFX0VSUk9SX0NPREVf",
-            "SU5URVJOQUwQBhIiCh5TRVJWSUNFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQ",
-            "B0IsqgIpR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Db21tb24u",
-            "VjFiBnByb3RvMw=="));
+            "bW9uLnYxLkNhbGxNZXRhZGF0YVIEY2FsbBJTChByZWNvdmVyeV9hY3Rpb25z",
+            "GAUgAygOMiguZ2xpbW1lci5jb21tb24udjEuU2VydmljZVJlY292ZXJ5QWN0",
+            "aW9uUg9yZWNvdmVyeUFjdGlvbnMSIQoMb3BlcmF0aW9uX2lkGAYgASgJUgtv",
+            "cGVyYXRpb25JZCJoCg1Db21tYW5kUmVzdWx0EiEKDG9wZXJhdGlvbl9pZBgB",
+            "IAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSHAoJ",
+            "ZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUq5wIKEFNlcnZpY2VFcnJvckNv",
+            "ZGUSIgoeU0VSVklDRV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASJgoiU0VS",
+            "VklDRV9FUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBABEiAKHFNFUlZJQ0Vf",
+            "RVJST1JfQ09ERV9OT1RfUkVBRFkQAhIqCiZTRVJWSUNFX0VSUk9SX0NPREVf",
+            "R0VORVJBVElPTl9NSVNNQVRDSBADEiAKHFNFUlZJQ0VfRVJST1JfQ09ERV9D",
+            "QU5DRUxMRUQQBBIoCiRTRVJWSUNFX0VSUk9SX0NPREVfREVBRExJTkVfRVhD",
+            "RUVERUQQBRIfChtTRVJWSUNFX0VSUk9SX0NPREVfSU5URVJOQUwQBhIiCh5T",
+            "RVJWSUNFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQBxIoCiRTRVJWSUNFX0VS",
+            "Uk9SX0NPREVfUkVDT1ZFUllfUkVRVUlSRUQQCCp3ChVTZXJ2aWNlUmVjb3Zl",
+            "cnlBY3Rpb24SJwojU0VSVklDRV9SRUNPVkVSWV9BQ1RJT05fVU5TUEVDSUZJ",
+            "RUQQABI1CjFTRVJWSUNFX1JFQ09WRVJZX0FDVElPTl9DT05GSVJNX1NJREVf",
+            "RUZGRUNUX1NUQVRFEAFCLKoCKUdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkds",
+            "aW1tZXIuQ29tbW9uLlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorCode), }, null, new pbr::GeneratedClrTypeInfo[] {
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorCode), typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction), }, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata), global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata.Parser, new[]{ "TraceId", "SpanId", "CausationId", "CorrelationId", "Generation", "IdempotencyKey" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorDetail), global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorDetail.Parser, new[]{ "Code", "SafeMessage", "Retryable", "Call" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorDetail), global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorDetail.Parser, new[]{ "Code", "SafeMessage", "Retryable", "Call", "RecoveryActions", "OperationId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.CommandResult), global::GlimmerCradle.Contracts.Glimmer.Common.V1.CommandResult.Parser, new[]{ "OperationId", "Status", "Duplicate" }, null, null, null, null)
           }));
     }
@@ -67,6 +73,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
     [pbr::OriginalName("SERVICE_ERROR_CODE_DEADLINE_EXCEEDED")] DeadlineExceeded = 5,
     [pbr::OriginalName("SERVICE_ERROR_CODE_INTERNAL")] Internal = 6,
     [pbr::OriginalName("SERVICE_ERROR_CODE_UNAVAILABLE")] Unavailable = 7,
+    [pbr::OriginalName("SERVICE_ERROR_CODE_RECOVERY_REQUIRED")] RecoveryRequired = 8,
+  }
+
+  public enum ServiceRecoveryAction {
+    [pbr::OriginalName("SERVICE_RECOVERY_ACTION_UNSPECIFIED")] Unspecified = 0,
+    [pbr::OriginalName("SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE")] ConfirmSideEffectState = 1,
   }
 
   #endregion
@@ -494,6 +506,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       safeMessage_ = other.safeMessage_;
       retryable_ = other.retryable_;
       call_ = other.call_ != null ? other.call_.Clone() : null;
+      recoveryActions_ = other.recoveryActions_.Clone();
+      operationId_ = other.operationId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -551,6 +565,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       }
     }
 
+    /// <summary>Field number for the "recovery_actions" field.</summary>
+    public const int RecoveryActionsFieldNumber = 5;
+    private static readonly pb::FieldCodec<global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction> _repeated_recoveryActions_codec
+        = pb::FieldCodec.ForEnum(42, x => (int) x, x => (global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction) x);
+    private readonly pbc::RepeatedField<global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction> recoveryActions_ = new pbc::RepeatedField<global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction> RecoveryActions {
+      get { return recoveryActions_; }
+    }
+
+    /// <summary>Field number for the "operation_id" field.</summary>
+    public const int OperationIdFieldNumber = 6;
+    private string operationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string OperationId {
+      get { return operationId_; }
+      set {
+        operationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -570,6 +607,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       if (SafeMessage != other.SafeMessage) return false;
       if (Retryable != other.Retryable) return false;
       if (!object.Equals(Call, other.Call)) return false;
+      if(!recoveryActions_.Equals(other.recoveryActions_)) return false;
+      if (OperationId != other.OperationId) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -581,6 +620,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       if (SafeMessage.Length != 0) hash ^= SafeMessage.GetHashCode();
       if (Retryable != false) hash ^= Retryable.GetHashCode();
       if (call_ != null) hash ^= Call.GetHashCode();
+      hash ^= recoveryActions_.GetHashCode();
+      if (OperationId.Length != 0) hash ^= OperationId.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -615,6 +656,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
         output.WriteRawTag(34);
         output.WriteMessage(Call);
       }
+      recoveryActions_.WriteTo(output, _repeated_recoveryActions_codec);
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(OperationId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -641,6 +687,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
         output.WriteRawTag(34);
         output.WriteMessage(Call);
       }
+      recoveryActions_.WriteTo(ref output, _repeated_recoveryActions_codec);
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(OperationId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -662,6 +713,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
       }
       if (call_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Call);
+      }
+      size += recoveryActions_.CalculateSize(_repeated_recoveryActions_codec);
+      if (OperationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(OperationId);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -689,6 +744,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
           Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
         }
         Call.MergeFrom(other.Call);
+      }
+      recoveryActions_.Add(other.recoveryActions_);
+      if (other.OperationId.Length != 0) {
+        OperationId = other.OperationId;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -728,6 +787,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             input.ReadMessage(Call);
             break;
           }
+          case 42:
+          case 40: {
+            recoveryActions_.AddEntriesFrom(input, _repeated_recoveryActions_codec);
+            break;
+          }
+          case 50: {
+            OperationId = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -764,6 +832,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
               Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
             }
             input.ReadMessage(Call);
+            break;
+          }
+          case 42:
+          case 40: {
+            recoveryActions_.AddEntriesFrom(ref input, _repeated_recoveryActions_codec);
+            break;
+          }
+          case 50: {
+            OperationId = input.ReadString();
             break;
           }
         }

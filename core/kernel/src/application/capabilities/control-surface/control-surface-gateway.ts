@@ -10,7 +10,12 @@ import { resolveWorkDir } from '../../../foundation/utils/path-utils';
 import { PerceptionAppService } from '../../services/perception-app.service';
 import { AvatarController } from '../avatar/avatar-controller';
 import { isLocalAvatarSurfaceScene } from '../action-stream/surface-scene-scope';
-import { EXTENSION_ID_PATTERN, getPresentationFrameClass, PerceptionEvent } from '@glimmer-cradle/protocol';
+import {
+  EXTENSION_ID_PATTERN,
+  RECOVERY_REQUIRED_ERROR_CODE,
+  getPresentationFrameClass,
+  PerceptionEvent,
+} from '@glimmer-cradle/protocol';
 import { AudioService } from '../audio/audio-service';
 import { SkillCatalogAppService } from '../../services/skill-catalog-app.service';
 import type { ConfigApplicationService } from '../../services/config-application.service';
@@ -48,6 +53,10 @@ import type {
 } from '@glimmer-cradle/protocol';
 import type { SkillConfirmationRequest } from '../../skill-plane/skill-invocation-gateway';
 import { EndpointRegistry } from '../../../foundation/endpoints/endpoint-registry';
+import {
+  RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
+  RecoveryRequiredError,
+} from '../../../foundation/exceptions';
 
 const logger = getLogger('control-surface-gateway');
 type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
@@ -1076,6 +1085,18 @@ export class ControlSurfaceGateway {
     const status = data.status === 'success' ? 'success' : 'error';
     if (status === 'success') {
       pending.resolve(data.result);
+      return;
+    }
+
+    if (data.error_code === RECOVERY_REQUIRED_ERROR_CODE) {
+      const actions = Array.isArray(data.recovery_actions)
+        ? data.recovery_actions.filter((action: unknown) => action === RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE)
+        : [];
+      pending.reject(new RecoveryRequiredError(
+        typeof data.operation_id === 'string' && data.operation_id ? data.operation_id : requestId,
+        actions.length > 0 ? actions : [RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE],
+        'Desktop Skill 副作用终态不明，需要人工恢复',
+      ));
       return;
     }
 

@@ -61,7 +61,7 @@ distribution；运行时不得依赖源码树 `PYTHONPATH` 偶然暴露 `contrac
 |---|---|---|
 | enums | `ErrorCode`、`CognitiveActivityState` | Kernel、Cognition、Renderer |
 | models | `PerceptionEvent`、`ActionCommand`、`TraceContext`、`SourceDescriptor` 字段 | 多语言/多进程共享模型 |
-| Protobuf Service | `CognitionService`、`KernelControlService`、`ServiceContext`、`ServiceErrorDetail` | Kernel ↔ Cognition Adapter |
+| Protobuf Service | `CognitionService`、`KernelControlService`、`CallMetadata`、`ServiceErrorDetail` | Kernel ↔ Cognition Adapter；人工恢复以稳定 code/action/operation 投影，不解析 message |
 | config | `AppConfig`、`SkillPlaneConfig`、`SurfaceConfig`、`CognitionConfig` | config normalizer 与生命周期 runtime |
 | runtime helper | `reply-messages`、`avatar-frame`、validator | TS runtime 消费 |
 

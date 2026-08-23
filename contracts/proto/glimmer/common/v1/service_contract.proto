@@ -22,6 +22,12 @@ enum ServiceErrorCode {
   SERVICE_ERROR_CODE_DEADLINE_EXCEEDED = 5;
   SERVICE_ERROR_CODE_INTERNAL = 6;
   SERVICE_ERROR_CODE_UNAVAILABLE = 7;
+  SERVICE_ERROR_CODE_RECOVERY_REQUIRED = 8;
+}
+
+enum ServiceRecoveryAction {
+  SERVICE_RECOVERY_ACTION_UNSPECIFIED = 0;
+  SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE = 1;
 }
 
 message ServiceErrorDetail {
@@ -29,6 +35,8 @@ message ServiceErrorDetail {
   string safe_message = 2;
   bool retryable = 3;
   CallMetadata call = 4;
+  repeated ServiceRecoveryAction recovery_actions = 5;
+  string operation_id = 6;
 }
 
 message CommandResult {

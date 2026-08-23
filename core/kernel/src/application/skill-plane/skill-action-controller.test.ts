@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ActionCommand } from '@glimmer-cradle/protocol';
 import type { AgentSynthesisRequest } from '../../foundation/ports/cognition-service-port';
 import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
-import { SkillInvocationRecoveryRequiredError } from './skill-invocation-gateway';
+import { RecoveryRequiredError } from '../../foundation/exceptions';
 
 function createPlanning(overrides: Partial<{
   readyToolCount: number;
@@ -233,18 +233,24 @@ describe('SkillActionController', () => {
     const planning = createPlanning() as any;
     planning.executeSuggestion = async () => {
       executeCount += 1;
-      throw new SkillInvocationRecoveryRequiredError('action:unsafe:tool:0');
+      throw new RecoveryRequiredError('action:unsafe:tool:0');
     };
     const controller = new SkillActionController(planning, async () => ({
       reply_content: 'unused', emotion_state: {}, trace_id: 'trace-1',
     }), async () => undefined);
 
-    await expect(controller.handleActionCommand(
+    const first = await controller.handleActionCommand(
       skillCommand(), undefined, 'action:unsafe',
-    )).rejects.toThrow('需要人工恢复');
-    await expect(controller.handleActionCommand(
+    ).catch((error: unknown) => error);
+    const retry = await controller.handleActionCommand(
       skillCommand(), undefined, 'action:unsafe',
-    )).rejects.toThrow('需要人工恢复');
+    ).catch((error: unknown) => error);
+    expect(first).toMatchObject({
+      code: 'recovery_required',
+      operationId: 'action:unsafe:tool:0',
+      recoveryActions: ['confirm_side_effect_state'],
+    });
+    expect(retry).toBe(first);
     expect(executeCount).toBe(1);
   });
 });

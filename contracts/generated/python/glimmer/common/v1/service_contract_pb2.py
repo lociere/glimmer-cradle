@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n(glimmer/common/v1/service_contract.proto\x12\x11glimmer.common.v1\"\xd5\x01\n\x0c\x43\x61llMetadata\x12\x19\n\x08trace_id\x18\x01 \x01(\tR\x07traceId\x12\x17\n\x07span_id\x18\x02 \x01(\tR\x06spanId\x12!\n\x0c\x63\x61usation_id\x18\x03 \x01(\tR\x0b\x63\x61usationId\x12%\n\x0e\x63orrelation_id\x18\x04 \x01(\tR\rcorrelationId\x12\x1e\n\ngeneration\x18\x05 \x01(\tR\ngeneration\x12\'\n\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"\xc3\x01\n\x12ServiceErrorDetail\x12\x37\n\x04\x63ode\x18\x01 \x01(\x0e\x32#.glimmer.common.v1.ServiceErrorCodeR\x04\x63ode\x12!\n\x0csafe_message\x18\x02 \x01(\tR\x0bsafeMessage\x12\x1c\n\tretryable\x18\x03 \x01(\x08R\tretryable\x12\x33\n\x04\x63\x61ll\x18\x04 \x01(\x0b\x32\x1f.glimmer.common.v1.CallMetadataR\x04\x63\x61ll\"h\n\rCommandResult\x12!\n\x0coperation_id\x18\x01 \x01(\tR\x0boperationId\x12\x16\n\x06status\x18\x02 \x01(\tR\x06status\x12\x1c\n\tduplicate\x18\x03 \x01(\x08R\tduplicate*\xbd\x02\n\x10ServiceErrorCode\x12\"\n\x1eSERVICE_ERROR_CODE_UNSPECIFIED\x10\x00\x12&\n\"SERVICE_ERROR_CODE_INVALID_REQUEST\x10\x01\x12 \n\x1cSERVICE_ERROR_CODE_NOT_READY\x10\x02\x12*\n&SERVICE_ERROR_CODE_GENERATION_MISMATCH\x10\x03\x12 \n\x1cSERVICE_ERROR_CODE_CANCELLED\x10\x04\x12(\n$SERVICE_ERROR_CODE_DEADLINE_EXCEEDED\x10\x05\x12\x1f\n\x1bSERVICE_ERROR_CODE_INTERNAL\x10\x06\x12\"\n\x1eSERVICE_ERROR_CODE_UNAVAILABLE\x10\x07\x42,\xaa\x02)GlimmerCradle.Contracts.Glimmer.Common.V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n(glimmer/common/v1/service_contract.proto\x12\x11glimmer.common.v1\"\xd5\x01\n\x0c\x43\x61llMetadata\x12\x19\n\x08trace_id\x18\x01 \x01(\tR\x07traceId\x12\x17\n\x07span_id\x18\x02 \x01(\tR\x06spanId\x12!\n\x0c\x63\x61usation_id\x18\x03 \x01(\tR\x0b\x63\x61usationId\x12%\n\x0e\x63orrelation_id\x18\x04 \x01(\tR\rcorrelationId\x12\x1e\n\ngeneration\x18\x05 \x01(\tR\ngeneration\x12\'\n\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"\xbb\x02\n\x12ServiceErrorDetail\x12\x37\n\x04\x63ode\x18\x01 \x01(\x0e\x32#.glimmer.common.v1.ServiceErrorCodeR\x04\x63ode\x12!\n\x0csafe_message\x18\x02 \x01(\tR\x0bsafeMessage\x12\x1c\n\tretryable\x18\x03 \x01(\x08R\tretryable\x12\x33\n\x04\x63\x61ll\x18\x04 \x01(\x0b\x32\x1f.glimmer.common.v1.CallMetadataR\x04\x63\x61ll\x12S\n\x10recovery_actions\x18\x05 \x03(\x0e\x32(.glimmer.common.v1.ServiceRecoveryActionR\x0frecoveryActions\x12!\n\x0coperation_id\x18\x06 \x01(\tR\x0boperationId\"h\n\rCommandResult\x12!\n\x0coperation_id\x18\x01 \x01(\tR\x0boperationId\x12\x16\n\x06status\x18\x02 \x01(\tR\x06status\x12\x1c\n\tduplicate\x18\x03 \x01(\x08R\tduplicate*\xe7\x02\n\x10ServiceErrorCode\x12\"\n\x1eSERVICE_ERROR_CODE_UNSPECIFIED\x10\x00\x12&\n\"SERVICE_ERROR_CODE_INVALID_REQUEST\x10\x01\x12 \n\x1cSERVICE_ERROR_CODE_NOT_READY\x10\x02\x12*\n&SERVICE_ERROR_CODE_GENERATION_MISMATCH\x10\x03\x12 \n\x1cSERVICE_ERROR_CODE_CANCELLED\x10\x04\x12(\n$SERVICE_ERROR_CODE_DEADLINE_EXCEEDED\x10\x05\x12\x1f\n\x1bSERVICE_ERROR_CODE_INTERNAL\x10\x06\x12\"\n\x1eSERVICE_ERROR_CODE_UNAVAILABLE\x10\x07\x12(\n$SERVICE_ERROR_CODE_RECOVERY_REQUIRED\x10\x08*w\n\x15ServiceRecoveryAction\x12\'\n#SERVICE_RECOVERY_ACTION_UNSPECIFIED\x10\x00\x12\x35\n1SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE\x10\x01\x42,\xaa\x02)GlimmerCradle.Contracts.Glimmer.Common.V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,12 +32,14 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'glimmer.common.v1.service_c
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\252\002)GlimmerCradle.Contracts.Glimmer.Common.V1'
-  _globals['_SERVICEERRORCODE']._serialized_start=584
-  _globals['_SERVICEERRORCODE']._serialized_end=901
+  _globals['_SERVICEERRORCODE']._serialized_start=704
+  _globals['_SERVICEERRORCODE']._serialized_end=1063
+  _globals['_SERVICERECOVERYACTION']._serialized_start=1065
+  _globals['_SERVICERECOVERYACTION']._serialized_end=1184
   _globals['_CALLMETADATA']._serialized_start=64
   _globals['_CALLMETADATA']._serialized_end=277
   _globals['_SERVICEERRORDETAIL']._serialized_start=280
-  _globals['_SERVICEERRORDETAIL']._serialized_end=475
-  _globals['_COMMANDRESULT']._serialized_start=477
-  _globals['_COMMANDRESULT']._serialized_end=581
+  _globals['_SERVICEERRORDETAIL']._serialized_end=595
+  _globals['_COMMANDRESULT']._serialized_start=597
+  _globals['_COMMANDRESULT']._serialized_end=701
 # @@protoc_insertion_point(module_scope)

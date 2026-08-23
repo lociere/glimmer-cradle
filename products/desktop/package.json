@@ -11,7 +11,7 @@
     "package:dry-run": "node scripts/package.mjs --dry-run",
     "package:runtimes:dry-run": "node scripts/prepare-package-runtimes.mjs --dry-run",
     "verify:package": "node scripts/verify-package.mjs",
-    "test": "node --experimental-transform-types --test tests/packaged-supervisor.test.ts",
+    "test": "node --experimental-transform-types --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit && tsc -p tsconfig.playwright.json --noEmit",
     "prebuild": "pnpm run sync:assets",
     "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && vite build",
