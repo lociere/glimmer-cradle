@@ -11,7 +11,7 @@ description: Develop, review, debug, document, or coordinate Glimmer Cradle（�
 
 本仓库只维护 Codex agent 配置：根目录 `AGENTS.md` 与 `.codex/skills/glimmer-cradle/`。本目录是唯一 canonical agent Skill（目录名暂保留，后续单独迁移）；不得新增 Claude、Copilot、Cursor 或其他 agent 薄适配层，也不得复制 `.codex/skills/glimmer-cradle/references/` 或维护第二套项目事实。
 
-## 每项任务的最小流程
+## 每项任务的工作流
 
 1. 读取根目录 `AGENTS.md`、`docs/README.md`、[开发手册](../../../docs/guides/开发手册.md)，并检查 `git status --short`。
 2. 架构设计先读 `architecture/blueprint/`，理解当前结构读 `architecture/current/`，改代码先读对应 `architecture/implementation/`；再核对实际代码、Schema、测试和配置。
@@ -20,6 +20,8 @@ description: Develop, review, debug, document, or coordinate Glimmer Cradle（�
 5. 删除被替代的旧入口、旧字段、旧桥接和无期限兼容壳；更新蓝图/Current/Implementation/Reference/Guide 中唯一受影响的事实源。
 6. 架构升级必须落到真实物理形态：目录结构、文件名、配置键、Schema、加载链路、默认模板、测试和文档同步升级；不要只把旧目录解释成新概念。
 7. 按风险运行验证；交付必须区分已运行验证、未运行验证及原因、真实阻塞和剩余风险。
+
+协调任务另读 `common/会话与任务编排.md`：总控只维护可追溯控制卡并消费结构化回报，执行者直接读取事实源。Codex 创建执行或审查会话时，默认用 `fork_turns=none` 或有界 recent turns，并随提示提供完成任务所需的决策、owner、风险、验证账本和事实源链接；只有关键对话决策无法从这些内容恢复时才传递完整历史，并说明原因。此策略服务于首次正确率和可追溯性，不以压缩上下文本身为目标。
 
 ## Reference 路由
 
