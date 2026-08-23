@@ -6,11 +6,11 @@ import type {
   CognitionProcessBootstrap,
   CognitionProcessTransportPort,
   CognitionRequestPort,
-} from '../../../foundation/ports/cognition-service-port';
+} from '../../../ports/cognition-service-port';
 import { CognitionManager } from './cognition-manager';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn(), execFile: vi.fn() }));
-vi.mock('../../../foundation/config/config-manager', () => ({
+vi.mock('../../../adapters/config/config-manager', () => ({
   ConfigManager: {
     instance: {
       getConfig: () => ({
@@ -26,7 +26,7 @@ vi.mock('../../../foundation/config/config-manager', () => ({
     },
   },
 }));
-vi.mock('../../../foundation/process/process-supervisor', () => ({
+vi.mock('../../../adapters/process/process-supervisor', () => ({
   forceTerminateManagedProcessTree: vi.fn(async () => undefined),
   stopManagedProcess: vi.fn(async () => undefined),
   waitForManagedProcessExit: vi.fn(async () => true),

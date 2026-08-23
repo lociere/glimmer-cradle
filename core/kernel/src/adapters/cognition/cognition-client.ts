@@ -28,8 +28,8 @@ import type {
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
   PerceptionOperationResult,
-} from '../../foundation/ports/cognition-service-port';
-import { getCurrentSpanId } from '../../foundation/logger/trace-context';
+} from '../../ports/cognition-service-port';
+import { getCurrentSpanId } from '../../adapters/observability/trace-context';
 import { KernelCognitionTransport, objectToStruct, structToObject } from './kernel-cognition-transport';
 
 export class CognitionClient {

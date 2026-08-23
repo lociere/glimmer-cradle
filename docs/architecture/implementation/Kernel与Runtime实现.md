@@ -1,7 +1,7 @@
 # Kernel 与 Runtime 实现
 
 > 范围：Kernel 如何把“中枢监督树”落成 TypeScript runtime，包括入口、runtime module、Ingress、capability、Skill Plane、Extension Host、状态投影和调试链路。
-> 源码依据：`core/kernel/src/app.ts`、`main.ts`、`core/kernel/src/adapters/cognition/`、`core/lifecycle/runtime/`、`foundation/`、`domain/`、`application/`、`host/`。
+> 源码依据：`core/kernel/src/composition/kernel-application.ts`、`main.ts`、`domain/`、`application/`、`ports/`、`adapters/`、`runtime/` 与 `composition/`。
 > 维护触发：runtime module、composition root、Ingress Gate、Capability、Extension Host、Cognition Service transport、状态投影、子进程监督或停机策略变化。
 
 ## 目录
@@ -22,11 +22,11 @@
 | 入口 | 职责 |
 |---|---|
 | `core/kernel/src/main.ts` | 进程级启动入口，处理启动参数、顶层异常和运行时退出 |
-| `core/kernel/src/app.ts` | Kernel composition root，组装配置、日志、事件总线、storage、Cognition gRPC transport、runtime 与 application service |
+| `core/kernel/src/composition/kernel-application.ts` | Kernel composition root，组装配置、日志、事件总线、storage、Cognition gRPC transport、runtime 与 application service |
 | `core/kernel/src/index.ts` | 包级导出边界 |
-| `core/kernel/src/lifecycle/runtime/lifecycle-orchestrator.ts` | runtime module 注册、依赖排序、启动/停止、状态聚合 |
+| `core/kernel/src/runtime/modules/lifecycle-orchestrator.ts` | runtime module 注册、依赖排序、启动/停止、状态聚合 |
 
-`app.ts` 是跨层具体实现的集中组装点。普通业务对象不应自行 new logger、storage、process supervisor、gRPC host/client 或 provider manager；需要替换实现时应通过 root/factory/port 完成。
+`app.ts` 是跨层具体实现的集中组装点。普通业务对象不应自行 new logger、storage、process supervisor、gRPC application/extension-supervision/client 或 provider manager；需要替换实现时应通过 root/factory/port 完成。
 
 ## 开发启动编排
 
@@ -38,24 +38,24 @@
 
 | 目录 | Owner | 关键内容 | 禁止 |
 |---|---|---|---|
-| `foundation/config` | Kernel foundation | config defaults、schema、manager | 让 renderer 直接读 YAML |
-| `foundation/event-bus` | Kernel foundation | domain/action/avatar/extension/lifecycle/memory/perception/scene events、DLQ | 用事件绕过 owner 边界 |
-| `foundation/logger` | Kernel foundation | logger、telemetry、trace、metrics | 记录密钥或大 payload |
-| `foundation/storage` | Kernel foundation | kernel DB、extension storage、DLQ | 存角色会话或 Cognition 长期记忆 |
-| `foundation/process` | Kernel foundation | 子进程监督 | 杀进程代替协议 shutdown |
-| `foundation/ingress-gate` | Kernel foundation | 输入闸门和身份路由 | UI ready 即放行 |
-| `lifecycle/runtime` | Kernel lifecycle | runtime module、readiness、orchestrator | start 返回即 ready |
-| `application/services` | Kernel application | Perception、Extension Host、Skill Catalog/Planning service | 写人格/记忆语义 |
+| `adapters/config` | Kernel foundation | config defaults、schema、manager | 让 renderer 直接读 YAML |
+| `adapters/events` | Kernel foundation | domain/action/avatar/extension/lifecycle/memory/perception/scene events、DLQ | 用事件绕过 owner 边界 |
+| `adapters/observability` | Kernel foundation | logger、telemetry、trace、metrics | 记录密钥或大 payload |
+| `adapters/storage` | Kernel foundation | kernel DB、extension storage、DLQ | 存角色会话或 Cognition 长期记忆 |
+| `adapters/process` | Kernel foundation | 子进程监督 | 杀进程代替协议 shutdown |
+| `application/ingress` | Kernel foundation | 输入闸门和身份路由 | UI ready 即放行 |
+| `runtime/modules` | Kernel lifecycle | runtime module、readiness、orchestrator | start 返回即 ready |
+| `application/use-cases` | Kernel application | Perception、Extension Host、Skill Catalog/Planning service | 写人格/记忆语义 |
 | `application/capabilities` | Kernel application | audio、avatar、conversation、desktop、inference、scene、action-stream | 泄露 provider 细节给 Cognition |
 | `application/skill-plane` | Kernel application | registry、policy、gateway、providers | handler 绕过授权 |
 | `host` | Kernel host | ExtensionManager | 扩展 import Kernel 内部 service |
-| `host/process` | Extension 进程边界 | 每扩展 Worker、双向 RPC、handler/disposable 代理和进程树回收 | 在 Kernel 进程内 `require()` 第三方扩展 |
-| `foundation/endpoints` | 内部端点目录 | 发布本代动态回环端点并在停机撤销 | 把内部端口写入用户配置或缓存跨代端点 |
+| `adapters/extension-host` | Extension 进程边界 | 每扩展 Worker、双向 RPC、handler/disposable 代理和进程树回收 | 在 Kernel 进程内 `require()` 第三方扩展 |
+| `adapters/endpoints` | 内部端点目录 | 发布本代动态回环端点并在停机撤销 | 把内部端口写入用户配置或缓存跨代端点 |
 | `adapters/cognition` | Kernel adapter | Cognition Service client、Kernel Control Service host、Protobuf DTO 映射 | 把 generated DTO 泄漏进 Application/Domain |
 
 ## Runtime module 实现规则
 
-当前 runtime module 位于 `core/lifecycle/runtime/`，包括 foundation、transport、application、surface、cognition、capability、extension、organism 等。每个 module 应实现同一组语义：
+当前 runtime module 位于 `core/kernel/src/runtime/modules/`，包括 foundation、transport、application、surface、cognition、capability、extension、organism 等。每个 module 应实现同一组语义：
 
 | 语义 | 必须回答 |
 |---|---|
@@ -91,7 +91,7 @@ register、knowledge init 与 readiness 后，`KernelTransportRuntime` 才恢复
 
 桌面与 Extension 都不能自行生成 Cognition 使用的会话 ID。桌面入口和 `ExtensionHostAppService` 先构造 `ConversationAddress`，再由 `application/capabilities/conversation/conversation-directory.ts` 解析为 `ConversationContext`。Directory 根据 provider、account、space、thread 和 actor endpoint 生成稳定且不可逆的 scene、conversation、continuity、thread 与 actor 标识，并同时决定 `recall_scope` / `disclosure_scope`。这些 canonical 字段跟随感知、Skill 请求和结果合成穿过 Cognition Service；下游只能消费，不能重新解释平台身份或放宽作用域。
 
-外部注意力链路当前由 `application/services/extension-host-app.service.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再由 `domain/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 直接读取 `AttentionLeaseStore.isChannelFocused()`。`domain/attention/attention-session-manager.ts` 直接消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`domain/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
+外部注意力链路当前由 `application/use-cases/extension-host-app.service.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再由 `domain/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 直接读取 `AttentionLeaseStore.isChannelFocused()`。`domain/attention/attention-session-manager.ts` 直接消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`domain/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
 
 ## 出站主链
 
@@ -136,28 +136,28 @@ application/skill-plane/
 
 Extension Host 的实现落点：
 
-- `host/extension-manager.ts` 只扫描 manifest、准备声明资源、创建独立 Host 和维护投影；不执行扩展入口；
-- `host/process/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 Worker；
-- `host/process/extension-host-worker.ts` 是唯一加载扩展代码的位置，激活结束前会等待同步注册请求完成；
-- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Host/Worker 双向消息，不暴露 Kernel 内部 service；
+- `application/extension-supervision/extension-manager.ts` 只扫描 manifest、准备声明资源、创建独立 Host 和维护投影；不执行扩展入口；
+- `adapters/extension-application/extension-supervision/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 Worker；
+- `adapters/extension-application/extension-supervision/extension-host-worker.ts` 是唯一加载扩展代码的位置，激活结束前会等待同步注册请求完成；
+- `packages/extension-sdk/src/adapters/extension-host-protocol.ts` 定义 Host/Worker 双向消息，不暴露 Kernel 内部 service；
 - Extension 停止、激活失败或进程退出都会撤销运行 handler、声明式 catalog、订阅和 Capability Projection。
 
 ```text
-host/extension-manager.ts
-host/extension-runtime-readiness.ts
-application/services/extension-host-app.service.ts
-foundation/ports/extension-host.port.ts
+application/extension-supervision/extension-manager.ts
+application/extension-supervision/extension-runtime-readiness.ts
+application/use-cases/extension-host-app.service.ts
+ports/extension-host.port.ts
 ```
 
 Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能执行。Extension 停用、MCP 断连或 provider 失败后，registry 中的能力必须撤销或标记不可用。
 
-`lifecycle/runtime/extension-runtime.ts` 不再只返回一个笼统的 `extension_host=ready`。它在 `ExtensionManager.startAllExtensions()` 之后调用 `getReadinessSnapshots()`，把 Host 当前维护的 `ExtensionRuntimeProjection` 统一折叠为 `RuntimeReadinessSnapshot[]`：`extension.host` 是聚合 runtime，`extension.<extension-id>` 是逐扩展 runtime，`reconciler.resources` 来自 Capability Graph 节点，缺失 package / sidecar / bridge 会直接体现为 `missing`、`degraded` 或 `failed`。这样 Lifecycle Orchestrator、Ingress 和 Desktop 读取的是同一条 runtime readiness 主线，而不是额外拼一份 Extension 专用状态。
+`runtime/modules/extension-runtime.ts` 不再只返回一个笼统的 `extension_host=ready`。它在 `ExtensionManager.startAllExtensions()` 之后调用 `getReadinessSnapshots()`，把 Host 当前维护的 `ExtensionRuntimeProjection` 统一折叠为 `RuntimeReadinessSnapshot[]`：`extension.host` 是聚合 runtime，`extension.<extension-id>` 是逐扩展 runtime，`reconciler.resources` 来自 Capability Graph 节点，缺失 package / sidecar / bridge 会直接体现为 `missing`、`degraded` 或 `failed`。这样 Lifecycle Orchestrator、Ingress 和 Desktop 读取的是同一条 runtime readiness 主线，而不是额外拼一份 Extension 专用状态。
 
-`LifecycleOrchestrator` 会把各 runtime module 返回的 `runtime_readiness` 统一写入 `foundation/runtime-readiness-catalog.ts`。这个 catalog 是 Kernel 向产品 Host 暴露 runtime/reconciler 主线的唯一聚合点：Cognition、Audio、Avatar、Extension Host 等模块的 readiness 快照都在这里按 `runtime_id` 收口，Desktop 与 Personal Server 不再从启动日志、页面局部探测或本地文件侧推运行状态。`KernelTransportRuntime` 还将 Ingress Gate 投影为 blocking 的 `kernel.ingress`，只在 required runtime 完成后切换为 `ready`。Personal Server 通过长连接观察该 catalog；断连即撤销 `/readyz`，不缓存陈旧 ready。Audio 采用 `audio.host -> audio.tts/audio.asr -> providers`：Kernel 只把 Audio Engine 返回的路线和节点健康折叠为 readiness；云端连接、模型目录、fallback 和熔断由 Engine owner 判断。
+`LifecycleOrchestrator` 会把各 runtime module 返回的 `runtime_readiness` 统一写入 `application/projection/runtime-readiness-projection.ts`。这个 catalog 是 Kernel 向产品 Host 暴露 runtime/reconciler 主线的唯一聚合点：Cognition、Audio、Avatar、Extension Host 等模块的 readiness 快照都在这里按 `runtime_id` 收口，Desktop 与 Personal Server 不再从启动日志、页面局部探测或本地文件侧推运行状态。`KernelTransportRuntime` 还将 Ingress Gate 投影为 blocking 的 `kernel.ingress`，只在 required runtime 完成后切换为 `ready`。Personal Server 通过长连接观察该 catalog；断连即撤销 `/readyz`，不缓存陈旧 ready。Audio 采用 `audio.host -> audio.tts/audio.asr -> providers`：Kernel 只把 Audio Engine 返回的路线和节点健康折叠为 readiness；云端连接、模型目录、fallback 和熔断由 Engine owner 判断。
 
 `avatar-runtime` 的 `avatar.host` 不再只在模块启动时写一次 catalog。`UnityAvatarHostProcess` 会把受管进程状态变化推给 `AvatarController`，后者在 `connected / host_hello / host_ready / heartbeat_timeout / disconnect / process exit` 各阶段都覆写 `RuntimeReadinessCatalogStore` 里的 `avatar-runtime` 快照。这样 Desktop 诊断看到的 `avatar.host.reconciler.actual` 会随着 `waiting-manual-launch -> connected-waiting-ready-gates -> connected-first-frame-presented` 实时变化，而不是停留在启动瞬间的陈旧状态。
 
-`foundation/endpoints/endpoint-registry.ts` 是内部地址唯一目录。Kernel Control Service、Control Surface Gateway 和 Avatar WebSocket 先绑定动态回环端点，取得真实地址后发布 `cognition-rpc`、`control-surface`、`avatar-host`。目录位于 `data/run/host/endpoints.json`，包含 Kernel PID 与 generation；安装态 Desktop 通过 `GLIMMER_CRADLE_LAUNCH_SESSION` 将该 generation 绑定到本次受管启动，其他启动保留随机 generation。Desktop main、Personal Server、开发启动器和 Unity 只接受存活 owner 的本代回环端点。Kernel Control Service 地址与 generation 由 Kernel 直接注入 Cognition 子进程；Cognition Service 亦绑定 `127.0.0.1:0` 并通过受监注册回传，不经磁盘发现。
+`adapters/endpoints/endpoint-registry.ts` 是内部地址唯一目录。Kernel Control Service、Control Surface Gateway 和 Avatar WebSocket 先绑定动态回环端点，取得真实地址后发布 `cognition-rpc`、`control-surface`、`avatar-host`。目录位于 `data/run/application/extension-supervision/endpoints.json`，包含 Kernel PID 与 generation；安装态 Desktop 通过 `GLIMMER_CRADLE_LAUNCH_SESSION` 将该 generation 绑定到本次受管启动，其他启动保留随机 generation。Desktop main、Personal Server、开发启动器和 Unity 只接受存活 owner 的本代回环端点。Kernel Control Service 地址与 generation 由 Kernel 直接注入 Cognition 子进程；Cognition Service 亦绑定 `127.0.0.1:0` 并通过受监注册回传，不经磁盘发现。
 
 `capability-runtime` 不再等待 Audio model warmup 后才返回。它先配置 AudioService，再把资源准备作为有 owner 的后台任务运行，并持续覆写 readiness 与 Desktop audio status；停机由 AudioService 统一取消和回收 lane。`app.ts` 在 Cognition 与必要传输完成后开放 Ingress，Extension activation 和 Organism 启动不再决定直接文本对话能否开始。
 同一条 `avatar.host.reconciler` 现在也承载 Avatar Package 相关资源投影：`avatar-package-registry.json`、受管 Host 可执行产物/工作目录，以及按 Avatar Package 反推出来的 `avatar.sdk.*` Unity SDK 导入状态都由 Kernel 检查并进入 `resources`。这样“缺 Avatar Package Registry / 缺 UnityAvatarHost.exe / Cubism SDK 只准备未导入”属于正式 runtime reconciler 事实，而不是 Desktop 专用的第二套判断。

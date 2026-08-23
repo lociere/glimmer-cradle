@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ActionCommand } from '@glimmer-cradle/protocol';
-import type { AgentSynthesisRequest } from '../../foundation/ports/cognition-service-port';
+import type { AgentSynthesisRequest } from '../../ports/cognition-service-port';
 import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
-import { RecoveryRequiredError } from '../../foundation/exceptions';
+import { RecoveryRequiredError } from '../../domain/errors';
 
 function createPlanning(overrides: Partial<{
   readyToolCount: number;

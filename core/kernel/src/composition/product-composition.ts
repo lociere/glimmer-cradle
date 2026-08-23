@@ -4,7 +4,7 @@ import {
   validateProductComposition,
   type ProductComposition,
 } from '@glimmer-cradle/protocol';
-import { resolveRepoRoot } from '../foundation/utils/path-utils';
+import { resolveRepoRoot } from '../adapters/filesystem/path-utils';
 
 export type { ProductComposition } from '@glimmer-cradle/protocol';
 

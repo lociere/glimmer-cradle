@@ -14,12 +14,12 @@
  *   - 不直接引用任何具体渲染实现
  *   - 远端平台场景（NapCat/Discord/直播等）不驱动本地身体
  */
-import { VisualCommandDispatchEvent, ActionStreamStartedEvent, ActionStreamCompletedEvent, ActionStreamCancelledEvent } from '../../../foundation/event-bus/events';
+import { VisualCommandDispatchEvent, ActionStreamStartedEvent, ActionStreamCompletedEvent, ActionStreamCancelledEvent } from '../../../domain/events';
 import type { AvatarConfig, VisualCommand } from '@glimmer-cradle/protocol';
-import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../foundation/event-bus/events';
-import { EventBus } from "../../../foundation/event-bus/event-bus";
-import { ConfigManager } from "../../../foundation/config/config-manager";
-import { getLogger } from "../../../foundation/logger/logger";
+import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../domain/events';
+import { EventBus } from "../../../adapters/events/event-bus";
+import { ConfigManager } from "../../../adapters/config/config-manager";
+import { getLogger } from "../../../adapters/observability/logger";
 import { isLocalAvatarSurfaceScene } from './surface-scene-scope';
 
 const logger = getLogger("visual-command-dispatcher");

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ControlSurfaceGateway } from './control-surface-gateway';
 import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/protocol';
 import type { ConversationHistoryService } from './conversation-history-service';
-import { RecoveryRequiredError } from '../../../foundation/exceptions';
+import { RecoveryRequiredError } from '../../../domain/errors';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
 

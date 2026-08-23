@@ -3,11 +3,11 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { EventBus } from '../../../foundation/event-bus/event-bus';
-import { getLogger } from '../../../foundation/logger/logger';
-import { RuntimeReadinessCatalogStore } from '../../../foundation/runtime-readiness-catalog';
-import { resolveWorkDir } from '../../../foundation/utils/path-utils';
-import { PerceptionAppService } from '../../services/perception-app.service';
+import { EventBus } from '../../../adapters/events/event-bus';
+import { getLogger } from '../../../adapters/observability/logger';
+import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
+import { resolveWorkDir } from '../../../adapters/filesystem/path-utils';
+import { PerceptionAppService } from '../../use-cases/perception-app.service';
 import { AvatarController } from '../avatar/avatar-controller';
 import { isLocalAvatarSurfaceScene } from '../action-stream/surface-scene-scope';
 import {
@@ -17,8 +17,8 @@ import {
   PerceptionEvent,
 } from '@glimmer-cradle/protocol';
 import { AudioService } from '../audio/audio-service';
-import { SkillCatalogAppService } from '../../services/skill-catalog-app.service';
-import type { ConfigApplicationService } from '../../services/config-application.service';
+import { SkillCatalogAppService } from '../../use-cases/skill-catalog-app.service';
+import type { ConfigApplicationService } from '../../use-cases/config-application.service';
 import { ConversationHistoryService } from './conversation-history-service';
 import {
   ActionStreamCancelledEvent,
@@ -30,7 +30,7 @@ import {
   ExtensionLoadedEvent,
   ExtensionStartedEvent,
   ExtensionStoppedEvent,
-} from '../../../foundation/event-bus/events';
+} from '../../../domain/events';
 import type {
   PresentationUpstreamFrame,
   PresentationDownstreamFrame,
@@ -52,11 +52,11 @@ import type {
   RuntimeReadinessCatalog,
 } from '@glimmer-cradle/protocol';
 import type { SkillConfirmationRequest } from '../../skill-plane/skill-invocation-gateway';
-import { EndpointRegistry } from '../../../foundation/endpoints/endpoint-registry';
+import { EndpointRegistry } from '../../../adapters/endpoints/endpoint-registry';
 import {
   RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
   RecoveryRequiredError,
-} from '../../../foundation/exceptions';
+} from '../../../domain/errors';
 
 const logger = getLogger('control-surface-gateway');
 type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
@@ -177,7 +177,7 @@ export class ControlSurfaceGateway {
         timestamp: Date.now(),
         character_presentation_projection: AvatarController.instance.getCharacterPresentationProjection(),
       });
-      this._sendRuntimeReadiness(ws, RuntimeReadinessCatalogStore.instance.getCatalog());
+      this._sendRuntimeReadiness(ws, RuntimeReadinessProjectionMapper.instance.getCatalog());
       void this._sendAudioStatus(ws);
 
       ws.on('message', (message: string) => {
@@ -352,7 +352,7 @@ export class ControlSurfaceGateway {
       broadcastExtensionStatusChanged('error', (event as ExtensionErrorEvent).payload);
     });
 
-    this._disposeRuntimeReadinessSubscription = RuntimeReadinessCatalogStore.instance.subscribe((catalog) => {
+    this._disposeRuntimeReadinessSubscription = RuntimeReadinessProjectionMapper.instance.subscribe((catalog) => {
       this.broadcastFrame({
         kind: 'runtime_readiness',
         timestamp: Date.now(),

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
-import { RuntimeReadinessCatalogStore } from '../../../foundation/runtime-readiness-catalog';
+import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
 import { AvatarController } from './avatar-controller';
 
 function createUnityAvatarHostConfig(
@@ -40,7 +40,7 @@ async function waitFor(
 }
 
 function getAvatarRuntime() {
-  return RuntimeReadinessCatalogStore.instance.getCatalog().runtimes.find(
+  return RuntimeReadinessProjectionMapper.instance.getCatalog().runtimes.find(
     (runtime) => runtime.runtime_id === 'avatar.host',
   );
 }
@@ -48,7 +48,7 @@ function getAvatarRuntime() {
 describe('AvatarController runtime readiness sync', () => {
   afterEach(async () => {
     await AvatarController.instance.stop();
-    RuntimeReadinessCatalogStore.instance.clear();
+    RuntimeReadinessProjectionMapper.instance.clear();
   });
 
   it('keeps avatar runtime readiness aligned with shell lifecycle', async () => {

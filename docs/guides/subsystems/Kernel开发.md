@@ -7,16 +7,16 @@
 
 | 任务 | 主要文件/目录 |
 |---|---|
-| 新增/修改 runtime | `core/kernel/src/lifecycle/runtime/`、`app.ts` |
-| 输入闸门 | `foundation/ingress-gate/`、`application/services/perception-app.service.ts` |
-| 子进程监督 | `foundation/process/`、对应 capability runtime |
+| 新增/修改 runtime | `core/kernel/src/runtime/modules/`、`composition/kernel-application.ts` |
+| 输入闸门 | `application/ingress/`、`application/use-cases/perception-app.service.ts` |
+| 子进程监督 | `adapters/process/`、对应 `runtime/modules/` |
 | Cognition Service | `adapters/cognition/`、`application/capabilities/inference/cognition-manager.ts` |
 | Audio | `application/capabilities/audio/` |
 | Avatar | `application/capabilities/avatar/` |
 | Desktop 投影 | `application/capabilities/desktop-ui/` |
 | Skill Plane | `application/skill-plane/` |
-| Extension Host | `host/`、`application/services/extension-host-app.service.ts` |
-| 日志/trace/DLQ | `foundation/logger/`、`foundation/event-bus/dead-letter-queue.ts` |
+| Extension Host（Slice 3 暂在 Kernel） | `application/extension-supervision/`、`adapters/extension-host/`、`application/use-cases/extension-host-app.service.ts` |
+| 日志/trace/DLQ | `adapters/observability/`、`adapters/events/dead-letter-queue.ts` |
 
 ## 标准步骤
 
@@ -24,9 +24,10 @@
 2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/`，运行 `pnpm contracts:generate` / `pnpm contracts:verify`；不得手改 generated。
 3. 找 producer、mapper、consumer、projection 和 tests。
 4. 修改 root/module/service，不在调用端堆临时补丁。
-5. 补 ready/degraded/failed/stop 语义。
-6. 删除旧事件、旧 bridge、旧 handler、旧 fallback。
-7. 同步 Current/Implementation/Reference/Guide 中唯一受影响页面。
+5. 保持 `domain <- application -> ports <- adapters`；Runtime 只提交运行事实给 `application/projection/runtime-readiness-projection.ts`，不得直接写只读投影。
+6. 补 ready/degraded/failed/stop 语义。
+7. 删除旧事件、旧 bridge、旧 handler、旧 fallback。
+8. 同步 Current/Implementation/Reference/Guide 中唯一受影响页面。
 
 ## 新 runtime 检查表
 

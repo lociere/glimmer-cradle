@@ -1,5 +1,5 @@
 import type { ExtensionSkillContribution } from '@glimmer-cradle/protocol';
-import type { ExtensionAgentRegistration } from '../../../../foundation/ports';
+import type { ExtensionAgentRegistration } from '../../../../ports';
 import type { SkillDescriptor } from '../../types';
 import type { SkillAvailabilityContext } from '../../types';
 import { DEFAULT_DESKTOP_SKILL_AVAILABILITY, isContributionAvailable } from '../../availability';

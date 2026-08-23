@@ -1,12 +1,12 @@
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import type { AddressInfo } from 'node:net';
-import { EventBus } from '../../../foundation/event-bus/event-bus';
-import { getLogger } from '../../../foundation/logger/logger';
+import { EventBus } from '../../../adapters/events/event-bus';
+import { getLogger } from '../../../adapters/observability/logger';
 import {
   VisualCommandDispatchEvent,
   AvatarActionStateChangedEvent,
   AvatarStatusChangedEvent,
-} from '../../../foundation/event-bus/events';
+} from '../../../domain/events';
 import { getPresentationFrameClass } from '@glimmer-cradle/protocol';
 import type {
   PresentationDownstreamFrame,
@@ -17,15 +17,15 @@ import type {
   AvatarHostReadyPayload,
   VisualCommand,
 } from '@glimmer-cradle/protocol';
-import type { RuntimeReadinessSnapshot } from '../../../foundation/runtime-readiness';
+import type { RuntimeReadinessSnapshot } from '../../../runtime/readiness';
 import {
   strongestRuntimeResourceState,
   type RuntimeResourceSnapshot,
-} from '../../../foundation/runtime-reconciler';
-import { RuntimeReadinessCatalogStore } from '../../../foundation/runtime-readiness-catalog';
+} from '../../../runtime/reconciler';
+import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
 import { UnityAvatarHostProcess } from './unity-avatar-host-process';
 import { buildAvatarResourceSnapshots } from './avatar-resource-catalog';
-import { EndpointRegistry } from '../../../foundation/endpoints/endpoint-registry';
+import { EndpointRegistry } from '../../../adapters/endpoints/endpoint-registry';
 
 const logger = getLogger('avatar-engine');
 const AVATAR_RUNTIME_MODULE_NAME = 'avatar-runtime';
@@ -557,7 +557,7 @@ export class AvatarController {
 
   private _syncRuntimeReadiness(): void {
     if (!this._config) return;
-    RuntimeReadinessCatalogStore.instance.replaceModuleSnapshots(
+    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots(
       AVATAR_RUNTIME_MODULE_NAME,
       [this.getReadinessSnapshot()],
     );

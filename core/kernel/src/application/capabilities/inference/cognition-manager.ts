@@ -9,13 +9,13 @@ import type {
   LifeHeartbeatResponse, PerceptionCancelRequest,
   PerceptionOperationHandle, PerceptionOperationResult,
   CognitionProcessTransportPort, CognitionRequestPort, CognitionLifecycleObserver,
-} from '../../../foundation/ports/cognition-service-port';
-import { ConfigManager } from '../../../foundation/config/config-manager';
-import { CoreException } from '../../../foundation/exceptions';
-import { createTraceContext } from '../../../foundation/logger/trace-context';
-import { getLogger } from '../../../foundation/logger/logger';
-import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../../../foundation/utils/path-utils';
-import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../../../foundation/process/process-supervisor';
+} from '../../../ports/cognition-service-port';
+import { ConfigManager } from '../../../adapters/config/config-manager';
+import { CoreException } from '../../../domain/errors';
+import { createTraceContext } from '../../../adapters/observability/trace-context';
+import { getLogger } from '../../../adapters/observability/logger';
+import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../../../adapters/filesystem/path-utils';
+import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../../../adapters/process/process-supervisor';
 
 const logger = getLogger('cognition-manager');
 const PROCESS_LOG = 'cognition.console.log';

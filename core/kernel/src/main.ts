@@ -2,8 +2,8 @@
  * 内核唯一启动入口
  * 应用启动的根文件，处理信号监听、异常捕获、优雅停机
  */
-import { App } from "./app";
-import { getLogger } from "./foundation/logger/logger";
+import { App } from "./composition/kernel-application";
+import { getLogger } from "./adapters/observability/logger";
 
 const logger = getLogger("main");
 

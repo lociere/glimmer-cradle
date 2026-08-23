@@ -7,10 +7,10 @@ import type {
   SkillRegistrationTarget,
 } from '../../types';
 import type { McpServerConfig } from '@glimmer-cradle/protocol';
-import { ConfigManager } from '../../../../foundation/config/config-manager';
-import { getLogger } from '../../../../foundation/logger/logger';
-import { RuntimeReadinessCatalogStore } from '../../../../foundation/runtime-readiness-catalog';
-import type { RuntimeReadinessSnapshot } from '../../../../foundation/runtime-readiness';
+import { ConfigManager } from '../../../../adapters/config/config-manager';
+import { getLogger } from '../../../../adapters/observability/logger';
+import { RuntimeReadinessProjectionMapper } from '../../../../application/projection/runtime-readiness-projection';
+import type { RuntimeReadinessSnapshot } from '../../../../runtime/readiness';
 import {
   McpServerConnection,
   type McpCapabilitySnapshot,
@@ -363,7 +363,7 @@ export class McpServerSkillProvider implements SkillProvider {
   }
 
   private syncRuntimeReadiness(): void {
-    RuntimeReadinessCatalogStore.instance.replaceModuleSnapshots('application', this.getReadinessSnapshots());
+    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots('application', this.getReadinessSnapshots());
   }
 
   private toProviderRuntimeSnapshot(

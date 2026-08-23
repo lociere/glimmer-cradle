@@ -1,7 +1,7 @@
 # Kernel 与 Runtime 当前视图
 
 > 范围：Kernel 作为中枢监督树的当前职责、运行阶段、runtime owner、Ingress Gate、状态投影和边界规则；不展开 TypeScript 逐文件实现。
-> 事实依据：`core/kernel/src/app.ts`、`main.ts`、`core/lifecycle/runtime/`、`foundation/`、`application/`、`host/`、`configs/system/*.yaml` 与历史 current 架构材料。
+> 事实依据：`core/kernel/src/composition/kernel-application.ts`、`main.ts`、`runtime/`、`domain/`、`application/`、`ports/`、`adapters/` 与 `configs/system/*.yaml`。
 > 维护触发：runtime module、启动阶段、Ingress、Capability、Extension Host、状态投影、子进程监督或日志策略变化。
 
 Kernel 是 Glimmer Cradle 的运行秩序中枢。它不拥有当前角色的心智，也不负责窗口绘制或模型内部推理；它负责把各个器官按真实 ready 状态组织起来，让输入、能力、输出和失败都经过可解释的路径。
@@ -21,17 +21,16 @@ Kernel 是 Glimmer Cradle 的运行秩序中枢。它不拥有当前角色的心
 
 ```text
 core/kernel/src/
-├── app.ts / main.ts                  # Kernel 入口与 composition root
-└── core/
-    ├── foundation/                   # config、event bus、logger、storage、process、ports、ingress
-    ├── adapters/cognition/           # Cognition v1 gRPC Service Adapter/client
-    ├── domain/                       # attention、organism、life clock 等内核领域规则
-    ├── application/                  # perception、channel、capability、skill-plane、projection
-    ├── host/                         # Extension 宿主边界
-    └── lifecycle/runtime/            # runtime module 与 lifecycle orchestrator
+├── main.ts                           # 进程入口与信号处理
+├── domain/                           # 状态机、不变量、领域事件与纯 attention lease
+├── application/                      # use case、capability、ingress、projection、Skill Plane
+├── ports/                            # process/config/storage/transport 等抽象能力
+├── adapters/                         # config、filesystem、process、transport、storage、observability
+├── runtime/                          # generation、readiness、recovery、cleanup 与模块监督
+└── composition/                      # 唯一具体实现装配根
 ```
 
-依赖方向是 `foundation -> infrastructure/domain/application/host/lifecycle` 的组合关系，而不是随意互相 import。组合可以集中在 root；普通业务代码不应自行创建跨层基础设施对象。
+依赖方向是 `domain <- application -> ports <- adapters`。`runtime/` 只执行世代、readiness、恢复与清理，并通过 Application Projection mapper 提交运行事实；`composition/` 是唯一可同时看见具体 Adapter 和所有层的装配根。旧 `foundation/`、`infrastructure/`、`host/` 与 `lifecycle/` 不再是 Kernel 源码入口。
 
 ## 当前 runtime 阶段
 

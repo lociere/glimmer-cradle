@@ -8,17 +8,17 @@ import {
 } from './skill-registry';
 import type { SkillDescriptor, SkillPolicy, SkillProviderKind } from './types';
 import type { SkillPolicyDecision } from './skill-policy-engine';
-import { counter, histogram } from '../../foundation/logger/metrics';
-import { getCurrentTraceId, newTraceId, withTrace } from '../../foundation/logger/trace-context';
-import { getLogger } from '../../foundation/logger/logger';
+import { counter, histogram } from '../../adapters/observability/metrics';
+import { getCurrentTraceId, newTraceId, withTrace } from '../../adapters/observability/trace-context';
+import { getLogger } from '../../adapters/observability/logger';
 import {
   OBSERVABILITY_EVENT_TYPES,
   appendAuditRecord,
   recordObservabilityEvent,
-} from '../../foundation/observability/plane';
+} from '../../adapters/observability/plane/plane';
 import type { ConversationContext } from '@glimmer-cradle/protocol';
 import { isCapabilityScopeVisible } from './scope';
-import { RecoveryRequiredError } from '../../foundation/exceptions';
+import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
   skillId: string;

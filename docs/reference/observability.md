@@ -11,7 +11,7 @@
 | 目录 | 语义 | 当前 owner / 入口 |
 |---|---|---|
 | `logs/application/` | 第一方应用日志与受管进程 stdout/stderr | Kernel、Cognition、Audio、Avatar、Extension Host |
-| `logs/events/` | 统一结构化诊断事件 JSONL | Kernel `foundation/observability/plane.ts` |
+| `logs/events/` | 统一结构化诊断事件 JSONL | Kernel `adapters/observability/plane/plane.ts` |
 | `logs/audit/` | 高风险副作用审计记录 | Skill Plane、Desktop main audit sink |
 | `traces/` | span JSONL | Kernel `tracer.ts`、Cognition `tracer.py` |
 | `metrics/` | metrics JSONL | Kernel `metrics.ts`、Cognition `metrics.py` |

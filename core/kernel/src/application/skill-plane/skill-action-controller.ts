@@ -9,14 +9,14 @@ import type {
   AgentSynthesisResponse,
   AgentToolResult,
   CognitionActionResult,
-} from '../../foundation/ports/cognition-service-port';
-import { ChannelReplyEvent } from '../../foundation/event-bus/events';
-import { EventBus } from '../../foundation/event-bus/event-bus';
-import { getLogger } from '../../foundation/logger/logger';
-import { createTraceContext } from '../../foundation/logger/trace-context';
+} from '../../ports/cognition-service-port';
+import { ChannelReplyEvent } from '../../domain/events';
+import { EventBus } from '../../adapters/events/event-bus';
+import { getLogger } from '../../adapters/observability/logger';
+import { createTraceContext } from '../../adapters/observability/trace-context';
 import { AIProxy } from '../capabilities/inference/ai-proxy';
-import { SkillPlanningAppService } from '../services/skill-planning-app.service';
-import { RecoveryRequiredError } from '../../foundation/exceptions';
+import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
+import { RecoveryRequiredError } from '../../domain/errors';
 
 const logger = getLogger('skill-action-controller');
 

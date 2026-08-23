@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RuntimeResourceSnapshot } from '../../../foundation/runtime-reconciler';
+import type { RuntimeResourceSnapshot } from '../../../runtime/reconciler';
 import {
   countFilesByExtension,
   inspectRuntimeDirectoryResource,
   inspectRuntimeFileResource,
-} from '../../../foundation/resource-resolver';
-import { resolveConfiguredProjectPath, resolveRepoRoot } from '../../../foundation/utils/path-utils';
+} from '../../../adapters/filesystem/resource-resolver';
+import { resolveConfiguredProjectPath, resolveRepoRoot } from '../../../adapters/filesystem/path-utils';
 
 interface AvatarPackageManifestLike {
   preferredBackend?: string;

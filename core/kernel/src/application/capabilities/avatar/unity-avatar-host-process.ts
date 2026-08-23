@@ -3,17 +3,17 @@ import path from 'node:path';
 import readline from 'node:readline';
 import fs from 'fs-extra';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../foundation/logger/logger';
+import { getLogger } from '../../../adapters/observability/logger';
 import {
   resolveConfiguredProjectPath,
   resolveLogDir,
   resolveRepoRoot,
   resolveStatePath,
-} from '../../../foundation/utils/path-utils';
+} from '../../../adapters/filesystem/path-utils';
 import {
   forceTerminateManagedProcessTree,
   waitForManagedProcessExit,
-} from '../../../foundation/process/process-supervisor';
+} from '../../../adapters/process/process-supervisor';
 
 type UnityAvatarHostConfig = AvatarConfig['host'];
 type UnityAvatarHostProcessState = 'manual' | 'disabled' | 'starting' | 'running' | 'exited' | 'failed' | 'stopped';

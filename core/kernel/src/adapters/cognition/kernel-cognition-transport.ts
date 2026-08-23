@@ -41,13 +41,13 @@ import {
   GetPerceptionOperationResponseSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { ActionCommand } from '@glimmer-cradle/protocol';
-import { EventBus } from '../../foundation/event-bus/event-bus';
-import { StateSyncEvent } from '../../foundation/event-bus/events';
-import { EndpointRegistry } from '../../foundation/endpoints/endpoint-registry';
-import { getLogger } from '../../foundation/logger/logger';
-import { createTraceContext, withTrace } from '../../foundation/logger/trace-context';
-import type { CognitionActionHandler, CognitionProcessBootstrap } from '../../foundation/ports/cognition-service-port';
-import { RecoveryRequiredError } from '../../foundation/exceptions';
+import { EventBus } from '../../adapters/events/event-bus';
+import { StateSyncEvent } from '../../domain/events';
+import { EndpointRegistry } from '../../adapters/endpoints/endpoint-registry';
+import { getLogger } from '../../adapters/observability/logger';
+import { createTraceContext, withTrace } from '../../adapters/observability/trace-context';
+import type { CognitionActionHandler, CognitionProcessBootstrap } from '../../ports/cognition-service-port';
+import { RecoveryRequiredError } from '../../domain/errors';
 import { serviceDefinition, unaryMethod } from './grpc-contract';
 
 const logger = getLogger('kernel-cognition-transport');

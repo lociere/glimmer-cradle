@@ -10,17 +10,17 @@ import type {
   TTSSynthesizeResponse,
   VoiceConfig,
 } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../foundation/logger/logger';
-import type { RuntimeReadinessSnapshot } from '../../../foundation/runtime-readiness';
+import { getLogger } from '../../../adapters/observability/logger';
+import type { RuntimeReadinessSnapshot } from '../../../runtime/readiness';
 import {
   strongestRuntimeResourceState,
   type RuntimeReconcilerSnapshot,
   type RuntimeResourceSnapshot,
-} from '../../../foundation/runtime-reconciler';
+} from '../../../runtime/reconciler';
 import {
   resolveCachePath,
   resolveConfiguredProjectPath,
-} from '../../../foundation/utils/path-utils';
+} from '../../../adapters/filesystem/path-utils';
 import {
   configureOfficialAudioEngine,
   probeOfficialAudioEngine,

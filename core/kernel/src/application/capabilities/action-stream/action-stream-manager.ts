@@ -1,8 +1,8 @@
-import { ActionStreamCancelledEvent, ActionStreamCompletedEvent, ActionStreamStartedEvent } from '../../../foundation/event-bus/events';
-import { createTraceContext } from '../../../foundation/logger/trace-context';
-import { ConfigManager } from "../../../foundation/config/config-manager";
-import { EventBus } from "../../../foundation/event-bus/event-bus";
-import { getLogger } from "../../../foundation/logger/logger";
+import { ActionStreamCancelledEvent, ActionStreamCompletedEvent, ActionStreamStartedEvent } from '../../../domain/events';
+import { createTraceContext } from '../../../adapters/observability/trace-context';
+import { ConfigManager } from "../../../adapters/config/config-manager";
+import { EventBus } from "../../../adapters/events/event-bus";
+import { getLogger } from "../../../adapters/observability/logger";
 
 const logger = getLogger("action-stream-manager");
 

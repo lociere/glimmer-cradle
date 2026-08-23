@@ -11,7 +11,7 @@ import type {
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
   PerceptionOperationHandle,
-} from "../../../foundation/ports/cognition-service-port";
+} from "../../../ports/cognition-service-port";
 import { CognitionManager } from "./cognition-manager";
 
 export class AIProxy {

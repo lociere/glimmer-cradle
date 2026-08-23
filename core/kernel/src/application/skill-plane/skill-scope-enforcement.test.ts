@@ -1,8 +1,8 @@
 import type { ConversationContext } from '@glimmer-cradle/protocol';
-import type { AgentPlanRequest, AgentPlanResponse } from '../../foundation/ports/cognition-service-port';
+import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SkillCatalogAppService } from '../services/skill-catalog-app.service';
-import { SkillPlanningAppService } from '../services/skill-planning-app.service';
+import { SkillCatalogAppService } from '../use-cases/skill-catalog-app.service';
+import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { SkillInvocationGateway } from './skill-invocation-gateway';
 import { SkillRegistry } from './skill-registry';
 

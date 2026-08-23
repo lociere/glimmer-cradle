@@ -8,13 +8,13 @@ import type {
   AudioEngineResponse,
   VoiceConfig,
 } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../../foundation/logger/logger';
+import { getLogger } from '../../../adapters/observability/logger';
 import {
   forceTerminateManagedProcessTree,
   stopManagedProcess,
   waitForManagedProcessExit,
-} from '../../../foundation/process/process-supervisor';
-import { resolveLogDir, resolveRepoRoot } from '../../../foundation/utils/path-utils';
+} from '../../../adapters/process/process-supervisor';
+import { resolveLogDir, resolveRepoRoot } from '../../../adapters/filesystem/path-utils';
 
 const logger = getLogger('official-audio-engine');
 type AudioCommandName = AudioEngineCommand['command'];

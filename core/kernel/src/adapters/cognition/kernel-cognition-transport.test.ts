@@ -15,7 +15,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unaryMethod } from './grpc-contract';
 import { KernelCognitionTransport } from './kernel-cognition-transport';
-import { RecoveryRequiredError } from '../../foundation/exceptions';
+import { RecoveryRequiredError } from '../../domain/errors';
 
 const registerMethod = unaryMethod(
   '/glimmer.kernel.v1.KernelControlService/RegisterCognition',

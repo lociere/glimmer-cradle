@@ -4,7 +4,7 @@ import {
   type ConversationHistoryResult as ConversationHistoryResponse,
   type ConversationNotice,
 } from '@glimmer-cradle/protocol';
-import type { ConversationHistoryRequest } from '../../../foundation/ports/cognition-service-port';
+import type { ConversationHistoryRequest } from '../../../ports/cognition-service-port';
 import { CognitionManager } from '../inference/cognition-manager';
 import type { ConversationDirectory, ResolvedConversation } from '../conversation/conversation-directory';
 
