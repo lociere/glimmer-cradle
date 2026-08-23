@@ -1,5 +1,5 @@
-import type { SkillTool } from '../../../types';
-import type { CorePlatformBridge } from '../core-platform-bridge';
+import type { SkillTool } from '../../../../../ports/skill-plane.port';
+import type { CorePlatformBridge } from '../../../../../ports/skill-plane.port';
 import { createContractOnlyTool } from '../shared';
 
 const notificationParameters = {
@@ -17,14 +17,14 @@ export function createNotificationTools(bridge: CorePlatformBridge): SkillTool[]
     name: 'notification.show',
     description: '显示一条系统通知。只适合短文本通知，复杂交互通知应由 Extension 提供。',
     parameters: notificationParameters,
-    handler: (args: unknown) => {
+    handler: (args: unknown, context) => {
       const value = args as { title?: unknown; body?: unknown };
       const title = typeof value?.title === 'string' ? value.title : '';
       const body = typeof value?.body === 'string' ? value.body : '';
       if (!title.trim() || !body.trim()) {
         throw new Error('notification.show 需要 title 与 body');
       }
-      return bridge.showNotification(title, body);
+      return bridge.showNotification(title, body, context?.invocationId);
     },
   }];
 }

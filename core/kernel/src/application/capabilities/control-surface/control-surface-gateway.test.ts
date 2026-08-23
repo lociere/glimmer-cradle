@@ -1,33 +1,112 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ControlSurfaceGateway } from './control-surface-gateway';
+import { ControlSurfaceGateway } from '../../../adapters/surface/control-surface-gateway';
 import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/protocol';
-import type { ConversationHistoryService } from './conversation-history-service';
+import type { ConversationHistoryService } from '../../../adapters/surface/conversation-history-service';
+import { RecoveryRequiredError } from '../../../domain/errors';
+import { RuntimeReadinessProjectionMapper } from '../../projection/runtime-readiness-projection';
+import { AvatarController } from '../../../adapters/avatar/avatar-controller';
+import { AudioService } from '../../../adapters/audio/audio-service';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
+const readinessProjection = new RuntimeReadinessProjectionMapper();
+const gateway = new ControlSurfaceGateway(
+  readinessProjection,
+  new AvatarController(readinessProjection),
+  new AudioService(),
+);
 
 describe('ControlSurfaceGateway', () => {
   afterEach(() => {
-    const gateway = ControlSurfaceGateway.instance as unknown as {
+    const subject = gateway as unknown as {
       _configApplicationService: unknown;
       _conversationHistoryService: unknown;
       _clients: Set<unknown>;
+      _coreSkillExecutions: Map<string, unknown>;
+      _completedCoreSkillExecutions: Map<string, unknown>;
     };
-    gateway._configApplicationService = null;
-    gateway._conversationHistoryService = null;
-    gateway._clients.clear();
+    subject._configApplicationService = null;
+    subject._conversationHistoryService = null;
+    subject._clients.clear();
+    subject._coreSkillExecutions.clear();
+    subject._completedCoreSkillExecutions.clear();
+  });
+
+  it('reuses a stable invocation id and does not resend a committed local side effect', async () => {
+    const subject = gateway as unknown as {
+      _clients: Set<unknown>;
+      _handleCoreSkillResponse(data: unknown): void;
+      requestCoreSkillAction(action: string, payload: Record<string, unknown>, invocationId?: string): Promise<unknown>;
+    };
+    const sent: Array<Record<string, unknown>> = [];
+    subject._clients.add({
+      readyState: 1,
+      send(data: string) {
+        const frame = JSON.parse(data) as Record<string, unknown>;
+        sent.push(frame);
+        queueMicrotask(() => subject._handleCoreSkillResponse({
+          kind: 'core_skill_action_response',
+          request_id: frame.request_id,
+          status: 'success',
+          result: { ok: true },
+        }));
+      },
+    });
+
+    await expect(subject.requestCoreSkillAction(
+      'clipboard.write', { text: 'once' }, 'action:1:tool:0',
+    )).resolves.toEqual({ ok: true });
+    await expect(subject.requestCoreSkillAction(
+      'clipboard.write', { text: 'once' }, 'action:1:tool:0',
+    )).resolves.toEqual({ ok: true });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].request_id).toBe('action:1:tool:0');
+  });
+
+  it('maps a Desktop manual-recovery projection to a programmatic terminal error', async () => {
+    const subject = gateway as unknown as {
+      _clients: Set<unknown>;
+      _handleCoreSkillResponse(data: unknown): void;
+      requestCoreSkillAction(action: string, payload: Record<string, unknown>, invocationId?: string): Promise<unknown>;
+    };
+    subject._clients.add({
+      readyState: 1,
+      send(data: string) {
+        const frame = JSON.parse(data) as Record<string, unknown>;
+        queueMicrotask(() => subject._handleCoreSkillResponse({
+          kind: 'core_skill_action_response',
+          request_id: frame.request_id,
+          status: 'error',
+          message: 'arbitrary localized text',
+          error_code: 'recovery_required',
+          operation_id: frame.request_id,
+          recovery_actions: ['confirm_side_effect_state'],
+        }));
+      },
+    });
+
+    const error = await subject.requestCoreSkillAction(
+      'clipboard.write', { text: 'uncertain' }, 'action:unsafe:tool:0',
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RecoveryRequiredError);
+    expect(error).toMatchObject({
+      code: 'recovery_required',
+      operationId: 'action:unsafe:tool:0',
+      recoveryActions: ['confirm_side_effect_state'],
+    });
   });
 
   it('returns an explicit conversation notice when no usable LLM route is configured', () => {
-    const gateway = ControlSurfaceGateway.instance as unknown as {
+    const subject = gateway as unknown as {
       _configApplicationService: { hasUsableModelRoute: () => boolean };
       _handleMessage: (data: unknown, ws: unknown) => void;
     };
     const frames: unknown[] = [];
-    gateway._configApplicationService = {
+    subject._configApplicationService = {
       hasUsableModelRoute: () => false,
     };
 
-    gateway._handleMessage({
+    subject._handleMessage({
       kind: 'chat_input',
       trace_id: 'trace-no-llm',
       chat_input: { text: '你好' },
@@ -45,12 +124,12 @@ describe('ControlSurfaceGateway', () => {
   });
 
   it('serves conversation history through the control surface protocol', async () => {
-    const gateway = ControlSurfaceGateway.instance as unknown as {
+    const subject = gateway as unknown as {
       _conversationHistoryService: Pick<ConversationHistoryService, 'readHistory'>;
       _handleMessage: (data: unknown, ws: unknown) => void;
     };
     const frames: unknown[] = [];
-    gateway._conversationHistoryService = {
+    subject._conversationHistoryService = {
       readHistory: async (request) => ({
         request_id: request.request_id,
         status: 'success',
@@ -79,7 +158,7 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    gateway._handleMessage({
+    subject._handleMessage({
       kind: 'conversation_history_request',
       conversation_history_request: { request_id: 'history-1', limit: 20 },
     }, createSocket(frames));
@@ -98,12 +177,12 @@ describe('ControlSurfaceGateway', () => {
   });
 
   it('serves configuration snapshots through the control surface protocol', async () => {
-    const gateway = ControlSurfaceGateway.instance as unknown as {
+    const subject = gateway as unknown as {
       _configApplicationService: { getSnapshot: () => Promise<ConfigurationSnapshot> };
       _handleMessage: (data: unknown, ws: unknown) => void;
     };
     const frames: unknown[] = [];
-    gateway._configApplicationService = {
+    subject._configApplicationService = {
       getSnapshot: async () => ({
         revision: 'snapshot-1',
         llm: {
@@ -226,7 +305,7 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    gateway._handleMessage({
+    subject._handleMessage({
       kind: 'config_snapshot_request',
       config_snapshot_request: { request_id: 'config-snapshot-1' },
     }, createSocket(frames));
@@ -246,12 +325,12 @@ describe('ControlSurfaceGateway', () => {
   });
 
   it('serves skill catalog snapshots through the formal presentation payload', () => {
-    const gateway = ControlSurfaceGateway.instance as unknown as {
+    const subject = gateway as unknown as {
       _skillCatalogAppService: { getCatalogSnapshot: () => SkillCatalogSnapshot };
       _handleMessage: (data: unknown, ws: unknown) => void;
     };
     const frames: unknown[] = [];
-    gateway._skillCatalogAppService = {
+    subject._skillCatalogAppService = {
       getCatalogSnapshot: () => ({
         generatedAt: '2026-07-18T18:06:00.000Z',
         totalSkills: 1,
@@ -299,7 +378,7 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    gateway._handleMessage({
+    subject._handleMessage({
       kind: 'skill_catalog_request',
       skill_catalog_request: { request_id: 'skill-catalog-1' },
     }, createSocket(frames));

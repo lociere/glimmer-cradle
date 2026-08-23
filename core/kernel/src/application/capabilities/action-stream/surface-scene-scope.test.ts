@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLocalAvatarSurfaceScene } from './surface-scene-scope';
+import { isLocalAvatarSurfaceScene } from '../../../domain/surface/local-avatar-scene-policy';
 
 describe('isLocalAvatarSurfaceScene', () => {
   it.each([

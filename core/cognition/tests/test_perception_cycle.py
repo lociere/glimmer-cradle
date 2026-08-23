@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
 from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.cycle.providers import PerceptionProvider
 from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
 from glimmer_cradle.cognition.foundation.config import CognitionConfig
@@ -82,9 +83,55 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         await recorder.stop()
 
 
+async def test_new_input_cancels_real_inference_operation_before_action(tmp_path) -> None:
+    """CancelPerception 取消实际 Deliberate task，并留下可查询的受管终态。"""
+    import asyncio
+
+    started = asyncio.Event()
+    emitted: list[dict] = []
+
+    class _SlowReasoning:
+        async def request(self, req, *, tier):
+            started.set()
+            await asyncio.Future()
+
+    async def _sink(command: dict) -> None:
+        emitted.append(command)
+
+    queue = PerceptionEventQueue(max_size=10)
+    queue.put(PerceptionEntry(
+        scene_id="scene-1", conversation_id="conversation-1", continuity_id="continuity-1",
+        thread_id="main", recall_scope="conversation_private", disclosure_scope="conversation_private",
+        address_mode="direct", familiarity=10, text="first", trace_id="trace-cancel-real",
+    ))
+    operations = PerceptionOperationRegistry()
+    operation, _ = operations.accept("perception:cancel-real", "trace-cancel-real")
+    recorder = ExperienceRecorder(tmp_path)
+    await recorder.start()
+    try:
+        loop = CycleController(
+            workspace=GlobalWorkspace(capacity=5),
+            providers=[PerceptionProvider(queue)],
+            experience_recorder=recorder,
+            willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
+            reasoning=_SlowReasoning(),
+            action_sink=_sink,
+            perception_operations=operations,
+        )
+        tick = asyncio.create_task(loop.tick_once())
+        await asyncio.wait_for(started.wait(), timeout=1)
+        await operations.cancel("trace-cancel-real")
+        assert tick.cancelled()
+        assert operation.state == "cancelled"
+        assert operation.terminal is True
+        assert emitted == []
+    finally:
+        await recorder.stop()
+
+
 # ─── 生产接线冒烟：感知 → 循环 → 真实 ReasoningService → Act → action_sink ───
 # 不用 _FakeReasoning，而用生产接线（ReasoningService→CloudReasoning→LLMEngine），
-# 覆盖容器实际装配的完整自主输出通路（缺的只有 ZMQ 物理线）。Act 推出的
+# 覆盖容器实际装配的完整自主输出通路（不含跨进程 gRPC transport）。Act 推出的
 # ActionCommand dict 即内核 ACTION_COMMAND handler 入参，跨进程契约在此对齐。
 
 async def test_smoke_perception_to_action_command_production_wiring(tmp_path) -> None:
@@ -189,3 +236,19 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     assert cmd["target"]["scene_id"] == "napcat:group:42"
     assert cmd["payload"]["text"] == "今天挺好的，谢谢你问我。"  # 真实生成文本
     assert cmd["trace_id"] == "trace-smoke-1"     # 原 perception trace 贯通（下游路由键）
+def test_perception_queue_reports_the_operation_dropped_by_capacity() -> None:
+    queue = PerceptionEventQueue(max_size=1)
+    first = PerceptionEntry(
+        scene_id="scene", conversation_id="conversation", continuity_id="continuity",
+        thread_id="main", recall_scope="private", disclosure_scope="private",
+        address_mode="direct", familiarity=10, text="first", trace_id="trace-first",
+    )
+    second = PerceptionEntry(
+        scene_id="scene", conversation_id="conversation", continuity_id="continuity",
+        thread_id="main", recall_scope="private", disclosure_scope="private",
+        address_mode="direct", familiarity=10, text="second", trace_id="trace-second",
+    )
+
+    assert queue.put(first) is None
+    assert queue.put(second) == first
+    assert queue.drain() == [second]

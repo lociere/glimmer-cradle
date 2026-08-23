@@ -1,12 +1,12 @@
 # Cognition 当前视图
 
 > 范围：Python 认知核的当前职责、边界、认知循环、记忆连续性、上下文、推理和行动语义；不展开逐函数实现。
-> 事实依据：`core/cognition/src/glimmer_cradle/cognition/`、`protocol/src/schemas/`、`configs/characters/selrena/`、历史 Cognition 架构材料与当前代码。
-> 维护触发：认知循环、人格/情绪/觉醒、记忆、经历、上下文装配、推理 provider、Kernel IPC 或持久化 owner 变化。
+> 事实依据：`core/cognition/src/glimmer_cradle/cognition/`、`contracts/proto/glimmer/cognition/v1/`、`configs/characters/selrena/`、历史 Cognition 架构材料与当前代码。
+> 维护触发：认知循环、人格/情绪/觉醒、记忆、经历、上下文装配、推理 provider、Kernel Service 或持久化 owner 变化。
 
 Cognition 是当前角色的心智主权边界。用户输入、平台事件、语音转写、工具结果和桌面上下文只有被规范化为当前角色感知后，才能进入 Cognition；Cognition 输出的是行动、回复、情绪、思考和状态事件，而不是直接控制窗口、平台或进程。
 
-生命周期结束同样遵守心智主权边界：Kernel 通过 `cognition_shutdown` 请求停机，Cognition 在回复确认后自行停止生产者、刷新 Experience、封口开放 Episode、关闭 Memory/telemetry 并退出；停机不运行记忆巩固模型，Kernel 只保留有界超时监督与强制回收兜底。
+生命周期结束同样遵守心智主权边界：Kernel 通过 `CognitionService.Shutdown` 请求停机，Cognition 在回复确认后自行停止入站 Service、刷新 Experience、封口开放 Episode、关闭 Memory/telemetry 并退出；停机不运行记忆巩固模型，Kernel 只保留有界 deadline、进程树监督与强制回收兜底。
 
 ## 当前职责
 
@@ -26,7 +26,8 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 core/cognition/src/glimmer_cradle/cognition/
 ├── host/{process,composition}.py      # 进程生命周期与唯一依赖组装
 ├── foundation/                        # config、event bus、path 等基础能力
-├── ports/kernel/{inbound,outbound}/   # Kernel 协议边界适配
+├── adapters/kernel/                   # Protobuf DTO mapping、gRPC host/client
+├── ports/kernel/                      # 与传输无关的 Kernel 应用 Port/内部模型
 ├── observability/                     # logger、trace、metrics、模型调用观测
 ├── protocol/generated/                # protocol schema 生成的 Python 投影
 ├── cycle/                             # controller、turn、providers、volition、行动出口
@@ -39,7 +40,14 @@ core/cognition/src/glimmer_cradle/cognition/
 └── application/                       # agent plan/synthesis 请求型应用用例
 ```
 
-`host/composition.py` 是 Cognition 唯一组装点，`host/process.py` 只监督进程生命周期。跨边界模型来自 `glimmer_cradle/cognition/protocol/generated/`；不得在 Python 端手写 TypeScript 镜像。
+`host/composition.py` 是 Cognition 唯一组装点，`host/process.py` 只监督进程生命周期。Kernel–Cognition 跨边界 DTO 来自 `contracts/generated/python/glimmer/{common,cognition,kernel}/v1/`，只允许 `adapters/kernel/` import；心智内部使用自己的应用模型，不得 import gRPC/Protobuf 或手写 TypeScript 镜像。
+
+感知入站由 `PerceptionOperationRegistry` 监督：transport 接受后保持
+`accepted/running/succeeded/cancelled/failed`，实际 Cycle tick 与推理 task 绑定到同一 trace。
+取消会移除队列/工作区候选或取消正在运行的推理，不会只取消 RPC 外壳；容量淘汰和竞争拒绝也
+必须进入失败终态；operation id 是幂等主键，trace 绑定冲突会被拒绝。Cognition 反向发布 action
+时等待 Kernel 的终态响应，不在固定 5 秒后脱离 Kernel 副作用继续运行；Kernel 的取消还会
+贯穿结果合成，不会被误写成合成失败 fallback。
 
 ## 唯一认知主线
 
@@ -119,7 +127,7 @@ Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `Co
 
 `maintenance/` 的 `MaintenanceScheduler` 拥有独立任务和间隔，串行调用 Episode/Relationship projection 与 `ConsolidationCoordinator`。终结 Moment 提供低延迟唤醒，sealed Episode 提供持久可恢复工作项，周期扫描提供补偿；`quiescent` 只提供一次强制封口提示。不存在 Dreaming 活动态，也不把维护运行解释为角色正在做梦。Global Workspace 广播同样是易失注意力过程，当前通用链路不会把它写成 Thought。
 
-外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`life_heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `CycleController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
+外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`CognitionService.Heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `CycleController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
 
 按 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，Cognition 不拥有 Attention Lease，也不查询 Kernel attention 内部对象。它只消费规范化感知中的 `address_mode`、`response_policy`、`scene_id`、`actor_id/actor_name`。外部场景是否被关注属于 Kernel Attention Projection；情绪强度属于 Affect；认知资源档位属于 Cognitive Activity；是否愿意开口属于 Volition；Episode 和 Memory 维护属于 Maintenance Scheduler。
 

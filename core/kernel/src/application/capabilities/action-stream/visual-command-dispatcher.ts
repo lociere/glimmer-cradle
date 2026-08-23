@@ -14,20 +14,17 @@
  *   - 不直接引用任何具体渲染实现
  *   - 远端平台场景（NapCat/Discord/直播等）不驱动本地身体
  */
-import { VisualCommandDispatchEvent, ActionStreamStartedEvent, ActionStreamCompletedEvent, ActionStreamCancelledEvent } from '../../../foundation/event-bus/events';
-import type { AvatarConfig, VisualCommand } from '@glimmer-cradle/protocol';
-import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../foundation/event-bus/events';
-import { EventBus } from "../../../foundation/event-bus/event-bus";
-import { ConfigManager } from "../../../foundation/config/config-manager";
-import { getLogger } from "../../../foundation/logger/logger";
-import { isLocalAvatarSurfaceScene } from './surface-scene-scope';
-
-const logger = getLogger("visual-command-dispatcher");
+import { VisualCommandDispatchEvent, ActionStreamStartedEvent, ActionStreamCompletedEvent, ActionStreamCancelledEvent } from '../../../domain/events';
+import type { AvatarConfiguration } from '../../../ports/configuration.port';
+import type { VisualCommand } from '../../../domain/kernel-contracts';
+import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../domain/events';
+import type { DomainEventHandler, KernelEventBusPort } from '../../../ports/event-bus.port';
+import type { KernelLoggerPort } from '../../../ports/observability.port';
+import { isLocalAvatarSurfaceScene } from '../../../domain/surface/local-avatar-scene-policy';
 
 export class VisualCommandDispatcher {
-  private static _instance: VisualCommandDispatcher | null = null;
   private _initialized = false;
-  private _emotionMapping: AvatarConfig['emotion_mapping'] = {
+  private _emotionMapping: AvatarConfiguration['emotion_mapping'] = {
     happy: { expression_id: 'happy', motion_group: 'happy', animator_trigger: 'happy' },
     sad: { expression_id: 'sad', motion_group: 'sad', animator_trigger: 'sad' },
     angry: { expression_id: 'angry', motion_group: 'angry', animator_trigger: 'angry' },
@@ -35,14 +32,21 @@ export class VisualCommandDispatcher {
     neutral: { expression_id: 'neutral', motion_group: 'idle', animator_trigger: 'idle' },
   };
 
-  public static get instance(): VisualCommandDispatcher {
-    if (!VisualCommandDispatcher._instance) {
-      VisualCommandDispatcher._instance = new VisualCommandDispatcher();
-    }
-    return VisualCommandDispatcher._instance;
-  }
+  private readonly streamStartedHandler: DomainEventHandler<ActionStreamStartedEvent> = async (event) => {
+    await this._onStreamStarted(event.payload);
+  };
+  private readonly streamCompletedHandler: DomainEventHandler<ActionStreamCompletedEvent> = async (event) => {
+    await this._onStreamCompleted(event.payload);
+  };
+  private readonly streamCancelledHandler: DomainEventHandler<ActionStreamCancelledEvent> = async (event) => {
+    await this._onStreamCancelled(event.payload);
+  };
 
-  private constructor() {}
+  public constructor(
+    private readonly avatarConfig: AvatarConfiguration,
+    private readonly eventBus: KernelEventBusPort,
+    private readonly logger: KernelLoggerPort,
+  ) {}
 
   /**
    * 初始化：订阅 ActionStream 事件。
@@ -50,30 +54,22 @@ export class VisualCommandDispatcher {
   public init(): void {
     if (this._initialized) return;
 
-    this._emotionMapping = ConfigManager.instance.getConfig().system.avatar.emotion_mapping;
+    this._emotionMapping = this.avatarConfig.emotion_mapping;
 
-    EventBus.instance.subscribe("ActionStreamStartedEvent", async (event) => {
-      await this._onStreamStarted((event as ActionStreamStartedEvent).payload);
-    });
-
-    EventBus.instance.subscribe("ActionStreamCompletedEvent", async (event) => {
-      await this._onStreamCompleted((event as ActionStreamCompletedEvent).payload);
-    });
-
-    EventBus.instance.subscribe("ActionStreamCancelledEvent", async (event) => {
-      await this._onStreamCancelled((event as ActionStreamCancelledEvent).payload);
-    });
+    this.eventBus.subscribe('ActionStreamStartedEvent', this.streamStartedHandler);
+    this.eventBus.subscribe('ActionStreamCompletedEvent', this.streamCompletedHandler);
+    this.eventBus.subscribe('ActionStreamCancelledEvent', this.streamCancelledHandler);
 
     this._initialized = true;
-    logger.info("视觉指令分发器已初始化");
+    this.logger.info("视觉指令分发器已初始化");
   }
 
   /**
    * 主动发送视觉指令（供内核其他模块调用）。
    */
   public async dispatch(command: VisualCommand): Promise<void> {
-    await EventBus.instance.publish(new VisualCommandDispatchEvent(command, undefined));
-    logger.debug("视觉指令已分发", {
+    await this.eventBus.publish(new VisualCommandDispatchEvent(command, undefined));
+    this.logger.debug("视觉指令已分发", {
       command_type: command.command_type,
       trace_id: command.trace_id,
     });
@@ -134,7 +130,7 @@ export class VisualCommandDispatcher {
 
     // 2. 延迟后回到待机（由渲染器插件自行决定是否执行）
     // 这里不做延迟，只发 idle 提示
-    logger.debug("流完成，情绪表情已分发", {
+    this.logger.debug("流完成，情绪表情已分发", {
       trace_id: traceId,
       emotion,
     });
@@ -151,7 +147,10 @@ export class VisualCommandDispatcher {
   }
 
   public stop(): void {
+    this.eventBus.unsubscribe('ActionStreamStartedEvent', this.streamStartedHandler);
+    this.eventBus.unsubscribe('ActionStreamCompletedEvent', this.streamCompletedHandler);
+    this.eventBus.unsubscribe('ActionStreamCancelledEvent', this.streamCancelledHandler);
     this._initialized = false;
-    logger.info("视觉指令分发器已停止");
+    this.logger.info("视觉指令分发器已停止");
   }
 }

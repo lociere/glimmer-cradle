@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ConversationDirectory } from './conversation-directory';
 
+const directory = new ConversationDirectory({
+  newId: () => 'interaction-default',
+  digest: (parts) => parts.join('|').split('').reduce((value, character) => `${value}${character.charCodeAt(0).toString(16)}`, '').padEnd(20, '0'),
+});
+
 describe('ConversationDirectory', () => {
   it('为同一平台地址生成稳定且不暴露外部键的会话拓扑', () => {
     const address = {
@@ -12,8 +17,8 @@ describe('ConversationDirectory', () => {
       visibility: 'private' as const,
     };
 
-    const first = ConversationDirectory.instance.resolve(address, 'interaction-a');
-    const second = ConversationDirectory.instance.resolve(address, 'interaction-b');
+    const first = directory.resolve(address, 'interaction-a');
+    const second = directory.resolve(address, 'interaction-b');
 
     expect(second.context.conversation_id).toBe(first.context.conversation_id);
     expect(second.context.continuity_id).toBe(first.context.continuity_id);
@@ -24,14 +29,14 @@ describe('ConversationDirectory', () => {
   });
 
   it('按空间可见性生成受限召回作用域', () => {
-    const shared = ConversationDirectory.instance.resolve({
+    const shared = directory.resolve({
       provider_id: 'community.example-extension',
       provider_account_id: 'account',
       space_kind: 'group',
       external_space_key: 'group',
       visibility: 'shared',
     });
-    const publicContext = ConversationDirectory.instance.resolve({
+    const publicContext = directory.resolve({
       provider_id: 'community.example-extension',
       provider_account_id: 'account',
       space_kind: 'channel',

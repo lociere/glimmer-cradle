@@ -11,7 +11,7 @@
 | 目录 | 语义 | 当前 owner / 入口 |
 |---|---|---|
 | `logs/application/` | 第一方应用日志与受管进程 stdout/stderr | Kernel、Cognition、Audio、Avatar、Extension Host |
-| `logs/events/` | 统一结构化诊断事件 JSONL | Kernel `foundation/observability/plane.ts` |
+| `logs/events/` | 统一结构化诊断事件 JSONL | Kernel `adapters/observability/plane/plane.ts` |
 | `logs/audit/` | 高风险副作用审计记录 | Skill Plane、Desktop main audit sink |
 | `traces/` | span JSONL | Kernel `tracer.ts`、Cognition `tracer.py` |
 | `metrics/` | metrics JSONL | Kernel `metrics.ts`、Cognition `metrics.py` |
@@ -255,7 +255,7 @@ cleanup 后 `observability.db` 会在下一次诊断查询时重建。
 | 症状 | 优先查看 |
 |---|---|
 | Kernel 启动卡住 | lifecycle 日志、runtime readiness、Ingress Gate |
-| Cognition 无回复 | IPC trace、Cognition process log、DLQ、provider span |
+| Cognition 无回复 | Cognition Service trace、Cognition process log、DLQ、provider span |
 | TTS/ASR 不可用 | audio readiness、`processes/audio-*.log`、resource catalog |
 | Avatar 已连接但无动作 | `host_hello` / `host_ready`、avatar process log、composition span |
 | Extension 工具不可调用 | skill catalog、policy decision、activation log |

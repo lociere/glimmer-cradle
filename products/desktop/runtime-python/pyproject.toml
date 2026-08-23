@@ -1,0 +1,19 @@
+[project]
+name = "glimmer-cradle-desktop-python-runtime"
+version = "0.1.8"
+description = "Locked Python dependency set for the installed Desktop runtime."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "glimmer-cradle-contracts==0.1.8",
+    "glimmer-cradle-cognition==0.1.8",
+    "glimmer-cradle-audio-engine[asr,tts]==0.1.8",
+]
+
+[tool.uv.sources]
+glimmer-cradle-contracts = { path = "../../../contracts" }
+glimmer-cradle-cognition = { path = "../../../core/cognition" }
+glimmer-cradle-audio-engine = { path = "../../../engines/audio" }
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

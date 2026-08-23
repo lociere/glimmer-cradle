@@ -47,9 +47,11 @@ class PerceptionEventQueue:
         self._max_size = max_size
         self._queue: collections.deque[PerceptionEntry] = collections.deque(maxlen=max_size)
 
-    def put(self, entry: PerceptionEntry) -> None:
-        """投放一条事件；队满时自动挤掉最旧（deque maxlen 语义）。"""
+    def put(self, entry: PerceptionEntry) -> PerceptionEntry | None:
+        """投放一条事件，并返回队满时被挤掉、需要关闭终态的旧事件。"""
+        dropped = self._queue[0] if len(self._queue) == self._max_size else None
         self._queue.append(entry)
+        return dropped
 
     def drain(self, *, max_items: int = 10) -> list[PerceptionEntry]:
         """取出至多 ``max_items`` 条；FIFO 顺序。"""
@@ -62,6 +64,14 @@ class PerceptionEventQueue:
 
     def size(self) -> int:
         return len(self._queue)
+
+    def remove(self, trace_id: str) -> bool:
+        before = len(self._queue)
+        self._queue = collections.deque(
+            (entry for entry in self._queue if entry.trace_id != trace_id),
+            maxlen=self._max_size,
+        )
+        return len(self._queue) != before
 
     @property
     def max_size(self) -> int:

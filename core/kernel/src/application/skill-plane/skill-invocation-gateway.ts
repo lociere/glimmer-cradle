@@ -6,18 +6,19 @@ import {
   resolveSkillAudience,
   resolveToolAudience,
 } from './skill-registry';
-import type { SkillDescriptor, SkillPolicy, SkillProviderKind } from './types';
+import type {
+  SkillConfirmationRequest,
+  SkillConfirmationRequester,
+  SkillDescriptor,
+  SkillPolicy,
+  SkillProviderKind,
+} from '../../ports/skill-plane.port';
 import type { SkillPolicyDecision } from './skill-policy-engine';
-import { counter, histogram } from '../../foundation/logger/metrics';
-import { getCurrentTraceId, newTraceId, withTrace } from '../../foundation/logger/trace-context';
-import { getLogger } from '../../foundation/logger/logger';
-import {
-  OBSERVABILITY_EVENT_TYPES,
-  appendAuditRecord,
-  recordObservabilityEvent,
-} from '../../foundation/observability/plane';
-import type { ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '../../ports/application-models';
+import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
+import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
 import { isCapabilityScopeVisible } from './scope';
+import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
   skillId: string;
@@ -25,6 +26,17 @@ export interface SkillInvocationRequest {
   args: unknown;
   traceId?: string;
   conversation?: ConversationContext;
+  signal?: AbortSignal;
+  /** 由反向 Service operation 派生的稳定副作用键，重试不得重新生成。 */
+  invocationId?: string;
+}
+
+export class SkillInvocationRecoveryRequiredError extends RecoveryRequiredError {
+  public constructor(public readonly invocationId: string) {
+    super(invocationId, undefined, `技能副作用终态不明，需要人工恢复（invocation_id=${invocationId}）`);
+    this.name = 'SkillInvocationRecoveryRequiredError';
+    Object.setPrototypeOf(this, SkillInvocationRecoveryRequiredError.prototype);
+  }
 }
 
 export interface SkillResourceReadRequest {
@@ -66,21 +78,8 @@ export interface SkillInvocationAuditSink {
   record(record: SkillInvocationAuditRecord): void;
 }
 
-export interface SkillConfirmationRequest {
-  traceId: string;
-  skillId: string;
-  targetKind: SkillInvocationTargetKind;
-  targetName: string;
-  riskLevel: SkillPolicy['riskLevel'];
-  sideEffects: string[];
-  args?: unknown;
-}
-
-export type SkillConfirmationRequester = (request: SkillConfirmationRequest) => Promise<boolean>;
-
-const logger = getLogger('skill-invocation');
-
-class LoggingSkillInvocationAuditSink implements SkillInvocationAuditSink {
+export class LoggingSkillInvocationAuditSink implements SkillInvocationAuditSink {
+  public constructor(private readonly logger: KernelLoggerPort) {}
   public record(record: SkillInvocationAuditRecord): void {
     const meta = {
       provider_id: record.provider_id,
@@ -98,23 +97,26 @@ class LoggingSkillInvocationAuditSink implements SkillInvocationAuditSink {
     };
 
     if (record.status === 'succeeded') {
-      logger.info('Skill 调用完成', meta);
+      this.logger.info('Skill 调用完成', meta);
       return;
     }
 
-    logger.warn(record.status === 'policy_denied' ? 'Skill 调用被策略拒绝' : 'Skill 调用失败', meta);
+    this.logger.warn(record.status === 'policy_denied' ? 'Skill 调用被策略拒绝' : 'Skill 调用失败', meta);
   }
 }
 
 export class SkillInvocationGateway {
   constructor(
-    private readonly _registry: SkillRegistry = SkillRegistry.instance,
-    private readonly _policyEngine: SkillPolicyEngine = new SkillPolicyEngine(),
-    private readonly _auditSink: SkillInvocationAuditSink = new LoggingSkillInvocationAuditSink(),
+    private readonly _registry: SkillRegistry,
+    private readonly _policyEngine: SkillPolicyEngine,
+    private readonly _auditSink: SkillInvocationAuditSink,
+    private readonly _observability: KernelObservabilityPort,
+    private readonly _diagnostics: SkillInvocationDiagnosticsPort,
     private readonly _requestConfirmation?: SkillConfirmationRequester,
   ) {}
 
   public async invoke(request: SkillInvocationRequest): Promise<unknown> {
+    request.signal?.throwIfAborted();
     const registered = this._registry.findById(request.skillId);
     if (!registered) {
       throw new Error(`技能不存在: ${request.skillId}`);
@@ -136,7 +138,12 @@ export class SkillInvocationGateway {
       targetKind: 'tool',
       targetName: request.toolName,
       args: request.args,
-      execute: () => tool.handler(request.args),
+      signal: request.signal,
+      invocationId: request.invocationId,
+      execute: () => tool.handler(request.args, {
+        signal: request.signal,
+        invocationId: request.invocationId,
+      }),
     });
   }
 
@@ -205,9 +212,14 @@ export class SkillInvocationGateway {
     targetName: string;
     args?: unknown;
     execute: () => Promise<unknown> | unknown;
+    signal?: AbortSignal;
+    invocationId?: string;
   }): Promise<unknown> {
-    const traceId = options.traceId ?? getCurrentTraceId() ?? newTraceId();
-    return withTrace(traceId, async () => {
+    const traceId = options.traceId
+      ?? this._observability.currentTraceId()
+      ?? this._observability.createTraceContext().trace_id;
+    return this._observability.withTrace(traceId, async () => {
+      options.signal?.throwIfAborted();
       const startedAt = Date.now();
       const policy = options.policy ?? options.skill.policy;
       const decision = this._policyEngine.evaluate(options.skill, policy);
@@ -254,6 +266,7 @@ export class SkillInvocationGateway {
           sideEffects: policy.sideEffects,
           args: options.args,
         });
+        options.signal?.throwIfAborted();
         if (!approved) {
           const message = `用户拒绝执行技能 ${options.skill.id}`;
           this.recordAudit({
@@ -297,6 +310,9 @@ export class SkillInvocationGateway {
           errorMessage: normalizeErrorMessage(error),
           policy,
         });
+        if (options.signal?.aborted && policy.sideEffects.length > 0) {
+          throw new SkillInvocationRecoveryRequiredError(options.invocationId ?? traceId);
+        }
         throw error;
       }
     });
@@ -314,50 +330,6 @@ export class SkillInvocationGateway {
     resultType?: string;
     errorMessage?: string;
   }): void {
-    const labels = {
-      provider_kind: options.skill.provider.kind,
-      provider_id: options.skill.provider.id,
-      skill_id: options.skill.id,
-      target_kind: options.targetKind,
-      target_name: options.targetName,
-      status: options.status,
-    };
-
-    counter('skill.invocation.count', 1, labels);
-    histogram('skill.invocation.duration_ms', options.durationMs, labels);
-
-    const eventType = options.status === 'succeeded'
-      ? OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_SUCCEEDED
-      : options.status === 'policy_denied'
-        ? OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_POLICY_DENIED
-        : OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_FAILED;
-    recordObservabilityEvent(eventType, {
-      level: options.status === 'succeeded' ? 'info' : 'warn',
-      event_outcome: options.status === 'succeeded'
-        ? 'succeeded'
-        : options.status === 'policy_denied'
-          ? 'policy_denied'
-          : 'failed',
-      trace_id: options.traceId,
-      provider_id: options.skill.provider.id,
-      skill_id: options.skill.id,
-      tool_name: options.targetKind === 'tool' ? options.targetName : null,
-      duration_ms: options.durationMs,
-      error_kind: options.status === 'failed' ? 'skill_execution_error' : null,
-      diagnostic_hint: options.errorMessage ?? null,
-      attributes: {
-        provider_kind: options.skill.provider.kind,
-        target_kind: options.targetKind,
-        target_name: options.targetName,
-        confirmation_required: options.decision.confirmationRequired,
-        result_type: options.resultType ?? null,
-      },
-    });
-
-    if (!options.policy.audit && options.status === 'succeeded') {
-      return;
-    }
-
     const record = {
       timestamp: new Date().toISOString(),
       trace_id: options.traceId,
@@ -374,32 +346,20 @@ export class SkillInvocationGateway {
     } satisfies SkillInvocationAuditRecord;
 
     this._auditSink.record(record);
-    appendAuditRecord({
-      action: `skill.${options.targetKind}.${options.status}`,
-      target_kind: options.targetKind,
-      target_name: options.targetName,
-      owner: 'skill_plane',
-      module: 'skill-invocation-gateway',
+    this._diagnostics.record({
+      timestamp: record.timestamp,
       trace_id: options.traceId,
+      provider_kind: options.skill.provider.kind,
       provider_id: options.skill.provider.id,
       skill_id: options.skill.id,
-      tool_name: options.targetKind === 'tool' ? options.targetName : null,
-      risk_level: options.policy.riskLevel,
-      outcome: options.status === 'succeeded'
-        ? 'succeeded'
-        : options.status === 'policy_denied'
-          ? 'policy_denied'
-          : 'failed',
-      reason: options.errorMessage,
-      diagnostic_hint: options.decision.reason ?? options.errorMessage ?? null,
+      target_kind: options.targetKind,
+      target_name: options.targetName,
+      status: options.status,
       duration_ms: options.durationMs,
-      attributes: {
-        provider_kind: options.skill.provider.kind,
-        target_name: options.targetName,
-        confirmation_required: options.decision.confirmationRequired,
-        result_type: options.resultType ?? null,
-      },
-    });
+      result_type: options.resultType,
+      error_message: options.errorMessage,
+      confirmation_required: options.decision.confirmationRequired,
+    }, options.policy);
   }
 
   private assertScopeVisible(

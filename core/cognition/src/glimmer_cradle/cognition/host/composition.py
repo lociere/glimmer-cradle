@@ -16,7 +16,8 @@ from glimmer_cradle.cognition.context.sources import (
     RelationshipSource,
 )
 from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.cycle.providers import (
     AffectProvider,
     DriveProvider,
@@ -44,11 +45,12 @@ from glimmer_cradle.cognition.memory.storage.consolidation_job_repo import Conso
 from glimmer_cradle.cognition.memory.storage.relationship_repo import RelationshipRepository
 from glimmer_cradle.cognition.memory.storage.vector_repo import VectorRepository
 from glimmer_cradle.cognition.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.kernel.inbound.kernel_event_adapter import KernelEventInboundAdapter
-from glimmer_cradle.cognition.ports.kernel.inbound.kernel_ingress_cortex import KernelIngressCortex
-from glimmer_cradle.cognition.ports.kernel.outbound.kernel_bridge import KernelBridge
-from glimmer_cradle.cognition.ports.kernel.outbound.kernel_event_adapter import KernelEventOutboundAdapter
-from glimmer_cradle.cognition.protocol.generated.enums.ipc_message_type import IPCMessageType
+from glimmer_cradle.cognition.adapters.kernel import (
+    CognitionGrpcHost,
+    KernelEventInboundAdapter,
+    KernelEventOutboundAdapter,
+    KernelGrpcClient,
+)
 
 logger = get_logger("cognition_composition")
 
@@ -58,7 +60,8 @@ class CognitionComponents:
     """由组装根创建并交给 Host 监督生命周期的组件图。"""
 
     self_entity: SelfEntity
-    kernel_bridge: KernelBridge
+    kernel_client: KernelGrpcClient
+    cognition_grpc_host: CognitionGrpcHost
     outbound_adapter: KernelEventOutboundAdapter
     experience_recorder: ExperienceRecorder
     activity_controller: CognitiveActivityController
@@ -68,7 +71,14 @@ class CognitionComponents:
     cycle_controller: CycleController
 
 
-def compose_cognition(config: CharacterRuntimeConfig) -> CognitionComponents:
+def compose_cognition(
+    config: CharacterRuntimeConfig,
+    *,
+    generation: str,
+    registration_nonce: str,
+    registration_secret: bytearray,
+    shutdown,
+) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     logger.info("Cognition Composition 开始组装")
 
@@ -144,11 +154,11 @@ def compose_cognition(config: CharacterRuntimeConfig) -> CognitionComponents:
         agent_synthesis_use_case=agent_synthesis,
         conversation_controller=conversation_controller,
     )
-    ingress_cortex = KernelIngressCortex()
-    kernel_bridge = KernelBridge()
-    outbound_adapter = KernelEventOutboundAdapter(kernel_bridge=kernel_bridge)
+    kernel_client = KernelGrpcClient(generation, registration_nonce, registration_secret)
+    outbound_adapter = KernelEventOutboundAdapter(kernel_client)
 
     perception_queue = PerceptionEventQueue(max_size=100)
+    perception_operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity)
     relationship_projection = RelationshipProjection(
         recorder=experience_recorder,
@@ -215,15 +225,18 @@ def compose_cognition(config: CharacterRuntimeConfig) -> CognitionComponents:
         self_entity=self_entity,
         conversation=conversation_controller,
         multimodal_router=multimodal_router,
+        perception_operations=perception_operations,
     )
 
-    _register_kernel_handlers(
-        bridge=kernel_bridge,
+    cognition_grpc_host = CognitionGrpcHost(
+        generation=generation,
         inbound=inbound_adapter,
-        ingress=ingress_cortex,
         queue=perception_queue,
         activity=activity_controller,
         cycle=cycle_controller,
+        shutdown=shutdown,
+        operations=perception_operations,
+        workspace=workspace,
     )
     logger.info(
         "Cognition Composition 组装完成",
@@ -232,7 +245,8 @@ def compose_cognition(config: CharacterRuntimeConfig) -> CognitionComponents:
     )
     return CognitionComponents(
         self_entity=self_entity,
-        kernel_bridge=kernel_bridge,
+        kernel_client=kernel_client,
+        cognition_grpc_host=cognition_grpc_host,
         outbound_adapter=outbound_adapter,
         experience_recorder=experience_recorder,
         activity_controller=activity_controller,
@@ -249,81 +263,3 @@ def _build_embedding_engine(
     engine = EmbeddingEngine(config.embedding)
     self_entity.knowledge_base.set_embedding_engine(engine)
     return engine
-
-
-def _register_kernel_handlers(
-    *,
-    bridge: KernelBridge,
-    inbound: KernelEventInboundAdapter,
-    ingress: KernelIngressCortex,
-    queue: PerceptionEventQueue,
-    activity: CognitiveActivityController,
-    cycle: CycleController,
-) -> None:
-    async def on_perception(message: dict) -> None:
-        parsed = ingress.parse_perception_message(message)
-        model_input = (
-            parsed.model_input
-            if isinstance(parsed.model_input, dict)
-            else parsed.model_input.model_dump()
-        )
-        text = model_input.get("text", "") if isinstance(model_input, dict) else ""
-        queue.put(PerceptionEntry(
-            scene_id=parsed.scene_id,
-            conversation_id=parsed.conversation_id,
-            continuity_id=parsed.continuity_id,
-            thread_id=parsed.thread_id,
-            recall_scope=parsed.recall_scope,
-            disclosure_scope=parsed.disclosure_scope,
-            address_mode=parsed.address_mode,
-            familiarity=parsed.familiarity,
-            response_policy=parsed.response_policy,
-            text=text or "",
-            trace_id=parsed.trace_id or "",
-            actor_id=model_input.get("actor_id") if isinstance(model_input, dict) else None,
-            actor_name=model_input.get("actor_name") if isinstance(model_input, dict) else None,
-            model_input=model_input if isinstance(model_input, dict) else None,
-            origin=parsed.origin,
-            retention_ceiling=parsed.retention_ceiling,
-            interaction_id=parsed.interaction_id,
-        ))
-        try:
-            if parsed.address_mode == "direct":
-                activity.engage("direct_perception")
-            else:
-                activity.observe_activity("ambient_perception")
-        except Exception as exc:
-            logger.warning("感知入站唤醒处理失败", error=str(exc))
-        cycle.notify_external_input()
-        return None
-
-    async def on_heartbeat() -> dict[str, str]:
-        return {"status": "alive"}
-
-    async def on_config_init(message: dict) -> dict[str, str]:
-        logger.info(
-            "收到 config_init 请求，Cognition 通信通道可用",
-            trace_id=message.get("trace_id"),
-        )
-        return {"status": "ok"}
-
-    bridge.register_handler(IPCMessageType.PERCEPTION_MESSAGE, on_perception)
-    bridge.register_handler(IPCMessageType.LIFE_HEARTBEAT, lambda _message: on_heartbeat())
-    bridge.register_handler(
-        IPCMessageType.KNOWLEDGE_INIT,
-        lambda message: inbound.on_knowledge_init(ingress.parse_knowledge_init(message)),
-    )
-    bridge.register_handler(
-        IPCMessageType.AGENT_PLAN,
-        lambda message: inbound.on_agent_plan(ingress.parse_agent_plan(message)),
-    )
-    bridge.register_handler(
-        IPCMessageType.AGENT_SYNTHESIS,
-        lambda message: inbound.on_agent_synthesis(ingress.parse_agent_synthesis(message)),
-    )
-    bridge.register_handler(
-        IPCMessageType.CONVERSATION_HISTORY,
-        lambda message: inbound.on_conversation_history(ingress.parse_conversation_history(message)),
-    )
-    bridge.register_handler(IPCMessageType.CONFIG_INIT, on_config_init)
-    bridge.register_handler("heartbeat", lambda _message: on_heartbeat())

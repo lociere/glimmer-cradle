@@ -2,9 +2,11 @@
 from abc import ABC, abstractmethod
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanOutput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput, AgentSynthesisOutput
-from glimmer_cradle.cognition.protocol.generated.ipc.conversation_history_payload import ConversationHistoryPayload
-from glimmer_cradle.cognition.protocol.generated.models.conversation_history_result import ConversationHistoryResult
-from glimmer_cradle.cognition.protocol.generated.ipc.knowledge_init_payload import KnowledgeBaseInitPayload
+from glimmer_cradle.cognition.ports.kernel.models import (
+    ConversationHistoryQuery,
+    ConversationHistoryResult,
+    KnowledgeInitialization,
+)
 
 
 class KernelRequestPort(ABC):
@@ -16,7 +18,7 @@ class KernelRequestPort(ABC):
     @abstractmethod
     async def on_knowledge_init(
         self,
-        knowledge_base: KnowledgeBaseInitPayload,
+        knowledge_base: KnowledgeInitialization,
     ) -> None:
         """
         接收内核注入的知识库
@@ -42,7 +44,7 @@ class KernelRequestPort(ABC):
     @abstractmethod
     async def on_conversation_history(
         self,
-        payload: ConversationHistoryPayload,
+        payload: ConversationHistoryQuery,
     ) -> ConversationHistoryResult:
         """读取可重建 Conversation 投影的历史页。"""
         pass

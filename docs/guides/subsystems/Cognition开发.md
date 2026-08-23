@@ -1,6 +1,6 @@
 # Cognition 开发
 
-> 适用场景：修改人格、情绪、觉醒、经历、记忆、上下文、推理、LLM、认知循环、Agent plan/synthesis、Kernel IPC 或 Cognition 持久化。
+> 适用场景：修改人格、情绪、觉醒、经历、记忆、上下文、推理、LLM、认知循环、Agent plan/synthesis、Kernel Service 或 Cognition 持久化。
 > 前置条件：已读 [Cognition 当前视图](../../architecture/current/07-子系统当前视图/Cognition.md) 与 [Cognition 认知核实现](../../architecture/implementation/Cognition认知核实现.md)。
 
 ## 改动路径
@@ -8,8 +8,8 @@
 | 任务 | 主要文件/目录 |
 |---|---|
 | 进程入口/组装 | `host/process.py`、`host/composition.py` |
-| 入站 Kernel 感知 | `ports/kernel/inbound/` |
-| 出站 Kernel 行动 | `ports/kernel/outbound/` |
+| Kernel Service Adapter | `adapters/kernel/` |
+| Kernel 应用 Port | `ports/kernel/` |
 | 认知主循环 | `cycle/controller.py`、`perception_queue.py`、`workspace.py` |
 | Volition/巩固 | `cycle/volition/`、`memory/consolidation.py`、`experience/episodes.py` |
 | 上下文 | `context/assembly.py`、`context/sources/` |
@@ -17,12 +17,12 @@
 | 记忆/知识 | `memory/`、`memory/storage/` |
 | 经历 | `experience/` |
 | 身份/人格/情绪/觉醒 | `identity/`、`persona/`、`affect/` |
-| 契约投影 | `protocol/generated/` |
+| Kernel–Cognition 契约投影 | `contracts/generated/python/glimmer/`（只在 Adapter 使用） |
 
 ## 标准步骤
 
 1. 判断改动是否属于心智语义；平台 IO、窗口、权限、进程不应放进 Cognition。
-2. 若入出站 payload 改变，先改 `protocol/src/schemas/` 并运行 `pnpm sync:contracts`。
+2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/` 并运行 `pnpm contracts:generate` / `pnpm contracts:verify`。
 3. 找到唯一主线：感知应进入 `CycleController`，不要新增并行聊天回复路径。
 4. 对上下文来源写清 owner、成本、排序、预算和失败语义。
 5. 对记忆/经历改动写清持久化 owner、迁移、回滚和 trace。
@@ -50,13 +50,13 @@
 ## 排障顺序：输入进来但无回复
 
 1. Kernel 是否把感知发到 Cognition。
-2. `ports/kernel/inbound/` 是否解析成功。
+2. `adapters/kernel/` 是否通过 generation 校验并完成 DTO mapping。
 3. `PerceptionEventQueue` 是否收到。
 4. `CycleController` 是否 tick。
 5. context assembly 是否产生可用上下文。
 6. ReasoningService/LLMEngine 是否返回。
 7. Volition 是否拒绝行动。
-8. outbound bridge 是否把 action 发回 Kernel。
+8. `KernelControlService.PublishAction` 是否把 action 发回 Kernel。
 9. Kernel 是否投影到 Channel/Desktop/Avatar。
 
 ## 验证
@@ -66,11 +66,11 @@ cd core/cognition
 uv run pytest -q
 ```
 
-涉及 Protocol 时：
+涉及 Kernel–Cognition Contract Spine 时：
 
 ```powershell
-pnpm sync:contracts
-pnpm --filter @glimmer-cradle/protocol typecheck
+pnpm contracts:generate
+pnpm contracts:verify
 ```
 
 涉及数据库/迁移时验证空态、旧样本、坏样本、重复迁移和回滚。涉及 provider 时验证超时、限流、空响应和错误脱敏。

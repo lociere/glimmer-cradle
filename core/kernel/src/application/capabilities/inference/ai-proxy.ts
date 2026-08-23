@@ -2,53 +2,50 @@
  * AIProxy — Cognition 认知能力的统一 Promise 门面
  * 上层模块仅依赖该门面，不感知 IPC/子进程通信细节。
  */
-import {
+import type { PerceptionEvent } from '../../../ports/application-models';
+import type {
   AgentPlanRequest,
   AgentPlanResponse,
   AgentSynthesisRequest,
   AgentSynthesisResponse,
-  ChatMessageResponse,
-  LifeHeartbeatRequest,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
-  PerceptionEvent,
-} from "@glimmer-cradle/protocol";
-import { CognitionManager } from "./cognition-manager";
+  PerceptionOperationHandle,
+} from "../../../ports/cognition-service-port";
+export interface CognitionApplicationPort {
+  readonly isReady: boolean;
+  sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle>;
+  cancelPerception(request: PerceptionCancelRequest): Promise<void>;
+  sendAgentPlan(request: AgentPlanRequest, traceId?: string): Promise<AgentPlanResponse>;
+  sendAgentSynthesis(request: AgentSynthesisRequest, signal?: AbortSignal): Promise<AgentSynthesisResponse>;
+  sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse>;
+}
 
 export class AIProxy {
-  private static _instance: AIProxy | null = null;
-
-  public static get instance(): AIProxy {
-    if (!AIProxy._instance) {
-      AIProxy._instance = new AIProxy();
-    }
-    return AIProxy._instance;
-  }
-
-  private constructor() {}
+  public constructor(private readonly cognition: CognitionApplicationPort) {}
 
   public get isReady(): boolean {
-    return CognitionManager.instance.isReady;
+    return this.cognition.isReady;
   }
 
-  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse> {
-    return CognitionManager.instance.sendPerceptionMessage(request, traceId);
+  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle> {
+    return this.cognition.sendPerceptionMessage(request, traceId);
   }
 
   public async cancelPerception(request: PerceptionCancelRequest): Promise<void> {
-    await CognitionManager.instance.cancelPerception(request);
+    await this.cognition.cancelPerception(request);
   }
 
   public async requestAgentPlan(request: AgentPlanRequest, traceId?: string): Promise<AgentPlanResponse> {
-    return CognitionManager.instance.sendAgentPlan(request, traceId);
+    return this.cognition.sendAgentPlan(request, traceId);
   }
 
-  public async requestAgentSynthesis(request: AgentSynthesisRequest): Promise<AgentSynthesisResponse> {
-    return CognitionManager.instance.sendAgentSynthesis(request);
+  public async requestAgentSynthesis(request: AgentSynthesisRequest, signal?: AbortSignal): Promise<AgentSynthesisResponse> {
+    return this.cognition.sendAgentSynthesis(request, signal);
   }
 
-  public async sendLifeHeartbeat(request: LifeHeartbeatRequest): Promise<LifeHeartbeatResponse> {
-    return CognitionManager.instance.sendLifeHeartbeat(request);
+  public async sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse> {
+    return this.cognition.sendLifeHeartbeat(request);
   }
 
 }

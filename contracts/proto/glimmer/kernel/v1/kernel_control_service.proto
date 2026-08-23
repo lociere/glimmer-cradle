@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package glimmer.kernel.v1;
+
+import "glimmer/common/v1/service_contract.proto";
+import "glimmer/cognition/v1/cognition_service.proto";
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Kernel.V1";
+
+message RegisterCognitionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string endpoint = 2;
+  int64 process_id = 3;
+  int64 supervisor_process_id = 4;
+  string registration_nonce = 5;
+  bytes auth_proof = 6;
+}
+
+message RegisterCognitionResponse {
+  string generation = 1;
+  bool accepted = 2;
+}
+
+message PublishStateRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  google.protobuf.Struct state = 2;
+}
+
+message PublishStateResponse {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}
+
+message PublishLogRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string level = 2;
+  string message = 3;
+  google.protobuf.Struct attributes = 4;
+}
+
+message ReplyMessage {
+  int32 sequence = 1;
+  string content_type = 2;
+  string text = 3;
+  string language = 4;
+}
+
+message MediaItem {
+  string type = 1;
+  string uri = 2;
+  string mime_type = 3;
+}
+
+message SkillRequest {
+  string original_goal = 1;
+  string capability_kind = 2;
+  double confidence = 3;
+  string reason = 4;
+  string planning_hint = 5;
+  glimmer.cognition.v1.ConversationContext conversation = 6;
+}
+
+message PublishLogResponse {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}
+
+message PublishActionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string action_type = 2;
+  string target_scene_id = 3;
+  string channel_hint = 4;
+  string text = 5;
+  repeated ReplyMessage messages = 6;
+  repeated MediaItem items = 7;
+  SkillRequest skill_request = 8;
+  google.protobuf.Struct emotion_state = 9;
+}
+
+message PublishActionResponse {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}
+
+service KernelControlService {
+  rpc RegisterCognition(RegisterCognitionRequest) returns (RegisterCognitionResponse);
+  rpc PublishState(PublishStateRequest) returns (PublishStateResponse);
+  rpc PublishLog(PublishLogRequest) returns (PublishLogResponse);
+  rpc PublishAction(PublishActionRequest) returns (PublishActionResponse);
+}

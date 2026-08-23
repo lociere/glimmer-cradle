@@ -17,7 +17,7 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 | `glimmer-cradle-napcat-adapter/` | 独立第三方 Adapter 示例；依赖 NapCat/QQ，不属于第一方扩展集合 |
 | `data/packages/extensions/<extension-id>/<version>/` | Extension Host 唯一运行期发现目录，只保存已构建发布投影 |
 | `data/packages/managed-resources/<extension-id>/` | 扩展声明并由 Host 管理的第三方程序包 |
-| `core/kernel/src/host/` | Extension Host、激活、权限、Port 实现 |
+| `core/kernel/src/application/extension-supervision/ 与 core/kernel/src/adapters/extension-host/` | Extension Host、激活、权限、Port 实现 |
 | `core/kernel/src/application/skill-plane/` | Skill Plane catalog、policy、gateway、provider |
 
 跨进程、跨仓库且需要序列化和版本化的 Extension Manifest、Host 消息、包、Release 与 Registry 格式只由 `@glimmer-cradle/protocol` 定义。Kernel 只依赖 Protocol，并拥有安装验证、权限裁决、生命周期、进程监督和内部 Port；`@glimmer-cradle/extension-sdk` 依赖并复用 Protocol，只为扩展作者提供函数式 API 与便利封装。Kernel、Products 与 Protocol 不依赖 Extension SDK。

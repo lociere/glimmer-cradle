@@ -2,9 +2,18 @@
   "name": "@glimmer-cradle/contracts",
   "version": "0.1.8",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
+  "main": "dist/glimmer/common/v1/contract_probe_pb.js",
+  "exports": {
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    }
+  },
   "scripts": {
     "generate": "node scripts/generate.mjs",
+    "build": "tsc -p tsconfig.build.json",
     "baseline:refresh": "node scripts/refresh-baselines.mjs",
     "test:gates": "node --test tests/gates/*.test.mjs",
     "lint:proto": "buf lint",

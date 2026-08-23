@@ -24,6 +24,7 @@ from glimmer_cradle.cognition.cycle.volition import (
     threshold_for,
 )
 from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace, WorkspaceItem
+from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.observability.logger import get_logger
 from glimmer_cradle.cognition.observability.metrics import counter, gauge
 from glimmer_cradle.cognition.observability.tracer import span
@@ -53,6 +54,7 @@ class CycleController:
         self_entity=None,
         conversation=None,
         multimodal_router=None,
+        perception_operations: PerceptionOperationRegistry | None = None,
     ) -> None:
         self._ws = workspace
         self._providers: list[Provider] = list(providers)
@@ -92,6 +94,8 @@ class CycleController:
         self._cycle_count: int = 0
         self._last_arbitration: ArbitrationResult | None = None
         self._turn = CycleTurn()
+        self._perception_operations = perception_operations
+        self._active_perception_trace = ""
 
     # ── 启停 ──────────────────────────────────────────────────────────────
 
@@ -136,7 +140,15 @@ class CycleController:
                 except asyncio.TimeoutError:
                     pass
                 self._tick_requested.clear()
-                await self.tick_once()
+                tick_task = asyncio.create_task(self.tick_once())
+                try:
+                    await tick_task
+                except asyncio.CancelledError:
+                    if not self._running:
+                        tick_task.cancel()
+                        raise
+                    # 单个感知被取消只终止当前 tick，循环继续服务后续输入。
+                    continue
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -158,13 +170,28 @@ class CycleController:
     async def tick_once(self) -> None:
         """跑一拍（外部可直调，便于测试与离线重放）。"""
         self._cycle_count += 1
-        # 每拍开新 trace + 根 span
-        with TraceContext(new_trace_id()):
-            with span("cognitive_cycle", attributes={"cycle": self._cycle_count}) as cycle:
-                broadcast_item = await self._do_tick()
-                if broadcast_item is not None:
-                    cycle.set_attribute("broadcast_source", broadcast_item.source)
-                    cycle.set_attribute("broadcast_salience", float(broadcast_item.salience))
+        self._active_perception_trace = ""
+        try:
+            # 每拍开新 trace + 根 span
+            with TraceContext(new_trace_id()):
+                with span("cognitive_cycle", attributes={"cycle": self._cycle_count}) as cycle:
+                    broadcast_item = await self._do_tick()
+                    if broadcast_item is not None:
+                        cycle.set_attribute("broadcast_source", broadcast_item.source)
+                        cycle.set_attribute("broadcast_salience", float(broadcast_item.salience))
+                        trace_id = self._perception_trace(broadcast_item)
+                        if trace_id and self._perception_operations is not None:
+                            self._perception_operations.finish(trace_id, "succeeded")
+        except asyncio.CancelledError:
+            if self._active_perception_trace and self._perception_operations is not None:
+                self._perception_operations.finish(self._active_perception_trace, "cancelled", "感知操作已取消")
+            raise
+        except Exception:
+            if self._active_perception_trace and self._perception_operations is not None:
+                self._perception_operations.finish(self._active_perception_trace, "failed", "认知循环处理失败")
+            raise
+        finally:
+            self._active_perception_trace = ""
 
     async def _do_tick(self) -> WorkspaceItem | None:
         self._turn = CycleTurn()
@@ -189,8 +216,17 @@ class CycleController:
             for items in results:
                 for item in items:
                     proposed_total += 1
-                    if await self._ws.propose(item):
+                    accepted, evicted = await self._ws.propose_with_eviction(item)
+                    if accepted:
                         accepted_total += 1
+                    elif item.source == "perception" and self._perception_operations is not None:
+                        trace_id = self._perception_trace(item)
+                        if trace_id:
+                            self._perception_operations.finish(trace_id, "failed", "感知未通过工作区竞争")
+                    if evicted is not None and evicted.source == "perception" and self._perception_operations is not None:
+                        trace_id = self._perception_trace(evicted)
+                        if trace_id:
+                            self._perception_operations.finish(trace_id, "failed", "感知被更高优先级输入淘汰")
             s_compete.set_attribute("proposed", proposed_total)
             s_compete.set_attribute("accepted", accepted_total)
             counter("cognition.propose", proposed_total, labels={"phase": "compete"})
@@ -201,6 +237,17 @@ class CycleController:
         with span("broadcast") as s_bc:
             broadcast_item = await self._ws.broadcast()
             s_bc.set_attribute("has_content", broadcast_item is not None)
+        trace_id = self._perception_trace(broadcast_item)
+        if trace_id and self._perception_operations is not None:
+            self._active_perception_trace = trace_id
+            operation = self._perception_operations.get_by_trace(trace_id)
+            if operation is not None and operation.state == "cancelled":
+                if broadcast_item is not None:
+                    await self._ws.remove(broadcast_item.item_id)
+                raise asyncio.CancelledError
+            task = asyncio.current_task()
+            if task is not None:
+                self._perception_operations.mark_running(trace_id, task)
 
         # Deliberate：结构化规划后生成角色回复或能力请求。
         with span("deliberate") as s_delib:
@@ -261,6 +308,12 @@ class CycleController:
             return
         if await self._ws.remove(broadcast_item.item_id):
             counter("cognition.workspace_consumed", 1, labels={"source": "perception"})
+
+    @staticmethod
+    def _perception_trace(item: WorkspaceItem | None) -> str:
+        if item is None or item.source != "perception" or not isinstance(item.content, dict):
+            return ""
+        return str(item.content.get("trace_id") or "")
 
     async def _safe_propose(
         self, provider: Provider, snapshot: list[WorkspaceItem]

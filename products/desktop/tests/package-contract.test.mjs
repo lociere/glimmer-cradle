@@ -73,10 +73,15 @@ test('Desktop package 在 clean Windows owner task 准备六类 runtime projecti
     assert.match(line, /@[0-9a-f]{40}(?:\s|$)/);
   }
   assert.match(runtimeScript, /pythonVersion = '3\.12\.13'/);
-  assert.match(runtimeScript, /core\/cognition\/uv\.lock/);
-  assert.match(runtimeScript, /engines\/audio\/uv\.lock/);
+  assert.match(runtimeScript, /products\/desktop\/runtime-python\/uv\.lock/);
+  assert.match(runtimeScript, /contracts\/pyproject\.toml/);
+  assert.match(runtimeScript, /glimmer\.cognition\.v1/);
+  assert.match(runtimeScript, /glimmer_cradle\.cognition\.host\.process', '--help'/);
   assert.match(runtimeScript, /--frozen/);
   assert.match(runtimeScript, /kernel', 'node_modules/);
+  assert.doesNotMatch(runtimeScript, /deploy', '--legacy'/);
+  assert.match(runtimeScript, /--config\.node-linker=hoisted/);
+  assert.match(runtimeScript, /CognitionService\.typeName/);
   for (const component of ['kernel', 'cognition', 'audio', 'avatar', 'extension-host', 'native']) {
     assert.match(prepareScript, new RegExp(`id: '${component}'`));
   }

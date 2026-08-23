@@ -15,10 +15,10 @@ import AvatarConfig from './schemas/config/AvatarConfig.schema.json';
 import CharacterManifestConfig from './schemas/config/CharacterManifestConfig.schema.json';
 import CharacterProfileConfig from './schemas/config/CharacterProfileConfig.schema.json';
 import CognitionConfig from './schemas/config/CognitionConfig.schema.json';
+import CognitionServiceConfig from './schemas/config/CognitionServiceConfig.schema.json';
 import DialoguePolicyConfig from './schemas/config/DialoguePolicyConfig.schema.json';
 import EmbeddingConfig from './schemas/config/EmbeddingConfig.schema.json';
 import ExtensionConfig from './schemas/config/ExtensionConfig.schema.json';
-import IPCConfig from './schemas/config/IPCConfig.schema.json';
 import IngressGateConfig from './schemas/config/IngressGateConfig.schema.json';
 import InferenceConfig from './schemas/config/InferenceConfig.schema.json';
 import KnowledgeBaseConfig from './schemas/config/KnowledgeBaseConfig.schema.json';
@@ -39,10 +39,10 @@ export const ConfigSchemas = {
   CharacterManifestConfig,
   CharacterProfileConfig,
   CognitionConfig,
+  CognitionServiceConfig,
   DialoguePolicyConfig,
   EmbeddingConfig,
   ExtensionConfig,
-  IPCConfig,
   IngressGateConfig,
   InferenceConfig,
   KnowledgeBaseConfig,

@@ -132,7 +132,7 @@ posts.forEach((post) => console.log(post.title));
 
 def test_knowledge_init_rejects_legacy_persona_compile_fields() -> None:
     from pydantic import ValidationError
-    from glimmer_cradle.cognition.protocol.generated.ipc.knowledge_init_payload import KnowledgeInitPayload
+    from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
 
     legacy_scope = "person" + "a"
     legacy_compile_field = "compile" + "_group"
@@ -159,7 +159,7 @@ def test_knowledge_init_rejects_legacy_persona_compile_fields() -> None:
     }
 
     try:
-        KnowledgeInitPayload.model_validate(payload)
+        KnowledgeInitialization.model_validate(payload["knowledge_base"])
     except ValidationError as exc:
         message = str(exc)
         assert "scope" in message

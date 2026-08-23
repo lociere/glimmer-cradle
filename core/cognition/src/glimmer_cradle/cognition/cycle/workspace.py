@@ -125,18 +125,26 @@ class GlobalWorkspace:
         - 容量已满：若新项注意力排序高于现存最低，则淘汰最低、接纳新项
         - 否则拒收
         """
+        accepted, _evicted = await self.propose_with_eviction(item)
+        return accepted
+
+    async def propose_with_eviction(
+        self,
+        item: WorkspaceItem,
+    ) -> tuple[bool, WorkspaceItem | None]:
+        """投入候选，并把竞争中被淘汰的旧项交还给生命周期 owner。"""
         async with self._lock:
             self._prune_expired_locked(_now_utc())
             if len(self._items) < self._capacity:
                 self._items.append(item)
-                return True
+                return True, None
             # 找最低
             min_idx = min(range(len(self._items)), key=lambda i: _attention_rank(self._items[i]))
             if _attention_rank(item) > _attention_rank(self._items[min_idx]):
-                self._items.pop(min_idx)
+                evicted = self._items.pop(min_idx)
                 self._items.append(item)
-                return True
-            return False
+                return True, evicted
+            return False, None
 
     async def broadcast(self) -> WorkspaceItem | None:
         """取本拍的"意识内容" —— 当前 salience 最高的项。空时返回 None。"""
@@ -157,6 +165,20 @@ class GlobalWorkspace:
         async with self._lock:
             before = len(self._items)
             self._items = [it for it in self._items if it.item_id != item_id]
+            return len(self._items) != before
+
+    async def remove_perception(self, trace_id: str) -> bool:
+        """按感知 trace 移除尚未完成的工作区输入。"""
+        async with self._lock:
+            before = len(self._items)
+            self._items = [
+                item for item in self._items
+                if not (
+                    item.source == "perception"
+                    and isinstance(item.content, dict)
+                    and item.content.get("trace_id") == trace_id
+                )
+            ]
             return len(self._items) != before
 
     async def prune_expired(self) -> int:

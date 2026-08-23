@@ -8,6 +8,10 @@ const violations = [];
 const removedWorkspaceFiles = [
   'protocol/project.json',
   'core/kernel/project.json',
+  'core/kernel/src/foundation',
+  'core/kernel/src/host',
+  'core/kernel/src/infrastructure',
+  'core/kernel/src/lifecycle',
   'products/desktop/project.json',
   'core/desktop',
   'extensions',
@@ -77,10 +81,9 @@ const requiredWorkspaceDirectories = [
   'core/kernel/src/application',
   'core/kernel/src/composition',
   'core/kernel/src/domain',
-  'core/kernel/src/foundation',
-  'core/kernel/src/host',
-  'core/kernel/src/infrastructure',
-  'core/kernel/src/lifecycle',
+  'core/kernel/src/ports',
+  'core/kernel/src/adapters',
+  'core/kernel/src/runtime',
   'core/cognition/src/glimmer_cradle/cognition',
   'engines/audio/src/glimmer_cradle/audio',
   'protocol/codegen',
@@ -303,6 +306,9 @@ if (/pnpm\s+deploy[^\n]*--legacy/.test(personalServerDockerfile)) {
   violations.push('deploy/personal-server/Dockerfile: 不得使用回查 registry 的 legacy deploy');
 }
 if ((personalServerDockerfile.match(/WORKDIR \/opt\/glimmer-cradle\/app/g) ?? []).length < 2
+  || !personalServerDockerfile.includes('COPY contracts/package.json contracts/package.json')
+  || !personalServerDockerfile.includes('pnpm --filter @glimmer-cradle/contracts build')
+  || !personalServerDockerfile.includes('COPY contracts contracts')
   || !personalServerDockerfile.includes(
     'COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/core/cognition core/cognition',
   )

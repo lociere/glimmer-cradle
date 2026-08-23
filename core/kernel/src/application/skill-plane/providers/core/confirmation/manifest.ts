@@ -1,4 +1,4 @@
-import type { SkillDescriptor } from '../../../types';
+import type { SkillDescriptor } from '../../../../../ports/skill-plane.port';
 import { CORE_CONTRACT_METADATA, CORE_SKILL_PROVIDER, createPolicy } from '../shared';
 import { confirmationTools } from './tools';
 

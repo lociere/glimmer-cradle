@@ -1,5 +1,5 @@
-import type { SkillDescriptor } from '../../../types';
-import type { CorePlatformBridge } from '../core-platform-bridge';
+import type { SkillDescriptor } from '../../../../../ports/skill-plane.port';
+import type { CorePlatformBridge } from '../../../../../ports/skill-plane.port';
 import { CORE_CONTRACT_METADATA, CORE_READY_METADATA, CORE_SKILL_PROVIDER, createPolicy } from '../shared';
 import { clipboardTools, createClipboardTools } from './tools';
 

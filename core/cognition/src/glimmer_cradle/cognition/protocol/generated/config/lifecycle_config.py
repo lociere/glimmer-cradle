@@ -18,10 +18,24 @@ class LifecycleConfig(BaseModel):
         30000, description='模块停止总超时（ms）', ge=1000
     )
     module_start_order: list[str] | None = Field(
-        ['config', 'persistence', 'ipc', 'cognition', 'extensions', 'life_clock'],
+        [
+            'config',
+            'persistence',
+            'kernel-transport',
+            'cognition',
+            'extensions',
+            'life_clock',
+        ],
         description='模块启动顺序（按数组顺序依次启动）',
     )
     module_stop_order: list[str] | None = Field(
-        ['life_clock', 'extensions', 'cognition', 'ipc', 'persistence', 'config'],
+        [
+            'life_clock',
+            'extensions',
+            'cognition',
+            'kernel-transport',
+            'persistence',
+            'config',
+        ],
         description='模块停止顺序（按数组顺序依次停止）',
     )

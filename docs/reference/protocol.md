@@ -1,7 +1,7 @@
 # Protocol Reference
 
 > 范围：跨语言、跨进程和公开 SDK 契约的权威规则，包括 Schema、生成物、事件、错误、Avatar frame 和变更流程。
-> 事实依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/codegen/`、M12 Slice 1 `contracts/{proto,json-schema,compatibility,generated}/` 与当前 runtime 消费端。
+> 事实依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/codegen/`、`contracts/{proto,json-schema,compatibility,generated}/` 与当前 runtime 消费端。
 > 维护触发：Schema、事件、IPC/WS frame、错误码、config schema、codegen、兼容策略或任一跨边界消费者变化。
 
 ## 目录
@@ -20,14 +20,13 @@
 
 - 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
 - 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
-- Slice 1 只建立 canonical baseline，没有 runtime consumer 已迁移；不得把同一结构同时复制为旧 Protocol 与新 Contracts 权威定义。
+- Kernel↔Cognition 已在 Slice 2 迁移；该边界只能由 `contracts/proto/glimmer/{common,kernel,cognition}/v1/` 定义，不得恢复旧 Protocol 镜像。
 
 现有 runtime Protocol 的生成投影和消费端包括：
 
 | 目录 | 角色 |
 |---|---|
 | `protocol/src/schemas/models/` | 领域共享模型，如 perception、action、memory、avatar frame |
-| `protocol/src/schemas/ipc/` | Kernel 与 Cognition 等 IPC envelope/payload |
 | `protocol/src/schemas/config/` | 配置结构的可校验契约 |
 | `protocol/src/schemas/enums/` | 跨语言枚举，如 error、moment、metric |
 | `protocol/src/generated/` | TypeScript 生成物，只读 |
@@ -37,34 +36,34 @@
 
 禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新其实际 owner。
 
-## M12 Slice 1 Contracts Baseline
+## M12 Contracts Baseline 与 Slice 2 Service
 
-M12 Slice 1 已建立长期 `contracts/` baseline，但尚未切换任何运行主线。当前查表规则如下：
+M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔Cognition 运行主线。当前查表规则如下：
 
 | 路径 | 当前状态 | 规则 |
 |---|---|---|
-| `contracts/proto/` | canonical Protobuf Service baseline | 新跨进程可调用能力的目标 IDL；Slice 1 只包含最小 `ContractProbeService`。 |
+| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService` 与已运行的 `CognitionService` / `KernelControlService` v1。 |
 | `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；Slice 1 只包含最小 Skill tool parameters Document。 |
-| `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；当前 runtime consumer 不 import。 |
+| `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 已消费对应生成物。 |
 | `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
 | `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
 
-迁移期必须明确区分：`contracts/` 是已落地的 baseline，`protocol/` 仍是运行事实。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力由 `contracts/` 拥有，其他尚未迁移运行结构仍由 `protocol/` 拥有。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
 
 ## Accepted 目标与当前差距
 
-[ADR-0013：契约脊柱与跨进程服务架构](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 已接受长期目标，[M12](../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 已开始 Slice 1 baseline，但 runtime 目标尚未落地：
+[ADR-0013：契约脊柱与跨进程服务架构](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 已接受长期目标，[M12](../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 已落地 Slice 1 与 Slice 2；其他 runtime 边界仍待后续切片：
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| 运行权威目录仍是 `protocol/src/schemas/`；baseline 已在 `contracts/` | 重建为 `contracts/` 契约脊柱并删除旧 `protocol/` |
-| JSON Schema 同时覆盖共享模型、IPC、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有配置、Character Package、Extension manifest/package、动态 Skill/tool 参数等文档契约 |
-| Kernel ↔ Cognition 使用 ZMQ 自制 RPC，部分 Engine 使用 stdio 命令协议，Surface/Host 存在手写 WebSocket 链路 | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
+| Kernel↔Cognition 已由 `contracts/` 权威定义；其他运行结构仍在 `protocol/` | 所有边界迁移后删除旧 `protocol/` |
+| 尚未迁移的 JSON Schema 仍覆盖共享模型、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有文档契约 |
+| Kernel ↔ Cognition 已使用 gRPC；部分 Engine 仍使用 stdio，Surface/Host 仍有手写 WebSocket | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
 | 大对象主要依赖资源引用、路径投影或现有帧约定 | control/data plane 分离，使用 typed reference、stream、Blob lease 或经验证的数据通道 |
 | 兼容主要依赖 Schema 同步、类型/测试与旧字段搜索 | 增加 Buf breaking、JSON Schema compatibility、TS/Python/C# round-trip 和 Adapter contract test |
 
-迁移前，下面所有字段、目录、命令和验证仍以“当前事实”执行。不得提前创建手写 Protobuf/JSON Schema 双份消息，也不得把 gRPC/Connect 目标当成已经可用。迁移完成后必须删除 ZMQ 自制 RPC、被替代的 stdio/手写 WebSocket 主线和 `protocol/`，不保留无退出条件双轨。
+后续切片仍必须以各边界当前事实执行，不得创建手写 Protobuf/JSON Schema 镜像。Kernel↔Cognition 旧 ZMQ/envelope 主线已经过删除门，不得作为 fallback 恢复；全部切片迁移完成后再删除其余 `protocol/`。
 
 ## 消息与事件规则
 
@@ -78,7 +77,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，但尚未切换任何运行�
 
 | 契约族 | 典型用途 | 变更关注点 |
 |---|---|---|
-| `KernelMessageEnvelope` / IPC payload | Kernel 与 Cognition 的消息包络 | 必填性、错误 code、trace、版本迁移 |
+| `CognitionService` / `KernelControlService` | Kernel 与 Cognition 的版本化请求、查询与回调 | deadline、cancellation、typed error、trace/causation/correlation、generation、幂等 |
 | `PerceptionEvent` / `ActionCommand` | 感知输入和行动语义 | 不暴露平台原始 payload；语义由 Cognition 解释 |
 | `CognitiveActivitySnapshot` / emotion model | 认知资源调度、情绪和表现投影 | 调度与 Affect 分离，不让 renderer 反推人格状态 |
 | `PresentationDownstreamFrame` / `PresentationUpstreamFrame` | Desktop/Avatar 消息 | `host_hello`、`host_ready`、`character_presentation_projection`、reply、emotion、audio、presentation 区分；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
@@ -87,6 +86,32 @@ M12 Slice 1 已建立长期 `contracts/` baseline，但尚未切换任何运行�
 | `SkillCatalogSnapshot` | Kernel 给 Desktop/Control Center 的 Skill Plane 目录与 provider runtime 投影 | 只暴露 character audience skill/tool/resource/prompt；`providerRuntimes` 补充 core / extension / MCP / user provider 的连接、契约-only、降级与恢复动作 |
 | config schemas | YAML/JSON 配置校验 | 默认值来源、normalizer、密钥边界 |
 | enums/error codes | 跨语言错误和状态分类 | 稳定命名、禁止局部字符串分叉 |
+
+`SubmitPerception` 返回的是受管 operation，不是“已处理”回执。Kernel 通过
+`GetPerceptionOperation` 观察 `accepted -> running -> succeeded/cancelled/failed`，只在真实终态
+清理 in-flight；`CancelPerception` 同时移除尚未竞争的队列/工作区输入，或取消正在执行的
+Cycle/推理 task。队满、工作区拒绝或被更高优先级输入淘汰都必须写入 `failed`，不能留下永久
+pending。重复提交先按稳定 `operation_id` 判定；同一 operation 绑定不同 trace，或同一 trace
+改用不同 operation，均返回 `INVALID_REQUEST`，不能把冲突请求误判为幂等命中。
+
+`PublishAction` 是 Cognition 到 Kernel 的反向终态调用。Kernel 持有 deadline 并把客户端取消或
+deadline 传播为 `AbortSignal`，贯穿工具调用与 `Synthesize` gRPC；取消不是合成失败，不能发布
+fallback reply。Skill Plane 从 action operation 派生稳定 invocation id，并以步骤账本记录工具与
+reply 的 committed 状态：提交后的重试只恢复未完成步骤，不能重复副作用；终态不明的不可逆
+provider 返回“需要人工恢复”，拒绝自动重放。响应只允许 `completed` 或 `duplicate`；transport
+只有在 handler 正常完成或步骤账本确认副作用已提交后才记录幂等完成，并发同键调用合并为一次
+执行。typed failure 通过 gRPC status 与 `ServiceErrorDetail` 的完整受控 `CallMetadata` 返回，对外
+message 不携带内部异常。不可安全重放固定使用 `RECOVERY_REQUIRED`，并由
+`recovery_actions=[CONFIRM_SIDE_EFFECT_STATE]` 与 `operation_id` 给出可程序化恢复投影；Desktop
+response、Control Surface、Skill Action、Kernel Service 与 Python client 都按这些稳定字段映射，
+不得解析 message 判定恢复语义。
+
+Cognition 注册使用 Kernel 通过匿名 bootstrap pipe 单次交付的 nonce/capability secret。HMAC
+proof 绑定 generation、nonce、Cognition 动态回环 endpoint、Service PID 与受监督子进程 PID；
+注册成功或任一注册校验失败都立即清零并作废 secret/nonce。PID 字段只参与已认证 proof 和监督树
+关系校验，不再被当作独立身份凭据。分配下一世代前会先原地清零旧 secret Buffer 并拒绝旧注册
+waiter；启动失败、未取得 PID、无 child 的提前 stop、child error/exit 与正常 stop 都统一撤销
+本代 endpoint/capability。
 
 `PerceptionEvent` 的寻址和响应策略分层表达：
 
@@ -105,7 +130,7 @@ scope 当前稳定值为 `conversation_private`、`actor_private`、`space_local
 
 `PerceptionEvent.content.actor_id` / `actor_name` 是可选语义发言者字段。`actor_id` 必须是 Adapter 归一化后的稳定 ID，不得使用 QQ 号、平台 user id 等原始私有标识；`actor_name` 只用于关系观察、近期经历可读性和上下文说明。
 
-Kernel 入站、注意力批处理和 Cognition IPC 全程使用同一份 `PerceptionEvent`，不得再定义字段更少的 IPC 感知结构。批处理必须保留 `trace_id`、`origin` 与 `retention_ceiling`；混合不同留存上限时采用最严格值，避免批处理扩大认知留存权限。
+Kernel 入站、注意力批处理和 Cognition Service 全程保留同一份感知语义，不得在 Transport 定义字段更少的替代模型。批处理必须保留 `trace_id`、`origin` 与 `retention_ceiling`；混合不同留存上限时采用最严格值，避免批处理扩大认知留存权限。
 
 `ActionCommand.action_type` 当前包含 `reply`、`recall`、`react`、`skill_request` 和 `noop`。其中 `skill_request` 是 Cognition 在普通对话主线中请求使用 Skill Plane 的稳定行动契约：`payload.skill_request.original_goal` 保存原始目标或整理后的目标，`capability_kind` 与 `confidence` 来自 Cognition 内部结构化 ActionPlan，`reason` 保存语义理由，`planning_hint` 是可选规划提示，并携带本轮 `conversation` 上下文。它不是执行授权；Kernel 必须经 character audience 的 ready catalog、`SkillPolicyEngine` 和 `SkillInvocationGateway` 编排，工具结果连同原 ConversationContext 通过 `agent_synthesis` 回到 Cognition。
 

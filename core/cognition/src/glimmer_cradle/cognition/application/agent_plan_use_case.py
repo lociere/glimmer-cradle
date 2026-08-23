@@ -10,8 +10,8 @@ from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.inference.gateway import LLMEngine, LLMMessage, LLMRequest
 from glimmer_cradle.cognition.observability.logger import get_logger
-from glimmer_cradle.cognition.protocol.generated.ipc.agent_plan_payload import SkillToolDescriptor
-from glimmer_cradle.cognition.protocol.generated.ipc.agent_plan_result import (
+from glimmer_cradle.cognition.ports.kernel.models import (
+    SkillToolDescriptor,
     AgentPlanResult,
     SkillToolSuggestion,
 )

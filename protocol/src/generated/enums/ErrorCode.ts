@@ -1,6 +1,6 @@
 /* 自动生成 — 从 ErrorCode.schema.json 生成，勿手动修改 */
 
-/** 跨层错误码 —— 字符串枚举，值=名。跨层单一事实源，Kernel 内核与 Cognition 认知核共用，随 IPC 错误响应 error.code 跨进程传递。归并历史：CORE_ERROR/UNKNOWN_ERROR→UNKNOWN；BRIDGE_ERROR/ADAPTER_ERROR→IPC_ERROR。 */
+/** 未迁移 runtime 结构使用的跨层错误码，字符串枚举且值=名。Kernel↔Cognition Service 错误已由 contracts Protobuf typed detail 拥有。归并历史：CORE_ERROR/UNKNOWN_ERROR→UNKNOWN；BRIDGE_ERROR/ADAPTER_ERROR→IPC_ERROR。 */
 export type ErrorCode =
   | 'UNKNOWN'
   | 'CONFIG_ERROR'

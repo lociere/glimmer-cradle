@@ -8,25 +8,17 @@ import type {
   SkillProviderRef,
   SkillProviderRuntimeSnapshot,
   SkillRuntimeStatus,
-} from './types';
+} from '../../ports/skill-plane.port';
 import { GLOBAL_CAPABILITY_SCOPE } from './scope';
 
 const PROVIDER_KINDS: SkillProviderKind[] = ['core', 'extension', 'mcp_server', 'user'];
 const RUNTIME_STATUSES: SkillRuntimeStatus[] = ['ready', 'contract_only'];
 
 export class SkillRegistry {
-  private static _instance: SkillRegistry | null = null;
   private readonly _skills = new Map<string, RegisteredSkill>();
   private readonly _providerRuntimes = new Map<string, SkillProviderRuntimeSnapshot>();
 
-  public static get instance(): SkillRegistry {
-    if (!SkillRegistry._instance) {
-      SkillRegistry._instance = new SkillRegistry();
-    }
-    return SkillRegistry._instance;
-  }
-
-  private constructor() {}
+  public constructor() {}
 
   public registerSkill(skill: SkillDescriptor): void {
     this._skills.set(skill.id, {

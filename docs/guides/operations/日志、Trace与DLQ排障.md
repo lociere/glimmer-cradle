@@ -55,7 +55,7 @@
 2. preload / Electron main 是否交给 Kernel
 3. Kernel Ingress Gate 是否放行
 4. PerceptionAppService 是否创建规范感知
-5. CognitionManager / IPC 是否发到 Python
+5. CognitionManager / Cognition Service 是否发到 Python
 6. `ports/kernel/inbound/` 是否成功解析
 7. `CycleController` 是否处理该感知
 8. context / reasoning / volition 是否产生 action

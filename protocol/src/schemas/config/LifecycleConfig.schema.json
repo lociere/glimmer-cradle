@@ -21,13 +21,13 @@
     "module_start_order": {
       "type": "array",
       "items": { "type": "string" },
-      "default": ["config", "persistence", "ipc", "cognition", "extensions", "life_clock"],
+      "default": ["config", "persistence", "kernel-transport", "cognition", "extensions", "life_clock"],
       "description": "模块启动顺序（按数组顺序依次启动）"
     },
     "module_stop_order": {
       "type": "array",
       "items": { "type": "string" },
-      "default": ["life_clock", "extensions", "cognition", "ipc", "persistence", "config"],
+      "default": ["life_clock", "extensions", "cognition", "kernel-transport", "persistence", "config"],
       "description": "模块停止顺序（按数组顺序依次停止）"
     }
   }

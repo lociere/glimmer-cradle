@@ -1,12 +1,23 @@
-import type { AgentPlanRequest, AgentPlanResponse, ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '../../ports/application-models';
+import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SkillCatalogAppService } from '../services/skill-catalog-app.service';
-import { SkillPlanningAppService } from '../services/skill-planning-app.service';
+import { SkillCatalogAppService } from '../use-cases/skill-catalog-app.service';
+import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { SkillInvocationGateway } from './skill-invocation-gateway';
 import { SkillRegistry } from './skill-registry';
+import { SkillPolicyEngine } from './skill-policy-engine';
+import type { KernelObservabilityPort } from '../../ports/observability.port';
 
-const registry = SkillRegistry.instance;
+const registry = new SkillRegistry();
 const skillId = 'extension:test.napcat:private-weather';
+const observability: KernelObservabilityPort = {
+  logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),
+  createTraceContext: (traceId) => ({ trace_id: traceId ?? 'trace-test' }), currentTraceId: () => undefined,
+  withTrace: async (_traceId, operation) => operation(),
+  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
+  histogram: () => undefined, counter: () => undefined, start: () => undefined, stop: () => undefined,
+  close: async () => undefined,
+};
 
 afterEach(() => registry.unregisterSkill(skillId));
 
@@ -40,7 +51,13 @@ describe('Skill capability scope', () => {
 
   it('调用网关对伪造的跨来源建议做二次拒绝', async () => {
     registerPrivateSkill();
-    const gateway = new SkillInvocationGateway(registry);
+    const gateway = new SkillInvocationGateway(
+      registry,
+      new SkillPolicyEngine(),
+      { record: () => undefined },
+      observability,
+      { record: () => undefined },
+    );
 
     await expect(gateway.invoke({
       skillId,

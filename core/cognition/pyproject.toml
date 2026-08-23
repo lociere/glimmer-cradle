@@ -8,12 +8,17 @@ authors = [
 ]
 
 dependencies = [
+    "glimmer-cradle-contracts==0.1.8",
     "numpy>=2.0,<3",
     "pydantic>=2.7,<3",
-    "pyzmq>=26.0,<28",
     "structlog>=24.0,<26",
     "aiosqlite>=0.20,<1",
+    "grpcio>=1.74,<2",
+    "protobuf==6.33.0",
 ]
+
+[tool.uv.sources]
+glimmer-cradle-contracts = { path = "../../contracts" }
 
 [project.optional-dependencies]
 local-embedding = [

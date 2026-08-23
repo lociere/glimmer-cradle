@@ -5,12 +5,12 @@ from .avatar_config import *  # noqa: F401,F403
 from .character_manifest_config import *  # noqa: F401,F403
 from .character_profile_config import *  # noqa: F401,F403
 from .cognition_config import *  # noqa: F401,F403
+from .cognition_service_config import *  # noqa: F401,F403
 from .dialogue_policy_config import *  # noqa: F401,F403
 from .embedding_config import *  # noqa: F401,F403
 from .extension_config import *  # noqa: F401,F403
 from .inference_config import *  # noqa: F401,F403
 from .ingress_gate_config import *  # noqa: F401,F403
-from .ipc_config import *  # noqa: F401,F403
 from .knowledge_base_config import *  # noqa: F401,F403
 from .knowledge_index_config import *  # noqa: F401,F403
 from .lifecycle_config import *  # noqa: F401,F403

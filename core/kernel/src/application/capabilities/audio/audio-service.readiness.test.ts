@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { AudioService } from './audio-service';
+import { AudioService } from '../../../adapters/audio/audio-service';
+
+const audioService = new AudioService();
 
 describe('AudioService readiness projection', () => {
   it('emits an aggregate audio.host reconciler ahead of per-lane snapshots', () => {
-    const service = AudioService.instance as unknown as {
+    const service = audioService as unknown as {
       audioConfig: { tts: { enabled: boolean }; asr: { enabled: boolean } };
       ttsReadiness: { status: 'disabled' | 'unknown' | 'ready' | 'degraded' | 'unavailable'; message?: string };
       asrReadiness: { status: 'disabled' | 'unknown' | 'ready' | 'degraded' | 'unavailable'; message?: string };
@@ -13,7 +15,7 @@ describe('AudioService readiness projection', () => {
     service.ttsReadiness = { status: 'ready' };
     service.asrReadiness = { status: 'unavailable', message: 'ASR 模型缺失' };
 
-    const snapshots = AudioService.instance.getReadinessSnapshots();
+    const snapshots = audioService.getReadinessSnapshots();
 
     expect(snapshots[0]).toMatchObject({
       runtime_id: 'audio.host',
@@ -42,7 +44,7 @@ describe('AudioService readiness projection', () => {
   });
 
   it('treats disabled audio enhancements as a ready baseline', () => {
-    const service = AudioService.instance as unknown as {
+    const service = audioService as unknown as {
       audioConfig: { tts: { enabled: boolean }; asr: { enabled: boolean } };
       ttsReadiness: { status: 'disabled'; message?: string };
       asrReadiness: { status: 'disabled'; message?: string };
@@ -51,7 +53,7 @@ describe('AudioService readiness projection', () => {
     service.ttsReadiness = { status: 'disabled' };
     service.asrReadiness = { status: 'disabled' };
 
-    expect(AudioService.instance.getReadinessSnapshots()[0]).toMatchObject({
+    expect(audioService.getReadinessSnapshots()[0]).toMatchObject({
       runtime_id: 'audio.host',
       state: 'ready',
       summary: '语音增强未启用，基础运行形态保持就绪',
@@ -60,7 +62,7 @@ describe('AudioService readiness projection', () => {
   });
 
   it('publishes a ready TTS lane without waiting for ASR warmup', async () => {
-    const service = AudioService.instance as unknown as {
+    const service = audioService as unknown as {
       cachedStatus: {
         updated_at: number;
         tts: Record<string, unknown>;
@@ -86,7 +88,7 @@ describe('AudioService readiness projection', () => {
     service.ttsReadiness = { status: 'unknown' };
     service.asrReadiness = { status: 'unknown' };
     const projections: string[] = [];
-    const unsubscribe = AudioService.instance.subscribeStatus((status) => {
+    const unsubscribe = audioService.subscribeStatus((status) => {
       projections.push(status.tts.route_state);
     });
 
@@ -106,7 +108,7 @@ describe('AudioService readiness projection', () => {
     }));
     unsubscribe();
 
-    expect(AudioService.instance.getCachedStatus()).toMatchObject({
+    expect(audioService.getCachedStatus()).toMatchObject({
       tts: { route_state: 'ready', active_provider: 'dashscope-cosyvoice' },
       asr: { route_state: 'unknown' },
     });

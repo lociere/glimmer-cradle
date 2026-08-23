@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto';
-import type { ConversationAddress, ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationAddress, ConversationContext } from '../../../ports/application-models';
+import type { StableIdentityPort } from '../../../ports/identity.port';
 
 export interface ResolvedConversation {
   context: ConversationContext;
@@ -10,16 +10,9 @@ export interface ResolvedConversation {
 
 /** 将平台地址解析为稳定、不可逆且与 Cognition 无关的规范会话拓扑。 */
 export class ConversationDirectory {
-  private static _instance: ConversationDirectory | null = null;
+  public constructor(private readonly identity: StableIdentityPort) {}
 
-  public static get instance(): ConversationDirectory {
-    ConversationDirectory._instance ??= new ConversationDirectory();
-    return ConversationDirectory._instance;
-  }
-
-  private constructor() {}
-
-  public resolve(address: ConversationAddress, interactionId: string = randomUUID()): ResolvedConversation {
+  public resolve(address: ConversationAddress, interactionId: string = this.identity.newId()): ResolvedConversation {
     const provider = this.part(address.provider_id);
     const account = this.digest(address.provider_id, address.provider_account_id);
     const space = this.digest(address.provider_id, address.provider_account_id, address.external_space_key);
@@ -59,7 +52,7 @@ export class ConversationDirectory {
   }
 
   private digest(...values: string[]): string {
-    return createHash('sha256').update(values.join('\u001f')).digest('hex').slice(0, 20);
+    return this.identity.digest(values).slice(0, 20);
   }
 
   private part(value: string): string {

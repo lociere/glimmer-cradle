@@ -51,6 +51,11 @@ import {
   queryObservabilityTrace,
 } from './observability-query';
 import type { SurfaceId } from './surface-registry';
+import {
+  buildCoreSkillResponseFrame,
+  manualRecoveryProjection,
+  type CoreSkillFailureProjection,
+} from './core-skill-response';
 
 const RECONNECT_INTERVAL_MS = 3000;
 const PROJECT_ROOTS = resolveDesktopProjectRoots({
@@ -99,6 +104,9 @@ const rendererWindows = new Set<BrowserWindow>();
 const rendererSurfaces = new Map<BrowserWindow, SurfaceId>();
 const deliveredAudioIds = new Set<string>();
 const MAX_DELIVERED_AUDIO_IDS = 256;
+const acceptedCoreSkillActionIds = new Set<string>();
+const completedCoreSkillActionResults = new Map<string, unknown>();
+const MAX_CORE_SKILL_ACTION_IDS = 2048;
 let handlersRegistered = false;
 let hasConnectedToKernel = false;
 let waitingForKernelLogged = false;
@@ -2968,6 +2976,38 @@ async function handleCoreSkillActionRequest(frame: Record<string, unknown>): Pro
     ? frame.payload as Record<string, unknown>
     : {};
 
+  if (!requestId) return;
+  if (completedCoreSkillActionResults.has(requestId)) {
+    sendCoreSkillResponse(
+      'core_skill_action_response',
+      requestId,
+      'success',
+      completedCoreSkillActionResults.get(requestId),
+    );
+    return;
+  }
+  if (acceptedCoreSkillActionIds.has(requestId)) {
+    sendCoreSkillResponse(
+      'core_skill_action_response',
+      requestId,
+      'error',
+      undefined,
+      '本地 Skill 副作用终态不明，需要人工确认，拒绝自动重放',
+      manualRecoveryProjection(requestId),
+    );
+    return;
+  }
+  acceptedCoreSkillActionIds.add(requestId);
+  if (acceptedCoreSkillActionIds.size > MAX_CORE_SKILL_ACTION_IDS) {
+    const oldestCompleted = [...acceptedCoreSkillActionIds].find((id) => (
+      completedCoreSkillActionResults.has(id)
+    ));
+    if (oldestCompleted) {
+      acceptedCoreSkillActionIds.delete(oldestCompleted);
+      completedCoreSkillActionResults.delete(oldestCompleted);
+    }
+  }
+
   try {
     const startedAt = Date.now();
     let result: unknown;
@@ -3003,6 +3043,7 @@ async function handleCoreSkillActionRequest(frame: Record<string, unknown>): Pro
       duration_ms: Date.now() - startedAt,
       attributes: { request_id: requestId },
     });
+    completedCoreSkillActionResults.set(requestId, result);
     sendCoreSkillResponse('core_skill_action_response', requestId, 'success', result);
   } catch (error) {
     void appendDesktopAuditRecord(PROJECT_ROOTS, {
@@ -3055,16 +3096,17 @@ function sendCoreSkillResponse(
   status: 'success' | 'error',
   result?: unknown,
   message?: string,
+  failure?: CoreSkillFailureProjection,
 ): void {
   if (kernelSocket?.readyState !== WebSocket.OPEN || !requestId) return;
-  kernelSocket.send(JSON.stringify({
+  kernelSocket.send(JSON.stringify(buildCoreSkillResponseFrame(
     kind,
-    request_id: requestId,
+    requestId,
     status,
     result,
     message,
-    timestamp: Date.now(),
-  }));
+    failure,
+  )));
 }
 
 function buildObservabilityQueryContext(): {

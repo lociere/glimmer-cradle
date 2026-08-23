@@ -1,0 +1,302 @@
+syntax = "proto3";
+
+package glimmer.cognition.v1;
+
+import "glimmer/common/v1/service_contract.proto";
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Cognition.V1";
+
+enum AddressMode {
+  ADDRESS_MODE_UNSPECIFIED = 0;
+  ADDRESS_MODE_DIRECT = 1;
+  ADDRESS_MODE_AMBIENT = 2;
+}
+
+enum ResponsePolicy {
+  RESPONSE_POLICY_UNSPECIFIED = 0;
+  RESPONSE_POLICY_REPLY_ALLOWED = 1;
+  RESPONSE_POLICY_OBSERVE_ONLY = 2;
+}
+
+enum RetentionCeiling {
+  RETENTION_CEILING_UNSPECIFIED = 0;
+  RETENTION_CEILING_TRANSIENT = 1;
+  RETENTION_CEILING_EXPERIENCE = 2;
+  RETENTION_CEILING_MEMORY_CANDIDATE = 3;
+}
+
+message ConversationContext {
+  string source_provider_id = 1;
+  string scene_id = 2;
+  string conversation_id = 3;
+  string continuity_id = 4;
+  string thread_id = 5;
+  string interaction_id = 6;
+  string recall_scope = 7;
+  string disclosure_scope = 8;
+}
+
+message SourceDescriptor {
+  string provider_kind = 1;
+  string provider_id = 2;
+  string provider_version = 3;
+  string contribution_id = 4;
+  string source_event_id = 5;
+  string schema_ref = 6;
+  string content_hash = 7;
+  string trust_tier = 8;
+  string privacy_class = 9;
+  string cognitive_effect = 10;
+}
+
+message ModalitySemantic {
+  string text = 1;
+  string source = 2;
+  optional bool resolved = 3;
+  optional double confidence = 4;
+}
+
+message ModalityItem {
+  string modality = 1;
+  string text = 2;
+  string uri = 3;
+  string mime_type = 4;
+  ModalitySemantic semantic = 5;
+  google.protobuf.Struct metadata = 6;
+}
+
+message PerceptionContent {
+  string text = 1;
+  repeated string modality = 2;
+  string actor_id = 3;
+  string actor_name = 4;
+  repeated ModalityItem items = 5;
+}
+
+message SubmitPerceptionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string perception_id = 2;
+  string sensory_type = 3;
+  string source = 4;
+  double timestamp_ms = 5;
+  int32 familiarity = 6;
+  AddressMode address_mode = 7;
+  ResponsePolicy response_policy = 8;
+  ConversationContext conversation = 9;
+  SourceDescriptor origin = 10;
+  RetentionCeiling retention_ceiling = 11;
+  PerceptionContent content = 12;
+}
+
+message SubmitPerceptionResponse {
+  string operation_id = 1;
+  PerceptionOperationState state = 2;
+  bool duplicate = 3;
+}
+
+enum PerceptionOperationState {
+  PERCEPTION_OPERATION_STATE_UNSPECIFIED = 0;
+  PERCEPTION_OPERATION_STATE_ACCEPTED = 1;
+  PERCEPTION_OPERATION_STATE_RUNNING = 2;
+  PERCEPTION_OPERATION_STATE_SUCCEEDED = 3;
+  PERCEPTION_OPERATION_STATE_CANCELLED = 4;
+  PERCEPTION_OPERATION_STATE_FAILED = 5;
+}
+
+message CancelPerceptionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string target_trace_id = 2;
+  string scene_id = 3;
+  string reason = 4;
+}
+
+message CancelPerceptionResponse {
+  string operation_id = 1;
+  string target_trace_id = 2;
+  PerceptionOperationState state = 3;
+  bool terminal = 4;
+}
+
+message GetPerceptionOperationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string operation_id = 2;
+}
+
+message GetPerceptionOperationResponse {
+  string operation_id = 1;
+  PerceptionOperationState state = 2;
+  bool terminal = 3;
+  string safe_message = 4;
+}
+
+message KnowledgeRetrievalConfig {
+  string mode = 1;
+  int32 top_k = 2;
+  double min_score = 3;
+  double semantic_weight = 4;
+}
+
+message KnowledgeEntry {
+  string entry_id = 1;
+  string scope = 2;
+  string content = 3;
+  bool enabled = 4;
+  int32 priority = 5;
+}
+
+message InitializeKnowledgeRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string version = 2;
+  KnowledgeRetrievalConfig retrieval = 3;
+  repeated KnowledgeEntry entries = 4;
+}
+
+message InitializeKnowledgeResponse {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}
+
+message SkillToolDescriptor {
+  string skill_id = 1;
+  string tool_name = 2;
+  string description = 3;
+  google.protobuf.Struct parameters_schema = 4;
+}
+
+message PlanRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string user_goal = 2;
+  string scene_id = 3;
+  repeated SkillToolDescriptor available_tools = 4;
+}
+
+message SkillToolSuggestion {
+  string skill_id = 1;
+  string tool_name = 2;
+  string purpose = 3;
+  double confidence = 4;
+  google.protobuf.Struct arguments_hint = 5;
+}
+
+message PlanResponse {
+  string summary = 1;
+  string reasoning = 2;
+  repeated SkillToolSuggestion suggestions = 3;
+  string trace_id = 4;
+}
+
+message ToolResult {
+  string tool_name = 1;
+  string status = 2;
+  string result_json = 3;
+  string invocation_id = 4;
+  string provider_kind = 5;
+  string provider_id = 6;
+  string provider_version = 7;
+  string source_event_id = 8;
+  string schema_ref = 9;
+}
+
+message SynthesizeRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string original_goal = 2;
+  string scene_id = 3;
+  ConversationContext conversation = 4;
+  repeated ToolResult tool_results = 5;
+}
+
+message SynthesizeResponse {
+  string reply_content = 1;
+  google.protobuf.Struct emotion_state = 2;
+  string trace_id = 3;
+}
+
+message GetConversationHistoryRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string request_id = 2;
+  string conversation_id = 3;
+  string scene_id = 4;
+  string thread_id = 5;
+  string actor_id = 6;
+  string actor_name = 7;
+  string source_provider_id = 8;
+  string cursor = 9;
+  int32 limit = 10;
+  repeated string allowed_scopes = 11;
+}
+
+message ConversationHistoryEntry {
+  string entry_id = 1;
+  string source_kind = 2;
+  string role = 3;
+  string status = 4;
+  string text = 5;
+  string title = 6;
+  string occurred_at = 7;
+  string trace_id = 8;
+  string interaction_id = 9;
+  string moment_id = 10;
+  int64 position = 11;
+  string conversation_id = 12;
+  string scene_id = 13;
+  string thread_id = 14;
+  string actor_id = 15;
+  string actor_name = 16;
+  string recall_scope = 17;
+  string disclosure_scope = 18;
+}
+
+message GetConversationHistoryResponse {
+  string request_id = 1;
+  string status = 2;
+  ConversationContext conversation = 3;
+  repeated ConversationHistoryEntry items = 4;
+  string next_cursor = 5;
+  bool has_more = 6;
+  string message = 7;
+}
+
+message HeartbeatRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+}
+
+message HeartbeatResponse {
+  string status = 1;
+  string generation = 2;
+}
+
+message GetReadinessRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+}
+
+message GetReadinessResponse {
+  string state = 1;
+  string phase = 2;
+  string generation = 3;
+}
+
+message ShutdownRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string reason = 2;
+}
+
+message ShutdownResponse {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}
+
+service CognitionService {
+  rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
+  rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
+  rpc GetPerceptionOperation(GetPerceptionOperationRequest) returns (GetPerceptionOperationResponse);
+  rpc InitializeKnowledge(InitializeKnowledgeRequest) returns (InitializeKnowledgeResponse);
+  rpc Plan(PlanRequest) returns (PlanResponse);
+  rpc Synthesize(SynthesizeRequest) returns (SynthesizeResponse);
+  rpc GetConversationHistory(GetConversationHistoryRequest) returns (GetConversationHistoryResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetReadiness(GetReadinessRequest) returns (GetReadinessResponse);
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}

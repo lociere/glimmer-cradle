@@ -3,3 +3,4 @@ export * from './emotion';
 export * from './multimodal';
 export * from './persona';
 export * from './scene';
+export * from './recovery';
