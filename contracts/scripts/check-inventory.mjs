@@ -1,5 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import { parse as parseToml } from 'smol-toml';
+
+const GENERATOR_PACKAGE = 'datamodel-code-generator';
+const AUDIO_PROJECT = 'glimmer-cradle-audio-engine';
+const COGNITION_PROJECT = 'glimmer-cradle-cognition';
+const AUDIO_GENERATOR_COMMAND =
+  'uv run --project ../engines/audio --extra dev python codegen/gen-py.py';
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -81,17 +88,76 @@ if (existsSync(cognitionLegacy)) {
   throw new Error('Cognition legacy Python generated output must remain deleted');
 }
 
-const protocolPackage = readFileSync(resolve(workspace, 'protocol', 'package.json'), 'utf8');
-const cognitionProject = readFileSync(resolve(workspace, 'core', 'cognition', 'pyproject.toml'), 'utf8');
-const audioProject = readFileSync(resolve(workspace, 'engines', 'audio', 'pyproject.toml'), 'utf8');
-if (!protocolPackage.includes('--project ../engines/audio') || protocolPackage.includes('--project ../core/cognition')) {
+function readJson(path) {
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+function readToml(path, context) {
+  if (!existsSync(path)) throw new Error(`${context} is missing: ${path}`);
+  return parseToml(readFileSync(path, 'utf8'));
+}
+
+function dependencyName(requirement) {
+  if (typeof requirement !== 'string') return null;
+  const separators = new Set([' ', '[', '<', '>', '=', '!', '~', ';', '@']);
+  let end = requirement.length;
+  for (let index = 0; index < requirement.length; index += 1) {
+    if (separators.has(requirement[index])) {
+      end = index;
+      break;
+    }
+  }
+  return requirement.slice(0, end).trim().toLowerCase().replaceAll('_', '-');
+}
+
+function projectDevDependencies(project) {
+  const dependencies = project.project?.['optional-dependencies']?.dev;
+  return Array.isArray(dependencies)
+    ? dependencies.map(dependencyName).filter(Boolean)
+    : [];
+}
+
+function lockPackage(lock, name) {
+  return Array.isArray(lock.package)
+    ? lock.package.find((entry) => entry?.name === name)
+    : undefined;
+}
+
+function lockDevDependencies(lock, projectName) {
+  const project = lockPackage(lock, projectName);
+  const dependencies = project?.['optional-dependencies']?.dev;
+  return Array.isArray(dependencies)
+    ? dependencies.map((entry) => entry?.name).filter(Boolean)
+    : [];
+}
+
+const protocolPackage = readJson(resolve(workspace, 'protocol', 'package.json'));
+if (protocolPackage.scripts?.['gen:py'] !== AUDIO_GENERATOR_COMMAND) {
   throw new Error('Protocol Python generator must execute in the Audio owner project');
 }
-if (cognitionProject.includes('datamodel-code-generator')) {
+
+const cognitionProjectPath = resolve(workspace, 'core', 'cognition', 'pyproject.toml');
+const audioProjectPath = resolve(workspace, 'engines', 'audio', 'pyproject.toml');
+const cognitionLockPath = resolve(workspace, 'core', 'cognition', 'uv.lock');
+const audioLockPath = resolve(workspace, 'engines', 'audio', 'uv.lock');
+const cognitionProject = readToml(cognitionProjectPath, 'Cognition project');
+const audioProject = readToml(audioProjectPath, 'Audio project');
+const cognitionLock = readToml(cognitionLockPath, 'Cognition lock');
+const audioLock = readToml(audioLockPath, 'Audio lock');
+
+if (projectDevDependencies(cognitionProject).includes(GENERATOR_PACKAGE)) {
   throw new Error('Cognition must not retain the Audio legacy generator tool dependency');
 }
-if (!audioProject.includes('datamodel-code-generator')) {
+if (!projectDevDependencies(audioProject).includes(GENERATOR_PACKAGE)) {
   throw new Error('Audio owner project must declare its legacy generator tool dependency');
+}
+if (lockPackage(cognitionLock, GENERATOR_PACKAGE)
+  || lockDevDependencies(cognitionLock, COGNITION_PROJECT).includes(GENERATOR_PACKAGE)) {
+  throw new Error('Cognition lock must not retain the Audio legacy generator tool dependency');
+}
+if (!lockPackage(audioLock, GENERATOR_PACKAGE)
+  || !lockDevDependencies(audioLock, AUDIO_PROJECT).includes(GENERATOR_PACKAGE)) {
+  throw new Error('Audio lock must resolve the legacy generator from the Audio dev dependency');
 }
 
 console.log('contracts inventory: ok');
