@@ -83,8 +83,9 @@ Desktop/Extension/Platform input
 
 `PerceptionAppService` 负责把已规范化的输入送入 Kernel 主链；`IngressGateManager` 决定是否允许进入认知链路；`CognitionManager` 管理 Python Cognition 进程与 Cognition Service 代际、注册、readiness、重启和停机。平台 Adapter 只做协议清洗，不把平台私有 payload 传进 Cognition。
 
-`CognitionManager` 保存 perception operation id，并轮询 Service 的真实终态；新输入取消等待
-`CancelPerception`/`GetPerceptionOperation` 到达终态后才释放 in-flight。进程 crash 会通过
+`CognitionManager` 把 perception operation handle 交给 `AttentionSessionManager` 持有，并轮询
+Service 的真实终态；新输入到达时旧 trace 仍保持 in-flight，等待
+`CancelPerception`/`GetPerceptionOperation` 到达终态后才结束旧 thinking stream 并处理合并输入。进程 crash 会通过
 `CognitionRuntime` observer 立即挂起 Ingress，自动重启失败保持 failed；只有新代完成
 register、knowledge init 与 readiness 后，`KernelTransportRuntime` 才恢复此前明确开放的 Ingress。
 
@@ -104,13 +105,15 @@ Cognition outbound action/reply/status
 
 `ActionStreamManager` 和 `visual-command-dispatcher.ts` 把认知行动投影到频道、桌面和身体。音频、Avatar、Desktop、Scene、Skill Plane 都是 capability adapter；它们不能反向改写 Cognition 的语义事实。`ApplicationRuntime` 会用 `SkillActionController` 覆盖 `ACTION_COMMAND` 处理器：`reply` 仍规范化为 `ChannelReplyEvent`，`skill_request` 则进入 Skill Plane 编排、工具调用和 Cognition synthesis 闭环。
 
-`CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID。启动时 Kernel 经 FD 3 匿名 pipe 单次交付 generation、动态 control endpoint、nonce 和 capability secret；Cognition 的 HMAC proof 绑定上述 challenge、实际 Service PID 与受监督子进程 PID，注册成功后两端清零 secret。Windows 的 venv launcher 与解释器 PID 可不同，因此监督树关系与已认证 proof 共同校验，绝不把自报 PID 单独当身份。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
+`CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID。启动时 Kernel 经 FD 3 匿名 pipe 单次交付 generation、动态 control endpoint、nonce 和 capability secret；Cognition 的 HMAC proof 绑定上述 challenge、实际 Service PID 与受监督子进程 PID。注册成功或校验失败后两端都会清零/作废 secret；Python 入口解码后只短暂持有可覆写 `bytearray`，不把原始 secret 字符串保留在 Host 生命周期。Windows 的 venv launcher 与解释器 PID 可不同，因此监督树关系与已认证 proof 共同校验，绝不把自报 PID 单独当身份。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
 
 `KernelControlService.PublishAction` 的 deadline 由 Kernel transport 持有，RPC cancellation 与
 deadline 转成 `AbortSignal` 贯穿 `SkillActionController -> SkillPlanningAppService ->
-SkillInvocationGateway -> tool handler`。同一 idempotency key 的并发调用共用一次执行，只有
-handler 成功且未取消后才写 completed；失败释放 key 供重试。transport 停机也会 abort 活跃
-action，避免 RPC 已结束而工具副作用继续。
+SkillInvocationGateway -> tool handler`，并继续传入 Cognition `Synthesize` unary call。action
+operation 派生稳定 invocation id；Controller 的步骤账本与 Control Surface 实际副作用 owner
+共同去重已提交工具/reply。若 deadline 在提交后到达，handler 以 committed 结果让 transport
+安全写 completed；若不可逆 handler 在取消点的终态不明，则固定为“需要人工恢复”并拒绝重放。
+提交前失败才释放未完成步骤供重试。transport 停机也会 abort 活跃 action。
 
 ## Skill Plane 与 Extension 接线
 

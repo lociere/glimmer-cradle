@@ -1,6 +1,7 @@
 """Cognition 进程 Host：管理启动、停止和 Kernel Port 生命周期。"""
 import asyncio
 import argparse
+import base64
 import json
 import os
 import sys
@@ -39,7 +40,7 @@ class CognitionHost(Lifecycle):
         kernel_endpoint: str,
         generation: str,
         registration_nonce: str,
-        registration_secret: str,
+        registration_secret: bytearray,
     ):
         """
         初始化AI核心
@@ -55,7 +56,7 @@ class CognitionHost(Lifecycle):
         self.kernel_endpoint: Final[str] = kernel_endpoint
         self.generation: Final[str] = generation
         self.registration_nonce: Final[str] = registration_nonce
-        self.registration_secret: Final[str] = registration_secret
+        self.registration_secret: bytearray | None = registration_secret
         self.components: CognitionComponents | None = None
         # 运行状态
         self._is_running: bool = False
@@ -82,11 +83,14 @@ class CognitionHost(Lifecycle):
         try:
             logger.info("Cognition 认知核开始启动")
 
+            registration_secret = self.registration_secret
+            if registration_secret is None:
+                raise RuntimeError("Cognition 注册 capability 已失效")
             self.components = compose_cognition(
                 self.config,
                 generation=self.generation,
                 registration_nonce=self.registration_nonce,
-                registration_secret=self.registration_secret,
+                registration_secret=registration_secret,
                 shutdown=self._accept_shutdown_request,
             )
             components = self._require_components()
@@ -147,6 +151,10 @@ class CognitionHost(Lifecycle):
             logger.critical(f"Cognition 认知核启动失败: {str(e)}", exc_info=True)
             await self.stop()
             raise e
+        finally:
+            if self.registration_secret is not None:
+                self.registration_secret[:] = b"\0" * len(self.registration_secret)
+                self.registration_secret = None
 
     async def stop(self) -> None:
         """并发停机请求共享同一收尾任务，避免信号与 RPC 重复释放资源。"""
@@ -358,15 +366,21 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     # 角色配置可通过环境变量注入；endpoint/generation/challenge 不进入环境。
+    registration_secret: bytearray | None = None
     try:
         import json
 
         config_json = args.config_json or os.environ.get("GLIMMER_CRADLE_CONFIG")
         bootstrap = _read_supervisor_bootstrap()
-        kernel_endpoint = str(bootstrap["kernelEndpoint"])
-        generation = str(bootstrap["generation"])
-        registration_nonce = str(bootstrap["registrationNonce"])
-        registration_secret = str(bootstrap["registrationSecret"])
+        kernel_endpoint = str(bootstrap.pop("kernelEndpoint"))
+        generation = str(bootstrap.pop("generation"))
+        registration_nonce = str(bootstrap.pop("registrationNonce"))
+        registration_secret_text = str(bootstrap.pop("registrationSecret"))
+        registration_secret = bytearray(base64.urlsafe_b64decode(
+            registration_secret_text + "=" * (-len(registration_secret_text) % 4)
+        ))
+        registration_secret_text = ""
+        bootstrap.clear()
 
         if not config_json or not kernel_endpoint or not generation or not registration_nonce or not registration_secret:
             raise ValueError("缺少 Cognition 启动配置、Kernel gRPC endpoint 或 generation")
@@ -374,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
         config_dict = json.loads(config_json)
         config = CharacterRuntimeConfig(**config_dict)
     except Exception as e:
+        if registration_secret is not None:
+            registration_secret[:] = b"\0" * len(registration_secret)
         logger.critical(f"配置解析失败: {str(e)}", exc_info=True)
         return 1
 

@@ -58,6 +58,7 @@ export interface CognitionCallOptions {
   readonly causationId?: string;
   readonly correlationId?: string;
   readonly idempotencyKey?: string;
+  readonly signal?: AbortSignal;
 }
 
 const kernelControlDefinition = serviceDefinition('glimmer.kernel.v1.KernelControlService', {
@@ -86,6 +87,7 @@ export class CognitionTransportError extends Error {
     public readonly code: ServiceErrorCode,
     public readonly retryable: boolean,
     public readonly traceId?: string,
+    public readonly call?: CallMetadata,
   ) {
     super(message);
     this.name = 'CognitionTransportError';
@@ -105,7 +107,7 @@ export class KernelCognitionTransport {
   private registrationWaiters = new Set<(error?: Error) => void>();
   private actionHandler: CognitionActionHandler | null = null;
   private readonly completedCommands = new Set<string>();
-  private readonly inFlightCommands = new Map<string, Promise<void>>();
+  private readonly inFlightCommands = new Map<string, Promise<unknown>>();
   private readonly actionAbortControllers = new Set<AbortController>();
   private actionDeadlineMs = 30_000;
 
@@ -233,7 +235,13 @@ export class KernelCognitionTransport {
       return Promise.reject(new CognitionTransportError('Cognition gRPC 尚未注册', ServiceErrorCode.NOT_READY, true, options.traceId));
     }
     return new Promise((resolve, reject) => {
-      client.makeUnaryRequest(
+      if (options.signal?.aborted) {
+        reject(options.signal.reason ?? new DOMException('请求已取消', 'AbortError'));
+        return;
+      }
+      let grpcCall: grpc.ClientUnaryCall | undefined;
+      const abort = () => grpcCall?.cancel();
+      grpcCall = client.makeUnaryRequest(
         method.path,
         method.requestSerialize,
         method.responseDeserialize,
@@ -241,10 +249,13 @@ export class KernelCognitionTransport {
         new grpc.Metadata(),
         { deadline: Date.now() + options.timeoutMs },
         (error, response) => {
+          options.signal?.removeEventListener('abort', abort);
           if (error) reject(parseServiceError(error, options.traceId));
           else resolve(response as O);
         },
       );
+      options.signal?.addEventListener('abort', abort, { once: true });
+      if (options.signal?.aborted) abort();
     });
   }
 
@@ -276,26 +287,33 @@ export class KernelCognitionTransport {
     callback: grpc.sendUnaryData<ReturnType<typeof create<typeof RegisterCognitionResponseSchema>>>,
   ): void {
     void this.handleServerCall(call, callback, async (request) => {
-      this.assertCall(request.call);
+      try {
+        this.assertCall(request.call);
+      } catch (error) {
+        if (error instanceof CognitionTransportError) {
+          throw this.registrationFault(error.code, error.message, request.call);
+        }
+        throw this.registrationFault(ServiceErrorCode.INTERNAL, 'Cognition 注册校验失败', request.call);
+      }
       const processId = Number(request.processId);
       const supervisorProcessId = Number(request.supervisorProcessId);
       const supervised = processId === this.expectedProcessId || supervisorProcessId === this.expectedProcessId;
       if (!Number.isSafeInteger(processId) || !Number.isSafeInteger(supervisorProcessId) || !supervised) {
-        throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程身份与受监督子进程不一致', false, request.call);
+        throw this.registrationFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程身份与受监督子进程不一致', request.call);
       }
       const endpoint = request.endpoint.trim();
       if (!/^grpc:\/\/127\.0\.0\.1:\d+$/.test(endpoint)) {
-        throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Cognition 端点必须是动态回环 gRPC 地址', false, request.call);
+        throw this.registrationFault(ServiceErrorCode.INVALID_REQUEST, 'Cognition 端点必须是动态回环 gRPC 地址', request.call);
       }
       if (!this.registrationNonce || !this.registrationSecret || request.registrationNonce !== this.registrationNonce) {
-        throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 注册 challenge 已失效', false, request.call);
+        throw this.registrationFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 注册 challenge 已失效', request.call);
       }
       const expectedProof = createHmac('sha256', this.registrationSecret)
         .update(`${this.generation}\n${this.registrationNonce}\n${endpoint}\n${processId}\n${supervisorProcessId}`)
         .digest();
       const proof = Buffer.from(request.authProof);
       if (proof.length !== expectedProof.length || !timingSafeEqual(proof, expectedProof)) {
-        throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程认证失败', false, request.call);
+        throw this.registrationFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程认证失败', request.call);
       }
       this.invalidateClient();
       this.client = new grpc.Client(endpoint.slice('grpc://'.length), grpc.credentials.createInsecure());
@@ -354,11 +372,13 @@ export class KernelCognitionTransport {
       }
       if (!this.actionHandler) throw serviceFault(ServiceErrorCode.NOT_READY, 'Kernel action handler 尚未就绪', true, request.call);
       const command = mapActionCommand(request, traceId);
-      const execution = withTrace(traceId, () => this.actionHandler!(command, abortController.signal));
+      const operationId = key || traceId;
+      const execution = withTrace(traceId, () => this.actionHandler!(command, abortController.signal, operationId));
       if (key) this.inFlightCommands.set(key, execution);
       try {
-        await execution;
-        if (abortController.signal.aborted) {
+        const result = await execution;
+        const sideEffectsCommitted = result?.status === 'completed';
+        if (abortController.signal.aborted && !sideEffectsCommitted) {
           throw serviceFault(
             deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
             deadlineExpired ? 'Kernel action deadline 已到期' : 'Cognition 已取消 action 调用',
@@ -369,7 +389,11 @@ export class KernelCognitionTransport {
         if (key) this.rememberCompleted(key);
         return this.commandResult(PublishActionResponseSchema, request.call, 'completed');
       } catch (error) {
-        if (abortController.signal.aborted && !(error instanceof CognitionTransportError)) {
+        if (
+          abortController.signal.aborted
+          && !(error instanceof CognitionTransportError)
+          && !(error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError')
+        ) {
           throw serviceFault(
             deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
             deadlineExpired ? 'Kernel action deadline 已到期' : 'Cognition 已取消 action 调用',
@@ -377,7 +401,19 @@ export class KernelCognitionTransport {
             request.call,
           );
         }
-        throw error;
+        if (error instanceof CognitionTransportError) throw error;
+        logger.error('Kernel action handler 执行失败', {
+          trace_id: traceId,
+          error_kind: error instanceof Error ? error.name : 'unknown',
+        });
+        throw serviceFault(
+          ServiceErrorCode.INTERNAL,
+          error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError'
+            ? 'Kernel action 副作用终态不明，需要人工恢复'
+            : 'Kernel action 执行失败',
+          false,
+          request.call,
+        );
       } finally {
         if (key) this.inFlightCommands.delete(key);
       }
@@ -419,6 +455,17 @@ export class KernelCognitionTransport {
     this.client?.close();
     this.client = null;
     this.registeredProcessId = null;
+  }
+
+  private registrationFault(code: ServiceErrorCode, message: string, call?: CallMetadata): CognitionTransportError {
+    this.registrationSecret?.fill(0);
+    this.registrationSecret = null;
+    this.registrationNonce = null;
+    this.expectedProcessId = null;
+    const error = serviceFault(code, message, false, call);
+    for (const waiter of this.registrationWaiters) waiter(error);
+    this.registrationWaiters.clear();
+    return error;
   }
 }
 
@@ -472,19 +519,30 @@ export function structToObject(value: unknown): Record<string, unknown> {
 }
 
 function serviceFault(code: ServiceErrorCode, message: string, retryable: boolean, call?: CallMetadata) {
-  return new CognitionTransportError(message, code, retryable, call?.traceId);
+  return new CognitionTransportError(message, code, retryable, call?.traceId, call);
 }
 
 function toServiceError(error: unknown): grpc.ServiceError {
   const fault = error instanceof CognitionTransportError
     ? error
-    : new CognitionTransportError(error instanceof Error ? error.message : String(error), ServiceErrorCode.INTERNAL, false);
+    : new CognitionTransportError(
+      error instanceof Error && error.name === 'SkillInvocationRecoveryRequiredError'
+        ? 'Kernel action 副作用终态不明，需要人工恢复'
+        : 'Kernel action 执行失败',
+      ServiceErrorCode.INTERNAL,
+      false,
+    );
+  if (!(error instanceof CognitionTransportError)) {
+    logger.error('Kernel action handler 返回未受控异常', {
+      error_kind: error instanceof Error ? error.name : 'unknown',
+    });
+  }
   const metadata = new grpc.Metadata();
   metadata.set(ERROR_DETAIL_KEY, Buffer.from(toBinary(ServiceErrorDetailSchema, create(ServiceErrorDetailSchema, {
     code: fault.code,
     safeMessage: fault.message,
     retryable: fault.retryable,
-    call: fault.traceId ? create(CallMetadataSchema, { traceId: fault.traceId }) : undefined,
+    call: fault.call ?? (fault.traceId ? create(CallMetadataSchema, { traceId: fault.traceId }) : undefined),
   }))));
   return Object.assign(new Error(fault.message), {
     code: grpcStatusFor(fault.code),
@@ -498,7 +556,13 @@ function parseServiceError(error: grpc.ServiceError, traceId?: string): Cognitio
   if (binary instanceof Buffer) {
     try {
       const detail = fromBinary(ServiceErrorDetailSchema, binary);
-      return new CognitionTransportError(detail.safeMessage || error.details, detail.code, detail.retryable, detail.call?.traceId || traceId);
+      return new CognitionTransportError(
+        detail.safeMessage || 'Cognition Service 请求失败',
+        detail.code,
+        detail.retryable,
+        detail.call?.traceId || traceId,
+        detail.call,
+      );
     } catch {
       // 远端 detail 损坏时保留 gRPC 通用语义。
     }
@@ -508,7 +572,12 @@ function parseServiceError(error: grpc.ServiceError, traceId?: string): Cognitio
     : error.code === grpc.status.CANCELLED
       ? ServiceErrorCode.CANCELLED
       : ServiceErrorCode.UNAVAILABLE;
-  return new CognitionTransportError(error.details || error.message, code, code === ServiceErrorCode.UNAVAILABLE, traceId);
+  return new CognitionTransportError(
+    code === ServiceErrorCode.CANCELLED ? 'Cognition Service 请求已取消' : 'Cognition Service 暂不可用',
+    code,
+    code === ServiceErrorCode.UNAVAILABLE,
+    traceId,
+  );
 }
 
 function grpcStatusFor(code: ServiceErrorCode): grpc.status {

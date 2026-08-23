@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ActionCommand } from '@glimmer-cradle/protocol';
 import type { AgentSynthesisRequest } from '../../foundation/ports/cognition-service-port';
 import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
+import { SkillInvocationRecoveryRequiredError } from './skill-invocation-gateway';
 
 function createPlanning(overrides: Partial<{
   readyToolCount: number;
@@ -159,5 +160,91 @@ describe('SkillActionController', () => {
       sceneId: 'desktop:local',
       text: '工具结果已经返回，但认知合成失败，稍后再试。',
     });
+  });
+
+  it.each(['cancel', 'deadline'])('propagates %s while synthesis is pending without publishing fallback', async (reason) => {
+    const replies: ChannelReplyPublishRequest[] = [];
+    let synthesisStarted!: () => void;
+    const entered = new Promise<void>((resolve) => { synthesisStarted = resolve; });
+    const controller = new SkillActionController(
+      createPlanning() as any,
+      async (_request, signal) => {
+        synthesisStarted();
+        return new Promise((_resolve, reject) => signal?.addEventListener(
+          'abort', () => reject(signal.reason), { once: true },
+        ));
+      },
+      async (reply) => { replies.push(reply); },
+    );
+    const abort = new AbortController();
+    const pending = controller.handleActionCommand(skillCommand(), abort.signal, `action:${reason}`);
+    await entered;
+    abort.abort(reason === 'deadline'
+      ? new Error('Kernel action deadline 已到期')
+      : new DOMException('调用已取消', 'AbortError'));
+
+    await expect(pending).rejects.toBe(abort.signal.reason);
+    expect(replies).toEqual([]);
+  });
+
+  it('resumes from committed tool step after cancellation without replaying the side effect', async () => {
+    let executeCount = 0;
+    let stableInvocationId = '';
+    const planning = createPlanning() as any;
+    planning.executeSuggestion = async (...args: unknown[]) => {
+      executeCount += 1;
+      stableInvocationId = String(args[4]);
+      return { temperature: 26 };
+    };
+    let synthesisCount = 0;
+    let firstSynthesisStarted!: () => void;
+    const entered = new Promise<void>((resolve) => { firstSynthesisStarted = resolve; });
+    const replies: ChannelReplyPublishRequest[] = [];
+    const controller = new SkillActionController(
+      planning,
+      async (_request, signal) => {
+        synthesisCount += 1;
+        if (synthesisCount === 1) {
+          firstSynthesisStarted();
+          return new Promise((_resolve, reject) => signal?.addEventListener(
+            'abort', () => reject(signal.reason), { once: true },
+          ));
+        }
+        return { reply_content: '恢复完成', emotion_state: {}, trace_id: 'trace-1' };
+      },
+      async (reply) => { replies.push(reply); },
+    );
+    const firstAbort = new AbortController();
+    const first = controller.handleActionCommand(skillCommand(), firstAbort.signal, 'action:stable-operation');
+    await entered;
+    firstAbort.abort(new DOMException('调用已取消', 'AbortError'));
+    await expect(first).rejects.toBe(firstAbort.signal.reason);
+
+    await expect(controller.handleActionCommand(
+      skillCommand(), new AbortController().signal, 'action:stable-operation',
+    )).resolves.toEqual({ status: 'completed' });
+    expect(executeCount).toBe(1);
+    expect(stableInvocationId).toBe('action:stable-operation:tool:0:core.weather:get_weather');
+    expect(replies).toHaveLength(1);
+  });
+
+  it('blocks automatic replay when an abort leaves a side-effect terminal state unknown', async () => {
+    let executeCount = 0;
+    const planning = createPlanning() as any;
+    planning.executeSuggestion = async () => {
+      executeCount += 1;
+      throw new SkillInvocationRecoveryRequiredError('action:unsafe:tool:0');
+    };
+    const controller = new SkillActionController(planning, async () => ({
+      reply_content: 'unused', emotion_state: {}, trace_id: 'trace-1',
+    }), async () => undefined);
+
+    await expect(controller.handleActionCommand(
+      skillCommand(), undefined, 'action:unsafe',
+    )).rejects.toThrow('需要人工恢复');
+    await expect(controller.handleActionCommand(
+      skillCommand(), undefined, 'action:unsafe',
+    )).rejects.toThrow('需要人工恢复');
+    expect(executeCount).toBe(1);
   });
 });

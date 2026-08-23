@@ -26,14 +26,14 @@ export function createDesktopTools(bridge: CorePlatformBridge): SkillTool[] {
       name: 'desktop.open_url',
       description: '打开一个 URL。只适合通用桌面打开动作，复杂浏览器自动化应交给 Extension 或 MCP Server。',
       parameters: openUrlParameters,
-      handler: (args: unknown) => {
+      handler: (args: unknown, context) => {
         const url = typeof (args as { url?: unknown })?.url === 'string'
           ? (args as { url: string }).url
           : '';
         if (!url.trim()) {
           throw new Error('desktop.open_url 需要 url');
         }
-        return bridge.openUrl(url);
+        return bridge.openUrl(url, context?.invocationId);
       },
     },
     createContractOnlyTool(

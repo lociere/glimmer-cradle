@@ -116,6 +116,8 @@ export class ControlSurfaceGateway {
   private _conversationHistoryService: ConversationHistoryService | null = null;
   private _disposeRuntimeReadinessSubscription: (() => void) | null = null;
   private readonly _pendingSurfaceRequests = new Map<string, PendingSurfaceRequest>();
+  private readonly _coreSkillExecutions = new Map<string, Promise<unknown>>();
+  private readonly _completedCoreSkillExecutions = new Map<string, unknown>();
   // Avatar status 由 AvatarStatusChangedEvent 驱动，不由 UI 定时推断。
 
   public static get instance(): ControlSurfaceGateway {
@@ -394,11 +396,32 @@ export class ControlSurfaceGateway {
     this.broadcast(JSON.stringify(frame));
   }
 
-  public async requestCoreSkillAction(action: string, payload: Record<string, unknown>): Promise<unknown> {
-    return this._requestSurfaceRoundTrip('core_skill_action_request', {
+  public async requestCoreSkillAction(
+    action: string,
+    payload: Record<string, unknown>,
+    invocationId?: string,
+  ): Promise<unknown> {
+    if (invocationId && this._completedCoreSkillExecutions.has(invocationId)) {
+      return this._completedCoreSkillExecutions.get(invocationId);
+    }
+    const existing = invocationId ? this._coreSkillExecutions.get(invocationId) : undefined;
+    if (existing) return existing;
+    const execution = this._requestSurfaceRoundTrip('core_skill_action_request', {
       action,
       payload,
+    }, invocationId).then((result) => {
+      if (invocationId) {
+        this._completedCoreSkillExecutions.set(invocationId, result);
+        if (this._completedCoreSkillExecutions.size > 2048) {
+          this._completedCoreSkillExecutions.delete(this._completedCoreSkillExecutions.keys().next().value!);
+        }
+      }
+      return result;
+    }).finally(() => {
+      if (invocationId) this._coreSkillExecutions.delete(invocationId);
     });
+    if (invocationId) this._coreSkillExecutions.set(invocationId, execution);
+    return execution;
   }
 
   public async requestSkillConfirmation(request: SkillConfirmationRequest): Promise<boolean> {
@@ -415,13 +438,13 @@ export class ControlSurfaceGateway {
     return Boolean((result as { approved?: unknown })?.approved);
   }
 
-  private _requestSurfaceRoundTrip(kind: string, payload: Record<string, unknown>): Promise<unknown> {
+  private _requestSurfaceRoundTrip(kind: string, payload: Record<string, unknown>, stableRequestId?: string): Promise<unknown> {
     const client = Array.from(this._clients).find((item) => item.readyState === WebSocket.OPEN);
     if (!client) {
       return Promise.reject(new Error('产品控制表面未连接，无法执行本地 Skill'));
     }
 
-    const requestId = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const requestId = stableRequestId || `${kind}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this._pendingSurfaceRequests.delete(requestId);
@@ -1388,6 +1411,8 @@ export class ControlSurfaceGateway {
     this._requestApplicationShutdown = null;
     this._lastAvatarActionState = null;
     this._conversationHistoryService = null;
+    this._coreSkillExecutions.clear();
+    this._completedCoreSkillExecutions.clear();
     this._initialized = false;
     logger.info('ControlSurfaceGateway stopped');
   }

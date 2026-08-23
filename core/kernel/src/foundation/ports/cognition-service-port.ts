@@ -91,10 +91,9 @@ export interface LifeHeartbeatResponse {
   readonly status: 'alive';
 }
 
-export interface ChatMessageResponse {
-  readonly reply_content?: string;
-  readonly emotion_state?: Record<string, unknown>;
-  readonly trace_id?: string;
+export interface PerceptionOperationHandle extends PerceptionOperationResult {
+  readonly trace_id: string;
+  readonly completion: Promise<PerceptionOperationResult>;
 }
 
 export interface CognitionProcessBootstrap {
@@ -119,7 +118,7 @@ export interface CognitionRequestPort {
   perceptionOperation(operationId: string, timeoutMs: number): Promise<PerceptionOperationResult>;
   initializeKnowledge(config: KnowledgeBaseConfig, timeoutMs: number): Promise<void>;
   plan(request: AgentPlanRequest, traceId: string, timeoutMs: number): Promise<AgentPlanResponse>;
-  synthesize(request: AgentSynthesisRequest, timeoutMs: number): Promise<AgentSynthesisResponse>;
+  synthesize(request: AgentSynthesisRequest, timeoutMs: number, signal?: AbortSignal): Promise<AgentSynthesisResponse>;
   heartbeat(timeoutMs: number): Promise<LifeHeartbeatResponse>;
   conversationHistory(request: ConversationHistoryRequest, traceId: string, timeoutMs: number): Promise<ConversationHistoryResponse>;
   readiness(timeoutMs: number): Promise<{ readonly state: string; readonly phase: string; readonly generation: string }>;
@@ -128,4 +127,13 @@ export interface CognitionRequestPort {
 
 export type CognitionLifecycleState = 'starting' | 'ready' | 'failed' | 'stopped';
 export type CognitionLifecycleObserver = (state: CognitionLifecycleState, summary: string) => void;
-export type CognitionActionHandler = (command: ActionCommand, signal: AbortSignal) => Promise<void>;
+export interface CognitionActionResult {
+  /** 副作用与步骤账本均已提交；即使 deadline 同时到达也可安全确认完成。 */
+  readonly status: 'completed';
+}
+
+export type CognitionActionHandler = (
+  command: ActionCommand,
+  signal: AbortSignal,
+  operationId: string,
+) => Promise<CognitionActionResult | void>;

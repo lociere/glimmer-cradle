@@ -8,9 +8,9 @@ import type {
   AgentPlanResponse,
   AgentSynthesisRequest,
   AgentSynthesisResponse,
-  ChatMessageResponse,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
+  PerceptionOperationHandle,
 } from "../../../foundation/ports/cognition-service-port";
 import { CognitionManager } from "./cognition-manager";
 
@@ -30,7 +30,7 @@ export class AIProxy {
     return CognitionManager.instance.isReady;
   }
 
-  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse> {
+  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle> {
     return CognitionManager.instance.sendPerceptionMessage(request, traceId);
   }
 
@@ -42,8 +42,8 @@ export class AIProxy {
     return CognitionManager.instance.sendAgentPlan(request, traceId);
   }
 
-  public async requestAgentSynthesis(request: AgentSynthesisRequest): Promise<AgentSynthesisResponse> {
-    return CognitionManager.instance.sendAgentSynthesis(request);
+  public async requestAgentSynthesis(request: AgentSynthesisRequest, signal?: AbortSignal): Promise<AgentSynthesisResponse> {
+    return CognitionManager.instance.sendAgentSynthesis(request, signal);
   }
 
   public async sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse> {

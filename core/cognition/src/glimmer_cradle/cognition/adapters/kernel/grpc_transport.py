@@ -26,7 +26,10 @@ from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanIn
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
 from glimmer_cradle.cognition.cycle import CycleController
 from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.cycle.perception_operations import (
+    PerceptionOperationConflict,
+    PerceptionOperationRegistry,
+)
 from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace
 from glimmer_cradle.cognition.observability.logger import get_logger
 from glimmer_cradle.cognition.observability.trace_context import TraceContext, new_trace_id
@@ -234,7 +237,10 @@ class CognitionGrpcHost:
     async def _submit_perception(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             operation_id = request.call.idempotency_key or trace_id
-            perception_operation, duplicate = self._operations.accept(operation_id, trace_id)
+            try:
+                perception_operation, duplicate = self._operations.accept(operation_id, trace_id)
+            except PerceptionOperationConflict as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)) from error
             if not duplicate:
                 content = request.content
                 model_input = {
@@ -414,10 +420,12 @@ async def _return(value: Any) -> Any:
 class KernelGrpcClient:
     """Cognition 进程独占的 KernelControlService client。"""
 
-    def __init__(self, generation: str, registration_nonce: str, registration_secret: str) -> None:
+    def __init__(self, generation: str, registration_nonce: str, registration_secret: bytearray | str) -> None:
         self.generation = generation
         self._registration_nonce = registration_nonce
-        self._registration_secret = bytearray(base64.urlsafe_b64decode(registration_secret + "=" * (-len(registration_secret) % 4)))
+        self._registration_secret = registration_secret if isinstance(registration_secret, bytearray) else bytearray(
+            base64.urlsafe_b64decode(registration_secret + "=" * (-len(registration_secret) % 4))
+        )
         self._channel: grpc.aio.Channel | None = None
 
     async def start(self, kernel_endpoint: str, cognition_endpoint: str) -> None:

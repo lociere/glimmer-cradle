@@ -89,6 +89,7 @@ export class SkillPlanningAppService {
     traceId?: string,
     conversation?: ConversationContext,
     signal?: AbortSignal,
+    invocationId?: string,
   ): Promise<unknown> {
     return this._gateway.invoke({
       skillId: suggestion.skill_id,
@@ -97,6 +98,7 @@ export class SkillPlanningAppService {
       traceId,
       conversation,
       signal,
+      invocationId,
     });
   }
 

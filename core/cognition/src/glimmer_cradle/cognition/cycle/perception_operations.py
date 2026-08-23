@@ -8,6 +8,10 @@ from dataclasses import dataclass
 TERMINAL_STATES = frozenset({"succeeded", "cancelled", "failed"})
 
 
+class PerceptionOperationConflict(ValueError):
+    """同一稳定 operation_id 或 trace 被绑定到不同调用。"""
+
+
 @dataclass(slots=True)
 class PerceptionOperation:
     operation_id: str
@@ -29,9 +33,14 @@ class PerceptionOperationRegistry:
         self._operation_by_trace: dict[str, str] = {}
 
     def accept(self, operation_id: str, trace_id: str) -> tuple[PerceptionOperation, bool]:
+        existing = self._by_operation.get(operation_id)
+        if existing is not None:
+            if existing.trace_id != trace_id:
+                raise PerceptionOperationConflict("感知 operation_id 已绑定到不同 trace")
+            return existing, True
         existing_id = self._operation_by_trace.get(trace_id)
         if existing_id is not None:
-            return self._by_operation[existing_id], True
+            raise PerceptionOperationConflict("感知 trace 已绑定到不同 operation_id")
         operation = PerceptionOperation(operation_id=operation_id, trace_id=trace_id)
         self._by_operation[operation_id] = operation
         self._operation_by_trace[trace_id] = operation_id

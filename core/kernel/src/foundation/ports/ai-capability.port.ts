@@ -7,9 +7,9 @@
  */
 import type { PerceptionEvent } from "@glimmer-cradle/protocol";
 import type {
-  ChatMessageResponse,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
+  PerceptionOperationHandle,
 } from "./cognition-service-port";
 
 /**
@@ -18,7 +18,7 @@ import type {
  */
 export interface IAICapabilityPort {
   readonly isReady: boolean;
-  sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse>;
+  sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle>;
   cancelPerception(request: PerceptionCancelRequest): Promise<void>;
   sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse>;
 }

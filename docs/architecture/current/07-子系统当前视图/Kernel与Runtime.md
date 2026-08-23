@@ -60,7 +60,8 @@ Renderer、Extension、MCP 和 Engine 都消费 Kernel 的投影，而不是反�
 
 Cognition 注册还必须通过匿名 bootstrap pipe 单次交付的 HMAC challenge，并把 proof 绑定到
 generation、动态 endpoint、Service PID 与受监督子进程；自报 PID 不是身份凭据。Cognition
-异常退出会立即撤销 required Ingress，新代必须重新 register/init/ready 才可恢复。
+注册成功或任一校验失败都会清零并作废 capability。异常退出会立即撤销 required Ingress，新代
+必须重新 register/init/ready 才可恢复。
 
 ## Attention Lease 与外部焦点
 

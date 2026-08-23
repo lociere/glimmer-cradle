@@ -23,17 +23,17 @@ export function createClipboardTools(bridge: CorePlatformBridge): SkillTool[] {
       name: 'clipboard.read',
       description: '读取系统剪贴板文本。该能力可能读取用户当前上下文，需要策略确认。',
       parameters: clipboardReadParameters,
-      handler: () => bridge.readClipboardText(),
+      handler: (_args, context) => bridge.readClipboardText(context?.invocationId),
     },
     {
       name: 'clipboard.write',
       description: '写入系统剪贴板文本。该能力会改变用户系统状态，需要策略确认。',
       parameters: clipboardWriteParameters,
-      handler: (args: unknown) => {
+      handler: (args: unknown, context) => {
         const text = typeof (args as { text?: unknown })?.text === 'string'
           ? (args as { text: string }).text
           : '';
-        return bridge.writeClipboardText(text);
+        return bridge.writeClipboardText(text, context?.invocationId);
       },
     },
   ];

@@ -8,6 +8,11 @@ from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
 from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.cycle import CycleController
+from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.providers import PerceptionProvider
+from glimmer_cradle.cognition.cycle.volition import WillingnessConfig
+from glimmer_cradle.cognition.experience.recorder import ExperienceRecorder
 from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace
 from glimmer_cradle.cognition.ports.kernel.models import AgentPlanResult
 
@@ -139,6 +144,21 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
     assert len(queue.entries) == 1
     assert queue.entries[0].trace_id == "trace-1"
 
+    conflicting_trace = cognition_pb.SubmitPerceptionRequest()
+    conflicting_trace.CopyFrom(request)
+    conflicting_trace.call.trace_id = "trace-conflict"
+    with pytest.raises(grpc.aio.AioRpcError) as operation_conflict:
+        await submit(conflicting_trace, timeout=1)
+    assert operation_conflict.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+
+    conflicting_operation = cognition_pb.SubmitPerceptionRequest()
+    conflicting_operation.CopyFrom(request)
+    conflicting_operation.call.idempotency_key = "perception-other"
+    with pytest.raises(grpc.aio.AioRpcError) as trace_conflict:
+        await submit(conflicting_operation, timeout=1)
+    assert trace_conflict.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    assert len(queue.entries) == 1
+
     request.call.generation = "stale-generation"
     with pytest.raises(grpc.aio.AioRpcError) as caught:
         await submit(request, timeout=1)
@@ -221,6 +241,134 @@ async def test_deadline_and_perception_cancellation_reach_terminal_state(service
 
 
 @pytest.mark.asyncio
+async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> None:
+    started = asyncio.Event()
+    emitted: list[dict] = []
+
+    class _SlowReasoning:
+        async def request(self, _request, *, tier):
+            started.set()
+            await asyncio.Future()
+
+    queue = PerceptionEventQueue(max_size=10)
+    operations = PerceptionOperationRegistry()
+    workspace = GlobalWorkspace(capacity=5)
+    recorder = ExperienceRecorder(tmp_path)
+    await recorder.start()
+    cycle = CycleController(
+        workspace=workspace,
+        providers=[PerceptionProvider(queue)],
+        experience_recorder=recorder,
+        willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
+        reasoning=_SlowReasoning(),
+        action_sink=lambda command: _append_async(emitted, command),
+        perception_operations=operations,
+    )
+    host = CognitionGrpcHost(
+        generation="generation-cycle",
+        inbound=_Inbound(),
+        queue=queue,
+        activity=_Activity(),
+        cycle=cycle,
+        shutdown=lambda: asyncio.sleep(0),
+        operations=operations,
+        workspace=workspace,
+    )
+    await host.start()
+    host.mark_ready()
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    submit = _call(channel, "SubmitPerception", cognition_pb.SubmitPerceptionRequest, cognition_pb.SubmitPerceptionResponse)
+    cancel = _call(channel, "CancelPerception", cognition_pb.CancelPerceptionRequest, cognition_pb.CancelPerceptionResponse)
+    status = _call(channel, "GetPerceptionOperation", cognition_pb.GetPerceptionOperationRequest, cognition_pb.GetPerceptionOperationResponse)
+    try:
+        await submit(_perception_request("generation-cycle", "trace-first", "operation:first", "first"), timeout=1)
+        tick = asyncio.create_task(cycle.tick_once())
+        await asyncio.wait_for(started.wait(), timeout=1)
+        cancelled = await cancel(cognition_pb.CancelPerceptionRequest(
+            call=_metadata("generation-cycle", "cancel-first"),
+            target_trace_id="trace-first",
+            reason="new_ingress_interrupt",
+        ), timeout=1)
+        await submit(_perception_request("generation-cycle", "trace-second", "operation:second", "second"), timeout=1)
+
+        assert tick.cancelled()
+        assert cancelled.terminal is True
+        first_terminal = await status(cognition_pb.GetPerceptionOperationRequest(
+            call=_metadata("generation-cycle", "status-first"), operation_id="operation:first",
+        ), timeout=1)
+        assert first_terminal.state == cognition_pb.PERCEPTION_OPERATION_STATE_CANCELLED
+        assert queue.size() == 1
+        assert emitted == []
+    finally:
+        await channel.close()
+        await host.stop()
+        await recorder.stop()
+
+
+async def _append_async(target: list[dict], value: dict) -> None:
+    target.append(value)
+
+
+def _perception_request(generation: str, trace_id: str, operation_id: str, text: str):
+    return cognition_pb.SubmitPerceptionRequest(
+        call=_metadata(generation, trace_id, operation_id),
+        familiarity=10,
+        address_mode=cognition_pb.ADDRESS_MODE_DIRECT,
+        response_policy=cognition_pb.RESPONSE_POLICY_REPLY_ALLOWED,
+        conversation=cognition_pb.ConversationContext(
+            scene_id="scene-1", conversation_id="conversation-1", continuity_id="continuity-1",
+            thread_id="main", interaction_id=trace_id, recall_scope="conversation_private",
+            disclosure_scope="conversation_private",
+        ),
+        content=cognition_pb.PerceptionContent(text=text),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["cancel", "deadline"])
+async def test_synthesis_cancellation_reaches_the_running_use_case(mode: str) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    class _SlowSynthesisInbound(_Inbound):
+        async def on_agent_synthesis(self, _input_data):
+            started.set()
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+
+    host = CognitionGrpcHost(
+        generation="generation-synthesis",
+        inbound=_SlowSynthesisInbound(),
+        queue=_Queue(),
+        activity=_Activity(),
+        cycle=_Cycle(),
+        shutdown=lambda: asyncio.sleep(0),
+        operations=PerceptionOperationRegistry(),
+        workspace=GlobalWorkspace(),
+    )
+    await host.start()
+    host.mark_ready()
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    synthesize = _call(channel, "Synthesize", cognition_pb.SynthesizeRequest, cognition_pb.SynthesizeResponse)
+    try:
+        pending = synthesize(cognition_pb.SynthesizeRequest(
+            call=_metadata("generation-synthesis", f"synthesis-{mode}"),
+            original_goal="wait",
+        ), timeout=0.03 if mode == "deadline" else 5)
+        await asyncio.wait_for(started.wait(), timeout=1)
+        if mode == "cancel":
+            pending.cancel()
+        with pytest.raises((asyncio.CancelledError, grpc.aio.AioRpcError)):
+            await pending
+        await asyncio.wait_for(cancelled.wait(), timeout=1)
+    finally:
+        await channel.close()
+        await host.stop()
+
+
+@pytest.mark.asyncio
 async def test_readiness_and_shutdown_are_generation_bound(service):
     _host, channel, _queue, stopped = service
     readiness = _call(channel, "GetReadiness", cognition_pb.GetReadinessRequest, cognition_pb.GetReadinessResponse)
@@ -259,4 +407,25 @@ async def test_kernel_typed_error_preserves_safe_metadata_without_raw_details():
     assert caught.value.safe_message == "Kernel action handler 尚未就绪"
     assert caught.value.retryable is True
     assert caught.value.call.trace_id == "trace-safe"
+    assert caught.value.call.causation_id == "cause-1"
+    assert caught.value.call.correlation_id == "correlation-1"
+    assert caught.value.call.generation == "generation-1"
     assert "private stack" not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_registration_secret_is_zeroed_on_client_registration_failure() -> None:
+    secret = bytearray(b"registration-capability")
+    client = KernelGrpcClient("generation-1", "nonce", secret)
+
+    async def reject_registration(*_args, **_kwargs):
+        raise RuntimeError("registration rejected")
+
+    client._call = reject_registration  # type: ignore[method-assign]
+    try:
+        with pytest.raises(RuntimeError, match="registration rejected"):
+            await client.start("grpc://127.0.0.1:1", "grpc://127.0.0.1:2")
+        assert secret == bytearray(len(secret))
+        assert client._registration_nonce == ""
+    finally:
+        await client.stop()

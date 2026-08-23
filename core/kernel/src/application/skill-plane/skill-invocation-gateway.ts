@@ -26,6 +26,15 @@ export interface SkillInvocationRequest {
   traceId?: string;
   conversation?: ConversationContext;
   signal?: AbortSignal;
+  /** 由反向 Service operation 派生的稳定副作用键，重试不得重新生成。 */
+  invocationId?: string;
+}
+
+export class SkillInvocationRecoveryRequiredError extends Error {
+  public constructor(public readonly invocationId: string) {
+    super(`技能副作用终态不明，需要人工恢复（invocation_id=${invocationId}）`);
+    this.name = 'SkillInvocationRecoveryRequiredError';
+  }
 }
 
 export interface SkillResourceReadRequest {
@@ -139,7 +148,11 @@ export class SkillInvocationGateway {
       targetName: request.toolName,
       args: request.args,
       signal: request.signal,
-      execute: () => tool.handler(request.args, { signal: request.signal }),
+      invocationId: request.invocationId,
+      execute: () => tool.handler(request.args, {
+        signal: request.signal,
+        invocationId: request.invocationId,
+      }),
     });
   }
 
@@ -209,6 +222,7 @@ export class SkillInvocationGateway {
     args?: unknown;
     execute: () => Promise<unknown> | unknown;
     signal?: AbortSignal;
+    invocationId?: string;
   }): Promise<unknown> {
     const traceId = options.traceId ?? getCurrentTraceId() ?? newTraceId();
     return withTrace(traceId, async () => {
@@ -279,7 +293,6 @@ export class SkillInvocationGateway {
 
       try {
         const result = await options.execute();
-        options.signal?.throwIfAborted();
         this.recordAudit({
           traceId,
           skill: options.skill,
@@ -304,6 +317,9 @@ export class SkillInvocationGateway {
           errorMessage: normalizeErrorMessage(error),
           policy,
         });
+        if (options.signal?.aborted && policy.sideEffects.length > 0) {
+          throw new SkillInvocationRecoveryRequiredError(options.invocationId ?? traceId);
+        }
         throw error;
       }
     });

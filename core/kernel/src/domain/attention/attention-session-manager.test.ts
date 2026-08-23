@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PerceptionEvent } from '@glimmer-cradle/protocol';
 import { AttentionSessionManager } from './attention-session-manager';
 
@@ -44,6 +44,10 @@ function perception(overrides: Partial<PerceptionEvent> = {}): PerceptionEvent {
 }
 
 describe('AttentionSessionManager 感知契约', () => {
+  afterEach(async () => {
+    await AttentionSessionManager.instance.stop();
+  });
+
   it('批处理后保留权威 PerceptionEvent 的 trace、来源和留存上限', () => {
     const manager = AttentionSessionManager.instance as unknown as {
       mergeRequests(requests: PerceptionEvent[]): PerceptionEvent;
@@ -68,5 +72,65 @@ describe('AttentionSessionManager 感知契约', () => {
     ]);
 
     expect(merged.retention_ceiling).toBe('transient');
+  });
+
+  it('首个 operation 未终态时第二次 ingress 会取消真实 operation 后再处理合并输入', async () => {
+    let finishFirst!: (value: {
+      operation_id: string;
+      state: 'cancelled';
+      terminal: true;
+    }) => void;
+    const firstCompletion = new Promise<{
+      operation_id: string;
+      state: 'cancelled';
+      terminal: true;
+    }>((resolve) => { finishFirst = resolve; });
+    const sendPerceptionMessage = vi.fn(async (_request: PerceptionEvent, traceId?: string) => {
+      if (traceId === 'trace-1') {
+        return {
+          operation_id: 'perception:event-1', state: 'running' as const, terminal: false,
+          trace_id: 'trace-1', completion: firstCompletion,
+        };
+      }
+      const terminal = { operation_id: 'perception:event-2', state: 'succeeded' as const, terminal: true };
+      return { ...terminal, trace_id: traceId ?? 'trace-2', completion: Promise.resolve(terminal) };
+    });
+    const cancelPerception = vi.fn(async (request: { target_trace_id: string }) => {
+      expect(request.target_trace_id).toBe('trace-1');
+      finishFirst({ operation_id: 'perception:event-1', state: 'cancelled', terminal: true });
+    });
+    const actionStream = {
+      startThinkingStream: vi.fn(async () => undefined),
+      completeStream: vi.fn(async () => undefined),
+      cancelStream: vi.fn(async () => undefined),
+    };
+    const manager = AttentionSessionManager.instance as unknown as {
+      _initialized: boolean;
+      _debounceMs: number;
+      _focusedDebounceMs: number;
+      _aiProxy: unknown;
+      _actionStream: unknown;
+      ingest(request: PerceptionEvent): Promise<void>;
+    };
+    manager._initialized = true;
+    manager._debounceMs = 1;
+    manager._focusedDebounceMs = 1;
+    manager._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception, sendLifeHeartbeat: vi.fn() };
+    manager._actionStream = actionStream;
+
+    const first = manager.ingest(perception({ id: 'event-1', trace_id: 'trace-1' }));
+    await vi.waitFor(() => expect(sendPerceptionMessage).toHaveBeenCalledTimes(1));
+    const second = manager.ingest(perception({ id: 'event-2', trace_id: 'trace-2' }));
+    await Promise.all([first, second]);
+
+    expect(cancelPerception).toHaveBeenCalledTimes(1);
+    expect(sendPerceptionMessage).toHaveBeenCalledTimes(2);
+    expect(actionStream.cancelStream).toHaveBeenCalledWith(
+      'conversation:desktop:local', 'trace-1', expect.any(String),
+    );
+    expect(actionStream.completeStream).toHaveBeenCalledTimes(1);
+    expect(actionStream.completeStream).toHaveBeenCalledWith(
+      'conversation:desktop:local', 'trace-2', 'calm', 0,
+    );
   });
 });

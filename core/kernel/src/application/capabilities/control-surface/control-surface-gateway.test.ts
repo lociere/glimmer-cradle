@@ -11,10 +11,46 @@ describe('ControlSurfaceGateway', () => {
       _configApplicationService: unknown;
       _conversationHistoryService: unknown;
       _clients: Set<unknown>;
+      _coreSkillExecutions: Map<string, unknown>;
+      _completedCoreSkillExecutions: Map<string, unknown>;
     };
     gateway._configApplicationService = null;
     gateway._conversationHistoryService = null;
     gateway._clients.clear();
+    gateway._coreSkillExecutions.clear();
+    gateway._completedCoreSkillExecutions.clear();
+  });
+
+  it('reuses a stable invocation id and does not resend a committed local side effect', async () => {
+    const gateway = ControlSurfaceGateway.instance as unknown as {
+      _clients: Set<unknown>;
+      _handleCoreSkillResponse(data: unknown): void;
+      requestCoreSkillAction(action: string, payload: Record<string, unknown>, invocationId?: string): Promise<unknown>;
+    };
+    const sent: Array<Record<string, unknown>> = [];
+    gateway._clients.add({
+      readyState: 1,
+      send(data: string) {
+        const frame = JSON.parse(data) as Record<string, unknown>;
+        sent.push(frame);
+        queueMicrotask(() => gateway._handleCoreSkillResponse({
+          kind: 'core_skill_action_response',
+          request_id: frame.request_id,
+          status: 'success',
+          result: { ok: true },
+        }));
+      },
+    });
+
+    await expect(gateway.requestCoreSkillAction(
+      'clipboard.write', { text: 'once' }, 'action:1:tool:0',
+    )).resolves.toEqual({ ok: true });
+    await expect(gateway.requestCoreSkillAction(
+      'clipboard.write', { text: 'once' }, 'action:1:tool:0',
+    )).resolves.toEqual({ ok: true });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].request_id).toBe('action:1:tool:0');
   });
 
   it('returns an explicit conversation notice when no usable LLM route is configured', () => {

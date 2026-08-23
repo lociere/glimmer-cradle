@@ -3,18 +3,36 @@ import {
   type ConversationContext,
   normalizeReplyMessages,
 } from '@glimmer-cradle/protocol';
-import type { AgentSynthesisRequest, AgentSynthesisResponse, AgentToolResult } from '../../foundation/ports/cognition-service-port';
-import { randomUUID } from 'node:crypto';
+import type {
+  AgentPlanResponse,
+  AgentSynthesisRequest,
+  AgentSynthesisResponse,
+  AgentToolResult,
+  CognitionActionResult,
+} from '../../foundation/ports/cognition-service-port';
 import { ChannelReplyEvent } from '../../foundation/event-bus/events';
 import { EventBus } from '../../foundation/event-bus/event-bus';
 import { getLogger } from '../../foundation/logger/logger';
 import { createTraceContext } from '../../foundation/logger/trace-context';
 import { AIProxy } from '../capabilities/inference/ai-proxy';
 import { SkillPlanningAppService } from '../services/skill-planning-app.service';
+import { SkillInvocationRecoveryRequiredError } from './skill-invocation-gateway';
 
 const logger = getLogger('skill-action-controller');
 
-export type AgentSynthesisRequester = (request: AgentSynthesisRequest) => Promise<AgentSynthesisResponse>;
+export type AgentSynthesisRequester = (
+  request: AgentSynthesisRequest,
+  signal?: AbortSignal,
+) => Promise<AgentSynthesisResponse>;
+
+type ActionExecutionJournal = {
+  readonly operationId: string;
+  plan?: AgentPlanResponse;
+  readonly toolResults: Map<string, AgentToolResult>;
+  synthesis?: AgentSynthesisResponse;
+  replyCommitted: boolean;
+  recoveryRequired?: SkillInvocationRecoveryRequiredError;
+};
 
 export interface ChannelReplyPublishRequest {
   traceId: string;
@@ -27,27 +45,42 @@ export interface ChannelReplyPublishRequest {
 export type ChannelReplyPublisher = (request: ChannelReplyPublishRequest) => Promise<void>;
 
 export class SkillActionController {
+  private readonly _journals = new Map<string, ActionExecutionJournal>();
+
   public constructor(
     private readonly _skillPlanning: SkillPlanningAppService,
-    private readonly _requestSynthesis: AgentSynthesisRequester = (request) =>
-      AIProxy.instance.requestAgentSynthesis(request),
+    private readonly _requestSynthesis: AgentSynthesisRequester = (request, signal) =>
+      AIProxy.instance.requestAgentSynthesis(request, signal),
     private readonly _publishReply: ChannelReplyPublisher = publishChannelReply,
   ) {}
 
-  public async handleActionCommand(command: ActionCommand, signal?: AbortSignal): Promise<void> {
+  public async handleActionCommand(
+    command: ActionCommand,
+    signal?: AbortSignal,
+    operationId = `action:${command.trace_id}`,
+  ): Promise<CognitionActionResult | void> {
     signal?.throwIfAborted();
+    const journal = this.getJournal(operationId);
+    if (journal.recoveryRequired) throw journal.recoveryRequired;
     const cmd = command as Record<string, any>;
     const actionType = String(command.action_type ?? '');
     if (actionType === 'reply') {
-      await this.handleReplyCommand(cmd, command.trace_id, signal);
-      return;
+      await this.handleReplyCommand(cmd, command.trace_id, journal, signal);
+      return { status: 'completed' };
     }
     if (actionType === 'skill_request') {
-      await this.handleSkillRequestCommand(cmd, command.trace_id, signal);
+      await this.handleSkillRequestCommand(cmd, command.trace_id, journal, signal);
+      return { status: 'completed' };
     }
   }
 
-  private async handleReplyCommand(cmd: Record<string, any>, requestTraceId: string, signal?: AbortSignal): Promise<void> {
+  private async handleReplyCommand(
+    cmd: Record<string, any>,
+    requestTraceId: string,
+    journal: ActionExecutionJournal,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (journal.replyCommitted) return;
     const traceId = String(cmd.trace_id || requestTraceId);
     const text = cmd.payload?.text;
     if (typeof text !== 'string' || !text.trim()) {
@@ -66,9 +99,16 @@ export class SkillActionController {
       messages: cmd.payload?.messages as Parameters<typeof normalizeReplyMessages>[1],
       emotionState: cmd.emotion_state,
     });
+    journal.replyCommitted = true;
   }
 
-  private async handleSkillRequestCommand(cmd: Record<string, any>, requestTraceId: string, signal?: AbortSignal): Promise<void> {
+  private async handleSkillRequestCommand(
+    cmd: Record<string, any>,
+    requestTraceId: string,
+    journal: ActionExecutionJournal,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    if (journal.replyCommitted) return;
     const traceId = String(cmd.trace_id || requestTraceId);
     const skillRequest = cmd.payload?.skill_request ?? {};
     const sceneId = String(cmd.target?.scene_id || skillRequest.scene_id || '');
@@ -96,29 +136,34 @@ export class SkillActionController {
       planningHint: typeof skillRequest.planning_hint === 'string' ? skillRequest.planning_hint : undefined,
       conversation,
       signal,
+      journal,
     });
 
-    let synthesis: AgentSynthesisResponse;
+    let synthesis = journal.synthesis;
     try {
-      synthesis = await this._requestSynthesis({
-        original_goal: originalGoal,
-        scene_id: sceneId,
-        conversation,
-        tool_results: toolResults,
-        trace_id: traceId,
-      });
+      synthesis ??= await this._requestSynthesis({
+          original_goal: originalGoal,
+          scene_id: sceneId,
+          conversation,
+          tool_results: toolResults,
+          trace_id: traceId,
+        }, signal);
       signal?.throwIfAborted();
+      journal.synthesis = synthesis;
     } catch (error) {
+      if (isAbortError(error, signal)) throw error;
       logger.error('Skill 结果回传 Cognition 合成失败', {
         trace_id: traceId,
         scene_id: sceneId,
         error: normalizeError(error),
       });
+      signal?.throwIfAborted();
       await this._publishReply({
         traceId,
         sceneId,
         text: '工具结果已经返回，但认知合成失败，稍后再试。',
       });
+      journal.replyCommitted = true;
       return;
     }
 
@@ -134,6 +179,7 @@ export class SkillActionController {
       text: synthesis.reply_content,
       emotionState: synthesis.emotion_state,
     });
+    journal.replyCommitted = true;
   }
 
   private async planAndExecute(options: {
@@ -143,22 +189,28 @@ export class SkillActionController {
     planningHint?: string;
     conversation?: ConversationContext;
     signal?: AbortSignal;
+    journal: ActionExecutionJournal;
   }): Promise<AgentToolResult[]> {
     const readyToolCount = this._skillPlanningReadyToolCount(options.conversation);
-    let plan;
-    try {
-      plan = await this._skillPlanning.plan({
-        userGoal: [options.originalGoal, options.planningHint].filter(Boolean).join('\n'),
-        sceneId: options.sceneId,
-        traceId: options.traceId,
-        conversation: options.conversation,
-      });
-    } catch (error) {
-      return [makeToolResult('skill_planning', 'error', {
-        phase: 'planning',
-        error: normalizeError(error),
-        ready_tool_count: readyToolCount,
-      }, { providerKind: 'core', providerId: 'kernel.skill-plane' })];
+    let plan = options.journal.plan;
+    if (!plan) {
+      try {
+        plan = await this._skillPlanning.plan({
+          userGoal: [options.originalGoal, options.planningHint].filter(Boolean).join('\n'),
+          sceneId: options.sceneId,
+          traceId: options.traceId,
+          conversation: options.conversation,
+        });
+        options.journal.plan = plan;
+      } catch (error) {
+        if (isAbortError(error, options.signal)) throw error;
+        const invocationId = `${options.journal.operationId}:planning`;
+        return [makeToolResult('skill_planning', 'error', {
+          phase: 'planning',
+          error: normalizeError(error),
+          ready_tool_count: readyToolCount,
+        }, { providerKind: 'core', providerId: 'kernel.skill-plane' }, invocationId)];
+      }
     }
 
     if (plan.suggestions.length === 0) {
@@ -166,12 +218,18 @@ export class SkillActionController {
         phase: 'planning',
         reason: readyToolCount === 0 ? 'no_ready_skill' : 'no_suitable_skill',
         ready_tool_count: readyToolCount,
-      }, { providerKind: 'core', providerId: 'kernel.skill-plane' })];
+      }, { providerKind: 'core', providerId: 'kernel.skill-plane' }, `${options.journal.operationId}:planning`)];
     }
 
     const results: AgentToolResult[] = [];
-    for (const suggestion of plan.suggestions) {
+    for (const [index, suggestion] of plan.suggestions.entries()) {
       options.signal?.throwIfAborted();
+      const invocationId = `${options.journal.operationId}:tool:${index}:${suggestion.skill_id}:${suggestion.tool_name}`;
+      const committed = options.journal.toolResults.get(invocationId);
+      if (committed) {
+        results.push(committed);
+        continue;
+      }
       const source = this._skillPlanning.getSkillSource(suggestion.skill_id);
       try {
         const result = await this._skillPlanning.executeSuggestion(
@@ -179,18 +237,28 @@ export class SkillActionController {
           options.traceId,
           options.conversation,
           options.signal,
+          invocationId,
         );
-        results.push(makeToolResult(suggestion.tool_name, 'success', {
+        const toolResult = makeToolResult(suggestion.tool_name, 'success', {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           result,
-        }, source));
+        }, source, invocationId);
+        options.journal.toolResults.set(invocationId, toolResult);
+        results.push(toolResult);
       } catch (error) {
-        results.push(makeToolResult(suggestion.tool_name, 'error', {
+        if (error instanceof SkillInvocationRecoveryRequiredError) {
+          options.journal.recoveryRequired = error;
+          throw error;
+        }
+        if (isAbortError(error, options.signal)) throw error;
+        const toolResult = makeToolResult(suggestion.tool_name, 'error', {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           error: normalizeError(error),
-        }, source));
+        }, source, invocationId);
+        options.journal.toolResults.set(invocationId, toolResult);
+        results.push(toolResult);
       }
     }
     return results;
@@ -202,6 +270,24 @@ export class SkillActionController {
     } catch {
       return 0;
     }
+  }
+
+  private getJournal(operationId: string): ActionExecutionJournal {
+    const existing = this._journals.get(operationId);
+    if (existing) return existing;
+    const created: ActionExecutionJournal = {
+      operationId,
+      toolResults: new Map(),
+      replyCommitted: false,
+    };
+    this._journals.set(operationId, created);
+    if (this._journals.size > 2048) {
+      const disposable = [...this._journals].find(([, journal]) => (
+        journal.replyCommitted || journal.recoveryRequired
+      ));
+      if (disposable) this._journals.delete(disposable[0]);
+    }
+    return created;
   }
 }
 
@@ -226,8 +312,8 @@ function makeToolResult(
   status: AgentToolResult['status'],
   payload: Record<string, unknown>,
   source: { providerKind: AgentToolResult['provider_kind']; providerId: string },
+  invocationId: string,
 ): AgentToolResult {
-  const invocationId = randomUUID();
   return {
     tool_name: toolName,
     status,
@@ -238,6 +324,10 @@ function makeToolResult(
     source_event_id: invocationId,
     schema_ref: 'glimmer://skill/action-result/v1',
   };
+}
+
+function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+  return Boolean(signal?.aborted) || (error instanceof Error && error.name === 'AbortError');
 }
 
 function safeJsonStringify(value: unknown): string {

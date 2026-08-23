@@ -108,6 +108,7 @@ export class AttentionSessionManager {
 
   public async stop(): Promise<void> {
     // 先取消所有定时器和拒绝所有待处理请求
+    const cancellations: Promise<unknown>[] = [];
     for (const [source, state] of this._sceneStates.entries()) {
       if (state.timer) {
         clearTimeout(state.timer);
@@ -115,8 +116,19 @@ export class AttentionSessionManager {
       for (const pending of state.pending) {
         pending.reject(new Error('Attention session manager stopped'));
       }
+      if (state.inFlightTraceId) {
+        const traceId = state.inFlightTraceId;
+        state.cancelRequested = true;
+        cancellations.push(this._actionStream.cancelStream(source, traceId, 'attention_stopped'));
+        cancellations.push(this._aiProxy.cancelPerception({
+          scene_id: source,
+          target_trace_id: traceId,
+          reason: 'attention_stopped',
+        }));
+      }
       logger.debug('注意力会话状态已清理', { scene_id: source });
     }
+    await Promise.allSettled(cancellations);
     // 等待所有 in-flight 的 flushScene 链完成
     const chains = Array.from(this._sceneStates.values()).map((s) => s.chain);
     await Promise.allSettled(chains);
@@ -258,7 +270,14 @@ export class AttentionSessionManager {
             async (ipcSpan) => {
               ipcSpan.setAttribute('scene_id', source);
               ipcSpan.setAttribute('request_id', mergedRequest.id);
-              await this._aiProxy.sendPerceptionMessage(mergedRequest, traceId);
+              const operation = await this._aiProxy.sendPerceptionMessage(mergedRequest, traceId);
+              const terminal = await operation.completion;
+              if (terminal.state === 'cancelled') {
+                throw new DOMException(terminal.safe_message ?? '感知操作已取消', 'AbortError');
+              }
+              if (terminal.state !== 'succeeded') {
+                throw new Error(terminal.safe_message ?? `感知操作以 ${terminal.state} 结束`);
+              }
             },
             {
               attention_projection_mode: attentionProjectionMode,

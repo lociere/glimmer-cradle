@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import { createHmac } from 'node:crypto';
-import { create } from '@bufbuild/protobuf';
+import { create, fromBinary } from '@bufbuild/protobuf';
+import { ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
   PublishActionRequestSchema,
   PublishActionResponseSchema,
@@ -105,6 +106,20 @@ describe('KernelCognitionTransport', () => {
       registrationNonce: bootstrap.registrationNonce,
       authProof: new Uint8Array(32),
     }))).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    expect((transport as unknown as { registrationSecret: Buffer | null }).registrationSecret).toBeNull();
+    expect((transport as unknown as { registrationNonce: string | null }).registrationNonce).toBeNull();
+    const endpoint = 'grpc://127.0.0.1:43210';
+    const validProofAfterFailure = createHmac('sha256', Buffer.from(bootstrap.registrationSecret, 'base64url'))
+      .update(`${bootstrap.generation}\n${bootstrap.registrationNonce}\n${endpoint}\n321\n0`)
+      .digest();
+    await expect(rawCall(client, registerMethod, create(RegisterCognitionRequestSchema, {
+      call: transport.makeCallMetadata({ traceId: 'capability-must-be-invalidated' }),
+      endpoint,
+      processId: 321n,
+      supervisorProcessId: 0n,
+      registrationNonce: bootstrap.registrationNonce,
+      authProof: validProofAfterFailure,
+    }))).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
     client.close();
   });
 
@@ -194,6 +209,58 @@ describe('KernelCognitionTransport', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(aborted).toBe(true);
     expect(sideEffect).toBe(false);
+    client.close();
+  });
+
+  it('commits transport idempotency when the handler journal confirms a post-deadline side effect', async () => {
+    await transport.start();
+    const client = await registerTransport(transport, 781);
+    transport.configureActionDeadline(10);
+    const handler = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return { status: 'completed' as const };
+    });
+    transport.setActionHandler(handler);
+    const action = create(PublishActionRequestSchema, {
+      call: transport.makeCallMetadata({ traceId: 'post-commit', idempotencyKey: 'post-commit-key' }),
+      actionType: 'reply', targetSceneId: 'scene-1', text: 'committed',
+    });
+
+    expect((await rawCall(client, actionMethod, action)).status).toBe('completed');
+    expect((await rawCall(client, actionMethod, action)).duplicate).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
+    client.close();
+  });
+
+  it('returns a safe typed action failure and preserves complete call metadata', async () => {
+    await transport.start();
+    const client = await registerTransport(transport, 782);
+    transport.setActionHandler(async () => { throw new Error('private provider token and stack'); });
+    const call = transport.makeCallMetadata({
+      traceId: 'safe-trace', spanId: 'safe-span', causationId: 'safe-cause',
+      correlationId: 'safe-correlation', idempotencyKey: 'safe-key',
+    });
+    const action = create(PublishActionRequestSchema, {
+      call, actionType: 'reply', targetSceneId: 'scene-1', text: 'fail',
+    });
+
+    let error!: grpc.ServiceError;
+    try {
+      await rawCall(client, actionMethod, action);
+      throw new Error('expected PublishAction to fail');
+    } catch (caught) {
+      error = caught as grpc.ServiceError;
+    }
+    expect(error.details).toBe('Kernel action 执行失败');
+    expect(error.details).not.toContain('private provider token');
+    const binary = error.metadata.get('glimmer-error-bin')[0];
+    expect(binary).toBeInstanceOf(Buffer);
+    const detail = fromBinary(ServiceErrorDetailSchema, binary as Buffer);
+    expect(detail.call).toMatchObject({
+      traceId: 'safe-trace', spanId: 'safe-span', causationId: 'safe-cause',
+      correlationId: 'safe-correlation', idempotencyKey: 'safe-key',
+      generation: call.generation,
+    });
     client.close();
   });
 

@@ -5,8 +5,9 @@ import fs from 'fs-extra';
 import type { PerceptionEvent } from '@glimmer-cradle/protocol';
 import type {
   AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse,
-  ChatMessageResponse, ConversationHistoryRequest, ConversationHistoryResponse,
+  ConversationHistoryRequest, ConversationHistoryResponse,
   LifeHeartbeatResponse, PerceptionCancelRequest,
+  PerceptionOperationHandle, PerceptionOperationResult,
   CognitionProcessTransportPort, CognitionRequestPort, CognitionLifecycleObserver,
 } from '../../../foundation/ports/cognition-service-port';
 import { ConfigManager } from '../../../foundation/config/config-manager';
@@ -126,15 +127,15 @@ export class CognitionManager {
     }
   }
 
-  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse> {
+  public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle> {
     this.assertReady();
     const resolvedTraceId = traceId ?? createTraceContext().trace_id;
     const operation = await this.client.submitPerception(request, resolvedTraceId, this.requestTimeoutMs);
-    if (!operation.terminal) {
-      this.inFlightPerceptions.set(resolvedTraceId, operation.operation_id);
-      void this.observePerceptionTerminal(resolvedTraceId, operation.operation_id);
-    }
-    return {} as ChatMessageResponse;
+    if (!operation.terminal) this.inFlightPerceptions.set(resolvedTraceId, operation.operation_id);
+    const completion = operation.terminal
+      ? Promise.resolve(operation)
+      : this.observePerceptionTerminal(resolvedTraceId, operation.operation_id);
+    return { ...operation, trace_id: resolvedTraceId, completion };
   }
 
   public async cancelPerception(request: PerceptionCancelRequest): Promise<void> {
@@ -154,9 +155,9 @@ export class CognitionManager {
     return this.client.plan(request, traceId ?? createTraceContext().trace_id, this.requestTimeoutMs);
   }
 
-  public async sendAgentSynthesis(request: AgentSynthesisRequest): Promise<AgentSynthesisResponse> {
+  public async sendAgentSynthesis(request: AgentSynthesisRequest, signal?: AbortSignal): Promise<AgentSynthesisResponse> {
     this.assertReady();
-    return this.client.synthesize(request, this.requestTimeoutMs);
+    return this.client.synthesize(request, this.requestTimeoutMs, signal);
   }
 
   public async sendLifeHeartbeat(_request: Record<string, never>): Promise<LifeHeartbeatResponse> {
@@ -242,7 +243,7 @@ export class CognitionManager {
     this.lifecycleObserver = observer;
   }
 
-  private async observePerceptionTerminal(traceId: string, operationId: string): Promise<void> {
+  private async observePerceptionTerminal(traceId: string, operationId: string): Promise<PerceptionOperationResult> {
     while (this.inFlightPerceptions.get(traceId) === operationId && this.isReady) {
       await new Promise((resolve) => setTimeout(resolve, 100));
       try {
@@ -254,10 +255,10 @@ export class CognitionManager {
           if (this.inFlightPerceptions.get(traceId) === operationId) {
             this.inFlightPerceptions.delete(traceId);
           }
-          return;
+          return operation;
         }
       } catch (error) {
-        if (!this.isReady) return;
+        if (!this.isReady) throw new CoreException('Cognition 在感知操作到达终态前失去就绪状态', 'INFERENCE_ERROR');
         logger.warn('查询 Cognition 感知操作终态失败，将继续受管轮询', {
           operation_id: operationId,
           error: normalizeError(error),
@@ -265,6 +266,7 @@ export class CognitionManager {
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
+    throw new CoreException('感知操作在到达终态前失去受管所有权', 'INFERENCE_ERROR');
   }
 
   private attachProcessObservers(child: ChildProcess): void {

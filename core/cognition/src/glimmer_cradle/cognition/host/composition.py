@@ -76,7 +76,7 @@ def compose_cognition(
     *,
     generation: str,
     registration_nonce: str,
-    registration_secret: str,
+    registration_secret: bytearray,
     shutdown,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""

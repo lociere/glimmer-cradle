@@ -74,7 +74,7 @@ export class ApplicationRuntime implements RuntimeModule {
     const skillPlanningAppService = new SkillPlanningAppService(skillCatalogAppService);
     const skillActionController = new SkillActionController(skillPlanningAppService);
     this._setCognitionActionHandler(
-      (command, signal) => skillActionController.handleActionCommand(command, signal),
+      (command, signal, operationId) => skillActionController.handleActionCommand(command, signal, operationId),
     );
 
     const perceptionAppService = new PerceptionAppService(

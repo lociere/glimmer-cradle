@@ -91,17 +91,22 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 `GetPerceptionOperation` 观察 `accepted -> running -> succeeded/cancelled/failed`，只在真实终态
 清理 in-flight；`CancelPerception` 同时移除尚未竞争的队列/工作区输入，或取消正在执行的
 Cycle/推理 task。队满、工作区拒绝或被更高优先级输入淘汰都必须写入 `failed`，不能留下永久
-pending。
+pending。重复提交先按稳定 `operation_id` 判定；同一 operation 绑定不同 trace，或同一 trace
+改用不同 operation，均返回 `INVALID_REQUEST`，不能把冲突请求误判为幂等命中。
 
 `PublishAction` 是 Cognition 到 Kernel 的反向终态调用。Kernel 持有 deadline 并把客户端取消或
-deadline 传播为 `AbortSignal`，Skill/工具副作用在提交前必须检查该信号；不可逆 provider 仍由
-Skill Plane 以 operation id、幂等键和其补偿规则负责恢复。响应只允许 `completed` 或
-`duplicate`；幂等键只在副作用成功后提交，失败可重试，并发同键调用合并为一次执行。typed
-failure 通过 gRPC status 与 `ServiceErrorDetail` 的受控 metadata 返回，message 不携带内部异常。
+deadline 传播为 `AbortSignal`，贯穿工具调用与 `Synthesize` gRPC；取消不是合成失败，不能发布
+fallback reply。Skill Plane 从 action operation 派生稳定 invocation id，并以步骤账本记录工具与
+reply 的 committed 状态：提交后的重试只恢复未完成步骤，不能重复副作用；终态不明的不可逆
+provider 返回“需要人工恢复”，拒绝自动重放。响应只允许 `completed` 或 `duplicate`；transport
+只有在 handler 正常完成或步骤账本确认副作用已提交后才记录幂等完成，并发同键调用合并为一次
+执行。typed failure 通过 gRPC status 与 `ServiceErrorDetail` 的完整受控 `CallMetadata` 返回，对外
+message 不携带内部异常。
 
 Cognition 注册使用 Kernel 通过匿名 bootstrap pipe 单次交付的 nonce/capability secret。HMAC
 proof 绑定 generation、nonce、Cognition 动态回环 endpoint、Service PID 与受监督子进程 PID；
-注册成功即清零 secret。PID 字段只参与已认证 proof 和监督树关系校验，不再被当作独立身份凭据。
+注册成功或任一注册校验失败都立即清零并作废 secret/nonce。PID 字段只参与已认证 proof 和监督树
+关系校验，不再被当作独立身份凭据。
 
 `PerceptionEvent` 的寻址和响应策略分层表达：
 

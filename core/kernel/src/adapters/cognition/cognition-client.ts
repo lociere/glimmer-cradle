@@ -187,7 +187,7 @@ export class CognitionClient {
     };
   }
 
-  public async synthesize(request: AgentSynthesisRequest, timeoutMs: number): Promise<AgentSynthesisResponse> {
+  public async synthesize(request: AgentSynthesisRequest, timeoutMs: number, signal?: AbortSignal): Promise<AgentSynthesisResponse> {
     const traceId = request.trace_id || randomUUID();
     const response = await this.transport.call(
       this.transport.methods.Synthesize,
@@ -208,7 +208,7 @@ export class CognitionClient {
           schemaRef: result.schema_ref,
         })),
       }),
-      { timeoutMs, traceId },
+      { timeoutMs, traceId, signal },
     );
     return { reply_content: response.replyContent, emotion_state: structToObject(response.emotionState), trace_id: response.traceId };
   }
