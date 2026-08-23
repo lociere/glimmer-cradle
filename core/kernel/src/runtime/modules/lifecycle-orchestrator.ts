@@ -5,18 +5,17 @@
  * 这样 Kernel 作为中枢表达“我确认哪些 runtime 已就绪”，各 runtime delegate
  * 只负责自己的组装细节，不再各自抢着宣布全局启动成功。
  */
-import type { TraceContext } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../ports/kernel-side-effects.port';
+import type { TraceContext } from '../../domain/kernel-contracts';
+import type { KernelEventBusPort } from '../../ports/event-bus.port';
+import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
 import {
   normalizeRuntimeReadiness,
   strongestRuntimeReadinessState,
   summarizeRuntimeReadiness,
 } from '../../ports/runtime-readiness.port';
-import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { RuntimeModule } from './runtime-module';
 import { startRuntimeModule, stopRuntimeModule } from './runtime-module';
-
-const logger = getLogger('lifecycle-orchestrator');
 
 export interface RuntimePhase {
   readonly name: string;
@@ -35,6 +34,12 @@ export class LifecycleOrchestrator {
   private readonly startedModules: RuntimeModule[] = [];
   private readonly startupRecords: RuntimeStartupRecord[] = [];
 
+  public constructor(
+    private readonly logger: KernelLoggerPort,
+    private readonly eventBus: KernelEventBusPort,
+    private readonly projection: RuntimeProjectionInputPort,
+  ) {}
+
   public get started(): RuntimeModule[] {
     return [...this.startedModules];
   }
@@ -44,7 +49,7 @@ export class LifecycleOrchestrator {
   }
 
   public async startPhase(phase: RuntimePhase, context: TraceContext): Promise<void> {
-    logger.info('启动阶段开始', {
+    this.logger.info('启动阶段开始', {
       phase: phase.name,
       modules: phase.modules.map((module) => module.name),
       mode: phase.mode ?? 'serial',
@@ -58,14 +63,14 @@ export class LifecycleOrchestrator {
       }
     }
 
-    logger.info('启动阶段完成', {
+    this.logger.info('启动阶段完成', {
       phase: phase.name,
       module_count: phase.modules.length,
     });
   }
 
   private async startModule(phase: string, module: RuntimeModule, context: TraceContext): Promise<void> {
-    const result = await startRuntimeModule(module, context);
+    const result = await startRuntimeModule(module, context, this.eventBus);
     this.startedModules.push(module);
     this.startupRecords.push({
       phase,
@@ -79,12 +84,12 @@ export class LifecycleOrchestrator {
         ...snapshot,
         duration_ms: snapshot.duration_ms ?? result.startupTimeMs,
       }));
-    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots(module.name, snapshots);
+    this.projection.replaceModuleSnapshots(module.name, snapshots);
     const readiness = summarizeRuntimeReadiness(snapshots)
       ?? (typeof result.details?.readiness === 'string' ? result.details.readiness : undefined);
     const readinessState = strongestRuntimeReadinessState(snapshots);
     const hasBlockingGate = snapshots.some((snapshot) => snapshot.blocking);
-    logger.info('启动模块完成', {
+    this.logger.info('启动模块完成', {
       phase,
       runtime_module: module.name,
       startup_time_ms: result.startupTimeMs,
@@ -95,7 +100,7 @@ export class LifecycleOrchestrator {
     });
 
     if (result.details && Object.keys(result.details).length > 0) {
-      logger.debug('启动模块详情', {
+      this.logger.debug('启动模块详情', {
         phase,
         runtime_module: module.name,
         ...result.details,
@@ -105,11 +110,11 @@ export class LifecycleOrchestrator {
 
   public async stopStarted(context: TraceContext): Promise<void> {
     for (const module of [...this.startedModules].reverse()) {
-      await stopRuntimeModule(module, context);
-      logger.info('停止模块完成', { runtime_module: module.name });
+      await stopRuntimeModule(module, context, this.eventBus);
+      this.logger.info('停止模块完成', { runtime_module: module.name });
     }
     this.startedModules.length = 0;
     this.startupRecords.length = 0;
-    RuntimeReadinessProjectionMapper.instance.clear();
+    this.projection.clear();
   }
 }

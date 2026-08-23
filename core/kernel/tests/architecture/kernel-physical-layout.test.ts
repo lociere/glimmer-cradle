@@ -90,7 +90,16 @@ describe('Kernel physical layout', () => {
     const concreteImportsOutsideComposition = files.filter((file) => ['domain', 'application', 'ports', 'runtime'].includes(layerFor(file)) && parseImportEdges(fs.readFileSync(file, 'utf8'))
       .some((edge) => layerFor(resolveImport(file, edge.source)) === 'adapters'));
     expect(concreteImportsOutsideComposition).toEqual([]);
-    const readinessStores = files.filter((file) => fs.readFileSync(file, 'utf8').includes('_snapshotsByModule.set('));
+    const readinessStores = files.filter((file) => fs.readFileSync(file, 'utf8').includes('snapshotsByModule.set('));
     expect(readinessStores).toEqual([path.join(sourceRoot, 'application', 'projection', 'runtime-readiness-projection.ts')]);
+  });
+
+  it('rejects service locators, Proxy façades and untyped or raw Node capability aliases in Ports', () => {
+    const portSources = walkTypeScript(path.join(sourceRoot, 'ports'))
+      .map((file) => fs.readFileSync(file, 'utf8'))
+      .join('\n');
+    expect(portSources).not.toMatch(/\bProxy\b|\bdeferredPort\b|\bserviceLocator\b|\bkernelSideEffectPorts\b/);
+    expect(portSources).not.toMatch(/\b(?:nodeFs|ChildProcessWithoutNullStreams|RawData)\b/);
+    expect(portSources).not.toMatch(/:\s*any\b|\bas\s+any\b|<\s*any\s*>|\bany\s*\[\s*\]/);
   });
 });

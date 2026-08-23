@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ReplayDeliveryAck, ReplayDeliveryRequest } from '../../adapters/events/event-bus';
+import type { ReplayDeliveryAck, ReplayDeliveryRequest } from '../../ports/event-bus.port';
 import { resolveStatePath } from '../filesystem/path-utils';
 
 const handlerId = 'organism.life-clock.state-sync.v1';

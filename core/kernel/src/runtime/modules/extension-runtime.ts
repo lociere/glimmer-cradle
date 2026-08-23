@@ -1,24 +1,22 @@
-import { ExtensionManager } from '../../application/extension-supervision/extension-manager';
-import { ExtensionHostAppService } from '../../application/use-cases/extension-host-app.service';
-import { ControlSurfaceGateway } from '../../application/capabilities/control-surface/control-surface-gateway';
 import type { RuntimeModule } from './runtime-module';
-import type { ExtensionProductTarget, TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from '../../domain/kernel-contracts';
+import type { ExtensionLifecycleControllerPort, ExtensionRuntimePort } from '../../ports/runtime-capabilities.port';
 
 export class ExtensionRuntime implements RuntimeModule {
   public readonly name = 'extension-runtime';
-  private _extensionManager: ExtensionManager | null = null;
+  private extensionController: ExtensionLifecycleControllerPort | null = null;
   private _activationTask: Promise<void> | null = null;
 
   public constructor(
-    private readonly extensionHostAppService: ExtensionHostAppService,
-    private readonly productId: Exclude<ExtensionProductTarget, 'any'>,
+    private readonly extensionRuntime: ExtensionRuntimePort,
+    private readonly productId: 'desktop' | 'personal-server',
   ) {}
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
-    const extensionManager = new ExtensionManager(this.extensionHostAppService, this.productId);
-    this._extensionManager = extensionManager;
+    const extensionManager = this.extensionRuntime.createController(this.productId);
+    this.extensionController = extensionManager;
     await extensionManager.init();
-    ControlSurfaceGateway.instance.setExtensionLifecycleController(extensionManager);
+    this.extensionRuntime.attachController(extensionManager);
     this._activationTask = extensionManager.startAllExtensions().catch(() => undefined);
     return {
       extension_host: 'discovering-complete',
@@ -28,11 +26,11 @@ export class ExtensionRuntime implements RuntimeModule {
   }
 
   public async stop(_context: TraceContext): Promise<void> {
-    if (this._extensionManager) {
-      await this._extensionManager.shutdown();
-      this._extensionManager = null;
+    if (this.extensionController) {
+      await this.extensionController.shutdown();
+      this.extensionController = null;
     }
     this._activationTask = null;
-    ControlSurfaceGateway.instance.setExtensionLifecycleController(null);
+    this.extensionRuntime.attachController(null);
   }
 }

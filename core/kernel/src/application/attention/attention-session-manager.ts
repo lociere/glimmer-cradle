@@ -1,13 +1,9 @@
-import type { PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { PerceptionEvent } from '../../ports/application-models';
 import type { PerceptionCancelRequest } from '../../ports/cognition-service-port';
 import { IAICapabilityPort, IActionStreamPort } from '../../ports';
-import { withTrace } from '../../ports/kernel-side-effects.port';
-import { ConfigManager } from '../../ports/kernel-side-effects.port';
-import { getLogger } from '../../ports/kernel-side-effects.port';
-import { histogram, span } from '../../ports/kernel-side-effects.port';
 import { AttentionLeaseStore, AttentionProjectionMode } from '../../domain/attention/attention-lease-store';
-
-const logger = getLogger('attention-session-manager');
+import type { LifeClockConfiguration } from '../../ports/configuration.port';
+import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
 
 type PendingIngress = {
   request: PerceptionEvent;
@@ -52,38 +48,35 @@ type SceneIngressState = {
 };
 
 export class AttentionSessionManager {
-  private static _instance: AttentionSessionManager | null = null;
   private readonly _sceneStates: Map<string, SceneIngressState> = new Map();
   private _initialized: boolean = false;
   private _debounceMs: number = 1400;
   private _focusedDebounceMs: number = 700;
   private _maxBatchMessages: number = 4;
   private _maxBatchItems: number = 24;
-  private readonly _attentionLeaseStore: AttentionLeaseStore = AttentionLeaseStore.instance;
+  private readonly logger: KernelLoggerPort;
   private _aiProxy!: IAICapabilityPort;
   private _actionStream!: IActionStreamPort;
 
-  public static get instance(): AttentionSessionManager {
-    if (!AttentionSessionManager._instance) {
-      AttentionSessionManager._instance = new AttentionSessionManager();
-    }
-    return AttentionSessionManager._instance;
+  public constructor(
+    private readonly config: LifeClockConfiguration,
+    private readonly observability: KernelObservabilityPort,
+    private readonly _attentionLeaseStore: AttentionLeaseStore,
+  ) {
+    this.logger = observability.logger('attention-session-manager');
   }
-
-  private constructor() {}
 
   public init(aiProxy: IAICapabilityPort, actionStream: IActionStreamPort): void {
     this._aiProxy = aiProxy;
     this._actionStream = actionStream;
-    const config = ConfigManager.instance.getConfig();
-    const lifeClock = config.character.inference.life_clock;
+    const lifeClock = this.config;
     this._debounceMs = lifeClock.ingress_debounce_ms;
     this._focusedDebounceMs = lifeClock.ingress_focused_debounce_ms;
     this._maxBatchMessages = lifeClock.ingress_max_batch_messages;
     this._maxBatchItems = lifeClock.ingress_max_batch_items;
     this._initialized = true;
 
-    logger.info('注意力会话管理器初始化完成', {
+    this.logger.info('注意力会话管理器初始化完成', {
       ingress_debounce_ms: this._debounceMs,
       ingress_focused_debounce_ms: this._focusedDebounceMs,
       ingress_max_batch_messages: this._maxBatchMessages,
@@ -126,7 +119,7 @@ export class AttentionSessionManager {
           reason: 'attention_stopped',
         }));
       }
-      logger.debug('注意力会话状态已清理', { scene_id: source });
+      this.logger.debug('注意力会话状态已清理', { scene_id: source });
     }
     await Promise.allSettled(cancellations);
     // 等待所有 in-flight 的 flushScene 链完成
@@ -165,7 +158,7 @@ export class AttentionSessionManager {
       state.chain = state.chain
         .then(() => this.flushScene(source, state))
         .catch((error: unknown) => {
-          logger.error('注意力场景刷新失败', {
+          this.logger.error('注意力场景刷新失败', {
             scene_id: source,
             error: error instanceof Error ? error.message : String(error),
           });
@@ -188,13 +181,13 @@ export class AttentionSessionManager {
     void this._actionStream.cancelStream(source, state.inFlightTraceId, 'new_ingress_interrupt').catch(() => {});
 
     void this._aiProxy.cancelPerception(cancelRequest).catch((error: unknown) => {
-      logger.warn('发送生成中断请求失败', {
+      this.logger.warn('发送生成中断请求失败', {
         scene_id: source,
         target_trace_id: state.inFlightTraceId,
         error: error instanceof Error ? error.message : String(error),
       });
     });
-    logger.info('已触发生成中断请求', {
+    this.logger.info('已触发生成中断请求', {
       scene_id: source,
       target_trace_id: state.inFlightTraceId,
     });
@@ -237,8 +230,8 @@ export class AttentionSessionManager {
     state.inFlightTraceId = traceId;
     state.cancelRequested = false;
 
-    await withTrace(traceId, async () => {
-      await span('attention.flush', async (flushSpan: any) => {
+    await this.observability.withTrace(traceId, async () => {
+      await this.observability.span('attention.flush', async (flushSpan) => {
         flushSpan.setAttribute('scene_id', source);
         flushSpan.setAttribute('batch_size', batch.length);
         flushSpan.setAttribute('dropped_count', overflowCount);
@@ -247,12 +240,12 @@ export class AttentionSessionManager {
         flushSpan.setAttribute('address_mode', mergedRequest.address_mode);
         flushSpan.setAttribute('response_policy', mergedRequest.response_policy ?? 'reply_allowed');
         flushSpan.setAttribute('modality', mergedRequest.content?.modality ?? []);
-        histogram('attention.ingress_wait_ms', queueWaitMs, {
+        this.observability.histogram('attention.ingress_wait_ms', queueWaitMs, {
           attention_projection_mode: attentionProjectionMode,
           address_mode: mergedRequest.address_mode,
           response_policy: mergedRequest.response_policy ?? 'reply_allowed',
         });
-        histogram('attention.batch_size', batch.length, {
+        this.observability.histogram('attention.batch_size', batch.length, {
           attention_projection_mode: attentionProjectionMode,
           address_mode: mergedRequest.address_mode,
           response_policy: mergedRequest.response_policy ?? 'reply_allowed',
@@ -265,9 +258,9 @@ export class AttentionSessionManager {
         );
 
         try {
-          await span(
+          await this.observability.span(
             'attention.ipc.perception_message',
-            async (ipcSpan: any) => {
+            async (ipcSpan) => {
               ipcSpan.setAttribute('scene_id', source);
               ipcSpan.setAttribute('request_id', mergedRequest.id);
               const operation = await this._aiProxy.sendPerceptionMessage(mergedRequest, traceId);
@@ -290,7 +283,7 @@ export class AttentionSessionManager {
             batch[index].resolve();
           }
           batch[batch.length - 1].resolve();
-          logger.debug('注意力批次完成', {
+          this.logger.debug('注意力批次完成', {
             scene_id: source,
             batch_size: batch.length,
           });
@@ -322,7 +315,7 @@ export class AttentionSessionManager {
             for (const entry of batch) {
               entry.resolve();
             }
-            logger.info('in-flight 批次被中断，内容已暂存供下次合并', {
+            this.logger.info('in-flight 批次被中断，内容已暂存供下次合并', {
               scene_id: source,
               batch_size: batch.length,
               trace_id: traceId,
@@ -332,7 +325,7 @@ export class AttentionSessionManager {
             for (const entry of batch) {
               entry.reject(error);
             }
-            logger.error('注意力批次失败', {
+            this.logger.error('注意力批次失败', {
               scene_id: source,
               batch_size: batch.length,
               trace_id: traceId,

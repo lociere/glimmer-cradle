@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SkillProviderRuntimeSnapshot } from '../../src/application/skill-plane/types';
-import { buildMcpRuntimeReadinessSnapshots } from '../../src/application/skill-plane/providers/mcp-server/mcp-server-runtime-readiness';
+import type { SkillProviderRuntimeSnapshot } from '../../src/ports/skill-plane.port';
+import { buildMcpRuntimeReadinessSnapshots } from '../../src/adapters/skill-plane/mcp-server/mcp-server-runtime-readiness';
 
 describe('mcp-server-runtime-readiness', () => {
   it('returns a ready aggregate when no MCP provider is enabled', () => {

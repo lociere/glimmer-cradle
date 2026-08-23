@@ -8,7 +8,7 @@ import { DomainEvent } from "./domain-events";
 import type { TraceContext } from "../kernel-contracts";
 
 export interface StateSyncPayload {
-  state: Record<string, any>;
+  state: Record<string, unknown>;
 }
 
 export class StateSyncEvent extends DomainEvent {

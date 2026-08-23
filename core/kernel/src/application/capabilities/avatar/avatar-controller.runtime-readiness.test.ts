@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
 import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
-import { AvatarController } from './avatar-controller';
+import { AvatarController } from '../../../adapters/avatar/avatar-controller';
+
+const readinessProjection = new RuntimeReadinessProjectionMapper();
+const avatarController = new AvatarController(readinessProjection);
 
 function createUnityAvatarHostConfig(
   overrides: Partial<AvatarConfig> = {},
@@ -40,19 +43,19 @@ async function waitFor(
 }
 
 function getAvatarRuntime() {
-  return RuntimeReadinessProjectionMapper.instance.getCatalog().runtimes.find(
+  return readinessProjection.getCatalog().runtimes.find(
     (runtime) => runtime.runtime_id === 'avatar.host',
   );
 }
 
 describe('AvatarController runtime readiness sync', () => {
   afterEach(async () => {
-    await AvatarController.instance.stop();
-    RuntimeReadinessProjectionMapper.instance.clear();
+    await avatarController.stop();
+    readinessProjection.clear();
   });
 
   it('keeps avatar runtime readiness aligned with shell lifecycle', async () => {
-    await AvatarController.instance.init(createUnityAvatarHostConfig());
+    await avatarController.init(createUnityAvatarHostConfig());
 
     await waitFor(() => Boolean(getAvatarRuntime()));
     expect(getAvatarRuntime()?.state).toBe('degraded');
@@ -63,7 +66,7 @@ describe('AvatarController runtime readiness sync', () => {
       || resource.resource_kind === 'unity_sdk'
     ))).toBe(true);
 
-    const server = (AvatarController.instance as unknown as {
+    const server = (avatarController as unknown as {
       _wss?: { address: () => string | { port: number } | null };
     })._wss;
     const address = server?.address();

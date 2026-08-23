@@ -12,12 +12,10 @@
  *   - 灵魂纯净：此网关之后的一切代码，不应看到任何平台私有字段
  *   - 位于 IngressGate 之前，是数据进入系统的第一道净化关卡
  */
-import { randomUUID } from '../../ports/kernel-side-effects.port';
-import { getLogger } from '../../ports/kernel-side-effects.port';
-import type { PerceptionEvent, PerceptionModalityItem } from '@glimmer-cradle/protocol';
+import type { PerceptionEvent, PerceptionModalityItem } from '../../ports/application-models';
 import { ConversationDirectory } from '../../application/capabilities/conversation/conversation-directory';
-
-const logger = getLogger('identity-router');
+import type { StableIdentityPort } from '../../ports/identity.port';
+import type { KernelLoggerPort } from '../../ports/observability.port';
 
 // ── CQ 码解析正则 ─────────────────────────────────────────
 const CQ_CODE_RE = /\[CQ:(\w+)(?:,([^\]]*))?\]/g;
@@ -34,19 +32,14 @@ interface AdapterMapping {
  * 负责在消息进入系统前完成身份归一化与协议清洗
  */
 export class IdentityRouter {
-  private static _instance: IdentityRouter | null = null;
-
   /** platform:raw_id → adapter_id 映射缓存 */
   private _adapterMap: Map<string, AdapterMapping> = new Map();
 
-  public static get instance(): IdentityRouter {
-    if (!IdentityRouter._instance) {
-      IdentityRouter._instance = new IdentityRouter();
-    }
-    return IdentityRouter._instance;
-  }
-
-  private constructor() {}
+  public constructor(
+    private readonly identity: StableIdentityPort,
+    private readonly conversations: ConversationDirectory,
+    private readonly logger: KernelLoggerPort,
+  ) {}
 
   // ═══════════════════════════════════════════════════════════
   //  身份映射
@@ -61,13 +54,13 @@ export class IdentityRouter {
     const existing = this._adapterMap.get(key);
     if (existing) return existing.adapterId;
 
-    const adapterId = `a_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const adapterId = `a_${this.identity.newId().replace(/-/g, '').slice(0, 12)}`;
     this._adapterMap.set(key, {
       adapterId,
       platform,
       createdAt: Date.now(),
     });
-    logger.info('新 adapter 身份已注册', { platform, raw_id: rawId, adapter_id: adapterId });
+    this.logger.info('新 adapter 身份已注册', { platform, raw_id: rawId, adapter_id: adapterId });
     return adapterId;
   }
 
@@ -82,7 +75,7 @@ export class IdentityRouter {
         createdAt: Date.now(),
       });
     }
-    logger.info('adapter 映射已加载', { count: entries.length });
+    this.logger.info('adapter 映射已加载', { count: entries.length });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -141,7 +134,7 @@ export class IdentityRouter {
           break;
         default:
           // 未知 CQ 码 → 静默丢弃，记录日志
-          logger.debug('未知 CQ 码类型已丢弃', { cq_type: cqType });
+          this.logger.debug('未知 CQ 码类型已丢弃', { cq_type: cqType });
           break;
       }
     }
@@ -188,8 +181,8 @@ export class IdentityRouter {
     if (items.some(i => i.modality === 'image')) modality.push('image');
     if (items.some(i => i.modality === 'video')) modality.push('video');
 
-    const traceId = randomUUID();
-    const resolved = ConversationDirectory.instance.resolve({
+    const traceId = this.identity.newId();
+    const resolved = this.conversations.resolve({
       provider_id: 'identity-router',
       provider_account_id: rawEvent.platform,
       space_kind: rawEvent.rawGroupId ? 'group' : 'direct',
@@ -229,7 +222,7 @@ export class IdentityRouter {
       },
     };
 
-    logger.debug('感知请求已组装', {
+    this.logger.debug('感知请求已组装', {
       trace_id: traceId,
       adapter_id: adapterId,
       source: request.source,

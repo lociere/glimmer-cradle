@@ -1,26 +1,20 @@
-import { CognitionManager } from '../../application/capabilities/inference/cognition-manager';
-import { CognitionClient } from '../../ports/kernel-side-effects.port';
-import { KernelCognitionTransport } from '../../ports/kernel-side-effects.port';
-import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { CognitionLifecycleState } from '../../ports/cognition-service-port';
+import type { CognitionLifecycleUseCasePort, RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
 import type { KernelTransportRuntime } from './kernel-transport-runtime';
 import type { RuntimeModule, RuntimeModuleStartDetails } from './runtime-module';
-import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from '../../domain/kernel-contracts';
 
 export class CognitionRuntime implements RuntimeModule {
   public readonly name = 'cognition';
 
-  public constructor(private readonly transportRuntime: KernelTransportRuntime) {
-    const transport = KernelCognitionTransport.instance;
-    CognitionManager.configure(
-      transport,
-      new CognitionClient(transport),
-      (state, summary) => this.publishLifecycle(state, summary),
-    );
-  }
+  public constructor(
+    private readonly transportRuntime: KernelTransportRuntime,
+    private readonly cognition: CognitionLifecycleUseCasePort,
+    private readonly projection: RuntimeProjectionInputPort,
+  ) {}
 
   public async start(_context: TraceContext): Promise<RuntimeModuleStartDetails> {
-    await CognitionManager.instance.start();
+    await this.cognition.start();
     return {
       readiness: 'service_config_knowledge_ready',
       runtime_readiness: {
@@ -36,11 +30,11 @@ export class CognitionRuntime implements RuntimeModule {
   }
 
   public async stop(_context: TraceContext): Promise<void> {
-    await CognitionManager.instance.stop();
+    await this.cognition.stop();
   }
 
-  private publishLifecycle(state: CognitionLifecycleState, summary: string): void {
-    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots(this.name, [{
+  public acceptLifecycleFact(state: CognitionLifecycleState, summary: string): void {
+    this.projection.replaceModuleSnapshots(this.name, [{
       runtime_id: 'cognition',
       owner: 'cognition',
       phase: state === 'ready' ? 'service_config_knowledge' : 'supervised_process',

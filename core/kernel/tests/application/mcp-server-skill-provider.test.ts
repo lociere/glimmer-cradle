@@ -2,12 +2,28 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
-import { McpServerSkillProvider } from '../../src/application/skill-plane/providers/mcp-server/mcp-server-skill-provider';
+import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
+import { McpServerSkillProvider } from '../../src/adapters/skill-plane/mcp-server/mcp-server-skill-provider';
+import { RuntimeReadinessProjectionMapper } from '../../src/application/projection/runtime-readiness-projection';
+import type { KernelObservabilityPort } from '../../src/ports/observability.port';
+
+const observability: KernelObservabilityPort = {
+  logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),
+  createTraceContext: (traceId) => ({ trace_id: traceId ?? 'trace-test' }),
+  currentTraceId: () => undefined,
+  withTrace: async (_traceId, operation) => operation(),
+  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
+  histogram: () => undefined,
+  counter: () => undefined,
+  start: () => undefined,
+  stop: () => undefined,
+  close: async () => undefined,
+};
 
 describe('McpServerSkillProvider', () => {
   it('把 stdio MCP 的 tool、resource、prompt 投影为可调用 Skill，并在停止时回收', async () => {
-    const registry = SkillRegistry.instance;
-    const provider = new McpServerSkillProvider(() => ({
+    const registry = new SkillRegistry();
+    const provider = new McpServerSkillProvider(new RuntimeReadinessProjectionMapper(), () => ({
       mcp_servers: [
         {
           id: 'fixture',
@@ -41,7 +57,13 @@ describe('McpServerSkillProvider', () => {
       expect(skill?.resources?.map((resource) => resource.id)).toContain('selrena-test://profile');
       expect(skill?.prompts?.map((prompt) => prompt.id)).toContain('greet');
 
-      const gateway = new SkillInvocationGateway(registry);
+      const gateway = new SkillInvocationGateway(
+        registry,
+        new SkillPolicyEngine(),
+        { record: () => undefined },
+        observability,
+        { record: () => undefined },
+      );
       const toolResult = await gateway.invoke({
         skillId: 'mcp.fixture',
         toolName: 'echo',

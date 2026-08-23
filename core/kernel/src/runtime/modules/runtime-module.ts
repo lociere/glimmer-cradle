@@ -1,7 +1,7 @@
-import { EventBus } from '../../ports/kernel-side-effects.port';
 import { ModuleStartedEvent, ModuleStoppedEvent } from '../../domain/events';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
-import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from '../../domain/kernel-contracts';
+import type { KernelEventBusPort } from '../../ports/event-bus.port';
 
 export interface RuntimeModuleStartDetails extends Record<string, unknown> {
   readonly readiness?: string;
@@ -22,11 +22,12 @@ export interface RuntimeModuleStartResult {
 export async function startRuntimeModule(
   module: RuntimeModule,
   context: TraceContext,
+  eventBus: KernelEventBusPort,
 ): Promise<RuntimeModuleStartResult> {
   const startedAt = Date.now();
   const details = await module.start(context);
   const startupTimeMs = Date.now() - startedAt;
-  await EventBus.instance.publish(
+  await eventBus.publish(
     new ModuleStartedEvent({
       moduleName: module.name,
       startupTimeMs,
@@ -41,9 +42,10 @@ export async function startRuntimeModule(
 export async function stopRuntimeModule(
   module: RuntimeModule,
   context: TraceContext,
+  eventBus: KernelEventBusPort,
 ): Promise<void> {
   await module.stop(context);
-  await EventBus.instance.publish(
+  await eventBus.publish(
     new ModuleStoppedEvent({ moduleName: module.name }, context),
   );
 }

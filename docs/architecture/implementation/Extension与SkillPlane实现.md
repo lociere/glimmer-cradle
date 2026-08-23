@@ -1,7 +1,7 @@
 # Extension 与 Skill Plane 实现
 
 > 范围：Extension SDK、Extension Host、Skill Registry、Policy、Invocation Gateway、Core/Extension/MCP/User Provider 和 Adapter 如何在代码中接线；不写 SDK 字段全表。
-> 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/application/extension-supervision/extension-manager.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
+> 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/adapters/{extension-host,skill-plane}/`、`core/kernel/src/ports/{extension-host,skill-plane,application-capabilities}.port.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
 > 维护触发：SDK API、manifest、permissions/requires、activation、provider 生命周期、MCP、Policy、Gateway、catalog、confirmation 或 audit 变化。
 
 ## 目录
@@ -25,17 +25,17 @@
 | `host/` | Host port 类型 |
 | `utilities/websocket/` | 扩展侧 WebSocket bridge |
 | `protocol/src/schemas/models/ExtensionRuntimeProjection.schema.json` | Extension Host 运行投影的跨进程契约 |
-| `core/kernel/src/application/extension-supervision/extension-manager.ts` | Kernel ExtensionManager |
-| `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧独立 Host 监督、权限和 Port RPC |
+| `core/kernel/src/adapters/extension-host/extension-manager.ts` | Kernel ExtensionManager |
+| `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧 Worker 监督、权限和 Port RPC |
 | `core/kernel/src/adapters/extension-host/extension-host-worker.ts` | 扩展入口唯一加载点与 SDK Context bridge |
 | `packages/extension-sdk/src/host/process-protocol.ts` | Host/Worker 双向进程消息 |
-| `core/kernel/src/application/extension-supervision/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
+| `core/kernel/src/adapters/extension-host/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
 | `core/kernel/src/adapters/extension-host/extension-dependency-installer.ts` | Extension 外部依赖准备、下载缓存和解压安装 |
 | `core/kernel/src/adapters/extension-host/managed-resource-supervisor.ts` | Extension 受管资源 readiness gate 检查，并产出 Capability Graph 节点 |
-| `application/services/extension-host-app.service.ts` | Extension Host application service |
-| `application/services/extension-runtime-registry.ts` | Host-owned Contribution Point Registry 到 Capability Graph projection 的转换器 |
+| `core/kernel/src/adapters/extension-host/extension-host-application-adapter.ts` | Extension Host 到 Application capability Ports 的适配器 |
+| `core/kernel/src/adapters/extension-host/extension-runtime-registry.ts` | Host-owned Contribution Point Registry 到 Capability Graph projection 的转换器 |
 
-Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。每个激活扩展运行在独立 Node Host 进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Worker 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。Host 负责加载、激活、停止、释放、超时和进程树错误隔离；这是故障隔离，不是承诺抵御恶意本机代码的 OS 沙箱。
+Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当前每个激活扩展运行在受 Kernel 直接监督的独立 Node Worker 子进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Worker 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。Kernel 负责加载、激活、停止、释放、超时和进程树错误隔离；这是 Slice 3 保留的监督实现，不等于 Slice 6 的独立 `hosts/extension-host/`，也不是承诺抵御恶意本机代码的 OS 沙箱。
 
 记忆相关 SDK Port 当前落点：
 
@@ -60,7 +60,7 @@ Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。每
 
 Control Center 通过桌面桥向 Kernel 发送扩展生命周期请求；Kernel 只暴露 `loadExtension`、`startExtension`、`stopExtension` 的受控入口，不允许 Electron renderer 直接触碰扩展进程或 Host 内部对象。运行投影契约是 `ExtensionRuntimeProjection`：Host 通过 `ExtensionRuntimeRegistry` 聚合 manifest 身份字段、lifecycle、contribution point definitions、带 `audience` 的 Capability Graph、带 `audience` 的 action intents 和 diagnostics 后推送给 Desktop，Renderer 只消费该投影。
 
-`ExtensionManager` 只从 `data/packages/extensions/<id>/<version>/` 发现已安装 manifest，并由 `configs/extensions/active.yaml` 的 `{ id, version }` 精确选择启动版本；不存在目录覆盖式升级或单一 package 兼容入口。Package Manager 另行发布 `ExtensionInstallationProjection`，表达已安装版本集合和当前激活版本；Extension Host 发布 `ExtensionRuntimeProjection`，只表达当前选择版本的运行事实。安装新版本不会隐式替换旧版本，控制表面通过带目标 `version` 的 lifecycle request 显式切换。在 `init()` 时注册 discovered 投影，在 `loadExtension()` 时升级 manifest/运行投影，在 `startExtension()`、`stopExtension()` 和激活失败时更新 lifecycle；`ControlSurfaceGateway` 支持 `extension_runtime_projection_request` 并广播 `extension_runtime_projection_changed`。产品表面直接消费两类权威投影，不扫描扩展源码仓库，也不读取扩展 storage 或运行日志来还原事实。extension lifecycle module 会经 `host/extension-runtime-readiness.ts` 把这些运行投影折叠成 `RuntimeReadinessSnapshot[]` 返回给 Lifecycle Orchestrator；后续扩展启停和失败继续覆写 `RuntimeReadinessCatalogStore` 中对应模块的 snapshots。
+`ExtensionManager` 只从 `data/packages/extensions/<id>/<version>/` 发现已安装 manifest，并由 `configs/extensions/active.yaml` 的 `{ id, version }` 精确选择启动版本；不存在目录覆盖式升级或单一 package 兼容入口。Package Manager 另行发布 `ExtensionInstallationProjection`，表达已安装版本集合和当前激活版本；Extension Host 发布 `ExtensionRuntimeProjection`，只表达当前选择版本的运行事实。安装新版本不会隐式替换旧版本，控制表面通过带目标 `version` 的 lifecycle request 显式切换。在 `init()` 时注册 discovered 投影，在 `loadExtension()` 时升级 manifest/运行投影，在 `startExtension()`、`stopExtension()` 和激活失败时更新 lifecycle；`ControlSurfaceGateway` 支持 `extension_runtime_projection_request` 并广播 `extension_runtime_projection_changed`。产品表面直接消费两类权威投影，不扫描扩展源码仓库，也不读取扩展 storage 或运行日志来还原事实。extension runtime module 会经 `adapters/extension-host/extension-runtime-readiness.ts` 把这些运行投影折叠成 `RuntimeReadinessSnapshot[]`；后续扩展启停和失败经 `RuntimeProjectionInputPort` 覆写 Application-owned projection mapper 中对应模块的 snapshots。
 
 Personal Server 的浏览器本地 `.gcex` 不把服务器路径暴露成公共协议。`src/server/bootstrap/personal-server-app.ts` 只接受认证后的 `.gcex` 字节流上传到 Product Host owned 临时目录，返回绑定当前 principal/session、30 分钟时效和单次消费的 opaque `upload_id`。`src/server/websocket/surface-proxy.ts` 会记录每个 `extension_install_prepare` 的授权上下文：`uploaded_package` 先在当前会话内解析为受控 file source，再转发给 Kernel；任何 ready preview 返回的 `transaction_id` 都会绑定到当前 principal/session，因此 commit/cancel 对仓库、Registry、Manifest 和本地上传四类来源都执行同一授权规则。Host 断线时先向 Kernel cancel 本连接所有已预览未提交事务，再释放本地上传索引；若 Product Host 已失去上游连接，则由 Kernel `ExtensionPackageManager` 的启动/定时 sweep 清理 stale transaction 目录，不依赖浏览器或 Product Host 的偶然恢复。
 
@@ -73,12 +73,14 @@ core/kernel/src/application/skill-plane/
 ├── skill-registry.ts
 ├── skill-policy-engine.ts
 ├── skill-invocation-gateway.ts
-├── types.ts
 └── providers/
     ├── core/
-    ├── extension/
-    ├── mcp-server/
     └── user/
+
+core/kernel/src/ports/skill-plane.port.ts
+core/kernel/src/adapters/skill-plane/
+├── extension/
+└── mcp-server/
 ```
 
 | 组件 | 职责 |
@@ -183,7 +185,7 @@ configs/system/skills.yaml
   -> normalized result / error
 ```
 
-MCP server 是外部能力来源，默认不可信。`McpServerSkillProvider` 会把连接状态同步为 `SkillCatalogSnapshot.providerRuntimes` 中的 `mcp_server` provider runtime：`connecting` 只表示正在握手，`ready` 表示能力目录已枚举并注册进 Skill Registry，`unavailable` 表示连接失败或能力刷新失败。当前它还会通过 `mcp-server-runtime-readiness.ts` 把这些 provider runtime 折叠成 `RuntimeReadinessSnapshot[]`：`mcp.host` 表达整个 MCP capability plane，`mcp.<server-id>` 表达逐 server desired/actual/readiness，且在连接状态变化时持续刷新 `RuntimeReadinessCatalogStore`。断连、initialize 失败、枚举失败、调用超时、工具返回非法结果都要有 trace、provider id、server id 和错误 code。
+MCP server 是外部能力来源，默认不可信。`adapters/skill-plane/mcp-server/McpServerSkillProvider` 会把连接状态同步为 `SkillCatalogSnapshot.providerRuntimes` 中的 `mcp_server` provider runtime：`connecting` 只表示正在握手，`ready` 表示能力目录已枚举并注册进 Skill Registry，`unavailable` 表示连接失败或能力刷新失败。它还会通过同目录的 `mcp-server-runtime-readiness.ts` 把这些 provider runtime 折叠成 `RuntimeReadinessSnapshot[]`：`mcp.host` 表达整个 MCP capability plane，`mcp.<server-id>` 表达逐 server desired/actual/readiness，且在连接状态变化时经 `RuntimeProjectionInputPort` 持续刷新唯一 Application projection store。断连、initialize 失败、枚举失败、调用超时、工具返回非法结果都要有 trace、provider id、server id 和错误 code。
 
 ## 调试入口
 

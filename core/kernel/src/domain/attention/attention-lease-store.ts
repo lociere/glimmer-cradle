@@ -49,17 +49,11 @@ export interface AttentionLeaseChange {
 export type AttentionLeaseChangeHandler = (change: AttentionLeaseChange) => void;
 
 export class AttentionLeaseStore {
-  private static _instance: AttentionLeaseStore | null = null;
   private readonly _leases: Map<string, AttentionLease> = new Map();
   private readonly _timers: Map<string, NodeJS.Timeout> = new Map();
   private _changeHandler: AttentionLeaseChangeHandler | null = null;
 
-  public static get instance(): AttentionLeaseStore {
-    if (!AttentionLeaseStore._instance) {
-      AttentionLeaseStore._instance = new AttentionLeaseStore();
-    }
-    return AttentionLeaseStore._instance;
-  }
+  public constructor() {}
 
   public acquire(request: AttentionLeaseRequest): AttentionLease {
     const leaseId = this.makeLeaseId(request.owner, request.owner_id, request.channel_id);

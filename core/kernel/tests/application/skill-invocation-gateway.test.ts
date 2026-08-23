@@ -5,6 +5,9 @@ import {
   type SkillInvocationAuditSink,
 } from '../../src/application/skill-plane/skill-invocation-gateway';
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
+import type { SkillConfirmationRequester } from '../../src/ports/skill-plane.port';
+import type { KernelObservabilityPort } from '../../src/ports/observability.port';
 
 class MemoryAuditSink implements SkillInvocationAuditSink {
   public readonly records: SkillInvocationAuditRecord[] = [];
@@ -14,9 +17,37 @@ class MemoryAuditSink implements SkillInvocationAuditSink {
   }
 }
 
+const observability: KernelObservabilityPort = {
+  logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),
+  createTraceContext: (traceId) => ({ trace_id: traceId ?? 'trace-test' }),
+  currentTraceId: () => undefined,
+  withTrace: async (_traceId, operation) => operation(),
+  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
+  histogram: () => undefined,
+  counter: () => undefined,
+  start: () => undefined,
+  stop: () => undefined,
+  close: async () => undefined,
+};
+
+function createGateway(
+  registry: SkillRegistry,
+  audit: SkillInvocationAuditSink = { record: () => undefined },
+  requestConfirmation?: SkillConfirmationRequester,
+): SkillInvocationGateway {
+  return new SkillInvocationGateway(
+    registry,
+    new SkillPolicyEngine(),
+    audit,
+    observability,
+    { record: () => undefined },
+    requestConfirmation,
+  );
+}
+
 describe('SkillInvocationGateway', () => {
   it('调用成功时记录 provider、policy、trace 与结果摘要', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.audit.success';
     const audit = new MemoryAuditSink();
 
@@ -35,7 +66,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry, undefined, audit);
+      const gateway = createGateway(registry, audit);
       await expect(gateway.invoke({
         skillId,
         toolName: 'echo',
@@ -64,7 +95,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('策略拒绝时记录拒绝原因，即使成功审计未开启', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.audit.denied';
     const audit = new MemoryAuditSink();
 
@@ -86,7 +117,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry, undefined, audit);
+      const gateway = createGateway(registry, audit);
       await expect(gateway.invoke({
         skillId,
         toolName: 'dangerous',
@@ -115,7 +146,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('拒绝执行非 character audience 的扩展工具', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.user-audience';
 
     registry.registerSkill({
@@ -135,7 +166,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry);
+      const gateway = createGateway(registry);
       await expect(gateway.invoke({
         skillId,
         toolName: 'openPanel',
@@ -148,7 +179,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('拒绝读取或渲染非 character audience 的资源与提示模板', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.resource-prompt-audience';
 
     registry.registerSkill({
@@ -196,7 +227,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry);
+      const gateway = createGateway(registry);
       await expect(gateway.readResource({
         skillId,
         resourceId: 'character.resource',
@@ -224,7 +255,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('需要确认的 skill 在用户确认后才执行 handler', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.confirmation.approved';
     const audit = new MemoryAuditSink();
     const confirmationRequests: unknown[] = [];
@@ -244,7 +275,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry, undefined, audit, async (request) => {
+      const gateway = createGateway(registry, audit, async (request) => {
         confirmationRequests.push(request);
         return true;
       });
@@ -277,7 +308,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('需要确认的 skill 被用户拒绝时不执行 handler 并记录拒绝', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.confirmation.rejected';
     const audit = new MemoryAuditSink();
     let executed = false;
@@ -300,7 +331,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry, undefined, audit, async () => false);
+      const gateway = createGateway(registry, audit, async () => false);
       await expect(gateway.invoke({
         skillId,
         toolName: 'run',
@@ -324,7 +355,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('handler 抛错时记录失败并保留原错误', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const skillId = 'test.gateway.audit.failed';
     const audit = new MemoryAuditSink();
 
@@ -345,7 +376,7 @@ describe('SkillInvocationGateway', () => {
     });
 
     try {
-      const gateway = new SkillInvocationGateway(registry, undefined, audit);
+      const gateway = createGateway(registry, audit);
       await expect(gateway.invoke({
         skillId,
         toolName: 'explode',

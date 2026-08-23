@@ -15,7 +15,7 @@ export enum AppLifecycleState {
 }
 
 export interface AppEventPayload {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export abstract class AppEvent extends DomainEvent {

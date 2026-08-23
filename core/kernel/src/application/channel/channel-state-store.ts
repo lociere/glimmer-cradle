@@ -1,7 +1,5 @@
-import { getLogger } from '../../ports/kernel-side-effects.port';
-import { PerceptionEvent } from "@glimmer-cradle/protocol";
-
-const logger = getLogger("channel-state");
+import type { PerceptionEvent } from '../../ports/application-models';
+import type { KernelLoggerPort } from '../../ports/observability.port';
 
 export interface ChannelStateSnapshot {
   source: string;
@@ -18,17 +16,8 @@ export interface ChannelStateSnapshot {
 interface ChannelState extends ChannelStateSnapshot {}
 
 export class ChannelStateStore {
-  private static _instance: ChannelStateStore | null = null;
   private readonly _channels = new Map<string, ChannelState>();
-  
-  private constructor() {}
-
-  public static get instance(): ChannelStateStore {
-    if (!this._instance) {
-      this._instance = new ChannelStateStore();
-    }
-    return this._instance;
-  }
+  public constructor(private readonly logger: KernelLoggerPort) {}
 
   public async handleInboundMessage(req: PerceptionEvent): Promise<ChannelStateSnapshot> {
     const now = Date.now();
@@ -47,7 +36,7 @@ export class ChannelStateStore {
 
     this._channels.set(req.source, nextState);
 
-    logger.debug("通道状态已更新", {
+    this.logger.debug("通道状态已更新", {
       source: nextState.source,
       message_count: nextState.messageCount,
       last_trace_id: nextState.lastTraceId,

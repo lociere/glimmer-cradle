@@ -1,21 +1,24 @@
-import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
-import { KernelCognitionTransport } from '../../ports/kernel-side-effects.port';
-import { IngressGateManager } from '../../application/ingress/ingress-gate-manager';
-import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
+import type { KernelConfiguration } from '../../ports/configuration.port';
+import type { KernelIngressPort, KernelTransportPort, RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import type { RuntimeModule } from './runtime-module';
-import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from '../../domain/kernel-contracts';
 import type { CognitionActionHandler } from '../../ports/cognition-service-port';
 
 export class KernelTransportRuntime implements RuntimeModule {
   public readonly name = 'kernel-transport';
 
-  public constructor(private readonly config: Readonly<GlobalConfig>) {}
+  public constructor(
+    private readonly config: Readonly<KernelConfiguration>,
+    private readonly transport: KernelTransportPort<CognitionActionHandler>,
+    private readonly ingress: KernelIngressPort,
+    private readonly projection: RuntimeProjectionInputPort,
+  ) {}
   private recoveryEnabled = false;
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
-    IngressGateManager.instance.init(this.config.system.ingress);
-    await KernelCognitionTransport.instance.start();
+    this.ingress.init(this.config.system.ingress);
+    await this.transport.start();
     return {
       cognition_control_transport: 'grpc_dynamic_loopback',
       ingress_gate: 'initialized',
@@ -26,25 +29,25 @@ export class KernelTransportRuntime implements RuntimeModule {
 
   public async stop(_context: TraceContext): Promise<void> {
     this.closeIngress();
-    await KernelCognitionTransport.instance.stop();
-    IngressGateManager.instance.stop();
+    await this.transport.stop();
+    this.ingress.stop();
   }
 
   public openIngress(): void {
     this.recoveryEnabled = true;
-    IngressGateManager.instance.setSystemReady(true);
+    this.ingress.setSystemReady(true);
     this.publishIngressSnapshot('ready');
   }
 
   public closeIngress(): void {
     this.recoveryEnabled = false;
-    IngressGateManager.instance.setSystemReady(false);
+    this.ingress.setSystemReady(false);
     this.publishIngressSnapshot('stopped');
   }
 
   public suspendIngress(summary: string): void {
-    IngressGateManager.instance.setSystemReady(false);
-    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots(this.name, [{
+    this.ingress.setSystemReady(false);
+    this.projection.replaceModuleSnapshots(this.name, [{
       ...this.createIngressSnapshot('stopped'),
       state: 'failed',
       summary,
@@ -56,11 +59,11 @@ export class KernelTransportRuntime implements RuntimeModule {
   }
 
   public setCognitionActionHandler(handler: CognitionActionHandler | null): void {
-    KernelCognitionTransport.instance.setActionHandler(handler);
+    this.transport.setActionHandler(handler);
   }
 
   private publishIngressSnapshot(state: 'ready' | 'stopped'): void {
-    RuntimeReadinessProjectionMapper.instance.replaceModuleSnapshots(
+    this.projection.replaceModuleSnapshots(
       this.name,
       [this.createIngressSnapshot(state)],
     );

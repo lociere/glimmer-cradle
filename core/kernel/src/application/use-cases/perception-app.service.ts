@@ -1,19 +1,21 @@
 import { ConversationDirectory } from "../capabilities/conversation/conversation-directory";
 
-import { AudioService } from "../capabilities/audio/audio-service";
+import type { AudioApplicationPort, AudioStatusSnapshot } from '../../ports/runtime-capabilities.port';
 
 import { ChannelStateStore } from "../channel/channel-state-store";
 
-import { getLogger } from '../../ports/kernel-side-effects.port';
+import type { KernelLoggerPort } from '../../ports/observability.port';
 
-import { TTSSynthesizeRequest, TTSSynthesizeResponse, ASRRecognizeRequest, ASRRecognizeResponse, PerceptionEvent, AudioStatusPayload } from '@glimmer-cradle/protocol';
+import type {
+  ASRRecognizeRequest,
+  ASRRecognizeResponse,
+  PerceptionEvent,
+  TTSSynthesizeRequest,
+  TTSSynthesizeResponse,
+} from '../../ports/application-models';
 import { AttentionSessionManager } from "../../application/attention/attention-session-manager";
 
 import { IngressGateManager } from "../../application/ingress/ingress-gate-manager";
-
-
-
-const logger = getLogger("perception-gateway");
 
 
 
@@ -23,11 +25,14 @@ export class PerceptionAppService {
 
     private conversationDirectory: ConversationDirectory,
 
-    private audioService: AudioService,
+    private audioService: AudioApplicationPort,
 
     private channelStateStore: ChannelStateStore,
 
-    private attentionMgr: AttentionSessionManager) {}
+    private attentionMgr: AttentionSessionManager,
+    private ingressGate: IngressGateManager,
+    private logger: KernelLoggerPort,
+  ) {}
 
 
 
@@ -35,13 +40,13 @@ export class PerceptionAppService {
 
     // ── 入站防护（速率限制 / 熔断 / 就绪守卫）──
 
-    const gate = IngressGateManager.instance;
+    const gate = this.ingressGate;
 
     const gateResult = gate.admit(event.source);
 
     if (!gateResult.admitted) {
 
-      logger.debug('感知输入被入站防护拒绝', {
+      this.logger.debug('感知输入被入站防护拒绝', {
 
         trace_id: event.id,
 
@@ -74,7 +79,7 @@ export class PerceptionAppService {
 
     // ── 统一感知入口日志（所有外部输入的唯一可见点）──
 
-    logger.info('感知输入', {
+    this.logger.info('感知输入', {
 
       trace_id: event.id,
 
@@ -113,7 +118,7 @@ export class PerceptionAppService {
 
       const channelState = await this.channelStateStore.handleInboundMessage(request);
 
-      logger.debug('通道状态刷新完成', {
+      this.logger.debug('通道状态刷新完成', {
 
         source: channelState.source,
 
@@ -138,7 +143,7 @@ export class PerceptionAppService {
 
       gate.complete(false);
 
-      logger.error('感知处理失败', {
+      this.logger.error('感知处理失败', {
 
         trace_id: event.id,
 
@@ -178,7 +183,7 @@ export class PerceptionAppService {
 
 
 
-  public async getAudioStatus(): Promise<AudioStatusPayload> {
+  public async getAudioStatus(): Promise<AudioStatusSnapshot> {
 
     return this.audioService.getStatus();
 

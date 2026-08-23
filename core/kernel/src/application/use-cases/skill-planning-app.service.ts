@@ -1,8 +1,6 @@
-import type { ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '../../ports/application-models';
 import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
-import { AIProxy } from '../capabilities/inference/ai-proxy';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
-import { ControlSurfaceCorePlatformBridge } from '../skill-plane/providers/core/core-platform-bridge';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
 import { isCapabilityScopeVisible } from '../skill-plane/scope';
 
@@ -21,17 +19,10 @@ type MCPToolSuggestion = AgentPlanResponse['suggestions'][number];
  * 这让扩展或 MCP 的内部 handler 永远不会进入认知进程。
  */
 export class SkillPlanningAppService {
-  private static createDefaultGateway(): SkillInvocationGateway {
-    const bridge = new ControlSurfaceCorePlatformBridge();
-    return new SkillInvocationGateway(undefined, undefined, undefined, (request) => (
-      bridge.requestConfirmation(request)
-    ));
-  }
-
   constructor(
     private readonly _catalog: SkillCatalogAppService,
-    private readonly _gateway: SkillInvocationGateway = SkillPlanningAppService.createDefaultGateway(),
-    private readonly _requestPlan: AgentPlanRequester = (request) => AIProxy.instance.requestAgentPlan(request),
+    private readonly _gateway: SkillInvocationGateway,
+    private readonly _requestPlan: AgentPlanRequester,
   ) {}
 
   public async plan(request: SkillPlanningRequest): Promise<AgentPlanResponse> {

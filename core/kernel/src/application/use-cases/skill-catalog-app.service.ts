@@ -6,11 +6,11 @@ import type {
   SkillProviderRef,
   SkillProviderRuntimeSnapshot,
   SkillRegistrationTarget,
-} from '../skill-plane/types';
+} from '../../ports/skill-plane.port';
 import { SkillRegistry } from '../skill-plane/skill-registry';
 
 export class SkillCatalogAppService implements SkillRegistrationTarget {
-  constructor(private readonly _registry: SkillRegistry = SkillRegistry.instance) {}
+  constructor(private readonly _registry: SkillRegistry) {}
 
   public registerSkill(skill: SkillDescriptor): void {
     this._registry.registerSkill(skill);

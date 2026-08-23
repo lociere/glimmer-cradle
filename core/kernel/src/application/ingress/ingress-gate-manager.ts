@@ -14,10 +14,8 @@
  *   - 透明接入：由 PerceptionAppService 自动调用，插件无需感知
  *   - 全局配置：参数来自 configs/system/kernel.yaml ingress 节
  */
-import type { IngressGateConfig } from '@glimmer-cradle/protocol';
-import { getLogger } from '../../ports/kernel-side-effects.port';
-
-const logger = getLogger('ingress-gate');
+import type { IngressConfiguration } from '../../ports/configuration.port';
+import type { KernelLoggerPort } from '../../ports/observability.port';
 
 /** 防护拒绝原因 */
 export type IngressRejectionType =
@@ -36,10 +34,8 @@ export interface IngressGateResult {
 }
 
 export class IngressGateManager {
-  private static _instance: IngressGateManager | null = null;
-
   // ── 配置 ────────────────────────────────────────────────
-  private _config: IngressGateConfig = {
+  private _config: IngressConfiguration = {
     rate_limit_per_source: 30,
     rate_limit_window_ms: 60_000,
     max_concurrent_requests: 10,
@@ -63,25 +59,18 @@ export class IngressGateManager {
   // ── 定期清理 ────────────────────────────────────────────
   private _cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  public static get instance(): IngressGateManager {
-    if (!IngressGateManager._instance) {
-      IngressGateManager._instance = new IngressGateManager();
-    }
-    return IngressGateManager._instance;
-  }
-
-  private constructor() {}
+  public constructor(private readonly logger: KernelLoggerPort) {}
 
   // ═══════════════════════════════════════════════════════════
   //  生命周期
   // ═══════════════════════════════════════════════════════════
 
   /** 使用内核配置初始化 */
-  public init(config: IngressGateConfig): void {
+  public init(config: IngressConfiguration): void {
     this._config = { ...config };
     // 每分钟清理过期的滑动窗口数据
     this._cleanupTimer = setInterval(() => this.pruneExpiredWindows(), 60_000);
-    logger.info('入站防护已初始化', {
+    this.logger.info('入站防护已初始化', {
       rate_limit: `${config.rate_limit_per_source}/${config.rate_limit_window_ms}ms`,
       max_concurrent: config.max_concurrent_requests,
       circuit_breaker: `${config.circuit_breaker_threshold} failures → ${config.circuit_breaker_recovery_ms}ms cooldown`,
@@ -107,7 +96,7 @@ export class IngressGateManager {
   /** 由 app.ts 在 AI 就绪后调用 */
   public setSystemReady(ready: boolean): void {
     this._systemReady = ready;
-    logger.info('系统就绪状态变更', { ready });
+    this.logger.info('系统就绪状态变更', { ready });
   }
 
   public get isSystemReady(): boolean {
@@ -181,7 +170,7 @@ export class IngressGateManager {
       this._consecutiveFailures++;
       if (this._consecutiveFailures >= this._config.circuit_breaker_threshold) {
         this._circuitOpenUntil = Date.now() + this._config.circuit_breaker_recovery_ms;
-        logger.warn('熔断器已触发', {
+        this.logger.warn('熔断器已触发', {
           consecutive_failures: this._consecutiveFailures,
           recovery_ms: this._config.circuit_breaker_recovery_ms,
         });

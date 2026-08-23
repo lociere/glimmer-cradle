@@ -5,7 +5,7 @@
  * 动作流等 Application 能力，但不得直接导入 Application 层实现。
  * 本文件定义纯接口，由 Application 层实现，在 app.ts 中注入 Domain 层。
  */
-import type { PerceptionEvent } from "@glimmer-cradle/protocol";
+import type { PerceptionEvent } from './application-models';
 import type {
   LifeHeartbeatResponse,
   PerceptionCancelRequest,

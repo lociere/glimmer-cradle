@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { unaryMethod } from './grpc-contract';
 import { KernelCognitionTransport } from './kernel-cognition-transport';
 import { RecoveryRequiredError } from '../../domain/errors';
+import type { ActionCommand } from '../../ports/application-models';
 
 const registerMethod = unaryMethod(
   '/glimmer.kernel.v1.KernelControlService/RegisterCognition',
@@ -52,7 +53,7 @@ function cancellableRawCall<I, O>(client: grpc.Client, method: grpc.MethodDefini
 }
 
 describe('KernelCognitionTransport', () => {
-  const transport = KernelCognitionTransport.instance;
+  const transport = new KernelCognitionTransport();
 
   afterEach(async () => {
     await transport.stop();
@@ -199,7 +200,7 @@ describe('KernelCognitionTransport', () => {
     transport.configureActionDeadline(25);
     let aborted = false;
     let sideEffect = false;
-    transport.setActionHandler(async (_command, signal) => {
+    transport.setActionHandler(async (_command: ActionCommand, signal: AbortSignal) => {
       await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => {
         aborted = true;
         reject(signal.reason);
@@ -223,7 +224,7 @@ describe('KernelCognitionTransport', () => {
     const entered = new Promise<void>((resolve) => { started = resolve; });
     let aborted = false;
     let sideEffect = false;
-    transport.setActionHandler(async (_command, signal) => {
+    transport.setActionHandler(async (_command: ActionCommand, signal: AbortSignal) => {
       started();
       await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => {
         aborted = true;

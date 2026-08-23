@@ -1,7 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { BuiltInContributionPoint, type ContributionRequirements } from '@glimmer-cradle/protocol';
-import { ExtensionHostAppService } from './extension-host-app.service';
+import { ExtensionHostAppService } from '../../adapters/extension-host/extension-host-application-adapter';
+import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
+import { SkillRegistry } from '../skill-plane/skill-registry';
+import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
+import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';
+import { SkillPlanePolicy } from '../skill-plane/availability';
+
+const availability: SkillAvailabilityContext = {
+  productId: 'desktop',
+  platform: 'windows-x64',
+  features: new Set(['extensions']),
+};
+const skillPlanePolicy = new SkillPlanePolicy();
+
+function createHostService(perception: unknown, catalog = new SkillCatalogAppService(new SkillRegistry())) {
+  return {
+    catalog,
+    service: new ExtensionHostAppService(
+      perception as never,
+      catalog,
+      availability,
+      skillPlanePolicy,
+      new AttentionLeaseStore(),
+      {} as never,
+      new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
+    ),
+  };
+}
 
 function createDefaultRequirements(): ContributionRequirements {
   return {
@@ -14,7 +41,7 @@ function createDefaultRequirements(): ContributionRequirements {
 
 describe('ExtensionHostAppService', () => {
   it('由 Host 分别标记普通观察和证据候选', async () => {
-    const received: any[] = [];
+    const received: unknown[] = [];
     const perceptionService = {
       getConversationDirectory: () => ({
         resolve: (_address: unknown, interactionId: string) => ({
@@ -35,7 +62,7 @@ describe('ExtensionHostAppService', () => {
       }),
       processIngress: async (event: unknown) => received.push(event),
     };
-    const hostService = new ExtensionHostAppService(perceptionService as never);
+    const { service: hostService } = createHostService(perceptionService);
     const address = {
       provider_id: 'test-extension',
       provider_account_id: 'account',
@@ -56,16 +83,17 @@ describe('ExtensionHostAppService', () => {
       schemaRef: 'test://summary/v1',
     });
 
-    expect(received[0].origin.cognitive_effect).toBe('observation');
-    expect(received[1].origin.cognitive_effect).toBe('evidence_proposal');
-    expect(received[1].response_policy).toBe('observe_only');
-    expect(received[1].retention_ceiling).toBe('memory_candidate');
+    const projections = received as Array<{ origin: { cognitive_effect: string }; response_policy: string; retention_ceiling: string }>;
+    expect(projections[0].origin.cognitive_effect).toBe('observation');
+    expect(projections[1].origin.cognitive_effect).toBe('evidence_proposal');
+    expect(projections[1].response_policy).toBe('observe_only');
+    expect(projections[1].retention_ceiling).toBe('memory_candidate');
   });
 
   it('projects extension runtime into skill provider runtimes and removes it on unregister', () => {
     const extensionId = `runtime-provider-${Date.now()}`;
-    const skillCatalog = new SkillCatalogAppService();
-    const hostService = new ExtensionHostAppService({} as never, skillCatalog);
+    const skillCatalog = new SkillCatalogAppService(new SkillRegistry());
+    const { service: hostService } = createHostService({}, skillCatalog);
 
     hostService.registerExtensionRuntimeManifest({
       id: extensionId,

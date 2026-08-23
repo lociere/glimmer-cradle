@@ -1,10 +1,7 @@
 import { ActionStreamCancelledEvent, ActionStreamCompletedEvent, ActionStreamStartedEvent } from '../../../domain/events';
-import { createTraceContext } from '../../../ports/kernel-side-effects.port';
-import { ConfigManager } from '../../../ports/kernel-side-effects.port';
-import { EventBus } from '../../../ports/kernel-side-effects.port';
-import { getLogger } from '../../../ports/kernel-side-effects.port';
-
-const logger = getLogger("action-stream-manager");
+import type { KernelConfiguration } from '../../../ports/configuration.port';
+import type { KernelEventBusPort } from '../../../ports/event-bus.port';
+import type { KernelLoggerPort, KernelObservabilityPort } from '../../../ports/observability.port';
 
 type StreamState = {
   sceneId: string;
@@ -13,29 +10,28 @@ type StreamState = {
 };
 
 export class ActionStreamManager {
-  private static _instance: ActionStreamManager | null = null;
   private _initialized: boolean = false;
   private _enabled: boolean = true;
   private _channel: "live2d" = "live2d";
   private readonly _streams: Map<string, StreamState> = new Map();
 
-  public static get instance(): ActionStreamManager {
-    if (!ActionStreamManager._instance) {
-      ActionStreamManager._instance = new ActionStreamManager();
-    }
-    return ActionStreamManager._instance;
+  private readonly logger: KernelLoggerPort;
+
+  public constructor(
+    private readonly config: KernelConfiguration['character']['inference']['action_stream'],
+    private readonly eventBus: KernelEventBusPort,
+    private readonly observability: KernelObservabilityPort,
+  ) {
+    this.logger = observability.logger('action-stream-manager');
   }
 
-  private constructor() {}
-
   public init(): void {
-    const config = ConfigManager.instance.getConfig();
-    const streamConfig = config.character.inference.action_stream;
+    const streamConfig = this.config;
     this._enabled = streamConfig.enabled;
     this._channel = streamConfig.channel;
     this._initialized = true;
 
-    logger.info("动作流管理器初始化完成", {
+    this.logger.info("动作流管理器初始化完成", {
       enabled: this._enabled,
       channel: this._channel,
     });
@@ -54,7 +50,7 @@ export class ActionStreamManager {
     const state: StreamState = { sceneId, streamId, sourceType };
     this._streams.set(streamId, state);
 
-    await EventBus.instance.publish(
+    await this.eventBus.publish(
       new ActionStreamStartedEvent(
         {
           scene_id: sceneId,
@@ -63,7 +59,7 @@ export class ActionStreamManager {
           source_type: sourceType,
           stage: "thinking",
         },
-        createTraceContext({ trace_id: streamId }),
+        this.observability.createTraceContext(streamId),
       )
     );
   }
@@ -75,7 +71,7 @@ export class ActionStreamManager {
 
     this.clearStream(streamId);
 
-    await EventBus.instance.publish(
+    await this.eventBus.publish(
       new ActionStreamCompletedEvent(
         {
           scene_id: sceneId,
@@ -84,7 +80,7 @@ export class ActionStreamManager {
           final_emotion: finalEmotion,
           reply_length: replyLength,
         },
-        createTraceContext({ trace_id: streamId }),
+        this.observability.createTraceContext(streamId),
       )
     );
   }
@@ -96,7 +92,7 @@ export class ActionStreamManager {
 
     this.clearStream(streamId);
 
-    await EventBus.instance.publish(
+    await this.eventBus.publish(
       new ActionStreamCancelledEvent(
         {
           scene_id: sceneId,
@@ -104,7 +100,7 @@ export class ActionStreamManager {
           channel: this._channel,
           reason,
         },
-        createTraceContext({ trace_id: streamId }),
+        this.observability.createTraceContext(streamId),
       )
     );
   }

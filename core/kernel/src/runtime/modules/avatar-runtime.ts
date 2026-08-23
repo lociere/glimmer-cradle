@@ -1,32 +1,32 @@
-import type { GlobalConfig } from '../../ports/kernel-side-effects.port';
-import { AvatarController } from '../../application/capabilities/avatar/avatar-controller';
-import { setUnityAvatarHostProcessLogRoot } from '../../application/capabilities/avatar/unity-avatar-host-process';
-import { resolveLogDir } from '../../ports/kernel-side-effects.port';
 import type { RuntimeModule } from './runtime-module';
-import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from '../../domain/kernel-contracts';
+import type { KernelConfiguration } from '../../ports/configuration.port';
+import type { AvatarRuntimePort } from '../../ports/runtime-capabilities.port';
 
 /** Lifecycle module for the intrinsic Avatar domain and its selected host. */
 export class AvatarRuntime implements RuntimeModule {
   public readonly name = 'avatar-runtime';
 
-  public constructor(private readonly config: Readonly<GlobalConfig>) {}
+  public constructor(
+    private readonly config: Readonly<KernelConfiguration>,
+    private readonly avatar: AvatarRuntimePort,
+  ) {}
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     if (!this.config.system.avatar.enabled) {
       return { avatar: 'disabled' };
     }
 
-    setUnityAvatarHostProcessLogRoot(resolveLogDir());
-    await AvatarController.instance.init(this.config.system.avatar);
+    await this.avatar.start(this.config.system.avatar);
 
     return {
       avatar: 'enabled',
       avatar_endpoint: 'dynamic-loopback',
-      runtime_readiness: AvatarController.instance.getReadinessSnapshot(),
+      runtime_readiness: this.avatar.getReadinessSnapshot(),
     };
   }
 
   public async stop(_context: TraceContext): Promise<void> {
-    await AvatarController.instance.stop();
+    await this.avatar.stop();
   }
 }

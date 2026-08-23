@@ -1,10 +1,10 @@
-import type { TraceContext } from '@glimmer-cradle/protocol';
-import { DlqReplayIngress } from '../../ports/kernel-side-effects.port';
+import type { TraceContext } from '../../domain/kernel-contracts';
+import type { DlqReplayRuntimePort } from '../../ports/runtime-capabilities.port';
 import type { RuntimeModule } from './runtime-module';
 
 export class DlqReplayRuntime implements RuntimeModule {
   public readonly name = 'dlq-replay-ingress';
-  private readonly ingress = new DlqReplayIngress();
+  public constructor(private readonly ingress: DlqReplayRuntimePort) {}
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     await this.ingress.start();

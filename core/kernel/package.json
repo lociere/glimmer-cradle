@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm run build",
     "test": "vitest run --threads false",
+    "smoke:bootstrap": "node tests/runtime/production-bootstrap.smoke.mjs",
     "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm run test"
   },
   "devDependencies": {

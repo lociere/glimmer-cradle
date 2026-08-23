@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ExtensionManager } from '../../src/application/extension-supervision/extension-manager';
+import { ExtensionManager } from '../../src/adapters/extension-host/extension-manager';
 import type {
   ActiveExtensionSelection,
   IExtensionHostService,
@@ -15,7 +15,9 @@ import { SkillRegistry } from '../../src/application/skill-plane/skill-registry'
 import {
   createDeclaredExtensionSkill,
   createExtensionSkillFromSubAgent,
-} from '../../src/application/skill-plane/providers/extension/extension-skill-provider';
+} from '../../src/adapters/skill-plane/extension/extension-skill-provider';
+import { SkillPlanePolicy } from '../../src/application/skill-plane/availability';
+import type { SkillAvailabilityContext } from '../../src/ports/skill-plane.port';
 
 type Disposable = { dispose(): void | Promise<void> };
 type ExtensionCommandHandler = (...args: unknown[]) => Promise<unknown> | unknown;
@@ -23,12 +25,17 @@ type PermissionName = 'AGENT_REGISTER' | 'COMMAND_REGISTER' | 'EVIDENCE_PROPOSAL
 
 const tempRoots: string[] = [];
 const originalDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
+const skillAvailability: SkillAvailabilityContext = {
+  productId: 'desktop', platform: 'windows-x64', features: new Set(['extensions']),
+};
+const skillPlanePolicy = new SkillPlanePolicy();
+const readinessProjection = new RuntimeReadinessProjectionMapper();
 
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
   if (originalDataRoot === undefined) delete process.env.GLIMMER_CRADLE_DATA_ROOT;
   else process.env.GLIMMER_CRADLE_DATA_ROOT = originalDataRoot;
-  RuntimeReadinessProjectionMapper.instance.clear();
+  readinessProjection.clear();
 });
 
 describe('ExtensionManager', () => {
@@ -41,9 +48,9 @@ describe('ExtensionManager', () => {
     const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'glimmer-extension-app-root-'));
     tempRoots.push(appRoot);
     process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(fixture.root, 'data');
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(appRoot, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -65,9 +72,9 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '2.0.0',
     });
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -102,9 +109,9 @@ describe('ExtensionManager', () => {
       `,
       version: '2.0.0',
     });
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -135,9 +142,9 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(SkillRegistry.instance),
+      new SkillCatalogAppService(new SkillRegistry()),
       [{ id: fixture.extensionId, version: '1.0.0' }],
-    ));
+    ), readinessProjection);
 
     try {
       await manager.init();
@@ -166,9 +173,9 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '1.10.0',
     });
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -194,8 +201,8 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(SkillRegistry.instance),
-    ));
+      new SkillCatalogAppService(new SkillRegistry()),
+    ), readinessProjection);
 
     try {
       await manager.init();
@@ -215,9 +222,9 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(SkillRegistry.instance),
+      new SkillCatalogAppService(new SkillRegistry()),
       [{ id: fixture.extensionId, version: '1.0.0' }],
-    ));
+    ), readinessProjection);
 
     try {
       await manager.init();
@@ -233,9 +240,9 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '1.0.0',
     });
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '2.0.0' }]);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     await expect(manager.init()).rejects.toThrow(`激活扩展未安装: ${fixture.extensionId}@2.0.0`);
   });
@@ -253,9 +260,9 @@ describe('ExtensionManager', () => {
       'main: index.cjs',
       'minAppVersion: 0.1.0',
     ].join('\n'), 'utf-8');
-    const catalog = new SkillCatalogAppService(SkillRegistry.instance);
+    const catalog = new SkillCatalogAppService(new SkillRegistry());
     const host = new FakeExtensionHost(root, catalog, [{ id: extensionId, version: '1.0.0' }]);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     await expect(manager.init()).rejects.toThrow(`激活扩展未安装: ${extensionId}@1.0.0`);
   });
@@ -277,10 +284,10 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -322,10 +329,10 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -367,10 +374,10 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -415,10 +422,10 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -461,10 +468,10 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
@@ -487,25 +494,25 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
-    const manager = new ExtensionManager(host);
+    const manager = new ExtensionManager(host, readinessProjection);
 
     try {
       await manager.init();
       await manager.loadExtension(fixture.extensionId);
-      expect(RuntimeReadinessProjectionMapper.instance.getCatalog().runtimes.find(
+      expect(readinessProjection.getCatalog().runtimes.find(
         (snapshot) => snapshot.runtime_id === `extension.${fixture.extensionId}`,
       )?.state).toBe('starting');
 
       await manager.startExtension(fixture.extensionId);
-      expect(RuntimeReadinessProjectionMapper.instance.getCatalog().runtimes.find(
+      expect(readinessProjection.getCatalog().runtimes.find(
         (snapshot) => snapshot.runtime_id === `extension.${fixture.extensionId}`,
       )?.state).toBe('ready');
 
       await manager.stopExtension(fixture.extensionId);
-      expect(RuntimeReadinessProjectionMapper.instance.getCatalog().runtimes.find(
+      expect(readinessProjection.getCatalog().runtimes.find(
         (snapshot) => snapshot.runtime_id === `extension.${fixture.extensionId}`,
       )?.state).toBe('stopped');
     } finally {
@@ -527,7 +534,7 @@ describe('Extension skill provider audience filtering', () => {
         parameters: {},
         handler: () => 'opened',
       }],
-    } as any)).toBeNull();
+    } as any, skillAvailability, skillPlanePolicy)).toBeNull();
 
     const skill = createExtensionSkillFromSubAgent('demo-extension', {
       id: 'runtime',
@@ -550,7 +557,7 @@ describe('Extension skill provider audience filtering', () => {
           handler: () => 'opened',
         },
       ],
-    } as any);
+    } as any, skillAvailability, skillPlanePolicy);
 
     expect(skill?.tools.map((tool) => tool.name)).toEqual(['character.lookup']);
   });
@@ -574,7 +581,7 @@ describe('Extension skill provider audience filtering', () => {
         { id: 'adapter.prompt', description: 'Adapter prompt', audience: 'adapter', template: 'bridge' },
       ],
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
-    } as any);
+    } as any, skillAvailability, skillPlanePolicy);
 
     expect(skill?.tools.map((tool) => tool.name)).toEqual(['character.lookup']);
     expect(skill?.resources?.map((resource) => resource.id)).toEqual(['character.resource']);
@@ -589,7 +596,7 @@ describe('Extension skill provider audience filtering', () => {
       resources: [{ id: 'host.resource', description: 'Host 资源', audience: 'host' }],
       prompts: [{ id: 'adapter.prompt', description: 'Adapter prompt', audience: 'adapter', template: 'bridge' }],
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
-    } as any)).toBeNull();
+    } as any, skillAvailability, skillPlanePolicy)).toBeNull();
   });
 });
 
@@ -798,7 +805,7 @@ class FakeExtensionHost implements IExtensionHostService {
   public registerSourcePolicies(): void {}
 
   public registerAgent(extensionId: string, profile: any): Disposable {
-    const skill = createExtensionSkillFromSubAgent(extensionId, profile);
+    const skill = createExtensionSkillFromSubAgent(extensionId, profile, skillAvailability, skillPlanePolicy);
     if (!skill) {
       return { dispose: () => undefined };
     }
@@ -813,7 +820,7 @@ class FakeExtensionHost implements IExtensionHostService {
     skills: any[],
   ): Disposable[] {
     return skills.map((contribution) => {
-      const skill = createDeclaredExtensionSkill(extensionId, contribution);
+      const skill = createDeclaredExtensionSkill(extensionId, contribution, skillAvailability, skillPlanePolicy);
       if (!skill) {
         return { dispose: () => undefined };
       }

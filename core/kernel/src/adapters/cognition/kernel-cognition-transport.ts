@@ -40,7 +40,7 @@ import {
   GetPerceptionOperationRequestSchema,
   GetPerceptionOperationResponseSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import type { ActionCommand } from '@glimmer-cradle/protocol';
+import type { ActionCommand } from '../../ports/application-models';
 import { EventBus } from '../../adapters/events/event-bus';
 import { StateSyncEvent } from '../../domain/events';
 import { EndpointRegistry } from '../../adapters/endpoints/endpoint-registry';
@@ -99,7 +99,6 @@ export class CognitionTransportError extends Error {
 }
 
 export class KernelCognitionTransport {
-  private static _instance: KernelCognitionTransport | null = null;
   private server: grpc.Server | null = null;
   private serverAddress: string | null = null;
   private client: grpc.Client | null = null;
@@ -115,12 +114,7 @@ export class KernelCognitionTransport {
   private readonly actionAbortControllers = new Set<AbortController>();
   private actionDeadlineMs = 30_000;
 
-  public static get instance(): KernelCognitionTransport {
-    KernelCognitionTransport._instance ??= new KernelCognitionTransport();
-    return KernelCognitionTransport._instance;
-  }
-
-  private constructor() {}
+  public constructor() {}
 
   public get controlEndpoint(): string {
     if (!this.serverAddress) throw new Error('Kernel Cognition gRPC control 尚未启动');

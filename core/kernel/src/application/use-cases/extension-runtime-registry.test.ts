@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BuiltInContributionPoint, ExtensionPermission, type ContributionRequirements } from '@glimmer-cradle/protocol';
-import { ExtensionRuntimeRegistry } from './extension-runtime-registry';
+import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
+import { SkillPlanePolicy } from '../skill-plane/availability';
+import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';
+
+const availability: SkillAvailabilityContext = { productId: 'desktop', platform: 'windows-x64', features: new Set(['extensions']) };
+const policy = new SkillPlanePolicy();
 
 function createDefaultRequirements(): ContributionRequirements {
   return {
@@ -13,7 +18,7 @@ function createDefaultRequirements(): ContributionRequirements {
 
 describe('ExtensionRuntimeRegistry', () => {
   it('uses capability graph dependencies to enable action intents', () => {
-    const registry = new ExtensionRuntimeRegistry();
+    const registry = new ExtensionRuntimeRegistry(availability, policy);
     registry.registerManifest({
       id: 'demo-extension',
       name: 'Demo Extension',
@@ -95,7 +100,7 @@ describe('ExtensionRuntimeRegistry', () => {
   });
 
   it('keeps unknown contribution points indexed but unsupported', () => {
-    const registry = new ExtensionRuntimeRegistry();
+    const registry = new ExtensionRuntimeRegistry(availability, policy);
     registry.registerManifest({
       id: 'demo-extension',
       name: 'Demo Extension',
@@ -126,7 +131,7 @@ describe('ExtensionRuntimeRegistry', () => {
   });
 
   it('projects manifest identity metadata for desktop consumers', () => {
-    const registry = new ExtensionRuntimeRegistry();
+    const registry = new ExtensionRuntimeRegistry(availability, policy);
     registry.registerManifest({
       id: 'identity-extension',
       name: 'Identity Extension',
@@ -147,7 +152,7 @@ describe('ExtensionRuntimeRegistry', () => {
   });
 
   it('defaults non-skill built-in contribution audiences away from character', () => {
-    const registry = new ExtensionRuntimeRegistry();
+    const registry = new ExtensionRuntimeRegistry(availability, policy);
     registry.registerManifest({
       id: 'audience-defaults',
       name: 'Audience Defaults',

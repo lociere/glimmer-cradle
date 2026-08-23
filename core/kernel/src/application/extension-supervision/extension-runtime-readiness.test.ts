@@ -3,7 +3,7 @@ import type { ExtensionRuntimeProjection } from '@glimmer-cradle/protocol';
 import {
   buildExtensionRuntimeReadinessSnapshot,
   buildExtensionRuntimeReadinessSnapshots,
-} from './extension-runtime-readiness';
+} from '../../adapters/extension-host/extension-runtime-readiness';
 
 describe('extension-runtime-readiness', () => {
   it('returns a ready host aggregate when no extension is enabled', () => {

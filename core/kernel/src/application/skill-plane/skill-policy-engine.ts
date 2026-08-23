@@ -1,4 +1,4 @@
-import type { SkillDescriptor, SkillPolicy } from './types';
+import type { SkillDescriptor, SkillPolicy } from '../../ports/skill-plane.port';
 
 export interface SkillPolicyDecision {
   allowed: boolean;

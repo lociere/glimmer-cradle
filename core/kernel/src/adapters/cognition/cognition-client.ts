@@ -17,7 +17,7 @@ import {
   SubmitPerceptionRequestSchema,
   SynthesizeRequestSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import type { KnowledgeBaseConfig, PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { KnowledgeBaseConfig, PerceptionEvent } from '../../ports/application-models';
 import type {
   AgentPlanRequest,
   AgentPlanResponse,
@@ -33,7 +33,7 @@ import { getCurrentSpanId } from '../../adapters/observability/trace-context';
 import { KernelCognitionTransport, objectToStruct, structToObject } from './kernel-cognition-transport';
 
 export class CognitionClient {
-  public constructor(private readonly transport = KernelCognitionTransport.instance) {}
+  public constructor(private readonly transport: KernelCognitionTransport) {}
 
   public async submitPerception(request: PerceptionEvent, traceId: string, timeoutMs: number): Promise<PerceptionOperationResult> {
     const call = this.transport.makeCallMetadata({

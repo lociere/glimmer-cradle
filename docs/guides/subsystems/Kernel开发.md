@@ -10,12 +10,12 @@
 | 新增/修改 runtime | `core/kernel/src/runtime/modules/`、`composition/kernel-application.ts` |
 | 输入闸门 | `application/ingress/`、`application/use-cases/perception-app.service.ts` |
 | 子进程监督 | `adapters/process/`、对应 `runtime/modules/` |
-| Cognition Service | `adapters/cognition/`、`application/capabilities/inference/cognition-manager.ts` |
-| Audio | `application/capabilities/audio/` |
-| Avatar | `application/capabilities/avatar/` |
-| Desktop 投影 | `application/capabilities/desktop-ui/` |
-| Skill Plane | `application/skill-plane/` |
-| Extension Host（Slice 3 暂在 Kernel） | `application/extension-supervision/`、`adapters/extension-host/`、`application/use-cases/extension-host-app.service.ts` |
+| Cognition Service | `adapters/cognition/`、`application/use-cases/manage-cognition-lifecycle.ts`、`ports/cognition-service-port.ts` |
+| Audio | `adapters/audio/`、`ports/runtime-capabilities.port.ts` |
+| Avatar | `adapters/avatar/`、`ports/runtime-capabilities.port.ts` |
+| Desktop/Surface 投影 | `adapters/surface/`、`ports/application-capabilities.port.ts` |
+| Skill Plane | `application/skill-plane/`、`adapters/skill-plane/`、`ports/skill-plane.port.ts` |
+| Extension Host（Slice 3 仍由 Kernel 监督） | `adapters/extension-host/`、`ports/extension-host.port.ts`、`ports/application-capabilities.port.ts` |
 | 日志/trace/DLQ | `adapters/observability/`、`adapters/events/dead-letter-queue.ts` |
 
 ## 标准步骤
@@ -24,10 +24,12 @@
 2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/`，运行 `pnpm contracts:generate` / `pnpm contracts:verify`；不得手改 generated。
 3. 找 producer、mapper、consumer、projection 和 tests。
 4. 修改 root/module/service，不在调用端堆临时补丁。
-5. 保持 `domain <- application -> ports <- adapters`；Runtime 只提交运行事实给 `application/projection/runtime-readiness-projection.ts`，不得直接写只读投影。
+5. 保持 `domain <- application -> ports <- adapters`；Domain/Application 不依赖 Protocol generated、Node、Adapter 或 Runtime concrete；Runtime 只调用 Application use case 与 Ports，运行事实经 `RuntimeProjectionInputPort` 提交给 Application-owned projection mapper。
 6. 补 ready/degraded/failed/stop 语义。
 7. 删除旧事件、旧 bridge、旧 handler、旧 fallback。
 8. 同步 Current/Implementation/Reference/Guide 中唯一受影响页面。
+
+新增边界时使用 capability-specific 强类型 Port；禁止 Proxy/service locator、关键边界 `any`、raw Node API façade、concrete alias 和测试 setup 注入。第三方扩展的独立 `hosts/extension-host/` 迁移属于 M12 Slice 6；在此之前只维护 Kernel 内既有 supervision/分类，不提前移动进程边界。
 
 ## 新 runtime 检查表
 
@@ -59,6 +61,9 @@
 
 ```powershell
 pnpm --filter @glimmer-cradle/kernel typecheck
+pnpm --filter @glimmer-cradle/kernel build
+pnpm --filter @glimmer-cradle/kernel smoke:bootstrap
+pnpm --filter @glimmer-cradle/kernel exec vitest run tests/architecture/kernel-physical-layout.test.ts --threads false
 pnpm typecheck
 pnpm build
 ```

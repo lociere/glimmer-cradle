@@ -4,10 +4,35 @@ import { SkillCatalogAppService } from '../../src/application/use-cases/skill-ca
 import { SkillPlanningAppService } from '../../src/application/use-cases/skill-planning-app.service';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
+import type { KernelObservabilityPort } from '../../src/ports/observability.port';
+
+const observability: KernelObservabilityPort = {
+  logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),
+  createTraceContext: (traceId) => ({ trace_id: traceId ?? 'trace-test' }),
+  currentTraceId: () => undefined,
+  withTrace: async (_traceId, operation) => operation(),
+  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
+  histogram: () => undefined,
+  counter: () => undefined,
+  start: () => undefined,
+  stop: () => undefined,
+  close: async () => undefined,
+};
+
+function createGateway(registry: SkillRegistry): SkillInvocationGateway {
+  return new SkillInvocationGateway(
+    registry,
+    new SkillPolicyEngine(),
+    { record: () => undefined },
+    observability,
+    { record: () => undefined },
+  );
+}
 
 describe('SkillPlanningAppService', () => {
   it('人物 catalog 只暴露 character tool/resource/prompt，保留 Core/MCP/User 默认 character 能力', () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const mixedSkillId = 'test.catalog.mixed-audience';
     const coreSkillId = 'test.catalog.core-default';
     const catalog = new SkillCatalogAppService(registry);
@@ -107,7 +132,7 @@ describe('SkillPlanningAppService', () => {
   });
 
   it('只向 Cognition 投影 ready 工具，过滤越界建议并经网关执行', async () => {
-    const registry = SkillRegistry.instance;
+    const registry = new SkillRegistry();
     const readySkillId = 'test.planning.ready';
     const contractOnlySkillId = 'test.planning.contract-only';
     const userSkillId = 'test.planning.user';
@@ -156,7 +181,7 @@ describe('SkillPlanningAppService', () => {
     try {
       const service = new SkillPlanningAppService(
         catalog,
-        new SkillInvocationGateway(registry),
+        createGateway(registry),
         async (request: AgentPlanRequest, traceId?: string): Promise<AgentPlanResponse> => {
           expect(traceId).toBe('trace-planning');
           expect(request.available_tools).toEqual([{

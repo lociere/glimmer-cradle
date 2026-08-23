@@ -1,4 +1,4 @@
-import type { SkillPolicy, SkillProviderRef, SkillTool } from '../../types';
+import type { SkillPolicy, SkillProviderRef, SkillTool } from '../../../../ports/skill-plane.port';
 
 export const CORE_SKILL_PROVIDER_ID = 'kernel-builtin-skills';
 

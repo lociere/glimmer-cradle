@@ -31,6 +31,11 @@ export interface RuntimeReadinessSnapshot {
   readonly reconciler?: RuntimeReconcilerSnapshot;
 }
 
+export interface RuntimeReadinessCatalog {
+  readonly updated_at: number;
+  readonly runtimes: RuntimeReadinessSnapshot[];
+}
+
 export function normalizeRuntimeReadiness(input: unknown): RuntimeReadinessSnapshot[] {
   const values = Array.isArray(input) ? input : input ? [input] : [];
   return values.filter(isRuntimeReadinessSnapshot);

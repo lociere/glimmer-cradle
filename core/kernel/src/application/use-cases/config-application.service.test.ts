@@ -4,7 +4,7 @@ import fs from 'fs-extra';
 import yaml from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GlobalConfig } from '../../adapters/config/config-schema';
-import { ConfigApplicationService } from './config-application.service';
+import { ConfigApplicationService } from '../../adapters/config/config-application-adapter';
 import type {
   AudioConfig,
   ConfigurationUpdateRequest,

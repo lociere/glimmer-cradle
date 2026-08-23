@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ActionCommand } from '@glimmer-cradle/protocol';
+import type { ActionCommand } from '../../ports/application-models';
 import type { AgentSynthesisRequest } from '../../ports/cognition-service-port';
 import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
 import { RecoveryRequiredError } from '../../domain/errors';
+
+const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined };
 
 function createPlanning(overrides: Partial<{
   readyToolCount: number;
@@ -65,12 +67,13 @@ describe('SkillActionController', () => {
     const synthesisRequests: AgentSynthesisRequest[] = [];
     const replies: ChannelReplyPublishRequest[] = [];
     const controller = new SkillActionController(
-      createPlanning() as any,
+      createPlanning() as never,
       async (request) => {
         synthesisRequests.push(request);
         return { reply_content: '天气是 26 度', emotion_state: { emotion_type: 'calm' }, trace_id: 'trace-1' };
       },
       async (reply) => { replies.push(reply); },
+      logger,
     );
 
     await controller.handleActionCommand(skillCommand());
@@ -96,12 +99,13 @@ describe('SkillActionController', () => {
   it('synthesizes no-ready-skill as skipped tool result', async () => {
     const synthesisRequests: AgentSynthesisRequest[] = [];
     const controller = new SkillActionController(
-      createPlanning({ readyToolCount: 0, suggestions: [] }) as any,
+      createPlanning({ readyToolCount: 0, suggestions: [] }) as never,
       async (request) => {
         synthesisRequests.push(request);
         return { reply_content: '现在没有可用工具', emotion_state: {}, trace_id: 'trace-1' };
       },
       async () => {},
+      logger,
     );
 
     await controller.handleActionCommand(skillCommand());
@@ -114,12 +118,13 @@ describe('SkillActionController', () => {
   it('synthesizes no-suitable-skill when ready catalog has no matching suggestion', async () => {
     const synthesisRequests: AgentSynthesisRequest[] = [];
     const controller = new SkillActionController(
-      createPlanning({ readyToolCount: 2, suggestions: [] }) as any,
+      createPlanning({ readyToolCount: 2, suggestions: [] }) as never,
       async (request) => {
         synthesisRequests.push(request);
         return { reply_content: '没有合适工具', emotion_state: {}, trace_id: 'trace-1' };
       },
       async () => {},
+      logger,
     );
 
     await controller.handleActionCommand(skillCommand());
@@ -131,12 +136,13 @@ describe('SkillActionController', () => {
   it('returns execution denial or handler failure as error tool result', async () => {
     const synthesisRequests: AgentSynthesisRequest[] = [];
     const controller = new SkillActionController(
-      createPlanning({ executeError: new Error('技能 core.weather 被策略拒绝') }) as any,
+      createPlanning({ executeError: new Error('技能 core.weather 被策略拒绝') }) as never,
       async (request) => {
         synthesisRequests.push(request);
         return { reply_content: '不能执行', emotion_state: {}, trace_id: 'trace-1' };
       },
       async () => {},
+      logger,
     );
 
     await controller.handleActionCommand(skillCommand());
@@ -149,9 +155,10 @@ describe('SkillActionController', () => {
   it('publishes controlled fallback when synthesis RPC fails', async () => {
     const replies: ChannelReplyPublishRequest[] = [];
     const controller = new SkillActionController(
-      createPlanning() as any,
+      createPlanning() as never,
       async () => { throw new Error('synthesis down'); },
       async (reply) => { replies.push(reply); },
+      logger,
     );
 
     await controller.handleActionCommand(skillCommand());
@@ -167,7 +174,7 @@ describe('SkillActionController', () => {
     let synthesisStarted!: () => void;
     const entered = new Promise<void>((resolve) => { synthesisStarted = resolve; });
     const controller = new SkillActionController(
-      createPlanning() as any,
+      createPlanning() as never,
       async (_request, signal) => {
         synthesisStarted();
         return new Promise((_resolve, reject) => signal?.addEventListener(
@@ -175,6 +182,7 @@ describe('SkillActionController', () => {
         ));
       },
       async (reply) => { replies.push(reply); },
+      logger,
     );
     const abort = new AbortController();
     const pending = controller.handleActionCommand(skillCommand(), abort.signal, `action:${reason}`);
@@ -190,7 +198,7 @@ describe('SkillActionController', () => {
   it('resumes from committed tool step after cancellation without replaying the side effect', async () => {
     let executeCount = 0;
     let stableInvocationId = '';
-    const planning = createPlanning() as any;
+    const planning = createPlanning() as never as ReturnType<typeof createPlanning>;
     planning.executeSuggestion = async (...args: unknown[]) => {
       executeCount += 1;
       stableInvocationId = String(args[4]);
@@ -201,7 +209,7 @@ describe('SkillActionController', () => {
     const entered = new Promise<void>((resolve) => { firstSynthesisStarted = resolve; });
     const replies: ChannelReplyPublishRequest[] = [];
     const controller = new SkillActionController(
-      planning,
+      planning as never,
       async (_request, signal) => {
         synthesisCount += 1;
         if (synthesisCount === 1) {
@@ -213,6 +221,7 @@ describe('SkillActionController', () => {
         return { reply_content: '恢复完成', emotion_state: {}, trace_id: 'trace-1' };
       },
       async (reply) => { replies.push(reply); },
+      logger,
     );
     const firstAbort = new AbortController();
     const first = controller.handleActionCommand(skillCommand(), firstAbort.signal, 'action:stable-operation');
@@ -230,14 +239,14 @@ describe('SkillActionController', () => {
 
   it('blocks automatic replay when an abort leaves a side-effect terminal state unknown', async () => {
     let executeCount = 0;
-    const planning = createPlanning() as any;
+    const planning = createPlanning();
     planning.executeSuggestion = async () => {
       executeCount += 1;
       throw new RecoveryRequiredError('action:unsafe:tool:0');
     };
-    const controller = new SkillActionController(planning, async () => ({
+    const controller = new SkillActionController(planning as never, async () => ({
       reply_content: 'unused', emotion_state: {}, trace_id: 'trace-1',
-    }), async () => undefined);
+    }), async () => undefined, logger);
 
     const first = await controller.handleActionCommand(
       skillCommand(), undefined, 'action:unsafe',

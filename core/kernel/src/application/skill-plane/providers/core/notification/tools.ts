@@ -1,5 +1,5 @@
-import type { SkillTool } from '../../../types';
-import type { CorePlatformBridge } from '../core-platform-bridge';
+import type { SkillTool } from '../../../../../ports/skill-plane.port';
+import type { CorePlatformBridge } from '../../../../../ports/skill-plane.port';
 import { createContractOnlyTool } from '../shared';
 
 const notificationParameters = {

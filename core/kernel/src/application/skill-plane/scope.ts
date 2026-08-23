@@ -1,4 +1,5 @@
-import type { CapabilityScope, ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '../../ports/application-models';
+import type { CapabilityScope } from '../../ports/skill-plane.port';
 
 export const GLOBAL_CAPABILITY_SCOPE: CapabilityScope = { kind: 'global' };
 

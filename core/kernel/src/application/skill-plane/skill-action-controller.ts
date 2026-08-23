@@ -1,8 +1,5 @@
-import {
-  type ActionCommand,
-  type ConversationContext,
-  normalizeReplyMessages,
-} from '@glimmer-cradle/protocol';
+import type { ActionCommand, ConversationContext } from '../../ports/application-models';
+import { normalizeReplyMessages } from './reply-messages';
 import type {
   AgentPlanResponse,
   AgentSynthesisRequest,
@@ -11,14 +8,10 @@ import type {
   CognitionActionResult,
 } from '../../ports/cognition-service-port';
 import { ChannelReplyEvent } from '../../domain/events';
-import { EventBus } from '../../ports/kernel-side-effects.port';
-import { getLogger } from '../../ports/kernel-side-effects.port';
-import { createTraceContext } from '../../ports/kernel-side-effects.port';
-import { AIProxy } from '../capabilities/inference/ai-proxy';
+import type { KernelEventBusPort } from '../../ports/event-bus.port';
+import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
 import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { RecoveryRequiredError } from '../../domain/errors';
-
-const logger = getLogger('skill-action-controller');
 
 export type AgentSynthesisRequester = (
   request: AgentSynthesisRequest,
@@ -49,9 +42,9 @@ export class SkillActionController {
 
   public constructor(
     private readonly _skillPlanning: SkillPlanningAppService,
-    private readonly _requestSynthesis: AgentSynthesisRequester = (request, signal) =>
-      AIProxy.instance.requestAgentSynthesis(request, signal),
-    private readonly _publishReply: ChannelReplyPublisher = publishChannelReply,
+    private readonly _requestSynthesis: AgentSynthesisRequester,
+    private readonly _publishReply: ChannelReplyPublisher,
+    private readonly logger: KernelLoggerPort,
   ) {}
 
   public async handleActionCommand(
@@ -62,20 +55,19 @@ export class SkillActionController {
     signal?.throwIfAborted();
     const journal = this.getJournal(operationId);
     if (journal.recoveryRequired) throw journal.recoveryRequired;
-    const cmd = command as Record<string, any>;
     const actionType = String(command.action_type ?? '');
     if (actionType === 'reply') {
-      await this.handleReplyCommand(cmd, command.trace_id, journal, signal);
+      await this.handleReplyCommand(command, command.trace_id, journal, signal);
       return { status: 'completed' };
     }
     if (actionType === 'skill_request') {
-      await this.handleSkillRequestCommand(cmd, command.trace_id, journal, signal);
+      await this.handleSkillRequestCommand(command, command.trace_id, journal, signal);
       return { status: 'completed' };
     }
   }
 
   private async handleReplyCommand(
-    cmd: Record<string, any>,
+    cmd: ActionCommand,
     requestTraceId: string,
     journal: ActionExecutionJournal,
     signal?: AbortSignal,
@@ -88,7 +80,7 @@ export class SkillActionController {
     }
     const sceneId = typeof cmd.target?.scene_id === 'string' ? cmd.target.scene_id : '';
     if (!sceneId) {
-      logger.warn('ActionCommand 缺少 target.scene_id，已丢弃 reply', { trace_id: traceId });
+      this.logger.warn('ActionCommand 缺少 target.scene_id，已丢弃 reply', { trace_id: traceId });
       return;
     }
     signal?.throwIfAborted();
@@ -103,19 +95,20 @@ export class SkillActionController {
   }
 
   private async handleSkillRequestCommand(
-    cmd: Record<string, any>,
+    cmd: ActionCommand,
     requestTraceId: string,
     journal: ActionExecutionJournal,
     signal?: AbortSignal,
   ): Promise<void> {
     if (journal.replyCommitted) return;
     const traceId = String(cmd.trace_id || requestTraceId);
-    const skillRequest = cmd.payload?.skill_request ?? {};
-    const sceneId = String(cmd.target?.scene_id || skillRequest.scene_id || '');
-    const originalGoal = String(skillRequest.original_goal || cmd.payload?.text || '').trim();
+    const skillRequest = cmd.payload.skill_request;
+    if (!skillRequest) return;
+    const sceneId = String(cmd.target?.scene_id || '');
+    const originalGoal = String(skillRequest.original_goal || cmd.payload.text || '').trim();
     const conversation = skillRequest.conversation;
     if (!sceneId || !originalGoal) {
-      logger.warn('Skill 请求缺少目标场景或用户目标，已丢弃', {
+      this.logger.warn('Skill 请求缺少目标场景或用户目标，已丢弃', {
         trace_id: traceId,
         has_scene_id: Boolean(sceneId),
         has_goal: Boolean(originalGoal),
@@ -123,7 +116,7 @@ export class SkillActionController {
       return;
     }
 
-    logger.info('开始处理角色 Skill 请求', {
+    this.logger.info('开始处理角色 Skill 请求', {
       trace_id: traceId,
       scene_id: sceneId,
       reason: skillRequest.reason,
@@ -152,7 +145,7 @@ export class SkillActionController {
       journal.synthesis = synthesis;
     } catch (error) {
       if (isAbortError(error, signal)) throw error;
-      logger.error('Skill 结果回传 Cognition 合成失败', {
+      this.logger.error('Skill 结果回传 Cognition 合成失败', {
         trace_id: traceId,
         scene_id: sceneId,
         error: normalizeError(error),
@@ -168,7 +161,7 @@ export class SkillActionController {
     }
 
     if (!synthesis.reply_content.trim()) {
-      logger.warn('Cognition 合成返回空回复，已停止投递', { trace_id: traceId, scene_id: sceneId });
+      this.logger.warn('Cognition 合成返回空回复，已停止投递', { trace_id: traceId, scene_id: sceneId });
       return;
     }
 
@@ -291,20 +284,20 @@ export class SkillActionController {
   }
 }
 
-async function publishChannelReply(request: ChannelReplyPublishRequest): Promise<void> {
-  const messages = normalizeReplyMessages(request.text, request.messages);
-  await EventBus.instance.publish(
-    new ChannelReplyEvent(
-      {
-        trace_id: request.traceId,
-        text: request.text,
-        messages,
-        emotion_state: request.emotionState,
-        target_channel: request.sceneId,
-      },
-      createTraceContext({ trace_id: request.traceId }),
-    ),
-  );
+export function createChannelReplyPublisher(
+  eventBus: KernelEventBusPort,
+  observability: KernelObservabilityPort,
+): ChannelReplyPublisher {
+  return async (request) => {
+    const messages = normalizeReplyMessages(request.text, request.messages);
+    await eventBus.publish(new ChannelReplyEvent({
+      trace_id: request.traceId,
+      text: request.text,
+      messages,
+      emotion_state: request.emotionState,
+      target_channel: request.sceneId,
+    }, observability.createTraceContext(request.traceId)));
+  };
 }
 
 function makeToolResult(

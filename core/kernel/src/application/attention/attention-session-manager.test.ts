@@ -1,6 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { PerceptionEvent } from '../../ports/application-models';
+import type { KernelObservabilityPort } from '../../ports/observability.port';
+import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
 import { AttentionSessionManager } from './attention-session-manager';
+
+const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), critical: vi.fn() };
+const observability: KernelObservabilityPort = {
+  logger: () => logger,
+  createTraceContext: (traceId) => ({ trace_id: traceId ?? 'trace-test' }),
+  currentTraceId: () => undefined,
+  withTrace: async (_traceId, operation) => operation(),
+  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
+  histogram: () => undefined,
+  counter: () => undefined,
+  start: () => undefined,
+  stop: () => undefined,
+  close: async () => undefined,
+};
+const manager = new AttentionSessionManager({
+  ingress_debounce_ms: 1,
+  ingress_focused_debounce_ms: 1,
+  ingress_max_batch_messages: 4,
+  ingress_max_batch_items: 24,
+  focus_duration_ms: 1,
+  focus_on_any_chat: false,
+  heartbeat_enabled: false,
+  heartbeat_interval_ms: 1,
+  summon_keywords: [],
+}, observability, new AttentionLeaseStore());
 
 function perception(overrides: Partial<PerceptionEvent> = {}): PerceptionEvent {
   const id = overrides.id ?? 'event-1';
@@ -45,16 +72,16 @@ function perception(overrides: Partial<PerceptionEvent> = {}): PerceptionEvent {
 
 describe('AttentionSessionManager 感知契约', () => {
   afterEach(async () => {
-    await AttentionSessionManager.instance.stop();
+    await manager.stop();
   });
 
   it('批处理后保留权威 PerceptionEvent 的 trace、来源和留存上限', () => {
-    const manager = AttentionSessionManager.instance as unknown as {
+    const subject = manager as unknown as {
       mergeRequests(requests: PerceptionEvent[]): PerceptionEvent;
     };
     const event = perception();
 
-    const merged = manager.mergeRequests([event]);
+    const merged = subject.mergeRequests([event]);
 
     expect(merged.trace_id).toBe(event.trace_id);
     expect(merged.origin).toEqual(event.origin);
@@ -62,11 +89,11 @@ describe('AttentionSessionManager 感知契约', () => {
   });
 
   it('合并不同留存上限时采用最严格上限', () => {
-    const manager = AttentionSessionManager.instance as unknown as {
+    const subject = manager as unknown as {
       mergeRequests(requests: PerceptionEvent[]): PerceptionEvent;
     };
 
-    const merged = manager.mergeRequests([
+    const merged = subject.mergeRequests([
       perception({ id: 'event-1', retention_ceiling: 'memory_candidate' }),
       perception({ id: 'event-2', retention_ceiling: 'transient' }),
     ]);
@@ -104,7 +131,7 @@ describe('AttentionSessionManager 感知契约', () => {
       completeStream: vi.fn(async () => undefined),
       cancelStream: vi.fn(async () => undefined),
     };
-    const manager = AttentionSessionManager.instance as unknown as {
+    const subject = manager as unknown as {
       _initialized: boolean;
       _debounceMs: number;
       _focusedDebounceMs: number;
@@ -112,15 +139,15 @@ describe('AttentionSessionManager 感知契约', () => {
       _actionStream: unknown;
       ingest(request: PerceptionEvent): Promise<void>;
     };
-    manager._initialized = true;
-    manager._debounceMs = 1;
-    manager._focusedDebounceMs = 1;
-    manager._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception, sendLifeHeartbeat: vi.fn() };
-    manager._actionStream = actionStream;
+    subject._initialized = true;
+    subject._debounceMs = 1;
+    subject._focusedDebounceMs = 1;
+    subject._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception, sendLifeHeartbeat: vi.fn() };
+    subject._actionStream = actionStream;
 
-    const first = manager.ingest(perception({ id: 'event-1', trace_id: 'trace-1' }));
+    const first = subject.ingest(perception({ id: 'event-1', trace_id: 'trace-1' }));
     await vi.waitFor(() => expect(sendPerceptionMessage).toHaveBeenCalledTimes(1));
-    const second = manager.ingest(perception({ id: 'event-2', trace_id: 'trace-2' }));
+    const second = subject.ingest(perception({ id: 'event-2', trace_id: 'trace-2' }));
     await Promise.all([first, second]);
 
     expect(cancelPerception).toHaveBeenCalledTimes(1);
