@@ -29,8 +29,8 @@ import { EventBus } from '../events/event-bus';
 import { getLogger } from '../observability/logger';
 import { ExtensionStorageRepository } from '../storage/repositories/extension-storage-repository';
 import { resolveRepoRoot } from '../filesystem/path-utils';
-import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
 import type {
+  AttentionLeasePort,
   LifeClockApplicationPort,
   PerceptionApplicationPort,
   SkillCatalogApplicationPort,
@@ -57,7 +57,7 @@ export class ExtensionHostAppService implements IExtensionHostService {
     private readonly _skillCatalogService: SkillCatalogApplicationPort,
     private readonly _availabilityContext: SkillAvailabilityContext,
     private readonly skillPolicy: SkillPlanePolicyPort,
-    private readonly attentionLeases: AttentionLeaseStore,
+    private readonly attentionLeases: AttentionLeasePort,
     private readonly lifeClock: LifeClockApplicationPort,
     runtimeRegistry: ExtensionRuntimeRegistry,
   ) {

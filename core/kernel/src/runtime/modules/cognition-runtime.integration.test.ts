@@ -11,6 +11,7 @@ import { KernelTransportRuntime } from './kernel-transport-runtime';
 import { createTraceContext } from '../../adapters/observability/trace-context';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { KernelConfiguration } from '../../ports/configuration.port';
+import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
 
 const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === '1';
 
@@ -25,7 +26,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     transportRuntime = new KernelTransportRuntime(
       ConfigManager.instance.getConfig() as unknown as KernelConfiguration,
       transport,
-      new IngressGateManager(logger),
+      new IngressGateManager(logger, new SystemClockAdapter()),
       projection,
     );
     let cognitionRuntime!: CognitionRuntime;

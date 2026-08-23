@@ -90,11 +90,12 @@ Desktop/Extension/Platform input
 Service 的真实终态；新输入到达时旧 trace 仍保持 in-flight，等待
 `CancelPerception`/`GetPerceptionOperation` 到达终态后才结束旧 thinking stream 并处理合并输入。进程 crash 会通过
 `CognitionRuntime` observer 立即挂起 Ingress，自动重启失败保持 failed；只有新代完成
-register、knowledge init 与 readiness 后，`KernelTransportRuntime` 才恢复此前明确开放的 Ingress。
+register、knowledge init 与 readiness 后，才通过 `CognitionIngressRecoveryPort` 恢复此前明确开放的
+Ingress。Runtime module 之间不注入或 import concrete；同层只共享 `runtime-module.ts` 生命周期契约。
 
 桌面与 Extension 都不能自行生成 Cognition 使用的会话 ID。桌面入口和 `ExtensionHostAppService` 先构造 `ConversationAddress`，再由 `application/capabilities/conversation/conversation-directory.ts` 解析为 `ConversationContext`。Directory 根据 provider、account、space、thread 和 actor endpoint 生成稳定且不可逆的 scene、conversation、continuity、thread 与 actor 标识，并同时决定 `recall_scope` / `disclosure_scope`。这些 canonical 字段跟随感知、Skill 请求和结果合成穿过 Cognition Service；下游只能消费，不能重新解释平台身份或放宽作用域。
 
-外部注意力链路当前由 `adapters/extension-host/extension-host-application-adapter.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再通过强类型 Attention capability Port 交给 `domain/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 读取同一 store。`application/attention/attention-session-manager.ts` 消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`application/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
+外部注意力链路当前由 `adapters/extension-host/extension-host-application-adapter.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再通过强类型 Attention capability Port 交给 `application/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`；纯数据词汇位于 `domain/attention/attention-lease.ts`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 读取同一 store。`application/attention/attention-session-manager.ts` 消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`application/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。Attention store/session、LifeClock 与 Ingress Gate 的时间读取和调度都依赖 `ports/clock.port.ts`，唯一 Node timer owner 是 `adapters/time/system-clock-adapter.ts`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
 
 ## 出站主链
 

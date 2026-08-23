@@ -36,7 +36,7 @@ import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gatew
 import { NodeStableIdentityAdapter } from '../adapters/identity/node-stable-identity-adapter';
 import { ConversationDirectory } from '../application/capabilities/conversation/conversation-directory';
 import { ChannelStateStore } from '../application/channel/channel-state-store';
-import { AttentionLeaseStore } from '../domain/attention/attention-lease-store';
+import { AttentionLeaseStore } from '../application/attention/attention-lease-store';
 import { AttentionSessionManager } from '../application/attention/attention-session-manager';
 import { ActionStreamManager } from '../application/capabilities/action-stream/action-stream-manager';
 import { VisualCommandDispatcher } from '../application/capabilities/action-stream/visual-command-dispatcher';
@@ -66,6 +66,7 @@ import { KernelPresentationAdapter } from '../adapters/surface/kernel-presentati
 import { KernelOrganismAdapter } from '../adapters/organism/kernel-organism-adapter';
 import { DlqReplayIngress } from '../adapters/events/dlq-replay-ingress';
 import { resolveLogDir } from '../adapters/filesystem/path-utils';
+import { SystemClockAdapter } from '../adapters/time/system-clock-adapter';
 import { loadProductComposition, type ProductComposition } from './product-composition';
 
 interface OperationalRuntimePlan {
@@ -174,8 +175,9 @@ function createOperationalRuntimePlan(options: {
   readonly configuration: KernelConfigurationAdapter;
 }): OperationalRuntimePlan {
   const { config, product, observability, eventBus, projection, configuration } = options;
+  const clock = new SystemClockAdapter();
   const transportAdapter = new KernelCognitionTransport();
-  const ingress = new IngressGateManager(observability.logger('ingress-gate'));
+  const ingress = new IngressGateManager(observability.logger('ingress-gate'), clock);
   const transport = new KernelTransportRuntime(config, transportAdapter, ingress, projection);
   let cognitionRuntime: CognitionRuntime | null = null;
   const cognitionAdapter = new CognitionManager(
@@ -189,12 +191,14 @@ function createOperationalRuntimePlan(options: {
   const surface = new ControlSurfaceGateway(projection, avatar, audio);
   const conversations = new ConversationDirectory(new NodeStableIdentityAdapter());
   const channelState = new ChannelStateStore(observability.logger('channel-state'));
-  const attentionLeases = new AttentionLeaseStore();
+  const attentionLeases = new AttentionLeaseStore(clock);
   const actionStream = new ActionStreamManager(config.character.inference.action_stream, eventBus, observability);
-  const attention = new AttentionSessionManager(config.character.inference.life_clock, observability, attentionLeases);
+  const attention = new AttentionSessionManager(
+    config.character.inference.life_clock, observability, attentionLeases, clock,
+  );
   const lifeClock = new LifeClockManager(
     config.character.inference.life_clock, eventBus, observability,
-    observability.logger('life-clock-manager'), attentionLeases,
+    observability.logger('life-clock-manager'), attentionLeases, clock,
   );
   const visual = new VisualCommandDispatcher(config.system.avatar, eventBus, observability.logger('visual-command-dispatcher'));
   const registry = new SkillRegistry();

@@ -1,9 +1,11 @@
 import type { PerceptionEvent } from '../../ports/application-models';
 import type { PerceptionCancelRequest } from '../../ports/cognition-service-port';
 import { IAICapabilityPort, IActionStreamPort } from '../../ports';
-import { AttentionLeaseStore, AttentionProjectionMode } from '../../domain/attention/attention-lease-store';
+import type { AttentionProjectionMode } from '../../domain/attention/attention-lease';
 import type { LifeClockConfiguration } from '../../ports/configuration.port';
 import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
+import type { AttentionLeasePort } from '../../ports/application-capabilities.port';
+import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
 
 type PendingIngress = {
   request: PerceptionEvent;
@@ -34,7 +36,7 @@ type InterruptedContent = {
 
 type SceneIngressState = {
   pending: PendingIngress[];
-  timer: NodeJS.Timeout | null;
+  timer: ScheduledTaskPort | null;
   chain: Promise<void>;
   inFlightTraceId: string | null;
   cancelRequested: boolean;
@@ -61,7 +63,8 @@ export class AttentionSessionManager {
   public constructor(
     private readonly config: LifeClockConfiguration,
     private readonly observability: KernelObservabilityPort,
-    private readonly _attentionLeaseStore: AttentionLeaseStore,
+    private readonly _attentionLeaseStore: AttentionLeasePort,
+    private readonly clock: KernelClockPort,
   ) {
     this.logger = observability.logger('attention-session-manager');
   }
@@ -94,7 +97,7 @@ export class AttentionSessionManager {
     this.tryInterruptInFlight(source, state);
 
     return new Promise<void>((resolve, reject) => {
-      state.pending.push({ request, resolve, reject, queued_at_ms: performance.now() });
+      state.pending.push({ request, resolve, reject, queued_at_ms: this.clock.monotonicNowMs() });
       this.scheduleFlush(source, state);
     });
   }
@@ -104,7 +107,7 @@ export class AttentionSessionManager {
     const cancellations: Promise<unknown>[] = [];
     for (const [source, state] of this._sceneStates.entries()) {
       if (state.timer) {
-        clearTimeout(state.timer);
+        state.timer.cancel();
       }
       for (const pending of state.pending) {
         pending.reject(new Error('Attention session manager stopped'));
@@ -148,12 +151,12 @@ export class AttentionSessionManager {
 
   private scheduleFlush(source: string, state: SceneIngressState): void {
     if (state.timer) {
-      clearTimeout(state.timer);
+      state.timer.cancel();
       state.timer = null;
     }
 
     const debounceMs = this.resolveDebounceMs();
-    state.timer = setTimeout(() => {
+    state.timer = this.clock.schedule(debounceMs, () => {
       state.timer = null;
       state.chain = state.chain
         .then(() => this.flushScene(source, state))
@@ -163,7 +166,7 @@ export class AttentionSessionManager {
             error: error instanceof Error ? error.message : String(error),
           });
         });
-    }, debounceMs);
+    });
   }
 
   private tryInterruptInFlight(source: string, state: SceneIngressState): void {
@@ -217,7 +220,7 @@ export class AttentionSessionManager {
     }
 
     const batch = queue.slice(overflowCount);
-    const queueWaitMs = performance.now() - Math.min(...batch.map((entry) => entry.queued_at_ms));
+    const queueWaitMs = this.clock.monotonicNowMs() - Math.min(...batch.map((entry) => entry.queued_at_ms));
     const attentionProjectionMode = this.resolveAttentionProjectionMode();
 
     // 提取并清空上次被中断的内容快照，作为本次合并的前缀。

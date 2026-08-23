@@ -10,12 +10,13 @@
  */
 import { OrganismAttentionChangedEvent, OrganismAttentionMode, StateSyncEvent } from '../../../domain/events';
 import type { CognitiveActivitySnapshot } from '../../../ports/application-models';
-import type { SourceAttentionPolicy } from '../../../ports/application-capabilities.port';
+import type { AttentionLeasePort, SourceAttentionPolicy } from '../../../ports/application-capabilities.port';
 import { IAICapabilityPort } from '../../../ports';
 import type { LifeClockConfiguration } from '../../../ports/configuration.port';
 import type { KernelEventBusPort } from '../../../ports/event-bus.port';
 import type { KernelLoggerPort, KernelObservabilityPort } from '../../../ports/observability.port';
-import { AttentionLeaseChange, AttentionLeaseStore } from '../../../domain/attention/attention-lease-store';
+import type { AttentionLeaseChange } from '../../../domain/attention/attention-lease';
+import type { KernelClockPort, ScheduledTaskPort } from '../../../ports/clock.port';
 import { AttentionTrigger, AttentionTriggerResult } from "./triggers/attention-trigger";
 import { WakeKeywordTrigger } from "./triggers/wake-keyword-trigger";
 
@@ -24,7 +25,7 @@ import { WakeKeywordTrigger } from "./triggers/wake-keyword-trigger";
  * 单例模式
  */
 export class LifeClockManager {
-  private _timer: NodeJS.Timeout | null = null;
+  private _timer: ScheduledTaskPort | null = null;
   private _isRunning: boolean = false;
   private _heartbeatIntervalMs: number = 45000;
   private _focusDurationMs: number = 180000;
@@ -49,7 +50,8 @@ export class LifeClockManager {
     private readonly eventBus: KernelEventBusPort,
     private readonly observability: KernelObservabilityPort,
     private readonly logger: KernelLoggerPort,
-    private readonly _attentionLeaseStore: AttentionLeaseStore,
+    private readonly _attentionLeaseStore: AttentionLeasePort,
+    private readonly clock: KernelClockPort,
   ) {}
 
   /**
@@ -140,28 +142,28 @@ export class LifeClockManager {
 
     const interval = this._cognitiveActivity?.policy.frequency_hint_ms ?? this._heartbeatIntervalMs;
 
-    this._timer = setTimeout(async () => {  
-      if (!this._isRunning) return;
+    this._timer = this.clock.schedule(interval, () => { void this.runHeartbeat(); });
+  }
 
-      try {
-        // 检查 Cognition 认知核是否就绪
-        if (!this._aiProxy.isReady) {
-          this.logger.warn("Cognition 认知核未就绪，跳过本次心跳");
-          // 未就绪时继续低频探测，认知循环由 Cognition 自己监督。
-          this.startHeartbeatLoop();
-          return;
-        }
+  private async runHeartbeat(): Promise<void> {
+    if (!this._isRunning) return;
 
-        // 仅探测 Cognition 活性；不触发思维或情绪变化。
-        await this._aiProxy.sendLifeHeartbeat({});
-
-      } catch (error) {
-        this.logger.error("生命心跳执行异常", { error: (error as Error).message });
-      } finally {
-        // 继续下一次循环；启停由显式配置和 LifeClock 生命周期控制。
-        this.startHeartbeatLoop();
+    try {
+      // 检查 Cognition 认知核是否就绪
+      if (!this._aiProxy.isReady) {
+        this.logger.warn("Cognition 认知核未就绪，跳过本次心跳");
+        return;
       }
-    }, interval);
+
+      // 仅探测 Cognition 活性；不触发思维或情绪变化。
+      await this._aiProxy.sendLifeHeartbeat({});
+
+    } catch (error) {
+      this.logger.error("生命心跳执行异常", { error: (error as Error).message });
+    } finally {
+      // 继续下一次循环；启停由显式配置和 LifeClock 生命周期控制。
+      this.startHeartbeatLoop();
+    }
   }
 
   /**
@@ -193,7 +195,7 @@ export class LifeClockManager {
    */
   private restartLoop(): void {
     if (this._timer) {
-      clearTimeout(this._timer);
+      this._timer.cancel();
       this._timer = null;
     }
     if (this._isRunning) {
@@ -250,7 +252,7 @@ export class LifeClockManager {
     this.logger.info("生命时钟停止");
     this._isRunning = false;
     if (this._timer) {
-      clearTimeout(this._timer);
+      this._timer.cancel();
       this._timer = null;
     }
     // 取消订阅事件，避免内存泄漏

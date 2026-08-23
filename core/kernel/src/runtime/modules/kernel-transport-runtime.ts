@@ -1,11 +1,16 @@
 import type { KernelConfiguration } from '../../ports/configuration.port';
-import type { KernelIngressPort, KernelTransportPort, RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
+import type {
+  CognitionIngressRecoveryPort,
+  KernelIngressPort,
+  KernelTransportPort,
+  RuntimeProjectionInputPort,
+} from '../../ports/kernel-lifecycle.port';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { CognitionActionHandler } from '../../ports/cognition-service-port';
 
-export class KernelTransportRuntime implements RuntimeModule {
+export class KernelTransportRuntime implements RuntimeModule, CognitionIngressRecoveryPort {
   public readonly name = 'kernel-transport';
 
   public constructor(

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AttentionLeaseStore } from '../../src/domain/attention/attention-lease-store';
+import { SystemClockAdapter } from '../../src/adapters/time/system-clock-adapter';
+import { AttentionLeaseStore } from '../../src/application/attention/attention-lease-store';
 
 describe('AttentionLeaseStore', () => {
   afterEach(() => {
@@ -9,7 +10,7 @@ describe('AttentionLeaseStore', () => {
   it('把 lease 汇总为只读 attention projection，并支持释放', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2023-11-14T22:13:20.000Z'));
-    const store = new AttentionLeaseStore();
+    const store = new AttentionLeaseStore(new SystemClockAdapter());
 
     const lease = store.acquire({
       scene_id: 'qq:group:10001',
@@ -53,7 +54,7 @@ describe('AttentionLeaseStore', () => {
 
   it('在 lease 过期时清理状态并通知 owner', () => {
     vi.useFakeTimers();
-    const store = new AttentionLeaseStore();
+    const store = new AttentionLeaseStore(new SystemClockAdapter());
     const changed = vi.fn();
     store.setChangeHandler(changed);
 

@@ -16,6 +16,7 @@
 | Desktop/Surface 投影 | `adapters/surface/`、`ports/application-capabilities.port.ts` |
 | Skill Plane | `application/skill-plane/`、`adapters/skill-plane/`、`ports/skill-plane.port.ts` |
 | Extension Host（Slice 3 仍由 Kernel 监督） | `adapters/extension-host/`、`ports/extension-host.port.ts`、`ports/application-capabilities.port.ts` |
+| 时间与调度 | `ports/clock.port.ts`、`adapters/time/system-clock-adapter.ts`；Domain/Application 禁止直接持有 Node timer |
 | 日志/trace/DLQ | `adapters/observability/`、`adapters/events/dead-letter-queue.ts` |
 
 ## 标准步骤
@@ -24,7 +25,7 @@
 2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/`，运行 `pnpm contracts:generate` / `pnpm contracts:verify`；不得手改 generated。
 3. 找 producer、mapper、consumer、projection 和 tests。
 4. 修改 root/module/service，不在调用端堆临时补丁。
-5. 保持 `domain <- application -> ports <- adapters`；Domain/Application 不依赖 Protocol generated、Node、Adapter 或 Runtime concrete；Runtime 只调用 Application use case 与 Ports，运行事实经 `RuntimeProjectionInputPort` 提交给 Application-owned projection mapper。
+5. 保持 `domain <- application -> ports <- adapters`；Domain/Application 不依赖 Protocol generated、Node、Adapter 或 Runtime concrete，也不直接调用 Node timer；Runtime 只调用 Application use case 与 Ports，runtime module 间不注入 concrete，运行事实经 `RuntimeProjectionInputPort` 提交给 Application-owned projection mapper。
 6. 补 ready/degraded/failed/stop 语义。
 7. 删除旧事件、旧 bridge、旧 handler、旧 fallback。
 8. 同步 Current/Implementation/Reference/Guide 中唯一受影响页面。
@@ -67,6 +68,10 @@ pnpm --filter @glimmer-cradle/kernel exec vitest run tests/architecture/kernel-p
 pnpm typecheck
 pnpm build
 ```
+
+`smoke:bootstrap` 会从 built production composition 调用 `createKernelApplication()`，启动真实
+Kernel/Cognition concrete graph 并完成 stop；只通过产品清单关闭非必需 UI、Avatar、Audio 与 Extension
+能力，不能用 Vitest setup 或全量 stub 代替。
 
 生命周期和子进程改动还要验证：正常启动、缺资源、超时、崩溃、重启、主动停机、反向停机、日志和 DLQ 定位。能实机启动时检查 `data/observability/logs/application/kernel.pretty.log` 与 `logs/application/`。
 

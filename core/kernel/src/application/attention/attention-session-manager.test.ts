@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PerceptionEvent } from '../../ports/application-models';
 import type { KernelObservabilityPort } from '../../ports/observability.port';
-import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
+import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { AttentionLeaseStore } from './attention-lease-store';
 import { AttentionSessionManager } from './attention-session-manager';
 
 const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), critical: vi.fn() };
@@ -17,6 +18,7 @@ const observability: KernelObservabilityPort = {
   stop: () => undefined,
   close: async () => undefined,
 };
+const clock = new SystemClockAdapter();
 const manager = new AttentionSessionManager({
   ingress_debounce_ms: 1,
   ingress_focused_debounce_ms: 1,
@@ -27,7 +29,7 @@ const manager = new AttentionSessionManager({
   heartbeat_enabled: false,
   heartbeat_interval_ms: 1,
   summon_keywords: [],
-}, observability, new AttentionLeaseStore());
+}, observability, new AttentionLeaseStore(clock), clock);
 
 function perception(overrides: Partial<PerceptionEvent> = {}): PerceptionEvent {
   const id = overrides.id ?? 'event-1';

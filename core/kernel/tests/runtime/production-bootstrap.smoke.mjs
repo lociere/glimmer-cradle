@@ -1,87 +1,42 @@
 import assert from 'node:assert/strict';
-import { App } from '../../dist/composition/kernel-application.js';
-import { AppLifecycleState } from '../../dist/domain/lifecycle/lifecycle-state.enum.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
-const calls = [];
-const config = {
-  system: { ingress: {} },
-  character: {},
-};
-const runtime = (name) => ({
-  name,
-  start: async () => { calls.push(`start:${name}`); },
-  stop: async () => { calls.push(`stop:${name}`); },
-});
-const transport = {
-  ...runtime('transport'),
-  openIngress: () => calls.push('ingress:open'),
-  closeIngress: () => calls.push('ingress:close'),
-};
-const bootstrap = {
-  ...runtime('bootstrap'),
-  get config() { return config; },
-};
-const logger = {
-  debug: () => undefined,
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined,
-  critical: () => undefined,
-};
-const eventBus = {
-  publish: async () => undefined,
-  subscribe: () => undefined,
-  unsubscribe: () => undefined,
-  shutdown: async () => calls.push('event-bus:shutdown'),
-};
-const observability = {
-  logger: () => logger,
-  createTraceContext: () => ({ trace_id: 'production-bootstrap-smoke' }),
-  currentTraceId: () => undefined,
-  withTrace: async (_traceId, operation) => operation(),
-  span: async (_name, operation) => operation({ setAttribute: () => undefined, setStatus: () => undefined }),
-  histogram: () => undefined,
-  counter: () => undefined,
-  start: () => undefined,
-  stop: () => undefined,
-  close: async () => calls.push('observability:close'),
-};
-const projection = {
-  replaceModuleSnapshots: () => undefined,
-  clear: () => calls.push('projection:clear'),
-};
-const app = new App(
-  logger,
-  observability,
-  eventBus,
-  projection,
-  bootstrap,
-  () => ({
-    transport,
-    application: runtime('application'),
-    presentation: [runtime('presentation')],
-    coreReadiness: [runtime('cognition')],
-    organism: runtime('organism'),
-    recovery: runtime('recovery'),
-  }),
-);
+const previousDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
+const dataRoot = await mkdtemp(path.join(os.tmpdir(), 'kernel-production-bootstrap-'));
+process.env.GLIMMER_CRADLE_DATA_ROOT = dataRoot;
 
-await app.start();
-assert.equal(app.state, AppLifecycleState.RUNNING);
-assert.deepEqual(calls.slice(0, 7), [
-  'start:bootstrap',
-  'start:transport',
-  'start:application',
-  'start:presentation',
-  'start:cognition',
-  'ingress:open',
-  'start:organism',
-]);
-await app.stop(0);
-assert.equal(app.state, AppLifecycleState.STOPPED);
-assert.ok(calls.includes('ingress:close'));
-assert.ok(calls.indexOf('stop:recovery') < calls.indexOf('stop:bootstrap'));
-assert.ok(calls.includes('event-bus:shutdown'));
-assert.ok(calls.includes('observability:close'));
+let app;
+try {
+  const [{ createKernelApplication }, { loadProductComposition }, { AppLifecycleState }] = await Promise.all([
+    import('../../dist/composition/kernel-application.js'),
+    import('../../dist/composition/product-composition.js'),
+    import('../../dist/domain/lifecycle/lifecycle-state.enum.js'),
+  ]);
+  const desktop = loadProductComposition();
+  const smokeProduct = {
+    ...desktop,
+    display_name: `${desktop.display_name} Production Bootstrap Smoke`,
+    features: {
+      control_surface_gateway: false,
+      local_device_actions: false,
+      avatar: false,
+      audio: { tts: false, asr: false },
+      extensions: false,
+    },
+  };
 
-process.stdout.write('production bootstrap smoke passed\n');
+  app = createKernelApplication(smokeProduct);
+  await app.start();
+  assert.equal(app.state, AppLifecycleState.RUNNING);
+  await app.stop(0);
+  assert.equal(app.state, AppLifecycleState.STOPPED);
+} finally {
+  if (app) await app.stop(1);
+  if (previousDataRoot === undefined) delete process.env.GLIMMER_CRADLE_DATA_ROOT;
+  else process.env.GLIMMER_CRADLE_DATA_ROOT = previousDataRoot;
+  await rm(dataRoot, { recursive: true, force: true });
+}
+
+process.stdout.write('production composition bootstrap smoke passed\n');

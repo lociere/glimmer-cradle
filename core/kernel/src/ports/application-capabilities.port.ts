@@ -11,6 +11,14 @@ import type {
 } from '@glimmer-cradle/protocol';
 import type { StateSyncEvent } from '../domain/events';
 import type {
+  AttentionLease,
+  AttentionLeaseChangeHandler,
+  AttentionLeaseReleaseRequest,
+  AttentionLeaseRequest,
+  AttentionProjection,
+  AttentionProjectionMode,
+} from '../domain/attention/attention-lease';
+import type {
   ConversationAddress,
   PerceptionEvent,
 } from './application-models';
@@ -68,6 +76,16 @@ export type SourceAttentionPolicy =
   | 'wake_word_focus_with_timeout'
   | 'chat_or_wake_focus_with_timeout'
   | 'ignore';
+
+export interface AttentionLeasePort {
+  acquire(request: AttentionLeaseRequest): AttentionLease;
+  release(request: AttentionLeaseReleaseRequest): boolean;
+  getProjection(baseMode?: Extract<AttentionProjectionMode, 'idle' | 'passive'>): AttentionProjection;
+  isChannelFocused(channelId: string): boolean;
+  hasFocusedLease(): boolean;
+  setChangeHandler(handler: AttentionLeaseChangeHandler | null): void;
+  clear(): void;
+}
 
 export interface AttentionApplicationPort {
   init(cognition: IAICapabilityPort, actionStream: IActionStreamPort): void;

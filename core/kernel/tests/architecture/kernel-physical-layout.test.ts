@@ -65,6 +65,13 @@ function assertSourcePolicy(file: string, text: string): void {
   }
 }
 
+function assertApplicationTimingPolicy(file: string, text: string): void {
+  const from = layerFor(file);
+  if (from !== 'domain' && from !== 'application') return;
+  expect(text, path.relative(sourceRoot, file)).not.toMatch(/\bNodeJS\./);
+  expect(text, path.relative(sourceRoot, file)).not.toMatch(/\b(?:setTimeout|clearTimeout|setInterval|clearInterval|performance\.now)\s*\(/);
+}
+
 describe('Kernel physical layout', () => {
   it('keeps the six owned layers and deletes legacy aggregate roots', () => {
     for (const required of layers) expect(fs.statSync(path.join(sourceRoot, required)).isDirectory()).toBe(true);
@@ -72,7 +79,11 @@ describe('Kernel physical layout', () => {
   });
 
   it('resolves every production import/export/dynamic-import through the layer matrix', () => {
-    for (const file of walkTypeScript(sourceRoot)) assertSourcePolicy(file, fs.readFileSync(file, 'utf8'));
+    for (const file of walkTypeScript(sourceRoot)) {
+      const text = fs.readFileSync(file, 'utf8');
+      assertSourcePolicy(file, text);
+      assertApplicationTimingPolicy(file, text);
+    }
   });
 
   it('proves the parser and matrix reject inverted, generated and Node-OS samples', () => {
@@ -83,6 +94,8 @@ describe('Kernel physical layout', () => {
     expect(() => assertSourcePolicy(runtimeFile, "export * from '../composition/root';")).toThrow();
     expect(() => assertSourcePolicy(applicationFile, "const x = import('node:child_process');")).toThrow();
     expect(() => assertSourcePolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), "import type { T } from '@glimmer-cradle/protocol';")).toThrow();
+    expect(() => assertApplicationTimingPolicy(applicationFile, 'const timer: NodeJS.Timeout = setTimeout(task, 1);')).toThrow();
+    expect(() => assertApplicationTimingPolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), 'const startedAt = performance.now();')).toThrow();
   });
 
   it('keeps concrete adapter imports and readiness-store mutation at their single owners', () => {
@@ -92,6 +105,17 @@ describe('Kernel physical layout', () => {
     expect(concreteImportsOutsideComposition).toEqual([]);
     const readinessStores = files.filter((file) => fs.readFileSync(file, 'utf8').includes('snapshotsByModule.set('));
     expect(readinessStores).toEqual([path.join(sourceRoot, 'application', 'projection', 'runtime-readiness-projection.ts')]);
+  });
+
+  it('keeps runtime modules coupled through Ports and the shared RuntimeModule contract only', () => {
+    const illegalRuntimeConcreteImports = walkTypeScript(path.join(sourceRoot, 'runtime'))
+      .flatMap((file) => parseImportEdges(fs.readFileSync(file, 'utf8')).map((edge) => ({ file, edge })))
+      .filter(({ file, edge }) => {
+        const target = resolveImport(file, edge.source);
+        return layerFor(target) === 'runtime' && path.basename(target ?? '') !== 'runtime-module.ts';
+      })
+      .map(({ file, edge }) => `${path.relative(sourceRoot, file)} -> ${edge.source}`);
+    expect(illegalRuntimeConcreteImports).toEqual([]);
   });
 
   it('rejects service locators, Proxy façades and untyped or raw Node capability aliases in Ports', () => {

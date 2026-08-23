@@ -16,6 +16,7 @@
  */
 import type { IngressConfiguration } from '../../ports/configuration.port';
 import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
 
 /** 防护拒绝原因 */
 export type IngressRejectionType =
@@ -57,9 +58,12 @@ export class IngressGateManager {
   private _circuitOpenUntil = 0;
 
   // ── 定期清理 ────────────────────────────────────────────
-  private _cleanupTimer: ReturnType<typeof setInterval> | null = null;
+  private _cleanupTimer: ScheduledTaskPort | null = null;
 
-  public constructor(private readonly logger: KernelLoggerPort) {}
+  public constructor(
+    private readonly logger: KernelLoggerPort,
+    private readonly clock: KernelClockPort,
+  ) {}
 
   // ═══════════════════════════════════════════════════════════
   //  生命周期
@@ -69,7 +73,7 @@ export class IngressGateManager {
   public init(config: IngressConfiguration): void {
     this._config = { ...config };
     // 每分钟清理过期的滑动窗口数据
-    this._cleanupTimer = setInterval(() => this.pruneExpiredWindows(), 60_000);
+    this.scheduleCleanup();
     this.logger.info('入站防护已初始化', {
       rate_limit: `${config.rate_limit_per_source}/${config.rate_limit_window_ms}ms`,
       max_concurrent: config.max_concurrent_requests,
@@ -79,7 +83,7 @@ export class IngressGateManager {
 
   public stop(): void {
     if (this._cleanupTimer) {
-      clearInterval(this._cleanupTimer);
+      this._cleanupTimer.cancel();
       this._cleanupTimer = null;
     }
     this._sourceWindows.clear();
@@ -119,7 +123,7 @@ export class IngressGateManager {
     }
 
     // 2. 熔断器
-    const now = Date.now();
+    const now = this.clock.nowMs();
     if (this._circuitOpenUntil > now) {
       return {
         admitted: false,
@@ -169,7 +173,7 @@ export class IngressGateManager {
     } else {
       this._consecutiveFailures++;
       if (this._consecutiveFailures >= this._config.circuit_breaker_threshold) {
-        this._circuitOpenUntil = Date.now() + this._config.circuit_breaker_recovery_ms;
+        this._circuitOpenUntil = this.clock.nowMs() + this._config.circuit_breaker_recovery_ms;
         this.logger.warn('熔断器已触发', {
           consecutive_failures: this._consecutiveFailures,
           recovery_ms: this._config.circuit_breaker_recovery_ms,
@@ -198,7 +202,7 @@ export class IngressGateManager {
   }
 
   private pruneExpiredWindows(): void {
-    const now = Date.now();
+    const now = this.clock.nowMs();
     const cutoff = now - this._config.rate_limit_window_ms;
     for (const [sourceId, timestamps] of this._sourceWindows) {
       const active = timestamps.filter((t) => t > cutoff);
@@ -208,5 +212,14 @@ export class IngressGateManager {
         this._sourceWindows.set(sourceId, active);
       }
     }
+  }
+
+  private scheduleCleanup(): void {
+    this._cleanupTimer?.cancel();
+    this._cleanupTimer = this.clock.schedule(60_000, () => {
+      this._cleanupTimer = null;
+      this.pruneExpiredWindows();
+      this.scheduleCleanup();
+    });
   }
 }

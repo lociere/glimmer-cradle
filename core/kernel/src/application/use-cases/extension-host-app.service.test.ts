@@ -4,9 +4,10 @@ import { ExtensionHostAppService } from '../../adapters/extension-host/extension
 import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
 import { SkillRegistry } from '../skill-plane/skill-registry';
-import { AttentionLeaseStore } from '../../domain/attention/attention-lease-store';
 import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';
 import { SkillPlanePolicy } from '../skill-plane/availability';
+import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { AttentionLeaseStore } from '../attention/attention-lease-store';
 
 const availability: SkillAvailabilityContext = {
   productId: 'desktop',
@@ -23,7 +24,7 @@ function createHostService(perception: unknown, catalog = new SkillCatalogAppSer
       catalog,
       availability,
       skillPlanePolicy,
-      new AttentionLeaseStore(),
+      new AttentionLeaseStore(new SystemClockAdapter()),
       {} as never,
       new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
     ),

@@ -28,6 +28,11 @@ export interface RuntimeProjectionPort extends RuntimeProjectionInputPort {
   subscribe(listener: (catalog: RuntimeReadinessCatalog) => void): () => void;
 }
 
+export interface CognitionIngressRecoveryPort {
+  suspendIngress(summary: string): void;
+  restoreIngress(): void;
+}
+
 export interface CognitionLifecycleUseCasePort {
   readonly isReady: boolean;
   start(): Promise<void>;

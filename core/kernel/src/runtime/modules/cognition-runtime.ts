@@ -1,6 +1,9 @@
 import type { CognitionLifecycleState } from '../../ports/cognition-service-port';
-import type { CognitionLifecycleUseCasePort, RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
-import type { KernelTransportRuntime } from './kernel-transport-runtime';
+import type {
+  CognitionIngressRecoveryPort,
+  CognitionLifecycleUseCasePort,
+  RuntimeProjectionInputPort,
+} from '../../ports/kernel-lifecycle.port';
 import type { RuntimeModule, RuntimeModuleStartDetails } from './runtime-module';
 import type { TraceContext } from '../../domain/kernel-contracts';
 
@@ -8,7 +11,7 @@ export class CognitionRuntime implements RuntimeModule {
   public readonly name = 'cognition';
 
   public constructor(
-    private readonly transportRuntime: KernelTransportRuntime,
+    private readonly ingressRecovery: CognitionIngressRecoveryPort,
     private readonly cognition: CognitionLifecycleUseCasePort,
     private readonly projection: RuntimeProjectionInputPort,
   ) {}
@@ -43,7 +46,7 @@ export class CognitionRuntime implements RuntimeModule {
       summary,
       details_ref: 'data/observability/logs/application/cognition.console.log',
     }]);
-    if (state === 'ready') this.transportRuntime.restoreIngress();
-    else if (state === 'starting' || state === 'failed') this.transportRuntime.suspendIngress(summary);
+    if (state === 'ready') this.ingressRecovery.restoreIngress();
+    else if (state === 'starting' || state === 'failed') this.ingressRecovery.suspendIngress(summary);
   }
 }
