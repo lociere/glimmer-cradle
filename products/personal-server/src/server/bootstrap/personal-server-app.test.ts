@@ -13,6 +13,39 @@ import path from 'node:path';
 import { PersonalServerApp } from './personal-server-app';
 import { DeploymentOperationsService } from '../adapters/deployment-operations-service';
 
+test('/readyz follows required Cognition failure and recovery without stale ready', async (t) => {
+  const fixture = createPersonalServerFixture();
+  await withDataRoot(fixture.dataRoot, async () => {
+    const app = new PersonalServerApp({
+      host: '127.0.0.1', port: 0, token: 'server-secret',
+      productManifestPath: fixture.productManifestPath, cwd: fixture.root,
+    });
+    await app.start();
+    t.after(() => void app.stop());
+    let ready = true;
+    const original = (app as unknown as { kernelReadiness: { stop(): void } }).kernelReadiness;
+    original.stop();
+    (app as unknown as { kernelReadiness: unknown }).kernelReadiness = {
+      stop() {},
+      getStatus: () => ({
+        ready,
+        status: ready ? 'ready' : 'failed',
+        summary: ready ? 'ready' : 'Cognition crashed',
+        connection_state: 'observing',
+        blocking_runtimes: [{ runtime_id: 'cognition', state: ready ? 'ready' : 'failed', summary: 'cognition' }],
+      }),
+    };
+    const request = () => fetch(`${fixture.baseUrl(app)}/readyz`, {
+      headers: { authorization: 'Bearer server-secret' },
+    });
+    assert.equal((await request()).status, 200);
+    ready = false;
+    assert.equal((await request()).status, 503);
+    ready = true;
+    assert.equal((await request()).status, 200);
+  });
+});
+
 test('serves recent observability logs through the authenticated control surface http api', async (t) => {
   const fixture = createPersonalServerFixture();
   await withDataRoot(fixture.dataRoot, async () => {

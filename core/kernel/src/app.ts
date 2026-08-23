@@ -86,6 +86,7 @@ export class App {
       const config = foundationRuntime.config;
 
       const transportRuntime = new KernelTransportRuntime(config);
+      const cognitionRuntime = new CognitionRuntime(transportRuntime);
       this._transportRuntime = transportRuntime;
       await orchestrator.startPhase({
         name: 'transport',
@@ -106,6 +107,7 @@ export class App {
             ...(product.features.extensions ? ['extensions' as const] : []),
           ]),
         },
+        setCognitionActionHandler: (handler) => transportRuntime.setCognitionActionHandler(handler),
       });
       await orchestrator.startPhase({
         name: 'application',
@@ -133,7 +135,7 @@ export class App {
         name: 'core-readiness',
         mode: 'parallel',
         modules: [
-          new CognitionRuntime(),
+          cognitionRuntime,
           ...(product.features.audio.tts || product.features.audio.asr
             ? [new AudioRuntime(product.features.audio)]
             : []),

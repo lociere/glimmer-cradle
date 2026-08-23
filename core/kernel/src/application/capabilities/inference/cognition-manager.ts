@@ -7,10 +7,8 @@ import type {
   AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse,
   ChatMessageResponse, ConversationHistoryRequest, ConversationHistoryResponse,
   LifeHeartbeatResponse, PerceptionCancelRequest,
+  CognitionProcessTransportPort, CognitionRequestPort, CognitionLifecycleObserver,
 } from '../../../foundation/ports/cognition-service-port';
-import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
-import { CognitionClient } from '../../../adapters/cognition/cognition-client';
-import { CognitionTransportError, KernelCognitionTransport } from '../../../adapters/cognition/kernel-cognition-transport';
 import { ConfigManager } from '../../../foundation/config/config-manager';
 import { CoreException } from '../../../foundation/exceptions';
 import { createTraceContext } from '../../../foundation/logger/trace-context';
@@ -25,8 +23,6 @@ const execFileAsync = promisify(execFile);
 
 export class CognitionManager {
   private static singleton: CognitionManager | null = null;
-  private readonly transport = KernelCognitionTransport.instance;
-  private readonly client = new CognitionClient(this.transport);
   private child: ChildProcess | null = null;
   private running = false;
   private ready = false;
@@ -35,13 +31,33 @@ export class CognitionManager {
   private stderrBuffer = '';
   private stopping = false;
   private starting = false;
+  private recoveryGeneration = 0;
+  private recoveryAttempts = 0;
+  private readonly inFlightPerceptions = new Map<string, string>();
 
-  public static get instance(): CognitionManager {
-    CognitionManager.singleton ??= new CognitionManager();
+  public static configure(
+    transport: CognitionProcessTransportPort,
+    client: CognitionRequestPort,
+    observer: CognitionLifecycleObserver,
+  ): CognitionManager {
+    if (!CognitionManager.singleton) {
+      CognitionManager.singleton = new CognitionManager(transport, client, observer);
+    } else {
+      CognitionManager.singleton.reconfigure(transport, client, observer);
+    }
     return CognitionManager.singleton;
   }
 
-  private constructor() {}
+  public static get instance(): CognitionManager {
+    if (!CognitionManager.singleton) throw new Error('CognitionManager 尚未由生命周期组装根配置');
+    return CognitionManager.singleton;
+  }
+
+  private constructor(
+    private transport: CognitionProcessTransportPort,
+    private client: CognitionRequestPort,
+    private lifecycleObserver: CognitionLifecycleObserver,
+  ) {}
 
   public async start(): Promise<void> {
     if (this.running) return;
@@ -53,10 +69,12 @@ export class CognitionManager {
     const command = packagedPython || await ensureDevelopmentPython(cognitionDir);
     const args = ['-m', 'glimmer_cradle.cognition.host.process'];
     this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
+    this.transport.configureActionDeadline(this.requestTimeoutMs);
     processLogDir = path.join(resolveLogDir(), 'application');
     this.stopping = false;
     this.starting = true;
-    const generation = this.transport.prepareProcess();
+    this.lifecycleObserver('starting', 'Cognition 正在启动并等待本代注册');
+    const bootstrap = this.transport.prepareProcess();
 
     try {
       ConfigManager.instance.freezeCoreConfig();
@@ -66,8 +84,6 @@ export class CognitionManager {
         env: {
           ...process.env,
           ...secrets,
-          GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT: this.transport.controlEndpoint,
-          GLIMMER_CRADLE_COGNITION_GENERATION: generation,
           GLIMMER_CRADLE_CONFIG: JSON.stringify({
             ...config.character,
             memory: config.system.memory,
@@ -77,45 +93,60 @@ export class CognitionManager {
           GLIMMER_CRADLE_OBSERVABILITY_DIR: resolveObservabilityDir(),
           LOG_DIR: resolveLogDir(),
           PYTHONUNBUFFERED: '1',
-          PYTHONPATH: [
-            path.resolve(repoRoot, 'contracts', 'generated', 'python'),
-            path.resolve(repoRoot, 'core', 'cognition', 'src'),
-            process.env.PYTHONPATH,
-          ].filter(Boolean).join(path.delimiter),
         },
-        stdio: ['pipe', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
       });
+      this.attachProcessObservers(this.child);
       if (!this.child.pid) throw new Error('Cognition 子进程未返回 PID');
       this.transport.expectProcess(this.child.pid);
-      this.attachProcessObservers(this.child);
+      const bootstrapPipe = this.child.stdio[3];
+      if (!bootstrapPipe || typeof (bootstrapPipe as NodeJS.WritableStream).write !== 'function') {
+        throw new Error('Cognition 子进程缺少受监督 bootstrap pipe');
+      }
+      (bootstrapPipe as NodeJS.WritableStream).end(`${JSON.stringify(bootstrap)}\n`);
       this.running = true;
 
       logger.info('Cognition 认知核启动：等待 gRPC 注册与真实 readiness');
       await this.transport.waitForRegistration(config.system.cognition_service.registration_timeout_ms);
       await this.client.initializeKnowledge(await ConfigManager.instance.loadKnowledgeBaseConfig(), this.requestTimeoutMs);
       const readiness = await this.client.readiness(this.requestTimeoutMs);
-      if (readiness.state !== 'ready' || readiness.generation !== generation) {
-        throw new CognitionTransportError('Cognition 未达到本代业务 ready', ServiceErrorCode.NOT_READY, true);
+      if (readiness.state !== 'ready' || readiness.generation !== bootstrap.generation) {
+        throw new CoreException('Cognition 未达到本代业务 ready', 'INFERENCE_ERROR');
       }
       this.ready = true;
       this.starting = false;
+      this.lifecycleObserver('ready', 'Cognition 已完成本代注册、初始化与 readiness');
       logger.info('Cognition 认知核已就绪', { startup_stage: readiness.phase });
     } catch (error) {
       this.starting = false;
       logger.error('Cognition 认知核启动失败', { error: normalizeError(error) });
       await this.stop();
+      this.lifecycleObserver('failed', 'Cognition 启动失败，必需入站保持关闭');
       throw error;
     }
   }
 
   public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse> {
     this.assertReady();
-    await this.client.submitPerception(request, traceId ?? createTraceContext().trace_id, this.requestTimeoutMs);
+    const resolvedTraceId = traceId ?? createTraceContext().trace_id;
+    const operation = await this.client.submitPerception(request, resolvedTraceId, this.requestTimeoutMs);
+    if (!operation.terminal) {
+      this.inFlightPerceptions.set(resolvedTraceId, operation.operation_id);
+      void this.observePerceptionTerminal(resolvedTraceId, operation.operation_id);
+    }
     return {} as ChatMessageResponse;
   }
 
   public async cancelPerception(request: PerceptionCancelRequest): Promise<void> {
-    if (this.isReady) await this.client.cancelPerception(request, this.requestTimeoutMs);
+    if (!this.isReady) return;
+    let operation = await this.client.cancelPerception(request, this.requestTimeoutMs);
+    const deadline = Date.now() + this.requestTimeoutMs;
+    while (!operation.terminal && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      operation = await this.client.perceptionOperation(operation.operation_id, Math.max(1, deadline - Date.now()));
+    }
+    if (!operation.terminal) throw new CoreException('感知取消未在 deadline 前到达终态', 'INFERENCE_ERROR');
+    this.inFlightPerceptions.delete(request.target_trace_id);
   }
 
   public async sendAgentPlan(request: AgentPlanRequest, traceId?: string): Promise<AgentPlanResponse> {
@@ -145,10 +176,19 @@ export class CognitionManager {
   }
 
   public async stop(): Promise<void> {
+    this.recoveryGeneration += 1;
     const child = this.child;
     if (!this.running && !child) return;
     this.stopping = true;
     this.ready = false;
+    if (child && !child.pid) {
+      this.child = null;
+      this.running = false;
+      this.inFlightPerceptions.clear();
+      this.stopping = false;
+      this.lifecycleObserver('stopped', 'Cognition 未完成启动的子进程已释放');
+      return;
+    }
     let accepted = false;
     if (child && this.transport.isRegistered) {
       try {
@@ -170,9 +210,11 @@ export class CognitionManager {
     }
     if (child?.pid) await this.transport.invalidateProcess(child.pid);
     this.running = false;
+    this.inFlightPerceptions.clear();
     this.child = null;
     this.stopping = false;
     logger.info('Cognition 认知核停止完成');
+    this.lifecycleObserver('stopped', 'Cognition 已停止');
   }
 
   public get isReady(): boolean {
@@ -183,29 +225,102 @@ export class CognitionManager {
     if (!this.isReady) throw new CoreException('Cognition 认知核未就绪', 'INFERENCE_ERROR');
   }
 
+  private reconfigure(
+    transport: CognitionProcessTransportPort,
+    client: CognitionRequestPort,
+    observer: CognitionLifecycleObserver,
+  ): void {
+    if (this.running || this.starting || this.child) {
+      if (this.transport !== transport || this.client !== client) {
+        throw new Error('CognitionManager 运行期间不得替换 transport composition');
+      }
+      this.lifecycleObserver = observer;
+      return;
+    }
+    this.transport = transport;
+    this.client = client;
+    this.lifecycleObserver = observer;
+  }
+
+  private async observePerceptionTerminal(traceId: string, operationId: string): Promise<void> {
+    while (this.inFlightPerceptions.get(traceId) === operationId && this.isReady) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      try {
+        const operation = await this.client.perceptionOperation(
+          operationId,
+          Math.min(this.requestTimeoutMs, 5_000),
+        );
+        if (operation.terminal) {
+          if (this.inFlightPerceptions.get(traceId) === operationId) {
+            this.inFlightPerceptions.delete(traceId);
+          }
+          return;
+        }
+      } catch (error) {
+        if (!this.isReady) return;
+        logger.warn('查询 Cognition 感知操作终态失败，将继续受管轮询', {
+          operation_id: operationId,
+          error: normalizeError(error),
+        });
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  }
+
   private attachProcessObservers(child: ChildProcess): void {
     child.stdout?.on('data', (data: Buffer) => this.consumeOutput(data, false));
     child.stderr?.on('data', (data: Buffer) => this.consumeOutput(data, true));
     child.on('exit', (code, signal) => {
       this.flushOutput();
       const interrupted = code === 0xC000013A;
-      const intentional = this.stopping || this.starting || code === 0 || interrupted;
+      const intentional = this.stopping || interrupted;
+      const startupFailure = this.starting;
+      if (this.child === child) this.child = null;
       this.running = false;
       this.ready = false;
-      if (child.pid) void this.transport.invalidateProcess(
+      const invalidation = child.pid ? this.transport.invalidateProcess(
         child.pid,
-        new CognitionTransportError('受监督 Cognition 进程在注册前退出', ServiceErrorCode.UNAVAILABLE, true),
-      );
+        new Error('受监督 Cognition 进程在注册前退出'),
+      ) : Promise.resolve();
       logger[code === 0 || interrupted ? 'info' : 'warn']('Cognition 认知核进程退出', { code, signal });
-      if (!intentional && code !== 0) {
-        void this.restart().catch((error) => logger.error('Cognition 自动重启失败', { error: normalizeError(error) }));
+      if (!intentional) {
+        this.inFlightPerceptions.clear();
+        this.lifecycleObserver('failed', 'Cognition 受监督进程意外退出');
+      }
+      if (!intentional && !startupFailure) {
+        const recoveryGeneration = ++this.recoveryGeneration;
+        void this.recoverAfterUnexpectedExit(invalidation, recoveryGeneration);
       }
     });
     child.on('error', (error) => {
+      if (this.child === child) this.child = null;
       this.running = false;
       this.ready = false;
+      this.lifecycleObserver('failed', 'Cognition 子进程启动失败');
       logger.error('Cognition 子进程启动失败', { error: error.message });
     });
+  }
+
+  private async recoverAfterUnexpectedExit(
+    invalidation: Promise<void>,
+    recoveryGeneration: number,
+  ): Promise<void> {
+    try {
+      await invalidation;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (
+        recoveryGeneration === this.recoveryGeneration
+        && !this.stopping
+        && !this.running
+        && !this.starting
+      ) {
+        this.recoveryAttempts += 1;
+        await this.start();
+      }
+    } catch (error) {
+      this.lifecycleObserver('failed', 'Cognition 自动恢复失败，必需入站保持关闭');
+      logger.error('Cognition 自动重启失败', { error: normalizeError(error) });
+    }
   }
 
   private consumeOutput(data: Buffer, stderr: boolean): void {

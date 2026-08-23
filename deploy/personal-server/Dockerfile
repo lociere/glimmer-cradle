@@ -32,10 +32,11 @@ RUN apt-get update \
 FROM ${NODE_IMAGE} AS node-builder
 WORKDIR /workspace
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends build-essential python3 pkg-config cmake libzmq3-dev \
+    && apt-get install --yes --no-install-recommends build-essential python3 pkg-config cmake \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY contracts/package.json contracts/package.json
 COPY protocol/package.json protocol/package.json
 COPY packages/extension-sdk/package.json packages/extension-sdk/package.json
 COPY core/kernel/package.json core/kernel/package.json
@@ -45,6 +46,7 @@ RUN pnpm install --frozen-lockfile \
     --filter @glimmer-cradle/personal-server...
 COPY . .
 RUN pnpm --filter @glimmer-cradle/protocol build \
+    && pnpm --filter @glimmer-cradle/contracts build \
     && pnpm --filter @glimmer-cradle/extension-sdk build \
     && pnpm --filter @glimmer-cradle/kernel build \
     && pnpm --filter @glimmer-cradle/personal-server build \
@@ -57,6 +59,7 @@ COPY --from=uv-runtime /uv /uvx /usr/local/bin/
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 WORKDIR /opt/glimmer-cradle/app
+COPY contracts contracts
 COPY core/cognition core/cognition
 COPY engines/audio engines/audio
 RUN uv sync --project core/cognition --frozen --no-dev --no-editable \
@@ -66,7 +69,7 @@ FROM ${PYTHON_IMAGE} AS personal-server
 ARG APP_UID=10001
 ARG APP_GID=10001
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends bash ca-certificates coreutils tini tar util-linux libatomic1 libstdc++6 libzmq5 \
+    && apt-get install --yes --no-install-recommends bash ca-certificates coreutils tini tar util-linux libatomic1 libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid ${APP_GID} glimmer \
     && useradd --uid ${APP_UID} --gid ${APP_GID} --home-dir /var/lib/glimmer-cradle --create-home --shell /usr/sbin/nologin glimmer

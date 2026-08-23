@@ -303,6 +303,9 @@ if (/pnpm\s+deploy[^\n]*--legacy/.test(personalServerDockerfile)) {
   violations.push('deploy/personal-server/Dockerfile: 不得使用回查 registry 的 legacy deploy');
 }
 if ((personalServerDockerfile.match(/WORKDIR \/opt\/glimmer-cradle\/app/g) ?? []).length < 2
+  || !personalServerDockerfile.includes('COPY contracts/package.json contracts/package.json')
+  || !personalServerDockerfile.includes('pnpm --filter @glimmer-cradle/contracts build')
+  || !personalServerDockerfile.includes('COPY contracts contracts')
   || !personalServerDockerfile.includes(
     'COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/core/cognition core/cognition',
   )

@@ -87,6 +87,22 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | config schemas | YAML/JSON 配置校验 | 默认值来源、normalizer、密钥边界 |
 | enums/error codes | 跨语言错误和状态分类 | 稳定命名、禁止局部字符串分叉 |
 
+`SubmitPerception` 返回的是受管 operation，不是“已处理”回执。Kernel 通过
+`GetPerceptionOperation` 观察 `accepted -> running -> succeeded/cancelled/failed`，只在真实终态
+清理 in-flight；`CancelPerception` 同时移除尚未竞争的队列/工作区输入，或取消正在执行的
+Cycle/推理 task。队满、工作区拒绝或被更高优先级输入淘汰都必须写入 `failed`，不能留下永久
+pending。
+
+`PublishAction` 是 Cognition 到 Kernel 的反向终态调用。Kernel 持有 deadline 并把客户端取消或
+deadline 传播为 `AbortSignal`，Skill/工具副作用在提交前必须检查该信号；不可逆 provider 仍由
+Skill Plane 以 operation id、幂等键和其补偿规则负责恢复。响应只允许 `completed` 或
+`duplicate`；幂等键只在副作用成功后提交，失败可重试，并发同键调用合并为一次执行。typed
+failure 通过 gRPC status 与 `ServiceErrorDetail` 的受控 metadata 返回，message 不携带内部异常。
+
+Cognition 注册使用 Kernel 通过匿名 bootstrap pipe 单次交付的 nonce/capability secret。HMAC
+proof 绑定 generation、nonce、Cognition 动态回环 endpoint、Service PID 与受监督子进程 PID；
+注册成功即清零 secret。PID 字段只参与已认证 proof 和监督树关系校验，不再被当作独立身份凭据。
+
 `PerceptionEvent` 的寻址和响应策略分层表达：
 
 | 字段 | 语义 |

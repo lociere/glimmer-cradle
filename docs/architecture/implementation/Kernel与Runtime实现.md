@@ -83,6 +83,11 @@ Desktop/Extension/Platform input
 
 `PerceptionAppService` 负责把已规范化的输入送入 Kernel 主链；`IngressGateManager` 决定是否允许进入认知链路；`CognitionManager` 管理 Python Cognition 进程与 Cognition Service 代际、注册、readiness、重启和停机。平台 Adapter 只做协议清洗，不把平台私有 payload 传进 Cognition。
 
+`CognitionManager` 保存 perception operation id，并轮询 Service 的真实终态；新输入取消等待
+`CancelPerception`/`GetPerceptionOperation` 到达终态后才释放 in-flight。进程 crash 会通过
+`CognitionRuntime` observer 立即挂起 Ingress，自动重启失败保持 failed；只有新代完成
+register、knowledge init 与 readiness 后，`KernelTransportRuntime` 才恢复此前明确开放的 Ingress。
+
 桌面与 Extension 都不能自行生成 Cognition 使用的会话 ID。桌面入口和 `ExtensionHostAppService` 先构造 `ConversationAddress`，再由 `application/capabilities/conversation/conversation-directory.ts` 解析为 `ConversationContext`。Directory 根据 provider、account、space、thread 和 actor endpoint 生成稳定且不可逆的 scene、conversation、continuity、thread 与 actor 标识，并同时决定 `recall_scope` / `disclosure_scope`。这些 canonical 字段跟随感知、Skill 请求和结果合成穿过 Cognition Service；下游只能消费，不能重新解释平台身份或放宽作用域。
 
 外部注意力链路当前由 `application/services/extension-host-app.service.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再由 `domain/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 直接读取 `AttentionLeaseStore.isChannelFocused()`。`domain/attention/attention-session-manager.ts` 直接消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`domain/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
@@ -99,7 +104,13 @@ Cognition outbound action/reply/status
 
 `ActionStreamManager` 和 `visual-command-dispatcher.ts` 把认知行动投影到频道、桌面和身体。音频、Avatar、Desktop、Scene、Skill Plane 都是 capability adapter；它们不能反向改写 Cognition 的语义事实。`ApplicationRuntime` 会用 `SkillActionController` 覆盖 `ACTION_COMMAND` 处理器：`reply` 仍规范化为 `ChannelReplyEvent`，`skill_request` 则进入 Skill Plane 编排、工具调用和 Cognition synthesis 闭环。
 
-`CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID；注册同时校验 generation、受监进程与实际 service PID。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
+`CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID。启动时 Kernel 经 FD 3 匿名 pipe 单次交付 generation、动态 control endpoint、nonce 和 capability secret；Cognition 的 HMAC proof 绑定上述 challenge、实际 Service PID 与受监督子进程 PID，注册成功后两端清零 secret。Windows 的 venv launcher 与解释器 PID 可不同，因此监督树关系与已认证 proof 共同校验，绝不把自报 PID 单独当身份。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
+
+`KernelControlService.PublishAction` 的 deadline 由 Kernel transport 持有，RPC cancellation 与
+deadline 转成 `AbortSignal` 贯穿 `SkillActionController -> SkillPlanningAppService ->
+SkillInvocationGateway -> tool handler`。同一 idempotency key 的并发调用共用一次执行，只有
+handler 成功且未取消后才写 completed；失败释放 key 供重试。transport 停机也会 abort 活跃
+action，避免 RPC 已结束而工具副作用继续。
 
 ## Skill Plane 与 Extension 接线
 

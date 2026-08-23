@@ -5,11 +5,13 @@ import { RuntimeReadinessCatalogStore } from '../../foundation/runtime-readiness
 import type { RuntimeReadinessSnapshot } from '../../foundation/runtime-readiness';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { CognitionActionHandler } from '../../foundation/ports/cognition-service-port';
 
 export class KernelTransportRuntime implements RuntimeModule {
   public readonly name = 'kernel-transport';
 
   public constructor(private readonly config: Readonly<GlobalConfig>) {}
+  private recoveryEnabled = false;
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     IngressGateManager.instance.init(this.config.system.ingress);
@@ -29,13 +31,32 @@ export class KernelTransportRuntime implements RuntimeModule {
   }
 
   public openIngress(): void {
+    this.recoveryEnabled = true;
     IngressGateManager.instance.setSystemReady(true);
     this.publishIngressSnapshot('ready');
   }
 
   public closeIngress(): void {
+    this.recoveryEnabled = false;
     IngressGateManager.instance.setSystemReady(false);
     this.publishIngressSnapshot('stopped');
+  }
+
+  public suspendIngress(summary: string): void {
+    IngressGateManager.instance.setSystemReady(false);
+    RuntimeReadinessCatalogStore.instance.replaceModuleSnapshots(this.name, [{
+      ...this.createIngressSnapshot('stopped'),
+      state: 'failed',
+      summary,
+    }]);
+  }
+
+  public restoreIngress(): void {
+    if (this.recoveryEnabled) this.openIngress();
+  }
+
+  public setCognitionActionHandler(handler: CognitionActionHandler | null): void {
+    KernelCognitionTransport.instance.setActionHandler(handler);
   }
 
   private publishIngressSnapshot(state: 'ready' | 'stopped'): void {

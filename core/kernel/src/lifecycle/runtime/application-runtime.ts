@@ -12,7 +12,7 @@ import type { SkillProvider } from '../../application/skill-plane/types';
 import type { SkillAvailabilityContext } from '../../application/skill-plane/types';
 import { McpServerSkillProvider } from '../../application/skill-plane/providers/mcp-server';
 import { SkillActionController } from '../../application/skill-plane/skill-action-controller';
-import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
+import type { CognitionActionHandler } from '../../foundation/ports/cognition-service-port';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 
@@ -29,11 +29,14 @@ export class ApplicationRuntime implements RuntimeModule {
   public constructor(options: {
     readonly localDeviceActions: boolean;
     readonly skillAvailability: SkillAvailabilityContext;
+    readonly setCognitionActionHandler: (handler: CognitionActionHandler | null) => void;
   }) {
     this._skillProviders = createSkillProviders(options);
     this._skillAvailability = options.skillAvailability;
+    this._setCognitionActionHandler = options.setCognitionActionHandler;
   }
   private readonly _skillAvailability: SkillAvailabilityContext;
+  private readonly _setCognitionActionHandler: (handler: CognitionActionHandler | null) => void;
 
   public get skillCatalogAppService(): SkillCatalogAppService {
     if (!this._skillCatalogAppService) {
@@ -70,8 +73,8 @@ export class ApplicationRuntime implements RuntimeModule {
     }
     const skillPlanningAppService = new SkillPlanningAppService(skillCatalogAppService);
     const skillActionController = new SkillActionController(skillPlanningAppService);
-    KernelCognitionTransport.instance.setActionHandler(
-      (command) => skillActionController.handleActionCommand(command),
+    this._setCognitionActionHandler(
+      (command, signal) => skillActionController.handleActionCommand(command, signal),
     );
 
     const perceptionAppService = new PerceptionAppService(
@@ -111,7 +114,7 @@ export class ApplicationRuntime implements RuntimeModule {
     this._perceptionAppService = null;
     this._skillPlanningAppService = null;
     this._skillCatalogAppService = null;
-    KernelCognitionTransport.instance.setActionHandler(null);
+    this._setCognitionActionHandler(null);
     logger.debug('Application Runtime 已停止');
   }
 }

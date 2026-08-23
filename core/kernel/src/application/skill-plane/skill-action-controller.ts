@@ -34,19 +34,20 @@ export class SkillActionController {
     private readonly _publishReply: ChannelReplyPublisher = publishChannelReply,
   ) {}
 
-  public async handleActionCommand(command: ActionCommand): Promise<void> {
+  public async handleActionCommand(command: ActionCommand, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     const cmd = command as Record<string, any>;
     const actionType = String(command.action_type ?? '');
     if (actionType === 'reply') {
-      await this.handleReplyCommand(cmd, command.trace_id);
+      await this.handleReplyCommand(cmd, command.trace_id, signal);
       return;
     }
     if (actionType === 'skill_request') {
-      await this.handleSkillRequestCommand(cmd, command.trace_id);
+      await this.handleSkillRequestCommand(cmd, command.trace_id, signal);
     }
   }
 
-  private async handleReplyCommand(cmd: Record<string, any>, requestTraceId: string): Promise<void> {
+  private async handleReplyCommand(cmd: Record<string, any>, requestTraceId: string, signal?: AbortSignal): Promise<void> {
     const traceId = String(cmd.trace_id || requestTraceId);
     const text = cmd.payload?.text;
     if (typeof text !== 'string' || !text.trim()) {
@@ -57,6 +58,7 @@ export class SkillActionController {
       logger.warn('ActionCommand 缺少 target.scene_id，已丢弃 reply', { trace_id: traceId });
       return;
     }
+    signal?.throwIfAborted();
     await this._publishReply({
       traceId,
       sceneId,
@@ -66,7 +68,7 @@ export class SkillActionController {
     });
   }
 
-  private async handleSkillRequestCommand(cmd: Record<string, any>, requestTraceId: string): Promise<void> {
+  private async handleSkillRequestCommand(cmd: Record<string, any>, requestTraceId: string, signal?: AbortSignal): Promise<void> {
     const traceId = String(cmd.trace_id || requestTraceId);
     const skillRequest = cmd.payload?.skill_request ?? {};
     const sceneId = String(cmd.target?.scene_id || skillRequest.scene_id || '');
@@ -93,6 +95,7 @@ export class SkillActionController {
       traceId,
       planningHint: typeof skillRequest.planning_hint === 'string' ? skillRequest.planning_hint : undefined,
       conversation,
+      signal,
     });
 
     let synthesis: AgentSynthesisResponse;
@@ -104,6 +107,7 @@ export class SkillActionController {
         tool_results: toolResults,
         trace_id: traceId,
       });
+      signal?.throwIfAborted();
     } catch (error) {
       logger.error('Skill 结果回传 Cognition 合成失败', {
         trace_id: traceId,
@@ -123,6 +127,7 @@ export class SkillActionController {
       return;
     }
 
+    signal?.throwIfAborted();
     await this._publishReply({
       traceId: synthesis.trace_id || traceId,
       sceneId,
@@ -137,6 +142,7 @@ export class SkillActionController {
     traceId: string;
     planningHint?: string;
     conversation?: ConversationContext;
+    signal?: AbortSignal;
   }): Promise<AgentToolResult[]> {
     const readyToolCount = this._skillPlanningReadyToolCount(options.conversation);
     let plan;
@@ -165,12 +171,14 @@ export class SkillActionController {
 
     const results: AgentToolResult[] = [];
     for (const suggestion of plan.suggestions) {
+      options.signal?.throwIfAborted();
       const source = this._skillPlanning.getSkillSource(suggestion.skill_id);
       try {
         const result = await this._skillPlanning.executeSuggestion(
           suggestion,
           options.traceId,
           options.conversation,
+          options.signal,
         );
         results.push(makeToolResult(suggestion.tool_name, 'success', {
           skill_id: suggestion.skill_id,

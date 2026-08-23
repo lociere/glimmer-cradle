@@ -71,148 +71,170 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
             "ZW50aW9uX2NlaWxpbmcYCyABKA4yJi5nbGltbWVyLmNvZ25pdGlvbi52MS5S",
             "ZXRlbnRpb25DZWlsaW5nUhByZXRlbnRpb25DZWlsaW5nEkEKB2NvbnRlbnQY",
             "DCABKAsyJy5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uQ29udGVu",
-            "dFIHY29udGVudCJzChhTdWJtaXRQZXJjZXB0aW9uUmVzcG9uc2USIQoMb3Bl",
-            "cmF0aW9uX2lkGAEgASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlS",
-            "BnN0YXR1cxIcCglkdXBsaWNhdGUYAyABKAhSCWR1cGxpY2F0ZSKpAQoXQ2Fu",
-            "Y2VsUGVyY2VwdGlvblJlcXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIu",
-            "Y29tbW9uLnYxLkNhbGxNZXRhZGF0YVIEY2FsbBImCg90YXJnZXRfdHJhY2Vf",
-            "aWQYAiABKAlSDXRhcmdldFRyYWNlSWQSGQoIc2NlbmVfaWQYAyABKAlSB3Nj",
-            "ZW5lSWQSFgoGcmVhc29uGAQgASgJUgZyZWFzb24iYAoYQ2FuY2VsUGVyY2Vw",
-            "dGlvblJlc3BvbnNlEiYKD3RhcmdldF90cmFjZV9pZBgBIAEoCVINdGFyZ2V0",
-            "VHJhY2VJZBIcCgljYW5jZWxsZWQYAiABKAhSCWNhbmNlbGxlZCKJAQoYS25v",
-            "d2xlZGdlUmV0cmlldmFsQ29uZmlnEhIKBG1vZGUYASABKAlSBG1vZGUSEwoF",
-            "dG9wX2sYAiABKAVSBHRvcEsSGwoJbWluX3Njb3JlGAMgASgBUghtaW5TY29y",
-            "ZRInCg9zZW1hbnRpY193ZWlnaHQYBCABKAFSDnNlbWFudGljV2VpZ2h0IpEB",
-            "Cg5Lbm93bGVkZ2VFbnRyeRIZCghlbnRyeV9pZBgBIAEoCVIHZW50cnlJZBIU",
-            "CgVzY29wZRgCIAEoCVIFc2NvcGUSGAoHY29udGVudBgDIAEoCVIHY29udGVu",
-            "dBIYCgdlbmFibGVkGAQgASgIUgdlbmFibGVkEhoKCHByaW9yaXR5GAUgASgF",
-            "Ughwcmlvcml0eSL5AQoaSW5pdGlhbGl6ZUtub3dsZWRnZVJlcXVlc3QSMwoE",
+            "dFIHY29udGVudCKhAQoYU3VibWl0UGVyY2VwdGlvblJlc3BvbnNlEiEKDG9w",
+            "ZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0aW9uSWQSRAoFc3RhdGUYAiABKA4y",
+            "Li5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uT3BlcmF0aW9uU3Rh",
+            "dGVSBXN0YXRlEhwKCWR1cGxpY2F0ZRgDIAEoCFIJZHVwbGljYXRlIqkBChdD",
+            "YW5jZWxQZXJjZXB0aW9uUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8uZ2xpbW1l",
+            "ci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsEiYKD3RhcmdldF90cmFj",
+            "ZV9pZBgCIAEoCVINdGFyZ2V0VHJhY2VJZBIZCghzY2VuZV9pZBgDIAEoCVIH",
+            "c2NlbmVJZBIWCgZyZWFzb24YBCABKAlSBnJlYXNvbiLHAQoYQ2FuY2VsUGVy",
+            "Y2VwdGlvblJlc3BvbnNlEiEKDG9wZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0",
+            "aW9uSWQSJgoPdGFyZ2V0X3RyYWNlX2lkGAIgASgJUg10YXJnZXRUcmFjZUlk",
+            "EkQKBXN0YXRlGAMgASgOMi4uZ2xpbW1lci5jb2duaXRpb24udjEuUGVyY2Vw",
+            "dGlvbk9wZXJhdGlvblN0YXRlUgVzdGF0ZRIaCgh0ZXJtaW5hbBgEIAEoCFII",
+            "dGVybWluYWwidwodR2V0UGVyY2VwdGlvbk9wZXJhdGlvblJlcXVlc3QSMwoE",
             "Y2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YVIE",
-            "Y2FsbBIYCgd2ZXJzaW9uGAIgASgJUgd2ZXJzaW9uEkwKCXJldHJpZXZhbBgD",
-            "IAEoCzIuLmdsaW1tZXIuY29nbml0aW9uLnYxLktub3dsZWRnZVJldHJpZXZh",
-            "bENvbmZpZ1IJcmV0cmlldmFsEj4KB2VudHJpZXMYBCADKAsyJC5nbGltbWVy",
-            "LmNvZ25pdGlvbi52MS5Lbm93bGVkZ2VFbnRyeVIHZW50cmllcyJ2ChtJbml0",
-            "aWFsaXplS25vd2xlZGdlUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lkGAEgASgJ",
-            "UgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxIcCglkdXBs",
-            "aWNhdGUYAyABKAhSCWR1cGxpY2F0ZSK1AQoTU2tpbGxUb29sRGVzY3JpcHRv",
-            "chIZCghza2lsbF9pZBgBIAEoCVIHc2tpbGxJZBIbCgl0b29sX25hbWUYAiAB",
-            "KAlSCHRvb2xOYW1lEiAKC2Rlc2NyaXB0aW9uGAMgASgJUgtkZXNjcmlwdGlv",
-            "bhJEChFwYXJhbWV0ZXJzX3NjaGVtYRgEIAEoCzIXLmdvb2dsZS5wcm90b2J1",
-            "Zi5TdHJ1Y3RSEHBhcmFtZXRlcnNTY2hlbWEizgEKC1BsYW5SZXF1ZXN0EjMK",
-            "BGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGFS",
-            "BGNhbGwSGwoJdXNlcl9nb2FsGAIgASgJUgh1c2VyR29hbBIZCghzY2VuZV9p",
-            "ZBgDIAEoCVIHc2NlbmVJZBJSCg9hdmFpbGFibGVfdG9vbHMYBCADKAsyKS5n",
-            "bGltbWVyLmNvZ25pdGlvbi52MS5Ta2lsbFRvb2xEZXNjcmlwdG9yUg5hdmFp",
-            "bGFibGVUb29scyLHAQoTU2tpbGxUb29sU3VnZ2VzdGlvbhIZCghza2lsbF9p",
-            "ZBgBIAEoCVIHc2tpbGxJZBIbCgl0b29sX25hbWUYAiABKAlSCHRvb2xOYW1l",
-            "EhgKB3B1cnBvc2UYAyABKAlSB3B1cnBvc2USHgoKY29uZmlkZW5jZRgEIAEo",
-            "AVIKY29uZmlkZW5jZRI+Cg5hcmd1bWVudHNfaGludBgFIAEoCzIXLmdvb2ds",
-            "ZS5wcm90b2J1Zi5TdHJ1Y3RSDWFyZ3VtZW50c0hpbnQirgEKDFBsYW5SZXNw",
-            "b25zZRIYCgdzdW1tYXJ5GAEgASgJUgdzdW1tYXJ5EhwKCXJlYXNvbmluZxgC",
-            "IAEoCVIJcmVhc29uaW5nEksKC3N1Z2dlc3Rpb25zGAMgAygLMikuZ2xpbW1l",
-            "ci5jb2duaXRpb24udjEuU2tpbGxUb29sU3VnZ2VzdGlvblILc3VnZ2VzdGlv",
-            "bnMSGQoIdHJhY2VfaWQYBCABKAlSB3RyYWNlSWQivwIKClRvb2xSZXN1bHQS",
-            "GwoJdG9vbF9uYW1lGAEgASgJUgh0b29sTmFtZRIWCgZzdGF0dXMYAiABKAlS",
-            "BnN0YXR1cxIfCgtyZXN1bHRfanNvbhgDIAEoCVIKcmVzdWx0SnNvbhIjCg1p",
-            "bnZvY2F0aW9uX2lkGAQgASgJUgxpbnZvY2F0aW9uSWQSIwoNcHJvdmlkZXJf",
-            "a2luZBgFIAEoCVIMcHJvdmlkZXJLaW5kEh8KC3Byb3ZpZGVyX2lkGAYgASgJ",
-            "Ugpwcm92aWRlcklkEikKEHByb3ZpZGVyX3ZlcnNpb24YByABKAlSD3Byb3Zp",
-            "ZGVyVmVyc2lvbhImCg9zb3VyY2VfZXZlbnRfaWQYCCABKAlSDXNvdXJjZUV2",
-            "ZW50SWQSHQoKc2NoZW1hX3JlZhgJIAEoCVIJc2NoZW1hUmVmIpwCChFTeW50",
-            "aGVzaXplUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24u",
-            "djEuQ2FsbE1ldGFkYXRhUgRjYWxsEiMKDW9yaWdpbmFsX2dvYWwYAiABKAlS",
-            "DG9yaWdpbmFsR29hbBIZCghzY2VuZV9pZBgDIAEoCVIHc2NlbmVJZBJNCgxj",
-            "b252ZXJzYXRpb24YBCABKAsyKS5nbGltbWVyLmNvZ25pdGlvbi52MS5Db252",
-            "ZXJzYXRpb25Db250ZXh0Ugxjb252ZXJzYXRpb24SQwoMdG9vbF9yZXN1bHRz",
-            "GAUgAygLMiAuZ2xpbW1lci5jb2duaXRpb24udjEuVG9vbFJlc3VsdFILdG9v",
-            "bFJlc3VsdHMikgEKElN5bnRoZXNpemVSZXNwb25zZRIjCg1yZXBseV9jb250",
-            "ZW50GAEgASgJUgxyZXBseUNvbnRlbnQSPAoNZW1vdGlvbl9zdGF0ZRgCIAEo",
-            "CzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSDGVtb3Rpb25TdGF0ZRIZCgh0",
-            "cmFjZV9pZBgDIAEoCVIHdHJhY2VJZCKRAwodR2V0Q29udmVyc2F0aW9uSGlz",
-            "dG9yeVJlcXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYx",
-            "LkNhbGxNZXRhZGF0YVIEY2FsbBIdCgpyZXF1ZXN0X2lkGAIgASgJUglyZXF1",
-            "ZXN0SWQSJwoPY29udmVyc2F0aW9uX2lkGAMgASgJUg5jb252ZXJzYXRpb25J",
-            "ZBIZCghzY2VuZV9pZBgEIAEoCVIHc2NlbmVJZBIbCgl0aHJlYWRfaWQYBSAB",
-            "KAlSCHRocmVhZElkEhkKCGFjdG9yX2lkGAYgASgJUgdhY3RvcklkEh0KCmFj",
-            "dG9yX25hbWUYByABKAlSCWFjdG9yTmFtZRIsChJzb3VyY2VfcHJvdmlkZXJf",
-            "aWQYCCABKAlSEHNvdXJjZVByb3ZpZGVySWQSFgoGY3Vyc29yGAkgASgJUgZj",
-            "dXJzb3ISFAoFbGltaXQYCiABKAVSBWxpbWl0EiUKDmFsbG93ZWRfc2NvcGVz",
-            "GAsgAygJUg1hbGxvd2VkU2NvcGVzIrEEChhDb252ZXJzYXRpb25IaXN0b3J5",
-            "RW50cnkSGQoIZW50cnlfaWQYASABKAlSB2VudHJ5SWQSHwoLc291cmNlX2tp",
-            "bmQYAiABKAlSCnNvdXJjZUtpbmQSEgoEcm9sZRgDIAEoCVIEcm9sZRIWCgZz",
-            "dGF0dXMYBCABKAlSBnN0YXR1cxISCgR0ZXh0GAUgASgJUgR0ZXh0EhQKBXRp",
-            "dGxlGAYgASgJUgV0aXRsZRIfCgtvY2N1cnJlZF9hdBgHIAEoCVIKb2NjdXJy",
-            "ZWRBdBIZCgh0cmFjZV9pZBgIIAEoCVIHdHJhY2VJZBIlCg5pbnRlcmFjdGlv",
-            "bl9pZBgJIAEoCVINaW50ZXJhY3Rpb25JZBIbCgltb21lbnRfaWQYCiABKAlS",
-            "CG1vbWVudElkEhoKCHBvc2l0aW9uGAsgASgDUghwb3NpdGlvbhInCg9jb252",
-            "ZXJzYXRpb25faWQYDCABKAlSDmNvbnZlcnNhdGlvbklkEhkKCHNjZW5lX2lk",
-            "GA0gASgJUgdzY2VuZUlkEhsKCXRocmVhZF9pZBgOIAEoCVIIdGhyZWFkSWQS",
-            "GQoIYWN0b3JfaWQYDyABKAlSB2FjdG9ySWQSHQoKYWN0b3JfbmFtZRgQIAEo",
-            "CVIJYWN0b3JOYW1lEiEKDHJlY2FsbF9zY29wZRgRIAEoCVILcmVjYWxsU2Nv",
-            "cGUSKQoQZGlzY2xvc3VyZV9zY29wZRgSIAEoCVIPZGlzY2xvc3VyZVNjb3Bl",
-            "IsICCh5HZXRDb252ZXJzYXRpb25IaXN0b3J5UmVzcG9uc2USHQoKcmVxdWVz",
-            "dF9pZBgBIAEoCVIJcmVxdWVzdElkEhYKBnN0YXR1cxgCIAEoCVIGc3RhdHVz",
-            "Ek0KDGNvbnZlcnNhdGlvbhgDIAEoCzIpLmdsaW1tZXIuY29nbml0aW9uLnYx",
-            "LkNvbnZlcnNhdGlvbkNvbnRleHRSDGNvbnZlcnNhdGlvbhJECgVpdGVtcxgE",
-            "IAMoCzIuLmdsaW1tZXIuY29nbml0aW9uLnYxLkNvbnZlcnNhdGlvbkhpc3Rv",
-            "cnlFbnRyeVIFaXRlbXMSHwoLbmV4dF9jdXJzb3IYBSABKAlSCm5leHRDdXJz",
-            "b3ISGQoIaGFzX21vcmUYBiABKAhSB2hhc01vcmUSGAoHbWVzc2FnZRgHIAEo",
-            "CVIHbWVzc2FnZSJHChBIZWFydGJlYXRSZXF1ZXN0EjMKBGNhbGwYASABKAsy",
-            "Hy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGFSBGNhbGwiSwoRSGVh",
-            "cnRiZWF0UmVzcG9uc2USFgoGc3RhdHVzGAEgASgJUgZzdGF0dXMSHgoKZ2Vu",
-            "ZXJhdGlvbhgCIAEoCVIKZ2VuZXJhdGlvbiJKChNHZXRSZWFkaW5lc3NSZXF1",
-            "ZXN0EjMKBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0",
-            "YWRhdGFSBGNhbGwiYgoUR2V0UmVhZGluZXNzUmVzcG9uc2USFAoFc3RhdGUY",
-            "ASABKAlSBXN0YXRlEhQKBXBoYXNlGAIgASgJUgVwaGFzZRIeCgpnZW5lcmF0",
-            "aW9uGAMgASgJUgpnZW5lcmF0aW9uIl4KD1NodXRkb3duUmVxdWVzdBIzCgRj",
-            "YWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRj",
-            "YWxsEhYKBnJlYXNvbhgCIAEoCVIGcmVhc29uImsKEFNodXRkb3duUmVzcG9u",
-            "c2USIQoMb3BlcmF0aW9uX2lkGAEgASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0",
-            "dXMYAiABKAlSBnN0YXR1cxIcCglkdXBsaWNhdGUYAyABKAhSCWR1cGxpY2F0",
-            "ZSpeCgtBZGRyZXNzTW9kZRIcChhBRERSRVNTX01PREVfVU5TUEVDSUZJRUQQ",
-            "ABIXChNBRERSRVNTX01PREVfRElSRUNUEAESGAoUQUREUkVTU19NT0RFX0FN",
-            "QklFTlQQAip2Cg5SZXNwb25zZVBvbGljeRIfChtSRVNQT05TRV9QT0xJQ1lf",
-            "VU5TUEVDSUZJRUQQABIhCh1SRVNQT05TRV9QT0xJQ1lfUkVQTFlfQUxMT1dF",
-            "RBABEiAKHFJFU1BPTlNFX1BPTElDWV9PQlNFUlZFX09OTFkQAiqgAQoQUmV0",
-            "ZW50aW9uQ2VpbGluZxIhCh1SRVRFTlRJT05fQ0VJTElOR19VTlNQRUNJRklF",
-            "RBAAEh8KG1JFVEVOVElPTl9DRUlMSU5HX1RSQU5TSUVOVBABEiAKHFJFVEVO",
-            "VElPTl9DRUlMSU5HX0VYUEVSSUVOQ0UQAhImCiJSRVRFTlRJT05fQ0VJTElO",
-            "R19NRU1PUllfQ0FORElEQVRFEAMyygcKEENvZ25pdGlvblNlcnZpY2UScQoQ",
-            "U3VibWl0UGVyY2VwdGlvbhItLmdsaW1tZXIuY29nbml0aW9uLnYxLlN1Ym1p",
-            "dFBlcmNlcHRpb25SZXF1ZXN0Gi4uZ2xpbW1lci5jb2duaXRpb24udjEuU3Vi",
-            "bWl0UGVyY2VwdGlvblJlc3BvbnNlEnEKEENhbmNlbFBlcmNlcHRpb24SLS5n",
-            "bGltbWVyLmNvZ25pdGlvbi52MS5DYW5jZWxQZXJjZXB0aW9uUmVxdWVzdBou",
-            "LmdsaW1tZXIuY29nbml0aW9uLnYxLkNhbmNlbFBlcmNlcHRpb25SZXNwb25z",
-            "ZRJ6ChNJbml0aWFsaXplS25vd2xlZGdlEjAuZ2xpbW1lci5jb2duaXRpb24u",
-            "djEuSW5pdGlhbGl6ZUtub3dsZWRnZVJlcXVlc3QaMS5nbGltbWVyLmNvZ25p",
-            "dGlvbi52MS5Jbml0aWFsaXplS25vd2xlZGdlUmVzcG9uc2USTQoEUGxhbhIh",
-            "LmdsaW1tZXIuY29nbml0aW9uLnYxLlBsYW5SZXF1ZXN0GiIuZ2xpbW1lci5j",
-            "b2duaXRpb24udjEuUGxhblJlc3BvbnNlEl8KClN5bnRoZXNpemUSJy5nbGlt",
-            "bWVyLmNvZ25pdGlvbi52MS5TeW50aGVzaXplUmVxdWVzdBooLmdsaW1tZXIu",
-            "Y29nbml0aW9uLnYxLlN5bnRoZXNpemVSZXNwb25zZRKDAQoWR2V0Q29udmVy",
-            "c2F0aW9uSGlzdG9yeRIzLmdsaW1tZXIuY29nbml0aW9uLnYxLkdldENvbnZl",
-            "cnNhdGlvbkhpc3RvcnlSZXF1ZXN0GjQuZ2xpbW1lci5jb2duaXRpb24udjEu",
-            "R2V0Q29udmVyc2F0aW9uSGlzdG9yeVJlc3BvbnNlElwKCUhlYXJ0YmVhdBIm",
-            "LmdsaW1tZXIuY29nbml0aW9uLnYxLkhlYXJ0YmVhdFJlcXVlc3QaJy5nbGlt",
-            "bWVyLmNvZ25pdGlvbi52MS5IZWFydGJlYXRSZXNwb25zZRJlCgxHZXRSZWFk",
-            "aW5lc3MSKS5nbGltbWVyLmNvZ25pdGlvbi52MS5HZXRSZWFkaW5lc3NSZXF1",
-            "ZXN0GiouZ2xpbW1lci5jb2duaXRpb24udjEuR2V0UmVhZGluZXNzUmVzcG9u",
-            "c2USWQoIU2h1dGRvd24SJS5nbGltbWVyLmNvZ25pdGlvbi52MS5TaHV0ZG93",
-            "blJlcXVlc3QaJi5nbGltbWVyLmNvZ25pdGlvbi52MS5TaHV0ZG93blJlc3Bv",
-            "bnNlQi+qAixHbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkNvZ25p",
-            "dGlvbi5WMWIGcHJvdG8z"));
+            "Y2FsbBIhCgxvcGVyYXRpb25faWQYAiABKAlSC29wZXJhdGlvbklkIsgBCh5H",
+            "ZXRQZXJjZXB0aW9uT3BlcmF0aW9uUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lk",
+            "GAEgASgJUgtvcGVyYXRpb25JZBJECgVzdGF0ZRgCIAEoDjIuLmdsaW1tZXIu",
+            "Y29nbml0aW9uLnYxLlBlcmNlcHRpb25PcGVyYXRpb25TdGF0ZVIFc3RhdGUS",
+            "GgoIdGVybWluYWwYAyABKAhSCHRlcm1pbmFsEiEKDHNhZmVfbWVzc2FnZRgE",
+            "IAEoCVILc2FmZU1lc3NhZ2UiiQEKGEtub3dsZWRnZVJldHJpZXZhbENvbmZp",
+            "ZxISCgRtb2RlGAEgASgJUgRtb2RlEhMKBXRvcF9rGAIgASgFUgR0b3BLEhsK",
+            "CW1pbl9zY29yZRgDIAEoAVIIbWluU2NvcmUSJwoPc2VtYW50aWNfd2VpZ2h0",
+            "GAQgASgBUg5zZW1hbnRpY1dlaWdodCKRAQoOS25vd2xlZGdlRW50cnkSGQoI",
+            "ZW50cnlfaWQYASABKAlSB2VudHJ5SWQSFAoFc2NvcGUYAiABKAlSBXNjb3Bl",
+            "EhgKB2NvbnRlbnQYAyABKAlSB2NvbnRlbnQSGAoHZW5hYmxlZBgEIAEoCFIH",
+            "ZW5hYmxlZBIaCghwcmlvcml0eRgFIAEoBVIIcHJpb3JpdHki+QEKGkluaXRp",
+            "YWxpemVLbm93bGVkZ2VSZXF1ZXN0EjMKBGNhbGwYASABKAsyHy5nbGltbWVy",
+            "LmNvbW1vbi52MS5DYWxsTWV0YWRhdGFSBGNhbGwSGAoHdmVyc2lvbhgCIAEo",
+            "CVIHdmVyc2lvbhJMCglyZXRyaWV2YWwYAyABKAsyLi5nbGltbWVyLmNvZ25p",
+            "dGlvbi52MS5Lbm93bGVkZ2VSZXRyaWV2YWxDb25maWdSCXJldHJpZXZhbBI+",
+            "CgdlbnRyaWVzGAQgAygLMiQuZ2xpbW1lci5jb2duaXRpb24udjEuS25vd2xl",
+            "ZGdlRW50cnlSB2VudHJpZXMidgobSW5pdGlhbGl6ZUtub3dsZWRnZVJlc3Bv",
+            "bnNlEiEKDG9wZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0aW9uSWQSFgoGc3Rh",
+            "dHVzGAIgASgJUgZzdGF0dXMSHAoJZHVwbGljYXRlGAMgASgIUglkdXBsaWNh",
+            "dGUitQEKE1NraWxsVG9vbERlc2NyaXB0b3ISGQoIc2tpbGxfaWQYASABKAlS",
+            "B3NraWxsSWQSGwoJdG9vbF9uYW1lGAIgASgJUgh0b29sTmFtZRIgCgtkZXNj",
+            "cmlwdGlvbhgDIAEoCVILZGVzY3JpcHRpb24SRAoRcGFyYW1ldGVyc19zY2hl",
+            "bWEYBCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0UhBwYXJhbWV0ZXJz",
+            "U2NoZW1hIs4BCgtQbGFuUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8uZ2xpbW1l",
+            "ci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsEhsKCXVzZXJfZ29hbBgC",
+            "IAEoCVIIdXNlckdvYWwSGQoIc2NlbmVfaWQYAyABKAlSB3NjZW5lSWQSUgoP",
+            "YXZhaWxhYmxlX3Rvb2xzGAQgAygLMikuZ2xpbW1lci5jb2duaXRpb24udjEu",
+            "U2tpbGxUb29sRGVzY3JpcHRvclIOYXZhaWxhYmxlVG9vbHMixwEKE1NraWxs",
+            "VG9vbFN1Z2dlc3Rpb24SGQoIc2tpbGxfaWQYASABKAlSB3NraWxsSWQSGwoJ",
+            "dG9vbF9uYW1lGAIgASgJUgh0b29sTmFtZRIYCgdwdXJwb3NlGAMgASgJUgdw",
+            "dXJwb3NlEh4KCmNvbmZpZGVuY2UYBCABKAFSCmNvbmZpZGVuY2USPgoOYXJn",
+            "dW1lbnRzX2hpbnQYBSABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ug1h",
+            "cmd1bWVudHNIaW50Iq4BCgxQbGFuUmVzcG9uc2USGAoHc3VtbWFyeRgBIAEo",
+            "CVIHc3VtbWFyeRIcCglyZWFzb25pbmcYAiABKAlSCXJlYXNvbmluZxJLCgtz",
+            "dWdnZXN0aW9ucxgDIAMoCzIpLmdsaW1tZXIuY29nbml0aW9uLnYxLlNraWxs",
+            "VG9vbFN1Z2dlc3Rpb25SC3N1Z2dlc3Rpb25zEhkKCHRyYWNlX2lkGAQgASgJ",
+            "Ugd0cmFjZUlkIr8CCgpUb29sUmVzdWx0EhsKCXRvb2xfbmFtZRgBIAEoCVII",
+            "dG9vbE5hbWUSFgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSHwoLcmVzdWx0X2pz",
+            "b24YAyABKAlSCnJlc3VsdEpzb24SIwoNaW52b2NhdGlvbl9pZBgEIAEoCVIM",
+            "aW52b2NhdGlvbklkEiMKDXByb3ZpZGVyX2tpbmQYBSABKAlSDHByb3ZpZGVy",
+            "S2luZBIfCgtwcm92aWRlcl9pZBgGIAEoCVIKcHJvdmlkZXJJZBIpChBwcm92",
+            "aWRlcl92ZXJzaW9uGAcgASgJUg9wcm92aWRlclZlcnNpb24SJgoPc291cmNl",
+            "X2V2ZW50X2lkGAggASgJUg1zb3VyY2VFdmVudElkEh0KCnNjaGVtYV9yZWYY",
+            "CSABKAlSCXNjaGVtYVJlZiKcAgoRU3ludGhlc2l6ZVJlcXVlc3QSMwoEY2Fs",
+            "bBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YVIEY2Fs",
+            "bBIjCg1vcmlnaW5hbF9nb2FsGAIgASgJUgxvcmlnaW5hbEdvYWwSGQoIc2Nl",
+            "bmVfaWQYAyABKAlSB3NjZW5lSWQSTQoMY29udmVyc2F0aW9uGAQgASgLMiku",
+            "Z2xpbW1lci5jb2duaXRpb24udjEuQ29udmVyc2F0aW9uQ29udGV4dFIMY29u",
+            "dmVyc2F0aW9uEkMKDHRvb2xfcmVzdWx0cxgFIAMoCzIgLmdsaW1tZXIuY29n",
+            "bml0aW9uLnYxLlRvb2xSZXN1bHRSC3Rvb2xSZXN1bHRzIpIBChJTeW50aGVz",
+            "aXplUmVzcG9uc2USIwoNcmVwbHlfY29udGVudBgBIAEoCVIMcmVwbHlDb250",
+            "ZW50EjwKDWVtb3Rpb25fc3RhdGUYAiABKAsyFy5nb29nbGUucHJvdG9idWYu",
+            "U3RydWN0UgxlbW90aW9uU3RhdGUSGQoIdHJhY2VfaWQYAyABKAlSB3RyYWNl",
+            "SWQikQMKHUdldENvbnZlcnNhdGlvbkhpc3RvcnlSZXF1ZXN0EjMKBGNhbGwY",
+            "ASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGFSBGNhbGwS",
+            "HQoKcmVxdWVzdF9pZBgCIAEoCVIJcmVxdWVzdElkEicKD2NvbnZlcnNhdGlv",
+            "bl9pZBgDIAEoCVIOY29udmVyc2F0aW9uSWQSGQoIc2NlbmVfaWQYBCABKAlS",
+            "B3NjZW5lSWQSGwoJdGhyZWFkX2lkGAUgASgJUgh0aHJlYWRJZBIZCghhY3Rv",
+            "cl9pZBgGIAEoCVIHYWN0b3JJZBIdCgphY3Rvcl9uYW1lGAcgASgJUglhY3Rv",
+            "ck5hbWUSLAoSc291cmNlX3Byb3ZpZGVyX2lkGAggASgJUhBzb3VyY2VQcm92",
+            "aWRlcklkEhYKBmN1cnNvchgJIAEoCVIGY3Vyc29yEhQKBWxpbWl0GAogASgF",
+            "UgVsaW1pdBIlCg5hbGxvd2VkX3Njb3BlcxgLIAMoCVINYWxsb3dlZFNjb3Bl",
+            "cyKxBAoYQ29udmVyc2F0aW9uSGlzdG9yeUVudHJ5EhkKCGVudHJ5X2lkGAEg",
+            "ASgJUgdlbnRyeUlkEh8KC3NvdXJjZV9raW5kGAIgASgJUgpzb3VyY2VLaW5k",
+            "EhIKBHJvbGUYAyABKAlSBHJvbGUSFgoGc3RhdHVzGAQgASgJUgZzdGF0dXMS",
+            "EgoEdGV4dBgFIAEoCVIEdGV4dBIUCgV0aXRsZRgGIAEoCVIFdGl0bGUSHwoL",
+            "b2NjdXJyZWRfYXQYByABKAlSCm9jY3VycmVkQXQSGQoIdHJhY2VfaWQYCCAB",
+            "KAlSB3RyYWNlSWQSJQoOaW50ZXJhY3Rpb25faWQYCSABKAlSDWludGVyYWN0",
+            "aW9uSWQSGwoJbW9tZW50X2lkGAogASgJUghtb21lbnRJZBIaCghwb3NpdGlv",
+            "bhgLIAEoA1IIcG9zaXRpb24SJwoPY29udmVyc2F0aW9uX2lkGAwgASgJUg5j",
+            "b252ZXJzYXRpb25JZBIZCghzY2VuZV9pZBgNIAEoCVIHc2NlbmVJZBIbCgl0",
+            "aHJlYWRfaWQYDiABKAlSCHRocmVhZElkEhkKCGFjdG9yX2lkGA8gASgJUgdh",
+            "Y3RvcklkEh0KCmFjdG9yX25hbWUYECABKAlSCWFjdG9yTmFtZRIhCgxyZWNh",
+            "bGxfc2NvcGUYESABKAlSC3JlY2FsbFNjb3BlEikKEGRpc2Nsb3N1cmVfc2Nv",
+            "cGUYEiABKAlSD2Rpc2Nsb3N1cmVTY29wZSLCAgoeR2V0Q29udmVyc2F0aW9u",
+            "SGlzdG9yeVJlc3BvbnNlEh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcXVlc3RJ",
+            "ZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxJNCgxjb252ZXJzYXRpb24YAyAB",
+            "KAsyKS5nbGltbWVyLmNvZ25pdGlvbi52MS5Db252ZXJzYXRpb25Db250ZXh0",
+            "Ugxjb252ZXJzYXRpb24SRAoFaXRlbXMYBCADKAsyLi5nbGltbWVyLmNvZ25p",
+            "dGlvbi52MS5Db252ZXJzYXRpb25IaXN0b3J5RW50cnlSBWl0ZW1zEh8KC25l",
+            "eHRfY3Vyc29yGAUgASgJUgpuZXh0Q3Vyc29yEhkKCGhhc19tb3JlGAYgASgI",
+            "UgdoYXNNb3JlEhgKB21lc3NhZ2UYByABKAlSB21lc3NhZ2UiRwoQSGVhcnRi",
+            "ZWF0UmVxdWVzdBIzCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEu",
+            "Q2FsbE1ldGFkYXRhUgRjYWxsIksKEUhlYXJ0YmVhdFJlc3BvbnNlEhYKBnN0",
+            "YXR1cxgBIAEoCVIGc3RhdHVzEh4KCmdlbmVyYXRpb24YAiABKAlSCmdlbmVy",
+            "YXRpb24iSgoTR2V0UmVhZGluZXNzUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8u",
+            "Z2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsImIKFEdldFJl",
+            "YWRpbmVzc1Jlc3BvbnNlEhQKBXN0YXRlGAEgASgJUgVzdGF0ZRIUCgVwaGFz",
+            "ZRgCIAEoCVIFcGhhc2USHgoKZ2VuZXJhdGlvbhgDIAEoCVIKZ2VuZXJhdGlv",
+            "biJeCg9TaHV0ZG93blJlcXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIu",
+            "Y29tbW9uLnYxLkNhbGxNZXRhZGF0YVIEY2FsbBIWCgZyZWFzb24YAiABKAlS",
+            "BnJlYXNvbiJrChBTaHV0ZG93blJlc3BvbnNlEiEKDG9wZXJhdGlvbl9pZBgB",
+            "IAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSHAoJ",
+            "ZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUqXgoLQWRkcmVzc01vZGUSHAoY",
+            "QUREUkVTU19NT0RFX1VOU1BFQ0lGSUVEEAASFwoTQUREUkVTU19NT0RFX0RJ",
+            "UkVDVBABEhgKFEFERFJFU1NfTU9ERV9BTUJJRU5UEAIqdgoOUmVzcG9uc2VQ",
+            "b2xpY3kSHwobUkVTUE9OU0VfUE9MSUNZX1VOU1BFQ0lGSUVEEAASIQodUkVT",
+            "UE9OU0VfUE9MSUNZX1JFUExZX0FMTE9XRUQQARIgChxSRVNQT05TRV9QT0xJ",
+            "Q1lfT0JTRVJWRV9PTkxZEAIqoAEKEFJldGVudGlvbkNlaWxpbmcSIQodUkVU",
+            "RU5USU9OX0NFSUxJTkdfVU5TUEVDSUZJRUQQABIfChtSRVRFTlRJT05fQ0VJ",
+            "TElOR19UUkFOU0lFTlQQARIgChxSRVRFTlRJT05fQ0VJTElOR19FWFBFUklF",
+            "TkNFEAISJgoiUkVURU5USU9OX0NFSUxJTkdfTUVNT1JZX0NBTkRJREFURRAD",
+            "KpICChhQZXJjZXB0aW9uT3BlcmF0aW9uU3RhdGUSKgomUEVSQ0VQVElPTl9P",
+            "UEVSQVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABInCiNQRVJDRVBUSU9OX09Q",
+            "RVJBVElPTl9TVEFURV9BQ0NFUFRFRBABEiYKIlBFUkNFUFRJT05fT1BFUkFU",
+            "SU9OX1NUQVRFX1JVTk5JTkcQAhIoCiRQRVJDRVBUSU9OX09QRVJBVElPTl9T",
+            "VEFURV9TVUNDRUVERUQQAxIoCiRQRVJDRVBUSU9OX09QRVJBVElPTl9TVEFU",
+            "RV9DQU5DRUxMRUQQBBIlCiFQRVJDRVBUSU9OX09QRVJBVElPTl9TVEFURV9G",
+            "QUlMRUQQBTLQCAoQQ29nbml0aW9uU2VydmljZRJxChBTdWJtaXRQZXJjZXB0",
+            "aW9uEi0uZ2xpbW1lci5jb2duaXRpb24udjEuU3VibWl0UGVyY2VwdGlvblJl",
+            "cXVlc3QaLi5nbGltbWVyLmNvZ25pdGlvbi52MS5TdWJtaXRQZXJjZXB0aW9u",
+            "UmVzcG9uc2UScQoQQ2FuY2VsUGVyY2VwdGlvbhItLmdsaW1tZXIuY29nbml0",
+            "aW9uLnYxLkNhbmNlbFBlcmNlcHRpb25SZXF1ZXN0Gi4uZ2xpbW1lci5jb2du",
+            "aXRpb24udjEuQ2FuY2VsUGVyY2VwdGlvblJlc3BvbnNlEoMBChZHZXRQZXJj",
+            "ZXB0aW9uT3BlcmF0aW9uEjMuZ2xpbW1lci5jb2duaXRpb24udjEuR2V0UGVy",
+            "Y2VwdGlvbk9wZXJhdGlvblJlcXVlc3QaNC5nbGltbWVyLmNvZ25pdGlvbi52",
+            "MS5HZXRQZXJjZXB0aW9uT3BlcmF0aW9uUmVzcG9uc2USegoTSW5pdGlhbGl6",
+            "ZUtub3dsZWRnZRIwLmdsaW1tZXIuY29nbml0aW9uLnYxLkluaXRpYWxpemVL",
+            "bm93bGVkZ2VSZXF1ZXN0GjEuZ2xpbW1lci5jb2duaXRpb24udjEuSW5pdGlh",
+            "bGl6ZUtub3dsZWRnZVJlc3BvbnNlEk0KBFBsYW4SIS5nbGltbWVyLmNvZ25p",
+            "dGlvbi52MS5QbGFuUmVxdWVzdBoiLmdsaW1tZXIuY29nbml0aW9uLnYxLlBs",
+            "YW5SZXNwb25zZRJfCgpTeW50aGVzaXplEicuZ2xpbW1lci5jb2duaXRpb24u",
+            "djEuU3ludGhlc2l6ZVJlcXVlc3QaKC5nbGltbWVyLmNvZ25pdGlvbi52MS5T",
+            "eW50aGVzaXplUmVzcG9uc2USgwEKFkdldENvbnZlcnNhdGlvbkhpc3RvcnkS",
+            "My5nbGltbWVyLmNvZ25pdGlvbi52MS5HZXRDb252ZXJzYXRpb25IaXN0b3J5",
+            "UmVxdWVzdBo0LmdsaW1tZXIuY29nbml0aW9uLnYxLkdldENvbnZlcnNhdGlv",
+            "bkhpc3RvcnlSZXNwb25zZRJcCglIZWFydGJlYXQSJi5nbGltbWVyLmNvZ25p",
+            "dGlvbi52MS5IZWFydGJlYXRSZXF1ZXN0GicuZ2xpbW1lci5jb2duaXRpb24u",
+            "djEuSGVhcnRiZWF0UmVzcG9uc2USZQoMR2V0UmVhZGluZXNzEikuZ2xpbW1l",
+            "ci5jb2duaXRpb24udjEuR2V0UmVhZGluZXNzUmVxdWVzdBoqLmdsaW1tZXIu",
+            "Y29nbml0aW9uLnYxLkdldFJlYWRpbmVzc1Jlc3BvbnNlElkKCFNodXRkb3du",
+            "EiUuZ2xpbW1lci5jb2duaXRpb24udjEuU2h1dGRvd25SZXF1ZXN0GiYuZ2xp",
+            "bW1lci5jb2duaXRpb24udjEuU2h1dGRvd25SZXNwb25zZUIvqgIsR2xpbW1l",
+            "ckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Db2duaXRpb24uVjFiBnByb3Rv",
+            "Mw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceContractReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.StructReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.AddressMode), typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ResponsePolicy), typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.RetentionCeiling), }, null, new pbr::GeneratedClrTypeInfo[] {
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.AddressMode), typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ResponsePolicy), typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.RetentionCeiling), typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState), }, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ConversationContext), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ConversationContext.Parser, new[]{ "SourceProviderId", "SceneId", "ConversationId", "ContinuityId", "ThreadId", "InteractionId", "RecallScope", "DisclosureScope" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SourceDescriptor), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SourceDescriptor.Parser, new[]{ "ProviderKind", "ProviderId", "ProviderVersion", "ContributionId", "SourceEventId", "SchemaRef", "ContentHash", "TrustTier", "PrivacyClass", "CognitiveEffect" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ModalitySemantic), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ModalitySemantic.Parser, new[]{ "Text", "Source", "Resolved", "Confidence" }, new[]{ "Resolved", "Confidence" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ModalityItem), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.ModalityItem.Parser, new[]{ "Modality", "Text", "Uri", "MimeType", "Semantic", "Metadata" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionContent), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionContent.Parser, new[]{ "Text", "Modality", "ActorId", "ActorName", "Items" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionRequest), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionRequest.Parser, new[]{ "Call", "PerceptionId", "SensoryType", "Source", "TimestampMs", "Familiarity", "AddressMode", "ResponsePolicy", "Conversation", "Origin", "RetentionCeiling", "Content" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionResponse), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionResponse.Parser, new[]{ "OperationId", "Status", "Duplicate" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionResponse), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.SubmitPerceptionResponse.Parser, new[]{ "OperationId", "State", "Duplicate" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionRequest), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionRequest.Parser, new[]{ "Call", "TargetTraceId", "SceneId", "Reason" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionResponse), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionResponse.Parser, new[]{ "TargetTraceId", "Cancelled" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionResponse), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CancelPerceptionResponse.Parser, new[]{ "OperationId", "TargetTraceId", "State", "Terminal" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.GetPerceptionOperationRequest), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.GetPerceptionOperationRequest.Parser, new[]{ "Call", "OperationId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.GetPerceptionOperationResponse), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.GetPerceptionOperationResponse.Parser, new[]{ "OperationId", "State", "Terminal", "SafeMessage" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.KnowledgeRetrievalConfig), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.KnowledgeRetrievalConfig.Parser, new[]{ "Mode", "TopK", "MinScore", "SemanticWeight" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.KnowledgeEntry), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.KnowledgeEntry.Parser, new[]{ "EntryId", "Scope", "Content", "Enabled", "Priority" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.InitializeKnowledgeRequest), global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.InitializeKnowledgeRequest.Parser, new[]{ "Call", "Version", "Retrieval", "Entries" }, null, null, null, null),
@@ -256,6 +278,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [pbr::OriginalName("RETENTION_CEILING_TRANSIENT")] Transient = 1,
     [pbr::OriginalName("RETENTION_CEILING_EXPERIENCE")] Experience = 2,
     [pbr::OriginalName("RETENTION_CEILING_MEMORY_CANDIDATE")] MemoryCandidate = 3,
+  }
+
+  public enum PerceptionOperationState {
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_UNSPECIFIED")] Unspecified = 0,
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_ACCEPTED")] Accepted = 1,
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_RUNNING")] Running = 2,
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_SUCCEEDED")] Succeeded = 3,
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_CANCELLED")] Cancelled = 4,
+    [pbr::OriginalName("PERCEPTION_OPERATION_STATE_FAILED")] Failed = 5,
   }
 
   #endregion
@@ -2992,7 +3023,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public SubmitPerceptionResponse(SubmitPerceptionResponse other) : this() {
       operationId_ = other.operationId_;
-      status_ = other.status_;
+      state_ = other.state_;
       duplicate_ = other.duplicate_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -3015,15 +3046,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       }
     }
 
-    /// <summary>Field number for the "status" field.</summary>
-    public const int StatusFieldNumber = 2;
-    private string status_ = "";
+    /// <summary>Field number for the "state" field.</summary>
+    public const int StateFieldNumber = 2;
+    private global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState state_ = global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public string Status {
-      get { return status_; }
+    public global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState State {
+      get { return state_; }
       set {
-        status_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        state_ = value;
       }
     }
 
@@ -3055,7 +3086,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
         return true;
       }
       if (OperationId != other.OperationId) return false;
-      if (Status != other.Status) return false;
+      if (State != other.State) return false;
       if (Duplicate != other.Duplicate) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -3065,7 +3096,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (OperationId.Length != 0) hash ^= OperationId.GetHashCode();
-      if (Status.Length != 0) hash ^= Status.GetHashCode();
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) hash ^= State.GetHashCode();
       if (Duplicate != false) hash ^= Duplicate.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -3089,9 +3120,9 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
         output.WriteRawTag(10);
         output.WriteString(OperationId);
       }
-      if (Status.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteString(Status);
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) State);
       }
       if (Duplicate != false) {
         output.WriteRawTag(24);
@@ -3111,9 +3142,9 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
         output.WriteRawTag(10);
         output.WriteString(OperationId);
       }
-      if (Status.Length != 0) {
-        output.WriteRawTag(18);
-        output.WriteString(Status);
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) State);
       }
       if (Duplicate != false) {
         output.WriteRawTag(24);
@@ -3132,8 +3163,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       if (OperationId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(OperationId);
       }
-      if (Status.Length != 0) {
-        size += 1 + pb::CodedOutputStream.ComputeStringSize(Status);
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) State);
       }
       if (Duplicate != false) {
         size += 1 + 1;
@@ -3153,8 +3184,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       if (other.OperationId.Length != 0) {
         OperationId = other.OperationId;
       }
-      if (other.Status.Length != 0) {
-        Status = other.Status;
+      if (other.State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        State = other.State;
       }
       if (other.Duplicate != false) {
         Duplicate = other.Duplicate;
@@ -3182,8 +3213,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
             OperationId = input.ReadString();
             break;
           }
-          case 18: {
-            Status = input.ReadString();
+          case 16: {
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
             break;
           }
           case 24: {
@@ -3213,8 +3244,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
             OperationId = input.ReadString();
             break;
           }
-          case 18: {
-            Status = input.ReadString();
+          case 16: {
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
             break;
           }
           case 24: {
@@ -3581,8 +3612,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CancelPerceptionResponse(CancelPerceptionResponse other) : this() {
+      operationId_ = other.operationId_;
       targetTraceId_ = other.targetTraceId_;
-      cancelled_ = other.cancelled_;
+      state_ = other.state_;
+      terminal_ = other.terminal_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -3592,8 +3625,20 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       return new CancelPerceptionResponse(this);
     }
 
+    /// <summary>Field number for the "operation_id" field.</summary>
+    public const int OperationIdFieldNumber = 1;
+    private string operationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string OperationId {
+      get { return operationId_; }
+      set {
+        operationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     /// <summary>Field number for the "target_trace_id" field.</summary>
-    public const int TargetTraceIdFieldNumber = 1;
+    public const int TargetTraceIdFieldNumber = 2;
     private string targetTraceId_ = "";
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3604,15 +3649,27 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       }
     }
 
-    /// <summary>Field number for the "cancelled" field.</summary>
-    public const int CancelledFieldNumber = 2;
-    private bool cancelled_;
+    /// <summary>Field number for the "state" field.</summary>
+    public const int StateFieldNumber = 3;
+    private global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState state_ = global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Cancelled {
-      get { return cancelled_; }
+    public global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState State {
+      get { return state_; }
       set {
-        cancelled_ = value;
+        state_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "terminal" field.</summary>
+    public const int TerminalFieldNumber = 4;
+    private bool terminal_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Terminal {
+      get { return terminal_; }
+      set {
+        terminal_ = value;
       }
     }
 
@@ -3631,8 +3688,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       if (ReferenceEquals(other, this)) {
         return true;
       }
+      if (OperationId != other.OperationId) return false;
       if (TargetTraceId != other.TargetTraceId) return false;
-      if (Cancelled != other.Cancelled) return false;
+      if (State != other.State) return false;
+      if (Terminal != other.Terminal) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -3640,8 +3699,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
+      if (OperationId.Length != 0) hash ^= OperationId.GetHashCode();
       if (TargetTraceId.Length != 0) hash ^= TargetTraceId.GetHashCode();
-      if (Cancelled != false) hash ^= Cancelled.GetHashCode();
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) hash ^= State.GetHashCode();
+      if (Terminal != false) hash ^= Terminal.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -3660,13 +3721,21 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (TargetTraceId.Length != 0) {
+      if (OperationId.Length != 0) {
         output.WriteRawTag(10);
+        output.WriteString(OperationId);
+      }
+      if (TargetTraceId.Length != 0) {
+        output.WriteRawTag(18);
         output.WriteString(TargetTraceId);
       }
-      if (Cancelled != false) {
-        output.WriteRawTag(16);
-        output.WriteBool(Cancelled);
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(24);
+        output.WriteEnum((int) State);
+      }
+      if (Terminal != false) {
+        output.WriteRawTag(32);
+        output.WriteBool(Terminal);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -3678,13 +3747,21 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (TargetTraceId.Length != 0) {
+      if (OperationId.Length != 0) {
         output.WriteRawTag(10);
+        output.WriteString(OperationId);
+      }
+      if (TargetTraceId.Length != 0) {
+        output.WriteRawTag(18);
         output.WriteString(TargetTraceId);
       }
-      if (Cancelled != false) {
-        output.WriteRawTag(16);
-        output.WriteBool(Cancelled);
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(24);
+        output.WriteEnum((int) State);
+      }
+      if (Terminal != false) {
+        output.WriteRawTag(32);
+        output.WriteBool(Terminal);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -3696,10 +3773,16 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
+      if (OperationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(OperationId);
+      }
       if (TargetTraceId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(TargetTraceId);
       }
-      if (Cancelled != false) {
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) State);
+      }
+      if (Terminal != false) {
         size += 1 + 1;
       }
       if (_unknownFields != null) {
@@ -3714,11 +3797,17 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
       if (other == null) {
         return;
       }
+      if (other.OperationId.Length != 0) {
+        OperationId = other.OperationId;
+      }
       if (other.TargetTraceId.Length != 0) {
         TargetTraceId = other.TargetTraceId;
       }
-      if (other.Cancelled != false) {
-        Cancelled = other.Cancelled;
+      if (other.State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        State = other.State;
+      }
+      if (other.Terminal != false) {
+        Terminal = other.Terminal;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -3740,11 +3829,19 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
+            OperationId = input.ReadString();
+            break;
+          }
+          case 18: {
             TargetTraceId = input.ReadString();
             break;
           }
-          case 16: {
-            Cancelled = input.ReadBool();
+          case 24: {
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
+            break;
+          }
+          case 32: {
+            Terminal = input.ReadBool();
             break;
           }
         }
@@ -3767,11 +3864,572 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
+            OperationId = input.ReadString();
+            break;
+          }
+          case 18: {
             TargetTraceId = input.ReadString();
             break;
           }
+          case 24: {
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
+            break;
+          }
+          case 32: {
+            Terminal = input.ReadBool();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class GetPerceptionOperationRequest : pb::IMessage<GetPerceptionOperationRequest>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<GetPerceptionOperationRequest> _parser = new pb::MessageParser<GetPerceptionOperationRequest>(() => new GetPerceptionOperationRequest());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<GetPerceptionOperationRequest> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[9]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationRequest() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationRequest(GetPerceptionOperationRequest other) : this() {
+      call_ = other.call_ != null ? other.call_.Clone() : null;
+      operationId_ = other.operationId_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationRequest Clone() {
+      return new GetPerceptionOperationRequest(this);
+    }
+
+    /// <summary>Field number for the "call" field.</summary>
+    public const int CallFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata call_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata Call {
+      get { return call_; }
+      set {
+        call_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "operation_id" field.</summary>
+    public const int OperationIdFieldNumber = 2;
+    private string operationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string OperationId {
+      get { return operationId_; }
+      set {
+        operationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as GetPerceptionOperationRequest);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(GetPerceptionOperationRequest other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Call, other.Call)) return false;
+      if (OperationId != other.OperationId) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (call_ != null) hash ^= Call.GetHashCode();
+      if (OperationId.Length != 0) hash ^= OperationId.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(OperationId);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(OperationId);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (call_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Call);
+      }
+      if (OperationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(OperationId);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(GetPerceptionOperationRequest other) {
+      if (other == null) {
+        return;
+      }
+      if (other.call_ != null) {
+        if (call_ == null) {
+          Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+        }
+        Call.MergeFrom(other.Call);
+      }
+      if (other.OperationId.Length != 0) {
+        OperationId = other.OperationId;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            OperationId = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            OperationId = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class GetPerceptionOperationResponse : pb::IMessage<GetPerceptionOperationResponse>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<GetPerceptionOperationResponse> _parser = new pb::MessageParser<GetPerceptionOperationResponse>(() => new GetPerceptionOperationResponse());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<GetPerceptionOperationResponse> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[10]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationResponse() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationResponse(GetPerceptionOperationResponse other) : this() {
+      operationId_ = other.operationId_;
+      state_ = other.state_;
+      terminal_ = other.terminal_;
+      safeMessage_ = other.safeMessage_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public GetPerceptionOperationResponse Clone() {
+      return new GetPerceptionOperationResponse(this);
+    }
+
+    /// <summary>Field number for the "operation_id" field.</summary>
+    public const int OperationIdFieldNumber = 1;
+    private string operationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string OperationId {
+      get { return operationId_; }
+      set {
+        operationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "state" field.</summary>
+    public const int StateFieldNumber = 2;
+    private global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState state_ = global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState State {
+      get { return state_; }
+      set {
+        state_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "terminal" field.</summary>
+    public const int TerminalFieldNumber = 3;
+    private bool terminal_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Terminal {
+      get { return terminal_; }
+      set {
+        terminal_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "safe_message" field.</summary>
+    public const int SafeMessageFieldNumber = 4;
+    private string safeMessage_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string SafeMessage {
+      get { return safeMessage_; }
+      set {
+        safeMessage_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as GetPerceptionOperationResponse);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(GetPerceptionOperationResponse other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (OperationId != other.OperationId) return false;
+      if (State != other.State) return false;
+      if (Terminal != other.Terminal) return false;
+      if (SafeMessage != other.SafeMessage) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (OperationId.Length != 0) hash ^= OperationId.GetHashCode();
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) hash ^= State.GetHashCode();
+      if (Terminal != false) hash ^= Terminal.GetHashCode();
+      if (SafeMessage.Length != 0) hash ^= SafeMessage.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(OperationId);
+      }
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) State);
+      }
+      if (Terminal != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(Terminal);
+      }
+      if (SafeMessage.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(SafeMessage);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (OperationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(OperationId);
+      }
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) State);
+      }
+      if (Terminal != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(Terminal);
+      }
+      if (SafeMessage.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(SafeMessage);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (OperationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(OperationId);
+      }
+      if (State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) State);
+      }
+      if (Terminal != false) {
+        size += 1 + 1;
+      }
+      if (SafeMessage.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(SafeMessage);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(GetPerceptionOperationResponse other) {
+      if (other == null) {
+        return;
+      }
+      if (other.OperationId.Length != 0) {
+        OperationId = other.OperationId;
+      }
+      if (other.State != global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState.Unspecified) {
+        State = other.State;
+      }
+      if (other.Terminal != false) {
+        Terminal = other.Terminal;
+      }
+      if (other.SafeMessage.Length != 0) {
+        SafeMessage = other.SafeMessage;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            OperationId = input.ReadString();
+            break;
+          }
           case 16: {
-            Cancelled = input.ReadBool();
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
+            break;
+          }
+          case 24: {
+            Terminal = input.ReadBool();
+            break;
+          }
+          case 34: {
+            SafeMessage = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            OperationId = input.ReadString();
+            break;
+          }
+          case 16: {
+            State = (global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.PerceptionOperationState) input.ReadEnum();
+            break;
+          }
+          case 24: {
+            Terminal = input.ReadBool();
+            break;
+          }
+          case 34: {
+            SafeMessage = input.ReadString();
             break;
           }
         }
@@ -3796,7 +4454,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[9]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[11]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4105,7 +4763,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[10]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[12]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4451,7 +5109,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[11]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[13]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4767,7 +5425,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[12]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[14]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5039,7 +5697,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[13]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[15]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5357,7 +6015,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[14]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[16]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5664,7 +6322,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[15]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[17]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6019,7 +6677,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[16]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[18]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6317,7 +6975,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[17]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[19]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6811,7 +7469,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[18]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[20]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7164,7 +7822,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[19]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[21]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7445,7 +8103,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[20]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[22]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8011,7 +8669,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[21]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[23]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8838,7 +9496,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[22]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[24]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9256,7 +9914,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[23]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[25]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9463,7 +10121,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[24]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[26]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9698,7 +10356,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[25]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[27]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9905,7 +10563,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[26]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[28]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10177,7 +10835,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[27]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[29]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10421,7 +11079,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Cognition.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[28]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor.MessageTypes[30]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

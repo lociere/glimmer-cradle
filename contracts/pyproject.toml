@@ -1,0 +1,18 @@
+[project]
+name = "glimmer-cradle-contracts"
+version = "0.1.8"
+description = "Generated Python runtime for Glimmer Cradle contracts"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "protobuf==6.33.0",
+    "grpcio>=1.74,<2",
+]
+
+[tool.setuptools.packages.find]
+where = ["generated/python"]
+include = ["glimmer*"]
+namespaces = true
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

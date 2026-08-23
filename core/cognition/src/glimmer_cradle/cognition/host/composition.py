@@ -17,6 +17,7 @@ from glimmer_cradle.cognition.context.sources import (
 )
 from glimmer_cradle.cognition.cycle import CycleController, GlobalWorkspace
 from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.cycle.providers import (
     AffectProvider,
     DriveProvider,
@@ -74,6 +75,8 @@ def compose_cognition(
     config: CharacterRuntimeConfig,
     *,
     generation: str,
+    registration_nonce: str,
+    registration_secret: str,
     shutdown,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
@@ -151,10 +154,11 @@ def compose_cognition(
         agent_synthesis_use_case=agent_synthesis,
         conversation_controller=conversation_controller,
     )
-    kernel_client = KernelGrpcClient(generation)
+    kernel_client = KernelGrpcClient(generation, registration_nonce, registration_secret)
     outbound_adapter = KernelEventOutboundAdapter(kernel_client)
 
     perception_queue = PerceptionEventQueue(max_size=100)
+    perception_operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity)
     relationship_projection = RelationshipProjection(
         recorder=experience_recorder,
@@ -221,6 +225,7 @@ def compose_cognition(
         self_entity=self_entity,
         conversation=conversation_controller,
         multimodal_router=multimodal_router,
+        perception_operations=perception_operations,
     )
 
     cognition_grpc_host = CognitionGrpcHost(
@@ -230,6 +235,8 @@ def compose_cognition(
         activity=activity_controller,
         cycle=cycle_controller,
         shutdown=shutdown,
+        operations=perception_operations,
+        workspace=workspace,
     )
     logger.info(
         "Cognition Composition 组装完成",

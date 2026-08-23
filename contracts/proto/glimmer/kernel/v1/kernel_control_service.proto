@@ -13,6 +13,8 @@ message RegisterCognitionRequest {
   string endpoint = 2;
   int64 process_id = 3;
   int64 supervisor_process_id = 4;
+  string registration_nonce = 5;
+  bytes auth_proof = 6;
 }
 
 message RegisterCognitionResponse {

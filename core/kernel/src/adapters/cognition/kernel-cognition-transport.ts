@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, toBinary, type JsonObject } from '@bufbuild/protobuf';
 import {
@@ -36,6 +36,8 @@ import {
   SynthesizeRequestSchema,
   SynthesizeResponseSchema,
   InitializeKnowledgeResponseSchema,
+  GetPerceptionOperationRequestSchema,
+  GetPerceptionOperationResponseSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { ActionCommand } from '@glimmer-cradle/protocol';
 import { EventBus } from '../../foundation/event-bus/event-bus';
@@ -43,12 +45,11 @@ import { StateSyncEvent } from '../../foundation/event-bus/events';
 import { EndpointRegistry } from '../../foundation/endpoints/endpoint-registry';
 import { getLogger } from '../../foundation/logger/logger';
 import { createTraceContext, withTrace } from '../../foundation/logger/trace-context';
+import type { CognitionActionHandler, CognitionProcessBootstrap } from '../../foundation/ports/cognition-service-port';
 import { serviceDefinition, unaryMethod } from './grpc-contract';
 
 const logger = getLogger('kernel-cognition-transport');
 const ERROR_DETAIL_KEY = 'glimmer-error-bin';
-
-export type CognitionActionHandler = (command: ActionCommand) => Promise<void>;
 
 export interface CognitionCallOptions {
   readonly timeoutMs: number;
@@ -69,6 +70,7 @@ const kernelControlDefinition = serviceDefinition('glimmer.kernel.v1.KernelContr
 const cognitionMethods = {
   SubmitPerception: unaryMethod('/glimmer.cognition.v1.CognitionService/SubmitPerception', SubmitPerceptionRequestSchema, SubmitPerceptionResponseSchema),
   CancelPerception: unaryMethod('/glimmer.cognition.v1.CognitionService/CancelPerception', CancelPerceptionRequestSchema, CancelPerceptionResponseSchema),
+  GetPerceptionOperation: unaryMethod('/glimmer.cognition.v1.CognitionService/GetPerceptionOperation', GetPerceptionOperationRequestSchema, GetPerceptionOperationResponseSchema),
   InitializeKnowledge: unaryMethod('/glimmer.cognition.v1.CognitionService/InitializeKnowledge', InitializeKnowledgeRequestSchema, InitializeKnowledgeResponseSchema),
   Plan: unaryMethod('/glimmer.cognition.v1.CognitionService/Plan', PlanRequestSchema, PlanResponseSchema),
   Synthesize: unaryMethod('/glimmer.cognition.v1.CognitionService/Synthesize', SynthesizeRequestSchema, SynthesizeResponseSchema),
@@ -98,9 +100,14 @@ export class KernelCognitionTransport {
   private expectedProcessId: number | null = null;
   private processGeneration: string | null = null;
   private registeredProcessId: number | null = null;
+  private registrationNonce: string | null = null;
+  private registrationSecret: Buffer | null = null;
   private registrationWaiters = new Set<(error?: Error) => void>();
   private actionHandler: CognitionActionHandler | null = null;
   private readonly completedCommands = new Set<string>();
+  private readonly inFlightCommands = new Map<string, Promise<void>>();
+  private readonly actionAbortControllers = new Set<AbortController>();
+  private actionDeadlineMs = 30_000;
 
   public static get instance(): KernelCognitionTransport {
     KernelCognitionTransport._instance ??= new KernelCognitionTransport();
@@ -143,12 +150,19 @@ export class KernelCognitionTransport {
     logger.info('Kernel Cognition gRPC control 已绑定动态回环端点');
   }
 
-  public prepareProcess(): string {
+  public prepareProcess(): CognitionProcessBootstrap {
     this.invalidateClient();
     this.expectedProcessId = null;
     this.processGeneration = randomUUID();
+    this.registrationNonce = randomUUID();
+    this.registrationSecret = randomBytes(32);
     this.registeredProcessId = null;
-    return this.processGeneration;
+    return {
+      generation: this.processGeneration,
+      kernelEndpoint: this.controlEndpoint,
+      registrationNonce: this.registrationNonce,
+      registrationSecret: this.registrationSecret.toString('base64url'),
+    };
   }
 
   public expectProcess(processId: number): void {
@@ -162,6 +176,9 @@ export class KernelCognitionTransport {
     this.expectedProcessId = null;
     this.processGeneration = null;
     this.registeredProcessId = null;
+    this.registrationNonce = null;
+    this.registrationSecret?.fill(0);
+    this.registrationSecret = null;
     if (reason) {
       for (const waiter of this.registrationWaiters) waiter(reason);
       this.registrationWaiters.clear();
@@ -171,6 +188,10 @@ export class KernelCognitionTransport {
 
   public setActionHandler(handler: CognitionActionHandler | null): void {
     this.actionHandler = handler;
+  }
+
+  public configureActionDeadline(timeoutMs: number): void {
+    this.actionDeadlineMs = Math.max(1, timeoutMs);
   }
 
   public waitForRegistration(timeoutMs: number): Promise<void> {
@@ -232,9 +253,14 @@ export class KernelCognitionTransport {
   }
 
   public async stop(): Promise<void> {
+    for (const controller of this.actionAbortControllers) {
+      controller.abort(new Error('Kernel Cognition transport 正在停止'));
+    }
+    this.actionAbortControllers.clear();
     await this.invalidateProcess();
     this.actionHandler = null;
     this.completedCommands.clear();
+    this.inFlightCommands.clear();
     for (const waiter of this.registrationWaiters) waiter(new Error('Kernel Cognition gRPC control 已停止'));
     this.registrationWaiters.clear();
     if (this.server) {
@@ -253,18 +279,30 @@ export class KernelCognitionTransport {
       this.assertCall(request.call);
       const processId = Number(request.processId);
       const supervisorProcessId = Number(request.supervisorProcessId);
-      const directlySupervised = processId === this.expectedProcessId;
-      const launcherSupervised = supervisorProcessId === this.expectedProcessId;
-      if (!Number.isSafeInteger(processId) || (!directlySupervised && !launcherSupervised)) {
+      const supervised = processId === this.expectedProcessId || supervisorProcessId === this.expectedProcessId;
+      if (!Number.isSafeInteger(processId) || !Number.isSafeInteger(supervisorProcessId) || !supervised) {
         throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程身份与受监督子进程不一致', false, request.call);
       }
       const endpoint = request.endpoint.trim();
       if (!/^grpc:\/\/127\.0\.0\.1:\d+$/.test(endpoint)) {
         throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Cognition 端点必须是动态回环 gRPC 地址', false, request.call);
       }
+      if (!this.registrationNonce || !this.registrationSecret || request.registrationNonce !== this.registrationNonce) {
+        throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 注册 challenge 已失效', false, request.call);
+      }
+      const expectedProof = createHmac('sha256', this.registrationSecret)
+        .update(`${this.generation}\n${this.registrationNonce}\n${endpoint}\n${processId}\n${supervisorProcessId}`)
+        .digest();
+      const proof = Buffer.from(request.authProof);
+      if (proof.length !== expectedProof.length || !timingSafeEqual(proof, expectedProof)) {
+        throw serviceFault(ServiceErrorCode.GENERATION_MISMATCH, 'Cognition 进程认证失败', false, request.call);
+      }
       this.invalidateClient();
       this.client = new grpc.Client(endpoint.slice('grpc://'.length), grpc.credentials.createInsecure());
       this.registeredProcessId = processId;
+      this.registrationSecret.fill(0);
+      this.registrationSecret = null;
+      this.registrationNonce = null;
       await EndpointRegistry.instance.publish('cognition-rpc', endpoint);
       for (const waiter of this.registrationWaiters) waiter();
       this.registrationWaiters.clear();
@@ -294,15 +332,58 @@ export class KernelCognitionTransport {
   }
 
   private publishAction(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>): void {
+    const abortController = new AbortController();
+    this.actionAbortControllers.add(abortController);
+    let deadlineExpired = false;
+    const deadline = setTimeout(() => {
+      deadlineExpired = true;
+      abortController.abort(new Error('Kernel action deadline 已到期'));
+    }, this.actionDeadlineMs);
+    call.once('cancelled', () => abortController.abort(new Error('Cognition 已取消 action 调用')));
     void this.handleServerCall(call, callback, async (request) => {
       this.assertCall(request.call);
       const traceId = request.call?.traceId || createTraceContext().trace_id;
-      const duplicate = this.isDuplicate(request.call);
-      if (!duplicate && this.actionHandler) {
-        const command = mapActionCommand(request, traceId);
-        await withTrace(traceId, () => this.actionHandler!(command));
+      const key = request.call?.idempotencyKey || '';
+      if (key && this.completedCommands.has(key)) {
+        return this.commandResult(PublishActionResponseSchema, request.call, 'duplicate', true);
       }
-      return this.commandResult(PublishActionResponseSchema, request.call, duplicate ? 'duplicate' : 'action_published', duplicate);
+      const existing = key ? this.inFlightCommands.get(key) : undefined;
+      if (existing) {
+        await existing;
+        return this.commandResult(PublishActionResponseSchema, request.call, 'duplicate', true);
+      }
+      if (!this.actionHandler) throw serviceFault(ServiceErrorCode.NOT_READY, 'Kernel action handler 尚未就绪', true, request.call);
+      const command = mapActionCommand(request, traceId);
+      const execution = withTrace(traceId, () => this.actionHandler!(command, abortController.signal));
+      if (key) this.inFlightCommands.set(key, execution);
+      try {
+        await execution;
+        if (abortController.signal.aborted) {
+          throw serviceFault(
+            deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
+            deadlineExpired ? 'Kernel action deadline 已到期' : 'Cognition 已取消 action 调用',
+            false,
+            request.call,
+          );
+        }
+        if (key) this.rememberCompleted(key);
+        return this.commandResult(PublishActionResponseSchema, request.call, 'completed');
+      } catch (error) {
+        if (abortController.signal.aborted && !(error instanceof CognitionTransportError)) {
+          throw serviceFault(
+            deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
+            deadlineExpired ? 'Kernel action deadline 已到期' : 'Cognition 已取消 action 调用',
+            false,
+            request.call,
+          );
+        }
+        throw error;
+      } finally {
+        if (key) this.inFlightCommands.delete(key);
+      }
+    }).finally(() => {
+      clearTimeout(deadline);
+      this.actionAbortControllers.delete(abortController);
     });
   }
 
@@ -317,13 +398,9 @@ export class KernelCognitionTransport {
     return create(schema, { operationId: call?.idempotencyKey || call?.traceId || randomUUID(), status, duplicate });
   }
 
-  private isDuplicate(call: CallMetadata | undefined): boolean {
-    const key = call?.idempotencyKey;
-    if (!key) return false;
-    if (this.completedCommands.has(key)) return true;
+  private rememberCompleted(key: string): void {
     this.completedCommands.add(key);
     if (this.completedCommands.size > 2048) this.completedCommands.delete(this.completedCommands.values().next().value!);
-    return false;
   }
 
   private async handleServerCall<I, O>(

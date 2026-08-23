@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Google.Protobuf;
 using GlimmerCradle.Contracts.Glimmer.Common.V1;
+using GlimmerCradle.Contracts.Glimmer.Cognition.V1;
+using GlimmerCradle.Contracts.Glimmer.Kernel.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -47,6 +49,31 @@ if (responseRoundTrip.ProbeId != request.ProbeId
     || responseRoundTrip.Document.SchemaVersion != document.GetProperty("schema_version").GetString())
 {
     throw new InvalidOperationException("C# response protobuf round-trip lost the successful echo result");
+}
+
+var registration = new RegisterCognitionRequest
+{
+    Call = new CallMetadata { TraceId = "trace-register", Generation = "generation-1" },
+    Endpoint = "grpc://127.0.0.1:43123",
+    ProcessId = 42,
+    RegistrationNonce = "nonce-1",
+    AuthProof = ByteString.CopyFrom(new byte[32]),
+};
+var registrationRoundTrip = RegisterCognitionRequest.Parser.ParseFrom(registration.ToByteArray());
+if (registrationRoundTrip.RegistrationNonce != "nonce-1" || registrationRoundTrip.AuthProof.Length != 32)
+{
+    throw new InvalidOperationException("C# KernelControlService registration contract round-trip failed");
+}
+
+var perception = new SubmitPerceptionResponse
+{
+    OperationId = "perception-1",
+    State = PerceptionOperationState.Accepted,
+};
+var perceptionRoundTrip = SubmitPerceptionResponse.Parser.ParseFrom(perception.ToByteArray());
+if (perceptionRoundTrip.State != PerceptionOperationState.Accepted)
+{
+    throw new InvalidOperationException("C# CognitionService operation contract round-trip failed");
 }
 
 Console.WriteLine("contracts roundtrip cs: ok");

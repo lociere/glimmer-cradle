@@ -91,8 +91,17 @@ message SubmitPerceptionRequest {
 
 message SubmitPerceptionResponse {
   string operation_id = 1;
-  string status = 2;
+  PerceptionOperationState state = 2;
   bool duplicate = 3;
+}
+
+enum PerceptionOperationState {
+  PERCEPTION_OPERATION_STATE_UNSPECIFIED = 0;
+  PERCEPTION_OPERATION_STATE_ACCEPTED = 1;
+  PERCEPTION_OPERATION_STATE_RUNNING = 2;
+  PERCEPTION_OPERATION_STATE_SUCCEEDED = 3;
+  PERCEPTION_OPERATION_STATE_CANCELLED = 4;
+  PERCEPTION_OPERATION_STATE_FAILED = 5;
 }
 
 message CancelPerceptionRequest {
@@ -103,8 +112,22 @@ message CancelPerceptionRequest {
 }
 
 message CancelPerceptionResponse {
-  string target_trace_id = 1;
-  bool cancelled = 2;
+  string operation_id = 1;
+  string target_trace_id = 2;
+  PerceptionOperationState state = 3;
+  bool terminal = 4;
+}
+
+message GetPerceptionOperationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string operation_id = 2;
+}
+
+message GetPerceptionOperationResponse {
+  string operation_id = 1;
+  PerceptionOperationState state = 2;
+  bool terminal = 3;
+  string safe_message = 4;
 }
 
 message KnowledgeRetrievalConfig {
@@ -268,6 +291,7 @@ message ShutdownResponse {
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
+  rpc GetPerceptionOperation(GetPerceptionOperationRequest) returns (GetPerceptionOperationResponse);
   rpc InitializeKnowledge(InitializeKnowledgeRequest) returns (InitializeKnowledgeResponse);
   rpc Plan(PlanRequest) returns (PlanResponse);
   rpc Synthesize(SynthesizeRequest) returns (SynthesizeResponse);

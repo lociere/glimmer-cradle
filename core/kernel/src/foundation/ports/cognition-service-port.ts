@@ -1,6 +1,9 @@
 import type {
   ConversationContext,
   ConversationHistoryResult,
+  KnowledgeBaseConfig,
+  PerceptionEvent,
+  ActionCommand,
 } from '@glimmer-cradle/protocol';
 
 /** Kernel 应用层使用的 Cognition 用例模型；跨进程 DTO 只存在于 Service Adapter。 */
@@ -8,6 +11,15 @@ export interface PerceptionCancelRequest {
   readonly scene_id?: string;
   readonly target_trace_id: string;
   readonly reason?: string;
+}
+
+export type PerceptionOperationState = 'accepted' | 'running' | 'succeeded' | 'cancelled' | 'failed';
+
+export interface PerceptionOperationResult {
+  readonly operation_id: string;
+  readonly state: PerceptionOperationState;
+  readonly terminal: boolean;
+  readonly safe_message?: string;
 }
 
 export interface AgentPlanRequest {
@@ -84,3 +96,36 @@ export interface ChatMessageResponse {
   readonly emotion_state?: Record<string, unknown>;
   readonly trace_id?: string;
 }
+
+export interface CognitionProcessBootstrap {
+  readonly generation: string;
+  readonly kernelEndpoint: string;
+  readonly registrationNonce: string;
+  readonly registrationSecret: string;
+}
+
+export interface CognitionProcessTransportPort {
+  readonly isRegistered: boolean;
+  prepareProcess(): CognitionProcessBootstrap;
+  expectProcess(processId: number): void;
+  waitForRegistration(timeoutMs: number): Promise<void>;
+  invalidateProcess(processId?: number, reason?: Error): Promise<void>;
+  configureActionDeadline(timeoutMs: number): void;
+}
+
+export interface CognitionRequestPort {
+  submitPerception(request: PerceptionEvent, traceId: string, timeoutMs: number): Promise<PerceptionOperationResult>;
+  cancelPerception(request: PerceptionCancelRequest, timeoutMs: number): Promise<PerceptionOperationResult>;
+  perceptionOperation(operationId: string, timeoutMs: number): Promise<PerceptionOperationResult>;
+  initializeKnowledge(config: KnowledgeBaseConfig, timeoutMs: number): Promise<void>;
+  plan(request: AgentPlanRequest, traceId: string, timeoutMs: number): Promise<AgentPlanResponse>;
+  synthesize(request: AgentSynthesisRequest, timeoutMs: number): Promise<AgentSynthesisResponse>;
+  heartbeat(timeoutMs: number): Promise<LifeHeartbeatResponse>;
+  conversationHistory(request: ConversationHistoryRequest, traceId: string, timeoutMs: number): Promise<ConversationHistoryResponse>;
+  readiness(timeoutMs: number): Promise<{ readonly state: string; readonly phase: string; readonly generation: string }>;
+  shutdown(reason: string, timeoutMs: number): Promise<void>;
+}
+
+export type CognitionLifecycleState = 'starting' | 'ready' | 'failed' | 'stopped';
+export type CognitionLifecycleObserver = (state: CognitionLifecycleState, summary: string) => void;
+export type CognitionActionHandler = (command: ActionCommand, signal: AbortSignal) => Promise<void>;

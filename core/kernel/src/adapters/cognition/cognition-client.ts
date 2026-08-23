@@ -5,12 +5,14 @@ import {
   CancelPerceptionRequestSchema,
   ConversationContextSchema,
   GetConversationHistoryRequestSchema,
+  GetPerceptionOperationRequestSchema,
   HeartbeatRequestSchema,
   InitializeKnowledgeRequestSchema,
   PlanRequestSchema,
   GetReadinessRequestSchema,
   ResponsePolicy,
   RetentionCeiling,
+  PerceptionOperationState as WirePerceptionOperationState,
   ShutdownRequestSchema,
   SubmitPerceptionRequestSchema,
   SynthesizeRequestSchema,
@@ -25,6 +27,7 @@ import type {
   ConversationHistoryResponse,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
+  PerceptionOperationResult,
 } from '../../foundation/ports/cognition-service-port';
 import { getCurrentSpanId } from '../../foundation/logger/trace-context';
 import { KernelCognitionTransport, objectToStruct, structToObject } from './kernel-cognition-transport';
@@ -32,7 +35,7 @@ import { KernelCognitionTransport, objectToStruct, structToObject } from './kern
 export class CognitionClient {
   public constructor(private readonly transport = KernelCognitionTransport.instance) {}
 
-  public async submitPerception(request: PerceptionEvent, traceId: string, timeoutMs: number): Promise<void> {
+  public async submitPerception(request: PerceptionEvent, traceId: string, timeoutMs: number): Promise<PerceptionOperationResult> {
     const call = this.transport.makeCallMetadata({
       traceId,
       spanId: getCurrentSpanId(),
@@ -40,7 +43,7 @@ export class CognitionClient {
       causationId: request.id,
       idempotencyKey: `perception:${request.id}`,
     });
-    await this.transport.call(
+    const response = await this.transport.call(
       this.transport.methods.SubmitPerception,
       create(SubmitPerceptionRequestSchema, {
         call,
@@ -91,9 +94,10 @@ export class CognitionClient {
       }),
       { timeoutMs, traceId },
     );
+    return mapPerceptionOperation(response.operationId, response.state);
   }
 
-  public async cancelPerception(request: PerceptionCancelRequest, timeoutMs: number): Promise<boolean> {
+  public async cancelPerception(request: PerceptionCancelRequest, timeoutMs: number): Promise<PerceptionOperationResult> {
     const traceId = randomUUID();
     const response = await this.transport.call(
       this.transport.methods.CancelPerception,
@@ -105,7 +109,27 @@ export class CognitionClient {
       }),
       { timeoutMs, traceId },
     );
-    return response.cancelled;
+    return {
+      ...mapPerceptionOperation(response.operationId, response.state),
+      terminal: response.terminal,
+    };
+  }
+
+  public async perceptionOperation(operationId: string, timeoutMs: number): Promise<PerceptionOperationResult> {
+    const traceId = randomUUID();
+    const response = await this.transport.call(
+      this.transport.methods.GetPerceptionOperation,
+      create(GetPerceptionOperationRequestSchema, {
+        call: this.transport.makeCallMetadata({ traceId, correlationId: operationId }),
+        operationId,
+      }),
+      { timeoutMs, traceId },
+    );
+    return {
+      ...mapPerceptionOperation(response.operationId, response.state),
+      terminal: response.terminal,
+      safe_message: response.safeMessage || undefined,
+    };
   }
 
   public async initializeKnowledge(config: KnowledgeBaseConfig, timeoutMs: number): Promise<void> {
@@ -268,6 +292,23 @@ export class CognitionClient {
       { timeoutMs, traceId },
     );
   }
+}
+
+function mapPerceptionOperation(operationId: string, state: WirePerceptionOperationState): PerceptionOperationResult {
+  const mapped = state === WirePerceptionOperationState.ACCEPTED
+    ? 'accepted'
+    : state === WirePerceptionOperationState.RUNNING
+      ? 'running'
+      : state === WirePerceptionOperationState.SUCCEEDED
+        ? 'succeeded'
+        : state === WirePerceptionOperationState.CANCELLED
+          ? 'cancelled'
+          : 'failed';
+  return {
+    operation_id: operationId,
+    state: mapped,
+    terminal: mapped === 'succeeded' || mapped === 'cancelled' || mapped === 'failed',
+  };
 }
 
 function mapConversation(input: any) {

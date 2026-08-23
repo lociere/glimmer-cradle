@@ -88,6 +88,7 @@ export class SkillPlanningAppService {
     suggestion: MCPToolSuggestion,
     traceId?: string,
     conversation?: ConversationContext,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     return this._gateway.invoke({
       skillId: suggestion.skill_id,
@@ -95,6 +96,7 @@ export class SkillPlanningAppService {
       args: suggestion.arguments_hint,
       traceId,
       conversation,
+      signal,
     });
   }
 

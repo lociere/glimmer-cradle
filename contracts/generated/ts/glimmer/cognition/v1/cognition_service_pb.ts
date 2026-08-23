@@ -13,7 +13,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/cognition/v1/cognition_service.proto.
  */
 export const file_glimmer_cognition_v1_cognition_service: GenFile = /*@__PURE__*/
-  fileDesc("CixnbGltbWVyL2NvZ25pdGlvbi92MS9jb2duaXRpb25fc2VydmljZS5wcm90bxIUZ2xpbW1lci5jb2duaXRpb24udjEizgEKE0NvbnZlcnNhdGlvbkNvbnRleHQSGgoSc291cmNlX3Byb3ZpZGVyX2lkGAEgASgJEhAKCHNjZW5lX2lkGAIgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCRIVCg1jb250aW51aXR5X2lkGAQgASgJEhEKCXRocmVhZF9pZBgFIAEoCRIWCg5pbnRlcmFjdGlvbl9pZBgGIAEoCRIUCgxyZWNhbGxfc2NvcGUYByABKAkSGAoQZGlzY2xvc3VyZV9zY29wZRgIIAEoCSL5AQoQU291cmNlRGVzY3JpcHRvchIVCg1wcm92aWRlcl9raW5kGAEgASgJEhMKC3Byb3ZpZGVyX2lkGAIgASgJEhgKEHByb3ZpZGVyX3ZlcnNpb24YAyABKAkSFwoPY29udHJpYnV0aW9uX2lkGAQgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgFIAEoCRISCgpzY2hlbWFfcmVmGAYgASgJEhQKDGNvbnRlbnRfaGFzaBgHIAEoCRISCgp0cnVzdF90aWVyGAggASgJEhUKDXByaXZhY3lfY2xhc3MYCSABKAkSGAoQY29nbml0aXZlX2VmZmVjdBgKIAEoCSJ8ChBNb2RhbGl0eVNlbWFudGljEgwKBHRleHQYASABKAkSDgoGc291cmNlGAIgASgJEhUKCHJlc29sdmVkGAMgASgISACIAQESFwoKY29uZmlkZW5jZRgEIAEoAUgBiAEBQgsKCV9yZXNvbHZlZEINCgtfY29uZmlkZW5jZSKzAQoMTW9kYWxpdHlJdGVtEhAKCG1vZGFsaXR5GAEgASgJEgwKBHRleHQYAiABKAkSCwoDdXJpGAMgASgJEhEKCW1pbWVfdHlwZRgEIAEoCRI4CghzZW1hbnRpYxgFIAEoCzImLmdsaW1tZXIuY29nbml0aW9uLnYxLk1vZGFsaXR5U2VtYW50aWMSKQoIbWV0YWRhdGEYBiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IowBChFQZXJjZXB0aW9uQ29udGVudBIMCgR0ZXh0GAEgASgJEhAKCG1vZGFsaXR5GAIgAygJEhAKCGFjdG9yX2lkGAMgASgJEhIKCmFjdG9yX25hbWUYBCABKAkSMQoFaXRlbXMYBSADKAsyIi5nbGltbWVyLmNvZ25pdGlvbi52MS5Nb2RhbGl0eUl0ZW0ingQKF1N1Ym1pdFBlcmNlcHRpb25SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESFQoNcGVyY2VwdGlvbl9pZBgCIAEoCRIUCgxzZW5zb3J5X3R5cGUYAyABKAkSDgoGc291cmNlGAQgASgJEhQKDHRpbWVzdGFtcF9tcxgFIAEoARITCgtmYW1pbGlhcml0eRgGIAEoBRI3CgxhZGRyZXNzX21vZGUYByABKA4yIS5nbGltbWVyLmNvZ25pdGlvbi52MS5BZGRyZXNzTW9kZRI9Cg9yZXNwb25zZV9wb2xpY3kYCCABKA4yJC5nbGltbWVyLmNvZ25pdGlvbi52MS5SZXNwb25zZVBvbGljeRI/Cgxjb252ZXJzYXRpb24YCSABKAsyKS5nbGltbWVyLmNvZ25pdGlvbi52MS5Db252ZXJzYXRpb25Db250ZXh0EjYKBm9yaWdpbhgKIAEoCzImLmdsaW1tZXIuY29nbml0aW9uLnYxLlNvdXJjZURlc2NyaXB0b3ISQQoRcmV0ZW50aW9uX2NlaWxpbmcYCyABKA4yJi5nbGltbWVyLmNvZ25pdGlvbi52MS5SZXRlbnRpb25DZWlsaW5nEjgKB2NvbnRlbnQYDCABKAsyJy5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uQ29udGVudCJTChhTdWJtaXRQZXJjZXB0aW9uUmVzcG9uc2USFAoMb3BlcmF0aW9uX2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRIRCglkdXBsaWNhdGUYAyABKAgigwEKF0NhbmNlbFBlcmNlcHRpb25SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESFwoPdGFyZ2V0X3RyYWNlX2lkGAIgASgJEhAKCHNjZW5lX2lkGAMgASgJEg4KBnJlYXNvbhgEIAEoCSJGChhDYW5jZWxQZXJjZXB0aW9uUmVzcG9uc2USFwoPdGFyZ2V0X3RyYWNlX2lkGAEgASgJEhEKCWNhbmNlbGxlZBgCIAEoCCJjChhLbm93bGVkZ2VSZXRyaWV2YWxDb25maWcSDAoEbW9kZRgBIAEoCRINCgV0b3BfaxgCIAEoBRIRCgltaW5fc2NvcmUYAyABKAESFwoPc2VtYW50aWNfd2VpZ2h0GAQgASgBImUKDktub3dsZWRnZUVudHJ5EhAKCGVudHJ5X2lkGAEgASgJEg0KBXNjb3BlGAIgASgJEg8KB2NvbnRlbnQYAyABKAkSDwoHZW5hYmxlZBgEIAEoCBIQCghwcmlvcml0eRgFIAEoBSLWAQoaSW5pdGlhbGl6ZUtub3dsZWRnZVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIPCgd2ZXJzaW9uGAIgASgJEkEKCXJldHJpZXZhbBgDIAEoCzIuLmdsaW1tZXIuY29nbml0aW9uLnYxLktub3dsZWRnZVJldHJpZXZhbENvbmZpZxI1CgdlbnRyaWVzGAQgAygLMiQuZ2xpbW1lci5jb2duaXRpb24udjEuS25vd2xlZGdlRW50cnkiVgobSW5pdGlhbGl6ZUtub3dsZWRnZVJlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSEQoJZHVwbGljYXRlGAMgASgIIoMBChNTa2lsbFRvb2xEZXNjcmlwdG9yEhAKCHNraWxsX2lkGAEgASgJEhEKCXRvb2xfbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIyChFwYXJhbWV0ZXJzX3NjaGVtYRgEIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QipQEKC1BsYW5SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEQoJdXNlcl9nb2FsGAIgASgJEhAKCHNjZW5lX2lkGAMgASgJEkIKD2F2YWlsYWJsZV90b29scxgEIAMoCzIpLmdsaW1tZXIuY29nbml0aW9uLnYxLlNraWxsVG9vbERlc2NyaXB0b3IikAEKE1NraWxsVG9vbFN1Z2dlc3Rpb24SEAoIc2tpbGxfaWQYASABKAkSEQoJdG9vbF9uYW1lGAIgASgJEg8KB3B1cnBvc2UYAyABKAkSEgoKY29uZmlkZW5jZRgEIAEoARIvCg5hcmd1bWVudHNfaGludBgFIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QihAEKDFBsYW5SZXNwb25zZRIPCgdzdW1tYXJ5GAEgASgJEhEKCXJlYXNvbmluZxgCIAEoCRI+CgtzdWdnZXN0aW9ucxgDIAMoCzIpLmdsaW1tZXIuY29nbml0aW9uLnYxLlNraWxsVG9vbFN1Z2dlc3Rpb24SEAoIdHJhY2VfaWQYBCABKAkizgEKClRvb2xSZXN1bHQSEQoJdG9vbF9uYW1lGAEgASgJEg4KBnN0YXR1cxgCIAEoCRITCgtyZXN1bHRfanNvbhgDIAEoCRIVCg1pbnZvY2F0aW9uX2lkGAQgASgJEhUKDXByb3ZpZGVyX2tpbmQYBSABKAkSEwoLcHJvdmlkZXJfaWQYBiABKAkSGAoQcHJvdmlkZXJfdmVyc2lvbhgHIAEoCRIXCg9zb3VyY2VfZXZlbnRfaWQYCCABKAkSEgoKc2NoZW1hX3JlZhgJIAEoCSLkAQoRU3ludGhlc2l6ZVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIVCg1vcmlnaW5hbF9nb2FsGAIgASgJEhAKCHNjZW5lX2lkGAMgASgJEj8KDGNvbnZlcnNhdGlvbhgEIAEoCzIpLmdsaW1tZXIuY29nbml0aW9uLnYxLkNvbnZlcnNhdGlvbkNvbnRleHQSNgoMdG9vbF9yZXN1bHRzGAUgAygLMiAuZ2xpbW1lci5jb2duaXRpb24udjEuVG9vbFJlc3VsdCJtChJTeW50aGVzaXplUmVzcG9uc2USFQoNcmVwbHlfY29udGVudBgBIAEoCRIuCg1lbW90aW9uX3N0YXRlGAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIQCgh0cmFjZV9pZBgDIAEoCSKZAgodR2V0Q29udmVyc2F0aW9uSGlzdG9yeVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRISCgpyZXF1ZXN0X2lkGAIgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCRIQCghzY2VuZV9pZBgEIAEoCRIRCgl0aHJlYWRfaWQYBSABKAkSEAoIYWN0b3JfaWQYBiABKAkSEgoKYWN0b3JfbmFtZRgHIAEoCRIaChJzb3VyY2VfcHJvdmlkZXJfaWQYCCABKAkSDgoGY3Vyc29yGAkgASgJEg0KBWxpbWl0GAogASgFEhYKDmFsbG93ZWRfc2NvcGVzGAsgAygJIvQCChhDb252ZXJzYXRpb25IaXN0b3J5RW50cnkSEAoIZW50cnlfaWQYASABKAkSEwoLc291cmNlX2tpbmQYAiABKAkSDAoEcm9sZRgDIAEoCRIOCgZzdGF0dXMYBCABKAkSDAoEdGV4dBgFIAEoCRINCgV0aXRsZRgGIAEoCRITCgtvY2N1cnJlZF9hdBgHIAEoCRIQCgh0cmFjZV9pZBgIIAEoCRIWCg5pbnRlcmFjdGlvbl9pZBgJIAEoCRIRCgltb21lbnRfaWQYCiABKAkSEAoIcG9zaXRpb24YCyABKAMSFwoPY29udmVyc2F0aW9uX2lkGAwgASgJEhAKCHNjZW5lX2lkGA0gASgJEhEKCXRocmVhZF9pZBgOIAEoCRIQCghhY3Rvcl9pZBgPIAEoCRISCgphY3Rvcl9uYW1lGBAgASgJEhQKDHJlY2FsbF9zY29wZRgRIAEoCRIYChBkaXNjbG9zdXJlX3Njb3BlGBIgASgJIvwBCh5HZXRDb252ZXJzYXRpb25IaXN0b3J5UmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSPwoMY29udmVyc2F0aW9uGAMgASgLMikuZ2xpbW1lci5jb2duaXRpb24udjEuQ29udmVyc2F0aW9uQ29udGV4dBI9CgVpdGVtcxgEIAMoCzIuLmdsaW1tZXIuY29nbml0aW9uLnYxLkNvbnZlcnNhdGlvbkhpc3RvcnlFbnRyeRITCgtuZXh0X2N1cnNvchgFIAEoCRIQCghoYXNfbW9yZRgGIAEoCBIPCgdtZXNzYWdlGAcgASgJIkEKEEhlYXJ0YmVhdFJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YSI3ChFIZWFydGJlYXRSZXNwb25zZRIOCgZzdGF0dXMYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoCSJEChNHZXRSZWFkaW5lc3NSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGEiSAoUR2V0UmVhZGluZXNzUmVzcG9uc2USDQoFc3RhdGUYASABKAkSDQoFcGhhc2UYAiABKAkSEgoKZ2VuZXJhdGlvbhgDIAEoCSJQCg9TaHV0ZG93blJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIOCgZyZWFzb24YAiABKAkiSwoQU2h1dGRvd25SZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSDgoGc3RhdHVzGAIgASgJEhEKCWR1cGxpY2F0ZRgDIAEoCCpeCgtBZGRyZXNzTW9kZRIcChhBRERSRVNTX01PREVfVU5TUEVDSUZJRUQQABIXChNBRERSRVNTX01PREVfRElSRUNUEAESGAoUQUREUkVTU19NT0RFX0FNQklFTlQQAip2Cg5SZXNwb25zZVBvbGljeRIfChtSRVNQT05TRV9QT0xJQ1lfVU5TUEVDSUZJRUQQABIhCh1SRVNQT05TRV9QT0xJQ1lfUkVQTFlfQUxMT1dFRBABEiAKHFJFU1BPTlNFX1BPTElDWV9PQlNFUlZFX09OTFkQAiqgAQoQUmV0ZW50aW9uQ2VpbGluZxIhCh1SRVRFTlRJT05fQ0VJTElOR19VTlNQRUNJRklFRBAAEh8KG1JFVEVOVElPTl9DRUlMSU5HX1RSQU5TSUVOVBABEiAKHFJFVEVOVElPTl9DRUlMSU5HX0VYUEVSSUVOQ0UQAhImCiJSRVRFTlRJT05fQ0VJTElOR19NRU1PUllfQ0FORElEQVRFEAMyygcKEENvZ25pdGlvblNlcnZpY2UScQoQU3VibWl0UGVyY2VwdGlvbhItLmdsaW1tZXIuY29nbml0aW9uLnYxLlN1Ym1pdFBlcmNlcHRpb25SZXF1ZXN0Gi4uZ2xpbW1lci5jb2duaXRpb24udjEuU3VibWl0UGVyY2VwdGlvblJlc3BvbnNlEnEKEENhbmNlbFBlcmNlcHRpb24SLS5nbGltbWVyLmNvZ25pdGlvbi52MS5DYW5jZWxQZXJjZXB0aW9uUmVxdWVzdBouLmdsaW1tZXIuY29nbml0aW9uLnYxLkNhbmNlbFBlcmNlcHRpb25SZXNwb25zZRJ6ChNJbml0aWFsaXplS25vd2xlZGdlEjAuZ2xpbW1lci5jb2duaXRpb24udjEuSW5pdGlhbGl6ZUtub3dsZWRnZVJlcXVlc3QaMS5nbGltbWVyLmNvZ25pdGlvbi52MS5Jbml0aWFsaXplS25vd2xlZGdlUmVzcG9uc2USTQoEUGxhbhIhLmdsaW1tZXIuY29nbml0aW9uLnYxLlBsYW5SZXF1ZXN0GiIuZ2xpbW1lci5jb2duaXRpb24udjEuUGxhblJlc3BvbnNlEl8KClN5bnRoZXNpemUSJy5nbGltbWVyLmNvZ25pdGlvbi52MS5TeW50aGVzaXplUmVxdWVzdBooLmdsaW1tZXIuY29nbml0aW9uLnYxLlN5bnRoZXNpemVSZXNwb25zZRKDAQoWR2V0Q29udmVyc2F0aW9uSGlzdG9yeRIzLmdsaW1tZXIuY29nbml0aW9uLnYxLkdldENvbnZlcnNhdGlvbkhpc3RvcnlSZXF1ZXN0GjQuZ2xpbW1lci5jb2duaXRpb24udjEuR2V0Q29udmVyc2F0aW9uSGlzdG9yeVJlc3BvbnNlElwKCUhlYXJ0YmVhdBImLmdsaW1tZXIuY29nbml0aW9uLnYxLkhlYXJ0YmVhdFJlcXVlc3QaJy5nbGltbWVyLmNvZ25pdGlvbi52MS5IZWFydGJlYXRSZXNwb25zZRJlCgxHZXRSZWFkaW5lc3MSKS5nbGltbWVyLmNvZ25pdGlvbi52MS5HZXRSZWFkaW5lc3NSZXF1ZXN0GiouZ2xpbW1lci5jb2duaXRpb24udjEuR2V0UmVhZGluZXNzUmVzcG9uc2USWQoIU2h1dGRvd24SJS5nbGltbWVyLmNvZ25pdGlvbi52MS5TaHV0ZG93blJlcXVlc3QaJi5nbGltbWVyLmNvZ25pdGlvbi52MS5TaHV0ZG93blJlc3BvbnNlQi+qAixHbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkNvZ25pdGlvbi5WMWIGcHJvdG8z", [file_glimmer_common_v1_service_contract, file_google_protobuf_struct]);
+  fileDesc("CixnbGltbWVyL2NvZ25pdGlvbi92MS9jb2duaXRpb25fc2VydmljZS5wcm90bxIUZ2xpbW1lci5jb2duaXRpb24udjEizgEKE0NvbnZlcnNhdGlvbkNvbnRleHQSGgoSc291cmNlX3Byb3ZpZGVyX2lkGAEgASgJEhAKCHNjZW5lX2lkGAIgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCRIVCg1jb250aW51aXR5X2lkGAQgASgJEhEKCXRocmVhZF9pZBgFIAEoCRIWCg5pbnRlcmFjdGlvbl9pZBgGIAEoCRIUCgxyZWNhbGxfc2NvcGUYByABKAkSGAoQZGlzY2xvc3VyZV9zY29wZRgIIAEoCSL5AQoQU291cmNlRGVzY3JpcHRvchIVCg1wcm92aWRlcl9raW5kGAEgASgJEhMKC3Byb3ZpZGVyX2lkGAIgASgJEhgKEHByb3ZpZGVyX3ZlcnNpb24YAyABKAkSFwoPY29udHJpYnV0aW9uX2lkGAQgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgFIAEoCRISCgpzY2hlbWFfcmVmGAYgASgJEhQKDGNvbnRlbnRfaGFzaBgHIAEoCRISCgp0cnVzdF90aWVyGAggASgJEhUKDXByaXZhY3lfY2xhc3MYCSABKAkSGAoQY29nbml0aXZlX2VmZmVjdBgKIAEoCSJ8ChBNb2RhbGl0eVNlbWFudGljEgwKBHRleHQYASABKAkSDgoGc291cmNlGAIgASgJEhUKCHJlc29sdmVkGAMgASgISACIAQESFwoKY29uZmlkZW5jZRgEIAEoAUgBiAEBQgsKCV9yZXNvbHZlZEINCgtfY29uZmlkZW5jZSKzAQoMTW9kYWxpdHlJdGVtEhAKCG1vZGFsaXR5GAEgASgJEgwKBHRleHQYAiABKAkSCwoDdXJpGAMgASgJEhEKCW1pbWVfdHlwZRgEIAEoCRI4CghzZW1hbnRpYxgFIAEoCzImLmdsaW1tZXIuY29nbml0aW9uLnYxLk1vZGFsaXR5U2VtYW50aWMSKQoIbWV0YWRhdGEYBiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IowBChFQZXJjZXB0aW9uQ29udGVudBIMCgR0ZXh0GAEgASgJEhAKCG1vZGFsaXR5GAIgAygJEhAKCGFjdG9yX2lkGAMgASgJEhIKCmFjdG9yX25hbWUYBCABKAkSMQoFaXRlbXMYBSADKAsyIi5nbGltbWVyLmNvZ25pdGlvbi52MS5Nb2RhbGl0eUl0ZW0ingQKF1N1Ym1pdFBlcmNlcHRpb25SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESFQoNcGVyY2VwdGlvbl9pZBgCIAEoCRIUCgxzZW5zb3J5X3R5cGUYAyABKAkSDgoGc291cmNlGAQgASgJEhQKDHRpbWVzdGFtcF9tcxgFIAEoARITCgtmYW1pbGlhcml0eRgGIAEoBRI3CgxhZGRyZXNzX21vZGUYByABKA4yIS5nbGltbWVyLmNvZ25pdGlvbi52MS5BZGRyZXNzTW9kZRI9Cg9yZXNwb25zZV9wb2xpY3kYCCABKA4yJC5nbGltbWVyLmNvZ25pdGlvbi52MS5SZXNwb25zZVBvbGljeRI/Cgxjb252ZXJzYXRpb24YCSABKAsyKS5nbGltbWVyLmNvZ25pdGlvbi52MS5Db252ZXJzYXRpb25Db250ZXh0EjYKBm9yaWdpbhgKIAEoCzImLmdsaW1tZXIuY29nbml0aW9uLnYxLlNvdXJjZURlc2NyaXB0b3ISQQoRcmV0ZW50aW9uX2NlaWxpbmcYCyABKA4yJi5nbGltbWVyLmNvZ25pdGlvbi52MS5SZXRlbnRpb25DZWlsaW5nEjgKB2NvbnRlbnQYDCABKAsyJy5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uQ29udGVudCKCAQoYU3VibWl0UGVyY2VwdGlvblJlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRI9CgVzdGF0ZRgCIAEoDjIuLmdsaW1tZXIuY29nbml0aW9uLnYxLlBlcmNlcHRpb25PcGVyYXRpb25TdGF0ZRIRCglkdXBsaWNhdGUYAyABKAgigwEKF0NhbmNlbFBlcmNlcHRpb25SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESFwoPdGFyZ2V0X3RyYWNlX2lkGAIgASgJEhAKCHNjZW5lX2lkGAMgASgJEg4KBnJlYXNvbhgEIAEoCSKaAQoYQ2FuY2VsUGVyY2VwdGlvblJlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRIXCg90YXJnZXRfdHJhY2VfaWQYAiABKAkSPQoFc3RhdGUYAyABKA4yLi5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uT3BlcmF0aW9uU3RhdGUSEAoIdGVybWluYWwYBCABKAgiZAodR2V0UGVyY2VwdGlvbk9wZXJhdGlvblJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIUCgxvcGVyYXRpb25faWQYAiABKAkinQEKHkdldFBlcmNlcHRpb25PcGVyYXRpb25SZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSPQoFc3RhdGUYAiABKA4yLi5nbGltbWVyLmNvZ25pdGlvbi52MS5QZXJjZXB0aW9uT3BlcmF0aW9uU3RhdGUSEAoIdGVybWluYWwYAyABKAgSFAoMc2FmZV9tZXNzYWdlGAQgASgJImMKGEtub3dsZWRnZVJldHJpZXZhbENvbmZpZxIMCgRtb2RlGAEgASgJEg0KBXRvcF9rGAIgASgFEhEKCW1pbl9zY29yZRgDIAEoARIXCg9zZW1hbnRpY193ZWlnaHQYBCABKAEiZQoOS25vd2xlZGdlRW50cnkSEAoIZW50cnlfaWQYASABKAkSDQoFc2NvcGUYAiABKAkSDwoHY29udGVudBgDIAEoCRIPCgdlbmFibGVkGAQgASgIEhAKCHByaW9yaXR5GAUgASgFItYBChpJbml0aWFsaXplS25vd2xlZGdlUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEg8KB3ZlcnNpb24YAiABKAkSQQoJcmV0cmlldmFsGAMgASgLMi4uZ2xpbW1lci5jb2duaXRpb24udjEuS25vd2xlZGdlUmV0cmlldmFsQ29uZmlnEjUKB2VudHJpZXMYBCADKAsyJC5nbGltbWVyLmNvZ25pdGlvbi52MS5Lbm93bGVkZ2VFbnRyeSJWChtJbml0aWFsaXplS25vd2xlZGdlUmVzcG9uc2USFAoMb3BlcmF0aW9uX2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRIRCglkdXBsaWNhdGUYAyABKAgigwEKE1NraWxsVG9vbERlc2NyaXB0b3ISEAoIc2tpbGxfaWQYASABKAkSEQoJdG9vbF9uYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEjIKEXBhcmFtZXRlcnNfc2NoZW1hGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdCKlAQoLUGxhblJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIRCgl1c2VyX2dvYWwYAiABKAkSEAoIc2NlbmVfaWQYAyABKAkSQgoPYXZhaWxhYmxlX3Rvb2xzGAQgAygLMikuZ2xpbW1lci5jb2duaXRpb24udjEuU2tpbGxUb29sRGVzY3JpcHRvciKQAQoTU2tpbGxUb29sU3VnZ2VzdGlvbhIQCghza2lsbF9pZBgBIAEoCRIRCgl0b29sX25hbWUYAiABKAkSDwoHcHVycG9zZRgDIAEoCRISCgpjb25maWRlbmNlGAQgASgBEi8KDmFyZ3VtZW50c19oaW50GAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdCKEAQoMUGxhblJlc3BvbnNlEg8KB3N1bW1hcnkYASABKAkSEQoJcmVhc29uaW5nGAIgASgJEj4KC3N1Z2dlc3Rpb25zGAMgAygLMikuZ2xpbW1lci5jb2duaXRpb24udjEuU2tpbGxUb29sU3VnZ2VzdGlvbhIQCgh0cmFjZV9pZBgEIAEoCSLOAQoKVG9vbFJlc3VsdBIRCgl0b29sX25hbWUYASABKAkSDgoGc3RhdHVzGAIgASgJEhMKC3Jlc3VsdF9qc29uGAMgASgJEhUKDWludm9jYXRpb25faWQYBCABKAkSFQoNcHJvdmlkZXJfa2luZBgFIAEoCRITCgtwcm92aWRlcl9pZBgGIAEoCRIYChBwcm92aWRlcl92ZXJzaW9uGAcgASgJEhcKD3NvdXJjZV9ldmVudF9pZBgIIAEoCRISCgpzY2hlbWFfcmVmGAkgASgJIuQBChFTeW50aGVzaXplUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEhUKDW9yaWdpbmFsX2dvYWwYAiABKAkSEAoIc2NlbmVfaWQYAyABKAkSPwoMY29udmVyc2F0aW9uGAQgASgLMikuZ2xpbW1lci5jb2duaXRpb24udjEuQ29udmVyc2F0aW9uQ29udGV4dBI2Cgx0b29sX3Jlc3VsdHMYBSADKAsyIC5nbGltbWVyLmNvZ25pdGlvbi52MS5Ub29sUmVzdWx0Im0KElN5bnRoZXNpemVSZXNwb25zZRIVCg1yZXBseV9jb250ZW50GAEgASgJEi4KDWVtb3Rpb25fc3RhdGUYAiABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhAKCHRyYWNlX2lkGAMgASgJIpkCCh1HZXRDb252ZXJzYXRpb25IaXN0b3J5UmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEhIKCnJlcXVlc3RfaWQYAiABKAkSFwoPY29udmVyc2F0aW9uX2lkGAMgASgJEhAKCHNjZW5lX2lkGAQgASgJEhEKCXRocmVhZF9pZBgFIAEoCRIQCghhY3Rvcl9pZBgGIAEoCRISCgphY3Rvcl9uYW1lGAcgASgJEhoKEnNvdXJjZV9wcm92aWRlcl9pZBgIIAEoCRIOCgZjdXJzb3IYCSABKAkSDQoFbGltaXQYCiABKAUSFgoOYWxsb3dlZF9zY29wZXMYCyADKAki9AIKGENvbnZlcnNhdGlvbkhpc3RvcnlFbnRyeRIQCghlbnRyeV9pZBgBIAEoCRITCgtzb3VyY2Vfa2luZBgCIAEoCRIMCgRyb2xlGAMgASgJEg4KBnN0YXR1cxgEIAEoCRIMCgR0ZXh0GAUgASgJEg0KBXRpdGxlGAYgASgJEhMKC29jY3VycmVkX2F0GAcgASgJEhAKCHRyYWNlX2lkGAggASgJEhYKDmludGVyYWN0aW9uX2lkGAkgASgJEhEKCW1vbWVudF9pZBgKIAEoCRIQCghwb3NpdGlvbhgLIAEoAxIXCg9jb252ZXJzYXRpb25faWQYDCABKAkSEAoIc2NlbmVfaWQYDSABKAkSEQoJdGhyZWFkX2lkGA4gASgJEhAKCGFjdG9yX2lkGA8gASgJEhIKCmFjdG9yX25hbWUYECABKAkSFAoMcmVjYWxsX3Njb3BlGBEgASgJEhgKEGRpc2Nsb3N1cmVfc2NvcGUYEiABKAki/AEKHkdldENvbnZlcnNhdGlvbkhpc3RvcnlSZXNwb25zZRISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRI/Cgxjb252ZXJzYXRpb24YAyABKAsyKS5nbGltbWVyLmNvZ25pdGlvbi52MS5Db252ZXJzYXRpb25Db250ZXh0Ej0KBWl0ZW1zGAQgAygLMi4uZ2xpbW1lci5jb2duaXRpb24udjEuQ29udmVyc2F0aW9uSGlzdG9yeUVudHJ5EhMKC25leHRfY3Vyc29yGAUgASgJEhAKCGhhc19tb3JlGAYgASgIEg8KB21lc3NhZ2UYByABKAkiQQoQSGVhcnRiZWF0UmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhIjcKEUhlYXJ0YmVhdFJlc3BvbnNlEg4KBnN0YXR1cxgBIAEoCRISCgpnZW5lcmF0aW9uGAIgASgJIkQKE0dldFJlYWRpbmVzc1JlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YSJIChRHZXRSZWFkaW5lc3NSZXNwb25zZRINCgVzdGF0ZRgBIAEoCRINCgVwaGFzZRgCIAEoCRISCgpnZW5lcmF0aW9uGAMgASgJIlAKD1NodXRkb3duUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEg4KBnJlYXNvbhgCIAEoCSJLChBTaHV0ZG93blJlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSEQoJZHVwbGljYXRlGAMgASgIKl4KC0FkZHJlc3NNb2RlEhwKGEFERFJFU1NfTU9ERV9VTlNQRUNJRklFRBAAEhcKE0FERFJFU1NfTU9ERV9ESVJFQ1QQARIYChRBRERSRVNTX01PREVfQU1CSUVOVBACKnYKDlJlc3BvbnNlUG9saWN5Eh8KG1JFU1BPTlNFX1BPTElDWV9VTlNQRUNJRklFRBAAEiEKHVJFU1BPTlNFX1BPTElDWV9SRVBMWV9BTExPV0VEEAESIAocUkVTUE9OU0VfUE9MSUNZX09CU0VSVkVfT05MWRACKqABChBSZXRlbnRpb25DZWlsaW5nEiEKHVJFVEVOVElPTl9DRUlMSU5HX1VOU1BFQ0lGSUVEEAASHwobUkVURU5USU9OX0NFSUxJTkdfVFJBTlNJRU5UEAESIAocUkVURU5USU9OX0NFSUxJTkdfRVhQRVJJRU5DRRACEiYKIlJFVEVOVElPTl9DRUlMSU5HX01FTU9SWV9DQU5ESURBVEUQAyqSAgoYUGVyY2VwdGlvbk9wZXJhdGlvblN0YXRlEioKJlBFUkNFUFRJT05fT1BFUkFUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASJwojUEVSQ0VQVElPTl9PUEVSQVRJT05fU1RBVEVfQUNDRVBURUQQARImCiJQRVJDRVBUSU9OX09QRVJBVElPTl9TVEFURV9SVU5OSU5HEAISKAokUEVSQ0VQVElPTl9PUEVSQVRJT05fU1RBVEVfU1VDQ0VFREVEEAMSKAokUEVSQ0VQVElPTl9PUEVSQVRJT05fU1RBVEVfQ0FOQ0VMTEVEEAQSJQohUEVSQ0VQVElPTl9PUEVSQVRJT05fU1RBVEVfRkFJTEVEEAUy0AgKEENvZ25pdGlvblNlcnZpY2UScQoQU3VibWl0UGVyY2VwdGlvbhItLmdsaW1tZXIuY29nbml0aW9uLnYxLlN1Ym1pdFBlcmNlcHRpb25SZXF1ZXN0Gi4uZ2xpbW1lci5jb2duaXRpb24udjEuU3VibWl0UGVyY2VwdGlvblJlc3BvbnNlEnEKEENhbmNlbFBlcmNlcHRpb24SLS5nbGltbWVyLmNvZ25pdGlvbi52MS5DYW5jZWxQZXJjZXB0aW9uUmVxdWVzdBouLmdsaW1tZXIuY29nbml0aW9uLnYxLkNhbmNlbFBlcmNlcHRpb25SZXNwb25zZRKDAQoWR2V0UGVyY2VwdGlvbk9wZXJhdGlvbhIzLmdsaW1tZXIuY29nbml0aW9uLnYxLkdldFBlcmNlcHRpb25PcGVyYXRpb25SZXF1ZXN0GjQuZ2xpbW1lci5jb2duaXRpb24udjEuR2V0UGVyY2VwdGlvbk9wZXJhdGlvblJlc3BvbnNlEnoKE0luaXRpYWxpemVLbm93bGVkZ2USMC5nbGltbWVyLmNvZ25pdGlvbi52MS5Jbml0aWFsaXplS25vd2xlZGdlUmVxdWVzdBoxLmdsaW1tZXIuY29nbml0aW9uLnYxLkluaXRpYWxpemVLbm93bGVkZ2VSZXNwb25zZRJNCgRQbGFuEiEuZ2xpbW1lci5jb2duaXRpb24udjEuUGxhblJlcXVlc3QaIi5nbGltbWVyLmNvZ25pdGlvbi52MS5QbGFuUmVzcG9uc2USXwoKU3ludGhlc2l6ZRInLmdsaW1tZXIuY29nbml0aW9uLnYxLlN5bnRoZXNpemVSZXF1ZXN0GiguZ2xpbW1lci5jb2duaXRpb24udjEuU3ludGhlc2l6ZVJlc3BvbnNlEoMBChZHZXRDb252ZXJzYXRpb25IaXN0b3J5EjMuZ2xpbW1lci5jb2duaXRpb24udjEuR2V0Q29udmVyc2F0aW9uSGlzdG9yeVJlcXVlc3QaNC5nbGltbWVyLmNvZ25pdGlvbi52MS5HZXRDb252ZXJzYXRpb25IaXN0b3J5UmVzcG9uc2USXAoJSGVhcnRiZWF0EiYuZ2xpbW1lci5jb2duaXRpb24udjEuSGVhcnRiZWF0UmVxdWVzdBonLmdsaW1tZXIuY29nbml0aW9uLnYxLkhlYXJ0YmVhdFJlc3BvbnNlEmUKDEdldFJlYWRpbmVzcxIpLmdsaW1tZXIuY29nbml0aW9uLnYxLkdldFJlYWRpbmVzc1JlcXVlc3QaKi5nbGltbWVyLmNvZ25pdGlvbi52MS5HZXRSZWFkaW5lc3NSZXNwb25zZRJZCghTaHV0ZG93bhIlLmdsaW1tZXIuY29nbml0aW9uLnYxLlNodXRkb3duUmVxdWVzdBomLmdsaW1tZXIuY29nbml0aW9uLnYxLlNodXRkb3duUmVzcG9uc2VCL6oCLEdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ29nbml0aW9uLlYxYgZwcm90bzM", [file_glimmer_common_v1_service_contract, file_google_protobuf_struct]);
 
 /**
  * @generated from message glimmer.cognition.v1.ConversationContext
@@ -322,9 +322,9 @@ export type SubmitPerceptionResponse = Message<"glimmer.cognition.v1.SubmitPerce
   operationId: string;
 
   /**
-   * @generated from field: string status = 2;
+   * @generated from field: glimmer.cognition.v1.PerceptionOperationState state = 2;
    */
-  status: string;
+  state: PerceptionOperationState;
 
   /**
    * @generated from field: bool duplicate = 3;
@@ -376,14 +376,24 @@ export const CancelPerceptionRequestSchema: GenMessage<CancelPerceptionRequest> 
  */
 export type CancelPerceptionResponse = Message<"glimmer.cognition.v1.CancelPerceptionResponse"> & {
   /**
-   * @generated from field: string target_trace_id = 1;
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string target_trace_id = 2;
    */
   targetTraceId: string;
 
   /**
-   * @generated from field: bool cancelled = 2;
+   * @generated from field: glimmer.cognition.v1.PerceptionOperationState state = 3;
    */
-  cancelled: boolean;
+  state: PerceptionOperationState;
+
+  /**
+   * @generated from field: bool terminal = 4;
+   */
+  terminal: boolean;
 };
 
 /**
@@ -392,6 +402,60 @@ export type CancelPerceptionResponse = Message<"glimmer.cognition.v1.CancelPerce
  */
 export const CancelPerceptionResponseSchema: GenMessage<CancelPerceptionResponse> = /*@__PURE__*/
   messageDesc(file_glimmer_cognition_v1_cognition_service, 8);
+
+/**
+ * @generated from message glimmer.cognition.v1.GetPerceptionOperationRequest
+ */
+export type GetPerceptionOperationRequest = Message<"glimmer.cognition.v1.GetPerceptionOperationRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: string operation_id = 2;
+   */
+  operationId: string;
+};
+
+/**
+ * Describes the message glimmer.cognition.v1.GetPerceptionOperationRequest.
+ * Use `create(GetPerceptionOperationRequestSchema)` to create a new message.
+ */
+export const GetPerceptionOperationRequestSchema: GenMessage<GetPerceptionOperationRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 9);
+
+/**
+ * @generated from message glimmer.cognition.v1.GetPerceptionOperationResponse
+ */
+export type GetPerceptionOperationResponse = Message<"glimmer.cognition.v1.GetPerceptionOperationResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: glimmer.cognition.v1.PerceptionOperationState state = 2;
+   */
+  state: PerceptionOperationState;
+
+  /**
+   * @generated from field: bool terminal = 3;
+   */
+  terminal: boolean;
+
+  /**
+   * @generated from field: string safe_message = 4;
+   */
+  safeMessage: string;
+};
+
+/**
+ * Describes the message glimmer.cognition.v1.GetPerceptionOperationResponse.
+ * Use `create(GetPerceptionOperationResponseSchema)` to create a new message.
+ */
+export const GetPerceptionOperationResponseSchema: GenMessage<GetPerceptionOperationResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 10);
 
 /**
  * @generated from message glimmer.cognition.v1.KnowledgeRetrievalConfig
@@ -423,7 +487,7 @@ export type KnowledgeRetrievalConfig = Message<"glimmer.cognition.v1.KnowledgeRe
  * Use `create(KnowledgeRetrievalConfigSchema)` to create a new message.
  */
 export const KnowledgeRetrievalConfigSchema: GenMessage<KnowledgeRetrievalConfig> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 9);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 11);
 
 /**
  * @generated from message glimmer.cognition.v1.KnowledgeEntry
@@ -460,7 +524,7 @@ export type KnowledgeEntry = Message<"glimmer.cognition.v1.KnowledgeEntry"> & {
  * Use `create(KnowledgeEntrySchema)` to create a new message.
  */
 export const KnowledgeEntrySchema: GenMessage<KnowledgeEntry> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 10);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 12);
 
 /**
  * @generated from message glimmer.cognition.v1.InitializeKnowledgeRequest
@@ -492,7 +556,7 @@ export type InitializeKnowledgeRequest = Message<"glimmer.cognition.v1.Initializ
  * Use `create(InitializeKnowledgeRequestSchema)` to create a new message.
  */
 export const InitializeKnowledgeRequestSchema: GenMessage<InitializeKnowledgeRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 11);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 13);
 
 /**
  * @generated from message glimmer.cognition.v1.InitializeKnowledgeResponse
@@ -519,7 +583,7 @@ export type InitializeKnowledgeResponse = Message<"glimmer.cognition.v1.Initiali
  * Use `create(InitializeKnowledgeResponseSchema)` to create a new message.
  */
 export const InitializeKnowledgeResponseSchema: GenMessage<InitializeKnowledgeResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 12);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 14);
 
 /**
  * @generated from message glimmer.cognition.v1.SkillToolDescriptor
@@ -551,7 +615,7 @@ export type SkillToolDescriptor = Message<"glimmer.cognition.v1.SkillToolDescrip
  * Use `create(SkillToolDescriptorSchema)` to create a new message.
  */
 export const SkillToolDescriptorSchema: GenMessage<SkillToolDescriptor> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 13);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 15);
 
 /**
  * @generated from message glimmer.cognition.v1.PlanRequest
@@ -583,7 +647,7 @@ export type PlanRequest = Message<"glimmer.cognition.v1.PlanRequest"> & {
  * Use `create(PlanRequestSchema)` to create a new message.
  */
 export const PlanRequestSchema: GenMessage<PlanRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 14);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 16);
 
 /**
  * @generated from message glimmer.cognition.v1.SkillToolSuggestion
@@ -620,7 +684,7 @@ export type SkillToolSuggestion = Message<"glimmer.cognition.v1.SkillToolSuggest
  * Use `create(SkillToolSuggestionSchema)` to create a new message.
  */
 export const SkillToolSuggestionSchema: GenMessage<SkillToolSuggestion> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 15);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 17);
 
 /**
  * @generated from message glimmer.cognition.v1.PlanResponse
@@ -652,7 +716,7 @@ export type PlanResponse = Message<"glimmer.cognition.v1.PlanResponse"> & {
  * Use `create(PlanResponseSchema)` to create a new message.
  */
 export const PlanResponseSchema: GenMessage<PlanResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 16);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 18);
 
 /**
  * @generated from message glimmer.cognition.v1.ToolResult
@@ -709,7 +773,7 @@ export type ToolResult = Message<"glimmer.cognition.v1.ToolResult"> & {
  * Use `create(ToolResultSchema)` to create a new message.
  */
 export const ToolResultSchema: GenMessage<ToolResult> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 17);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 19);
 
 /**
  * @generated from message glimmer.cognition.v1.SynthesizeRequest
@@ -746,7 +810,7 @@ export type SynthesizeRequest = Message<"glimmer.cognition.v1.SynthesizeRequest"
  * Use `create(SynthesizeRequestSchema)` to create a new message.
  */
 export const SynthesizeRequestSchema: GenMessage<SynthesizeRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 18);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 20);
 
 /**
  * @generated from message glimmer.cognition.v1.SynthesizeResponse
@@ -773,7 +837,7 @@ export type SynthesizeResponse = Message<"glimmer.cognition.v1.SynthesizeRespons
  * Use `create(SynthesizeResponseSchema)` to create a new message.
  */
 export const SynthesizeResponseSchema: GenMessage<SynthesizeResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 19);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 21);
 
 /**
  * @generated from message glimmer.cognition.v1.GetConversationHistoryRequest
@@ -840,7 +904,7 @@ export type GetConversationHistoryRequest = Message<"glimmer.cognition.v1.GetCon
  * Use `create(GetConversationHistoryRequestSchema)` to create a new message.
  */
 export const GetConversationHistoryRequestSchema: GenMessage<GetConversationHistoryRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 20);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 22);
 
 /**
  * @generated from message glimmer.cognition.v1.ConversationHistoryEntry
@@ -942,7 +1006,7 @@ export type ConversationHistoryEntry = Message<"glimmer.cognition.v1.Conversatio
  * Use `create(ConversationHistoryEntrySchema)` to create a new message.
  */
 export const ConversationHistoryEntrySchema: GenMessage<ConversationHistoryEntry> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 21);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 23);
 
 /**
  * @generated from message glimmer.cognition.v1.GetConversationHistoryResponse
@@ -989,7 +1053,7 @@ export type GetConversationHistoryResponse = Message<"glimmer.cognition.v1.GetCo
  * Use `create(GetConversationHistoryResponseSchema)` to create a new message.
  */
 export const GetConversationHistoryResponseSchema: GenMessage<GetConversationHistoryResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 22);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 24);
 
 /**
  * @generated from message glimmer.cognition.v1.HeartbeatRequest
@@ -1006,7 +1070,7 @@ export type HeartbeatRequest = Message<"glimmer.cognition.v1.HeartbeatRequest"> 
  * Use `create(HeartbeatRequestSchema)` to create a new message.
  */
 export const HeartbeatRequestSchema: GenMessage<HeartbeatRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 23);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 25);
 
 /**
  * @generated from message glimmer.cognition.v1.HeartbeatResponse
@@ -1028,7 +1092,7 @@ export type HeartbeatResponse = Message<"glimmer.cognition.v1.HeartbeatResponse"
  * Use `create(HeartbeatResponseSchema)` to create a new message.
  */
 export const HeartbeatResponseSchema: GenMessage<HeartbeatResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 24);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 26);
 
 /**
  * @generated from message glimmer.cognition.v1.GetReadinessRequest
@@ -1045,7 +1109,7 @@ export type GetReadinessRequest = Message<"glimmer.cognition.v1.GetReadinessRequ
  * Use `create(GetReadinessRequestSchema)` to create a new message.
  */
 export const GetReadinessRequestSchema: GenMessage<GetReadinessRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 25);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 27);
 
 /**
  * @generated from message glimmer.cognition.v1.GetReadinessResponse
@@ -1072,7 +1136,7 @@ export type GetReadinessResponse = Message<"glimmer.cognition.v1.GetReadinessRes
  * Use `create(GetReadinessResponseSchema)` to create a new message.
  */
 export const GetReadinessResponseSchema: GenMessage<GetReadinessResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 26);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 28);
 
 /**
  * @generated from message glimmer.cognition.v1.ShutdownRequest
@@ -1094,7 +1158,7 @@ export type ShutdownRequest = Message<"glimmer.cognition.v1.ShutdownRequest"> & 
  * Use `create(ShutdownRequestSchema)` to create a new message.
  */
 export const ShutdownRequestSchema: GenMessage<ShutdownRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 27);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 29);
 
 /**
  * @generated from message glimmer.cognition.v1.ShutdownResponse
@@ -1121,7 +1185,7 @@ export type ShutdownResponse = Message<"glimmer.cognition.v1.ShutdownResponse"> 
  * Use `create(ShutdownResponseSchema)` to create a new message.
  */
 export const ShutdownResponseSchema: GenMessage<ShutdownResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_cognition_v1_cognition_service, 28);
+  messageDesc(file_glimmer_cognition_v1_cognition_service, 30);
 
 /**
  * @generated from enum glimmer.cognition.v1.AddressMode
@@ -1207,6 +1271,47 @@ export const RetentionCeilingSchema: GenEnum<RetentionCeiling> = /*@__PURE__*/
   enumDesc(file_glimmer_cognition_v1_cognition_service, 2);
 
 /**
+ * @generated from enum glimmer.cognition.v1.PerceptionOperationState
+ */
+export enum PerceptionOperationState {
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_ACCEPTED = 1;
+   */
+  ACCEPTED = 1,
+
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_RUNNING = 2;
+   */
+  RUNNING = 2,
+
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_SUCCEEDED = 3;
+   */
+  SUCCEEDED = 3,
+
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_CANCELLED = 4;
+   */
+  CANCELLED = 4,
+
+  /**
+   * @generated from enum value: PERCEPTION_OPERATION_STATE_FAILED = 5;
+   */
+  FAILED = 5,
+}
+
+/**
+ * Describes the enum glimmer.cognition.v1.PerceptionOperationState.
+ */
+export const PerceptionOperationStateSchema: GenEnum<PerceptionOperationState> = /*@__PURE__*/
+  enumDesc(file_glimmer_cognition_v1_cognition_service, 3);
+
+/**
  * @generated from service glimmer.cognition.v1.CognitionService
  */
 export const CognitionService: GenService<{
@@ -1225,6 +1330,14 @@ export const CognitionService: GenService<{
     methodKind: "unary";
     input: typeof CancelPerceptionRequestSchema;
     output: typeof CancelPerceptionResponseSchema;
+  },
+  /**
+   * @generated from rpc glimmer.cognition.v1.CognitionService.GetPerceptionOperation
+   */
+  getPerceptionOperation: {
+    methodKind: "unary";
+    input: typeof GetPerceptionOperationRequestSchema;
+    output: typeof GetPerceptionOperationResponseSchema;
   },
   /**
    * @generated from rpc glimmer.cognition.v1.CognitionService.InitializeKnowledge

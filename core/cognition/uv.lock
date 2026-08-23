@@ -218,6 +218,7 @@ version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "glimmer-cradle-contracts" },
     { name = "grpcio" },
     { name = "numpy" },
     { name = "protobuf" },
@@ -241,6 +242,7 @@ local-embedding = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20,<1" },
     { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.25,<1" },
+    { name = "glimmer-cradle-contracts", directory = "../../contracts" },
     { name = "grpcio", specifier = ">=1.74,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "numpy", specifier = ">=2.0,<3" },
@@ -253,6 +255,21 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.0,<26" },
 ]
 provides-extras = ["local-embedding", "dev"]
+
+[[package]]
+name = "glimmer-cradle-contracts"
+version = "0.1.8"
+source = { directory = "../../contracts" }
+dependencies = [
+    { name = "grpcio" },
+    { name = "protobuf" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", specifier = ">=1.74,<2" },
+    { name = "protobuf", specifier = "==6.33.0" },
+]
 
 [[package]]
 name = "grpcio"

@@ -36,6 +36,7 @@ contracts/
 ├── json-schema/skill/v1/tool-parameters.schema.json
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
+├── pyproject.toml                     # 安装态 Python Contracts distribution
 ├── toolchain.json、global.json
 ├── inventory.md
 └── supply-chain.md
@@ -49,6 +50,10 @@ pnpm contracts:verify
 ```
 
 `contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；其旧 ZMQ、通用 envelope、IPC payload 生成物和配置已删除。Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+
+Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
+environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地
+distribution；运行时不得依赖源码树 `PYTHONPATH` 偶然暴露 `contracts/generated/python`。
 
 ## 契约分类
 

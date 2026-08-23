@@ -1,9 +1,23 @@
 import { CognitionManager } from '../../application/capabilities/inference/cognition-manager';
+import { CognitionClient } from '../../adapters/cognition/cognition-client';
+import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
+import { RuntimeReadinessCatalogStore } from '../../foundation/runtime-readiness-catalog';
+import type { CognitionLifecycleState } from '../../foundation/ports/cognition-service-port';
+import type { KernelTransportRuntime } from './kernel-transport-runtime';
 import type { RuntimeModule, RuntimeModuleStartDetails } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 
 export class CognitionRuntime implements RuntimeModule {
   public readonly name = 'cognition';
+
+  public constructor(private readonly transportRuntime: KernelTransportRuntime) {
+    const transport = KernelCognitionTransport.instance;
+    CognitionManager.configure(
+      transport,
+      new CognitionClient(transport),
+      (state, summary) => this.publishLifecycle(state, summary),
+    );
+  }
 
   public async start(_context: TraceContext): Promise<RuntimeModuleStartDetails> {
     await CognitionManager.instance.start();
@@ -23,5 +37,19 @@ export class CognitionRuntime implements RuntimeModule {
 
   public async stop(_context: TraceContext): Promise<void> {
     await CognitionManager.instance.stop();
+  }
+
+  private publishLifecycle(state: CognitionLifecycleState, summary: string): void {
+    RuntimeReadinessCatalogStore.instance.replaceModuleSnapshots(this.name, [{
+      runtime_id: 'cognition',
+      owner: 'cognition',
+      phase: state === 'ready' ? 'service_config_knowledge' : 'supervised_process',
+      state,
+      blocking: true,
+      summary,
+      details_ref: 'data/observability/logs/application/cognition.console.log',
+    }]);
+    if (state === 'ready') this.transportRuntime.restoreIngress();
+    else if (state === 'starting' || state === 'failed') this.transportRuntime.suspendIngress(summary);
   }
 }

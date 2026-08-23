@@ -8,6 +8,7 @@ authors = [
 ]
 
 dependencies = [
+    "glimmer-cradle-contracts==0.1.8",
     "numpy>=2.0,<3",
     "pydantic>=2.7,<3",
     "structlog>=24.0,<26",
@@ -15,6 +16,9 @@ dependencies = [
     "grpcio>=1.74,<2",
     "protobuf==6.33.0",
 ]
+
+[tool.uv.sources]
+glimmer-cradle-contracts = { path = "../../contracts" }
 
 [project.optional-dependencies]
 local-embedding = [
@@ -42,6 +46,6 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "../../contracts/generated/python"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"

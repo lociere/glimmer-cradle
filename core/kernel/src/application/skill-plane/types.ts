@@ -38,7 +38,7 @@ export interface SkillTool<TArgs = unknown> {
   audience?: SkillAudience;
   scope?: CapabilityScope;
   parameters: unknown;
-  handler: (args: TArgs) => Promise<unknown> | unknown;
+  handler: (args: TArgs, context?: { readonly signal?: AbortSignal }) => Promise<unknown> | unknown;
   policy?: SkillPolicy;
 }
 

@@ -7,6 +7,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import os
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -23,6 +26,8 @@ from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanIn
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
 from glimmer_cradle.cognition.cycle import CycleController
 from glimmer_cradle.cognition.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.cycle.workspace import GlobalWorkspace
 from glimmer_cradle.cognition.observability.logger import get_logger
 from glimmer_cradle.cognition.observability.trace_context import TraceContext, new_trace_id
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
@@ -40,6 +45,16 @@ _COGNITION_SERVICE = "glimmer.cognition.v1.CognitionService"
 _KERNEL_SERVICE = "glimmer.kernel.v1.KernelControlService"
 
 
+def _perception_state(state: str) -> int:
+    return {
+        "accepted": cognition_pb.PERCEPTION_OPERATION_STATE_ACCEPTED,
+        "running": cognition_pb.PERCEPTION_OPERATION_STATE_RUNNING,
+        "succeeded": cognition_pb.PERCEPTION_OPERATION_STATE_SUCCEEDED,
+        "cancelled": cognition_pb.PERCEPTION_OPERATION_STATE_CANCELLED,
+        "failed": cognition_pb.PERCEPTION_OPERATION_STATE_FAILED,
+    }.get(state, cognition_pb.PERCEPTION_OPERATION_STATE_UNSPECIFIED)
+
+
 def _struct_dict(value: Any) -> dict[str, Any]:
     if value is None:
         return {}
@@ -55,6 +70,17 @@ class ServiceFault(Exception):
         super().__init__(message)
         self.code = code
         self.retryable = retryable
+
+
+class KernelServiceError(Exception):
+    """Kernel 返回的受控 typed failure；不暴露远端内部异常文本。"""
+
+    def __init__(self, code: int, safe_message: str, *, retryable: bool = False, call: Any = None) -> None:
+        super().__init__(safe_message)
+        self.code = code
+        self.safe_message = safe_message
+        self.retryable = retryable
+        self.call = call
 
 
 def _grpc_status(code: int) -> grpc.StatusCode:
@@ -80,6 +106,8 @@ class CognitionGrpcHost:
         activity: CognitiveActivityController,
         cycle: CycleController,
         shutdown: Callable[[], Awaitable[None]],
+        operations: PerceptionOperationRegistry,
+        workspace: GlobalWorkspace,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -87,6 +115,8 @@ class CognitionGrpcHost:
         self._activity = activity
         self._cycle = cycle
         self._shutdown = shutdown
+        self._operations = operations
+        self._workspace = workspace
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._phase = "binding"
@@ -107,6 +137,7 @@ class CognitionGrpcHost:
         handlers = {
             "SubmitPerception": self._method(self._submit_perception, cognition_pb.SubmitPerceptionRequest, cognition_pb.SubmitPerceptionResponse),
             "CancelPerception": self._method(self._cancel_perception, cognition_pb.CancelPerceptionRequest, cognition_pb.CancelPerceptionResponse),
+            "GetPerceptionOperation": self._method(self._get_perception_operation, cognition_pb.GetPerceptionOperationRequest, cognition_pb.GetPerceptionOperationResponse),
             "InitializeKnowledge": self._method(self._initialize_knowledge, cognition_pb.InitializeKnowledgeRequest, cognition_pb.InitializeKnowledgeResponse),
             "Plan": self._method(self._plan, cognition_pb.PlanRequest, cognition_pb.PlanResponse),
             "Synthesize": self._method(self._synthesize, cognition_pb.SynthesizeRequest, cognition_pb.SynthesizeResponse),
@@ -188,20 +219,22 @@ class CognitionGrpcHost:
         context.set_trailing_metadata(((_ERROR_KEY, detail.SerializeToString()),))
         await context.abort(_grpc_status(code), message)
 
-    def _duplicate(self, call: common_pb.CallMetadata) -> bool:
+    def _is_completed(self, call: common_pb.CallMetadata) -> bool:
+        key = call.idempotency_key
+        return bool(key and key in self._completed)
+
+    def _mark_completed(self, call: common_pb.CallMetadata) -> None:
         key = call.idempotency_key
         if not key:
-            return False
-        if key in self._completed:
-            return True
+            return
         self._completed[key] = None
         if len(self._completed) > 2048:
             self._completed.popitem(last=False)
-        return False
 
     async def _submit_perception(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            duplicate = self._duplicate(request.call)
+            operation_id = request.call.idempotency_key or trace_id
+            perception_operation, duplicate = self._operations.accept(operation_id, trace_id)
             if not duplicate:
                 content = request.content
                 model_input = {
@@ -218,7 +251,7 @@ class CognitionGrpcHost:
                     cognition_pb.RETENTION_CEILING_TRANSIENT: "transient",
                     cognition_pb.RETENTION_CEILING_MEMORY_CANDIDATE: "memory_candidate",
                 }.get(request.retention_ceiling, "experience")
-                self._queue.put(PerceptionEntry(
+                dropped = self._queue.put(PerceptionEntry(
                     scene_id=conversation.scene_id,
                     conversation_id=conversation.conversation_id,
                     continuity_id=conversation.continuity_id,
@@ -237,26 +270,51 @@ class CognitionGrpcHost:
                     retention_ceiling=retention,
                     interaction_id=conversation.interaction_id,
                 ))
+                if dropped is not None:
+                    self._operations.finish(dropped.trace_id, "failed", "感知队列容量已满")
                 if address_mode == "direct":
                     self._activity.engage("direct_perception")
                 else:
                     self._activity.observe_activity("ambient_perception")
                 self._cycle.notify_external_input()
-            return cognition_pb.SubmitPerceptionResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "accepted", duplicate=duplicate)
+            return cognition_pb.SubmitPerceptionResponse(
+                operation_id=perception_operation.operation_id,
+                state=_perception_state(perception_operation.state),
+                duplicate=duplicate,
+            )
         return await self._invoke(request, context, operation)
 
     async def _cancel_perception(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
-            task = self._inflight.get(request.target_trace_id)
-            cancelled = bool(task and not task.done())
-            if cancelled:
-                task.cancel()
-            return cognition_pb.CancelPerceptionResponse(target_trace_id=request.target_trace_id, cancelled=cancelled)
+            self._queue.remove(request.target_trace_id)
+            await self._workspace.remove_perception(request.target_trace_id)
+            perception_operation = await self._operations.cancel(request.target_trace_id)
+            if perception_operation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "感知操作不存在")
+            return cognition_pb.CancelPerceptionResponse(
+                operation_id=perception_operation.operation_id,
+                target_trace_id=request.target_trace_id,
+                state=_perception_state(perception_operation.state),
+                terminal=perception_operation.terminal,
+            )
+        return await self._invoke(request, context, operation)
+
+    async def _get_perception_operation(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            perception_operation = self._operations.get(request.operation_id)
+            if perception_operation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "感知操作不存在")
+            return cognition_pb.GetPerceptionOperationResponse(
+                operation_id=perception_operation.operation_id,
+                state=_perception_state(perception_operation.state),
+                terminal=perception_operation.terminal,
+                safe_message=perception_operation.safe_message,
+            )
         return await self._invoke(request, context, operation)
 
     async def _initialize_knowledge(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            duplicate = self._duplicate(request.call)
+            duplicate = self._is_completed(request.call)
             if not duplicate:
                 await self._inbound.on_knowledge_init(KnowledgeInitialization(
                     version=request.version,
@@ -268,6 +326,7 @@ class CognitionGrpcHost:
                     ),
                     entries=[KnowledgeEntryInput(entry_id=e.entry_id, scope=e.scope, content=e.content, enabled=e.enabled, priority=e.priority) for e in request.entries],
                 ))
+                self._mark_completed(request.call)
             return cognition_pb.InitializeKnowledgeResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "initialized", duplicate=duplicate)
         return await self._invoke(request, context, operation)
 
@@ -340,9 +399,10 @@ class CognitionGrpcHost:
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            duplicate = self._duplicate(request.call)
+            duplicate = self._is_completed(request.call)
             if not duplicate:
                 asyncio.create_task(self._shutdown())
+                self._mark_completed(request.call)
             return cognition_pb.ShutdownResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "accepted", duplicate=duplicate)
         return await self._invoke(request, context, operation)
 
@@ -354,25 +414,35 @@ async def _return(value: Any) -> Any:
 class KernelGrpcClient:
     """Cognition 进程独占的 KernelControlService client。"""
 
-    def __init__(self, generation: str) -> None:
+    def __init__(self, generation: str, registration_nonce: str, registration_secret: str) -> None:
         self.generation = generation
+        self._registration_nonce = registration_nonce
+        self._registration_secret = bytearray(base64.urlsafe_b64decode(registration_secret + "=" * (-len(registration_secret) % 4)))
         self._channel: grpc.aio.Channel | None = None
 
     async def start(self, kernel_endpoint: str, cognition_endpoint: str) -> None:
         if not kernel_endpoint.startswith("grpc://127.0.0.1:"):
             raise ValueError("Kernel gRPC endpoint 必须是动态回环地址")
         self._channel = grpc.aio.insecure_channel(kernel_endpoint.removeprefix("grpc://"))
-        response = await self._call(
-            "RegisterCognition",
-            kernel_pb.RegisterCognitionRequest(
-                call=self._call_metadata(),
-                endpoint=cognition_endpoint,
-                process_id=os.getpid(),
-                supervisor_process_id=os.getppid(),
-            ),
-            kernel_pb.RegisterCognitionRequest,
-            kernel_pb.RegisterCognitionResponse,
-        )
+        proof_payload = f"{self.generation}\n{self._registration_nonce}\n{cognition_endpoint}\n{os.getpid()}\n{os.getppid()}".encode()
+        auth_proof = hmac.new(bytes(self._registration_secret), proof_payload, hashlib.sha256).digest()
+        try:
+            response = await self._call(
+                "RegisterCognition",
+                kernel_pb.RegisterCognitionRequest(
+                    call=self._call_metadata(),
+                    endpoint=cognition_endpoint,
+                    process_id=os.getpid(),
+                    supervisor_process_id=os.getppid(),
+                    registration_nonce=self._registration_nonce,
+                    auth_proof=auth_proof,
+                ),
+                kernel_pb.RegisterCognitionRequest,
+                kernel_pb.RegisterCognitionResponse,
+            )
+        finally:
+            self._registration_secret[:] = b"\0" * len(self._registration_secret)
+            self._registration_nonce = ""
         if not response.accepted or response.generation != self.generation:
             raise RuntimeError("Kernel 拒绝 Cognition gRPC Service 注册")
 
@@ -421,9 +491,17 @@ class KernelGrpcClient:
             for field in ("source_provider_id", "scene_id", "conversation_id", "continuity_id", "thread_id", "interaction_id", "recall_scope", "disclosure_scope"):
                 setattr(request.skill_request.conversation, field, str(conversation.get(field) or ""))
         _parse_struct(command.get("emotion_state") or {}, request.emotion_state)
-        await self._call("PublishAction", request, kernel_pb.PublishActionRequest, kernel_pb.PublishActionResponse)
+        response = await self._call(
+            "PublishAction",
+            request,
+            kernel_pb.PublishActionRequest,
+            kernel_pb.PublishActionResponse,
+            timeout=None,
+        )
+        if response.status not in {"completed", "duplicate"}:
+            raise KernelServiceError(common_pb.SERVICE_ERROR_CODE_INTERNAL, "Kernel action 未到达终态")
 
-    async def _call(self, method: str, request: Any, request_type: Any, response_type: Any) -> Any:
+    async def _call(self, method: str, request: Any, request_type: Any, response_type: Any, *, timeout: float | None = 5.0) -> Any:
         if self._channel is None:
             raise RuntimeError("Kernel gRPC client 尚未启动")
         call = self._channel.unary_unary(
@@ -431,4 +509,29 @@ class KernelGrpcClient:
             request_serializer=request_type.SerializeToString,
             response_deserializer=response_type.FromString,
         )
-        return await call(request, timeout=5.0)
+        try:
+            return await call(request, timeout=timeout)
+        except grpc.aio.AioRpcError as error:
+            for key, value in error.trailing_metadata() or ():
+                if key == _ERROR_KEY and isinstance(value, bytes):
+                    detail = common_pb.ServiceErrorDetail()
+                    try:
+                        detail.ParseFromString(value)
+                    except Exception:
+                        break
+                    raise KernelServiceError(
+                        detail.code,
+                        detail.safe_message or "Kernel 请求失败",
+                        retryable=detail.retryable,
+                        call=detail.call if detail.HasField("call") else None,
+                    ) from None
+            code = {
+                grpc.StatusCode.CANCELLED: common_pb.SERVICE_ERROR_CODE_CANCELLED,
+                grpc.StatusCode.DEADLINE_EXCEEDED: common_pb.SERVICE_ERROR_CODE_DEADLINE_EXCEEDED,
+                grpc.StatusCode.UNAVAILABLE: common_pb.SERVICE_ERROR_CODE_UNAVAILABLE,
+            }.get(error.code(), common_pb.SERVICE_ERROR_CODE_INTERNAL)
+            raise KernelServiceError(
+                code,
+                "Kernel 请求已取消" if code == common_pb.SERVICE_ERROR_CODE_CANCELLED else "Kernel Service 暂不可用",
+                retryable=code == common_pb.SERVICE_ERROR_CODE_UNAVAILABLE,
+            ) from None

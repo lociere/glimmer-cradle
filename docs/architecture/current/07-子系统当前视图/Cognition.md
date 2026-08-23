@@ -42,6 +42,12 @@ core/cognition/src/glimmer_cradle/cognition/
 
 `host/composition.py` 是 Cognition 唯一组装点，`host/process.py` 只监督进程生命周期。Kernel–Cognition 跨边界 DTO 来自 `contracts/generated/python/glimmer/{common,cognition,kernel}/v1/`，只允许 `adapters/kernel/` import；心智内部使用自己的应用模型，不得 import gRPC/Protobuf 或手写 TypeScript 镜像。
 
+感知入站由 `PerceptionOperationRegistry` 监督：transport 接受后保持
+`accepted/running/succeeded/cancelled/failed`，实际 Cycle tick 与推理 task 绑定到同一 trace。
+取消会移除队列/工作区候选或取消正在运行的推理，不会只取消 RPC 外壳；容量淘汰和竞争拒绝也
+必须进入失败终态。Cognition 反向发布 action 时等待 Kernel 的终态响应，不在固定 5 秒后脱离
+Kernel 副作用继续运行。
+
 ## 唯一认知主线
 
 当前认知主线是 `cycle/controller.py` 的 `CycleController`。控制器只编排阶段顺序：`CycleTurn` 持有单拍状态，`ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。它把感知处理为行动的基本语义顺序是：

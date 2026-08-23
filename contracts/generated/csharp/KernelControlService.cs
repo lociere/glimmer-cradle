@@ -28,62 +28,64 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
             "b3RvEhFnbGltbWVyLmtlcm5lbC52MRooZ2xpbW1lci9jb21tb24vdjEvc2Vy",
             "dmljZV9jb250cmFjdC5wcm90bxosZ2xpbW1lci9jb2duaXRpb24vdjEvY29n",
             "bml0aW9uX3NlcnZpY2UucHJvdG8aHGdvb2dsZS9wcm90b2J1Zi9zdHJ1Y3Qu",
-            "cHJvdG8ivgEKGFJlZ2lzdGVyQ29nbml0aW9uUmVxdWVzdBIzCgRjYWxsGAEg",
+            "cHJvdG8ijAIKGFJlZ2lzdGVyQ29nbml0aW9uUmVxdWVzdBIzCgRjYWxsGAEg",
             "ASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsEhoK",
             "CGVuZHBvaW50GAIgASgJUghlbmRwb2ludBIdCgpwcm9jZXNzX2lkGAMgASgD",
             "Uglwcm9jZXNzSWQSMgoVc3VwZXJ2aXNvcl9wcm9jZXNzX2lkGAQgASgDUhNz",
-            "dXBlcnZpc29yUHJvY2Vzc0lkIlcKGVJlZ2lzdGVyQ29nbml0aW9uUmVzcG9u",
-            "c2USHgoKZ2VuZXJhdGlvbhgBIAEoCVIKZ2VuZXJhdGlvbhIaCghhY2NlcHRl",
-            "ZBgCIAEoCFIIYWNjZXB0ZWQieQoTUHVibGlzaFN0YXRlUmVxdWVzdBIzCgRj",
-            "YWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRj",
-            "YWxsEi0KBXN0YXRlGAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFIF",
-            "c3RhdGUibwoUUHVibGlzaFN0YXRlUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lk",
-            "GAEgASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxIc",
-            "CglkdXBsaWNhdGUYAyABKAhSCWR1cGxpY2F0ZSKxAQoRUHVibGlzaExvZ1Jl",
-            "cXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxN",
-            "ZXRhZGF0YVIEY2FsbBIUCgVsZXZlbBgCIAEoCVIFbGV2ZWwSGAoHbWVzc2Fn",
-            "ZRgDIAEoCVIHbWVzc2FnZRI3CgphdHRyaWJ1dGVzGAQgASgLMhcuZ29vZ2xl",
-            "LnByb3RvYnVmLlN0cnVjdFIKYXR0cmlidXRlcyJ9CgxSZXBseU1lc3NhZ2US",
-            "GgoIc2VxdWVuY2UYASABKAVSCHNlcXVlbmNlEiEKDGNvbnRlbnRfdHlwZRgC",
-            "IAEoCVILY29udGVudFR5cGUSEgoEdGV4dBgDIAEoCVIEdGV4dBIaCghsYW5n",
-            "dWFnZRgEIAEoCVIIbGFuZ3VhZ2UiTgoJTWVkaWFJdGVtEhIKBHR5cGUYASAB",
-            "KAlSBHR5cGUSEAoDdXJpGAIgASgJUgN1cmkSGwoJbWltZV90eXBlGAMgASgJ",
-            "UghtaW1lVHlwZSKIAgoMU2tpbGxSZXF1ZXN0EiMKDW9yaWdpbmFsX2dvYWwY",
-            "ASABKAlSDG9yaWdpbmFsR29hbBInCg9jYXBhYmlsaXR5X2tpbmQYAiABKAlS",
-            "DmNhcGFiaWxpdHlLaW5kEh4KCmNvbmZpZGVuY2UYAyABKAFSCmNvbmZpZGVu",
-            "Y2USFgoGcmVhc29uGAQgASgJUgZyZWFzb24SIwoNcGxhbm5pbmdfaGludBgF",
-            "IAEoCVIMcGxhbm5pbmdIaW50Ek0KDGNvbnZlcnNhdGlvbhgGIAEoCzIpLmds",
-            "aW1tZXIuY29nbml0aW9uLnYxLkNvbnZlcnNhdGlvbkNvbnRleHRSDGNvbnZl",
-            "cnNhdGlvbiJtChJQdWJsaXNoTG9nUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lk",
-            "GAEgASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxIc",
-            "CglkdXBsaWNhdGUYAyABKAhSCWR1cGxpY2F0ZSLAAwoUUHVibGlzaEFjdGlv",
-            "blJlcXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNh",
-            "bGxNZXRhZGF0YVIEY2FsbBIfCgthY3Rpb25fdHlwZRgCIAEoCVIKYWN0aW9u",
-            "VHlwZRImCg90YXJnZXRfc2NlbmVfaWQYAyABKAlSDXRhcmdldFNjZW5lSWQS",
-            "IQoMY2hhbm5lbF9oaW50GAQgASgJUgtjaGFubmVsSGludBISCgR0ZXh0GAUg",
-            "ASgJUgR0ZXh0EjsKCG1lc3NhZ2VzGAYgAygLMh8uZ2xpbW1lci5rZXJuZWwu",
-            "djEuUmVwbHlNZXNzYWdlUghtZXNzYWdlcxIyCgVpdGVtcxgHIAMoCzIcLmds",
-            "aW1tZXIua2VybmVsLnYxLk1lZGlhSXRlbVIFaXRlbXMSRAoNc2tpbGxfcmVx",
-            "dWVzdBgIIAEoCzIfLmdsaW1tZXIua2VybmVsLnYxLlNraWxsUmVxdWVzdFIM",
-            "c2tpbGxSZXF1ZXN0EjwKDWVtb3Rpb25fc3RhdGUYCSABKAsyFy5nb29nbGUu",
-            "cHJvdG9idWYuU3RydWN0UgxlbW90aW9uU3RhdGUicAoVUHVibGlzaEFjdGlv",
-            "blJlc3BvbnNlEiEKDG9wZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0aW9uSWQS",
-            "FgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSHAoJZHVwbGljYXRlGAMgASgIUglk",
-            "dXBsaWNhdGUypgMKFEtlcm5lbENvbnRyb2xTZXJ2aWNlEm4KEVJlZ2lzdGVy",
-            "Q29nbml0aW9uEisuZ2xpbW1lci5rZXJuZWwudjEuUmVnaXN0ZXJDb2duaXRp",
-            "b25SZXF1ZXN0GiwuZ2xpbW1lci5rZXJuZWwudjEuUmVnaXN0ZXJDb2duaXRp",
-            "b25SZXNwb25zZRJfCgxQdWJsaXNoU3RhdGUSJi5nbGltbWVyLmtlcm5lbC52",
-            "MS5QdWJsaXNoU3RhdGVSZXF1ZXN0GicuZ2xpbW1lci5rZXJuZWwudjEuUHVi",
-            "bGlzaFN0YXRlUmVzcG9uc2USWQoKUHVibGlzaExvZxIkLmdsaW1tZXIua2Vy",
-            "bmVsLnYxLlB1Ymxpc2hMb2dSZXF1ZXN0GiUuZ2xpbW1lci5rZXJuZWwudjEu",
-            "UHVibGlzaExvZ1Jlc3BvbnNlEmIKDVB1Ymxpc2hBY3Rpb24SJy5nbGltbWVy",
-            "Lmtlcm5lbC52MS5QdWJsaXNoQWN0aW9uUmVxdWVzdBooLmdsaW1tZXIua2Vy",
-            "bmVsLnYxLlB1Ymxpc2hBY3Rpb25SZXNwb25zZUIsqgIpR2xpbW1lckNyYWRs",
-            "ZS5Db250cmFjdHMuR2xpbW1lci5LZXJuZWwuVjFiBnByb3RvMw=="));
+            "dXBlcnZpc29yUHJvY2Vzc0lkEi0KEnJlZ2lzdHJhdGlvbl9ub25jZRgFIAEo",
+            "CVIRcmVnaXN0cmF0aW9uTm9uY2USHQoKYXV0aF9wcm9vZhgGIAEoDFIJYXV0",
+            "aFByb29mIlcKGVJlZ2lzdGVyQ29nbml0aW9uUmVzcG9uc2USHgoKZ2VuZXJh",
+            "dGlvbhgBIAEoCVIKZ2VuZXJhdGlvbhIaCghhY2NlcHRlZBgCIAEoCFIIYWNj",
+            "ZXB0ZWQieQoTUHVibGlzaFN0YXRlUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8u",
+            "Z2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsEi0KBXN0YXRl",
+            "GAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFIFc3RhdGUibwoUUHVi",
+            "bGlzaFN0YXRlUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lkGAEgASgJUgtvcGVy",
+            "YXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxIcCglkdXBsaWNhdGUY",
+            "AyABKAhSCWR1cGxpY2F0ZSKxAQoRUHVibGlzaExvZ1JlcXVlc3QSMwoEY2Fs",
+            "bBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YVIEY2Fs",
+            "bBIUCgVsZXZlbBgCIAEoCVIFbGV2ZWwSGAoHbWVzc2FnZRgDIAEoCVIHbWVz",
+            "c2FnZRI3CgphdHRyaWJ1dGVzGAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0",
+            "cnVjdFIKYXR0cmlidXRlcyJ9CgxSZXBseU1lc3NhZ2USGgoIc2VxdWVuY2UY",
+            "ASABKAVSCHNlcXVlbmNlEiEKDGNvbnRlbnRfdHlwZRgCIAEoCVILY29udGVu",
+            "dFR5cGUSEgoEdGV4dBgDIAEoCVIEdGV4dBIaCghsYW5ndWFnZRgEIAEoCVII",
+            "bGFuZ3VhZ2UiTgoJTWVkaWFJdGVtEhIKBHR5cGUYASABKAlSBHR5cGUSEAoD",
+            "dXJpGAIgASgJUgN1cmkSGwoJbWltZV90eXBlGAMgASgJUghtaW1lVHlwZSKI",
+            "AgoMU2tpbGxSZXF1ZXN0EiMKDW9yaWdpbmFsX2dvYWwYASABKAlSDG9yaWdp",
+            "bmFsR29hbBInCg9jYXBhYmlsaXR5X2tpbmQYAiABKAlSDmNhcGFiaWxpdHlL",
+            "aW5kEh4KCmNvbmZpZGVuY2UYAyABKAFSCmNvbmZpZGVuY2USFgoGcmVhc29u",
+            "GAQgASgJUgZyZWFzb24SIwoNcGxhbm5pbmdfaGludBgFIAEoCVIMcGxhbm5p",
+            "bmdIaW50Ek0KDGNvbnZlcnNhdGlvbhgGIAEoCzIpLmdsaW1tZXIuY29nbml0",
+            "aW9uLnYxLkNvbnZlcnNhdGlvbkNvbnRleHRSDGNvbnZlcnNhdGlvbiJtChJQ",
+            "dWJsaXNoTG9nUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lkGAEgASgJUgtvcGVy",
+            "YXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxIcCglkdXBsaWNhdGUY",
+            "AyABKAhSCWR1cGxpY2F0ZSLAAwoUUHVibGlzaEFjdGlvblJlcXVlc3QSMwoE",
+            "Y2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YVIE",
+            "Y2FsbBIfCgthY3Rpb25fdHlwZRgCIAEoCVIKYWN0aW9uVHlwZRImCg90YXJn",
+            "ZXRfc2NlbmVfaWQYAyABKAlSDXRhcmdldFNjZW5lSWQSIQoMY2hhbm5lbF9o",
+            "aW50GAQgASgJUgtjaGFubmVsSGludBISCgR0ZXh0GAUgASgJUgR0ZXh0EjsK",
+            "CG1lc3NhZ2VzGAYgAygLMh8uZ2xpbW1lci5rZXJuZWwudjEuUmVwbHlNZXNz",
+            "YWdlUghtZXNzYWdlcxIyCgVpdGVtcxgHIAMoCzIcLmdsaW1tZXIua2VybmVs",
+            "LnYxLk1lZGlhSXRlbVIFaXRlbXMSRAoNc2tpbGxfcmVxdWVzdBgIIAEoCzIf",
+            "LmdsaW1tZXIua2VybmVsLnYxLlNraWxsUmVxdWVzdFIMc2tpbGxSZXF1ZXN0",
+            "EjwKDWVtb3Rpb25fc3RhdGUYCSABKAsyFy5nb29nbGUucHJvdG9idWYuU3Ry",
+            "dWN0UgxlbW90aW9uU3RhdGUicAoVUHVibGlzaEFjdGlvblJlc3BvbnNlEiEK",
+            "DG9wZXJhdGlvbl9pZBgBIAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIg",
+            "ASgJUgZzdGF0dXMSHAoJZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUypgMK",
+            "FEtlcm5lbENvbnRyb2xTZXJ2aWNlEm4KEVJlZ2lzdGVyQ29nbml0aW9uEisu",
+            "Z2xpbW1lci5rZXJuZWwudjEuUmVnaXN0ZXJDb2duaXRpb25SZXF1ZXN0Giwu",
+            "Z2xpbW1lci5rZXJuZWwudjEuUmVnaXN0ZXJDb2duaXRpb25SZXNwb25zZRJf",
+            "CgxQdWJsaXNoU3RhdGUSJi5nbGltbWVyLmtlcm5lbC52MS5QdWJsaXNoU3Rh",
+            "dGVSZXF1ZXN0GicuZ2xpbW1lci5rZXJuZWwudjEuUHVibGlzaFN0YXRlUmVz",
+            "cG9uc2USWQoKUHVibGlzaExvZxIkLmdsaW1tZXIua2VybmVsLnYxLlB1Ymxp",
+            "c2hMb2dSZXF1ZXN0GiUuZ2xpbW1lci5rZXJuZWwudjEuUHVibGlzaExvZ1Jl",
+            "c3BvbnNlEmIKDVB1Ymxpc2hBY3Rpb24SJy5nbGltbWVyLmtlcm5lbC52MS5Q",
+            "dWJsaXNoQWN0aW9uUmVxdWVzdBooLmdsaW1tZXIua2VybmVsLnYxLlB1Ymxp",
+            "c2hBY3Rpb25SZXNwb25zZUIsqgIpR2xpbW1lckNyYWRsZS5Db250cmFjdHMu",
+            "R2xpbW1lci5LZXJuZWwuVjFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceContractReflection.Descriptor, global::GlimmerCradle.Contracts.Glimmer.Cognition.V1.CognitionServiceReflection.Descriptor, global::Google.Protobuf.WellKnownTypes.StructReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionRequest), global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionRequest.Parser, new[]{ "Call", "Endpoint", "ProcessId", "SupervisorProcessId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionRequest), global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionRequest.Parser, new[]{ "Call", "Endpoint", "ProcessId", "SupervisorProcessId", "RegistrationNonce", "AuthProof" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionResponse), global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.RegisterCognitionResponse.Parser, new[]{ "Generation", "Accepted" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.PublishStateRequest), global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.PublishStateRequest.Parser, new[]{ "Call", "State" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.PublishStateResponse), global::GlimmerCradle.Contracts.Glimmer.Kernel.V1.PublishStateResponse.Parser, new[]{ "OperationId", "Status", "Duplicate" }, null, null, null, null),
@@ -139,6 +141,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       endpoint_ = other.endpoint_;
       processId_ = other.processId_;
       supervisorProcessId_ = other.supervisorProcessId_;
+      registrationNonce_ = other.registrationNonce_;
+      authProof_ = other.authProof_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -196,6 +200,30 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       }
     }
 
+    /// <summary>Field number for the "registration_nonce" field.</summary>
+    public const int RegistrationNonceFieldNumber = 5;
+    private string registrationNonce_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string RegistrationNonce {
+      get { return registrationNonce_; }
+      set {
+        registrationNonce_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "auth_proof" field.</summary>
+    public const int AuthProofFieldNumber = 6;
+    private pb::ByteString authProof_ = pb::ByteString.Empty;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString AuthProof {
+      get { return authProof_; }
+      set {
+        authProof_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -215,6 +243,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       if (Endpoint != other.Endpoint) return false;
       if (ProcessId != other.ProcessId) return false;
       if (SupervisorProcessId != other.SupervisorProcessId) return false;
+      if (RegistrationNonce != other.RegistrationNonce) return false;
+      if (AuthProof != other.AuthProof) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -226,6 +256,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
       if (ProcessId != 0L) hash ^= ProcessId.GetHashCode();
       if (SupervisorProcessId != 0L) hash ^= SupervisorProcessId.GetHashCode();
+      if (RegistrationNonce.Length != 0) hash ^= RegistrationNonce.GetHashCode();
+      if (AuthProof.Length != 0) hash ^= AuthProof.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -260,6 +292,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
         output.WriteRawTag(32);
         output.WriteInt64(SupervisorProcessId);
       }
+      if (RegistrationNonce.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(RegistrationNonce);
+      }
+      if (AuthProof.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteBytes(AuthProof);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -286,6 +326,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
         output.WriteRawTag(32);
         output.WriteInt64(SupervisorProcessId);
       }
+      if (RegistrationNonce.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(RegistrationNonce);
+      }
+      if (AuthProof.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteBytes(AuthProof);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -307,6 +355,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       }
       if (SupervisorProcessId != 0L) {
         size += 1 + pb::CodedOutputStream.ComputeInt64Size(SupervisorProcessId);
+      }
+      if (RegistrationNonce.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(RegistrationNonce);
+      }
+      if (AuthProof.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(AuthProof);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -334,6 +388,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
       }
       if (other.SupervisorProcessId != 0L) {
         SupervisorProcessId = other.SupervisorProcessId;
+      }
+      if (other.RegistrationNonce.Length != 0) {
+        RegistrationNonce = other.RegistrationNonce;
+      }
+      if (other.AuthProof.Length != 0) {
+        AuthProof = other.AuthProof;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -373,6 +433,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
             SupervisorProcessId = input.ReadInt64();
             break;
           }
+          case 42: {
+            RegistrationNonce = input.ReadString();
+            break;
+          }
+          case 50: {
+            AuthProof = input.ReadBytes();
+            break;
+          }
         }
       }
     #endif
@@ -409,6 +477,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Kernel.V1 {
           }
           case 32: {
             SupervisorProcessId = input.ReadInt64();
+            break;
+          }
+          case 42: {
+            RegistrationNonce = input.ReadString();
+            break;
+          }
+          case 50: {
+            AuthProof = input.ReadBytes();
             break;
           }
         }

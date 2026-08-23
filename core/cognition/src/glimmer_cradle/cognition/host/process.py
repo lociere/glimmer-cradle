@@ -1,32 +1,10 @@
 """Cognition 进程 Host：管理启动、停止和 Kernel Port 生命周期。"""
-# ruff: noqa: E402 -- 源码直启时必须先完成 sys.path 与 Windows event loop 引导。
 import asyncio
 import argparse
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Final
-
-# Ensure that `glimmer_cradle.cognition` package can be imported when run from source (without installing). This is
-# especially important when the TS kernel launches Python via `python -m glimmer_cradle.cognition.host.process`.
-# It locates the repository root by walking upward until it finds a `pyproject.toml` or `pnpm-workspace.yaml`.
-# Then it prepends the Python source directory to sys.path.
-repo_root = Path(__file__).resolve()
-for _ in range(20):
-    # Prefer the monorepo root marker. If not found, fallback to pyproject.toml.
-    if (repo_root / "pnpm-workspace.yaml").exists():
-        break
-    if (repo_root / "pyproject.toml").exists():
-        # Note: this pyproject may be inside a subpackage; keep searching for pnpm-workspace.yaml.
-        pass
-    if repo_root.parent == repo_root:
-        break
-    repo_root = repo_root.parent
-
-src_path = repo_root / "core" / "cognition" / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
 
 from glimmer_cradle.cognition.foundation.config import CharacterRuntimeConfig
 from glimmer_cradle.cognition.host.composition import CognitionComponents, compose_cognition
@@ -60,6 +38,8 @@ class CognitionHost(Lifecycle):
         config: CharacterRuntimeConfig,
         kernel_endpoint: str,
         generation: str,
+        registration_nonce: str,
+        registration_secret: str,
     ):
         """
         初始化AI核心
@@ -74,6 +54,8 @@ class CognitionHost(Lifecycle):
         self.config: Final[CharacterRuntimeConfig] = config
         self.kernel_endpoint: Final[str] = kernel_endpoint
         self.generation: Final[str] = generation
+        self.registration_nonce: Final[str] = registration_nonce
+        self.registration_secret: Final[str] = registration_secret
         self.components: CognitionComponents | None = None
         # 运行状态
         self._is_running: bool = False
@@ -103,6 +85,8 @@ class CognitionHost(Lifecycle):
             self.components = compose_cognition(
                 self.config,
                 generation=self.generation,
+                registration_nonce=self.registration_nonce,
+                registration_secret=self.registration_secret,
                 shutdown=self._accept_shutdown_request,
             )
             components = self._require_components()
@@ -342,19 +326,26 @@ class CognitionHost(Lifecycle):
         return json.dumps(stable, sort_keys=True, ensure_ascii=False, default=str)
 
 
+def _read_supervisor_bootstrap() -> dict[str, str]:
+    """从仅由 Kernel 受监督子进程继承的匿名管道读取一次性注册能力。"""
+    try:
+        with os.fdopen(3, "r", encoding="utf-8", closefd=True) as bootstrap_pipe:
+            payload = bootstrap_pipe.readline(16_384)
+    except OSError as error:
+        raise ValueError("缺少 Kernel 受监督 bootstrap pipe") from error
+    value = json.loads(payload)
+    if not isinstance(value, dict):
+        raise ValueError("Kernel bootstrap payload 格式无效")
+    return value
+
+
 # ======================================
 # 命令行启动入口
 # ======================================
 def main(argv: list[str] | None = None) -> int:
     """
     Cognition 认知核唯一命令行启动入口
-    由Kernel 内核通过子进程启动，所有参数由内核传入
-    启动参数示例：
-    python -m glimmer_cradle.cognition.host.process --config-json '{...}' --kernel-endpoint grpc://127.0.0.1:<dynamic> --generation <uuid>
-
-    也支持通过环境变量注入（供 Kernel 内核启动时使用）：
-      GLIMMER_CRADLE_CONFIG / GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT /
-      GLIMMER_CRADLE_COGNITION_GENERATION
+    由 Kernel 受监督子进程启动；配置来自参数/环境，注册能力只来自 FD3 匿名管道。
     """
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="Glimmer Cradle Cognition 认知核")
@@ -364,29 +355,20 @@ def main(argv: list[str] | None = None) -> int:
         required=False,
         help="JSON格式的全局配置字符串，由Kernel 内核注入（优先）"
     )
-    parser.add_argument(
-        "--kernel-endpoint",
-        type=str,
-        required=False,
-        help="KernelControlService 动态回环端点（优先）"
-    )
-    parser.add_argument(
-        "--generation",
-        type=str,
-        required=False,
-        help="Kernel 分配的 Cognition 受监督进程世代（优先）"
-    )
     args = parser.parse_args(argv)
 
-    # 解析配置（支持通过环境变量传入）
+    # 角色配置可通过环境变量注入；endpoint/generation/challenge 不进入环境。
     try:
         import json
 
         config_json = args.config_json or os.environ.get("GLIMMER_CRADLE_CONFIG")
-        kernel_endpoint = args.kernel_endpoint or os.environ.get("GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT")
-        generation = args.generation or os.environ.get("GLIMMER_CRADLE_COGNITION_GENERATION")
+        bootstrap = _read_supervisor_bootstrap()
+        kernel_endpoint = str(bootstrap["kernelEndpoint"])
+        generation = str(bootstrap["generation"])
+        registration_nonce = str(bootstrap["registrationNonce"])
+        registration_secret = str(bootstrap["registrationSecret"])
 
-        if not config_json or not kernel_endpoint or not generation:
+        if not config_json or not kernel_endpoint or not generation or not registration_nonce or not registration_secret:
             raise ValueError("缺少 Cognition 启动配置、Kernel gRPC endpoint 或 generation")
 
         config_dict = json.loads(config_json)
@@ -400,6 +382,8 @@ def main(argv: list[str] | None = None) -> int:
         config=config,
         kernel_endpoint=kernel_endpoint,
         generation=generation,
+        registration_nonce=registration_nonce,
+        registration_secret=registration_secret,
     )
 
     loop = asyncio.new_event_loop()

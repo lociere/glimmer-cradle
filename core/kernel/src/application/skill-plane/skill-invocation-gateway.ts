@@ -25,6 +25,7 @@ export interface SkillInvocationRequest {
   args: unknown;
   traceId?: string;
   conversation?: ConversationContext;
+  signal?: AbortSignal;
 }
 
 export interface SkillResourceReadRequest {
@@ -115,6 +116,7 @@ export class SkillInvocationGateway {
   ) {}
 
   public async invoke(request: SkillInvocationRequest): Promise<unknown> {
+    request.signal?.throwIfAborted();
     const registered = this._registry.findById(request.skillId);
     if (!registered) {
       throw new Error(`技能不存在: ${request.skillId}`);
@@ -136,7 +138,8 @@ export class SkillInvocationGateway {
       targetKind: 'tool',
       targetName: request.toolName,
       args: request.args,
-      execute: () => tool.handler(request.args),
+      signal: request.signal,
+      execute: () => tool.handler(request.args, { signal: request.signal }),
     });
   }
 
@@ -205,9 +208,11 @@ export class SkillInvocationGateway {
     targetName: string;
     args?: unknown;
     execute: () => Promise<unknown> | unknown;
+    signal?: AbortSignal;
   }): Promise<unknown> {
     const traceId = options.traceId ?? getCurrentTraceId() ?? newTraceId();
     return withTrace(traceId, async () => {
+      options.signal?.throwIfAborted();
       const startedAt = Date.now();
       const policy = options.policy ?? options.skill.policy;
       const decision = this._policyEngine.evaluate(options.skill, policy);
@@ -254,6 +259,7 @@ export class SkillInvocationGateway {
           sideEffects: policy.sideEffects,
           args: options.args,
         });
+        options.signal?.throwIfAborted();
         if (!approved) {
           const message = `用户拒绝执行技能 ${options.skill.id}`;
           this.recordAudit({
@@ -273,6 +279,7 @@ export class SkillInvocationGateway {
 
       try {
         const result = await options.execute();
+        options.signal?.throwIfAborted();
         this.recordAudit({
           traceId,
           skill: options.skill,
