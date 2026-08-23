@@ -7,7 +7,7 @@ from glimmer_cradle.cognition.application.agent_synthesis_use_case import (
     AgentSynthesisInput,
     AgentSynthesisUseCase,
 )
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.domain.experience import MomentKind
 
 
@@ -36,6 +36,8 @@ def _self_entity():
             base=SimpleNamespace(nickname="月见"),
         ),
         persona_injector=_FakePersonaInjector(),
+        ids=IDS,
+        observability=OBSERVABILITY,
     )
 
 
@@ -46,6 +48,8 @@ async def test_agent_synthesis_uses_persona_prompt_for_system_message() -> None:
         self_entity=_self_entity(),
         llm_engine=llm,
         persona_injector=_FakePersonaInjector(),
+        ids=IDS,
+        observability=OBSERVABILITY,
     )
 
     output = await use_case.execute(AgentSynthesisInput(
@@ -75,6 +79,8 @@ async def test_agent_synthesis_error_result_prompt_does_not_pretend_success() ->
         self_entity=_self_entity(),
         llm_engine=llm,
         persona_injector=_FakePersonaInjector(),
+        ids=IDS,
+        observability=OBSERVABILITY,
     )
 
     output = await use_case.execute(AgentSynthesisInput(
@@ -101,6 +107,8 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
         self_entity=_self_entity(),
         llm_engine=_FakeLlmEngine("已经打开。"),
         persona_injector=_FakePersonaInjector(),
+        ids=IDS,
+        observability=OBSERVABILITY,
         experience_recorder=recorder,
     )
 

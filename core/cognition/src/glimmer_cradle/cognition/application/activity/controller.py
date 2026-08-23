@@ -18,12 +18,8 @@ from glimmer_cradle.cognition.application.activity.projection import (
 )
 from glimmer_cradle.cognition.domain.activity.transition import ActivityTransition, evaluate_transition
 from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter, gauge
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
-
-logger = get_logger("cognitive_activity_controller")
-
 
 def _iso_ms(value: datetime) -> str:
     return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -38,6 +34,7 @@ class CognitiveActivityController:
         experience_recorder: ExperienceRecorder,
         affect_activation_provider: Callable[[], float],
         clock: ClockPort,
+        observability: ObservabilityPort,
         config: ActivityTransitionConfig = DEFAULT_ACTIVITY_TRANSITION_CONFIG,
         tick_interval_s: float = 5.0,
     ) -> None:
@@ -46,6 +43,8 @@ class CognitiveActivityController:
         self._recorder = experience_recorder
         self._affect_activation = affect_activation_provider
         self._clock = clock
+        self._observability = observability
+        self._logger = observability.logger("cognitive_activity_controller")
         self._state = CognitiveActivityState.AMBIENT
         self._since_at = self._clock.now()
         self._last_direct_interaction_at: datetime | None = None
@@ -61,7 +60,7 @@ class CognitiveActivityController:
         try:
             history = project_activity_history(self._recorder)
         except Exception as exc:
-            logger.warning("认知活动冷启动投影失败，使用空活动基线", error=str(exc))
+            self._logger.warning("认知活动冷启动投影失败，使用空活动基线", error=str(exc))
             history = None
         now = self._clock.now()
         if history is None or not history.has_activity:
@@ -76,7 +75,7 @@ class CognitiveActivityController:
         self._running = True
         self._task = asyncio.create_task(self._tick_loop())
         self._emit_state_metric()
-        logger.info(
+        self._logger.info(
             "认知活动控制器已启动",
             initial_state=self._state.value,
             direct_idle_seconds=self._idle(now, self._last_direct_interaction_at),
@@ -91,7 +90,7 @@ class CognitiveActivityController:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        logger.info("认知活动控制器已停止", final_state=self._state.value)
+        self._logger.info("认知活动控制器已停止", final_state=self._state.value)
 
     def on_transition(self, callback: Callable[[], None]) -> None:
         self._transition_callbacks.append(callback)
@@ -103,7 +102,7 @@ class CognitiveActivityController:
         self._last_direct_interaction_at = now
         self._last_observed_activity_at = now
         if self._state == CognitiveActivityState.ENGAGED:
-            logger.debug("记录直接互动", reason=reason, state=self._state.value)
+            self._logger.debug("记录直接互动", reason=reason, state=self._state.value)
             return
         self._apply_transition(
             ActivityTransition(CognitiveActivityState.ENGAGED, True, reason)
@@ -120,7 +119,7 @@ class CognitiveActivityController:
 
     def record_self_activity(self, reason: str = "self_activity") -> None:
         self._last_self_activity_at = self._clock.now()
-        logger.debug("记录角色活动", reason=reason, state=self._state.value)
+        self._logger.debug("记录角色活动", reason=reason, state=self._state.value)
 
     def get_state(self) -> dict:
         now = self._clock.now()
@@ -148,14 +147,14 @@ class CognitiveActivityController:
             except asyncio.CancelledError:
                 break
             except Exception as exc:
-                logger.error("认知活动状态计算异常", error=str(exc), exc_info=True)
+                self._logger.error("认知活动状态计算异常", error=str(exc), exc_info=True)
 
     def _do_tick(self) -> None:
         now = self._clock.now()
         try:
             activation = float(self._affect_activation())
         except Exception as exc:
-            logger.warning("情感激活强度采集失败，按 0 处理", error=str(exc))
+            self._logger.warning("情感激活强度采集失败，按 0 处理", error=str(exc))
             activation = 0.0
         result = evaluate_transition(
             self._state,
@@ -177,11 +176,11 @@ class CognitiveActivityController:
         previous = self._state.value
         self._state = result.state
         self._since_at = self._clock.now()
-        counter(
+        self._observability.counter(
             "cognition.activity.transition",
             labels={"from": previous, "to": self._state.value, "reason": result.reason},
         )
-        logger.info(
+        self._logger.info(
             "认知活动状态变化",
             from_state=previous,
             to_state=self._state.value,
@@ -191,7 +190,7 @@ class CognitiveActivityController:
             try:
                 callback()
             except Exception as exc:
-                logger.warning("认知活动状态回调失败", error=str(exc))
+                self._logger.warning("认知活动状态回调失败", error=str(exc))
 
     def _bootstrap_state(self, now: datetime) -> CognitiveActivityState:
         direct_idle = self._idle(now, self._last_direct_interaction_at)
@@ -213,4 +212,6 @@ class CognitiveActivityController:
             CognitiveActivityState.AMBIENT: 1.0,
             CognitiveActivityState.ENGAGED: 2.0,
         }[self._state]
-        gauge("cognition.activity.state", level, labels={"state": self._state.value})
+        self._observability.gauge(
+            "cognition.activity.state", level, labels={"state": self._state.value}
+        )

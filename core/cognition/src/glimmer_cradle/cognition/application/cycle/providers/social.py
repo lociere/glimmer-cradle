@@ -6,6 +6,8 @@ from __future__ import annotations
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
 from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
 def _extract_actor_info(item: WorkspaceItem) -> tuple[str | None, str | None, str]:
@@ -30,8 +32,11 @@ class SocialProvider(Provider):
     def __init__(
         self,
         relationship_repo: RelationshipRepositoryPort,
+        *, clock: ClockPort, ids: IdGeneratorPort,
     ) -> None:
         self._repo = relationship_repo
+        self._clock = clock
+        self._ids = ids
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
         if not workspace_snapshot:
@@ -71,4 +76,6 @@ class SocialProvider(Provider):
                 "relationship_attributes": record.attributes,
             },
             salience=salience,
+            clock=self._clock,
+            ids=self._ids,
         )]

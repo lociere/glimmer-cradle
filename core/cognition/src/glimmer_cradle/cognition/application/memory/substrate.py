@@ -4,13 +4,14 @@ from __future__ import annotations
 import re
 import numpy as np
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from glimmer_cradle.cognition.domain.memory import MemoryKind
 from glimmer_cradle.cognition.ports.persistence import MemoryRepositoryPort
 from glimmer_cradle.cognition.ports.persistence import VectorRepositoryPort
 from glimmer_cradle.cognition.ports.inference import EmbeddingPort
+from glimmer_cradle.cognition.ports.clock import ClockPort
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]")
 
@@ -48,8 +49,10 @@ class MemorySubstrate:
     """记忆业务 owner；repository 只负责事务，检索始终按 token 预算截断。"""
 
     def __init__(
-        self, *, token_budget: int = 800, candidate_limit: int = 24, result_limit: int = 6
+        self, *, clock: ClockPort, token_budget: int = 800,
+        candidate_limit: int = 24, result_limit: int = 6
     ) -> None:
+        self._clock = clock
         self._repo: MemoryRepositoryPort | None = None
         self._records: dict[str, MemoryRecord] = {}
         self._token_budget = max(128, token_budget)
@@ -154,7 +157,7 @@ class MemorySubstrate:
             query_vector = await engine.encode_single(
                 query, text_type="query"
             )
-        now = datetime.now(timezone.utc)
+        now = self._clock.now()
         ranked: list[tuple[float, MemoryRecord]] = []
         for record in self._records.values():
             if record.status not in {"active", "disputed"}:

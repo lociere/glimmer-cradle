@@ -10,7 +10,7 @@ from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettin
 from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
 from glimmer_cradle.cognition.host.composition import CognitionComponents, compose_cognition
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.trace_context import new_boot_id, set_boot_id
+from glimmer_cradle.cognition.adapters.observability.trace_context import new_boot_id, set_boot_id
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_metrics_dir,
     resolve_traces_dir,

@@ -15,12 +15,7 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 from glimmer_cradle.cognition.application.context.sources.base import ContextItem, ContextQuery, ContextSource
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter, gauge, histogram
-from glimmer_cradle.cognition.ports.observability import span
-
-logger = get_logger("context_assembly")
-
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 @dataclass
 class AssembledContext:
@@ -53,10 +48,13 @@ class ContextAssembly:
         *,
         base_budget_tokens: int = 2000,
         weights: tuple[float, float, float] = (0.2, 0.3, 0.5),  # (recency, importance, relevance)
+        observability: ObservabilityPort,
     ) -> None:
         self._sources: list[ContextSource] = list(sources)
         self._base_budget = max(0, int(base_budget_tokens))
         self._w_recency, self._w_importance, self._w_relevance = weights
+        self._observability = observability
+        self._logger = observability.logger("context_assembly")
 
     @property
     def sources(self) -> list[ContextSource]:
@@ -78,7 +76,7 @@ class ContextAssembly:
         """
         budget = max(0, int(self._base_budget * max(0.0, min(1.0, float(budget_factor)))))
 
-        with span("context_assembly", attributes={"budget_tokens": budget}) as s:
+        with self._observability.span("context_assembly", attributes={"budget_tokens": budget}) as s:
             # 1. 并发拉所有源（异常隔离）
             results = await asyncio.gather(
                 *(self._safe_activate(src, query, per_source_limit) for src in self._sources),
@@ -90,9 +88,9 @@ class ContextAssembly:
             for r in results:
                 if r:
                     all_items.extend(r)
-            counter("context.sources_called", called)
-            counter("context.sources_failed", failed)
-            gauge("context.candidates_raw", float(len(all_items)))
+            self._observability.counter("context.sources_called", called)
+            self._observability.counter("context.sources_failed", failed)
+            self._observability.gauge("context.candidates_raw", float(len(all_items)))
 
             # 2. 综合打分排序
             all_items.sort(
@@ -114,7 +112,7 @@ class ContextAssembly:
                 used += it.token_estimate
             was_truncated = len(picked) < len(all_items)
 
-            histogram("context.tokens_used", float(used))
+            self._observability.histogram("context.tokens_used", float(used))
             s.set_attribute("candidates_total", len(all_items))
             s.set_attribute("picked", len(picked))
             s.set_attribute("was_truncated", was_truncated)
@@ -134,7 +132,7 @@ class ContextAssembly:
         try:
             return await src.activate(query, max_items=max_items)
         except Exception as e:
-            logger.error(
+            self._logger.error(
                 "ContextSource activate 异常",
                 source=src.name,
                 error=str(e),

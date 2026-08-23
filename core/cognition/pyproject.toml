@@ -29,8 +29,6 @@ dev = [
     "pytest-asyncio>=0.23",
     "mypy>=1.10",
     "ruff>=0.5",
-    # Pydantic 契约由 protocol/src/schemas 统一生成，详见协议实现文档。
-    "datamodel-code-generator>=0.25,<1",
 ]
 
 [project.scripts]

@@ -8,16 +8,13 @@ import json
 from dataclasses import dataclass
 from typing import Literal, cast
 
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.application.inference.service import (
     ModelTierEnum,
     ReasoningRequest,
     ReasoningService,
     ReasoningUnavailable,
 )
-
-logger = get_logger("cognitive_action_planner")
 
 CognitiveAction = Literal["reply", "skill_request", "ask_clarification", "noop"]
 
@@ -72,8 +69,10 @@ class ActionPlan:
 class CognitiveActionPlanner:
     """基于结构化推理结果判断本拍行动类型。"""
 
-    def __init__(self, reasoning: ReasoningService | None) -> None:
+    def __init__(self, reasoning: ReasoningService | None, *, observability: ObservabilityPort) -> None:
         self._reasoning = reasoning
+        self._observability = observability
+        self._logger = observability.logger("cognitive_action_planner")
 
     async def plan(
         self,
@@ -126,16 +125,16 @@ class CognitiveActionPlanner:
         try:
             resp = await self._reasoning.request(req, tier=tier)
         except ReasoningUnavailable as error:
-            logger.debug("ActionPlan 推理不可用，降级为普通回复路径", error=str(error))
+            self._logger.debug("ActionPlan 推理不可用，降级为普通回复路径", error=str(error))
             return ActionPlan.reply(normalized_goal, "推理服务不可用，未触发 Skill")
         except Exception as error:
-            logger.debug("ActionPlan 推理异常，降级为普通回复路径", error=str(error))
-            counter("cognition.action_plan_error", 1)
+            self._logger.debug("ActionPlan 推理异常，降级为普通回复路径", error=str(error))
+            self._observability.counter("cognition.action_plan_error", 1)
             return ActionPlan.reply(normalized_goal, "行动规划失败，未触发 Skill")
 
         plan = self._parse_plan(resp.text, fallback_goal=normalized_goal)
         if plan is None:
-            counter("cognition.action_plan_invalid", 1)
+            self._observability.counter("cognition.action_plan_invalid", 1)
             return ActionPlan.reply(normalized_goal, "行动规划结果非法，未触发 Skill")
         return plan
 

@@ -32,7 +32,7 @@ from glimmer_cradle.cognition.application.cycle.perception_operations import (
 )
 from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.trace_context import TraceContext, new_trace_id
+from glimmer_cradle.cognition.adapters.observability.trace_context import TraceContext, new_trace_id
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.ports.kernel.models import (
     ConversationHistoryQuery,

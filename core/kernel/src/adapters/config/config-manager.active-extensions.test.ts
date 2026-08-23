@@ -13,6 +13,17 @@ afterEach(() => {
 });
 
 describe('ConfigManager active extension selections', () => {
+  it('normalizes the complete canonical Cognition document defaults', async () => {
+    process.env.GLIMMER_CRADLE_CONFIG_ROOT = path.resolve(process.cwd(), '..', '..', 'configs');
+
+    await ConfigManager.instance.init();
+
+    expect(ConfigManager.instance.getConfig().system.cognition).toEqual({
+      workspace_capacity: 7,
+      default_tick_interval_ms: 5000,
+    });
+  });
+
   it('rejects active selections without an explicit activation profile', async () => {
     const configRoot = mkdtempSync(path.join(tmpdir(), 'gc-active-extensions-'));
     process.env.GLIMMER_CRADLE_CONFIG_ROOT = configRoot;

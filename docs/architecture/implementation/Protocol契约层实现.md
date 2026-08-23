@@ -14,7 +14,7 @@ protocol/src/
 ├── models/ ipc/ utils/                  # 手写 runtime helper 和便利模型
 └── config-schemas.ts                    # config schema 聚合入口
 
-engines/audio/src/glimmer_cradle/audio/protocol/generated/
+engines/audio/src/glimmer_cradle/audio/generated/
 └── Audio legacy Python 生成投影；Cognition legacy Python projection 已删除
 ```
 
@@ -49,7 +49,7 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。其旧 ZMQ、通用 envelope、IPC payload 生成物、配置与 Cognition legacy Python projection 已删除。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。其旧 ZMQ、通用 envelope、IPC payload 生成物、配置与 Cognition legacy Python projection 已删除。`protocol/codegen/gen-py.py` 现在只生成 Audio projection，并使用 `engines/audio` 自有 uv dev 环境；Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
 
 Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
 environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地

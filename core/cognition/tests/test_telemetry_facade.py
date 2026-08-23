@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from glimmer_cradle.cognition.adapters.observability import telemetry
-from glimmer_cradle.cognition.ports import trace_context as tc
+from glimmer_cradle.cognition.adapters.observability import trace_context as tc
 
 
 def test_facade_reexports_log_metric_span() -> None:

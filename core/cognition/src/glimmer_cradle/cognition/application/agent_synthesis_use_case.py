@@ -14,11 +14,8 @@ from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
-from glimmer_cradle.cognition.ports.observability import get_logger
 from glimmer_cradle.cognition.domain.experience.events import MomentKind, SourceDescriptor
 from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
-
-logger = get_logger("agent_synthesis_use_case")
 
 _SYNTHESIS_RESULT_INSTRUCTION = """\
 [外部能力结果处理]
@@ -91,9 +88,9 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
             # generate() 是同步方法，用 to_thread 避免阻塞事件循环
             reply_content = await asyncio.to_thread(self.llm_engine.generate, llm_request)
             reply_content = reply_content.strip()
-            logger.debug("工具结果合成成功", goal_len=len(input_data.original_goal))
+            self._logger.debug("工具结果合成成功", goal_len=len(input_data.original_goal))
         except Exception as exc:
-            logger.warning("合成失败，返回兜底回复", error=str(exc))
+            self._logger.warning("合成失败，返回兜底回复", error=str(exc))
             reply_content = "外部能力已经返回，但我整理结果时出了问题。你稍后再试一次。"
 
         reply_content = normalize_reply_text(reply_content)
@@ -189,7 +186,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
                     address_mode="direct",
                 )
             except Exception as exc:
-                logger.warning("合成人设 prompt 构造失败，使用最小人设 prompt", error=str(exc))
+                self._logger.warning("合成人设 prompt 构造失败，使用最小人设 prompt", error=str(exc))
         return f"{persona_prompt}\n\n{_SYNTHESIS_RESULT_INSTRUCTION}"
 
     @staticmethod

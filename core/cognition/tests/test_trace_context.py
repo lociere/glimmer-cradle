@@ -1,5 +1,5 @@
 """trace 上下文处理器测试（阶段 3.6 重构后：boot/trace/span 三层）。"""
-from glimmer_cradle.cognition.ports import trace_context as tc
+from glimmer_cradle.cognition.adapters.observability import trace_context as tc
 
 
 def _reset() -> None:

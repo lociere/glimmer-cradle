@@ -13,6 +13,8 @@ from __future__ import annotations
 from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
 def salience_for_perception(*, address_mode: str, familiarity: int) -> float:
@@ -36,9 +38,13 @@ class PerceptionProvider(Provider):
         queue: PerceptionEventQueue,
         *,
         max_items_per_tick: int = 5,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
     ) -> None:
         self._queue = queue
         self._max_items = max(1, int(max_items_per_tick))
+        self._clock = clock
+        self._ids = ids
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
         entries: list[PerceptionEntry] = self._queue.drain(max_items=self._max_items)
@@ -78,5 +84,7 @@ class PerceptionProvider(Provider):
                     address_mode=e.address_mode,
                     familiarity=e.familiarity,
                 ),
+                clock=self._clock,
+                ids=self._ids,
             ))
         return items

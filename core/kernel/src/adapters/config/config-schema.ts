@@ -18,6 +18,7 @@ import type {
   ExtensionConfig,
   IngressGateConfig,
   CognitionServiceConfig,
+  CognitionConfig,
   InferenceConfig,
   LifecycleConfig,
   LLMConfig,
@@ -32,6 +33,7 @@ import type {
 /** configs/system/*.yaml 组合后的解析结果（系统身份/当前角色/备份 + Kernel 运行时子块） */
 export type SystemConfig = AppConfig & {
   cognition_service: CognitionServiceConfig;
+  cognition: CognitionConfig;
   lifecycle: LifecycleConfig;
   extensions: ExtensionConfig;
   avatar: AvatarConfig;

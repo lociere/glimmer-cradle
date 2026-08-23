@@ -7,21 +7,20 @@ import asyncio
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn, UserConversationTurn
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem
 from glimmer_cradle.cognition.domain.experience.events import MomentKind, SourceDescriptor
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import gauge
-
-logger = get_logger("perception_appraisal")
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
 class PerceptionAppraiser:
     """将本拍感知统一解释为多模态路由、情绪变化和 Moment。"""
 
     def __init__(self, *, recorder, emotion_system=None, multimodal_router=None,
-                 self_entity=None) -> None:
+                 self_entity=None, observability: ObservabilityPort) -> None:
         self._recorder = recorder
         self._emotion = emotion_system
         self._router = multimodal_router
         self._entity = self_entity
+        self._observability = observability
+        self._logger = observability.logger("perception_appraisal")
 
     async def appraise(
         self, sense_results: list[list[WorkspaceItem]], turn: CycleTurn
@@ -129,7 +128,7 @@ class PerceptionAppraiser:
         try:
             route = await asyncio.to_thread(self._router.route, model_input)
         except Exception as exc:
-            logger.warning("多模态路由失败，回落纯文本", error=str(exc))
+            self._logger.warning("多模态路由失败，回落纯文本", error=str(exc))
             return text, "", (), None
         effective_text = route.primary_text or "[多模态输入]"
         semantic_text = route.semantic_text or ""
@@ -152,11 +151,11 @@ class PerceptionAppraiser:
             self._emotion.update_by_input("\n".join(inputs).strip())
             state = self._emotion.get_state()
         except Exception as exc:
-            logger.warning("感知情绪评价失败（已隔离）", error=str(exc))
+            self._logger.warning("感知情绪评价失败（已隔离）", error=str(exc))
             return
         if not isinstance(state, dict):
             return
-        gauge(
+        self._observability.gauge(
             "emotion.intensity",
             float(state.get("intensity", 0.0)),
             labels={"emotion": str(state.get("emotion_type", ""))},

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
 function option(name, fallback) {
@@ -10,6 +10,7 @@ function option(name, fallback) {
 }
 
 const root = option('--contracts-root', resolve(import.meta.dirname, '..'));
+const workspace = option('--workspace-root', resolve(import.meta.dirname, '..', '..'));
 const inventoryPath = option('--inventory', resolve(root, 'inventory.md'));
 const inventory = readFileSync(inventoryPath, 'utf8');
 const required = [
@@ -65,6 +66,32 @@ for (const file of walk(resolve(root, 'json-schema')).filter((path) => path.ends
   requireInventoryValue(path, 'canonical JSON Schema path');
   requireInventoryValue(schema.$id, `canonical JSON Schema $id from ${path}`);
   requireInventoryValue(schema.title, `canonical JSON Schema title from ${path}`);
+}
+
+const audioGenerated = resolve(
+  workspace, 'engines', 'audio', 'src', 'glimmer_cradle', 'audio', 'generated',
+);
+if (!existsSync(audioGenerated) || !walk(audioGenerated).some((path) => path.endsWith('.py'))) {
+  throw new Error('Audio legacy Python generated output is missing at its real owner path');
+}
+const cognitionLegacy = resolve(
+  workspace, 'core', 'cognition', 'src', 'glimmer_cradle', 'cognition', 'protocol', 'generated',
+);
+if (existsSync(cognitionLegacy)) {
+  throw new Error('Cognition legacy Python generated output must remain deleted');
+}
+
+const protocolPackage = readFileSync(resolve(workspace, 'protocol', 'package.json'), 'utf8');
+const cognitionProject = readFileSync(resolve(workspace, 'core', 'cognition', 'pyproject.toml'), 'utf8');
+const audioProject = readFileSync(resolve(workspace, 'engines', 'audio', 'pyproject.toml'), 'utf8');
+if (!protocolPackage.includes('--project ../engines/audio') || protocolPackage.includes('--project ../core/cognition')) {
+  throw new Error('Protocol Python generator must execute in the Audio owner project');
+}
+if (cognitionProject.includes('datamodel-code-generator')) {
+  throw new Error('Cognition must not retain the Audio legacy generator tool dependency');
+}
+if (!audioProject.includes('datamodel-code-generator')) {
+  throw new Error('Audio owner project must declare its legacy generator tool dependency');
 }
 
 console.log('contracts inventory: ok');

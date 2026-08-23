@@ -1,163 +1,276 @@
-"""Cognition 内部冻结配置视图；外部 Document 只在配置 Adapter 中出现。"""
+"""Cognition 内部强类型配置投影；canonical defaults 只由 Kernel Schema normalizer 拥有。"""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-from types import MappingProxyType
-from typing import Any
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-def _freeze(value: Any) -> Any:
-    if isinstance(value, SettingsNode):
-        return value
-    if isinstance(value, Mapping):
-        return SettingsNode(value)
-    if isinstance(value, list):
-        return tuple(_freeze(item) for item in value)
-    return value
+class _Settings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
-def _thaw(value: Any) -> Any:
-    if isinstance(value, SettingsNode):
-        return value.to_mapping()
-    if isinstance(value, tuple):
-        return [_thaw(item) for item in value]
-    return value
+class CharacterBaseSettings(_Settings):
+    name: str
+    nickname: str
 
 
-class SettingsNode(Mapping[str, Any]):
-    """只暴露 Cognition 需要的属性式读取，不复制跨语言 Schema 类型。"""
-
-    __slots__ = ("_values",)
-
-    def __init__(self, values: Mapping[str, Any] | None = None, /, **updates: Any) -> None:
-        merged = dict(values or {})
-        merged.update(updates)
-        object.__setattr__(
-            self,
-            "_values",
-            MappingProxyType({key: _freeze(value) for key, value in merged.items()}),
-        )
-
-    def __getattribute__(self, name: str) -> Any:
-        if not name.startswith("_"):
-            values = object.__getattribute__(self, "_values")
-            if name in values:
-                return values[name]
-        return object.__getattribute__(self, name)
-
-    def __getattr__(self, name: str) -> Any:
-        try:
-            return self._values[name]
-        except KeyError as error:
-            raise AttributeError(name) from error
-
-    def __getitem__(self, key: str) -> Any:
-        return self._values[key]
-
-    def __iter__(self):
-        return iter(self._values)
-
-    def __len__(self) -> int:
-        return len(self._values)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, SettingsNode):
-            return self.to_mapping() == other.to_mapping()
-        if isinstance(other, Mapping):
-            return self.to_mapping() == dict(other)
-        return False
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        raise TypeError("Cognition settings are frozen")
-
-    def to_mapping(self) -> dict[str, Any]:
-        return {key: _thaw(value) for key, value in self._values.items()}
-
-    @classmethod
-    def model_validate(cls, value: Mapping[str, Any]) -> "SettingsNode":
-        return cls(value)
-
-    def model_dump(self, **_: Any) -> dict[str, Any]:
-        return self.to_mapping()
-
-    def with_updates(self, **updates: Any) -> "SettingsNode":
-        return SettingsNode(self.to_mapping(), **updates)
+class CharacterAssetsSettings(_Settings):
+    root: str
 
 
-class CharacterManifestSettings(SettingsNode):
-    pass
+class CharacterKnowledgeSettings(_Settings):
+    index: str
 
 
-class CharacterProfileSettings(SettingsNode):
-    pass
+class CharacterMigrationsSettings(_Settings):
+    root: str
 
 
-class CognitionSettings(SettingsNode):
-    def __init__(self, values: Mapping[str, Any] | None = None, /, **updates: Any) -> None:
-        defaults = {"workspace_capacity": 7, "default_tick_interval_ms": 5000}
-        defaults.update(values or {})
-        defaults.update(updates)
-        super().__init__(defaults)
+class CharacterManifestSettings(_Settings):
+    character_id: str
+    base: CharacterBaseSettings
+    persona_mode: Literal["api", "local_base", "local_finetune"]
+    assets: CharacterAssetsSettings
+    knowledge: CharacterKnowledgeSettings
+    migrations: CharacterMigrationsSettings
 
 
-class DialoguePolicySettings(SettingsNode):
-    pass
+class ProfileTextEntrySettings(_Settings):
+    id: str
+    content: str
+    priority: int
+    enabled: bool
 
 
-class EmbeddingSettings(SettingsNode):
-    def __init__(self, values: Mapping[str, Any] | None = None, /, **updates: Any) -> None:
-        merged = dict(values or {})
-        merged.update(updates)
-        providers = merged.get("providers")
-        if isinstance(providers, Mapping):
-            merged["providers"] = {
-                str(key).replace("-", "_"): value for key, value in providers.items()
-            }
-        super().__init__(merged)
+class ProfileConditionalEntrySettings(ProfileTextEntrySettings):
+    condition: str
 
 
-class InferenceSettings(SettingsNode):
-    pass
+class ProfileIdentitySettings(_Settings):
+    summary: str
+    appearance: str
+    values: list[ProfileTextEntrySettings]
 
 
-class LLMSettings(SettingsNode):
-    def __init__(self, values: Mapping[str, Any] | None = None, /, **updates: Any) -> None:
-        defaults: dict[str, Any] = {
-            "api_type": None,
-            "api_key": None,
-            "base_url": None,
-            "models": {},
-            "providers": {},
-            "temperature": None,
-            "request_method": None,
-            "request_path": None,
-            "request_headers": None,
-            "request_body_template": None,
-            "response_extract": None,
-        }
-        defaults.update(values or {})
-        defaults.update(updates)
-        super().__init__(defaults)
+class CharacterProfileSettings(_Settings):
+    identity: ProfileIdentitySettings
+    traits: list[ProfileTextEntrySettings]
+    relationship: list[ProfileTextEntrySettings]
+    expression: list[ProfileTextEntrySettings]
+    emotion_behaviors: list[ProfileConditionalEntrySettings]
+    context_behaviors: list[ProfileConditionalEntrySettings]
+    examples: list[ProfileTextEntrySettings]
 
 
-class MemorySettings(SettingsNode):
-    pass
+class DialoguePresentationSettings(_Settings):
+    forbid_stage_directions: bool
+    forbid_emotion_labels: bool
+    casual_max_sentences: int
+    casual_max_chars_per_message: int
+    complex_reply_policy: str
+    message_split_policy: str
+    rules: list[str]
 
 
-class SafetySettings(SettingsNode):
-    pass
+class StructuredOutputSettings(_Settings):
+    preserve_markdown: bool
+    preserve_code_blocks: bool
+    require_fenced_code_blocks: bool
+    rules: list[str]
 
 
-@dataclass(frozen=True, slots=True)
-class CharacterRuntimeSettings:
+class DialogueNormalizationSettings(_Settings):
+    strip_stage_directions: bool
+    strip_emotion_labels: bool
+
+
+class DialoguePolicySettings(_Settings):
+    presentation: DialoguePresentationSettings
+    structured_output: StructuredOutputSettings
+    normalization: DialogueNormalizationSettings
+
+
+class SafetySettings(_Settings):
+    taboos: str
+    forbidden_phrases: list[str]
+    forbidden_regex: list[str]
+
+
+class ModelSettings(_Settings):
+    max_tokens: int
+    temperature: float
+    top_p: float
+    frequency_penalty: float
+
+
+class LifeClockSettings(_Settings):
+    heartbeat_enabled: bool
+    heartbeat_interval_ms: int
+    focus_duration_ms: int
+    ingress_debounce_ms: int
+    ingress_focused_debounce_ms: int
+    ingress_max_batch_messages: int
+    ingress_max_batch_items: int
+    summon_keywords: list[str]
+    focus_on_any_chat: bool
+
+
+class MultimodalSettings(_Settings):
+    enabled: bool
+    strategy: Literal["core_direct", "specialist_then_core"]
+    max_items: int
+    core_model: str
+    image_model: str
+    video_model: str
+
+
+class ActionStreamSettings(_Settings):
+    enabled: bool
+    channel: Literal["live2d"]
+
+
+class InferenceSettings(_Settings):
+    model: ModelSettings
+    life_clock: LifeClockSettings
+    multimodal: MultimodalSettings
+    action_stream: ActionStreamSettings
+
+
+class LLMRouteSettings(_Settings):
+    provider: str | None = None
+    model_alias: str | None = None
+
+
+class LLMProviderSettings(_Settings):
+    api_type: str
+    api_key: str | None = None
+    base_url: str | None = None
+    models: dict[str, str]
+    temperature: float | None = None
+    request_method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
+    request_path: str | None = None
+    request_headers: dict[str, str] | None = None
+    request_body_template: str | None = None
+    response_extract: str | None = None
+
+
+class LLMSettings(_Settings):
+    default_route: LLMRouteSettings | None = None
+    api_type: str
+    api_key: str | None = None
+    base_url: str | None = None
+    models: dict[str, str] | None = None
+    temperature: float | None = None
+    providers: dict[str, LLMProviderSettings] | None = None
+    request_method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
+    request_path: str | None = None
+    request_headers: dict[str, str] | None = None
+    request_body_template: str | None = None
+    response_extract: str | None = None
+
+
+class WorkingMemorySettings(_Settings):
+    max_messages_per_conversation: int = Field(ge=2)
+    hydrate_recent_messages: int = Field(ge=2)
+    context_message_limit: int = Field(ge=1)
+
+
+class ConversationProjectionSettings(_Settings):
+    segment_target_messages: int = Field(ge=4)
+    chapter_idle_minutes: int = Field(ge=1)
+    chapter_segment_limit: int = Field(ge=2)
+    state_update_messages: int = Field(ge=1)
+    history_candidate_limit: int = Field(ge=1)
+    history_result_limit: int = Field(ge=1)
+    summary_max_chars: int = Field(ge=256)
+
+
+class ExperienceSettings(_Settings):
+    enabled: bool
+    pack_max_size_mb: int = Field(ge=16)
+    flush_interval_ms: int = Field(ge=50)
+    flush_max_buffer: int = Field(ge=1)
+    episode_idle_seconds: int = Field(ge=10)
+    seal_integrity_check: bool
+
+
+class ConsolidationSettings(_Settings):
+    enabled: bool
+    batch_size: int = Field(ge=1)
+    max_batch_moments: int = Field(ge=1)
+    debounce_seconds: int = Field(ge=0)
+    max_wait_seconds: int = Field(ge=10)
+    lease_seconds: int = Field(ge=10)
+    retry_base_seconds: int = Field(ge=1)
+    minimum_salience: float = Field(ge=0, le=1)
+    autobiographical_evidence_threshold: int = Field(ge=2)
+    schedule_interval_seconds: int = Field(ge=10)
+
+
+class RetrievalSettings(_Settings):
+    token_budget: int = Field(ge=128)
+    candidate_limit: int = Field(ge=1)
+    result_limit: int = Field(ge=1)
+    semantic_weight: float = Field(ge=0, le=1)
+
+
+class MemorySettings(_Settings):
+    working: WorkingMemorySettings
+    conversation: ConversationProjectionSettings
+    experience: ExperienceSettings
+    consolidation: ConsolidationSettings
+    retrieval: RetrievalSettings
+
+
+class CognitionSettings(_Settings):
+    workspace_capacity: int = Field(ge=1)
+    default_tick_interval_ms: int = Field(ge=1)
+
+
+class EmbeddingRouteSettings(_Settings):
+    provider: Literal["dashscope-text-embedding", "local-sentence-transformers"]
+
+
+class DashScopeEmbeddingSettings(_Settings):
+    endpoint: str
+    model: str
+    dimensions: Literal[64, 128, 256, 512, 768, 1024, 1536, 2048]
+    request_timeout_ms: int = Field(ge=1000)
+    max_retries: int = Field(ge=0, le=3)
+
+
+class LocalEmbeddingSettings(_Settings):
+    model_path: str
+    model_id: str
+    auto_download: bool
+    device: str
+    batch_size: int = Field(ge=1)
+
+
+class EmbeddingProvidersSettings(_Settings):
+    dashscope_text_embedding: DashScopeEmbeddingSettings = Field(
+        validation_alias="dashscope-text-embedding"
+    )
+    local_sentence_transformers: LocalEmbeddingSettings = Field(
+        validation_alias="local-sentence-transformers"
+    )
+
+
+class EmbeddingSettings(_Settings):
+    enabled: bool
+    route: EmbeddingRouteSettings
+    providers: EmbeddingProvidersSettings
+
+
+class CharacterRuntimeSettings(_Settings):
     manifest: CharacterManifestSettings
     profile: CharacterProfileSettings
     dialogue: DialoguePolicySettings
     safety: SafetySettings
     inference: InferenceSettings
-    llm: LLMSettings | None
+    llm: LLMSettings | None = None
     memory: MemorySettings
-    embedding: EmbeddingSettings | None
+    embedding: EmbeddingSettings
     cognition: CognitionSettings

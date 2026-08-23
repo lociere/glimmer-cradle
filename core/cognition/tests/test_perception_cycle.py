@@ -1,27 +1,47 @@
 """感知进入 CycleController 唯一主线的端到端验证。"""
 from __future__ import annotations
 
-from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+from glimmer_cradle.cognition.application.cycle import (
+    CycleController as _CycleController,
+    GlobalWorkspace as _GlobalWorkspace,
+)
 from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
+from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from glimmer_cradle.cognition.domain.configuration import CognitionSettings
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+
+
+def GlobalWorkspace(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    return _GlobalWorkspace(*args, **kwargs)
+
+
+def PerceptionProvider(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    return _PerceptionProvider(*args, **kwargs)
+
+
+def CycleController(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _CycleController(*args, **kwargs)
 
 
 # ─────────────────────────────── 配置默认值 ───────────────────────────────
 
-def test_cognition_config_defaults() -> None:
-    """CognitionSettings 默认值（workspace_capacity / tick interval）。"""
-    cfg = CognitionSettings()
+def test_cognition_config_requires_normalized_values() -> None:
+    cfg = CognitionSettings(workspace_capacity=7, default_tick_interval_ms=5000)
     assert cfg.workspace_capacity == 7
     assert cfg.default_tick_interval_ms == 5000
 
 
 def test_cognition_config_frozen() -> None:
     """配置 frozen=True，运行时不可篡改。"""
-    cfg = CognitionSettings()
+    cfg = CognitionSettings(workspace_capacity=7, default_tick_interval_ms=5000)
     import pydantic
     try:
         cfg.workspace_capacity = 99  # type: ignore[misc]
@@ -198,6 +218,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     reasoning = ReasoningService(
         cloud=CloudReasoning(_StubLLM()),  # type: ignore[arg-type]
         local=None,
+        observability=OBSERVABILITY,
     )
 
     ws = GlobalWorkspace(capacity=5)

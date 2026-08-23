@@ -17,13 +17,17 @@ from __future__ import annotations
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
 from glimmer_cradle.cognition.domain.affect.emotion import EmotionSystem
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
 class AffectProvider(Provider):
     name = "affect"
 
-    def __init__(self, emotion_system: EmotionSystem) -> None:
+    def __init__(self, emotion_system: EmotionSystem, *, clock: ClockPort, ids: IdGeneratorPort) -> None:
         self._emotion = emotion_system
+        self._clock = clock
+        self._ids = ids
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
         try:
@@ -44,4 +48,6 @@ class AffectProvider(Provider):
                 "trigger": state.get("trigger", ""),
             },
             salience=min(1.0, intensity),
+            clock=self._clock,
+            ids=self._ids,
         )]

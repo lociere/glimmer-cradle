@@ -2,11 +2,37 @@
 
 import pytest
 
-from glimmer_cradle.cognition.domain.configuration import InferenceSettings, LLMSettings, SettingsNode
+from glimmer_cradle.cognition.domain.configuration import (
+    ActionStreamSettings, InferenceSettings, LifeClockSettings, LLMSettings,
+    ModelSettings, MultimodalSettings,
+)
 from glimmer_cradle.cognition.domain.exceptions import InferenceException
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, LLMMessage, LLMRequest
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
-ActionStreamConfig = LifeClockConfig = ModelConfig = MultimodalConfig = SettingsNode
+
+def ModelConfig(**updates):
+    return ModelSettings(max_tokens=1024, temperature=0.8, top_p=0.9,
+                         frequency_penalty=0.0, **updates)
+
+
+def LifeClockConfig(**updates):
+    values = dict(heartbeat_enabled=False, heartbeat_interval_ms=45000,
+                  focus_duration_ms=20000, ingress_debounce_ms=1400,
+                  ingress_focused_debounce_ms=700, ingress_max_batch_messages=4,
+                  ingress_max_batch_items=24, summon_keywords=[], focus_on_any_chat=False)
+    values.update(updates)
+    return LifeClockSettings(**values)
+
+
+def MultimodalConfig(**updates):
+    values = dict(enabled=False, strategy="specialist_then_core", max_items=6,
+                  core_model="deepseek", image_model="", video_model="")
+    values.update(updates)
+    return MultimodalSettings(**values)
+
+
+def ActionStreamConfig(**updates):
+    return ActionStreamSettings(enabled=False, channel="live2d", **updates)
 
 
 class _SelfEntity:

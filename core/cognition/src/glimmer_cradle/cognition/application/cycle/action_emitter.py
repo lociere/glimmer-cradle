@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.application.cycle.reply_text import build_reply_messages, normalize_reply_text
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult, Intent
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter
-
-logger = get_logger("cognition_action_emitter")
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
 class ActionEmitter:
     """将已仲裁意图映射为受控 ActionCommand 并推向 Kernel。"""
 
-    def __init__(self, *, sink=None, emotion_system=None) -> None:
+    def __init__(self, *, sink=None, emotion_system=None,
+                 observability: ObservabilityPort) -> None:
         self._sink = sink
         self._emotion = emotion_system
+        self._observability = observability
+        self._logger = observability.logger("cognition_action_emitter")
 
     async def emit(self, arbitration: ArbitrationResult | None) -> int:
         if self._sink is None or arbitration is None:
@@ -29,8 +29,8 @@ class ActionEmitter:
                 await self._sink(command)
                 emitted += 1
             except Exception as exc:
-                logger.error("ActionCommand 推送失败（已隔离）", error=str(exc), exc_info=True)
-                counter("cognition.action_emit_error", 1)
+                self._logger.error("ActionCommand 推送失败（已隔离）", error=str(exc), exc_info=True)
+                self._observability.counter("cognition.action_emit_error", 1)
         return emitted
 
     def to_command(self, intent: Intent) -> dict | None:

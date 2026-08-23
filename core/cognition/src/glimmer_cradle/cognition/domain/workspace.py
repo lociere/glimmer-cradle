@@ -15,11 +15,13 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
+
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
 class WorkspaceSource(StrEnum):
@@ -49,14 +51,8 @@ __all__ = ["GlobalWorkspace", "WorkspaceItem", "make_item", "now_iso_ms"]
 
 # ── 工具 ──────────────────────────────────────────────────────────────────
 
-def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def now_iso_ms() -> str:
-    """返回 UTC 毫秒 ISO8601 时间戳（与经历之流 occurred_at 同格式）。"""
-    return _now_utc().isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
+def now_iso_ms(clock: ClockPort) -> str:
+    return clock.now_iso()
 
 def _parse_iso(s: str) -> datetime:
     if s.endswith("Z"):
@@ -109,17 +105,19 @@ def make_item(
     content: dict,
     salience: float,
     decay_at: str | None = None,
+    clock: ClockPort,
+    ids: IdGeneratorPort,
 ) -> WorkspaceItem:
     """便利构造：自动填 item_id 与 created_at。
 
     Provider 用这个工厂投放，不必关心 ID/时间字段。
     """
     return WorkspaceItem(
-        item_id=uuid.uuid4().hex,
+        item_id=ids.new(),
         source=WorkspaceSource(source),
         content=content,
         salience=salience,
-        created_at=now_iso_ms(),
+        created_at=clock.now_iso(),
         decay_at=decay_at,
     )
 
@@ -129,10 +127,11 @@ def make_item(
 class GlobalWorkspace:
     """LIDA 风格的全局工作区。"""
 
-    def __init__(self, *, capacity: int = 7) -> None:
+    def __init__(self, *, capacity: int = 7, clock: ClockPort) -> None:
         if capacity < 1:
             raise ValueError("capacity 必须 >= 1")
         self._capacity: int = capacity
+        self._clock = clock
         self._items: list[WorkspaceItem] = []
         self._lock: asyncio.Lock = asyncio.Lock()
 
@@ -156,7 +155,7 @@ class GlobalWorkspace:
     ) -> tuple[bool, WorkspaceItem | None]:
         """投入候选，并把竞争中被淘汰的旧项交还给生命周期 owner。"""
         async with self._lock:
-            self._prune_expired_locked(_now_utc())
+            self._prune_expired_locked(self._clock.now())
             if len(self._items) < self._capacity:
                 self._items.append(item)
                 return True, None
@@ -171,7 +170,7 @@ class GlobalWorkspace:
     async def broadcast(self) -> WorkspaceItem | None:
         """取本拍的"意识内容" —— 当前 salience 最高的项。空时返回 None。"""
         async with self._lock:
-            self._prune_expired_locked(_now_utc())
+            self._prune_expired_locked(self._clock.now())
             if not self._items:
                 return None
             return max(self._items, key=_attention_rank)
@@ -179,7 +178,7 @@ class GlobalWorkspace:
     async def snapshot(self) -> list[WorkspaceItem]:
         """返回当前所有项的副本（监控用，state_sync 等）。"""
         async with self._lock:
-            self._prune_expired_locked(_now_utc())
+            self._prune_expired_locked(self._clock.now())
             return list(self._items)
 
     async def remove(self, item_id: str) -> bool:
@@ -206,7 +205,7 @@ class GlobalWorkspace:
     async def prune_expired(self) -> int:
         """主动剪掉过期项，返回剪掉的数量。"""
         async with self._lock:
-            return self._prune_expired_locked(_now_utc())
+            return self._prune_expired_locked(self._clock.now())
 
     async def clear(self) -> None:
         """清空（测试 / 复位用）。"""
@@ -215,7 +214,7 @@ class GlobalWorkspace:
 
     async def size(self) -> int:
         async with self._lock:
-            self._prune_expired_locked(_now_utc())
+            self._prune_expired_locked(self._clock.now())
             return len(self._items)
 
     # ── 内部：调用方必须持锁 ─────────────────────────────────────────────

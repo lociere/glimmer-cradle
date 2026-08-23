@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.trace_context import (
+from glimmer_cradle.cognition.adapters.observability.trace_context import (
     get_current_boot_id,
     get_current_trace_id,
 )

@@ -5,9 +5,6 @@ from __future__ import annotations
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.cognition.domain.experience.events import MomentKind
-from glimmer_cradle.cognition.ports.observability import get_logger
-
-logger = get_logger("cognition_continuity")
 
 
 class CycleContinuity:

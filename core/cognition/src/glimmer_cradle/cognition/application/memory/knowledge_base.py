@@ -19,11 +19,9 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
-from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.inference import EmbeddingPort
 from glimmer_cradle.cognition.ports.persistence import KnowledgeRepositoryPort, VectorRepositoryPort
-
-logger = get_logger("knowledge_base")
 
 # 英文单词 / 汉字逐字分词（bigram 在 _tokenize 中生成）
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]")
@@ -55,7 +53,8 @@ class KnowledgeBase:
       3. init_from_kernel() 注册 scope=knowledge 条目，按 mode 决定检索策略
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, observability: ObservabilityPort) -> None:
+        self._logger = observability.logger("knowledge_base")
         self._entries: Dict[str, KnowledgeEntry] = {}
         self._policy = KnowledgeRetrievalPolicy()
         self._embedding_engine: Optional[EmbeddingPort] = None
@@ -63,13 +62,13 @@ class KnowledgeBase:
         self._repo: Optional[KnowledgeRepositoryPort] = None
         # 向量持久化避免每次进程启动重新计算。
         self._vec_repo: Optional[VectorRepositoryPort] = None
-        logger.info("世界知识库初始化完成")
+        self._logger.info("世界知识库初始化完成")
 
     def set_embedding_engine(self, engine: EmbeddingPort) -> None:
         """接入由 Composition Root 创建的嵌入引擎。"""
         self._embedding_engine = engine if engine.is_available() else None
         if self._embedding_engine:
-            logger.info("知识库已接入向量引擎，semantic_rag 模式可用")
+            self._logger.info("知识库已接入向量引擎，semantic_rag 模式可用")
 
     def bind_repository(self, repo: KnowledgeRepositoryPort) -> None:
         """绑定知识持久化仓库。"""
@@ -94,7 +93,7 @@ class KnowledgeBase:
             for r in rows
         }
         await self._restore_or_compute_embeddings()
-        logger.info("知识库已从本地库加载", entry_count=len(self._entries))
+        self._logger.info("知识库已从本地库加载", entry_count=len(self._entries))
 
     async def init_from_kernel(self, payload: KnowledgeInitialization) -> None:
         """从内核 knowledge_init 载荷预填知识库。
@@ -123,12 +122,12 @@ class KnowledgeBase:
         ]
 
         if self._repo is None:
-            logger.error("知识库未绑定持久化仓库，knowledge_init 已跳过")
+            self._logger.error("知识库未绑定持久化仓库，knowledge_init 已跳过")
             return
 
         await self._repo.replace_config_entries(config_entries)
         await self.load_persisted()
-        logger.info(
+        self._logger.info(
             "知识库注入完成",
             version=payload.version,
             mode=self._policy.mode,
@@ -169,9 +168,9 @@ class KnowledgeBase:
                             model=model_id, vector=entry._embedding,
                         )
             except Exception as exc:
-                logger.warning("知识库语义索引更新失败，继续使用基础检索", error=str(exc))
+                self._logger.warning("知识库语义索引更新失败，继续使用基础检索", error=str(exc))
                 return
-        logger.info(
+        self._logger.info(
             "知识库向量就绪",
             restored=len(self._entries) - len(missing),
             recomputed=len(missing),
@@ -216,7 +215,7 @@ class KnowledgeBase:
                 try:
                     return await self._semantic_retrieve(query, has_embedding)
                 except Exception as exc:
-                    logger.warning("语义检索异常，继续使用基础检索", error=str(exc))
+                    self._logger.warning("语义检索异常，继续使用基础检索", error=str(exc))
 
         # 退化为 bigram
         return self._bigram_retrieve(query, entries)

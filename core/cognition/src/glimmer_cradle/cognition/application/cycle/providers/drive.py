@@ -11,10 +11,12 @@ DriveProvider —— 内在动机专家。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
 @dataclass(frozen=True)
@@ -40,10 +42,6 @@ class DriveConfig:
     emotion_strong_rest_multiplier: float = 2.0
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 class DriveProvider(Provider):
     name = "drive"
 
@@ -55,10 +53,14 @@ class DriveProvider(Provider):
         activity_controller=None,
         emotion_system=None,
         config: DriveConfig | None = None,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
     ) -> None:
         self._cfg = config or DriveConfig()
         self._activity = activity_controller
         self._emotion = emotion_system
+        self._clock = clock
+        self._ids = ids
 
         self._levels: dict[str, float] = {d: 0.0 for d in self.DRIVES}
         self._last_tick_at: datetime | None = None
@@ -79,7 +81,7 @@ class DriveProvider(Provider):
     # ── propose ──────────────────────────────────────────────────────────
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
-        now = _now()
+        now = self._clock.now()
         if self._last_tick_at is None:
             tick_seconds = 0.0  # 首拍不累积
         else:
@@ -126,6 +128,8 @@ class DriveProvider(Provider):
                 "all_levels": dict(self._levels),
             },
             salience=top_level,
+            clock=self._clock,
+            ids=self._ids,
         )]
 
     # ── helpers ──────────────────────────────────────────────────────────

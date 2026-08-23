@@ -25,14 +25,11 @@ from glimmer_cradle.cognition.domain.volition import (
 )
 from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace, WorkspaceItem
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter, gauge
-from glimmer_cradle.cognition.ports.observability import span
-from glimmer_cradle.cognition.ports.trace_context import TraceContext, new_trace_id
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
-
-logger = get_logger("cycle_controller")
 
 class CycleController:
     """只负责编排 Sense 到 Consolidate 的阶段顺序与故障隔离。"""
@@ -55,7 +52,14 @@ class CycleController:
         conversation=None,
         multimodal_router=None,
         perception_operations: PerceptionOperationRegistry | None = None,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+        observability: ObservabilityPort,
     ) -> None:
+        self._clock = clock
+        self._ids = ids
+        self._observability = observability
+        self.logger = observability.logger("cycle_controller")
         self._ws = workspace
         self._providers: list[Provider] = list(providers)
         recent_experience_source = RecentExperienceSource(experience_recorder)
@@ -65,17 +69,21 @@ class CycleController:
         self._default_interval_s: float = max(0.5, default_tick_interval_ms / 1000.0)
         # Act 阶段出口：Callable[[dict], Awaitable] —— 一般 = outbound_adapter.
         # send_action_command。None 时 Act 只记 metric 不推送（蓝图 §4.7 沉默默认）。
-        self._action_emitter = ActionEmitter(sink=action_sink, emotion_system=emotion_system)
+        self._action_emitter = ActionEmitter(
+            sink=action_sink, emotion_system=emotion_system, observability=observability
+        )
         reply_context = ReplyContextBuilder(
             self_entity=self_entity,
             conversation=conversation,
             recent_experience_source=recent_experience_source,
+            observability=observability,
         )
         self._appraiser = PerceptionAppraiser(
             recorder=experience_recorder,
             emotion_system=emotion_system,
             multimodal_router=multimodal_router,
             self_entity=self_entity,
+            observability=observability,
         )
         self._deliberation = DeliberationController(
             reasoning=reasoning,
@@ -84,6 +92,7 @@ class CycleController:
             emotion_system=emotion_system,
             persona_injector=persona_injector,
             boundary_validator=boundary_validator,
+            observability=observability,
         )
         self._continuity = CycleContinuity(
             recorder=experience_recorder,
@@ -101,11 +110,11 @@ class CycleController:
 
     async def start(self) -> None:
         if self._running:
-            logger.warning("认知循环已在运行")
+            self.logger.warning("认知循环已在运行")
             return
         self._running = True
         self._task = asyncio.create_task(self._main_loop())
-        logger.info(
+        self.logger.info(
             "认知循环已启动",
             providers=[p.name for p in self._providers],
             workspace_capacity=self._ws.capacity,
@@ -119,7 +128,7 @@ class CycleController:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        logger.info("认知循环已停止", total_cycles=self._cycle_count)
+        self.logger.info("认知循环已停止", total_cycles=self._cycle_count)
 
     @property
     def cycle_count(self) -> int:
@@ -152,7 +161,7 @@ class CycleController:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("认知循环 tick 异常", error=str(e), exc_info=True)
+                self.logger.error("认知循环 tick 异常", error=str(e), exc_info=True)
 
     def _current_tick_interval_s(self) -> float:
         if self._activity is not None:
@@ -173,8 +182,10 @@ class CycleController:
         self._active_perception_trace = ""
         try:
             # 每拍开新 trace + 根 span
-            with TraceContext(new_trace_id()):
-                with span("cognitive_cycle", attributes={"cycle": self._cycle_count}) as cycle:
+            with self._observability.trace_context(self._observability.new_trace_id()):
+                with self._observability.span(
+                    "cognitive_cycle", attributes={"cycle": self._cycle_count}
+                ) as cycle:
                     broadcast_item = await self._do_tick()
                     if broadcast_item is not None:
                         cycle.set_attribute("broadcast_source", broadcast_item.source)
@@ -197,7 +208,7 @@ class CycleController:
         self._turn = CycleTurn()
         # ── Sense / Appraise / Recall（并发投放）──────────────────────────
         snapshot: list[WorkspaceItem] = []
-        with span("sense_appraise_recall"):
+        with self._observability.span("sense_appraise_recall"):
             snapshot = await self._ws.snapshot()
             results = await asyncio.gather(
                 *(self._safe_propose(p, snapshot) for p in self._providers),
@@ -205,14 +216,14 @@ class CycleController:
             )
 
         # Appraise 在竞争前更新情绪，让 Deliberate 消费本次感知后的状态。
-        with span("appraise") as s_appraise:
+        with self._observability.span("appraise") as s_appraise:
             await self._appraiser.appraise(results, self._turn)
             s_appraise.set_attribute("perceptions", len(self._turn.perception_moment_ids))
 
         # ── Compete（投候选 → 工作区按 salience 竞争）─────────────────────
         proposed_total = 0
         accepted_total = 0
-        with span("compete") as s_compete:
+        with self._observability.span("compete") as s_compete:
             for items in results:
                 for item in items:
                     proposed_total += 1
@@ -229,12 +240,12 @@ class CycleController:
                             self._perception_operations.finish(trace_id, "failed", "感知被更高优先级输入淘汰")
             s_compete.set_attribute("proposed", proposed_total)
             s_compete.set_attribute("accepted", accepted_total)
-            counter("cognition.propose", proposed_total, labels={"phase": "compete"})
-            counter("cognition.accepted", accepted_total, labels={"phase": "compete"})
+            self._observability.counter("cognition.propose", proposed_total, labels={"phase": "compete"})
+            self._observability.counter("cognition.accepted", accepted_total, labels={"phase": "compete"})
 
         # ── Broadcast（取 top 作"意识内容"）──────────────────────────────
         broadcast_item: WorkspaceItem | None = None
-        with span("broadcast") as s_bc:
+        with self._observability.span("broadcast") as s_bc:
             broadcast_item = await self._ws.broadcast()
             s_bc.set_attribute("has_content", broadcast_item is not None)
         trace_id = self._perception_trace(broadcast_item)
@@ -250,7 +261,7 @@ class CycleController:
                 self._perception_operations.mark_running(trace_id, task)
 
         # Deliberate：结构化规划后生成角色回复或能力请求。
-        with span("deliberate") as s_delib:
+        with self._observability.span("deliberate") as s_delib:
             self._turn.skill_request = None
             self._turn.action_plan = None
             self._turn.reply = await self._deliberation.deliberate(
@@ -264,7 +275,7 @@ class CycleController:
             )
 
         # ── Intend（5.7 Volition 连续意愿 + 仲裁）─────────────────────────
-        with span("intend") as s_intend:
+        with self._observability.span("intend") as s_intend:
             intents = self._build_intents(broadcast_item, await self._ws.snapshot())
             activity_state, allows_proactive = self._read_activity_for_volition()
             threshold = threshold_for(activity_state, self._willingness_cfg)
@@ -275,26 +286,26 @@ class CycleController:
             s_intend.set_attribute("candidate_intents", len(intents))
             s_intend.set_attribute("accepted_intents", len(self._last_arbitration.accepted))
             s_intend.set_attribute("threshold", threshold)
-            counter("cognition.intents_proposed", len(intents))
-            counter("cognition.intents_accepted", len(self._last_arbitration.accepted))
+            self._observability.counter("cognition.intents_proposed", len(intents))
+            self._observability.counter("cognition.intents_accepted", len(self._last_arbitration.accepted))
 
         # Act：只发送通过仲裁的 ActionCommand。
-        with span("act") as s_act:
+        with self._observability.span("act") as s_act:
             emitted = await self._action_emitter.emit(self._turn.arbitration)
             s_act.set_attribute("actions_emitted", emitted)
             if emitted:
                 if self._activity is not None and hasattr(self._activity, "record_self_activity"):
                     self._activity.record_self_activity("action_emitted")
-                counter("cognition.actions_emitted", emitted)
+                self._observability.counter("cognition.actions_emitted", emitted)
 
         # ── Consolidate（只提交本拍真实经历；后台维护由独立 Scheduler 推进）
-        with span("consolidate") as s_cons:
+        with self._observability.span("consolidate") as s_cons:
             await self._continuity.commit(self._turn)
             s_cons.set_attribute("experience_committed", True)
 
         await self._consume_ephemeral_broadcast(broadcast_item)
-        gauge("cognition.tick_alive", 1.0)
-        gauge("cognition.workspace_size", float(await self._ws.size()))
+        self._observability.gauge("cognition.tick_alive", 1.0)
+        self._observability.gauge("cognition.workspace_size", float(await self._ws.size()))
         return broadcast_item
 
     # ── 内部辅助 ─────────────────────────────────────────────────────────
@@ -307,7 +318,7 @@ class CycleController:
         if not content.get("scene_id") or not content.get("trace_id"):
             return
         if await self._ws.remove(broadcast_item.item_id):
-            counter("cognition.workspace_consumed", 1, labels={"source": "perception"})
+            self._observability.counter("cognition.workspace_consumed", 1, labels={"source": "perception"})
 
     @staticmethod
     def _perception_trace(item: WorkspaceItem | None) -> str:
@@ -322,13 +333,13 @@ class CycleController:
         try:
             return await provider.propose(snapshot)
         except Exception as e:
-            logger.error(
+            self.logger.error(
                 "Provider propose 异常",
                 provider=provider.name,
                 error=str(e),
                 exc_info=True,
             )
-            counter("cognition.provider_error", 1, labels={"provider": provider.name})
+            self._observability.counter("cognition.provider_error", 1, labels={"provider": provider.name})
             return []
 
     @property
@@ -359,7 +370,7 @@ class CycleController:
         if broadcast_item.source == "perception":
             initiative = "reactive" if bc.get("address_mode") == "direct" else "proactive"
             if self._turn.skill_request is not None:
-                return [make_intent(
+                return [self._make_intent(
                     type="action",
                     initiative=initiative,
                     willingness=w,
@@ -384,7 +395,7 @@ class CycleController:
             # 无生成、越界或推理失败时不产生 reply intent。
             if not self._turn.reply:
                 return []
-            return [make_intent(
+            return [self._make_intent(
                 type="reply",
                 initiative=initiative,
                 willingness=w,
@@ -399,19 +410,26 @@ class CycleController:
             )]
         if broadcast_item.source == "drive" and bc.get("drive") == "companionship":
             # 强陪伴欲：proactive reply（仍受 activity policy 闸控）。
-            return [make_intent(
+            return [self._make_intent(
                 type="reply",
                 initiative="proactive",
                 willingness=w,
                 payload={"trigger": "drive.companionship", "level": bc.get("level", 0.0)},
             )]
         # 其他来源 → 主动思考
-        return [make_intent(
+        return [self._make_intent(
             type="thought",
             initiative="proactive",
             willingness=w,
             payload={"source": broadcast_item.source, "content": bc},
         )]
+
+    def _make_intent(self, **values) -> Intent:
+        return make_intent(
+            **values,
+            intent_id=self._ids.new(),
+            created_at=self._clock.now_iso(),
+        )
 
     def _gather_willingness_inputs(
         self,

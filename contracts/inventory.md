@@ -31,6 +31,7 @@
 |---|---|---|---|---|---|
 | `pnpm sync:contracts` | root script 指向 `pnpm --filter @glimmer-cradle/protocol gen:all`。 | Protocol owner | root `package.json` | Slice 9 | 所有旧 protocol consumer 归零，`contracts/` 生成链成为运行事实后删除或改名；Slice 1 保留。 |
 | `protocol/package.json gen:all` | 顺序运行 `gen:ts`、`gen:py`、`gen:cs`。 | Protocol owner | `protocol/package.json` | Slice 2-9 | 对应旧语言投影消费者迁移完成后删除。 |
+| `engines/audio/src/glimmer_cradle/audio/generated/` | Audio legacy Python projection；`gen:py` 使用 `engines/audio` 的 uv dev 环境，Cognition 不再承担生成工具依赖。 | Audio owner | `protocol/src/schemas/engine/` + `protocol/codegen/gen-py.py` | Slice 4 contract edge；Slice 8 前保留 | checker 同时验证真实输出存在、Audio tool owner 与 Cognition tool consumer 归零。 |
 | `protocol/codegen/{gen-ts.ts,gen-py.py,gen-cs.ts}` | JSON Schema -> TypeScript/Python/C# 的旧生成器；Slice 4 后 `gen-py.py` 只读取 `schemas/engine/` 并生成 Audio projection，不再生成 Cognition projection。 | Protocol owner | `protocol/codegen/` | Slice 2-9 | 各语言旧生成物消费者归零且 Contract Spine/JSON Schema 门覆盖后，按对应切片删除；Audio Python projection 属于 Slice 8。 |
 | `@bufbuild/buf` in `protocol/package.json` | 当前锁定解析为 `1.66.1`，但旧 protocol 生成链不使用 Protobuf Service baseline。 | Protocol owner | `pnpm-lock.yaml` | Slice 1 建立新 baseline | 新 `contracts/` 使用本地 Buf CLI；旧 protocol 是否保留由 Slice 9 决定。 |
 | `ajv` / `ajv-formats` | 旧 JSON Schema validator runtime 位于 `@glimmer-cradle/protocol`。 | Protocol runtime helper owner | `protocol/src/runtime/validator.ts` | Document 迁移相关切片 | 配置/manifest/package/dynamic params 均有 `contracts/json-schema` owner、兼容门和 runtime adapter 后迁移。 |

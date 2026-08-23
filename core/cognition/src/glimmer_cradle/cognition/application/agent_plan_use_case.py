@@ -9,14 +9,11 @@ from typing import List
 from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
-from glimmer_cradle.cognition.ports.observability import get_logger
 from glimmer_cradle.cognition.ports.kernel.models import (
     SkillToolDescriptor,
     AgentPlanResult,
     SkillToolSuggestion,
 )
-
-logger = get_logger("agent_plan_use_case")
 
 _PLAN_SYSTEM_PROMPT = (
     "你是一个 AI 任务规划助手。根据用户目标和可用工具列表，输出结构化工具调用规划。\n\n"
@@ -101,10 +98,10 @@ class AgentPlanUseCase(BaseUseCase[AgentPlanInput, AgentPlanOutput]):
             summary = parsed.get("plan_summary", "")
             for item in parsed.get("suggestions", []):
                 suggestions.append(SkillToolSuggestion.model_validate(item))
-            logger.debug("LLM 规划成功", goal_len=len(goal), suggestion_count=len(suggestions))
+            self._logger.debug("LLM 规划成功", goal_len=len(goal), suggestion_count=len(suggestions))
 
         except Exception as exc:
-            logger.warning("LLM 规划失败，返回空建议", error=str(exc), goal=goal[:60])
+            self._logger.warning("LLM 规划失败，返回空建议", error=str(exc), goal=goal[:60])
             reasoning = "LLM 规划异常：" + str(exc)
             summary = "规划失败，请检查 LLM 服务。"
 

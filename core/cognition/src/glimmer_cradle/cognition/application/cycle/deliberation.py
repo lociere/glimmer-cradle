@@ -14,10 +14,7 @@ from glimmer_cradle.cognition.application.inference.service import (
     ReasoningService,
     ReasoningUnavailable,
 )
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter
-
-logger = get_logger("cognition_deliberation")
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
 class DeliberationController:
@@ -32,14 +29,17 @@ class DeliberationController:
         emotion_system=None,
         persona_injector=None,
         boundary_validator: Callable[[str], bool] | None = None,
+        observability: ObservabilityPort,
     ) -> None:
         self._reasoning = reasoning
-        self._planner = CognitiveActionPlanner(reasoning)
+        self._planner = CognitiveActionPlanner(reasoning, observability=observability)
         self._context = context_builder
         self._activity = activity_controller
         self._emotion = emotion_system
         self._persona = persona_injector
         self._boundary_validator = boundary_validator
+        self._observability = observability
+        self._logger = observability.logger("cognition_deliberation")
 
     async def deliberate(
         self, broadcast: WorkspaceItem | None, turn: CycleTurn
@@ -84,11 +84,11 @@ class DeliberationController:
         try:
             response = await self._reasoning.request(request, tier=self._reasoning_tier())
         except ReasoningUnavailable as exc:
-            logger.debug("回复推理不可用，本拍不回复", error=str(exc))
+            self._logger.debug("回复推理不可用，本拍不回复", error=str(exc))
             return None
         except Exception as exc:
-            logger.error("回复推理异常", error=str(exc), exc_info=True)
-            counter("cognition.deliberate_error", 1)
+            self._logger.error("回复推理异常", error=str(exc), exc_info=True)
+            self._observability.counter("cognition.deliberate_error", 1)
             return None
         reply = (response.text or "").strip()
         if not reply or not self._within_boundary(reply):
@@ -149,7 +149,7 @@ class DeliberationController:
                     address_mode=content.get("address_mode", "direct"),
                 )
             except Exception as exc:
-                logger.warning("角色 prompt 构建失败，使用最小 prompt", error=str(exc))
+                self._logger.warning("角色 prompt 构建失败，使用最小 prompt", error=str(exc))
         user_text = content.get("text", "")
         return await self._context.build(
             persona_prompt=persona_prompt,
@@ -179,10 +179,10 @@ class DeliberationController:
         try:
             allowed = self._boundary_validator(reply)
         except Exception as exc:
-            logger.error("角色边界校验异常，本拍不回复", error=str(exc), exc_info=True)
-            counter("cognition.deliberate_boundary_error", 1)
+            self._logger.error("角色边界校验异常，本拍不回复", error=str(exc), exc_info=True)
+            self._observability.counter("cognition.deliberate_boundary_error", 1)
             return False
         if not allowed:
-            logger.warning("回复越过角色边界，已拦截")
-            counter("cognition.deliberate_boundary_block", 1)
+            self._logger.warning("回复越过角色边界，已拦截")
+            self._observability.counter("cognition.deliberate_boundary_block", 1)
         return allowed

@@ -17,16 +17,13 @@ from glimmer_cradle.cognition.domain.configuration import (
     DialoguePolicySettings,
     SafetySettings,
 )
-from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.ports.observability import LoggerPort
 from glimmer_cradle.cognition.domain.persona.dialogue_policy_builder import DialoguePolicyBuilder
 from glimmer_cradle.cognition.domain.persona.profile_compiler import (
     CompiledPersonaProfile,
     PersonaProfileCompiler,
 )
 from glimmer_cradle.cognition.domain.persona.prompt_assembler import PromptAssembler
-
-logger = get_logger("persona_injector")
-
 
 class PersonaInjector:
     """Stable facade name for persona prompt assembly.
@@ -35,7 +32,8 @@ class PersonaInjector:
     assembly of profile, dialogue policy, current affect and safety boundary.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, logger: LoggerPort) -> None:
+        self._logger = logger
         self.manifest_config: CharacterManifestSettings | None = None
         self.profile_config: CharacterProfileSettings | None = None
         self.dialogue_config: DialoguePolicySettings | None = None
@@ -59,7 +57,7 @@ class PersonaInjector:
         self.safety_config = safety_config
         self._compiled_profile = self._profile_compiler.compile(profile_config)
         self._dialogue_policy_segment = self._dialogue_builder.build(dialogue_config)
-        logger.info(
+        self._logger.info(
             "人格提示词门面初始化完成",
             persona_mode=manifest_config.persona_mode,
         )

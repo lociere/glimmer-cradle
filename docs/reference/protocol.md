@@ -30,7 +30,7 @@
 | `protocol/src/schemas/config/` | 配置结构的可校验契约 |
 | `protocol/src/schemas/enums/` | 跨语言枚举，如 error、moment、metric |
 | `protocol/src/generated/` | TypeScript 生成物，只读 |
-| `engines/audio/src/glimmer_cradle/audio/protocol/generated/` | Audio legacy Python 生成物，只读；Cognition legacy projection 已删除 |
+| `engines/audio/src/glimmer_cradle/audio/generated/` | Audio legacy Python 生成物，只读；生成工具环境由 Audio owner 持有，Cognition legacy projection 已删除 |
 | `core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs` | Unity C# Presentation Frame 生成物，只读 |
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 

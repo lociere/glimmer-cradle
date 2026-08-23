@@ -8,8 +8,6 @@
 
 输出由 Protocol 生成的 Intent，并在 CycleController 中进入仲裁与 ActionEmitter。
 """
-import uuid
-from datetime import datetime, timezone
 from glimmer_cradle.cognition.domain.volition.models import Initiative, Intent, IntentType
 
 from glimmer_cradle.cognition.domain.volition.willingness import (
@@ -28,12 +26,12 @@ def make_intent(
     willingness: float,
     payload: dict | None = None,
     causation_ids: list[str] | None = None,
+    intent_id: str,
+    created_at: str,
 ) -> Intent:
-    """构造 Intent —— 自动填 intent_id 与 created_at。"""
-    created_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds") \
-        .replace("+00:00", "Z")
+    """用 Application 注入的 ID 与时间构造 Intent。"""
     return Intent(
-        intent_id=uuid.uuid4().hex,
+        intent_id=intent_id,
         type=IntentType(type),
         initiative=Initiative(initiative),
         willingness=max(0.0, min(1.0, float(willingness))),

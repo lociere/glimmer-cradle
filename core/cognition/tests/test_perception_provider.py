@@ -4,6 +4,7 @@ import pytest
 from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
 from glimmer_cradle.cognition.application.cycle.providers.perception import salience_for_perception
+from tests.support import CLOCK, IDS
 
 
 def _entry(*, address_mode="direct", familiarity=5, text="hi",
@@ -115,7 +116,7 @@ def test_salience_floor_at_point_one() -> None:
 
 async def test_provider_empty_queue_returns_empty() -> None:
     q = PerceptionEventQueue()
-    p = PerceptionProvider(q)
+    p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     assert await p.propose([]) == []
 
 
@@ -123,7 +124,7 @@ async def test_provider_drains_and_proposes() -> None:
     q = PerceptionEventQueue()
     q.put(_entry(text="你好", address_mode="direct", familiarity=8))
     q.put(_entry(text="哈喽", address_mode="ambient", familiarity=2))
-    p = PerceptionProvider(q)
+    p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
     assert len(items) == 2
     assert all(it.source == "perception" for it in items)
@@ -139,7 +140,7 @@ async def test_provider_drains_and_proposes() -> None:
 async def test_provider_carries_response_policy() -> None:
     q = PerceptionEventQueue()
     q.put(_entry(address_mode="ambient", response_policy="observe_only"))
-    p = PerceptionProvider(q)
+    p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
     assert items[0].content["response_policy"] == "observe_only"
 
@@ -148,7 +149,7 @@ async def test_provider_max_items_per_tick_caps_drain() -> None:
     q = PerceptionEventQueue()
     for i in range(10):
         q.put(_entry(text=f"e{i}"))
-    p = PerceptionProvider(q, max_items_per_tick=3)
+    p = PerceptionProvider(q, max_items_per_tick=3, clock=CLOCK, ids=IDS)
     items = await p.propose([])
     assert len(items) == 3
     assert q.size() == 7  # 留 7 个等下一拍
@@ -157,7 +158,7 @@ async def test_provider_max_items_per_tick_caps_drain() -> None:
 async def test_provider_carries_actor_info_when_present() -> None:
     q = PerceptionEventQueue()
     q.put(_entry(actor_id="napcat:user:U_1", actor_name="Alice"))
-    p = PerceptionProvider(q)
+    p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
     assert items[0].content["actor_id"] == "napcat:user:U_1"
     assert items[0].content["actor_name"] == "Alice"
@@ -166,7 +167,7 @@ async def test_provider_carries_actor_info_when_present() -> None:
 async def test_provider_omits_actor_fields_when_absent() -> None:
     q = PerceptionEventQueue()
     q.put(_entry(actor_id=None, actor_name=None))
-    p = PerceptionProvider(q)
+    p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
     assert "actor_id" not in items[0].content
     assert "actor_name" not in items[0].content

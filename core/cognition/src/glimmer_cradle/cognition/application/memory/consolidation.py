@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import uuid
 from dataclasses import asdict
 from typing import Literal
 
@@ -12,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from glimmer_cradle.cognition.domain.experience.episode import Episode
 from glimmer_cradle.cognition.application.memory.substrate import MemoryRecord, MemorySubstrate
-from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.domain.memory import MemoryKind
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
 from glimmer_cradle.cognition.ports.persistence import (
@@ -22,9 +21,7 @@ from glimmer_cradle.cognition.ports.persistence import (
     RelationshipProjectionPort,
 )
 from glimmer_cradle.cognition.ports.clock import ClockPort
-
-logger = get_logger("memory_consolidation")
-
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 class MemoryDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -62,6 +59,8 @@ class ConsolidationCoordinator:
         self, *, episodes: EpisodeProjectionPort, memory: MemorySubstrate,
         jobs: ConsolidationJobRepositoryPort, llm: LLMPort | None,
         clock: ClockPort,
+        ids: IdGeneratorPort,
+        observability: ObservabilityPort,
         relationship_projection: RelationshipProjectionPort | None = None,
         enabled: bool = True, batch_size: int = 8, max_batch_moments: int = 64,
         debounce_seconds: int = 120, max_wait_seconds: int = 900,
@@ -75,6 +74,8 @@ class ConsolidationCoordinator:
         self._llm = llm
         self._relationship_projection = relationship_projection
         self._clock = clock
+        self._ids = ids
+        self._logger = observability.logger("memory_consolidation")
         self._enabled = enabled
         self._batch_size = batch_size
         self._max_batch_moments = max_batch_moments
@@ -191,10 +192,9 @@ class ConsolidationCoordinator:
             limit=12,
             token_budget=1400,
         )
-        batch_id = uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            "glimmer:memory-batch:" + ":".join(sorted(job.job_id for job in jobs)),
-        ).hex
+        batch_id = self._ids.stable(
+            "memory-batch", ":".join(sorted(job.job_id for job in jobs))
+        )
         try:
             output = await self._infer(valid_episodes, eligible, existing)
             drafts = self._build_drafts(
@@ -206,7 +206,7 @@ class ConsolidationCoordinator:
             await self._finish_jobs(jobs)
             return len(drafts)
         except Exception as exc:
-            logger.warning(
+            self._logger.warning(
                 "长期记忆批量巩固失败，任务等待重试",
                 jobs=[job.job_id for job in jobs], error=str(exc),
             )
@@ -291,10 +291,9 @@ class ConsolidationCoordinator:
             if decision.operation == "add":
                 drafts.append({
                     **base,
-                    "memory_id": uuid.uuid5(
-                        uuid.NAMESPACE_URL,
-                        f"glimmer:memory:{consolidation_id}:{index}",
-                    ).hex,
+                    "memory_id": self._ids.stable(
+                        "memory", f"{consolidation_id}:{index}"
+                    ),
                 })
                 continue
             assert target is not None
@@ -310,10 +309,9 @@ class ConsolidationCoordinator:
                 })
                 drafts.append({
                     **base,
-                    "memory_id": uuid.uuid5(
-                        uuid.NAMESPACE_URL,
-                        f"glimmer:memory:{consolidation_id}:{index}:replacement",
-                    ).hex,
+                    "memory_id": self._ids.stable(
+                        "memory", f"{consolidation_id}:{index}:replacement"
+                    ),
                     "attributes": {**base["attributes"], "supersedes_memory_id": target.memory_id},
                 })
             else:

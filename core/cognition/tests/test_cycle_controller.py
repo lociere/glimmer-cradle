@@ -7,13 +7,40 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.application.cycle.providers import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.application.cycle import (
+    CycleController as _CycleController,
+    GlobalWorkspace as _GlobalWorkspace,
+)
+from glimmer_cradle.cognition.application.cycle.providers import Provider, PerceptionProvider as _PerceptionProvider
+from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item as _make_item
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 from glimmer_cradle.cognition.adapters.persistence.experience.ledger import ExperienceLedger
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
+
+
+def GlobalWorkspace(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    return _GlobalWorkspace(*args, **kwargs)
+
+
+def make_item(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    return _make_item(*args, **kwargs)
+
+
+def PerceptionProvider(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    return _PerceptionProvider(*args, **kwargs)
+
+
+def CycleController(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _CycleController(*args, **kwargs)
 
 
 def read_ledger_moments(path):
@@ -398,7 +425,6 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
 
 async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     """perception 广播 → reply intent → Act 推 ActionCommand 经 sink。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -442,7 +468,6 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
 
 async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path) -> None:
     """结构化 ActionPlan 判定需要外部能力时发 skill_request。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -803,7 +828,6 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
 async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
     """直接外部输入应在同一拍即时唤醒，再进入 Deliberate/Volition。"""
     from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-    from glimmer_cradle.cognition.application.cycle.providers.perception import PerceptionProvider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Activity:
@@ -871,7 +895,6 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
 async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: Path) -> None:
     """工作区被 drive 填满时，直接对话仍应成为本拍广播并回复。"""
     from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
-    from glimmer_cradle.cognition.application.cycle.providers.perception import PerceptionProvider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     emitted: list[dict] = []
@@ -922,7 +945,6 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
 
 async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
     """无 action_sink → Act 不推送，不报错（沉默默认）。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -949,7 +971,6 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
 
 async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     """Deliberate 生成空文本 → 无 reply intent → 不推 ActionCommand（沉默）。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -984,7 +1005,6 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
 
 async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     """sink 抛错 → 隔离，不连坐 tick。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -1017,7 +1037,6 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
 
 async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     """有 emotion_system → ActionCommand 带 emotion_state。"""
-    from glimmer_cradle.cognition.domain.workspace import make_item
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 

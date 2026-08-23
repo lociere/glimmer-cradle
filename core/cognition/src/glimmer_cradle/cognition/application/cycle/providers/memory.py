@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
 from glimmer_cradle.cognition.application.context import ContextAssembly, ContextQuery
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 if TYPE_CHECKING:
     from glimmer_cradle.cognition.application.activity import CognitiveActivityController
@@ -45,10 +47,14 @@ class MemoryProvider(Provider):
         *,
         activity_controller: "CognitiveActivityController | None" = None,
         max_items_per_tick: int = 3,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
     ) -> None:
         self._asm = context_assembly
         self._activity = activity_controller
         self._max_items = max(1, int(max_items_per_tick))
+        self._clock = clock
+        self._ids = ids
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
         if not workspace_snapshot:
@@ -105,6 +111,8 @@ class MemoryProvider(Provider):
                     "metadata": ci.metadata,
                 },
                 salience=min(1.0, max(0.05, ci.score())),
+                clock=self._clock,
+                ids=self._ids,
             )
             for ci in picks
         ]

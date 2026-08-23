@@ -10,12 +10,10 @@ from glimmer_cradle.cognition.domain.configuration import (
 from glimmer_cradle.cognition.domain.affect.emotion import EmotionSystem, EmotionType
 from glimmer_cradle.cognition.domain.persona.persona_injector import PersonaInjector
 from glimmer_cradle.cognition.domain.exceptions import ConfigException
-from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
-
-# 初始化模块日志器
-logger = get_logger("self_entity")
-
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 class MemoryModule(Protocol):
     def count(self) -> int: ...
@@ -37,6 +35,10 @@ class SelfEntity:
         safety_config: SafetySettings | None = None,
         memory: MemoryModule | None = None,
         knowledge_base: KnowledgeModule | None = None,
+        *,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+        observability: ObservabilityPort,
     ):
         """
         使用 Kernel 注入的冻结配置初始化自我实体。
@@ -72,7 +74,10 @@ class SelfEntity:
         # 核心子系统，终身唯一，不可替换
         # ======================================
         # 情绪系统
-        self.emotion_system: Final[EmotionSystem] = EmotionSystem()
+        self._logger = observability.logger("self_entity")
+        self.emotion_system: Final[EmotionSystem] = EmotionSystem(
+            clock=clock, ids=ids, logger=observability.logger("emotion_system")
+        )
         # 版本化 Memory Substrate
         if memory is None or knowledge_base is None:
             raise ConfigException("Memory 与 Knowledge 内部模块必须由 Composition 注入")
@@ -80,13 +85,15 @@ class SelfEntity:
         # 独立知识库
         self.knowledge_base: Final[KnowledgeModule] = knowledge_base
         # 人设注入器
-        self.persona_injector: Final[PersonaInjector] = PersonaInjector()
+        self.persona_injector: Final[PersonaInjector] = PersonaInjector(
+            logger=observability.logger("persona_injector")
+        )
 
         # ======================================
         # 运行状态
         # ======================================
         self.is_awake: bool = False
-        logger.info(
+        self._logger.info(
             "角色自我实体初始化完成",
             name=self.manifest_config.base.name,
             nickname=self.manifest_config.base.nickname
@@ -100,7 +107,7 @@ class SelfEntity:
             0.2,
             trigger="wake_up"
         )
-        logger.info(f"{self.manifest_config.base.nickname} 已醒来")
+        self._logger.info(f"{self.manifest_config.base.nickname} 已醒来")
 
     def sleep(self) -> None:
         """让当前角色进入休眠，仅内核可调用"""
@@ -110,7 +117,7 @@ class SelfEntity:
             0.1,
             trigger="sleep"
         )
-        logger.info(f"{self.manifest_config.base.nickname} 已进入休眠")
+        self._logger.info(f"{self.manifest_config.base.nickname} 已进入休眠")
 
     def validate_boundary(self, content: str) -> bool:
         """

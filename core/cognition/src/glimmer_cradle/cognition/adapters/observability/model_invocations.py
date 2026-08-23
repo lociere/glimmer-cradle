@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.trace_context import get_current_span_id, get_current_trace_id
+from glimmer_cradle.cognition.adapters.observability.trace_context import get_current_span_id, get_current_trace_id
 from glimmer_cradle.cognition.adapters.paths import ensure_dir, resolve_model_invocations_dir
 
 logger = get_logger("model_invocations")

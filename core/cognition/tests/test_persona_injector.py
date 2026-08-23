@@ -7,6 +7,7 @@ from glimmer_cradle.cognition.domain.configuration import (
     SafetySettings,
 )
 from glimmer_cradle.cognition.domain.persona.persona_injector import PersonaInjector
+from tests.support import OBSERVABILITY
 
 
 def _manifest_config() -> CharacterManifestSettings:
@@ -34,26 +35,26 @@ def _profile_config() -> CharacterProfileSettings:
             "summary": "月见重视真实和边界。",
             "appearance": "银白长发少女。",
             "values": [
-                {"id": "truth", "content": "不为了迎合而伪装。", "priority": 9},
+                {"id": "truth", "content": "不为了迎合而伪装。", "priority": 9, "enabled": True},
             ],
         },
         "traits": [
-            {"id": "calm", "content": "表达冷静克制。", "priority": 9},
+            {"id": "calm", "content": "表达冷静克制。", "priority": 9, "enabled": True},
         ],
         "relationship": [
-            {"id": "presence", "content": "用陪伴式在场回应对方。", "priority": 8},
+            {"id": "presence", "content": "用陪伴式在场回应对方。", "priority": 8, "enabled": True},
         ],
         "expression": [
-            {"id": "short", "content": "普通聊天优先短句。", "priority": 9},
+            {"id": "short", "content": "普通聊天优先短句。", "priority": 9, "enabled": True},
         ],
         "emotion_behaviors": [
-            {"id": "shy", "condition": "shy", "content": "害羞时话会变少。", "priority": 8},
+            {"id": "shy", "condition": "shy", "content": "害羞时话会变少。", "priority": 8, "enabled": True},
         ],
         "context_behaviors": [
-            {"id": "ambient", "condition": "ambient", "content": "群聊里可以旁听。", "priority": 8},
+            {"id": "ambient", "condition": "ambient", "content": "群聊里可以旁听。", "priority": 8, "enabled": True},
         ],
         "examples": [
-            {"id": "line", "content": "「随便。你决定就好。」", "priority": 5},
+            {"id": "line", "content": "「随便。你决定就好。」", "priority": 5, "enabled": True},
         ],
     })
 
@@ -88,7 +89,7 @@ def _dialogue_config() -> DialoguePolicySettings:
 
 
 def _init_injector() -> PersonaInjector:
-    injector = PersonaInjector()
+    injector = PersonaInjector(logger=OBSERVABILITY.logger("persona_injector_test"))
     injector.init(
         manifest_config=_manifest_config(),
         profile_config=_profile_config(),

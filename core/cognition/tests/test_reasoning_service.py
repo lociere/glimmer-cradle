@@ -5,9 +5,15 @@ from glimmer_cradle.cognition.application.inference.service import (
     ModelTierEnum,
     ReasoningRequest,
     ReasoningResponse,
-    ReasoningService,
+    ReasoningService as _ReasoningService,
     ReasoningUnavailable,
 )
+from tests.support import OBSERVABILITY
+
+
+def ReasoningService(*args, **kwargs):
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _ReasoningService(*args, **kwargs)
 
 
 def _req(user: str = "你好") -> ReasoningRequest:

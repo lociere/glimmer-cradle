@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate
-from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
-from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
+from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate as _MemorySubstrate
+from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator as _ConsolidationCoordinator
+from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler as _MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
 from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
@@ -17,6 +17,22 @@ from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import Mem
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 from glimmer_cradle.cognition.domain.memory import MemoryKind
+
+
+def MemorySubstrate(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    return _MemorySubstrate(*args, **kwargs)
+
+
+def ConsolidationCoordinator(*args, **kwargs):
+    kwargs.setdefault("ids", IDS)
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _ConsolidationCoordinator(*args, **kwargs)
+
+
+def MaintenanceScheduler(*args, **kwargs):
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _MaintenanceScheduler(*args, **kwargs)
 
 
 @pytest.fixture
@@ -206,7 +222,10 @@ async def test_terminal_moment_wakes_maintenance_without_forced_seal() -> None:
         activity_state_provider=lambda: "engaged",
         interval_seconds=300,
     )
-    terminal = Moment.create(1, kind=MomentKind.REPLY, content={"text": "完成"})
+    terminal = Moment.create(
+        1, kind=MomentKind.REPLY, content={"text": "完成"},
+        moment_id=IDS.new(), occurred_at=CLOCK.now_iso()
+    )
     scheduler.notify_moment(terminal)
 
     assert scheduler._wake_event.is_set()

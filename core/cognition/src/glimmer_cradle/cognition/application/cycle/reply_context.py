@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from glimmer_cradle.cognition.ports.observability import get_logger
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.application.context.sources.base import allowed_recall_scopes
-
-logger = get_logger("reply_context")
 
 _EMOTION_HINTS: dict[str, str] = {
     "calm": "平静",
@@ -22,10 +20,12 @@ class ReplyContextBuilder:
     """按 token 预算前的固定分区收集会话、记忆、知识和经历。"""
 
     def __init__(self, *, self_entity=None, conversation=None,
-                 recent_experience_source=None) -> None:
+                 recent_experience_source=None,
+                 observability: ObservabilityPort) -> None:
         self._entity = self_entity
         self._conversation = conversation
         self._experience = recent_experience_source
+        self._logger = observability.logger("reply_context")
 
     async def build(
         self,
@@ -85,7 +85,7 @@ class ReplyContextBuilder:
             ]
             context["preference"] = "\n".join(f"偏好：{item.content}" for item in preferences)
         except Exception as exc:
-            logger.debug("偏好记忆取用失败", error=str(exc))
+            self._logger.debug("偏好记忆取用失败", error=str(exc))
         try:
             memories = await self._entity.memory.retrieve(
                 query, actor_id=actor_id, scene_id=scene_id,
@@ -94,12 +94,12 @@ class ReplyContextBuilder:
             )
             context["ltm"] = "\n".join(f"记忆：{item.content}" for item in memories)
         except Exception as exc:
-            logger.debug("相关记忆检索失败", error=str(exc))
+            self._logger.debug("相关记忆检索失败", error=str(exc))
         try:
             knowledge = await self._entity.knowledge_base.get_knowledge(query=query)
             context["knowledge"] = "\n".join(f"知识：{item.content}" for item in knowledge)
         except Exception as exc:
-            logger.debug("世界知识取用失败", error=str(exc))
+            self._logger.debug("世界知识取用失败", error=str(exc))
         if self._experience is not None:
             try:
                 context["experience"] = self._experience.digest(
@@ -112,7 +112,7 @@ class ReplyContextBuilder:
                     max_items=6,
                 )
             except Exception as exc:
-                logger.debug("近期经历取用失败", error=str(exc))
+                self._logger.debug("近期经历取用失败", error=str(exc))
         try:
             if self._conversation is not None:
                 (
@@ -124,7 +124,7 @@ class ReplyContextBuilder:
                     allowed_scopes=self._allowed_scopes(recall_scope),
                 )
         except Exception as exc:
-            logger.debug("Conversation 上下文投影取用失败", error=str(exc))
+            self._logger.debug("Conversation 上下文投影取用失败", error=str(exc))
         return context
 
     @staticmethod

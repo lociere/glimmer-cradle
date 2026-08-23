@@ -19,7 +19,11 @@ import numpy as np
 
 from glimmer_cradle.cognition.adapters.paths import resolve_cache_dir, resolve_models_dir
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.domain.configuration import EmbeddingSettings, SettingsNode
+from glimmer_cradle.cognition.domain.configuration import (
+    DashScopeEmbeddingSettings,
+    EmbeddingSettings,
+    LocalEmbeddingSettings,
+)
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -109,7 +113,7 @@ class _DashScopeEmbeddingProvider:
     _MAX_BATCH_SIZE = 10
 
     def __init__(
-        self, config: SettingsNode, *, api_key: str
+        self, config: DashScopeEmbeddingSettings, *, api_key: str
     ) -> None:
         self._config = config
         self._api_key = api_key
@@ -193,7 +197,7 @@ class _DashScopeEmbeddingProvider:
 class _LocalSentenceTransformersProvider:
     provider_id = "local-sentence-transformers"
 
-    def __init__(self, config: SettingsNode) -> None:
+    def __init__(self, config: LocalEmbeddingSettings) -> None:
         self._config = config
         self._model: SentenceTransformer | None = None
         self._load_lock = threading.Lock()

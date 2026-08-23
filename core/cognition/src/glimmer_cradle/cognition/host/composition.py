@@ -30,6 +30,7 @@ from glimmer_cradle.cognition.adapters.persistence.experience.episodes import Ep
 from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
 from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
+from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import resolve_episode_projection_path, resolve_experience_dir
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
@@ -48,17 +49,13 @@ from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import Mem
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
-from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.observability.binding import bind_file_observability
+from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
 from glimmer_cradle.cognition.adapters.kernel import (
     CognitionGrpcHost,
     KernelEventInboundAdapter,
     KernelEventOutboundAdapter,
     KernelGrpcClient,
 )
-
-logger = get_logger("cognition_composition")
-
 
 @dataclass(frozen=True, slots=True)
 class CognitionComponents:
@@ -87,20 +84,24 @@ def compose_cognition(
     shutdown,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
+    observability = FileObservability()
+    logger = observability.logger("cognition_composition")
     logger.info("Cognition Composition 开始组装")
-
-    bind_file_observability()
     memory_config = config.memory
     experience_config = memory_config.experience
     cognition_config = config.cognition
 
     clock = SystemClock()
+    ids = SystemIdGenerator()
     experience_recorder = build_experience_recorder(
         resolve_experience_dir(),
         enabled=experience_config.enabled,
         pack_max_size_mb=experience_config.pack_max_size_mb,
         flush_interval_ms=experience_config.flush_interval_ms,
         flush_max_buffer=experience_config.flush_max_buffer,
+        clock=clock,
+        ids=ids,
+        observability=observability,
     )
     cognition_database = CognitionDatabase()
     memory_repository = MemoryRepository(cognition_database)
@@ -114,11 +115,12 @@ def compose_cognition(
     )
 
     memory_substrate = MemorySubstrate(
+        clock=clock,
         token_budget=memory_config.retrieval.token_budget,
         candidate_limit=memory_config.retrieval.candidate_limit,
         result_limit=memory_config.retrieval.result_limit,
     )
-    knowledge_base = KnowledgeBase()
+    knowledge_base = KnowledgeBase(observability=observability)
     self_entity = SelfEntity(
         manifest_config=config.manifest,
         inference_config=config.inference,
@@ -127,6 +129,9 @@ def compose_cognition(
         safety_config=config.safety,
         memory=memory_substrate,
         knowledge_base=knowledge_base,
+        clock=clock,
+        ids=ids,
+        observability=observability,
     )
     self_entity.persona_injector.init(
         manifest_config=config.manifest,
@@ -141,6 +146,7 @@ def compose_cognition(
     activity_controller = CognitiveActivityController(
         experience_recorder=experience_recorder,
         clock=clock,
+        observability=observability,
         affect_activation_provider=lambda: float(
             self_entity.emotion_system.get_state().get("intensity", 0.0)
         ),
@@ -157,13 +163,18 @@ def compose_cognition(
         semantic_weight=memory_config.retrieval.semantic_weight,
     )
 
-    agent_plan = AgentPlanUseCase(self_entity=self_entity, llm_engine=llm_engine)
+    agent_plan = AgentPlanUseCase(
+        ids=ids, observability=observability,
+        self_entity=self_entity, llm_engine=llm_engine
+    )
     agent_synthesis = AgentSynthesisUseCase(
         self_entity=self_entity,
         llm_engine=llm_engine,
         persona_injector=self_entity.persona_injector,
         experience_recorder=experience_recorder,
         activity_controller=activity_controller,
+        ids=ids,
+        observability=observability,
     )
     inbound_adapter = KernelEventInboundAdapter(
         self_entity=self_entity,
@@ -176,7 +187,7 @@ def compose_cognition(
 
     perception_queue = PerceptionEventQueue(max_size=100)
     perception_operations = PerceptionOperationRegistry()
-    workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity)
+    workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity, clock=clock)
     relationship_projection = RelationshipProjection(
         recorder=experience_recorder,
         repository=relationship_repository,
@@ -184,11 +195,13 @@ def compose_cognition(
     )
     context_assembly = ContextAssembly(sources=[
         RecentExperienceSource(experience_recorder),
-        EpisodicMemorySource(memory_substrate),
+        EpisodicMemorySource(memory_substrate, clock=clock),
         KnowledgeSource(knowledge_base),
         RelationshipSource(relationship_repository),
-    ])
-    reasoning = ReasoningService(cloud=CloudReasoning(llm_engine), local=None)
+    ], observability=observability)
+    reasoning = ReasoningService(
+        cloud=CloudReasoning(llm_engine), local=None, observability=observability
+    )
 
     episode_projection = EpisodeProjection(
         resolve_episode_projection_path(),
@@ -203,6 +216,8 @@ def compose_cognition(
         jobs=ConsolidationJobRepository(cognition_database),
         llm=llm_engine,
         clock=clock,
+        ids=ids,
+        observability=observability,
         relationship_projection=relationship_projection,
         enabled=consolidation_config.enabled,
         batch_size=consolidation_config.batch_size,
@@ -220,17 +235,19 @@ def compose_cognition(
         consolidation=consolidation_coordinator,
         activity_state_provider=lambda: activity_controller.state.value,
         interval_seconds=consolidation_config.schedule_interval_seconds,
+        observability=observability,
     )
     activity_controller.on_transition(maintenance_scheduler.notify_activity_transition)
     experience_recorder.on_recorded(maintenance_scheduler.notify_moment)
     cycle_controller = CycleController(
         workspace=workspace,
         providers=[
-            PerceptionProvider(perception_queue),
-            AffectProvider(self_entity.emotion_system),
-            MemoryProvider(context_assembly, activity_controller=activity_controller),
-            DriveProvider(activity_controller=activity_controller),
-            SocialProvider(relationship_repository),
+            PerceptionProvider(perception_queue, clock=clock, ids=ids),
+            AffectProvider(self_entity.emotion_system, clock=clock, ids=ids),
+            MemoryProvider(context_assembly, activity_controller=activity_controller,
+                           clock=clock, ids=ids),
+            DriveProvider(activity_controller=activity_controller, clock=clock, ids=ids),
+            SocialProvider(relationship_repository, clock=clock, ids=ids),
         ],
         experience_recorder=experience_recorder,
         activity_controller=activity_controller,
@@ -244,6 +261,9 @@ def compose_cognition(
         conversation=conversation_controller,
         multimodal_router=multimodal_router,
         perception_operations=perception_operations,
+        clock=clock,
+        ids=ids,
+        observability=observability,
     )
 
     cognition_grpc_host = CognitionGrpcHost(

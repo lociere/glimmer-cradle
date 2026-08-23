@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.trace_context import (
+from glimmer_cradle.cognition.adapters.observability.trace_context import (
     _span_id_var,
     _trace_id_var,
     get_current_boot_id,

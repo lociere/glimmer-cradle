@@ -4,9 +4,13 @@ from pathlib import Path
 import pytest
 
 import glimmer_cradle.cognition.adapters.inference.gateway as llm_module
-from glimmer_cradle.cognition.domain.configuration import LLMSettings, SettingsNode
+from glimmer_cradle.cognition.domain.configuration import LLMSettings, ModelSettings
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMApiResult, LLMEngine, LLMMessage, LLMRequest
-ModelConfig = SettingsNode
+
+def ModelConfig():
+    return ModelSettings(
+        max_tokens=1024, temperature=0.8, top_p=0.9, frequency_penalty=0.0
+    )
 
 
 class _SelfEntity:

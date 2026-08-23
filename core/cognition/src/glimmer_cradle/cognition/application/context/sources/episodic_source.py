@@ -12,13 +12,15 @@ from glimmer_cradle.cognition.application.context.sources.base import (
 from glimmer_cradle.cognition.domain.experience.events import Moment, MomentKind
 from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
 from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate
+from glimmer_cradle.cognition.ports.clock import ClockPort
 
 
 class EpisodicMemorySource(ContextSource):
     name = "episodic"
 
-    def __init__(self, memory: MemorySubstrate) -> None:
+    def __init__(self, memory: MemorySubstrate, *, clock: ClockPort) -> None:
         self._memory = memory
+        self._clock = clock
 
     async def activate(self, query: ContextQuery, *, max_items: int = 10) -> list[ContextItem]:
         try:
@@ -34,7 +36,7 @@ class EpisodicMemorySource(ContextSource):
             return []
 
         query_tokens = _context_tokens(query.text)
-        now = datetime.now(timezone.utc)
+        now = self._clock.now()
         items: list[ContextItem] = []
         for mem in results:
             content = f"记忆：{mem.content}"

@@ -1,9 +1,7 @@
 """Experience Ledger 的不可变 Moment 领域模型。"""
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
 
 SCHEMA_VERSION = 4
@@ -16,10 +14,6 @@ class MomentKind(str, Enum):
     ACTION = "action"
     ACTION_RESULT = "action_result"
     SILENCE = "silence"
-
-
-def now_iso_ms() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 @dataclass(frozen=True)
@@ -90,8 +84,10 @@ class Moment:
         affect: AffectSnapshot | None = None,
         importance: float = 0.5,
         trace_id: str = "",
+        moment_id: str,
+        occurred_at: str,
     ) -> "Moment":
-        event_id = uuid.uuid4().hex
+        event_id = moment_id
         try:
             kind_value = kind.value if isinstance(kind, MomentKind) else MomentKind(str(kind)).value
         except ValueError as error:
@@ -99,7 +95,7 @@ class Moment:
         return Moment(
             seq=seq,
             moment_id=event_id,
-            occurred_at=now_iso_ms(),
+            occurred_at=occurred_at,
             kind=kind_value,
             content=content,
             causation_ids=tuple(causation_ids),

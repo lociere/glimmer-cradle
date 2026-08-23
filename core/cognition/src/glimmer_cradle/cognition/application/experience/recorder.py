@@ -4,22 +4,24 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.trace_context import get_current_trace_id
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.domain.experience.events import AffectSnapshot, Moment, MomentKind, SourceDescriptor
 from glimmer_cradle.cognition.ports.persistence import ExperienceLedgerPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
-
-logger = get_logger("experience_recorder")
-
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 class ExperienceRecorder:
     def __init__(self, ledger: ExperienceLedgerPort, *, clock: ClockPort,
+                 ids: IdGeneratorPort,
+                 observability: ObservabilityPort,
                  enabled: bool = True,
                  flush_interval_ms: int = 500,
                  flush_max_buffer: int = 64) -> None:
         self._enabled = enabled
         self._clock = clock
+        self._ids = ids
+        self._observability = observability
+        self._logger = observability.logger("experience_recorder")
         self._flush_interval = max(50, flush_interval_ms) / 1000
         self._flush_max_buffer = max(1, flush_max_buffer)
         self._ledger = ledger
@@ -42,7 +44,7 @@ class ExperienceRecorder:
         await self._ledger.start()
         self._running = True
         self._flush_task = asyncio.create_task(self._flush_loop())
-        logger.info("Experience Ledger 已启动", base_dir=str(self._ledger.base_dir))
+        self._logger.info("Experience Ledger 已启动", base_dir=str(self._ledger.base_dir))
 
     async def stop(self) -> None:
         self._running = False
@@ -69,7 +71,7 @@ class ExperienceRecorder:
                trace_id: str | None = None) -> Moment | None:
         if not self._enabled:
             return None
-        resolved_trace = trace_id or get_current_trace_id() or ""
+        resolved_trace = trace_id or self._observability.current_trace_id() or ""
         moment = self._ledger.append(Moment.create(
             0, kind=kind, content=content, causation_ids=causation_ids,
             scene_id=scene_id, interaction_id=interaction_id,
@@ -78,7 +80,8 @@ class ExperienceRecorder:
             actor_id=actor_id, actor_name=actor_name, origin=origin,
             retention_ceiling=retention_ceiling, affect=affect,
             recall_scope=recall_scope, disclosure_scope=disclosure_scope,
-            importance=importance, trace_id=resolved_trace))
+            importance=importance, trace_id=resolved_trace,
+            moment_id=self._ids.new(), occurred_at=self._clock.now_iso()))
         self._since_flush += 1
         if self._since_flush >= self._flush_max_buffer:
             self._schedule_flush()
@@ -86,7 +89,7 @@ class ExperienceRecorder:
             try:
                 listener(moment)
             except Exception as exc:
-                logger.warning("Experience Moment 通知失败", error=str(exc), exc_info=True)
+                self._logger.warning("Experience Moment 通知失败", error=str(exc), exc_info=True)
         return moment
 
     def on_recorded(self, listener: Callable[[Moment], None]) -> None:
@@ -132,4 +135,4 @@ class ExperienceRecorder:
             except asyncio.CancelledError:
                 return
             except Exception as exc:
-                logger.error("Experience Ledger 刷盘失败", error=str(exc), exc_info=True)
+                self._logger.error("Experience Ledger 刷盘失败", error=str(exc), exc_info=True)

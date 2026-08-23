@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.application.activity import (
 )
 from glimmer_cradle.cognition.application.activity.projection import project_activity_history
 from glimmer_cradle.cognition.domain.experience.events import MomentKind
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 
 CFG = ActivityTransitionConfig(
@@ -114,6 +114,7 @@ async def test_transitions_do_not_write_experience(tmp_path: Path) -> None:
     controller = CognitiveActivityController(
         experience_recorder=recorder,
         clock=SystemClock(),
+        observability=OBSERVABILITY,
         affect_activation_provider=lambda: 0.0,
         tick_interval_s=60,
     )

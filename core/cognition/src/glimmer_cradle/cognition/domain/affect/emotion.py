@@ -8,21 +8,17 @@
 3. 完全基于人设规则，无硬编码业务逻辑
 4. 情绪仅由输入内容和主动思维触发，不碰场景规则
 """
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
-from uuid import uuid4
 from datetime import datetime
 from glimmer_cradle.cognition.domain.exceptions import EmotionException
 from glimmer_cradle.cognition.domain.affect.rules import (
     DEFAULT_INTENSITY_DECAY_ON_NEUTRAL,
     infer_emotion_by_input,
 )
-from glimmer_cradle.cognition.ports.observability import get_logger
-
-# 初始化模块日志器
-logger = get_logger("emotion_system")
-
+from glimmer_cradle.cognition.ports.observability import LoggerPort
+from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 # ======================================
 # 情绪类型枚举（完全贴合傲娇少女人设）
@@ -47,12 +43,12 @@ class EmotionState:
     emotion_type: EmotionType
     # 情绪强度 0~1，0=无情绪，1=情绪最强烈
     intensity: float
+    # 全链路追踪ID
+    trace_id: str
+    # 情绪更新时间
+    timestamp: datetime
     # 情绪触发源
     trigger: str = ""
-    # 全链路追踪ID
-    trace_id: str = field(default_factory=lambda: str(uuid4()))
-    # 情绪更新时间
-    timestamp: datetime = field(default_factory=datetime.now)
 
 
 # ======================================
@@ -64,31 +60,36 @@ class EmotionSystem:
     核心特性：连续流转、自然衰减、符合人设的触发规则
     真人逻辑对齐：情绪不会突然消失，会随时间慢慢平复，符合人类情绪变化规律
     """
-    def __init__(self):
+    def __init__(self, *, clock: ClockPort, ids: IdGeneratorPort, logger: LoggerPort):
+        self._clock = clock
+        self._ids = ids
+        self._logger = logger
         # 当前情绪状态，初始为平静
         self.current_state: EmotionState = EmotionState(
             emotion_type=EmotionType.CALM,
             intensity=0.2,
-            trigger="init"
+            trigger="init",
+            trace_id=ids.new(),
+            timestamp=clock.now(),
         )
         # 情绪衰减系数（每秒衰减0.1%，符合真人心情慢慢平复的逻辑）
         self.decay_rate: float = 0.001
-        logger.info("情绪系统初始化完成", initial_emotion=self.current_state.emotion_type.value)
+        self._logger.info("情绪系统初始化完成", initial_emotion=self.current_state.emotion_type.value)
 
     def decay(self) -> None:
         """
         情绪自然衰减，每次操作前都会调用，保证情绪连续
         核心逻辑：情绪强度随时间自然降低，最低保留0.1的基础情绪，不会完全归零
         """
-        now = time.time()
+        now = self._clock.now().timestamp()
         # 计算距离上次更新的秒数
         delta_seconds = now - self.current_state.timestamp.timestamp()
         # 计算衰减后的强度
         new_intensity = self.current_state.intensity * max(0.1, 1 - delta_seconds * self.decay_rate)
         # 更新强度和时间
         self.current_state.intensity = max(0.1, new_intensity)
-        self.current_state.timestamp = datetime.now()
-        logger.debug(
+        self.current_state.timestamp = self._clock.now()
+        self._logger.debug(
             "情绪自然衰减完成",
             current_emotion=self.current_state.emotion_type.value,
             intensity=round(self.current_state.intensity, 2)
@@ -115,9 +116,9 @@ class EmotionSystem:
         self.current_state.intensity = max(0.1, min(1.0, self.current_state.intensity + intensity_delta))
         # 更新触发源和时间
         self.current_state.trigger = trigger
-        self.current_state.timestamp = datetime.now()
+        self.current_state.timestamp = self._clock.now()
 
-        logger.info(
+        self._logger.info(
             "情绪状态更新完成",
             new_emotion=new_emotion.value,
             intensity=round(self.current_state.intensity, 2),

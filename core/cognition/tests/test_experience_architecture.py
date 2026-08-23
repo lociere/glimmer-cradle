@@ -1,9 +1,9 @@
 from pathlib import Path
 import sqlite3
 
-from glimmer_cradle.cognition.ports import trace_context
+from glimmer_cradle.cognition.adapters.observability import trace_context
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import build_experience_recorder
 from glimmer_cradle.cognition.domain.experience import MomentKind
 
 

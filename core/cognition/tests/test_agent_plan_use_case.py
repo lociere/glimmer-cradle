@@ -3,6 +3,7 @@ import json
 import pytest
 
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanUseCase
+from tests.support import IDS, OBSERVABILITY
 from glimmer_cradle.cognition.ports.kernel.models import SkillToolDescriptor
 
 
@@ -28,7 +29,9 @@ class _PlanningLLM:
 @pytest.mark.asyncio
 async def test_agent_plan_keeps_kernel_skill_identity_in_suggestion():
     llm = _PlanningLLM()
-    use_case = AgentPlanUseCase(self_entity=object(), llm_engine=llm)
+    use_case = AgentPlanUseCase(
+        ids=IDS, observability=OBSERVABILITY, self_entity=object(), llm_engine=llm
+    )
 
     result = await use_case.execute(AgentPlanInput(
         user_goal="检查当前配置",

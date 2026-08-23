@@ -23,7 +23,7 @@ import structlog
 from structlog.stdlib import ProcessorFormatter
 
 from glimmer_cradle.cognition.adapters.paths import ensure_dir, resolve_global_log_dir
-from glimmer_cradle.cognition.ports.trace_context import trace_context_processor
+from glimmer_cradle.cognition.adapters.observability.trace_context import trace_context_processor
 
 
 # ──────────────────────────────────────────────────────────────────────────────

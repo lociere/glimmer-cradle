@@ -7,11 +7,7 @@ from collections.abc import Callable
 
 from glimmer_cradle.cognition.domain.experience.events import Moment, MomentKind
 from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
-from glimmer_cradle.cognition.ports.observability import get_logger
-from glimmer_cradle.cognition.ports.observability import counter, gauge
-from glimmer_cradle.cognition.ports.observability import span
-
-logger = get_logger("maintenance_scheduler")
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
 class MaintenanceScheduler:
@@ -23,10 +19,13 @@ class MaintenanceScheduler:
         consolidation: ConsolidationCoordinator,
         activity_state_provider: Callable[[], str],
         interval_seconds: float = 300,
+        observability: ObservabilityPort,
     ) -> None:
         self._consolidation = consolidation
         self._activity_state_provider = activity_state_provider
         self._interval_seconds = max(10.0, interval_seconds)
+        self._observability = observability
+        self._logger = observability.logger("maintenance_scheduler")
         self._wake_event = asyncio.Event()
         self._force_seal_requested = False
         self._pending_reason = "scheduled"
@@ -43,8 +42,8 @@ class MaintenanceScheduler:
             self._pending_reason = "quiescent_boundary"
         self._wake_event.set()
         self._task = asyncio.create_task(self._run_loop())
-        gauge("cognition.maintenance.running", 1.0)
-        logger.info(
+        self._observability.gauge("cognition.maintenance.running", 1.0)
+        self._logger.info(
             "认知维护调度器已启动",
             interval_seconds=self._interval_seconds,
         )
@@ -59,8 +58,8 @@ class MaintenanceScheduler:
             except asyncio.CancelledError:
                 pass
         await self._consolidation.stop()
-        gauge("cognition.maintenance.running", 0.0)
-        logger.info("认知维护调度器已停止")
+        self._observability.gauge("cognition.maintenance.running", 0.0)
+        self._logger.info("认知维护调度器已停止")
 
     def notify_activity_transition(self) -> None:
         """静息只触发一次 Episode 封口，不改变维护任务的 owner 或节拍。"""
@@ -84,20 +83,20 @@ class MaintenanceScheduler:
         force_seal: bool = False,
         reason: str = "scheduled",
     ) -> int:
-        with span(
+        with self._observability.span(
             "cognition_maintenance",
             attributes={"force_seal": force_seal, "reason": reason},
         ) as task_span:
             created = await self._consolidation.consolidate(force_seal=force_seal)
             task_span.set_attribute("memories_created", created)
-            counter(
+            self._observability.counter(
                 "cognition.maintenance.run",
                 labels={
                     "status": "success",
                     "reason": reason,
                 },
             )
-            counter("cognition.memories_consolidated", created)
+            self._observability.counter("cognition.memories_consolidated", created)
             return created
 
     async def _run_loop(self) -> None:
@@ -119,11 +118,11 @@ class MaintenanceScheduler:
             except asyncio.CancelledError:
                 break
             except Exception as exc:
-                counter(
+                self._observability.counter(
                     "cognition.maintenance.run",
                     labels={"status": "error", "reason": "scheduled"},
                 )
-                logger.error(
+                self._logger.error(
                     "认知维护任务失败，等待下一次调度",
                     error=str(exc),
                     exc_info=True,

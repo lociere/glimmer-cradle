@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from glimmer_cradle.cognition.application.conversation import ConversationController
 from glimmer_cradle.cognition.adapters.persistence.conversation import ConversationStore
 from glimmer_cradle.cognition.application.experience import ExperienceRecorder
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from tests.support import CLOCK, IDS, build_experience_recorder
 from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
 
 
@@ -209,7 +209,10 @@ async def test_conversation_projection_rejects_identity_or_scope_drift(tmp_path:
 
 def test_experience_rejects_unknown_moment_kind() -> None:
     try:
-        Moment.create(1, kind="thought", content={"text": "内部草稿"})
+        Moment.create(
+            1, kind="thought", content={"text": "内部草稿"},
+            moment_id=IDS.new(), occurred_at=CLOCK.now_iso()
+        )
     except ValueError as error:
         assert "不支持的 Experience Moment kind" in str(error)
     else:

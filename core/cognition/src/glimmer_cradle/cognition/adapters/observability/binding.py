@@ -1,16 +1,37 @@
-"""把文件型 telemetry concrete 绑定到 Cognition 可观测性 Port。"""
+"""文件型 telemetry 的显式 Observability Adapter。"""
 
+from __future__ import annotations
+
+from glimmer_cradle.cognition.adapters.observability import metrics, tracer
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.observability.metrics import counter, gauge, histogram
-from glimmer_cradle.cognition.adapters.observability.tracer import span
-from glimmer_cradle.cognition.ports.observability import bind_observability
+from glimmer_cradle.cognition.adapters.observability.trace_context import (
+    TraceContext,
+    get_current_trace_id,
+    new_trace_id,
+)
 
 
-def bind_file_observability() -> None:
-    bind_observability(
-        logger_factory=get_logger,
-        counter_sink=counter,
-        gauge_sink=gauge,
-        histogram_sink=histogram,
-        span_factory=span,
-    )
+class FileObservability:
+    def logger(self, module_name: str):
+        return get_logger(module_name)
+
+    def counter(self, name: str, value: float = 1, labels: dict | None = None) -> None:
+        metrics.counter(name, value, labels)
+
+    def gauge(self, name: str, value: float, labels: dict | None = None) -> None:
+        metrics.gauge(name, value, labels)
+
+    def histogram(self, name: str, value: float, labels: dict | None = None) -> None:
+        metrics.histogram(name, value, labels)
+
+    def span(self, name: str, *, attributes: dict | None = None):
+        return tracer.span(name, attributes=attributes)
+
+    def trace_context(self, trace_id: str):
+        return TraceContext(trace_id)
+
+    def new_trace_id(self) -> str:
+        return new_trace_id()
+
+    def current_trace_id(self) -> str | None:
+        return get_current_trace_id()

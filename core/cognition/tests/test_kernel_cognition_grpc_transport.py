@@ -8,13 +8,31 @@ from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
-from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.application.cycle import CycleController as _CycleController
 from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEventQueue
-from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
+from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
-from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace as _GlobalWorkspace
 from glimmer_cradle.cognition.ports.kernel.models import AgentPlanResult
+
+
+def GlobalWorkspace(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    return _GlobalWorkspace(*args, **kwargs)
+
+
+def PerceptionProvider(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    return _PerceptionProvider(*args, **kwargs)
+
+
+def CycleController(*args, **kwargs):
+    kwargs.setdefault("clock", CLOCK)
+    kwargs.setdefault("ids", IDS)
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _CycleController(*args, **kwargs)
 
 
 class _Queue:

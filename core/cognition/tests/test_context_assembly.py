@@ -7,13 +7,19 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from glimmer_cradle.cognition.application.context import (
-    ContextAssembly,
+    ContextAssembly as _ContextAssembly,
     ContextItem,
     ContextQuery,
     ContextSource,
 )
 from glimmer_cradle.cognition.application.context.sources.base import estimate_tokens
 from glimmer_cradle.cognition.application.context.sources.episodic_source import EpisodicMemorySource
+from tests.support import CLOCK, OBSERVABILITY
+
+
+def ContextAssembly(*args, **kwargs):
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _ContextAssembly(*args, **kwargs)
 
 
 class _FixedSource(ContextSource):
@@ -87,7 +93,7 @@ async def test_episodic_memory_projects_real_relevance_and_recency() -> None:
             salience=0.8,
             updated_at=(now - timedelta(days=30)).isoformat(),
         ),
-    ]))
+    ]), clock=CLOCK)
 
     items = await source.activate(ContextQuery(text="喜欢草莓"))
 

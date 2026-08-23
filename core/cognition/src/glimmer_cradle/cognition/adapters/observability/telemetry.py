@@ -51,7 +51,7 @@ from glimmer_cradle.cognition.adapters.observability.tracer import (
 )
 
 # ── trace 上下文（boot / trace / span 三层；蓝图 §6.2）─────────────────────────
-from glimmer_cradle.cognition.ports.trace_context import (
+from glimmer_cradle.cognition.adapters.observability.trace_context import (
     TraceContext,
     get_current_boot_id,
     get_current_span_id,

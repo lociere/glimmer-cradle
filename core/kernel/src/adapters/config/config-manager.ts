@@ -102,6 +102,7 @@ export class ConfigManager {
       }
       const SYSTEM_SUB_SECTIONS: Array<[keyof typeof systemData, ConfigSchemaName]> = [
         ['cognition_service', 'CognitionServiceConfig'],
+        ['cognition', 'CognitionConfig'],
         ['lifecycle', 'LifecycleConfig'],
         ['extensions', 'ExtensionConfig'],
         ['avatar', 'AvatarConfig'],
