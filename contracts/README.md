@@ -1,10 +1,10 @@
 # Contracts Baseline
 
-> 范围：M12 Slice 1 已落地的 canonical `contracts/` baseline、生成链、兼容基线和验证入口。
+> 范围：M12 已落地的 canonical `contracts/` baseline、Kernel↔Cognition v1 Service、生成链、兼容基线和验证入口。
 > 事实依据：本目录下的 `proto/`、`json-schema/`、`compatibility/`、`generated/`、`scripts/` 与 `tests/`。
 > 维护触发：新增或修改 Contract Spine IDL、JSON Schema Document、生成工具链、兼容基线或跨语言验证门。
 
-`contracts/` 是长期 Contract Spine 的 canonical baseline。当前运行主线仍使用 `protocol/`、ZMQ、stdio 和手写 WebSocket；本切片不切 transport、不迁移 runtime consumer，也不删除当前 `protocol/`。
+`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition 运行主线已使用本目录的 v1 Protobuf Service 与生成物；该边界的旧 ZMQ/envelope 已删除。其他尚未迁移边界仍按 M12 切片使用 `protocol/`、stdio 或手写 WebSocket。
 
 ## 目录
 
@@ -43,9 +43,9 @@ pnpm --filter @glimmer-cradle/contracts baseline:refresh
 - C# round-trip 只接受 `.NET SDK 8.0.423` 与 locked `Google.Protobuf 3.33.0`。全新环境按 supply-chain 清单校验 archive 后安装，或放到 ignored `contracts/.tools/dotnet/`；`DOTNET_EXE` 指向本地 SDK 时还会校验 launcher SHA-256。
 - `toolchain.json` 的支持平台、archive 摘要和 launcher 摘要是机器事实源；工具缺失、版本/摘要/许可证不符均失败，不降为 warn。
 
-## Slice 1 边界
+## 已落地边界
 
 - Protobuf 只拥有跨进程可调用能力；JSON Schema 只拥有 Document。
 - 同一结构不得同时在 Protobuf 和 JSON Schema 中拥有权威定义。当前 proto 只引用 Document 的 id、version 和 digest，不复制 Document 字段。
-- `generated/` 只属于 Adapter/Transport 边缘；本切片没有任何 runtime consumer import 新生成物。
-- Slice 2 之前不得把 Kernel、Cognition、Engine、Avatar、Extension 或 Surface 主线切到 `contracts/`。
+- `generated/` 只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 是当前运行 consumer。
+- Engine、Avatar、Extension 和 Surface 只能在对应 M12 切片中迁入 `contracts/`。

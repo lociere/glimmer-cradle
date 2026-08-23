@@ -28,14 +28,6 @@ src_path = repo_root / "core" / "cognition" / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-# On Windows, asyncio defaults to ProactorEventLoop which is incompatible with zmq's add_reader.
-# Ensure selector policy is set before any zmq/asyncio interaction.
-if sys.platform == "win32":
-    try:
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    except AttributeError:
-        pass
-
 from glimmer_cradle.cognition.foundation.config import CharacterRuntimeConfig
 from glimmer_cradle.cognition.host.composition import CognitionComponents, compose_cognition
 from glimmer_cradle.cognition.foundation.lifecycle import Lifecycle
@@ -47,7 +39,6 @@ from glimmer_cradle.cognition.foundation.path_utils import (
 )
 from glimmer_cradle.cognition.observability.metrics import start_metrics, stop_metrics
 from glimmer_cradle.cognition.observability.tracer import start_tracer, stop_tracer
-from glimmer_cradle.cognition.protocol.generated.enums.ipc_message_type import IPCMessageType
 
 # 初始化模块日志器
 logger = get_logger("cognition_host")
@@ -64,19 +55,25 @@ class CognitionHost(Lifecycle):
     Cognition 认知核主类，管理整个认知层的完整生命周期。
     核心作用：作为认知层根节点，统一管理所有模块的启动、运行、停止。
     """
-    def __init__(self, config: CharacterRuntimeConfig, bind_address: str):
+    def __init__(
+        self,
+        config: CharacterRuntimeConfig,
+        kernel_endpoint: str,
+        generation: str,
+    ):
         """
         初始化AI核心
         参数：
             config: 内核注入的全局冻结配置
-            bind_address: ZMQ IPC绑定地址，用于和Kernel 内核通信
+            kernel_endpoint: KernelControlService 动态回环端点
+            generation: Kernel 分配给受监督 Cognition 进程的世代
         异常：
             ConfigException: 配置校验失败时抛出
         """
         # 全局冻结配置，会话期不可修改
         self.config: Final[CharacterRuntimeConfig] = config
-        # IPC绑定地址
-        self.bind_address: Final[str] = bind_address
+        self.kernel_endpoint: Final[str] = kernel_endpoint
+        self.generation: Final[str] = generation
         self.components: CognitionComponents | None = None
         # 运行状态
         self._is_running: bool = False
@@ -103,12 +100,12 @@ class CognitionHost(Lifecycle):
         try:
             logger.info("Cognition 认知核开始启动")
 
-            self.components = compose_cognition(self.config)
-            components = self._require_components()
-            components.kernel_bridge.register_handler(
-                IPCMessageType.COGNITION_SHUTDOWN,
-                self._accept_shutdown_request,
+            self.components = compose_cognition(
+                self.config,
+                generation=self.generation,
+                shutdown=self._accept_shutdown_request,
             )
+            components = self._require_components()
 
             # 1.5 启动经历记录器（Glimmer Cradle 架构蓝图 §4.1，脊柱①）
             #     先确立进程级 boot_id（telemetry 层用，蓝图 §6.2），经历之流本身是连续的，
@@ -138,19 +135,17 @@ class CognitionHost(Lifecycle):
             # 1.67 启动认知循环。
             await components.cycle_controller.start()
 
-            # 2. 启动内核通信桥接
-            kernel_bridge = components.kernel_bridge
-            connect_address = self.bind_address
-            # 适配本地回环地址
-            if connect_address.startswith("tcp://0.0.0.0"):
-                connect_address = connect_address.replace("tcp://0.0.0.0", "tcp://127.0.0.1")
-
-            # 启动连接
-            await kernel_bridge.start(connect_address)
+            # 2. 先绑定受监督入站 Service，再向 Kernel 注册动态端点。
+            await components.cognition_grpc_host.start()
+            await components.kernel_client.start(
+                self.kernel_endpoint,
+                components.cognition_grpc_host.endpoint,
+            )
 
             # 3. 唤醒当前角色
             self_entity = components.self_entity
             self_entity.wake_up()
+            components.cognition_grpc_host.mark_ready()
 
             # 4. 发出首条状态同步消息。启动快照用于建立 Kernel/Renderer 投影，
             # 不代表一次认知活动状态转换。
@@ -170,7 +165,7 @@ class CognitionHost(Lifecycle):
             raise e
 
     async def stop(self) -> None:
-        """并发停机请求共享同一收尾任务，避免信号与 IPC 重复释放资源。"""
+        """并发停机请求共享同一收尾任务，避免信号与 RPC 重复释放资源。"""
         if self._stop_task is None:
             self._stop_task = asyncio.create_task(self._stop_components())
         await asyncio.shield(self._stop_task)
@@ -196,9 +191,9 @@ class CognitionHost(Lifecycle):
             components = self.components
             # 先关闭 Kernel 入站，避免停机期间继续接收新感知。
             try:
-                await components.kernel_bridge.stop()
+                await components.cognition_grpc_host.stop()
             except Exception as e:
-                logger.error(f"Error stopping kernel bridge: {e}")
+                logger.error(f"Error stopping Cognition gRPC host: {e}")
 
             # 停止认知循环后，Experience 不再产生新的对话 Moment。
             try:
@@ -242,6 +237,11 @@ class CognitionHost(Lifecycle):
             except Exception as e:
                 logger.error(f"Error closing cognition database: {e}")
 
+            try:
+                await components.kernel_client.stop()
+            except Exception as e:
+                logger.error(f"Error stopping Kernel gRPC client: {e}")
+
             # 最后刷新遥测，确保上述停机错误仍可被记录。
             try:
                 await stop_metrics()
@@ -254,13 +254,12 @@ class CognitionHost(Lifecycle):
 
         logger.info("Cognition 认知核已停止，当前角色已进入休眠")
 
-    async def _accept_shutdown_request(self, _message: dict) -> dict[str, str]:
+    async def _accept_shutdown_request(self) -> None:
         if self._shutdown_task is None or self._shutdown_task.done():
             self._shutdown_task = asyncio.create_task(self._shutdown_after_ack())
-        return {"status": "accepted"}
 
     async def _shutdown_after_ack(self) -> None:
-        # 先让 KernelBridge 发回 ACK，再关闭承载该请求的通信边界。
+        # 先让 gRPC 返回 ACK，再关闭承载该请求的 Service。
         await asyncio.sleep(0.05)
         await self.stop()
         asyncio.get_running_loop().stop()
@@ -351,10 +350,11 @@ def main(argv: list[str] | None = None) -> int:
     Cognition 认知核唯一命令行启动入口
     由Kernel 内核通过子进程启动，所有参数由内核传入
     启动参数示例：
-    python -m glimmer_cradle.cognition.host.process --config-json '{...}' --bind-address tcp://127.0.0.1:<dynamic>
+    python -m glimmer_cradle.cognition.host.process --config-json '{...}' --kernel-endpoint grpc://127.0.0.1:<dynamic> --generation <uuid>
 
     也支持通过环境变量注入（供 Kernel 内核启动时使用）：
-      GLIMMER_CRADLE_CONFIG / GLIMMER_CRADLE_IPC_BIND_ADDRESS
+      GLIMMER_CRADLE_CONFIG / GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT /
+      GLIMMER_CRADLE_COGNITION_GENERATION
     """
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="Glimmer Cradle Cognition 认知核")
@@ -365,10 +365,16 @@ def main(argv: list[str] | None = None) -> int:
         help="JSON格式的全局配置字符串，由Kernel 内核注入（优先）"
     )
     parser.add_argument(
-        "--bind-address",
+        "--kernel-endpoint",
         type=str,
         required=False,
-        help="ZMQ IPC绑定地址，用于和Kernel 内核通信（优先）"
+        help="KernelControlService 动态回环端点（优先）"
+    )
+    parser.add_argument(
+        "--generation",
+        type=str,
+        required=False,
+        help="Kernel 分配的 Cognition 受监督进程世代（优先）"
     )
     args = parser.parse_args(argv)
 
@@ -377,10 +383,11 @@ def main(argv: list[str] | None = None) -> int:
         import json
 
         config_json = args.config_json or os.environ.get("GLIMMER_CRADLE_CONFIG")
-        bind_address = args.bind_address or os.environ.get("GLIMMER_CRADLE_IPC_BIND_ADDRESS")
+        kernel_endpoint = args.kernel_endpoint or os.environ.get("GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT")
+        generation = args.generation or os.environ.get("GLIMMER_CRADLE_COGNITION_GENERATION")
 
-        if not config_json or not bind_address:
-            raise ValueError("缺少 GLIMMER_CRADLE_CONFIG 或 GLIMMER_CRADLE_IPC_BIND_ADDRESS，无法启动")
+        if not config_json or not kernel_endpoint or not generation:
+            raise ValueError("缺少 Cognition 启动配置、Kernel gRPC endpoint 或 generation")
 
         config_dict = json.loads(config_json)
         config = CharacterRuntimeConfig(**config_dict)
@@ -389,7 +396,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # 创建认知核实例
-    cognition_host = CognitionHost(config=config, bind_address=bind_address)
+    cognition_host = CognitionHost(
+        config=config,
+        kernel_endpoint=kernel_endpoint,
+        generation=generation,
+    )
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

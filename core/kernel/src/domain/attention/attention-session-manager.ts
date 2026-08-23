@@ -1,4 +1,5 @@
-import { PerceptionCancelRequest, PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { PerceptionCancelRequest } from '../../foundation/ports/cognition-service-port';
 import { IAICapabilityPort, IActionStreamPort } from '../../foundation/ports';
 import { withTrace } from '../../foundation/logger/trace-context';
 import { ConfigManager } from '../../foundation/config/config-manager';

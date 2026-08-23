@@ -19,7 +19,7 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
-  zeromq: true
+  protobufjs: true
 
 minimumReleaseAgeExclude:
   - electron@43.1.1

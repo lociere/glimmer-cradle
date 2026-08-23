@@ -208,7 +208,7 @@ export interface ILogger {
   critical(message: string, meta?: Record<string, unknown>): void;
   /**
    * 动态级别输出（由调用方传入 winston 级别字符串，如 `"info"`、`"warn"`）。
-   * 用于外部系统（如 Cognition 认知核）通过 IPC 上报指定级别的日志。
+   * 用于外部系统（如 Cognition 认知核）通过受控 Service 上报指定级别的日志。
    */
   log(level: string, message: string, meta?: Record<string, unknown>): void;
 }
@@ -281,7 +281,7 @@ export function closeLogger(): void {
  * 获取模块级 logger。
  * 每条日志会自动注入 `module` 字段，无需在每次调用时手动传入。
  *
- * @param name 模块名（如 `"config-manager"`、`"ipc-server"`）
+ * @param name 模块名（如 `"config-manager"`、`"kernel-control-service"`）
  */
 export function getLogger(name = 'core'): ILogger {
   return {

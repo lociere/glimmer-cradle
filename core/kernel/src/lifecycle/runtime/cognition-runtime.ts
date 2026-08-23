@@ -8,14 +8,14 @@ export class CognitionRuntime implements RuntimeModule {
   public async start(_context: TraceContext): Promise<RuntimeModuleStartDetails> {
     await CognitionManager.instance.start();
     return {
-      readiness: 'ipc_config_knowledge_ready',
+      readiness: 'service_config_knowledge_ready',
       runtime_readiness: {
         runtime_id: 'cognition',
         owner: 'cognition',
-        phase: 'ipc_config_knowledge',
+        phase: 'service_config_knowledge',
         state: 'ready',
         blocking: true,
-        summary: 'Cognition 认知核已完成 IPC、配置与知识注入',
+        summary: 'Cognition 认知核已完成 Service 注册、配置与知识注入',
         details_ref: 'data/observability/logs/application/cognition.console.log',
       },
     };

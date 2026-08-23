@@ -3,5 +3,4 @@ export * from './config';
 export * from './engine';
 export * from './enums';
 export * from './extension';
-export * from './ipc';
 export * from './models';

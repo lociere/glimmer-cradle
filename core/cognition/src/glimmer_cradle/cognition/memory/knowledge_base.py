@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from glimmer_cradle.cognition.protocol.generated.ipc.knowledge_init_payload import KnowledgeBaseInitPayload
+from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
 from glimmer_cradle.cognition.observability.logger import get_logger
 from glimmer_cradle.cognition.inference.embedding import EmbeddingEngine
 from glimmer_cradle.cognition.memory.storage.knowledge_repo import KnowledgeRepository
@@ -97,7 +97,7 @@ class KnowledgeBase:
         await self._restore_or_compute_embeddings()
         logger.info("知识库已从本地库加载", entry_count=len(self._entries))
 
-    async def init_from_kernel(self, payload: KnowledgeBaseInitPayload) -> None:
+    async def init_from_kernel(self, payload: KnowledgeInitialization) -> None:
         """从内核 knowledge_init 载荷预填知识库。
 
         knowledge_init 是知识库的配置预填入口，只接收

@@ -1,10 +1,10 @@
 import {
   type ConversationHistoryEntry,
-  type ConversationHistoryIPCRequest,
-  type ConversationHistoryQuery,
-  type ConversationHistoryResponse,
+  type ConversationHistoryRequest as ConversationHistoryQuery,
+  type ConversationHistoryResult as ConversationHistoryResponse,
   type ConversationNotice,
 } from '@glimmer-cradle/protocol';
+import type { ConversationHistoryRequest } from '../../../foundation/ports/cognition-service-port';
 import { CognitionManager } from '../inference/cognition-manager';
 import type { ConversationDirectory, ResolvedConversation } from '../conversation/conversation-directory';
 
@@ -121,7 +121,7 @@ export class ConversationHistoryService {
         ? [resolved.context.disclosure_scope]
         : []),
     ] as [string, ...string[]];
-    const payload: ConversationHistoryIPCRequest = {
+    const payload: ConversationHistoryRequest = {
       request_id: request.request_id,
       conversation_id: request.conversation_id?.trim() || resolved.context.conversation_id,
       scene_id: request.scene_id?.trim() || resolved.context.scene_id,

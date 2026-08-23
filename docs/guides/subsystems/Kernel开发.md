@@ -1,6 +1,6 @@
 # Kernel 开发
 
-> 适用场景：修改 Kernel lifecycle、runtime module、Ingress Gate、IPC、Application service、Capability、Skill Plane、Extension Host、Desktop/Avatar/Audio 投影。
+> 适用场景：修改 Kernel lifecycle、runtime module、Ingress Gate、跨进程 Service、Application service、Capability、Skill Plane、Extension Host、Desktop/Avatar/Audio 投影。
 > 前置条件：已读 [Kernel 当前视图](../../architecture/current/07-子系统当前视图/Kernel与Runtime.md) 与 [Kernel 与 Runtime 实现](../../architecture/implementation/Kernel与Runtime实现.md)。
 
 ## 改动路径
@@ -10,7 +10,7 @@
 | 新增/修改 runtime | `core/kernel/src/lifecycle/runtime/`、`app.ts` |
 | 输入闸门 | `foundation/ingress-gate/`、`application/services/perception-app.service.ts` |
 | 子进程监督 | `foundation/process/`、对应 capability runtime |
-| Cognition IPC | `application/capabilities/inference/cognition-manager.ts`、`infrastructure/ipc-broker/` |
+| Cognition Service | `adapters/cognition/`、`application/capabilities/inference/cognition-manager.ts` |
 | Audio | `application/capabilities/audio/` |
 | Avatar | `application/capabilities/avatar/` |
 | Desktop 投影 | `application/capabilities/desktop-ui/` |
@@ -21,7 +21,7 @@
 ## 标准步骤
 
 1. 确认 owner：Kernel 是否只做生命周期、路由、权限、状态投影和能力编排。
-2. 若 payload 跨语言或跨进程，先走 Schema 变更流程。
+2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/`，运行 `pnpm contracts:generate` / `pnpm contracts:verify`；不得手改 generated。
 3. 找 producer、mapper、consumer、projection 和 tests。
 4. 修改 root/module/service，不在调用端堆临时补丁。
 5. 补 ready/degraded/failed/stop 语义。
@@ -51,6 +51,7 @@
 | 重启后工具还指向旧 handler | Skill registry 撤销、provider dispose、Gateway 引用 |
 | renderer 状态旧 | projection producer、preload subscription、store 更新 |
 | 停机卡住 | stop 顺序、未释放订阅/计时器/stdio/WebSocket |
+| Cognition 注册失败 | generation、自身/受管父 PID、动态回环端点与 process log |
 | DLQ 增长 | event bus、payload schema、owner 错误 |
 
 ## 验证

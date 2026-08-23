@@ -1,11 +1,8 @@
-# Kernel 进程编排、IPC 与入站治理。
+# Kernel 进程编排、Cognition Service 与入站治理。
 
-ipc:
-  bind_address: "tcp://127.0.0.1:*"
+cognition_service:
   request_timeout_ms: 30000
-  retry_count: 2
-  retry_interval_ms: 2000
-  heartbeat_interval_ms: 5000
+  registration_timeout_ms: 120000
 
 lifecycle:
   start_timeout_ms: 30000
@@ -13,7 +10,7 @@ lifecycle:
   module_start_order:
     - config
     - persistence
-    - ipc
+    - kernel-transport
     - cognition
     - extensions
     - life_clock
@@ -21,7 +18,7 @@ lifecycle:
     - life_clock
     - extensions
     - cognition
-    - ipc
+    - kernel-transport
     - persistence
     - config
 

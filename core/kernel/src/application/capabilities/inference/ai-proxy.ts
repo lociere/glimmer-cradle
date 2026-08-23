@@ -2,17 +2,16 @@
  * AIProxy — Cognition 认知能力的统一 Promise 门面
  * 上层模块仅依赖该门面，不感知 IPC/子进程通信细节。
  */
-import {
+import type { PerceptionEvent } from "@glimmer-cradle/protocol";
+import type {
   AgentPlanRequest,
   AgentPlanResponse,
   AgentSynthesisRequest,
   AgentSynthesisResponse,
   ChatMessageResponse,
-  LifeHeartbeatRequest,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
-  PerceptionEvent,
-} from "@glimmer-cradle/protocol";
+} from "../../../foundation/ports/cognition-service-port";
 import { CognitionManager } from "./cognition-manager";
 
 export class AIProxy {
@@ -47,7 +46,7 @@ export class AIProxy {
     return CognitionManager.instance.sendAgentSynthesis(request);
   }
 
-  public async sendLifeHeartbeat(request: LifeHeartbeatRequest): Promise<LifeHeartbeatResponse> {
+  public async sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse> {
     return CognitionManager.instance.sendLifeHeartbeat(request);
   }
 

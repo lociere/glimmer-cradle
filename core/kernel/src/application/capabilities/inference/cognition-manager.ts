@@ -1,233 +1,73 @@
-/**
- * Cognition 认知核管理器
- * 负责认知核 Python 子进程的启动、停止、生命周期管理、配置注入。
- * 是 Kernel 内核与 Cognition 认知核交互的唯一入口。
- */
-import { spawn, ChildProcess } from "child_process";
-import path from "path";
-import fs from "fs-extra";
-import {
-  IPCMessageType,
-  IPCRequest,
-  IPCResponse,
-  ChatMessageResponse,
-  LifeHeartbeatRequest,
-  LifeHeartbeatResponse,
-  AgentPlanRequest,
-  AgentPlanResponse,
-  AgentSynthesisRequest,
-  AgentSynthesisResponse,
-  ConversationHistoryIPCRequest,
-  ConversationHistoryResponse,
-  PerceptionCancelRequest,
-  PerceptionEvent,
-  createIPCRequest,
-  ErrorCode,
-  KnowledgeInitPayload,
-} from '@glimmer-cradle/protocol';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
+import path from 'node:path';
+import fs from 'fs-extra';
+import type { PerceptionEvent } from '@glimmer-cradle/protocol';
+import type {
+  AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse,
+  ChatMessageResponse, ConversationHistoryRequest, ConversationHistoryResponse,
+  LifeHeartbeatResponse, PerceptionCancelRequest,
+} from '../../../foundation/ports/cognition-service-port';
+import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import { CognitionClient } from '../../../adapters/cognition/cognition-client';
+import { CognitionTransportError, KernelCognitionTransport } from '../../../adapters/cognition/kernel-cognition-transport';
+import { ConfigManager } from '../../../foundation/config/config-manager';
 import { CoreException } from '../../../foundation/exceptions';
-import { createTraceContext, getCurrentSpanId } from '../../../foundation/logger/trace-context';
-import { ConfigManager } from "../../../foundation/config/config-manager";
-import { IPCServer } from "../../../infrastructure/ipc-broker/ipc-server";
-import { getLogger } from "../../../foundation/logger/logger";
-import { resolveRepoRoot, resolveLogDir, resolveObservabilityDir } from "../../../foundation/utils/path-utils";
-import {
-  forceTerminateManagedProcessTree,
-  stopManagedProcess,
-  waitForManagedProcessExit,
-} from '../../../foundation/process/process-supervisor';
+import { createTraceContext } from '../../../foundation/logger/trace-context';
+import { getLogger } from '../../../foundation/logger/logger';
+import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../../../foundation/utils/path-utils';
+import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../../../foundation/process/process-supervisor';
 
-const logger = getLogger("cognition-manager");
-const COGNITION_PROCESS_LOG = "cognition.console.log";
-let cognitionProcessLogDir = path.join(resolveLogDir(), "application");
+const logger = getLogger('cognition-manager');
+const PROCESS_LOG = 'cognition.console.log';
+let processLogDir = path.join(resolveLogDir(), 'application');
+const execFileAsync = promisify(execFile);
 
-function setCognitionProcessLogRoot(logDir: string): void {
-  cognitionProcessLogDir = path.join(logDir, "application");
-}
-
-function appendCognitionProcessLog(record: Record<string, unknown>): void {
-  const line = JSON.stringify(record, undefined, 0);
-  fs.ensureDir(cognitionProcessLogDir)
-    .then(() => fs.appendFile(path.join(cognitionProcessLogDir, COGNITION_PROCESS_LOG), `${line}\n`, "utf8"))
-    .catch((error) => {
-      // 不能再走 logger，避免日志 sink 自身失败时递归写日志。
-      console.error("写入 Cognition 子进程日志失败", error);
-    });
-}
-
-function classifyCognitionProcessLine(line: string, fromStderr: boolean): "debug" | "info" | "warn" | "error" {
-  const normalized = line.replace(/\x1b\[[0-9;]*m/g, "").toLowerCase();
-  if (/traceback|exception|fatal|critical|error:/.test(normalized)) return "error";
-  if (/warning|warn/.test(normalized)) return "warn";
-  if (/building|built|downloading|downloaded|installed|uninstalled|resolved|prepared|audited|uv |sentence-transformers|transformers|torch|pillow|modelscope/.test(normalized)) {
-    return "debug";
-  }
-  return fromStderr ? "info" : "debug";
-}
-
-/**
- * 解析 Cognition 认知核输出的单行日志并路由到 TS logger。
- *
- * 支持两种格式：
- *   1. 纯 JSON（structlog ProcessorFormatter → stdout）：
- *      {"level":"info","event":"...","module":"...","timestamp":"..."}
- *   2. stdlib logging 前缀格式（date prefix + JSON，通常来自 stderr）：
- *      "2026-01-01 12:00:00,000 [INFO] {"event":"...","level":"info",...}"
- *
- * 对于无法解析的非 JSON 行（如 Traceback 纯文本），视为 error 级别直接输出。
- */
-// 匹配 Python stdlib logging 的 "DATE TIME,ms [LEVEL] " 前缀
-const PYTHON_STDLIB_LOG_PREFIX_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[(\w+)\] /;
-
-function routePythonLogLine(line: string, fromStderr = false): void {
-  const trimmed = line.trim();
-  if (!trimmed) return;
-
-  // 尝试剥离 "DATE TIME [LEVEL] " 前缀（Python stdlib logging 格式）
-  const prefixMatch = PYTHON_STDLIB_LOG_PREFIX_RE.exec(trimmed);
-  const stdlibLevel = prefixMatch ? prefixMatch[1].toLowerCase() : null;
-  const jsonStr = prefixMatch ? trimmed.slice(prefixMatch[0].length) : trimmed;
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-  } catch {
-    const processLevel = classifyCognitionProcessLine(trimmed, fromStderr);
-    appendCognitionProcessLog({
-      timestamp: new Date().toISOString(),
-      level: processLevel,
-      source: "cognition",
-      stream: fromStderr ? "stderr" : "stdout",
-      message: trimmed,
-    });
-
-    // 无法解析为 JSON：只有明显错误才摘要进入 Kernel 主时间线。
-    if (processLevel === "error") {
-      logger.error("Cognition 子进程输出了非结构化错误", {
-        source: "cognition",
-        stream: fromStderr ? "stderr" : "stdout",
-        message_excerpt: trimmed.slice(0, 240),
-      });
-    }
-    return;
-  }
-
-  // 优先使用 structlog 输出的 level 字段，fallback 到 stdlib prefix 中解析出的等级
-  const level = String(parsed.level ?? stdlibLevel ?? "info").toLowerCase();
-  const event = String(parsed.event ?? "");
-  const childModule = typeof parsed.module === "string" ? parsed.module : undefined;
-  const childTimestamp = typeof parsed.timestamp === "string" ? parsed.timestamp : undefined;
-  // 透传其余业务字段（排除已提取的字段）
-  const { level: _l, event: _e, module: _m, timestamp: _t, logger: _lg, ...rest } = parsed;
-
-  appendCognitionProcessLog({
-    timestamp: childTimestamp ?? new Date().toISOString(),
-    level,
-    source: "cognition",
-    stream: fromStderr ? "stderr" : "stdout",
-    module: childModule,
-    message: event,
-    ...rest,
-  });
-
-  const meta: Record<string, unknown> = {
-    source: "cognition",
-    child_module: childModule,
-    child_event: event,
-  };
-  if (childTimestamp) meta.child_timestamp = childTimestamp;
-  const traceId = rest.trace_id;
-  if (traceId) meta.trace_id = traceId;
-  const bootId = rest.boot_id;
-  if (bootId) meta.boot_id = bootId;
-
-  switch (level) {
-    case "warning":
-    case "warn":
-      logger.warn("Cognition 子进程告警", meta);
-      break;
-    case "error":
-    case "critical":
-      logger.error("Cognition 子进程错误", meta);
-      break;
-    case "debug":
-    default:
-      // info/debug 是 Cognition 自己的内部时间线，已写入
-      // Cognition console 时间线独立落盘；Kernel 主日志只记录中枢观察到的状态。
-      break;
-  }
-}
-
-/**
- * Cognition 认知核管理器
- * 单例模式
- */
 export class CognitionManager {
-  private static _instance: CognitionManager | null = null;
-  private _pythonProcess: ChildProcess | null = null;
-  private _isRunning: boolean = false;
-  private _isReady: boolean = false;
-  private _requestTimeoutMs: number = 30000;
-  /** 逐行缓冲：子进程 data 事件可能携带不完整行 */
-  private _stdoutLineBuffer: string = "";
-  private _stderrLineBuffer: string = "";
-  /** 标记是否为主动停止，避免 exit 事件误触自动重启 */
-  private _stoppingIntentionally: boolean = false;
-  private _lastExitKind: "normal" | "console_interrupt" | "unexpected" | null = null;
+  private static singleton: CognitionManager | null = null;
+  private readonly transport = KernelCognitionTransport.instance;
+  private readonly client = new CognitionClient(this.transport);
+  private child: ChildProcess | null = null;
+  private running = false;
+  private ready = false;
+  private requestTimeoutMs = 30_000;
+  private stdoutBuffer = '';
+  private stderrBuffer = '';
+  private stopping = false;
+  private starting = false;
 
-  /**
-   * 获取单例实例
-   */
   public static get instance(): CognitionManager {
-    if (!CognitionManager._instance) {
-      CognitionManager._instance = new CognitionManager();
-    }
-    return CognitionManager._instance;
+    CognitionManager.singleton ??= new CognitionManager();
+    return CognitionManager.singleton;
   }
 
   private constructor() {}
 
-  /**
-   * 启动 Cognition 认知核子进程，初始化配置。
-   */
   public async start(): Promise<void> {
-    if (this._isRunning) {
-      logger.warn("Cognition 认知核已在运行，跳过重复启动");
-      return;
-    }
-
-    logger.info("Cognition 认知核启动：创建子进程");
-    this._lastExitKind = null;
+    if (this.running) return;
     const config = ConfigManager.instance.getConfig();
-    const dashScopeSecrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
-    this._requestTimeoutMs = config.system.ipc.request_timeout_ms;
-    setCognitionProcessLogRoot(resolveLogDir());
+    const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
+    const repoRoot = resolveRepoRoot();
+    const cognitionDir = path.resolve(repoRoot, 'core', 'cognition');
+    const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
+    const command = packagedPython || await ensureDevelopmentPython(cognitionDir);
+    const args = ['-m', 'glimmer_cradle.cognition.host.process'];
+    this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
+    processLogDir = path.join(resolveLogDir(), 'application');
+    this.stopping = false;
+    this.starting = true;
+    const generation = this.transport.prepareProcess();
 
     try {
-      // 冻结核心配置，防止运行时修改
       ConfigManager.instance.freezeCoreConfig();
-
-      const repoRoot = resolveRepoRoot();
-
-      const cognitionDir = path.resolve(repoRoot, "core", "cognition");
-      const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
-      const uvCommand = packagedPython || (process.platform === "win32" ? "uv.exe" : "uv");
-      const uvArgs = packagedPython
-        ? ["-m", "glimmer_cradle.cognition.host.process"]
-        : ["run", "--project", cognitionDir, "glimmer-cradle-cognition"];
-
-      logger.debug("Cognition 认知核运行命令已解析", {
-        command: uvCommand,
-        project: packagedPython ? "packaged-python-runtime" : cognitionDir,
-      });
-
-      this._pythonProcess = spawn(uvCommand, uvArgs, {
+      this.child = spawn(command, args, {
         cwd: repoRoot,
-        detached: process.platform !== "win32",
+        detached: process.platform !== 'win32',
         env: {
           ...process.env,
-          ...dashScopeSecrets,
-          GLIMMER_CRADLE_IPC_BIND_ADDRESS: IPCServer.instance.bindAddress,
+          ...secrets,
+          GLIMMER_CRADLE_KERNEL_GRPC_ENDPOINT: this.transport.controlEndpoint,
+          GLIMMER_CRADLE_COGNITION_GENERATION: generation,
           GLIMMER_CRADLE_CONFIG: JSON.stringify({
             ...config.character,
             memory: config.system.memory,
@@ -236,420 +76,185 @@ export class CognitionManager {
           GLIMMER_CRADLE_OBSERVABILITY: JSON.stringify(config.system.observability),
           GLIMMER_CRADLE_OBSERVABILITY_DIR: resolveObservabilityDir(),
           LOG_DIR: resolveLogDir(),
-          PYTHONUNBUFFERED: "1",
+          PYTHONUNBUFFERED: '1',
+          PYTHONPATH: [
+            path.resolve(repoRoot, 'contracts', 'generated', 'python'),
+            path.resolve(repoRoot, 'core', 'cognition', 'src'),
+            process.env.PYTHONPATH,
+          ].filter(Boolean).join(path.delimiter),
         },
-        // 将 stdin 也设为 pipe 避免 Windows 下 inherit 导致 stdout 被路由到控制台
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+      if (!this.child.pid) throw new Error('Cognition 子进程未返回 PID');
+      this.transport.expectProcess(this.child.pid);
+      this.attachProcessObservers(this.child);
+      this.running = true;
 
-      this._pythonProcess.stdout?.on("data", (data: Buffer) => {
-        this._stdoutLineBuffer += data.toString("utf-8");
-        const lines = this._stdoutLineBuffer.split("\n");
-        this._stdoutLineBuffer = lines.pop() ?? "";
-        for (const line of lines) {
-          routePythonLogLine(line, false);
-        }
-      });
-
-      // stderr 同样使用 routePythonLogLine 解析，兼容 Python 日志写到 stderr 的情况
-      // 真实的 Traceback / 非结构化错误仍会被识别并路由为 error 级别
-      this._pythonProcess.stderr?.on("data", (data: Buffer) => {
-        this._stderrLineBuffer += data.toString("utf-8");
-        const lines = this._stderrLineBuffer.split("\n");
-        this._stderrLineBuffer = lines.pop() ?? "";
-        for (const line of lines) {
-          routePythonLogLine(line, true);
-        }
-      });
-
-      this._pythonProcess.on("exit", (code, signal) => {
-        // 进程退出时刷新两路缓冲中的残余内容
-        if (this._stdoutLineBuffer.trim()) {
-          routePythonLogLine(this._stdoutLineBuffer, false);
-          this._stdoutLineBuffer = "";
-        }
-        if (this._stderrLineBuffer.trim()) {
-          routePythonLogLine(this._stderrLineBuffer, true);
-          this._stderrLineBuffer = "";
-        }
-        const interrupted = code === 0xC000013A;
-        const exitKind = interrupted ? "console_interrupt" : code === 0 ? "normal" : "unexpected";
-        const intentional = this._stoppingIntentionally || code === 0 || interrupted;
-        this._lastExitKind = exitKind;
-        const exitMeta = {
-          code,
-          signal,
-          exit_kind: exitKind,
-        };
-        if (interrupted || code === 0) {
-          logger.info("Cognition 认知核进程退出", exitMeta);
-        } else {
-          logger.warn("Cognition 认知核进程退出", exitMeta);
-        }
-        this._isRunning = false;
-        this._isReady = false;
-
-        if (!intentional && code !== 0) {
-          logger.error("Cognition 认知核异常退出，正在自动重启");
-          this.restart().catch(() => {
-            logger.error("自动重启失败");
-          });
-        }
-      });
-
-      this._pythonProcess.on("error", (error) => {
-        logger.error("Cognition 认知核进程启动失败", { error: error.message });
-        this._isRunning = false;
-        this._isReady = false;
-      });
-
-      this._isRunning = true;
-
-      await this.waitForReady();
-      await this.initAIConfig();
-      await this.initKnowledge();
-
-      this._isReady = true;
-      logger.info("Cognition 认知核已就绪", {
-        startup_stage: "ready",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (this._lastExitKind === "console_interrupt") {
-        logger.warn("Cognition 认知核启动被外部中断", { error: message });
-      } else {
-        logger.error("Cognition 认知核启动失败", { error: message });
+      logger.info('Cognition 认知核启动：等待 gRPC 注册与真实 readiness');
+      await this.transport.waitForRegistration(config.system.cognition_service.registration_timeout_ms);
+      await this.client.initializeKnowledge(await ConfigManager.instance.loadKnowledgeBaseConfig(), this.requestTimeoutMs);
+      const readiness = await this.client.readiness(this.requestTimeoutMs);
+      if (readiness.state !== 'ready' || readiness.generation !== generation) {
+        throw new CognitionTransportError('Cognition 未达到本代业务 ready', ServiceErrorCode.NOT_READY, true);
       }
+      this.ready = true;
+      this.starting = false;
+      logger.info('Cognition 认知核已就绪', { startup_stage: readiness.phase });
+    } catch (error) {
+      this.starting = false;
+      logger.error('Cognition 认知核启动失败', { error: normalizeError(error) });
       await this.stop();
       throw error;
     }
   }
 
-  /**
-   * 等待 Cognition 认知核真正就绪：不仅是进程启动（PID 存在），
-   * 而是等待 ZMQ DEALER 连接建立并收到第一条 IPC 消息（_lastClientId 非空）。
-   * 只有这样，后续的 initAIConfig / initKnowledge 才不会因
-   * "未连接客户端" 而失败。
-   */
-  private async waitForReady(): Promise<void> {
-    const maxWaitMs = 20 * 60_000;
-    const pollIntervalMs = 300;
-    const startAt = Date.now();
-
-    logger.info("Cognition 认知核启动：等待模型准备与 IPC 握手");
-
-    return new Promise((resolve, reject) => {
-      const check = () => {
-        // 进程意外退出或启动失败：快速失败，避免等满超时
-        if (!this._pythonProcess || this._pythonProcess.killed || !this._isRunning) {
-          if (this._lastExitKind === "console_interrupt") {
-            return reject(new CoreException("Cognition 认知核启动被外部中断", ErrorCode.INFERENCE_ERROR));
-          }
-          return reject(new CoreException("Python 进程意外退出", ErrorCode.INFERENCE_ERROR));
-        }
-
-        // 最终检查：IPCServer 已收到来自 Python 的首条消息（_lastClientId 已设置）
-        if (IPCServer.instance.isClientConnected) {
-          logger.info("Cognition 认知核启动：IPC 握手完成", {
-            waited_ms: Date.now() - startAt,
-          });
-          return resolve();
-        }
-
-        if (Date.now() - startAt >= maxWaitMs) {
-          return reject(new CoreException(
-            `等待 Cognition 认知核模型准备与 IPC 连接超时（>${maxWaitMs}ms）`,
-            ErrorCode.INFERENCE_ERROR
-          ));
-        }
-
-        setTimeout(check, pollIntervalMs);
-      };
-
-      // 延迟一个 tick 开始轮询，让进程有机会 spawn
-      setTimeout(check, pollIntervalMs);
-    });
-  }
-
-  private async initAIConfig(): Promise<void> {
-    logger.info("Cognition 认知核启动：注入配置");
-    const config = ConfigManager.instance.getConfig();
-
-    const traceContext = createTraceContext();
-    const request = createIPCRequest(
-      IPCMessageType.CONFIG_INIT,
-      traceContext.trace_id,
-      { config: config.character }
-    );
-
-    await this.sendRequest(request);
-    logger.info("Cognition 认知核启动：配置注入完成");
-  }
-
-  private async initKnowledge(): Promise<void> {
-    logger.info("Cognition 认知核启动：注入知识库");
-    const knowledgeBaseConfig = await ConfigManager.instance.loadKnowledgeBaseConfig();
-    // KnowledgeBaseConfig（配置 schema）→ KnowledgeInitPayload（IPC schema）。
-    // 两端都只允许 scope=knowledge，角色人格不走知识库初始化链路。
-    // 用 unknown 中转转型，避免 TS 因命名类型差异误报。
-    const payload: KnowledgeInitPayload = {
-      knowledge_base: {
-        version: knowledgeBaseConfig.version,
-        retrieval: knowledgeBaseConfig.retrieval as unknown as KnowledgeInitPayload['knowledge_base']['retrieval'],
-        entries: knowledgeBaseConfig.entries as unknown as KnowledgeInitPayload['knowledge_base']['entries'],
-      },
-    };
-
-    const traceContext = createTraceContext();
-    const request = createIPCRequest(
-      IPCMessageType.KNOWLEDGE_INIT,
-      traceContext.trace_id,
-      payload
-    );
-
-    await this.sendRequest(request);
-    logger.info("Cognition 认知核启动：知识库注入完成", {
-      knowledge_version: knowledgeBaseConfig.version,
-      knowledge_entry_count: knowledgeBaseConfig.entries.length,
-    });
-  }
-
-  /**
-   * 向 Cognition 认知核发送请求并等待响应。
-   * 委托给 IPCServer.sendRequest() 统一处理 RPC 协调（trace_id 关联、超时、并发安全）。
-   */
-  private async sendRequest(request: IPCRequest, timeoutMs = this._requestTimeoutMs): Promise<IPCResponse> {
-    if (!this._isRunning || !this._pythonProcess) {
-      throw new CoreException("Cognition 认知核未运行", ErrorCode.INFERENCE_ERROR);
-    }
-
-    // 使用 IPCServer 的 pendingRequests 机制处理并发安全的 RPC 调用
-    const data = await IPCServer.instance.sendRequest<any>(
-      request.type,
-      request.payload,
-      timeoutMs,
-      {
-        trace_id: request.trace_id,
-        span_id: request.span_id ?? getCurrentSpanId(),
-      },
-    );
-
-    // 将 RPC payload 包装为统一 IPCResponse。
-    return {
-      type: IPCMessageType.SUCCESS_RESPONSE,
-      trace_id: request.trace_id,
-      success: true,
-      payload: data,
-    };
-  }
-
   public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse> {
-    if (!this._isReady) {
-      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
-    }
-
-    const traceContext = createTraceContext({ trace_id: traceId });
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.PERCEPTION_MESSAGE,
-      traceContext.trace_id,
-      request
-    );
-
-    const response = await this.sendRequest(ipcRequest);
-    if (!response.success) {
-      throw new CoreException(
-        `AI生成失败: ${response.error?.message}`,
-        response.error?.code as ErrorCode || ErrorCode.INFERENCE_ERROR,
-        traceContext.trace_id
-      );
-    }
-
-    return response.payload as ChatMessageResponse;
+    this.assertReady();
+    await this.client.submitPerception(request, traceId ?? createTraceContext().trace_id, this.requestTimeoutMs);
+    return {} as ChatMessageResponse;
   }
 
   public async cancelPerception(request: PerceptionCancelRequest): Promise<void> {
-    if (!this._isReady) {
-      return;
-    }
-
-    const traceContext = createTraceContext();
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.PERCEPTION_CANCEL,
-      traceContext.trace_id,
-      request
-    );
-
-    await IPCServer.instance.sendRequest(
-      ipcRequest.type,
-      ipcRequest.payload,
-      this._requestTimeoutMs,
-      { trace_id: ipcRequest.trace_id },
-    );
+    if (this.isReady) await this.client.cancelPerception(request, this.requestTimeoutMs);
   }
 
   public async sendAgentPlan(request: AgentPlanRequest, traceId?: string): Promise<AgentPlanResponse> {
-    if (!this._isReady) {
-      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
-    }
-
-    const traceContext = createTraceContext({ trace_id: traceId });
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.AGENT_PLAN,
-      traceContext.trace_id,
-      request
-    );
-
-    const response = await this.sendRequest(ipcRequest);
-    if (!response.success) {
-      throw new CoreException(
-        `Agent规划失败: ${response.error?.message}`,
-        response.error?.code as ErrorCode || ErrorCode.INFERENCE_ERROR,
-        traceContext.trace_id
-      );
-    }
-
-    return response.payload as AgentPlanResponse;
+    this.assertReady();
+    return this.client.plan(request, traceId ?? createTraceContext().trace_id, this.requestTimeoutMs);
   }
 
   public async sendAgentSynthesis(request: AgentSynthesisRequest): Promise<AgentSynthesisResponse> {
-    if (!this._isReady) {
-      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
-    }
-
-    const traceContext = createTraceContext({ trace_id: request.trace_id });
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.AGENT_SYNTHESIS,
-      traceContext.trace_id,
-      {
-        original_goal: request.original_goal,
-        scene_id: request.scene_id ?? 'default',
-        tool_results: request.tool_results,
-      }
-    );
-
-    const response = await this.sendRequest(ipcRequest);
-    if (!response.success) {
-      throw new CoreException(
-        `Agent合成失败: ${response.error?.message}`,
-        response.error?.code as ErrorCode || ErrorCode.INFERENCE_ERROR,
-        traceContext.trace_id
-      );
-    }
-
-    return response.payload as AgentSynthesisResponse;
+    this.assertReady();
+    return this.client.synthesize(request, this.requestTimeoutMs);
   }
 
-  public async sendLifeHeartbeat(request: LifeHeartbeatRequest): Promise<LifeHeartbeatResponse> {
-    if (!this._isReady) {
-      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
-    }
-
-    const traceContext = createTraceContext();
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.LIFE_HEARTBEAT,
-      traceContext.trace_id,
-      request
-    );
-
-    const response = await this.sendRequest(ipcRequest);
-    if (!response.success) {
-      logger.warn("生命心跳发送失败", { error: response.error?.message });
-      throw new CoreException(`生命心跳失败: ${response.error?.message}`, ErrorCode.INFERENCE_ERROR);
-    }
-
-    return response.payload as LifeHeartbeatResponse;
+  public async sendLifeHeartbeat(_request: Record<string, never>): Promise<LifeHeartbeatResponse> {
+    this.assertReady();
+    return this.client.heartbeat(this.requestTimeoutMs);
   }
 
-  public async getConversationHistory(
-    request: ConversationHistoryIPCRequest,
-    traceId?: string,
-  ): Promise<ConversationHistoryResponse> {
-    if (!this._isReady) {
-      throw new CoreException("Cognition 认知核未就绪", ErrorCode.INFERENCE_ERROR);
-    }
-
-    const traceContext = createTraceContext({ trace_id: traceId });
-    const ipcRequest = createIPCRequest(
-      IPCMessageType.CONVERSATION_HISTORY,
-      traceContext.trace_id,
-      request,
-    );
-
-    const response = await this.sendRequest(ipcRequest);
-    if (!response.success) {
-      throw new CoreException(
-        `Conversation 历史查询失败: ${response.error?.message}`,
-        response.error?.code as ErrorCode || ErrorCode.INFERENCE_ERROR,
-        traceContext.trace_id,
-      );
-    }
-
-    return response.payload as ConversationHistoryResponse;
+  public async getConversationHistory(request: ConversationHistoryRequest, traceId?: string): Promise<ConversationHistoryResponse> {
+    this.assertReady();
+    return this.client.conversationHistory(request, traceId ?? createTraceContext().trace_id, this.requestTimeoutMs);
   }
 
   public async restart(): Promise<void> {
-    logger.info("开始重启 Cognition 认知核");
     await this.stop();
     await new Promise((resolve) => setTimeout(resolve, 2000));
     await this.start();
-    logger.info("Cognition 认知核重启完成");
   }
 
   public async stop(): Promise<void> {
-    if (!this._isRunning) {
-      return;
-    }
-
-    logger.info("Cognition 认知核开始停止");
-    this._stoppingIntentionally = true;
-    this._isReady = false;
-    const child = this._pythonProcess;
-    let shutdownAccepted = false;
-
-    if (child && IPCServer.instance.isClientConnected) {
+    const child = this.child;
+    if (!this.running && !child) return;
+    this.stopping = true;
+    this.ready = false;
+    let accepted = false;
+    if (child && this.transport.isRegistered) {
       try {
-        const traceContext = createTraceContext();
-        const request = createIPCRequest(
-          IPCMessageType.COGNITION_SHUTDOWN,
-          traceContext.trace_id,
-          { reason: 'kernel_lifecycle_stop' },
-          traceContext.span_id ?? undefined,
-        );
-        await this.sendRequest(request, 1000);
-        shutdownAccepted = true;
-        logger.info("Cognition 已确认协议级停机请求");
+        await this.client.shutdown('kernel_lifecycle_stop', 1000);
+        accepted = true;
       } catch (error) {
-        logger.warn("Cognition 协议级停机请求失败，转入受管进程回收", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        logger.warn('Cognition gRPC 停机请求失败，转入受管进程回收', { error: normalizeError(error) });
       }
     }
-
-    if (child && shutdownAccepted) {
+    if (child && accepted) {
       if (!await waitForManagedProcessExit(child, 2500)) {
-        await forceTerminateManagedProcessTree(
-          child,
-          'Cognition 认知核',
-          1000,
-          process.platform !== 'win32',
-        );
+        await forceTerminateManagedProcessTree(child, 'Cognition 认知核', 1000, process.platform !== 'win32');
       }
     } else {
       await stopManagedProcess(child, {
-        label: 'Cognition 认知核',
-        gracefulTimeoutMs: 2500,
-        forceTimeoutMs: 1000,
+        label: 'Cognition 认知核', gracefulTimeoutMs: 2500, forceTimeoutMs: 1000,
         ownsProcessGroup: process.platform !== 'win32',
       });
     }
-
-    this._isRunning = false;
-    this._pythonProcess = null;
-    this._stoppingIntentionally = false;
-    logger.info("Cognition 认知核停止完成");
+    if (child?.pid) await this.transport.invalidateProcess(child.pid);
+    this.running = false;
+    this.child = null;
+    this.stopping = false;
+    logger.info('Cognition 认知核停止完成');
   }
 
   public get isReady(): boolean {
-    return this._isReady && this._isRunning;
+    return this.ready && this.running && this.transport.isRegistered;
   }
+
+  private assertReady(): void {
+    if (!this.isReady) throw new CoreException('Cognition 认知核未就绪', 'INFERENCE_ERROR');
+  }
+
+  private attachProcessObservers(child: ChildProcess): void {
+    child.stdout?.on('data', (data: Buffer) => this.consumeOutput(data, false));
+    child.stderr?.on('data', (data: Buffer) => this.consumeOutput(data, true));
+    child.on('exit', (code, signal) => {
+      this.flushOutput();
+      const interrupted = code === 0xC000013A;
+      const intentional = this.stopping || this.starting || code === 0 || interrupted;
+      this.running = false;
+      this.ready = false;
+      if (child.pid) void this.transport.invalidateProcess(
+        child.pid,
+        new CognitionTransportError('受监督 Cognition 进程在注册前退出', ServiceErrorCode.UNAVAILABLE, true),
+      );
+      logger[code === 0 || interrupted ? 'info' : 'warn']('Cognition 认知核进程退出', { code, signal });
+      if (!intentional && code !== 0) {
+        void this.restart().catch((error) => logger.error('Cognition 自动重启失败', { error: normalizeError(error) }));
+      }
+    });
+    child.on('error', (error) => {
+      this.running = false;
+      this.ready = false;
+      logger.error('Cognition 子进程启动失败', { error: error.message });
+    });
+  }
+
+  private consumeOutput(data: Buffer, stderr: boolean): void {
+    const key = stderr ? 'stderrBuffer' : 'stdoutBuffer';
+    this[key] += data.toString('utf8');
+    const lines = this[key].split('\n');
+    this[key] = lines.pop() ?? '';
+    for (const line of lines) routeProcessLine(line, stderr);
+  }
+
+  private flushOutput(): void {
+    if (this.stdoutBuffer.trim()) routeProcessLine(this.stdoutBuffer, false);
+    if (this.stderrBuffer.trim()) routeProcessLine(this.stderrBuffer, true);
+    this.stdoutBuffer = '';
+    this.stderrBuffer = '';
+  }
+}
+
+function routeProcessLine(line: string, stderr: boolean): void {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  let parsed: Record<string, unknown> | undefined;
+  try { parsed = JSON.parse(trimmed) as Record<string, unknown>; } catch { parsed = undefined; }
+  const level = String(parsed?.level ?? (stderr ? 'warn' : 'debug')).toLowerCase();
+  const event = String(parsed?.event ?? trimmed);
+  const record = { timestamp: String(parsed?.timestamp ?? new Date().toISOString()), level, source: 'cognition', stream: stderr ? 'stderr' : 'stdout', message: event, ...(parsed ?? {}) };
+  fs.ensureDir(processLogDir)
+    .then(() => fs.appendFile(path.join(processLogDir, PROCESS_LOG), `${JSON.stringify(record)}\n`, 'utf8'))
+    .catch((error) => console.error('写入 Cognition 子进程日志失败', error));
+  if (level === 'error' || level === 'critical') logger.error('Cognition 子进程错误', { child_event: event, trace_id: parsed?.trace_id });
+}
+
+function normalizeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function ensureDevelopmentPython(cognitionDir: string): Promise<string> {
+  const python = process.platform === 'win32'
+    ? path.join(cognitionDir, '.venv', 'Scripts', 'python.exe')
+    : path.join(cognitionDir, '.venv', 'bin', 'python');
+  if (!await fs.pathExists(python)) {
+    const uv = process.platform === 'win32' ? 'uv.exe' : 'uv';
+    await execFileAsync(uv, ['sync', '--project', cognitionDir, '--frozen'], {
+      cwd: resolveRepoRoot(),
+      windowsHide: true,
+    });
+  }
+  if (!await fs.pathExists(python)) {
+    throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
+  }
+  return python;
 }

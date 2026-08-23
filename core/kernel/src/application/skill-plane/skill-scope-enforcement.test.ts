@@ -1,4 +1,5 @@
-import type { AgentPlanRequest, AgentPlanResponse, ConversationContext } from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '@glimmer-cradle/protocol';
+import type { AgentPlanRequest, AgentPlanResponse } from '../../foundation/ports/cognition-service-port';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SkillCatalogAppService } from '../services/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../services/skill-planning-app.service';

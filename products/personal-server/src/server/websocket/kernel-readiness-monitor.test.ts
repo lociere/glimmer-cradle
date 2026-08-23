@@ -23,7 +23,7 @@ function catalog(
       {
         runtime_id: 'cognition',
         owner: 'cognition',
-        phase: 'ipc_config_knowledge',
+        phase: 'service_config_knowledge',
         state: cognitionState,
         blocking: true,
         summary: 'cognition',

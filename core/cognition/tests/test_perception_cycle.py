@@ -84,7 +84,7 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
 
 # ─── 生产接线冒烟：感知 → 循环 → 真实 ReasoningService → Act → action_sink ───
 # 不用 _FakeReasoning，而用生产接线（ReasoningService→CloudReasoning→LLMEngine），
-# 覆盖容器实际装配的完整自主输出通路（缺的只有 ZMQ 物理线）。Act 推出的
+# 覆盖容器实际装配的完整自主输出通路（不含跨进程 gRPC transport）。Act 推出的
 # ActionCommand dict 即内核 ACTION_COMMAND handler 入参，跨进程契约在此对齐。
 
 async def test_smoke_perception_to_action_command_production_wiring(tmp_path) -> None:

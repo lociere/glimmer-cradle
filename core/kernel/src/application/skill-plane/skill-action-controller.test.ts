@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { IPCMessageType, type AgentSynthesisRequest, type IPCRequest } from '@glimmer-cradle/protocol';
+import type { ActionCommand } from '@glimmer-cradle/protocol';
+import type { AgentSynthesisRequest } from '../../foundation/ports/cognition-service-port';
 import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
-
-function actionRequest(payload: Record<string, unknown>): IPCRequest {
-  return {
-    type: IPCMessageType.ACTION_COMMAND,
-    trace_id: 'trace-1',
-    payload,
-  };
-}
 
 function createPlanning(overrides: Partial<{
   readyToolCount: number;
@@ -45,7 +38,7 @@ function createPlanning(overrides: Partial<{
   };
 }
 
-function skillCommand(goal = '查一下天气') {
+function skillCommand(goal = '查一下天气'): ActionCommand {
   return {
     trace_id: 'trace-1',
     action_type: 'skill_request',
@@ -56,6 +49,11 @@ function skillCommand(goal = '查一下天气') {
         capability_kind: 'realtime_lookup',
         confidence: 0.9,
         reason: '需要实时天气',
+        conversation: {
+          source_provider_id: 'desktop', scene_id: 'desktop:local', conversation_id: 'conversation-1',
+          continuity_id: 'continuity-1', thread_id: 'main', interaction_id: 'trace-1',
+          recall_scope: 'conversation_private', disclosure_scope: 'conversation_private',
+        },
       },
     },
   };
@@ -74,7 +72,7 @@ describe('SkillActionController', () => {
       async (reply) => { replies.push(reply); },
     );
 
-    await controller.handleActionCommand(actionRequest(skillCommand()));
+    await controller.handleActionCommand(skillCommand());
 
     expect(synthesisRequests[0].tool_results[0].status).toBe('success');
     expect(synthesisRequests[0].tool_results[0].tool_name).toBe('get_weather');
@@ -105,7 +103,7 @@ describe('SkillActionController', () => {
       async () => {},
     );
 
-    await controller.handleActionCommand(actionRequest(skillCommand()));
+    await controller.handleActionCommand(skillCommand());
 
     const result = JSON.parse(synthesisRequests[0].tool_results[0].result_json);
     expect(synthesisRequests[0].tool_results[0].status).toBe('skipped');
@@ -123,7 +121,7 @@ describe('SkillActionController', () => {
       async () => {},
     );
 
-    await controller.handleActionCommand(actionRequest(skillCommand()));
+    await controller.handleActionCommand(skillCommand());
 
     const result = JSON.parse(synthesisRequests[0].tool_results[0].result_json);
     expect(result.reason).toBe('no_suitable_skill');
@@ -140,7 +138,7 @@ describe('SkillActionController', () => {
       async () => {},
     );
 
-    await controller.handleActionCommand(actionRequest(skillCommand()));
+    await controller.handleActionCommand(skillCommand());
 
     const result = synthesisRequests[0].tool_results[0];
     expect(result.status).toBe('error');
@@ -155,7 +153,7 @@ describe('SkillActionController', () => {
       async (reply) => { replies.push(reply); },
     );
 
-    await controller.handleActionCommand(actionRequest(skillCommand()));
+    await controller.handleActionCommand(skillCommand());
 
     expect(replies[0]).toMatchObject({
       sceneId: 'desktop:local',

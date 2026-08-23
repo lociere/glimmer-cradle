@@ -3,7 +3,7 @@ import json
 import pytest
 
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanUseCase
-from glimmer_cradle.cognition.protocol.generated.ipc.agent_plan_payload import SkillToolDescriptor
+from glimmer_cradle.cognition.ports.kernel.models import SkillToolDescriptor
 
 
 class _PlanningLLM:

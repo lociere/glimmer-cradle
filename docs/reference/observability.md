@@ -255,7 +255,7 @@ cleanup 后 `observability.db` 会在下一次诊断查询时重建。
 | 症状 | 优先查看 |
 |---|---|
 | Kernel 启动卡住 | lifecycle 日志、runtime readiness、Ingress Gate |
-| Cognition 无回复 | IPC trace、Cognition process log、DLQ、provider span |
+| Cognition 无回复 | Cognition Service trace、Cognition process log、DLQ、provider span |
 | TTS/ASR 不可用 | audio readiness、`processes/audio-*.log`、resource catalog |
 | Avatar 已连接但无动作 | `host_hello` / `host_ready`、avatar process log、composition span |
 | Extension 工具不可调用 | skill catalog、policy decision、activation log |

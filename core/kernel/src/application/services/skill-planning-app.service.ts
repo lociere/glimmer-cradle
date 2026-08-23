@@ -1,9 +1,5 @@
-import type {
-  AgentPlanRequest,
-  AgentPlanResponse,
-  ConversationContext,
-  MCPToolSuggestion,
-} from '@glimmer-cradle/protocol';
+import type { ConversationContext } from '@glimmer-cradle/protocol';
+import type { AgentPlanRequest, AgentPlanResponse } from '../../foundation/ports/cognition-service-port';
 import { AIProxy } from '../capabilities/inference/ai-proxy';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 import { ControlSurfaceCorePlatformBridge } from '../skill-plane/providers/core/core-platform-bridge';
@@ -18,6 +14,7 @@ export interface SkillPlanningRequest {
 }
 
 export type AgentPlanRequester = (request: AgentPlanRequest, traceId?: string) => Promise<AgentPlanResponse>;
+type MCPToolSuggestion = AgentPlanResponse['suggestions'][number];
 
 /**
  * Cognition 只根据目录提出建议；只有这里能把建议交给 Kernel 的统一调用网关。

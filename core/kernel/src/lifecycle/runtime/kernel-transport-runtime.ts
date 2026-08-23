@@ -1,5 +1,5 @@
 import type { GlobalConfig } from '../../foundation/config/config-schema';
-import { IPCServer } from '../../infrastructure/ipc-broker/ipc-server';
+import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
 import { IngressGateManager } from '../../foundation/ingress-gate/ingress-gate-manager';
 import { RuntimeReadinessCatalogStore } from '../../foundation/runtime-readiness-catalog';
 import type { RuntimeReadinessSnapshot } from '../../foundation/runtime-readiness';
@@ -13,9 +13,9 @@ export class KernelTransportRuntime implements RuntimeModule {
 
   public async start(_context: TraceContext): Promise<Record<string, unknown>> {
     IngressGateManager.instance.init(this.config.system.ingress);
-    await IPCServer.instance.start();
+    await KernelCognitionTransport.instance.start();
     return {
-      ipc_bind_address: IPCServer.instance.bindAddress,
+      cognition_control_transport: 'grpc_dynamic_loopback',
       ingress_gate: 'initialized',
       ingress_open: false,
       runtime_readiness: this.createIngressSnapshot('starting'),
@@ -24,7 +24,7 @@ export class KernelTransportRuntime implements RuntimeModule {
 
   public async stop(_context: TraceContext): Promise<void> {
     this.closeIngress();
-    await IPCServer.instance.stop();
+    await KernelCognitionTransport.instance.stop();
     IngressGateManager.instance.stop();
   }
 

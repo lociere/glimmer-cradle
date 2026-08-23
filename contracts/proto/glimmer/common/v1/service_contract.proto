@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package glimmer.common.v1;
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Common.V1";
+
+message CallMetadata {
+  string trace_id = 1;
+  string span_id = 2;
+  string causation_id = 3;
+  string correlation_id = 4;
+  string generation = 5;
+  string idempotency_key = 6;
+}
+
+enum ServiceErrorCode {
+  SERVICE_ERROR_CODE_UNSPECIFIED = 0;
+  SERVICE_ERROR_CODE_INVALID_REQUEST = 1;
+  SERVICE_ERROR_CODE_NOT_READY = 2;
+  SERVICE_ERROR_CODE_GENERATION_MISMATCH = 3;
+  SERVICE_ERROR_CODE_CANCELLED = 4;
+  SERVICE_ERROR_CODE_DEADLINE_EXCEEDED = 5;
+  SERVICE_ERROR_CODE_INTERNAL = 6;
+  SERVICE_ERROR_CODE_UNAVAILABLE = 7;
+}
+
+message ServiceErrorDetail {
+  ServiceErrorCode code = 1;
+  string safe_message = 2;
+  bool retryable = 3;
+  CallMetadata call = 4;
+}
+
+message CommandResult {
+  string operation_id = 1;
+  string status = 2;
+  bool duplicate = 3;
+}

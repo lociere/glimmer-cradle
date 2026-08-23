@@ -116,7 +116,8 @@ ASR 当前主线为 FunASR，因此 Control Center 只暴露启停，不提供�
 
 | 配置 | 当前语义 |
 |---|---|
-| `kernel.ipc.bind_address` | 固定为 `tcp://127.0.0.1:*`，Kernel 绑定后把真实 Cognition RPC 地址直接注入子进程。 |
+| `kernel.cognition_service.request_timeout_ms` | Kernel 调用 Cognition Service 的默认 deadline；不配置稳定端口。 |
+| `kernel.cognition_service.registration_timeout_ms` | Kernel 等待受监 Cognition 以本代 generation/PID 注册的上限。 |
 | `surfaces.yaml` | 不含 Desktop WebSocket 端口；Desktop 从本代 endpoint catalog 发现。 |
 | `avatar.yaml` | 不含 Avatar WebSocket 端口；Kernel 启动 Unity 时直接注入。 |
 | `data/run/host/endpoints.json` | Kernel 生成的可再生目录，不是用户配置，不得手改或跨启动缓存。 |

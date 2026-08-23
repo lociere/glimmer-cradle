@@ -101,7 +101,7 @@ export class ConfigManager {
         await this.injectLLMApiKeysFromSecrets(characterData.llm as LLMConfigLike);
       }
       const SYSTEM_SUB_SECTIONS: Array<[keyof typeof systemData, ConfigSchemaName]> = [
-        ['ipc', 'IPCConfig'],
+        ['cognition_service', 'CognitionServiceConfig'],
         ['lifecycle', 'LifecycleConfig'],
         ['extensions', 'ExtensionConfig'],
         ['avatar', 'AvatarConfig'],
@@ -432,7 +432,7 @@ export class ConfigManager {
 
     return {
       ...identityData,
-      ipc: kernelData.ipc,
+      cognition_service: kernelData.cognition_service,
       lifecycle: kernelData.lifecycle,
       ingress: kernelData.ingress,
       avatar: avatarData,

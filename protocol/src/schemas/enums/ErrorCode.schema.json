@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://glimmer-cradle.local/schemas/enums/ErrorCode.schema.json",
   "title": "ErrorCode",
-  "description": "跨层错误码 —— 字符串枚举，值=名。跨层单一事实源，Kernel 内核与 Cognition 认知核共用，随 IPC 错误响应 error.code 跨进程传递。归并历史：CORE_ERROR/UNKNOWN_ERROR→UNKNOWN；BRIDGE_ERROR/ADAPTER_ERROR→IPC_ERROR。",
+  "description": "未迁移 runtime 结构使用的跨层错误码，字符串枚举且值=名。Kernel↔Cognition Service 错误已由 contracts Protobuf typed detail 拥有。归并历史：CORE_ERROR/UNKNOWN_ERROR→UNKNOWN；BRIDGE_ERROR/ADAPTER_ERROR→IPC_ERROR。",
   "type": "string",
   "enum": [
     "UNKNOWN",

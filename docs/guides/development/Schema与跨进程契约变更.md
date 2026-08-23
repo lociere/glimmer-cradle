@@ -16,7 +16,7 @@
 
 ## M12 Slice 1 contracts baseline
 
-`contracts/` 已建立长期 baseline，但当前运行主线仍未迁移。处理 `contracts/` 本身时使用：
+`contracts/` 已建立长期 baseline，Kernel↔Cognition 运行主线已迁移。处理 Contract Spine 时使用：
 
 ```powershell
 pnpm contracts:generate
@@ -29,7 +29,7 @@ pnpm contracts:verify
 - JSON Schema Document 放在 `contracts/json-schema/`，用于配置、Character Package、Extension manifest/package、动态 Skill/tool 参数等文档型契约。
 - 同一结构不得同时由 Protobuf 和 JSON Schema 拥有权威定义；Protobuf 只能引用 Document 的稳定 id、version、digest 或 typed reference。
 - `contracts/generated/` 只属于 Adapter/Transport 边缘，不能 import 到 Domain/Application/Port。
-- Slice 1 不切换 ZMQ、stdio、WebSocket、gRPC/Connect runtime 链路，不删除当前 `protocol/`。
+- Kernel↔Cognition 只能修改 `contracts/proto/glimmer/{common,kernel,cognition}/v1/`，不得恢复 ZMQ/envelope；其他边界按对应 M12 切片迁移。
 
 ## 兼容判断
 

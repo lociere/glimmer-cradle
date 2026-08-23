@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentPlanRequest, AgentPlanResponse } from '@glimmer-cradle/protocol';
+import type { AgentPlanRequest, AgentPlanResponse } from '../../src/foundation/ports/cognition-service-port';
 import { SkillCatalogAppService } from '../../src/application/services/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../../src/application/services/skill-planning-app.service';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';

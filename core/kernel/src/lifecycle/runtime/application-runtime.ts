@@ -12,8 +12,7 @@ import type { SkillProvider } from '../../application/skill-plane/types';
 import type { SkillAvailabilityContext } from '../../application/skill-plane/types';
 import { McpServerSkillProvider } from '../../application/skill-plane/providers/mcp-server';
 import { SkillActionController } from '../../application/skill-plane/skill-action-controller';
-import { IPCServer } from '../../infrastructure/ipc-broker/ipc-server';
-import { IPCMessageType } from '@glimmer-cradle/protocol';
+import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
 import type { RuntimeModule } from './runtime-module';
 import type { TraceContext } from '@glimmer-cradle/protocol';
 
@@ -71,9 +70,8 @@ export class ApplicationRuntime implements RuntimeModule {
     }
     const skillPlanningAppService = new SkillPlanningAppService(skillCatalogAppService);
     const skillActionController = new SkillActionController(skillPlanningAppService);
-    IPCServer.instance.registerHandler(
-      IPCMessageType.ACTION_COMMAND,
-      (request) => skillActionController.handleActionCommand(request),
+    KernelCognitionTransport.instance.setActionHandler(
+      (command) => skillActionController.handleActionCommand(command),
     );
 
     const perceptionAppService = new PerceptionAppService(
@@ -113,6 +111,7 @@ export class ApplicationRuntime implements RuntimeModule {
     this._perceptionAppService = null;
     this._skillPlanningAppService = null;
     this._skillCatalogAppService = null;
+    KernelCognitionTransport.instance.setActionHandler(null);
     logger.debug('Application Runtime 已停止');
   }
 }

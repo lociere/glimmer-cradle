@@ -2,7 +2,6 @@
 export * from './CognitiveActivityState';
 export * from './ErrorCode';
 export * from './EventOutcome';
-export * from './IPCMessageType';
 export * from './MemoryKind';
 export * from './MemoryStatus';
 export * from './MetricKind';

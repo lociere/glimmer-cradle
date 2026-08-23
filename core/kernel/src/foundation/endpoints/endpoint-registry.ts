@@ -32,6 +32,7 @@ export class EndpointRegistry {
     ? process.env.GLIMMER_CRADLE_LAUNCH_SESSION!
     : randomUUID();
   private readonly records = new Map<LocalEndpointPurpose, LocalEndpointRecord>();
+  private writeChain: Promise<void> = Promise.resolve();
 
   public static get instance(): EndpointRegistry {
     EndpointRegistry._instance ??= new EndpointRegistry();
@@ -56,7 +57,7 @@ export class EndpointRegistry {
       published_at: new Date().toISOString(),
     };
     this.records.set(purpose, record);
-    await this.flush();
+    await this.enqueueFlush();
     return record;
   }
 
@@ -67,15 +68,15 @@ export class EndpointRegistry {
   public async revoke(purpose: LocalEndpointPurpose): Promise<void> {
     if (!this.records.delete(purpose)) return;
     if (this.records.size === 0) {
-      await rm(this.catalogPath, { force: true });
+      await this.enqueueWrite(() => rm(this.catalogPath, { force: true }));
       return;
     }
-    await this.flush();
+    await this.enqueueFlush();
   }
 
   public async close(): Promise<void> {
     this.records.clear();
-    await rm(this.catalogPath, { force: true });
+    await this.enqueueWrite(() => rm(this.catalogPath, { force: true }));
   }
 
   private async flush(): Promise<void> {
@@ -91,6 +92,16 @@ export class EndpointRegistry {
     await writeFile(temporaryPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
     await rename(temporaryPath, this.catalogPath);
   }
+
+  private enqueueFlush(): Promise<void> {
+    return this.enqueueWrite(() => this.flush());
+  }
+
+  private enqueueWrite(operation: () => Promise<void>): Promise<void> {
+    const next = this.writeChain.then(operation, operation);
+    this.writeChain = next.catch(() => undefined);
+    return next;
+  }
 }
 
 function isLaunchSession(value: string | undefined): value is string {
@@ -100,6 +111,7 @@ function isLaunchSession(value: string | undefined): value is string {
 function assertLoopbackEndpoint(endpoint: string): void {
   if (
     !endpoint.startsWith('tcp://127.0.0.1:')
+    && !endpoint.startsWith('grpc://127.0.0.1:')
     && !endpoint.startsWith('ws://127.0.0.1:')
     && !endpoint.startsWith('ws://[::1]:')
   ) {

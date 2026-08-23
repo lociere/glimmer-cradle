@@ -3,7 +3,6 @@
 // in their respective owners and consume these contracts one way.
 
 export * from './models';
-export * from './ipc/ipc-types';
 export * from './extension';
 export * from './product';
 

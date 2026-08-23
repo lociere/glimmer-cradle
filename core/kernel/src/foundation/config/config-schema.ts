@@ -1,7 +1,7 @@
 /**
  * 全局配置类型聚合（阶段 P.4b 起，从 Zod 推断 → JSON Schema codegen 产物）
  *
- * - system 块：identity / character / backup + Kernel 子块（ipc / lifecycle /
+ * - system 块：identity / character / backup + Kernel 子块（cognition_service / lifecycle /
  *   extensions / surfaces / ingress / memory / observability）
  * - character 块：当前 active character package 的 manifest / profile / dialogue / safety / inference / llm 六段
  *
@@ -17,7 +17,7 @@ import type {
   EmbeddingConfig,
   ExtensionConfig,
   IngressGateConfig,
-  IPCConfig,
+  CognitionServiceConfig,
   InferenceConfig,
   LifecycleConfig,
   LLMConfig,
@@ -31,7 +31,7 @@ import type {
 
 /** configs/system/*.yaml 组合后的解析结果（系统身份/当前角色/备份 + Kernel 运行时子块） */
 export type SystemConfig = AppConfig & {
-  ipc: IPCConfig;
+  cognition_service: CognitionServiceConfig;
   lifecycle: LifecycleConfig;
   extensions: ExtensionConfig;
   avatar: AvatarConfig;

@@ -24,7 +24,7 @@ core/kernel/src/
 ├── app.ts / main.ts                  # Kernel 入口与 composition root
 └── core/
     ├── foundation/                   # config、event bus、logger、storage、process、ports、ingress
-    ├── infrastructure/ipc-broker/    # 与 Cognition 等跨进程传输适配
+    ├── adapters/cognition/           # Cognition v1 gRPC Service Adapter/client
     ├── domain/                       # attention、organism、life clock 等内核领域规则
     ├── application/                  # perception、channel、capability、skill-plane、projection
     ├── host/                         # Extension 宿主边界
@@ -38,7 +38,7 @@ core/kernel/src/
 | 阶段 | 目的 | 核心要求 |
 |---|---|---|
 | Foundation | 路径、配置、日志、trace、DLQ、storage 可用 | 失败要阻断后续 required SDK |
-| Transport | IPC/WebSocket/stdio 等传输通道可建立 | 通道存在不代表业务能力 ready |
+| Transport | gRPC/WebSocket/stdio 等传输通道可建立 | 通道存在不代表业务能力 ready |
 | Application | Application service、capability、projection、Skill Plane 被组装 | 不能在这里偷偷做人格判断 |
 | Surface | Desktop 等可见表面启动并显示等待/降级状态 | UI 可早出现，但不等于 Ingress 开放 |
 | Core Readiness | required SDK 完成真实握手或明确 degraded | 这是用户输入能否进入的判断点 |
@@ -51,7 +51,7 @@ core/kernel/src/
 
 Ingress Gate 是 Kernel 对输入的闸门。它必须等 required SDK 完成真实业务 ready 或明确 degraded 后才开放。典型判断：
 
-- Cognition：IPC 握手、配置、数据库/记忆基础设施和认知循环可服务。
+- Cognition：受监督进程以本代 generation 注册动态回环 gRPC 端点，知识初始化、数据库/记忆基础设施和认知循环均可服务；仅进程存在或端口绑定不算 ready。
 - Audio：协议健康、TTS route/ASR warmup 或清晰 degraded；`audio.host` 先汇总语音整体 desired/actual/readiness，再由 `audio.tts`、`audio.asr` 投影 Engine 返回的 cloud/local provider 状态。Kernel 不扫描模型目录或 sidecar，也不复制 Engine 路由。
 - Avatar：`host_hello` 之后完成 catalog、模型 driver、Composition Host 首帧和 `host_ready`；这些阶段变化由 `AvatarController` 实时回写 `RuntimeReadinessCatalog`，Desktop 诊断消费的不是启动时死快照。
 - Extension/MCP：manifest/config 校验、initialize、catalog 枚举、Policy/Gateway 可审计；`extension-runtime` 会把 `ExtensionRuntimeProjection` 归一成 `RuntimeReadinessSnapshot.reconciler`，把 host aggregate、每个扩展的 desired/actual/readiness 与缺包恢复动作纳入同一 runtime 生命周期主线。MCP 则通过 `application` runtime 暴露 `mcp.host` 与 `mcp.<server-id>` snapshots，并在 provider 连接状态变化时持续刷新 catalog。

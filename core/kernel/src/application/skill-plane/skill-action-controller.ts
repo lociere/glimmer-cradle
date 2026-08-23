@@ -1,14 +1,9 @@
 import {
-  AgentSynthesisRequest,
-  AgentSynthesisResponse,
-  AgentToolResult,
-  IPCMessageType,
-  IPCRequest,
-  IPCResponse,
-  createSuccessResponse,
+  type ActionCommand,
   type ConversationContext,
   normalizeReplyMessages,
 } from '@glimmer-cradle/protocol';
+import type { AgentSynthesisRequest, AgentSynthesisResponse, AgentToolResult } from '../../foundation/ports/cognition-service-port';
 import { randomUUID } from 'node:crypto';
 import { ChannelReplyEvent } from '../../foundation/event-bus/events';
 import { EventBus } from '../../foundation/event-bus/event-bus';
@@ -39,18 +34,16 @@ export class SkillActionController {
     private readonly _publishReply: ChannelReplyPublisher = publishChannelReply,
   ) {}
 
-  public async handleActionCommand(request: IPCRequest): Promise<IPCResponse> {
-    const cmd = request.payload ?? {};
-    const actionType = String(cmd.action_type ?? '');
+  public async handleActionCommand(command: ActionCommand): Promise<void> {
+    const cmd = command as Record<string, any>;
+    const actionType = String(command.action_type ?? '');
     if (actionType === 'reply') {
-      await this.handleReplyCommand(cmd, request.trace_id);
-      return createSuccessResponse(IPCMessageType.SUCCESS_RESPONSE, request.trace_id);
+      await this.handleReplyCommand(cmd, command.trace_id);
+      return;
     }
     if (actionType === 'skill_request') {
-      await this.handleSkillRequestCommand(cmd, request.trace_id);
-      return createSuccessResponse(IPCMessageType.SUCCESS_RESPONSE, request.trace_id);
+      await this.handleSkillRequestCommand(cmd, command.trace_id);
     }
-    return createSuccessResponse(IPCMessageType.SUCCESS_RESPONSE, request.trace_id);
   }
 
   private async handleReplyCommand(cmd: Record<string, any>, requestTraceId: string): Promise<void> {

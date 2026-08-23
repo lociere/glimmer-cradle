@@ -1,8 +1,8 @@
 # Cognition 认知核实现
 
-> 范围：Python Cognition 如何实现人格、情绪、认知活动、后台维护、经历、记忆、上下文、推理、认知循环和 Kernel IPC；不写 LLM prompt 全文或字段全表。
-> 源码依据：`core/cognition/src/glimmer_cradle/cognition/host/`、`foundation/`、`activity/`、`maintenance/`、`cycle/`、`context/`、`inference/`、`memory/`、`experience/`、`ports/kernel/`、`protocol/generated/`。
-> 维护触发：认知循环、DI、上下文来源、推理 provider、记忆/经历持久化、Kernel IPC、协议生成物或测试入口变化。
+> 范围：Python Cognition 如何实现人格、情绪、认知活动、后台维护、经历、记忆、上下文、推理、认知循环和 Kernel Service 边界；不写 LLM prompt 全文或字段全表。
+> 源码依据：`core/cognition/src/glimmer_cradle/cognition/host/`、`adapters/kernel/`、`foundation/`、`activity/`、`maintenance/`、`cycle/`、`context/`、`inference/`、`memory/`、`experience/`、`ports/kernel/`。
+> 维护触发：认知循环、DI、上下文来源、推理 provider、记忆/经历持久化、Kernel Service transport、协议生成物或测试入口变化。
 
 ## 目录
 
@@ -20,17 +20,18 @@
 
 | 入口 | 职责 |
 |---|---|
-| `host/process.py` | Python 进程入口、配置加载、IPC server、生命周期监督 |
+| `host/process.py` | Python 进程入口、配置加载、Cognition Service host、生命周期监督 |
 | `host/composition.py` | 唯一组装点，连接 event bus、DB、memory、inference、cycle、adapters |
-| `ports/kernel/inbound/` | Kernel 入站感知与请求的协议适配 |
-| `ports/kernel/outbound/` | 行动、状态、错误和事件回传 Kernel |
-| `protocol/generated/` | 由 `protocol/src/schemas/` 生成的 Python 契约投影 |
+| `adapters/kernel/inbound_adapter.py` | Cognition Service DTO 到应用端口的入站映射 |
+| `adapters/kernel/outbound_adapter.py` | 行动、状态和日志经 Kernel Control Service 回传 |
+| `adapters/kernel/grpc_transport.py` | 动态回环 gRPC host/client、deadline、取消、typed detail 与 generation 校验 |
+| `ports/kernel/models.py` | 不依赖 generated DTO 的进程内边界模型 |
 
 Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 Electron、平台 payload、Extension handler 或 Kernel 内部对象。
 
 ## 代码结构地图
 
-以下是 Cognition 当前完整物理结构。`protocol/generated/` 内文件逐项列出用于审计，但其唯一 owner 仍是 `protocol/src/schemas/`，不得在 Python 侧手改。
+以下是 Cognition 当前物理结构。Contract Spine 生成物位于仓库根 `contracts/generated/python/`，只能由 Adapter 引用，不得在 Cognition 侧手改。
 
 ```text
 core/cognition/
@@ -43,6 +44,11 @@ core/cognition/
 │   │   ├── __init__.py
 │   │   ├── process.py                 # 进程生命周期监督
 │   │   └── composition.py             # 唯一 Composition Root 与冻结组件图
+│   ├── adapters/
+│   │   └── kernel/
+│   │       ├── grpc_transport.py          # Cognition Service host / Kernel Control client
+│   │       ├── inbound_adapter.py         # Protobuf DTO -> application port
+│   │       └── outbound_adapter.py        # application event -> Protobuf DTO
 │   ├── foundation/
 │   │   ├── __init__.py
 │   │   ├── config.py                  # 生成配置的进程聚合根
@@ -59,17 +65,13 @@ core/cognition/
 │   │   ├── __init__.py
 │   │   └── kernel/
 │   │       ├── __init__.py
+│   │       ├── models.py                  # 进程内边界模型
 │   │       ├── inbound/
 │   │       │   ├── __init__.py
-│   │       │   ├── kernel_request_port.py # 请求型应用端口
-│   │       │   ├── kernel_event_adapter.py
-│   │       │   ├── kernel_ingress_cortex.py
-│   │       │   └── parsed_perception.py
+│   │       │   └── kernel_request_port.py # 请求型应用端口
 │   │       └── outbound/
 │   │           ├── __init__.py
-│   │           ├── kernel_event_port.py
-│   │           ├── kernel_event_adapter.py
-│   │           └── kernel_bridge.py       # ZMQ 通信 Bridge
+│   │           └── kernel_event_port.py
 │   ├── cycle/
 │   │   ├── __init__.py
 │   │   ├── controller.py              # 九阶段顺序、竞争与 Volition
@@ -181,7 +183,7 @@ core/cognition/
 │           │   ├── extension_config.py
 │           │   ├── inference_config.py
 │           │   ├── ingress_gate_config.py
-│           │   ├── ipc_config.py
+│           │   ├── cognition_service_config.py
 │           │   ├── knowledge_base_config.py
 │           │   ├── knowledge_index_config.py
 │           │   ├── lifecycle_config.py
@@ -196,21 +198,11 @@ core/cognition/
 │           │   ├── cognitive_activity_state.py
 │           │   ├── error_code.py
 │           │   ├── event_outcome.py
-│           │   ├── ipc_message_type.py
 │           │   ├── model_invocation_capture_mode.py
 │           │   ├── memory_kind.py
 │           │   ├── memory_status.py
 │           │   ├── metric_kind.py
 │           │   └── moment_kind.py
-│           ├── ipc/
-│           │   ├── __init__.py
-│           │   ├── agent_plan_payload.py
-│           │   ├── agent_plan_result.py
-│           │   ├── agent_synthesis_payload.py
-│           │   ├── kernel_message_envelope.py
-│           │   ├── knowledge_init_payload.py
-│           │   ├── life_heartbeat_payload.py
-│           │   └── life_heartbeat_result.py
 │           └── models/
 │               ├── __init__.py
 │               ├── action_command.py
@@ -262,7 +254,7 @@ core/cognition/
 
 `.venv/`、`.pytest_cache/`、`__pycache__/`、构建输出和本地数据均为可重建产物，不属于认知核源码架构，因此不纳入上树。
 
-已删除且不得恢复的旧物理入口包括：`main.py`、`container.py`、`core/`、`ipc_server/`、`cognition/`、`reasoning/`、`llm_engine/`、`multimodal/`、`emotion_matrix/`、`arousal/`、`persistence/`、`narrative/`、`thought/`，以及 Kernel 驱动的并行主动思维用例。进程内唯一性由 `CognitionComponents` 所有权保证，不使用 `SelfEntity`、`PersonaInjector`、`KnowledgeBase` 或 `KernelBridge` Singleton。
+已删除且不得恢复的旧物理入口包括：`main.py`、`container.py`、`core/`、`ipc_server/`、`cognition/`、`reasoning/`、`llm_engine/`、`multimodal/`、`emotion_matrix/`、`arousal/`、`persistence/`、`narrative/`、`thought/`，以及 Kernel 驱动的并行主动思维用例。进程内唯一性由 `CognitionComponents` 所有权保证，不使用 `SelfEntity`、`PersonaInjector` 或 `KnowledgeBase` Singleton。旧 `KernelBridge`、ZMQ host 与通用 envelope adapter 已删除，不得恢复。
 
 | 目录 | 职责 | 关键风险 |
 |---|---|---|
@@ -281,10 +273,10 @@ core/cognition/
 ## 入站链路
 
 ```text
-Kernel IPC frame
-  -> ports/kernel/inbound/kernel_event_adapter.py
-  -> kernel_ingress_cortex.py / kernel_request_port.py
-  -> parsed_perception.py
+Kernel CognitionService request
+  -> adapters/kernel/grpc_transport.py
+  -> adapters/kernel/inbound_adapter.py
+  -> ports/kernel/inbound/kernel_request_port.py
   -> PerceptionEventQueue
   -> CycleController
 ```
@@ -314,7 +306,7 @@ Kernel IPC frame
 
 当前 `CycleController` 的 Deliberate 阶段以 `cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；ReasoningService 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
 
-`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 `agent_plan` / `agent_synthesis` IPC 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> agent_synthesis -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`agent_synthesis` 的 system prompt 由 `PersonaInjector.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
+`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaInjector.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
 `activity/` 是认知资源调度的唯一 owner。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
 
@@ -393,7 +385,7 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 - `ExperienceRecorder` 会把 Moment 写入 `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db`；`catalog.db` 维护全局 position 和 pack 范围。
 - `EpisodeProjection` 按 interaction、scene、conversation 与 recall/disclosure 权限域形成可重建 Episode；同一个 Episode 在物理表和查询键上都不能跨域。`reply` / `silence` 立即形成 `interaction_completed` 边界，`episode_idle_seconds`、`quiescent` 与停机只补充收口开放批次。启动时按 `seal_integrity_check` 校验投影数据库，先补投影所有已提交 Moment，再将遗留开放批次标记为 `process_interrupted`；封口后同 interaction 的迟到 Moment 会进入新 Episode，不改写已封口批次。
 - `MaintenanceScheduler` 在正常运行中由终结 Moment 唤醒，并按 `schedule_interval_seconds` 对持久待办补偿扫描；`ConsolidationCoordinator` 只处理 `memory_candidate`，先写 `consolidation_jobs`，再按 scope/owner 分批 claim。停机只投影、封口和入队，不执行模型巩固。输出必须通过结构、evidence id 与目标权限域校验后才可写入 Memory。
-- `KnowledgeBase` 启动时通过 `KNOWLEDGE_INIT` 注入角色知识，`knowledge_entry` 可被活动上下文检索。
+- `KnowledgeBase` 启动时通过 Cognition Service `InitializeKnowledge` 注入角色知识，`knowledge_entry` 可被活动上下文检索。
 - 工具结果通过 `agent_synthesis` 写入 `action_result` Moment；成功结果最多成为记忆候选，失败结果只保留为 Experience。
 - provider 缺失、非法输出或证据越权会记录 failed consolidation run，并保留 Episode 供后续重试；没有 mock fallback。
 
@@ -402,22 +394,22 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 ```text
 CycleController / use case
   -> ports/kernel/outbound/kernel_event_port.py
-  -> ports/kernel/outbound/kernel_bridge.py
-  -> generated KernelMessageEnvelope / ActionCommand / payload
-  -> Kernel IPC
+  -> adapters/kernel/outbound_adapter.py
+  -> generated KernelControlService request
+  -> Kernel gRPC host
 ```
 
-出站必须区分 reply、thought、emotion、`skill_request`、action command 和错误结果。`skill_request` 只承载目标、场景和 Cognition 的语义理由；目录、权限、确认、调用、审计和工具结果归一化由 Kernel 完成。所有跨边界结构来自生成模型；不要手写 `dict` 让字段漂移。
+出站必须区分 reply、thought、emotion、`skill_request`、action command 和错误结果。`skill_request` 只承载目标、场景和 Cognition 的语义理由；目录、权限、确认、调用、审计和工具结果归一化由 Kernel 完成。所有跨边界结构来自 `contracts/generated/python/` 的 Protobuf 模型，且只在 Adapter 边缘出现；不要手写 `dict` 让字段漂移。
 
 ## 调试入口
 
 | 症状 | 先查 |
 |---|---|
-| Cognition 进程未 ready | `host/process.py` 启动、配置、DB、provider warmup、IPC bind/connect |
+| Cognition 进程未 ready | `host/process.py` 启动、配置、DB、provider warmup、generation/PID 注册、gRPC readiness |
 | 输入进来但无行动 | inbound adapter、perception queue、`CycleController` tick、volition |
 | 回复空或异常 | context assembly、ReasoningService、LLMEngine、provider 错误 |
 | 记忆异常 | `memory/storage/database.py`、`memory_repo.py`、`memory/substrate.py`、consolidation run |
-| trace 断裂 | inbound trace、context/reasoning span、outbound bridge |
+| trace 断裂 | inbound gRPC metadata/DTO、context/reasoning span、outbound adapter |
 | 重启后状态丢失 | `data/state/cognition/`、Experience catalog/pack、Episode Projection、Memory revision |
 
 ## 验证
@@ -429,10 +421,11 @@ uv run pytest -q
 
 根目录的 `pnpm test` 会先执行同一组 Cognition 测试，再执行 Kernel 测试；不得让认知核退出全仓验收主线。
 
-涉及 protocol 时先在根目录运行：
+涉及 Kernel↔Cognition Service 时先在根目录运行：
 
 ```powershell
-pnpm sync:contracts
+pnpm contracts:generate
+pnpm contracts:verify
 ```
 
 涉及 provider、模型、embedding 或数据库迁移时，还需要验证空态、缺模型、坏数据、重复迁移、限流/超时和 outbound 失败。

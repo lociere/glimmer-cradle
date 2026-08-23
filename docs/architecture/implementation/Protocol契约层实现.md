@@ -1,15 +1,15 @@
 # Protocol 契约层实现
 
-> 范围：迁移期现有 runtime Protocol 与 M12 Slice 1 Contract Spine baseline 如何分 owner 定义、生成、校验和消费；不列全部字段。
-> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/`、Cognition `protocol/generated/`、M12 Slice 1 `contracts/` baseline。
+> 范围：迁移期现有 runtime Protocol 与 M12 Contract Spine 如何分 owner 定义、生成、校验和消费；不列全部字段。
+> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/`、Cognition `protocol/generated/`、`contracts/`。
 > 维护触发：Schema、IPC 消息、Avatar frame、配置模型、生成脚本、runtime helper、跨语言消费者或错误码变化。
 
 ## 目录与生成链
 
 ```text
 protocol/src/
-├── schemas/{enums,models,ipc,config}/   # 唯一权威 Schema
-├── generated/{enums,models,ipc,config}/ # TypeScript 生成投影
+├── schemas/{enums,models,config}/       # 未迁移边界的权威 Schema
+├── generated/{enums,models,config}/     # TypeScript 生成投影
 ├── runtime/                             # validator、normalizer、reply/avatar helper
 ├── models/ ipc/ utils/                  # 手写 runtime helper 和便利模型
 └── config-schemas.ts                    # config schema 聚合入口
@@ -26,11 +26,13 @@ pnpm sync:contracts
 
 生成物不能手改。若生成物不满足消费需求，应改对应 owner 的 Schema/IDL、生成脚本或 runtime helper，而不是在消费者里复制字段。
 
-M12 Slice 1 新增了不切运行主线的 `contracts/` baseline：
+M12 Slice 1 建立 baseline，Slice 2 已将 Kernel↔Cognition Service 迁入 `contracts/`：
 
 ```text
 contracts/
-├── proto/glimmer/common/v1/contract_probe.proto
+├── proto/glimmer/common/v1/{contract_probe,service_contract}.proto
+├── proto/glimmer/cognition/v1/cognition_service.proto
+├── proto/glimmer/kernel/v1/kernel_control_service.proto
 ├── json-schema/skill/v1/tool-parameters.schema.json
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
@@ -46,15 +48,15 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘；当前 Kernel、Cognition、Desktop、Avatar、Engine、Extension 和 Personal Server runtime consumer 仍走旧 `@glimmer-cradle/protocol`。Slice 1 不修改 `protocol/`、不切 ZMQ/stdio/WebSocket/gRPC/Connect 链路，也不删除旧生成链。两条 canonical 路由按“现有 runtime / 新 Contract Spine”分工，不是同一结构的兼容双轨。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；其旧 ZMQ、通用 envelope、IPC payload 生成物和配置已删除。Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
 
 ## 契约分类
 
 | 分类 | 示例 | 消费者 |
 |---|---|---|
-| enums | `IPCMessageType`、`ErrorCode`、`CognitiveActivityState` | Kernel、Cognition、Renderer |
+| enums | `ErrorCode`、`CognitiveActivityState` | Kernel、Cognition、Renderer |
 | models | `PerceptionEvent`、`ActionCommand`、`TraceContext`、`SourceDescriptor` 字段 | 多语言/多进程共享模型 |
-| ipc | `KernelMessageEnvelope`、`AgentPlanPayload`、`AgentSynthesisPayload` | Kernel ↔ Cognition |
+| Protobuf Service | `CognitionService`、`KernelControlService`、`ServiceContext`、`ServiceErrorDetail` | Kernel ↔ Cognition Adapter |
 | config | `AppConfig`、`SkillPlaneConfig`、`SurfaceConfig`、`CognitionConfig` | config normalizer 与生命周期 runtime |
 | runtime helper | `reply-messages`、`avatar-frame`、validator | TS runtime 消费 |
 

@@ -5,13 +5,12 @@
  * 动作流等 Application 能力，但不得直接导入 Application 层实现。
  * 本文件定义纯接口，由 Application 层实现，在 app.ts 中注入 Domain 层。
  */
-import {
+import type { PerceptionEvent } from "@glimmer-cradle/protocol";
+import type {
   ChatMessageResponse,
-  LifeHeartbeatRequest,
   LifeHeartbeatResponse,
   PerceptionCancelRequest,
-  PerceptionEvent,
-} from "@glimmer-cradle/protocol";
+} from "./cognition-service-port";
 
 /**
  * AI 推理能力端口
@@ -21,7 +20,7 @@ export interface IAICapabilityPort {
   readonly isReady: boolean;
   sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<ChatMessageResponse>;
   cancelPerception(request: PerceptionCancelRequest): Promise<void>;
-  sendLifeHeartbeat(request: LifeHeartbeatRequest): Promise<LifeHeartbeatResponse>;
+  sendLifeHeartbeat(request: Record<string, never>): Promise<LifeHeartbeatResponse>;
 }
 
 /**
