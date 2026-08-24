@@ -1,12 +1,12 @@
 # Extension 与 Skill Plane 当前视图
 
 > 范围：Extension SDK、Extension Host、Core/Extension/MCP/User Skill Provider、catalog、Policy、Gateway、权限和审计的当前边界；不写 SDK API 全表。
-> 事实依据：`packages/extension-sdk/`、`templates/extension-basic/`、独立扩展仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`configs/system/skills.yaml`、`configs/extensions/` 与当前 Skill Plane 实现。
+> 事实依据：`packages/extension-sdk/`、`hosts/extension-host/`、`templates/extension-basic/`、独立扩展仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`configs/system/skills.yaml`、`configs/extensions/` 与当前 Skill Plane 实现。
 > 维护触发：Extension manifest、requires/permissions、activation、provider 生命周期、MCP 接入、policy、confirmation、invocation、catalog 或公开 SDK 变化。
 
 Extension 是生态边界，Skill Plane 是能力运行平面。当前角色可以通过它接入平台、工具、MCP 和用户能力，但这些能力不成为本体器官，也不能绕过 Kernel 的授权和审计。
 
-跨进程、跨仓库且可序列化、可版本化的 Extension Manifest、Host 消息、包、Release 与 Registry 契约只归 Protocol。Kernel 依赖 Protocol 并拥有安装安全、权限、生命周期、进程监督和内部 Port；Extension SDK 依赖 Protocol，只提供扩展作者 API。Kernel、Products 与 Protocol 不依赖 Extension SDK，产品发行物只在 Extension Host 执行环境中携带 SDK module root。
+跨仓库且可序列化、可版本化的 Extension Manifest、包、Release 与 Registry 契约仍归 Protocol；Slice 6 新增的 Extension Host process Service/Document 归 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。Kernel 拥有安装安全、权限、生命周期、进程监督和内部 Port；`hosts/extension-host` 拥有第三方入口加载、handler registry 与 disposable lifecycle；Extension SDK 只提供扩展作者 API 与公开 Host process protocol。Products 不接触 Extension Host 内部对象，只携带运行所需 SDK module root。
 
 ## 当前能力来源
 
@@ -31,6 +31,8 @@ Extension 是生态边界，Skill Plane 是能力运行平面。当前角色可�
 | disposable | Extension 停用、失败或升级时必须释放的资源 |
 
 Extension 只能通过 SDK 和公开 Port 与 Kernel 协作。禁止 import `core/kernel/src/**`，禁止拿内部 service 实例，禁止把平台 payload 原样传入 Cognition。
+
+第三方扩展入口只在 `hosts/extension-host` 独立 Node 子进程内加载。Kernel `adapters/extension-host` 只 fork Host process、校验权限、代理 Host Port、撤销 handler/disposable、维护 ExtensionRuntimeProjection 和 readiness；它不 import 或执行第三方 handler。Host process 会报告 `process_alive`、`connected`、`handshake`、`resource_prepared`、`ready`、`degraded`、`failed`、`stopping`、`stopped` 阶段，Kernel 以这些事实更新 diagnostics/lifecycle。
 
 `contributes` 当前按 contribution point id 分组，官方内建能力也通过 `glimmer.*` contribution point definition 进入 registry。`glimmer.command`、`glimmer.setting`、`glimmer.skill`、`glimmer.capability`、`glimmer.managedResource`、`glimmer.protocolBridge`、`glimmer.managementSurface` 等只是预注册 definition，不是平台固定能力边界。未知 contribution point 会被索引和投影为 `unsupported`，但不会执行、不会进入 Cognition、不会获得权限。
 

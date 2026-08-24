@@ -119,6 +119,7 @@ test('Desktop package 在 clean Windows owner task 准备六类 runtime projecti
   assert.doesNotMatch(runtimeScript, /deploy', '--legacy'/);
   assert.match(runtimeScript, /--config\.node-linker=hoisted/);
   assert.match(runtimeScript, /CognitionService\.typeName/);
+  assert.match(runtimeScript, /@glimmer-cradle',\s*'extension-host',\s*'dist',\s*'main\.js'/);
   for (const component of ['kernel', 'cognition', 'audio', 'avatar', 'extension-host', 'native']) {
     assert.match(prepareScript, new RegExp(`id: '${component}'`));
   }
@@ -195,9 +196,9 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       },
       {
         id: 'extension-host',
-        owner: 'packages/extension-sdk',
+        owner: 'hosts/extension-host',
         projection: 'extension-host/modules',
-        paths: ['extension-host/modules/host.mjs'],
+        paths: ['extension-host/modules/@glimmer-cradle/extension-sdk/dist/index.js'],
       },
       {
         id: 'native',
@@ -244,6 +245,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       'runtime/node/node.exe',
       'runtime/python/Scripts/python.exe',
       'runtime/kernel/node_modules/fixture/index.js',
+      'runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js',
       'runtime/runtime-manifest.json',
       'products/desktop/product.json',
       'app.asar.unpacked/dist/main/packaged-supervisor.js',

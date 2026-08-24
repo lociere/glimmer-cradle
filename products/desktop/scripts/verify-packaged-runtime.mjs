@@ -37,6 +37,11 @@ try {
     nodeExecutable: { root: resourcesRoot, relative: 'runtime/node/node.exe', kind: 'file' },
     pythonExecutable: { root: resourcesRoot, relative: 'runtime/python/Scripts/python.exe', kind: 'file' },
     kernelEntry: { root: resourcesRoot, relative: 'runtime/kernel/dist/index.js', kind: 'file' },
+    extensionHostEntry: {
+      root: resourcesRoot,
+      relative: 'runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js',
+      kind: 'file',
+    },
     productManifest: { root: resourcesRoot, relative: 'products/desktop/product.json', kind: 'file' },
     extensionModuleRoot: { root: resourcesRoot, relative: 'extension-host/modules', kind: 'directory' },
     avatarHostExecutable: {
@@ -98,7 +103,7 @@ try {
       projection: 'runtime/python/Lib/site-packages/glimmer_cradle/audio',
     },
     avatar: { owner: 'hosts/unity-avatar-host', projection: 'components/avatar/unity-host' },
-    'extension-host': { owner: 'packages/extension-sdk', projection: 'extension-host/modules' },
+    'extension-host': { owner: 'hosts/extension-host', projection: 'extension-host/modules' },
     native: { owner: 'native', projection: 'components/native/composition-host' },
   };
   const components = new Map((manifest.components ?? []).map((component) => [component.id, component]));
@@ -127,6 +132,8 @@ try {
     ['runtime/python/Scripts/python.exe', runtimeFiles],
     ['runtime/kernel/dist/index.js', runtimeFiles],
     ['runtime/kernel/dist/index.js', kernelFiles],
+    ['runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js', runtimeFiles],
+    ['runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js', kernelFiles],
     ['components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe', nativeFiles],
     ['components/native/composition-host/bin/Release/platform_native.dll', nativeFiles],
     ['components/native/composition-host/DesktopProcessTreeBridge.exe', nativeFiles],
@@ -144,7 +151,7 @@ try {
   }
   if (!avatarFiles.some((file) => file.path === 'components/avatar/unity-host/UnityAvatarHost.exe')
     || avatarFiles.some((file) => file.path.endsWith('/UnityAvatarHostLauncher.exe'))
-    || !extensionFiles.some((file) => file.path.startsWith('extension-host/modules/'))) {
+    || !extensionFiles.some((file) => file.path === 'extension-host/modules/@glimmer-cradle/extension-sdk/dist/index.js')) {
     throw new Error('Desktop component manifest 的 Avatar/Extension 投影无效');
   }
 

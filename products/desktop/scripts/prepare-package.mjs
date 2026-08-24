@@ -33,7 +33,7 @@ const projections = [
   },
   {
     id: 'extension-host',
-    owner: 'packages/extension-sdk',
+    owner: 'hosts/extension-host',
     source: path.join(repoRoot, 'build', 'extension-host', 'modules'),
     staged: 'extension-host/modules',
   },

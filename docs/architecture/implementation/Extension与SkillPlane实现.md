@@ -25,17 +25,19 @@
 | `host/` | Host port 类型 |
 | `utilities/websocket/` | 扩展侧 WebSocket bridge |
 | `protocol/src/schemas/models/ExtensionRuntimeProjection.schema.json` | Extension Host 运行投影的跨进程契约 |
+| `contracts/proto/glimmer/extension/v1/extension_host_process.proto` | Extension Host 进程监督 Service IDL |
+| `contracts/json-schema/extension/v1/extension-host-process.schema.json` | Extension Host process stage 与 IPC 文档契约 |
 | `core/kernel/src/adapters/extension-host/extension-manager.ts` | Kernel ExtensionManager |
-| `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧 Worker 监督、权限和 Port RPC |
-| `core/kernel/src/adapters/extension-host/extension-host-worker.ts` | 扩展入口唯一加载点与 SDK Context bridge |
-| `packages/extension-sdk/src/host/process-protocol.ts` | Host/Worker 双向进程消息 |
+| `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧 Host process 监督、权限和 Port RPC |
+| `hosts/extension-host/src/main.ts` | 扩展入口唯一加载点与 SDK Context bridge |
+| `packages/extension-sdk/src/host/process-protocol.ts` | Kernel supervision / Host process 双向进程消息 |
 | `core/kernel/src/adapters/extension-host/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
 | `core/kernel/src/adapters/extension-host/extension-dependency-installer.ts` | Extension 外部依赖准备、下载缓存和解压安装 |
 | `core/kernel/src/adapters/extension-host/managed-resource-supervisor.ts` | Extension 受管资源 readiness gate 检查，并产出 Capability Graph 节点 |
 | `core/kernel/src/adapters/extension-host/extension-host-application-adapter.ts` | Extension Host 到 Application capability Ports 的适配器 |
 | `core/kernel/src/adapters/extension-host/extension-runtime-registry.ts` | Host-owned Contribution Point Registry 到 Capability Graph projection 的转换器 |
 
-Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当前每个激活扩展运行在受 Kernel 直接监督的独立 Node Worker 子进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Worker 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。Kernel 负责加载、激活、停止、释放、超时和进程树错误隔离；这是 Slice 3 保留的监督实现，不等于 Slice 6 的独立 `hosts/extension-host/`，也不是承诺抵御恶意本机代码的 OS 沙箱。
+Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当前每个激活扩展运行在受 Kernel 直接监督的 `hosts/extension-host` 独立 Node 子进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Host process 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。Kernel 负责 manifest、权限、激活、停止、释放、超时、重启/失败投影和进程树错误隔离；Host process 负责第三方 module loader、handler registry、订阅/timer/disposable lifecycle 和扩展上下文。
 
 记忆相关 SDK Port 当前落点：
 
@@ -54,7 +56,7 @@ Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当
 - `loadExtension()` 校验 manifest、版本和入口，准备配置/依赖并创建尚未启动的独立 Host；只把 `audience=character` 的 `contributes.glimmer.skill` 中 character audience 的 tool/resource/prompt 注册为 `contract_only` 人物目录项；
 - `loadExtension()` 会读取 `contributionPoints` 与按 point id 分组的 `contributes`，注册内建和扩展自带 definition；未知 point 只进入 unsupported 投影；
 - `loadExtension()` 会准备 `contributes.glimmer.managedResource` / `contributes.glimmer.protocolBridge` 中带 package 的受管资源：先检查声明安装目录，缺失时由宿主级 installer 按 manifest 来源下载和解压；第三方包落在数据根，不进入源码树；
-- `startExtension()` fork Worker 并等待 ready，再在 Worker 内加载扩展、校验配置和激活；`ctx.ports.agents.registerSubAgent(...)` 等同步注册必须全部由 Kernel 确认后激活才算成功；
+- `startExtension()` fork `hosts/extension-host` 并等待 process ready，再在 Host 内加载扩展、校验配置和激活；`ctx.ports.agents.registerSubAgent(...)` 等同步注册必须全部由 Kernel 确认后激活才算成功；
 - 激活失败会释放激活过程中注册的订阅/handler，并撤销声明式目录项，然后发布 `ExtensionErrorEvent`；
 - `stopExtension()` 无论扩展是否成功运行，都会释放 activation subscriptions 和声明式目录项；重启时重新注册声明式目录，避免复用旧 handler 或旧 catalog。
 

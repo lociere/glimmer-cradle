@@ -112,6 +112,7 @@ async function collectDependencyPackages() {
   for (const manifestPath of [
     'package.json',
     'core/kernel/package.json',
+    'hosts/extension-host/package.json',
     'packages/extension-sdk/package.json',
     'products/desktop/package.json',
   ]) {

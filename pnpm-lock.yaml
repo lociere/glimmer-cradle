@@ -74,6 +74,9 @@ importers:
       '@glimmer-cradle/contracts':
         specifier: workspace:*
         version: link:../../contracts
+      '@glimmer-cradle/extension-host':
+        specifier: workspace:*
+        version: link:../../hosts/extension-host
       '@glimmer-cradle/protocol':
         specifier: workspace:*
         version: link:../../protocol
@@ -141,6 +144,24 @@ importers:
       vitest:
         specifier: ^0.34.0
         version: 0.34.6(playwright@1.61.0)
+
+  hosts/extension-host:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^0.34.0
+        version: 0.34.6(playwright@1.61.0)
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
 
   packages/extension-sdk:
     dependencies:
@@ -1237,10 +1258,12 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abbrev@1.1.1:
     resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}

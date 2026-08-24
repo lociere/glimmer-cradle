@@ -17,6 +17,7 @@ for (const relativePath of [
   'core/kernel/package.json',
   'products/desktop/package.json',
   'products/personal-server/package.json',
+  'hosts/extension-host/package.json',
   'packages/extension-sdk/package.json',
   'native/package.manifest.json',
 ]) {

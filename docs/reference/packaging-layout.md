@@ -14,6 +14,7 @@
 | Cognition | `core/cognition/` | Python runtime/包投影，按 uv 环境或发行方案携带 |
 | Audio Engine | `engines/audio/` | 官方 engine 组件，模型不随源码硬编码 |
 | UnityAvatarHost | `hosts/unity-avatar-host/`；Core assembly 源为 `core/avatar/` | `resources/components/avatar/unity-host/` 或本机 Host 构建投影 |
+| Extension Host | `hosts/extension-host/`；公开 SDK 源为 `packages/extension-sdk/` | Host process 随 Kernel production deploy 进入 `runtime/kernel/node_modules/@glimmer-cradle/extension-host/`；SDK module root 投影到 `extension-host/modules/` |
 | Native Composition | `native/` 构建产物 | `resources/components/native/composition-host/`；`bin/Release/` 包含 canonical native DLL 与 UnityAvatarHostLauncher，组件根包含 Desktop process-tree helper |
 | Default assets | `assets/` | 只读默认资产，按 catalog 选择打包 |
 | User data | `data/` 或系统 user-data 域 | 安装外持久化，不被升级覆盖 |
@@ -54,6 +55,7 @@ runtime/
 ├── python/Lib/site-packages/{glimmer_cradle,...}
 ├── kernel/dist/
 ├── kernel/node_modules/
+│   └── @glimmer-cradle/extension-host/dist/main.js
 └── runtime-manifest.json
 components/
 ├── avatar/unity-host/
@@ -69,7 +71,8 @@ Audio 的兼容依赖解析为单一安装态环境；三个本地 distribution 
 避免依赖源码树 `PYTHONPATH` 或拼接两份互相冲突的 lock。Kernel 由
 pnpm production deploy 以 hoisted 实体布局产生 resolved dependency tree，避免 Windows
 junction 绑定随后被重命名的 staging 目录；打包门会在最终安装树用 bundled Node 隔离加载
-Contracts TS Service。`packaged-paths.ts` 拒绝缺失或
+Contracts TS Service，并验证 Extension Host process 入口位于
+`runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js`。`packaged-paths.ts` 拒绝缺失或
 symlink 运行组件，并把首次配置从只读 defaults 原子投影到 user-data；
 `packaged-supervisor.ts` 使用 bundled Node 启动 Kernel，并注入 bundled Python、Avatar、
 Extension、native 与 product manifest 路径。它不调用仓库 root

@@ -3,6 +3,15 @@
   "compatibility": "Schema additions, removals, path or id changes, and content changes require an intentional baseline update and review.",
   "schemas": [
     {
+      "path": "json-schema/extension/v1/extension-host-process.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-host-process.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension Host owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 6 baseline; changes require compatibility baseline refresh and Extension Host process contract review.",
+      "sha256": "1809c8f86cfd7ef680b9e6bfe7d55e2a2dba4ead550dc81c57f4d8ba9270f88c"
+    },
+    {
       "path": "json-schema/skill/v1/tool-parameters.schema.json",
       "id": "https://glimmer-cradle.local/contracts/skill/v1/tool-parameters.schema.json",
       "dialect": "https://json-schema.org/draft/2020-12/schema",

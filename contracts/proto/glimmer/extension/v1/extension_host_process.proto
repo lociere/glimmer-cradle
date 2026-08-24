@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package glimmer.extension.v1;
+
+import "glimmer/common/v1/service_contract.proto";
+
+option csharp_namespace = "GlimmerCradle.Extension.V1";
+
+message HandshakeRequest {
+  glimmer.common.v1.CallMetadata metadata = 1;
+  string runtime_id = 2;
+  string extension_id = 3;
+  uint32 process_id = 4;
+}
+
+message HandshakeResponse {
+  glimmer.common.v1.CommandResult result = 1;
+  string runtime_id = 2;
+  string host_protocol_version = 3;
+}
+
+enum ExtensionHostProcessStage {
+  EXTENSION_HOST_PROCESS_STAGE_UNSPECIFIED = 0;
+  EXTENSION_HOST_PROCESS_STAGE_PROCESS_ALIVE = 1;
+  EXTENSION_HOST_PROCESS_STAGE_CONNECTED = 2;
+  EXTENSION_HOST_PROCESS_STAGE_HANDSHAKE = 3;
+  EXTENSION_HOST_PROCESS_STAGE_RESOURCE_PREPARED = 4;
+  EXTENSION_HOST_PROCESS_STAGE_READY = 5;
+  EXTENSION_HOST_PROCESS_STAGE_DEGRADED = 6;
+  EXTENSION_HOST_PROCESS_STAGE_FAILED = 7;
+  EXTENSION_HOST_PROCESS_STAGE_STOPPING = 8;
+  EXTENSION_HOST_PROCESS_STAGE_STOPPED = 9;
+}
+
+message ReportStateRequest {
+  glimmer.common.v1.CallMetadata metadata = 1;
+  string runtime_id = 2;
+  string extension_id = 3;
+  uint32 process_id = 4;
+  ExtensionHostProcessStage stage = 5;
+  string summary = 6;
+  glimmer.common.v1.ServiceErrorDetail error = 7;
+}
+
+message ReportStateResponse {
+  glimmer.common.v1.CommandResult result = 1;
+}
+
+service ExtensionHostProcessService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+  rpc ReportState(ReportStateRequest) returns (ReportStateResponse);
+}

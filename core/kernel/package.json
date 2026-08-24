@@ -11,9 +11,9 @@
     "start": "tsx src/index.ts",
     "start:built": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm run typecheck",
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm --filter @glimmer-cradle/extension-host run build && pnpm run typecheck",
     "build": "tsc -p tsconfig.json",
-    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm run build",
+    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm --filter @glimmer-cradle/extension-host run build && pnpm run build",
     "test": "vitest run --threads false",
     "smoke:bootstrap": "node tests/runtime/production-bootstrap.smoke.mjs",
     "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm run test"
@@ -33,6 +33,7 @@
   "dependencies": {
     "@bufbuild/protobuf": "2.13.0",
     "@glimmer-cradle/contracts": "workspace:*",
+    "@glimmer-cradle/extension-host": "workspace:*",
     "@glimmer-cradle/protocol": "workspace:*",
     "@grpc/grpc-js": "1.14.0",
     "@modelcontextprotocol/sdk": "^1.29.0",

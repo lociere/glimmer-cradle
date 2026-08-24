@@ -1,8 +1,3 @@
-/**
- * Public IPC contract between Kernel supervision and the isolated Extension Host
- * process. It is intentionally owned by the SDK/Host boundary instead of the
- * former Kernel-internal process protocol.
- */
 export type ExtensionHostProcessMessage =
   | ExtensionKernelRequest
   | ExtensionHostProcessRequest
@@ -79,7 +74,3 @@ export interface ExtensionHostProcessState {
   summary?: string;
   error?: string;
 }
-
-export type ExtensionHostMethod = ExtensionKernelMethod;
-export type ExtensionHostRequest = ExtensionKernelRequest;
-export type ExtensionRpcResponse = ExtensionHostProcessResponse;

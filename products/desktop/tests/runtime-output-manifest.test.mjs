@@ -58,6 +58,7 @@ test('runtime task 向下游传播实际 output digest，不传播 input digest'
 test('组合任务只有 root 拓扑构建依赖，package atomic task 不含重复 prehook', async () => {
   for (const relative of [
     'packages/extension-sdk/package.json',
+    'hosts/extension-host/package.json',
     'core/kernel/package.json',
     'templates/extension-basic/package.json',
   ]) {

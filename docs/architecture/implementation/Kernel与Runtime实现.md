@@ -52,7 +52,7 @@
 | `application/skill-plane` | Kernel application | registry、policy、gateway 与 Core/User provider policy | handler 绕过授权；import MCP/Extension concrete |
 | `adapters/{audio,avatar,surface,organism}` | Kernel adapter | 平台 IO、Host/Engine client 与 Application capability adapter | 让 Application import concrete |
 | `adapters/skill-plane` | Skill provider adapter | Extension/MCP provider、connection 与 runtime readiness | 绕过 Skill policy/gateway |
-| `adapters/extension-host` | Extension 进程边界 | Kernel 内 supervision、每扩展 Worker、双向 RPC、handler/disposable 代理和进程树回收 | 在 Kernel 进程内 `require()` 第三方扩展；宣称已完成 Slice 6 |
+| `adapters/extension-host` | Extension 监督边界 | Kernel 内 supervision、权限、Host Port RPC、catalog/projection、handler/disposable 代理和进程树回收 | 在 Kernel 进程内 `require()` 第三方扩展；把 Host 执行容器实现放回 Kernel |
 | `adapters/endpoints` | 内部端点目录 | 发布本代动态回环端点并在停机撤销 | 把内部端口写入用户配置或缓存跨代端点 |
 | `adapters/cognition` | Kernel adapter | Cognition Service client、Kernel Control Service host、Protobuf DTO 映射 | 把 generated DTO 泄漏进 Application/Domain |
 
@@ -143,13 +143,13 @@ adapters/skill-plane/{extension,mcp-server}/
 
 Extension Host 的实现落点：
 
-- `adapters/extension-host/extension-manager.ts` 扫描 manifest、准备声明资源、创建受管 Worker 并维护投影；不在 Kernel 进程执行扩展入口；
-- `adapters/extension-host/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 Worker；
-- `adapters/extension-host/extension-host-worker.ts` 是当前唯一加载扩展代码的位置，激活结束前会等待同步注册请求完成；
+- `adapters/extension-host/extension-manager.ts` 扫描 manifest、准备声明资源、创建受管 Host process 并维护投影；不在 Kernel 进程执行扩展入口；
+- `adapters/extension-host/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 `hosts/extension-host` 子进程；
+- `hosts/extension-host/src/main.ts` 是唯一加载第三方扩展入口的位置，激活结束前会等待同步注册请求完成，并把 process alive / connected / handshake / resource prepared / ready / degraded / failed / stopped 阶段回报给 Kernel；
 - `adapters/extension-host/extension-host-application-adapter.ts` 只通过 `ports/application-capabilities.port.ts` 与 `ports/skill-plane.port.ts` 调用 Application capability；
-- `packages/extension-sdk/src/adapters/extension-host-protocol.ts` 定义 Host/Worker 双向消息，不暴露 Kernel 内部 service；
+- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Kernel supervision 与独立 Host process 的公开 IPC 消息，不暴露 Kernel 内部 service；
 - Extension 停止、激活失败或进程退出都会撤销运行 handler、声明式 catalog、订阅和 Capability Projection。
-- 这些 supervision/categorization 仍由 Kernel 承载；迁到独立 `hosts/extension-host/` 崩溃域属于 M12 Slice 6，Slice 3 不移动该进程边界。
+- Kernel 保留 supervision、权限、catalog、编排和 Projection owner；第三方 handler registry、timer、订阅和扩展 module loader 均位于独立 Host 进程。
 
 ```text
 adapters/extension-host/extension-manager.ts

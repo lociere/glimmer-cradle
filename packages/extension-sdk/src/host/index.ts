@@ -200,11 +200,16 @@ export interface ExtensionModule<TConfig = unknown> {
 }
 
 export type {
-  ExtensionHostMessage,
   ExtensionHostMethod,
+  ExtensionHostProcessMessage,
+  ExtensionHostProcessMethod,
+  ExtensionHostProcessReady,
+  ExtensionHostProcessRequest,
+  ExtensionHostProcessResponse,
+  ExtensionHostProcessStage,
+  ExtensionHostProcessState,
   ExtensionHostRequest,
+  ExtensionKernelMethod,
+  ExtensionKernelRequest,
   ExtensionRpcResponse,
-  ExtensionWorkerMethod,
-  ExtensionWorkerReady,
-  ExtensionWorkerRequest,
 } from './process-protocol';

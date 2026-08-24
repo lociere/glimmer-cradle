@@ -59,6 +59,15 @@ try {
     'v1',
     'cognition_service_pb.js',
   );
+  const extensionHostEntry = path.join(
+    temporaryRoot,
+    'kernel',
+    'node_modules',
+    '@glimmer-cradle',
+    'extension-host',
+    'dist',
+    'main.js',
+  );
   await run('uv', [
     'pip', 'install', '--python', python, '--strict',
     '--requirement', pythonRequirements,
@@ -76,6 +85,7 @@ try {
     path.join(temporaryRoot, 'kernel', 'dist', 'index.js'),
     path.join(temporaryRoot, 'kernel', 'node_modules'),
     kernelContracts,
+    extensionHostEntry,
     python,
     path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'cognition'),
     path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'audio'),
@@ -97,6 +107,7 @@ try {
     node: { version: process.version, executable: 'node/node.exe' },
     python: { version: pythonVersion, executable: 'python/Scripts/python.exe' },
     kernel: { entry: 'kernel/dist/index.js', dependencies: 'kernel/node_modules' },
+    extension_host: { entry: 'kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js' },
     cognition: { module: 'glimmer_cradle.cognition.host.process' },
     audio: { module: 'glimmer_cradle.audio.main' },
     contracts: {

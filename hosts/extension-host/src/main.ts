@@ -1,29 +1,40 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  ExtensionHostMessage,
-  ExtensionHostMethod,
-  ExtensionRpcResponse,
-  ExtensionWorkerRequest,
-} from '@glimmer-cradle/protocol';
-import type { Disposable } from '../../ports';
-import type { ExtensionWorkerContext, LoadedExtensionModule } from './extension-worker-module';
+  ExtensionHostProcessMessage,
+  ExtensionHostProcessRequest,
+  ExtensionHostProcessResponse,
+  ExtensionHostProcessStage,
+  ExtensionKernelMethod,
+  ExtensionKernelRequest,
+} from './process-protocol';
+import type {
+  Disposable,
+  ExtensionHostContext,
+  LoadedExtensionModule,
+} from './application/extension-module';
+import { createDisposableRegistry } from './application/extension-module';
 
 type Handler = (...args: unknown[]) => unknown | Promise<unknown>;
 
+const runtimeId = process.env.GLIMMER_CRADLE_EXTENSION_RUNTIME_ID
+  || `extension-host:${process.env.GLIMMER_CRADLE_EXTENSION_ID || 'unknown'}:${process.pid}`;
 const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
 const handlers = new Map<string, Handler>();
+const timers = new Set<NodeJS.Timeout>();
+const disposables = createDisposableRegistry();
+
 let extension: LoadedExtensionModule | null = null;
-let context: ExtensionWorkerContext | null = null;
+let context: ExtensionHostContext | null = null;
 let stopping = false;
 let activationRegistrations: Promise<string>[] | null = null;
 
-process.on('message', (message: ExtensionHostMessage) => {
-  if (message.channel === 'extension-rpc-response') {
+process.on('message', (message: ExtensionHostProcessMessage) => {
+  if (message.channel === 'extension-host-process-response') {
     settle(message);
     return;
   }
-  if (message.channel === 'extension-worker-request') {
-    void handleWorkerRequest(message);
+  if (message.channel === 'extension-host-process-request') {
+    void handleHostProcessRequest(message);
   }
 });
 
@@ -32,17 +43,22 @@ process.on('disconnect', () => {
 });
 
 process.on('uncaughtException', (error) => {
-  fire('log', { level: 'error', message: 'Extension Host uncaughtException', meta: { error: error.message, stack: error.stack } });
+  reportStage('failed', 'Extension Host uncaughtException', error);
+  fire('log', { level: 'error', message: 'Extension Host uncaughtException', meta: safeErrorMeta(error) });
   void deactivate().finally(() => process.exit(1));
 });
 
 process.on('unhandledRejection', (reason) => {
-  fire('log', { level: 'error', message: 'Extension Host unhandledRejection', meta: { error: String(reason) } });
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  reportStage('degraded', 'Extension Host unhandledRejection', error);
+  fire('log', { level: 'error', message: 'Extension Host unhandledRejection', meta: safeErrorMeta(error) });
 });
 
-send({ channel: 'extension-worker-ready', pid: process.pid });
+reportStage('process_alive', 'Extension Host process alive.');
+send({ channel: 'extension-host-process-ready', runtime_id: runtimeId, pid: process.pid });
+reportStage('connected', 'Extension Host IPC connected.');
 
-async function handleWorkerRequest(message: ExtensionWorkerRequest): Promise<void> {
+async function handleHostProcessRequest(message: ExtensionHostProcessRequest): Promise<void> {
   try {
     let result: unknown;
     if (message.method === 'activate') result = await activate(message.payload);
@@ -50,35 +66,36 @@ async function handleWorkerRequest(message: ExtensionWorkerRequest): Promise<voi
     else result = await invokeHandler(message.payload);
     respond(message.request_id, true, result);
   } catch (error) {
+    reportStage('failed', 'Extension Host request failed.', error);
     respond(message.request_id, false, undefined, error instanceof Error ? error.message : String(error));
   }
 }
 
-async function activate(payload: unknown): Promise<{ ready: true }> {
-  if (extension) return { ready: true };
+async function activate(payload: unknown): Promise<{ ready: true; runtime_id: string }> {
+  if (extension) return { ready: true, runtime_id: runtimeId };
   const input = asRecord(payload);
   const extensionId = readString(input.extension_id);
   const entryPath = readString(input.entry_path);
   const rawConfig = asRecord(input.config);
   if (!extensionId || !entryPath) throw new Error('Extension Host 缺少 extension_id 或 entry_path');
 
-  // The extension package is loaded only inside this process boundary.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const requiredModule = require(entryPath);
-  const exported = requiredModule.default ?? requiredModule;
+  reportStage('handshake', `Extension Host handshake accepted for ${extensionId}.`);
+  const exported = loadExtensionEntry(entryPath);
   const candidate = exported?.extension ?? exported;
-  if (!candidate || typeof candidate.onActivate !== 'function') {
+  if (!isLoadedExtensionModule(candidate)) {
     throw new Error(`扩展入口没有导出合法模块: ${extensionId}`);
   }
-  extension = candidate as LoadedExtensionModule;
+  extension = candidate;
   const config = validateConfig(extension, rawConfig, extensionId);
   context = createContext(extensionId, config);
+  reportStage('resource_prepared', `Extension ${extensionId} context prepared.`);
   const registrations: Promise<string>[] = [];
   activationRegistrations = registrations;
   try {
     await extension.onActivate(context);
     await Promise.all(registrations);
-    return { ready: true };
+    reportStage('ready', `Extension ${extensionId} activated.`);
+    return { ready: true, runtime_id: runtimeId };
   } catch (error) {
     await deactivate();
     throw error;
@@ -90,25 +107,28 @@ async function activate(payload: unknown): Promise<{ ready: true }> {
 async function deactivate(): Promise<{ stopped: true }> {
   if (stopping) return { stopped: true };
   stopping = true;
+  reportStage('stopping', 'Extension Host stopping.');
   try {
     if (extension?.onDeactivate) await extension.onDeactivate();
   } finally {
-    if (context) {
-      for (const subscription of [...context.subscriptions].reverse()) {
-        try { await subscription.dispose(); } catch { /* continue releasing the boundary */ }
-      }
-      context.subscriptions.length = 0;
-    }
+    await disposables.disposeAll();
+    for (const timer of timers) clearTimeout(timer);
+    timers.clear();
     handlers.clear();
     extension = null;
     context = null;
     stopping = false;
+    reportStage('stopped', 'Extension Host stopped.');
   }
   return { stopped: true };
 }
 
-function createContext(extensionId: string, config: Record<string, unknown>): ExtensionWorkerContext {
+function createContext(extensionId: string, config: Record<string, unknown>): ExtensionHostContext {
   const subscriptions: Disposable[] = [];
+  const track = (disposable: Disposable): Disposable => {
+    subscriptions.push(disposable);
+    return disposables.add(disposable);
+  };
   return {
     extensionId,
     config: Object.freeze(config),
@@ -121,27 +141,27 @@ function createContext(extensionId: string, config: Record<string, unknown>): Ex
     },
     ports: {
       storage: {
-        get: (key) => request('storage.get', { key }),
-        set: async (key, value) => { await request('storage.set', { key, value }); },
-        delete: async (key) => { await request('storage.delete', { key }); },
+        get: (key: string) => request('storage.get', { key }),
+        set: async (key: string, value: unknown) => { await request('storage.set', { key, value }); },
+        delete: async (key: string) => { await request('storage.delete', { key }); },
       },
-      evidenceProposal: { submit: async (proposal) => { await request('evidence.submit', proposal); } },
-      perception: { inject: (proposal) => fire('perception.inject', proposal) },
+      evidenceProposal: { submit: async (proposal: unknown) => { await request('evidence.submit', proposal); } },
+      perception: { inject: (proposal: unknown) => fire('perception.inject', proposal) },
       sceneAttention: {
-        requestAttentionLease: (lease) => deferredRegistration('attention.acquire', lease),
-        isSceneFocused: async (channelId) => Boolean(await request('attention.focused', { channel_id: channelId })),
-        registerSourcePolicies: (policies) => fire('attention.policies', { policies }),
+        requestAttentionLease: (lease: unknown) => track(deferredRegistration('attention.acquire', lease)),
+        isSceneFocused: async (channelId: string) => Boolean(await request('attention.focused', { channel_id: channelId })),
+        registerSourcePolicies: (policies: Record<string, string>) => fire('attention.policies', { policies }),
       },
       events: {
         on: (eventName: string, handler: (payload: unknown) => void) => {
           const handlerId = registerHandler(handler);
-          return deferredRegistration('events.subscribe', { event_name: eventName, handler_id: handlerId }, handlerId);
+          return track(deferredRegistration('events.subscribe', { event_name: eventName, handler_id: handlerId }, handlerId));
         },
         emit: (eventName: string, payload: unknown) => fire('events.emit', { event_name: eventName, payload }),
       },
       agents: {
-        registerSubAgent: (profile) => {
-          const tools = profile.tools.map((tool) => ({
+        registerSubAgent: (profile: Record<string, any>) => {
+          const tools = (Array.isArray(profile.tools) ? profile.tools : []).map((tool: Record<string, any>) => ({
             name: tool.name,
             description: tool.description,
             audience: tool.audience,
@@ -150,30 +170,30 @@ function createContext(extensionId: string, config: Record<string, unknown>): Ex
             parameters: tool.parameters,
             handler_id: registerHandler((args) => tool.handler(args)),
           }));
-          return deferredRegistration('agents.register', { profile: { ...profile, tools } }, tools.map((tool) => tool.handler_id));
+          return track(deferredRegistration('agents.register', { profile: { ...profile, tools } }, tools.map((tool) => tool.handler_id)));
         },
       },
       commands: {
-        registerCommand: (commandId, handler, metadata) => {
+        registerCommand: (commandId: string, handler: (...args: unknown[]) => unknown, metadata?: Record<string, unknown>) => {
           const handlerId = registerHandler((args) => handler(...(Array.isArray(args) ? args : [])));
-          return deferredRegistration('commands.register', {
+          return track(deferredRegistration('commands.register', {
             command_id: commandId,
             handler_id: handlerId,
             metadata,
-          }, handlerId);
+          }, handlerId));
         },
-        executeCommand: (commandId, ...args) => request('commands.execute', { command_id: commandId, args }),
+        executeCommand: (commandId: string, ...args: unknown[]) => request('commands.execute', { command_id: commandId, args }),
         listCommands: async () => (await request('commands.list', {})) as never,
       },
       runtime: {
-        reportCapabilityGraph: async (report) => { await request('runtime.capabilities', report); },
-        reportDiagnostics: async (diagnostics) => { await request('runtime.diagnostics', diagnostics); },
+        reportCapabilityGraph: async (report: unknown) => { await request('runtime.capabilities', report); },
+        reportDiagnostics: async (diagnostics: unknown) => { await request('runtime.diagnostics', diagnostics); },
       },
     },
   };
 }
 
-function deferredRegistration(method: Parameters<typeof request>[0], payload: unknown, handlerIds: string | string[] = []): Disposable {
+function deferredRegistration(method: ExtensionKernelMethod, payload: unknown, handlerIds: string | string[] = []): Disposable {
   let disposed = false;
   const ids = Array.isArray(handlerIds) ? handlerIds : [handlerIds];
   const registration = request(method, payload).then((value) => readString(asRecord(value).registration_id));
@@ -202,19 +222,19 @@ async function invokeHandler(payload: unknown): Promise<unknown> {
   return handler(input.args);
 }
 
-function request(method: ExtensionHostMethod, payload: unknown): Promise<unknown> {
+function request(method: ExtensionKernelMethod, payload: unknown): Promise<unknown> {
   const requestId = randomUUID();
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject });
-    send({ channel: 'extension-host-request', request_id: requestId, method, payload });
+    send({ channel: 'extension-kernel-request', request_id: requestId, method, payload });
   });
 }
 
-function fire(method: ExtensionHostMethod, payload: unknown): void {
+function fire(method: ExtensionKernelMethod, payload: unknown): void {
   void request(method, payload).catch(() => undefined);
 }
 
-function settle(message: ExtensionRpcResponse): void {
+function settle(message: ExtensionHostProcessResponse): void {
   const waiter = pending.get(message.request_id);
   if (!waiter) return;
   pending.delete(message.request_id);
@@ -223,11 +243,33 @@ function settle(message: ExtensionRpcResponse): void {
 }
 
 function respond(requestId: string, ok: boolean, result?: unknown, error?: string): void {
-  send({ channel: 'extension-rpc-response', request_id: requestId, ok, result, error });
+  send({ channel: 'extension-host-process-response', request_id: requestId, ok, result, error });
 }
 
-function send(message: ExtensionHostMessage): void {
+function reportStage(stage: ExtensionHostProcessStage, summary: string, error?: unknown): void {
+  send({
+    channel: 'extension-host-process-state',
+    runtime_id: runtimeId,
+    stage,
+    pid: process.pid,
+    summary,
+    error: error instanceof Error ? error.message : error ? String(error) : undefined,
+  });
+}
+
+function send(message: ExtensionHostProcessMessage): void {
   if (process.connected && process.send) process.send(message);
+}
+
+function loadExtensionEntry(entryPath: string): Record<string, unknown> {
+  // Third-party extension code is loaded exclusively inside this Host process.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const requiredModule = require(entryPath);
+  return (requiredModule.default ?? requiredModule) as Record<string, unknown>;
+}
+
+function isLoadedExtensionModule(value: unknown): value is LoadedExtensionModule {
+  return Boolean(value) && typeof value === 'object' && typeof (value as { onActivate?: unknown }).onActivate === 'function';
 }
 
 function validateConfig(module: LoadedExtensionModule, raw: Record<string, unknown>, extensionId: string): Record<string, unknown> {
@@ -238,6 +280,10 @@ function validateConfig(module: LoadedExtensionModule, raw: Record<string, unkno
     .map((issue) => `${(issue.path ?? []).join('.')}: ${issue.message}`)
     .join('; ');
   throw new Error(`扩展配置校验失败: ${extensionId}; ${detail || 'unknown validation error'}`);
+}
+
+function safeErrorMeta(error: Error): Record<string, unknown> {
+  return { error: error.message, stack: error.stack };
 }
 
 function asRecord(value: unknown): Record<string, any> {

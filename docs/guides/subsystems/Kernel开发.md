@@ -15,7 +15,7 @@
 | Avatar | `adapters/avatar/`、`ports/runtime-capabilities.port.ts` |
 | Desktop/Surface 投影 | `adapters/surface/`、`ports/application-capabilities.port.ts` |
 | Skill Plane | `application/skill-plane/`、`adapters/skill-plane/`、`ports/skill-plane.port.ts` |
-| Extension Host（Slice 3 仍由 Kernel 监督） | `adapters/extension-host/`、`ports/extension-host.port.ts`、`ports/application-capabilities.port.ts` |
+| Extension Host supervision | `adapters/extension-host/`、`ports/extension-host.port.ts`、`ports/application-capabilities.port.ts`；执行容器在 `hosts/extension-host/` |
 | 时间与调度 | `ports/clock.port.ts`、`adapters/time/system-clock-adapter.ts`；Domain/Application 禁止直接持有 Node timer |
 | 日志/trace/DLQ | `adapters/observability/`、`adapters/events/dead-letter-queue.ts` |
 
@@ -30,7 +30,7 @@
 7. 删除旧事件、旧 bridge、旧 handler、旧 fallback。
 8. 同步 Current/Implementation/Reference/Guide 中唯一受影响页面。
 
-新增边界时使用 capability-specific 强类型 Port；禁止 Proxy/service locator、关键边界 `any`、raw Node API façade、concrete alias 和测试 setup 注入。第三方扩展的独立 `hosts/extension-host/` 迁移属于 M12 Slice 6；在此之前只维护 Kernel 内既有 supervision/分类，不提前移动进程边界。
+新增边界时使用 capability-specific 强类型 Port；禁止 Proxy/service locator、关键边界 `any`、raw Node API façade、concrete alias 和测试 setup 注入。第三方扩展入口只在 `hosts/extension-host/` 加载；Kernel 只保留 supervision、权限、catalog、编排和 Projection owner。
 
 ## 新 runtime 检查表
 

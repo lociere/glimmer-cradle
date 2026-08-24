@@ -57,6 +57,7 @@ const provenance = {
 const componentPackages = await collectComponentPackages([
   'package.json',
   'core/kernel/package.json',
+  'hosts/extension-host/package.json',
   'packages/extension-sdk/package.json',
   'products/personal-server/package.json',
 ]);

@@ -1,7 +1,7 @@
 # Extension SDK Reference
 
 > 范围：Extension 的公开 SDK、manifest、权限、contribution、Host Port、Skill Plane 关系和生命周期规则。
-> 事实依据：`packages/extension-sdk/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、Kernel Extension Host、Skill Plane 实现。
+> 事实依据：`packages/extension-sdk/`、`hosts/extension-host/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、Kernel Extension supervision、Skill Plane 实现。
 > 维护触发：SDK export、manifest schema、contribution point、Port、permission、activation、disposable 或 Skill Plane 映射变化。
 
 Extension 是可安装、可禁用、可授权、可升级和可回收的生态能力单元。它通过公开 SDK 与 Host Port 接入当前角色的能力边界，不 import Kernel 内部对象，不直接访问 Cognition 私有状态。
@@ -18,11 +18,12 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 | `data/packages/extensions/<extension-id>/<version>/` | Extension Host 唯一运行期发现目录，只保存已构建发布投影 |
 | `data/packages/managed-resources/<extension-id>/` | 扩展声明并由 Host 管理的第三方程序包 |
 | `core/kernel/src/application/extension-supervision/ 与 core/kernel/src/adapters/extension-host/` | Extension Host、激活、权限、Port 实现 |
+| `hosts/extension-host/` | 第三方扩展入口加载、SDK Context bridge、handler registry 和 disposable lifecycle |
 | `core/kernel/src/application/skill-plane/` | Skill Plane catalog、policy、gateway、provider |
 
-跨进程、跨仓库且需要序列化和版本化的 Extension Manifest、Host 消息、包、Release 与 Registry 格式只由 `@glimmer-cradle/protocol` 定义。Kernel 只依赖 Protocol，并拥有安装验证、权限裁决、生命周期、进程监督和内部 Port；`@glimmer-cradle/extension-sdk` 依赖并复用 Protocol，只为扩展作者提供函数式 API 与便利封装。Kernel、Products 与 Protocol 不依赖 Extension SDK。
+跨仓库且需要序列化和版本化的 Extension Manifest、包、Release 与 Registry 格式仍由 `@glimmer-cradle/protocol` 定义；Extension Host process 的 Service/Document 契约位于 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。Kernel 拥有安装验证、权限裁决、生命周期、进程监督、catalog/projection 和内部 Port；`hosts/extension-host` 拥有第三方入口加载、SDK Context bridge、handler registry 和 disposable lifecycle；`@glimmer-cradle/extension-sdk` 为扩展作者和 Host process 提供公开 API 与进程协议。
 
-独立扩展发布物把 `@glimmer-cradle/extension-sdk` 与 `@glimmer-cradle/protocol` 声明为语义化版本 peer dependency；Extension Host 产品组装会在发行物内提供与当前主程序匹配的 SDK module root，这属于产品携带的扩展执行环境，不是 Kernel 对 SDK 的包依赖。扩展安装包不得复制 Kernel 源码或依赖主仓库相对路径。
+独立扩展发布物把 `@glimmer-cradle/extension-sdk` 与 `@glimmer-cradle/protocol` 声明为语义化版本 peer dependency；Extension Host 产品组装会在发行物内提供与当前主程序匹配的 SDK module root，这属于产品携带的扩展执行环境，不是扩展安装包对 Kernel 源码的依赖。扩展安装包不得复制 Kernel 源码或依赖主仓库相对路径。
 
 ## 包导出
 
@@ -75,6 +76,8 @@ Contribution declaration 可以携带 `audience`，枚举为 `character`、`user
 第三方包、外部进程、本地服务和协议桥通过 `glimmer.managedResource` / `glimmer.protocolBridge` 声明。带 `package.installDir` 的资源会先检查本地目录；缺失且声明了 `githubRelease`/`downloadUrl` 来源时，由宿主级 dependency installer 下载到数据根缓存并解压到数据根包目录。`readinessGates` 声明 startup、liveness、readiness、management 等检查点；检查通过只能证明对应节点状态，不能代表整个扩展 ready。
 
 扩展运行事实由 Host 生产 `ExtensionRuntimeProjection`，权威 Schema 位于 `protocol/src/schemas/models/ExtensionRuntimeProjection.schema.json`。投影包含 lifecycle、contribution point definitions、Capability Graph、action intents 和 diagnostics。Capability Graph 是运行事实核心：节点承载 owner、audience、权限、状态、readiness、诊断引用和 metadata；边承载依赖关系；action intent 承载 audience、可执行入口和 enablement。Renderer/Control Center 只消费该投影，不读取扩展 DB、日志、本地端点或 manifest 固定字段来推断 ready。
+
+`@glimmer-cradle/extension-sdk/host` 的 Host process protocol 只描述 Kernel supervision 与 `hosts/extension-host` 的 IPC。阶段必须区分 `process_alive`、`connected`、`handshake`、`resource_prepared`、`ready`、`degraded`、`failed`、`stopping` 和 `stopped`；前一阶段不能冒充后一阶段。第三方 handler、订阅、timer 和配置校验都在 Host process 内，Kernel 只接收受控 Port RPC 并执行权限/Policy/catalog/projection。
 
 路径约定：
 

@@ -1,0 +1,40 @@
+{
+  "name": "@glimmer-cradle/extension-host",
+  "version": "0.1.8",
+  "private": true,
+  "main": "dist/main.js",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "require": "./dist/main.js",
+      "default": "./dist/main.js"
+    },
+    "./process-protocol": {
+      "types": "./dist/process-protocol.d.ts",
+      "require": "./dist/process-protocol.js",
+      "default": "./dist/process-protocol.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "start:built": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:with-deps": "pnpm run typecheck",
+    "build": "tsc -p tsconfig.json",
+    "build:with-deps": "pnpm run build",
+    "test": "vitest run --threads false"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "zod": "^3.23.0"
+  }
+}

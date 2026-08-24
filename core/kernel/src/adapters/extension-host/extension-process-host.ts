@@ -8,13 +8,16 @@ import {
   ExtensionPermission,
   ExtensionSystemEventTopic,
   hasExtensionPermission,
-  type ExtensionHostRequest,
-  type ExtensionHostMessage,
   type ExtensionManifest,
   type ExtensionPermission as ExtensionPermissionValue,
-  type ExtensionRpcResponse,
-  type ExtensionWorkerMethod,
 } from '@glimmer-cradle/protocol';
+import type {
+  ExtensionHostProcessMessage,
+  ExtensionHostProcessResponse,
+  ExtensionHostProcessStage,
+  ExtensionKernelRequest,
+  ExtensionHostProcessMethod,
+} from '@glimmer-cradle/extension-host/process-protocol';
 import { ErrorCode } from '@glimmer-cradle/protocol';
 import { ExtensionException } from '../../domain/errors';
 import type { Disposable, ExtensionAgentRegistration, IExtensionHostService } from '../../ports';
@@ -35,6 +38,7 @@ export class ExtensionProcessHost {
   private readyPromise: Promise<void> | null = null;
   private resolveReady: (() => void) | null = null;
   private rejectReady: ((error: Error) => void) | null = null;
+  private readonly runtimeId: string;
 
   public constructor(
     private readonly service: IExtensionHostService,
@@ -42,17 +46,20 @@ export class ExtensionProcessHost {
     private readonly entryPath: string,
     private readonly config: Record<string, unknown>,
     private readonly timeoutMs: number,
-  ) {}
+  ) {
+    this.runtimeId = `extension.${manifest.id}.${randomUUID()}`;
+  }
 
   public async start(): Promise<void> {
     if (this.child) return;
-    const worker = resolveWorkerEntry();
-    const useTypeScript = worker.endsWith('.ts');
-    const child = fork(worker, [], {
+    const hostEntry = resolveExtensionHostEntry();
+    const useTypeScript = hostEntry.endsWith('.ts');
+    const child = fork(hostEntry, [], {
       cwd: path.dirname(this.entryPath),
       env: {
         ...process.env,
         GLIMMER_CRADLE_EXTENSION_ID: this.manifest.id,
+        GLIMMER_CRADLE_EXTENSION_RUNTIME_ID: this.runtimeId,
         NODE_PATH: buildExtensionModulePath(),
       },
       execArgv: useTypeScript ? ['--import', pathToFileURL(require.resolve('tsx')).href] : [],
@@ -65,7 +72,7 @@ export class ExtensionProcessHost {
       this.resolveReady = resolve;
       this.rejectReady = reject;
     });
-    child.on('message', (message: ExtensionHostMessage) => this.onMessage(message));
+    child.on('message', (message: ExtensionHostProcessMessage) => this.onMessage(message));
     child.once('error', (error) => this.onExit(error));
     child.once('exit', (code, signal) => this.onExit(new Error(`Extension Host 退出: code=${code}, signal=${signal}`)));
     this.forwardOutput(child.stdout, 'debug');
@@ -99,23 +106,28 @@ export class ExtensionProcessHost {
     }
   }
 
-  private onMessage(message: ExtensionHostMessage): void {
-    if (message.channel === 'extension-worker-ready') {
+  private onMessage(message: ExtensionHostProcessMessage): void {
+    if (message.channel === 'extension-host-process-ready') {
       this.resolveReady?.();
       this.resolveReady = null;
       this.rejectReady = null;
+      this.reportHostStage('connected', `Extension Host process connected pid=${message.pid}`);
       return;
     }
-    if (message.channel === 'extension-rpc-response') {
+    if (message.channel === 'extension-host-process-state') {
+      this.reportHostStage(message.stage, message.summary, message.error);
+      return;
+    }
+    if (message.channel === 'extension-host-process-response') {
       this.settle(message);
       return;
     }
-    if (message.channel === 'extension-host-request') {
+    if (message.channel === 'extension-kernel-request') {
       void this.handleHostRequest(message);
     }
   }
 
-  private async handleHostRequest(message: ExtensionHostRequest): Promise<void> {
+  private async handleHostRequest(message: ExtensionKernelRequest): Promise<void> {
     try {
       const result = await this.dispatchHostRequest(message);
       this.respond(message.request_id, true, result);
@@ -124,7 +136,7 @@ export class ExtensionProcessHost {
     }
   }
 
-  private async dispatchHostRequest(message: ExtensionHostRequest): Promise<unknown> {
+  private async dispatchHostRequest(message: ExtensionKernelRequest): Promise<unknown> {
     const payload = asRecord(message.payload);
     switch (message.method) {
       case 'log': {
@@ -225,7 +237,7 @@ export class ExtensionProcessHost {
     return { registration_id: this.register(this.service.registerAgent(this.manifest.id, profile)) };
   }
 
-  private request(method: ExtensionWorkerMethod, payload: unknown): Promise<unknown> {
+  private request(method: ExtensionHostProcessMethod, payload: unknown): Promise<unknown> {
     const child = this.child;
     if (!child?.connected) return Promise.reject(new Error(`Extension Host ${this.manifest.id} 未连接`));
     const requestId = randomUUID();
@@ -235,11 +247,11 @@ export class ExtensionProcessHost {
         reject(new Error(`Extension Host ${this.manifest.id} 请求超时: ${method}`));
       }, this.timeoutMs);
       this.pending.set(requestId, { resolve, reject, timer });
-      child.send({ channel: 'extension-worker-request', request_id: requestId, method, payload } satisfies ExtensionHostMessage);
+      child.send({ channel: 'extension-host-process-request', request_id: requestId, method, payload } satisfies ExtensionHostProcessMessage);
     });
   }
 
-  private settle(message: ExtensionRpcResponse): void {
+  private settle(message: ExtensionHostProcessResponse): void {
     const waiter = this.pending.get(message.request_id);
     if (!waiter) return;
     this.pending.delete(message.request_id);
@@ -250,7 +262,7 @@ export class ExtensionProcessHost {
 
   private respond(requestId: string, ok: boolean, result?: unknown, error?: string): void {
     if (!this.child?.connected) return;
-    this.child.send({ channel: 'extension-rpc-response', request_id: requestId, ok, result, error } satisfies ExtensionHostMessage);
+    this.child.send({ channel: 'extension-host-process-response', request_id: requestId, ok, result, error } satisfies ExtensionHostProcessMessage);
   }
 
   private register(disposable: Disposable): string {
@@ -300,6 +312,7 @@ export class ExtensionProcessHost {
     this.child = null;
     this.rejectPending(error);
     void this.disposeRegistrations();
+    this.reportHostStage('failed', `Extension Host ${this.manifest.id} process exited`, error.message);
   }
 
   private rejectPending(error: Error): void {
@@ -315,6 +328,30 @@ export class ExtensionProcessHost {
     const lines = readline.createInterface({ input: stream });
     const logger = this.service.createLogger(`ExtensionHost:${this.manifest.id}`);
     lines.on('line', (line) => level === 'warn' ? logger.warn(line) : logger.debug(line));
+  }
+
+  private reportHostStage(stage: ExtensionHostProcessStage, summary?: string, error?: string): void {
+    const safeSummary = summary || `Extension Host ${this.manifest.id} stage=${stage}`;
+    if (stage === 'failed') {
+      this.service.updateExtensionRuntimeLifecycle(this.manifest.id, 'failed', safeSummary, error);
+      return;
+    }
+    if (stage === 'degraded') {
+      this.service.updateExtensionRuntimeLifecycle(this.manifest.id, 'degraded', safeSummary, error);
+      return;
+    }
+    if (stage === 'stopped') {
+      this.service.updateExtensionRuntimeLifecycle(this.manifest.id, 'stopped', safeSummary);
+      return;
+    }
+    this.service.updateExtensionDiagnostics(this.manifest.id, {
+      summary: safeSummary,
+      trace_id: this.runtimeId,
+      last_error: error,
+      entries: [],
+      log_locations: [],
+      recovery_actions: [],
+    });
   }
 }
 
@@ -334,9 +371,17 @@ function buildExtensionModulePath(): string {
   return [...new Set(moduleRoots)].join(path.delimiter);
 }
 
-function resolveWorkerEntry(): string {
-  const source = path.join(__dirname, 'extension-host-worker.ts');
-  return fs.existsSync(source) ? source : path.join(__dirname, 'extension-host-worker.js');
+function resolveExtensionHostEntry(): string {
+  const explicit = process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY?.trim();
+  if (explicit) return explicit;
+  try {
+    return require.resolve('@glimmer-cradle/extension-host');
+  } catch {
+    const source = path.resolve(__dirname, '../../../../../hosts/extension-host/src/main.ts');
+    return fs.existsSync(source)
+      ? source
+      : path.resolve(__dirname, '../../../../../hosts/extension-host/dist/main.js');
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
