@@ -1,0 +1,50 @@
+{
+  "defaultAvatarPackageId": "selrena-youling",
+  "defaultModelId": "youling",
+  "models": [
+    {
+      "avatarPackageId": "selrena-youling",
+      "characterId": "selrena",
+      "id": "youling",
+      "displayName": "月见 Live2D（幽灵）",
+      "metadataRoot": "avatar/youling",
+      "emotionMapFile": "",
+      "actionsFile": "avatar-actions.json",
+      "behaviorFile": "avatar-behavior.json",
+      "resourceKey": "AvatarModels/youling/youling",
+      "modelFormat": "cubism4",
+      "idleMotionGroup": "Idle",
+      "motionGroups": [
+        {
+          "id": "Idle",
+          "clips": [
+            "daiji"
+          ]
+        }
+      ],
+      "presentation": {
+        "defaultPlacement": "bust",
+        "placementPresets": [
+          {
+            "id": "bust",
+            "visibleRatio": 0.4,
+            "rightInset": 24,
+            "bottomInset": 0
+          },
+          {
+            "id": "three-quarter",
+            "visibleRatio": 0.76,
+            "rightInset": 24,
+            "bottomInset": 0
+          },
+          {
+            "id": "full-body",
+            "visibleRatio": 1,
+            "rightInset": 24,
+            "bottomInset": 16
+          }
+        ]
+      }
+    }
+  ]
+}
