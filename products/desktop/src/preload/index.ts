@@ -124,8 +124,8 @@ export interface AvatarPackageCatalogSnapshot {
 /**
  * Kernel 下发的音频播放请求。
  *
- * `audio_uri` 和 `audio_data` 可同时存在；renderer 优先使用内联数据，避免
- * Windows file URL、Vite 与 Electron 安全策略之间的路径差异。
+ * Kernel 下行主线只发送 `audio_uri` 媒体引用，避免把音频二进制塞进普通
+ * control frame。`audio_data` 仅保留为旧 projection 的只读兼容字段。
  */
 export interface AudioPlayPayload {
   trace_id: string;

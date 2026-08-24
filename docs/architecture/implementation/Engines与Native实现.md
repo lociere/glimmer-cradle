@@ -36,7 +36,7 @@ Cognition reply
   -> audio envelope -> Avatar 口型
 ```
 
-CosyVoice adapter 在进程内复用 WebSocket，严格执行 `run-task -> task-started -> continue-task -> finish-task -> task-finished`，二进制帧聚合后在 provider 边界回填 RIFF 和 data chunk 真实长度，再交给 `TTSRoute` 原子落盘。单次调用只在 adapter 内执行有界退避重试；跨 provider fallback 和熔断由 `TTSRoute` 统一处理。当前路线只有 CosyVoice；未来微调 provider 接入后可复用现有顺序路由。Kernel 只复用已定稿的 WAV 缓存；流式占位头或过期产物会被删除并重新生成。fallback 产物不写入主路线的稳定缓存，避免主 provider 恢复后继续复用替代声线。每个语义分段使用由 `trace_id + sequence` 派生的稳定 `audio_id`，Electron main 对同一 `audio_id` 只向唯一音频 owner Surface 投递一次。新 reply 到来时 Kernel 不再继续生成旧 reply 的后续分段，Renderer 清空旧 trace 的播放队列。
+CosyVoice adapter 在进程内复用 WebSocket，严格执行 `run-task -> task-started -> continue-task -> finish-task -> task-finished`，二进制帧聚合后在 provider 边界回填 RIFF 和 data chunk 真实长度，再交给 `TTSRoute` 原子落盘。单次调用只在 adapter 内执行有界退避重试；跨 provider fallback 和熔断由 `TTSRoute` 统一处理。当前路线只有 CosyVoice；未来微调 provider 接入后可复用现有顺序路由。Kernel 只复用已定稿的 WAV 缓存；流式占位头或过期产物会被删除并重新生成。fallback 产物不写入主路线的稳定缓存，避免主 provider 恢复后继续复用替代声线。每个语义分段使用由 `trace_id + sequence` 派生的稳定 `audio_id`，Electron main 对同一 `audio_id` 只向唯一音频 owner Surface 投递一次，并只下发 `audio_uri` 媒体引用，不在普通 control frame 内联 `audio_data`。新 reply 到来时 Kernel 不再继续生成旧 reply 的后续分段，Renderer 清空旧 trace 的播放队列。
 
 当前播放边界仍是语义短句级 WAV，而不是把二进制音频块直接暴露给 Renderer。这样保留稳定的缓存、回放和 Avatar 包络边界；未来若引入 PCM media plane，必须以独立流协议和播放器缓冲状态替换，不能把 base64 chunk 塞进现有单响应帧。
 

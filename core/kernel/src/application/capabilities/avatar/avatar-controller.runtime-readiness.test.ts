@@ -116,4 +116,41 @@ describe('AvatarController runtime readiness sync', () => {
     await waitFor(() => getAvatarRuntime()?.reconciler?.actual === 'waiting-manual-launch');
     expect(getAvatarRuntime()?.state).toBe('degraded');
   });
+
+  it('maps audio visual commands to media references instead of inline data', () => {
+    const subject = avatarController as unknown as {
+      _visualCommandToFrames(command: unknown): Array<{
+        kind?: string;
+        audio_play?: {
+          audio_id?: string;
+          audio_uri?: string;
+          audio_data?: string;
+          mime_type?: string;
+        };
+      }>;
+    };
+
+    const frames = subject._visualCommandToFrames({
+      trace_id: 'trace-avatar-audio-ref',
+      timestamp: 1787580000000,
+      command_type: 'play_audio',
+      audio: {
+        audio_id: 'audio-ref-1',
+        audio_uri: 'file:///D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+        audio_data: 'base64-must-not-cross-control-plane',
+        mime_type: 'audio/wav',
+      },
+    });
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({
+      kind: 'audio_play',
+      audio_play: {
+        audio_id: 'audio-ref-1',
+        audio_uri: 'file:///D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+        mime_type: 'audio/wav',
+      },
+    });
+    expect(frames[0].audio_play).not.toHaveProperty('audio_data');
+  });
 });

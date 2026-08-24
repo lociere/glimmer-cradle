@@ -615,7 +615,6 @@ export class AvatarController {
         audio_play: {
           audio_id: command.audio.audio_id,
           audio_uri: command.audio.audio_uri ?? undefined,
-          audio_data: command.audio.audio_data ?? undefined,
           mime_type: command.audio.mime_type,
           duration_ms: command.audio.duration_ms,
         },

@@ -401,6 +401,38 @@ describe('ControlSurfaceGateway', () => {
     expect(frames[0]).not.toHaveProperty('skill_catalog');
   });
 
+  it('broadcasts synthesized reply audio as a media reference instead of inline data', async () => {
+    const subject = gateway as unknown as {
+      _clients: Set<unknown>;
+      audio: { synthesizeSpeech: (request: { text: string; trace_id: string }) => Promise<unknown> };
+      _synthesizeAndBroadcastAudio(traceId: string, text: string, sequence?: number): Promise<void>;
+    };
+    const frames: unknown[] = [];
+    subject._clients.add(createSocket(frames));
+    const synthesizeSpeech = subject.audio.synthesizeSpeech;
+    subject.audio.synthesizeSpeech = async () => ({
+      status: 'success',
+      output_path: 'D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+    });
+    try {
+      await subject._synthesizeAndBroadcastAudio('trace-audio-ref', '你好', 0);
+    } finally {
+      subject.audio.synthesizeSpeech = synthesizeSpeech;
+    }
+
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({
+      kind: 'audio_play',
+      trace_id: 'trace-audio-ref',
+      audio_play: {
+        audio_id: 'reply-trace-audio-ref-0',
+        audio_uri: 'file:///D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+        mime_type: 'audio/wav',
+      },
+    });
+    expect((frames[0] as { audio_play?: { audio_data?: unknown } }).audio_play).not.toHaveProperty('audio_data');
+  });
+
   it('rejects Query requests whose declared operation does not match frame.kind', async () => {
     const subject = gateway as unknown as {
       _surfaceSessions: Map<string, { productId: string; scopes: Set<string> }>;

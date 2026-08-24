@@ -1,6 +1,6 @@
 import * as grpc from '@grpc/grpc-js';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { create, fromJson, type JsonObject } from '@bufbuild/protobuf';
@@ -779,9 +779,6 @@ export class ControlSurfaceGateway {
         return;
       }
 
-      const audioBuffer = await readFile(result.output_path);
-      const maxInlineBytes = 8 * 1024 * 1024;
-
       this.broadcastFrame({
         kind: 'audio_play',
         trace_id: traceId,
@@ -789,9 +786,6 @@ export class ControlSurfaceGateway {
         audio_play: {
           audio_id: `reply-${traceId}-${sequence}`,
           audio_uri: pathToFileURL(result.output_path).toString(),
-          audio_data: audioBuffer.length <= maxInlineBytes
-            ? audioBuffer.toString('base64')
-            : undefined,
           mime_type: 'audio/wav',
         },
       });
