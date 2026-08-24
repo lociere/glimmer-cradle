@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
