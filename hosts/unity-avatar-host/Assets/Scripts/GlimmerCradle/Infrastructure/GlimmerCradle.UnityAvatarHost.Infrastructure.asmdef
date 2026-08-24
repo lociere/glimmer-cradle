@@ -1,0 +1,11 @@
+{
+  "name": "GlimmerCradle.UnityAvatarHost.Infrastructure",
+  "rootNamespace": "GlimmerCradle.Avatar",
+  "references": [
+    "Live2D.Cubism"
+  ],
+  "precompiledReferences": ["GlimmerCradle.Avatar.Core.dll"],
+  "overrideReferences": true,
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

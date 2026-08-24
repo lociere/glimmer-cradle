@@ -28,10 +28,13 @@ Avatar 属于 Character，不是 Surface 或 Extension。UnityAvatarHost 只是�
 ## 物理结构
 
 ```text
-core/avatar/unity-host/
-└── Assets/Scripts/Avatar/
-    ├── Domain/
-    ├── Application/
+core/avatar/
+├── src/Domain/
+└── src/Application/
+
+hosts/unity-avatar-host/
+└── Assets/Scripts/GlimmerCradle/
+    ├── Adapters/
     ├── Infrastructure/Cubism/
     ├── Host/
     └── Editor/
@@ -58,8 +61,9 @@ Kernel 使用独立 `AvatarRuntime` 监督 Avatar Host；`PresentationRuntime` �
 
 | 方向 | 契约 | 语义 |
 |---|---|---|
-| Desktop/Host -> Kernel | `PresentationUpstreamFrame` | 用户输入、Avatar intent、Host 生命周期与错误 |
-| Kernel -> Desktop/Host | `PresentationDownstreamFrame` | reply、emotion、Avatar 控制、状态与 Projection |
+| Unity Host -> Kernel | Contract Spine `AvatarUpstreamFrame` | Host 生命周期、动作状态与错误 |
+| Kernel -> Unity Host | Contract Spine `AvatarDownstreamFrame` | emotion、动作、音频、呈现与身体 Projection |
+| Desktop ↔ Kernel | legacy Presentation frame（待 Slice 7） | 用户输入、reply 与产品 Surface Projection |
 | Kernel -> 所有呈现出口 | `character_presentation_projection` | 当前 Avatar、显示意图与 lifecycle 的只读投影 |
 
 Desktop 与 UnityAvatarHost 可以消费同一 Envelope，但不共享 Electron、Unity 或 Cubism 对象。Extension 不直接发布 Avatar 控制帧；只有本地 Presentation scene 默认驱动本地 Avatar。

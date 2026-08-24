@@ -26,13 +26,14 @@ pnpm sync:contracts
 
 生成物不能手改。若生成物不满足消费需求，应改对应 owner 的 Schema/IDL、生成脚本或 runtime helper，而不是在消费者里复制字段。
 
-M12 Slice 1 建立 baseline，Slice 2 已将 Kernel↔Cognition Service 迁入 `contracts/`：
+M12 Slice 1 建立 baseline，Slice 2 已将 Kernel↔Cognition Service、Slice 5 已将 Avatar control Service 迁入 `contracts/`：
 
 ```text
 contracts/
 ├── proto/glimmer/common/v1/{contract_probe,service_contract}.proto
 ├── proto/glimmer/cognition/v1/cognition_service.proto
 ├── proto/glimmer/kernel/v1/kernel_control_service.proto
+├── proto/glimmer/avatar/v1/avatar_host.proto
 ├── json-schema/skill/v1/tool-parameters.schema.json
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
@@ -49,7 +50,7 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 已分别从 `contracts/generated/ts/` 和 `contracts/generated/python/` 消费版本化 Service；Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。其旧 ZMQ、通用 envelope、IPC payload 生成物、配置与 Cognition legacy Python projection 已删除。`protocol/codegen/gen-py.py` 现在只生成 Audio projection，并使用 `engines/audio` 自有 uv dev 环境；Desktop、Avatar、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 分别消费 Avatar TS/C# projection，并用 preserve-proto-field-name JSON 保持已发布 snake_case wire。legacy `PresentationFrames.g.cs` 已删除。Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
 
 Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
 environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地
@@ -103,7 +104,7 @@ Protocol 的 runtime helper 负责：
 | contracts compatibility 失败 | `contracts/compatibility/` baseline、`buf breaking --against`、JSON Schema baseline |
 | 运行时报未知字段 | validator、producer payload、consumer 版本 |
 | 配置读不出 | config schema、normalizer、默认值和实际 YAML |
-| Avatar frame 不兼容 | `PresentationUpstreamFrame`/`DownstreamFrame` schema 与 runtime helper |
+| Avatar frame 不兼容 | `contracts/proto/glimmer/avatar/v1/avatar_host.proto`、Kernel/Unity Host Adapter 与 snake_case round-trip |
 | Cognition payload 解析失败 | Contract Spine Python DTO、Kernel contract adapter、错误 code |
 
 ## 验证

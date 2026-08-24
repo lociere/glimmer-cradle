@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package glimmer.avatar.v1;
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Avatar.V1";
+
+message EmotionPayload {
+  string emotion_type = 1;
+  float intensity = 2;
+  string trigger = 3;
+  int32 blend_time_ms = 4;
+}
+
+message ThoughtPayload {
+  bool active = 1;
+  string hint = 2;
+}
+
+message AudioPlayPayload {
+  string audio_id = 1;
+  string audio_uri = 2;
+  string audio_data = 3;
+  string mime_type = 4;
+  int32 duration_ms = 5;
+}
+
+message AvatarExpressionPayload {
+  string expression_id = 1;
+  int32 blend_time_ms = 2;
+  bool auto_reset = 3;
+}
+
+message AvatarMotionPayload {
+  string motion_id = 1;
+  bool loop = 2;
+  int32 priority = 3;
+}
+
+message AvatarLipSyncPayload {
+  float amplitude = 1;
+  string source = 2;
+}
+
+message AvatarParameterPayload {
+  string param_id = 1;
+  float value = 2;
+  int32 fade_ms = 3;
+}
+
+message AvatarIntentPayload {
+  string action_id = 1;
+  string operation = 2;
+  string source = 3;
+  int32 priority = 4;
+}
+
+message AvatarActionStatePayload {
+  string action_id = 1;
+  string state = 2;
+  repeated string active_action_ids = 3;
+  string message = 4;
+}
+
+message AvatarPresentationPayload {
+  string placement_id = 1;
+  float display_scale = 2;
+  bool reset_placement = 3;
+}
+
+message CharacterPresentationAppearancePayload {
+  string placement_id = 1;
+  float display_scale = 2;
+}
+
+message CharacterPresentationLifecyclePayload {
+  string worker_window_state = 1;
+  string composition_surface_state = 2;
+  bool first_frame_presented = 3;
+  bool interaction_ready = 4;
+  bool ready = 5;
+  string summary = 6;
+}
+
+message CharacterPresentationProjectionPayload {
+  string avatar_package_id = 1;
+  string model_id = 2;
+  string display_name = 3;
+  string kind = 4;
+  string backend = 5;
+  string host_kind = 6;
+  string avatar_state = 7;
+  CharacterPresentationAppearancePayload appearance = 8;
+  CharacterPresentationLifecyclePayload lifecycle = 9;
+}
+
+message LoadScenePayload {
+  string scene_id = 1;
+  int32 fade_ms = 2;
+}
+
+message UnloadScenePayload {
+  int32 fade_ms = 1;
+}
+
+message AvatarHostHelloPayload {
+  string host_kind = 1;
+  string host_id = 2;
+  string host_version = 3;
+  repeated string capabilities = 4;
+  string model_id = 5;
+  string avatar_package_id = 6;
+}
+
+message AvatarHostReadyPayload {
+  string host_id = 1;
+  string model_id = 2;
+  string avatar_package_id = 3;
+  string worker_window_state = 4;
+  string composition_surface_state = 5;
+  bool first_frame_presented = 6;
+  bool interaction_ready = 7;
+  string summary = 8;
+}
+
+message AnimationCompletePayload {
+  string animation_id = 1;
+}
+
+message AvatarHostErrorPayload {
+  string code = 1;
+  string message = 2;
+}
+
+message AvatarDownstreamFrame {
+  string kind = 1;
+  string trace_id = 2;
+  double timestamp = 3;
+  EmotionPayload emotion = 4;
+  ThoughtPayload thought = 5;
+  AudioPlayPayload audio_play = 6;
+  AvatarExpressionPayload expression = 7;
+  AvatarMotionPayload motion = 8;
+  AvatarLipSyncPayload lip_sync = 9;
+  AvatarParameterPayload parameter = 10;
+  AvatarIntentPayload avatar_intent = 11;
+  AvatarPresentationPayload presentation = 12;
+  CharacterPresentationProjectionPayload character_presentation_projection = 13;
+  LoadScenePayload load_scene = 14;
+  UnloadScenePayload unload_scene = 15;
+}
+
+message AvatarUpstreamFrame {
+  string kind = 1;
+  string trace_id = 2;
+  double timestamp = 3;
+  AvatarHostHelloPayload host_hello = 4;
+  AvatarHostReadyPayload host_ready = 5;
+  AvatarActionStatePayload avatar_action_state = 6;
+  AnimationCompletePayload animation_complete = 7;
+  AvatarHostErrorPayload error = 8;
+}
+
+service AvatarHostService {
+  rpc Connect(stream AvatarUpstreamFrame) returns (stream AvatarDownstreamFrame);
+}

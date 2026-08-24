@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const buf = resolve(root, 'node_modules', '@bufbuild', 'buf', 'bin', 'buf');
@@ -21,6 +21,21 @@ if (result.status !== 0) {
   if (result.error) console.error(result.error.message);
   process.exit(result.status ?? 1);
 }
+
+// protoc 的 C# builtin 默认扁平输出；Avatar projection 按 Contract Spine 的
+// namespace 所有权投影到稳定目录，避免 Host 再消费 legacy 聚合生成物。
+const avatarCsharpSource = resolve(root, 'generated', 'csharp', 'AvatarHost.cs');
+const avatarCsharpTarget = resolve(
+  root,
+  'generated',
+  'csharp',
+  'GlimmerCradle',
+  'avatar',
+  'v1',
+  'AvatarHost.cs',
+);
+mkdirSync(dirname(avatarCsharpTarget), { recursive: true });
+renameSync(avatarCsharpSource, avatarCsharpTarget);
 
 function walk(dir) {
   const result = [];

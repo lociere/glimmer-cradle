@@ -1,16 +1,17 @@
 # Contracts Baseline
 
-> 范围：M12 已落地的 canonical `contracts/` baseline、Kernel↔Cognition v1 Service、生成链、兼容基线和验证入口。
+> 范围：M12 已落地的 canonical `contracts/` baseline、Kernel↔Cognition 与 Avatar v1 Service、生成链、兼容基线和验证入口。
 > 事实依据：本目录下的 `proto/`、`json-schema/`、`compatibility/`、`generated/`、`scripts/` 与 `tests/`。
 > 维护触发：新增或修改 Contract Spine IDL、JSON Schema Document、生成工具链、兼容基线或跨语言验证门。
 
-`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition 运行主线已使用本目录的 v1 Protobuf Service 与生成物；该边界的旧 ZMQ/envelope 已删除。其他尚未迁移边界仍按 M12 切片使用 `protocol/`、stdio 或手写 WebSocket。
+`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition 与 Kernel↔UnityAvatarHost 的 Avatar control 主线已使用本目录的 v1 Protobuf Service/DTO；Avatar 当前 WebSocket transport 只承载该 canonical JSON projection。其他尚未迁移边界仍按 M12 切片使用 `protocol/`、stdio 或手写 WebSocket。
 
 ## 目录
 
 | 路径 | Owner | 说明 |
 |---|---|---|
 | `proto/glimmer/common/v1/` | Contract Spine owner | Protobuf Service baseline，当前只包含最小 `ContractProbeService`。 |
+| `proto/glimmer/avatar/v1/` | Avatar Contract owner | Avatar Host 上下行控制帧与 `AvatarHostService`；snake_case 是已发布 JSON wire name。 |
 | `json-schema/skill/v1/` | Skill Plane Document owner | JSON Schema Document baseline，当前只包含最小动态 tool parameters Document。 |
 | `generated/` | Contract Spine Adapter edge | Buf 生成的 TS/Python/C# DTO；只读，不进入 Domain/Application/Port。 |
 | `compatibility/` | Contract Spine owner | 仓库内 Protobuf image 与 JSON Schema compatibility baseline；`buf breaking` 不依赖 BSR。 |
@@ -47,5 +48,5 @@ pnpm --filter @glimmer-cradle/contracts baseline:refresh
 
 - Protobuf 只拥有跨进程可调用能力；JSON Schema 只拥有 Document。
 - 同一结构不得同时在 Protobuf 和 JSON Schema 中拥有权威定义。当前 proto 只引用 Document 的 id、version 和 digest，不复制 Document 字段。
-- `generated/` 只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 是当前运行 consumer。
-- Engine、Avatar、Extension 和 Surface 只能在对应 M12 切片中迁入 `contracts/`。
+- `generated/` 只属于 Adapter/Transport 边缘；Kernel/Cognition/UnityAvatarHost Adapter 是当前运行 consumer。
+- Engine、Extension 和 Surface 只能在对应 M12 切片中迁入 `contracts/`；Avatar control 已在 Slice 5 迁入。

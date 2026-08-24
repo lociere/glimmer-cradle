@@ -14,8 +14,9 @@
 | UI store/host | `renderer/store/`、`renderer/host/useDesktopHost.ts` |
 | 录音/播放 | `renderer/audio/` |
 | Avatar renderer bridge | `renderer/avatar/`、`renderer/components/avatar/` |
-| Unity Avatar | `core/avatar/unity-host/Assets/Scripts/Avatar/` |
-| Avatar build/setup | `Assets/Scripts/Avatar/Editor/` |
+| Avatar Core | `core/avatar/src/` |
+| Unity Avatar | `hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/` |
+| Avatar build/setup | `hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/Editor/` |
 | Unity SDK 投影 | `avatar-sdk-catalog.json`、`hosts/unity-avatar-host/scripts/unitypackage-projector.mjs` |
 
 ## 标准步骤

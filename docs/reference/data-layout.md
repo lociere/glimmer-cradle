@@ -81,8 +81,8 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 | 路径 | 说明 |
 |---|---|
 | `assets/avatar/avatar-packages/*/avatar-package.json` | Avatar Package 事实源，声明 character/model、backend、Live2D 资源、动作、行为和 presentation |
-| `core/avatar/unity-host/Assets/StreamingAssets/avatar-package-registry.json` | 根据 Avatar Package 同步生成的 Unity 投影，不手改 |
-| `core/avatar/unity-host/Assets/Resources/AvatarModels/` | Unity/Cubism 导入投影，不入 Git |
+| `hosts/unity-avatar-host/Assets/StreamingAssets/avatar-package-registry.json` | 根据 Avatar Package 同步生成的 Unity 投影，不手改 |
+| `hosts/unity-avatar-host/Assets/Resources/AvatarModels/` | Unity/Cubism 导入投影，不入 Git |
 | `build/components/avatar/unity-host/` | UnityAvatarHost 第一方构建投影；打包时进入应用资源，不属于用户数据 |
 
 私人模型、贴图、`.moc3`、prefab 和 SDK 导入产物不得进入提交。正式身体是否可用由 catalog、SDK、模型 driver 和首帧 ready 决定，不由文件是否存在单独决定。

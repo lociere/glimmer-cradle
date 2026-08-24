@@ -51,7 +51,7 @@
     "avatar:sync": "pnpm sync:unity-assets && pnpm sync:unity-sdk",
     "avatar:doctor": "node hosts/unity-avatar-host/scripts/project-sdk.mjs --check",
     "avatar:projector:test": "node --test hosts/unity-avatar-host/tests/unitypackage-projector.test.mjs",
-    "avatar:composition:build": "node core/avatar/scripts/build-core.mjs",
+    "avatar:composition:build": "node hosts/unity-avatar-host/scripts/build-native.mjs",
     "avatar:build": "node hosts/unity-avatar-host/scripts/build.mjs",
     "prebuild:all": "node products/desktop/scripts/sync-assets.mjs",
     "check:pr": "pnpm check:encoding && pnpm check:architecture && pnpm test && pnpm typecheck && pnpm build"

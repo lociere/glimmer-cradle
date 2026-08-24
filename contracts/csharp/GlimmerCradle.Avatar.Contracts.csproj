@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>GlimmerCradle.Avatar.Contracts</AssemblyName>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\generated\csharp\GlimmerCradle\avatar\v1\AvatarHost.cs" Link="Generated\AvatarHost.cs" />
+    <PackageReference Include="Google.Protobuf" Version="3.33.0" />
+  </ItemGroup>
+</Project>

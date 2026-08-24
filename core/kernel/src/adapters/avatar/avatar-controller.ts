@@ -8,15 +8,19 @@ import {
   AvatarStatusChangedEvent,
 } from '../../domain/events';
 import type { VisualCommand } from '../../domain/kernel-contracts';
-import { getPresentationFrameClass } from '@glimmer-cradle/protocol';
+import type { AvatarConfig } from '@glimmer-cradle/protocol';
+import { fromJsonString, toJsonString } from '@bufbuild/protobuf';
+import {
+  AvatarDownstreamFrameSchema,
+  AvatarUpstreamFrameSchema,
+} from '@glimmer-cradle/contracts/glimmer/avatar/v1/avatar_host_pb';
 import type {
   PresentationDownstreamFrame,
-  AvatarConfig,
   PresentationUpstreamFrame,
   CharacterPresentationProjectionPayload,
   AvatarHostHelloPayload,
   AvatarHostReadyPayload,
-} from '@glimmer-cradle/protocol';
+} from './avatar-control-model';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import {
   strongestRuntimeResourceState,
@@ -128,7 +132,7 @@ export class AvatarController {
       kind: 'shutdown',
       timestamp: Date.now(),
     };
-    const shutdownPayload = JSON.stringify(shutdownFrame);
+    const shutdownPayload = encodeDownstream(shutdownFrame);
     for (const client of this._clients) {
       this._sendRaw(client, shutdownPayload);
     }
@@ -384,10 +388,10 @@ export class AvatarController {
   }
 
   public broadcastFrame(frame: PresentationDownstreamFrame): void {
-    const payload = JSON.stringify(frame);
+    const payload = encodeDownstream(frame);
     if (frame.kind !== 'presentation') {
       logger.debug('向 Avatar 广播帧', {
-        frame_class: getPresentationFrameClass(frame.kind),
+        frame_class: 'avatar-control',
         kind: frame.kind,
         trace_id: frame.trace_id,
       });
@@ -409,7 +413,7 @@ export class AvatarController {
 
   private _handleRawMessage(message: RawData, ws: WebSocket): void {
     try {
-      const frame = JSON.parse(message.toString()) as PresentationUpstreamFrame;
+      const frame = decodeUpstream(message.toString());
       this._handleUpstream(frame, ws);
     } catch (err) {
       logger.warn('无法解析 Avatar 消息', {
@@ -476,7 +480,9 @@ export class AvatarController {
           break;
         }
         void EventBus.instance.publish(
-          new AvatarActionStateChangedEvent(frame.avatar_action_state),
+          new AvatarActionStateChangedEvent({
+            active_action_ids: frame.avatar_action_state.active_action_ids ?? [],
+          }),
         ).catch((err: any) => logger.error('AvatarActionStateChangedEvent publish 失败', { err }));
         break;
       case 'error':
@@ -510,7 +516,7 @@ export class AvatarController {
       kind: 'ping',
       timestamp: now,
     };
-    const pingPayload = JSON.stringify(pingFrame);
+    const pingPayload = encodeDownstream(pingFrame);
 
     for (const client of this._clients) {
       this._sendRaw(client, pingPayload);
@@ -626,6 +632,16 @@ export class AvatarController {
 
     return frames;
   }
+}
+
+function encodeDownstream(frame: PresentationDownstreamFrame): string {
+  const message = fromJsonString(AvatarDownstreamFrameSchema, JSON.stringify(frame));
+  return toJsonString(AvatarDownstreamFrameSchema, message, { useProtoFieldName: true });
+}
+
+function decodeUpstream(json: string): PresentationUpstreamFrame {
+  const message = fromJsonString(AvatarUpstreamFrameSchema, json, { ignoreUnknownFields: true });
+  return JSON.parse(toJsonString(AvatarUpstreamFrameSchema, message, { useProtoFieldName: true })) as PresentationUpstreamFrame;
 }
 
 function waitForWebSocketServer(server: WebSocketServer): Promise<void> {

@@ -11,7 +11,7 @@ Engine 是 Glimmer Cradle 的官方能力器官，不是 Extension。它们可�
 | Engine | 来源 | 主要能力 | 当前边界 |
 |---|---|---|---|
 | Audio Engine | `engines/audio/` | TTS、ASR、音频资源检测、模型 warmup | Kernel audio capability 管理，子进程日志进入 process log |
-| Avatar/Composition native | `core/avatar/unity-host/` + `native/` | 复杂身体渲染、透明合成、DPI、命中 | Avatar/Native 边界管理，Kernel 只看协议状态 |
+| Avatar/Composition native | `hosts/unity-avatar-host/` + `native/` | 复杂身体渲染、透明合成、DPI、命中 | Avatar/Native 边界管理，Kernel 只看协议状态 |
 | 未来 Vision/Vector/Reasoning engine | `engines/` 预留 | 官方模型能力 | 必须按 Engine 契约纳入 readiness，不走 Extension 假装本体 |
 
 ## 官方 Engine 不变量

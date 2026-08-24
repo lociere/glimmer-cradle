@@ -5,6 +5,12 @@ modules:
 lint:
   use:
     - STANDARD
+  # Connect 直接复用已发布的上下行 frame wire，不额外包装 request/response。
+  ignore_only:
+    RPC_REQUEST_STANDARD_NAME:
+      - proto/glimmer/avatar/v1/avatar_host.proto
+    RPC_RESPONSE_STANDARD_NAME:
+      - proto/glimmer/avatar/v1/avatar_host.proto
 breaking:
   use:
     - FILE

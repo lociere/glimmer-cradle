@@ -121,8 +121,8 @@ function resolveUnityAssetPath(value, fieldName) {
   ) {
     fail([`Avatar SDK catalog 的 ${fieldName} 必须是 Assets/ 下的 Unity 资产路径`]);
   }
-  const resolved = path.resolve(resolveRepositoryPath('core/avatar/unity-host', 'unityProject'), ...segments);
-  const projectRoot = resolveRepositoryPath('core/avatar/unity-host', 'unityProject');
+  const resolved = path.resolve(resolveRepositoryPath('hosts/unity-avatar-host', 'unityProject'), ...segments);
+  const projectRoot = resolveRepositoryPath('hosts/unity-avatar-host', 'unityProject');
   const relative = path.relative(projectRoot, resolved);
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
     fail([`Avatar SDK catalog 的 ${fieldName} 越过 Unity 工程边界: ${normalized}`]);

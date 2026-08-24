@@ -25,6 +25,7 @@ await fs.writeFile(logPath, '', 'utf8');
 await runNodeScript(path.join('hosts', 'unity-avatar-host', 'scripts', 'sync-assets.mjs'));
 await runNodeScript(path.join('hosts', 'unity-avatar-host', 'scripts', 'project-sdk.mjs'));
 await runNodeScript(path.join('core', 'avatar', 'scripts', 'build-core.mjs'));
+await runNodeScript(path.join('hosts', 'unity-avatar-host', 'scripts', 'build-native.mjs'));
 await projectRequiredUnityPackages();
 
 const unityEditor = await resolveUnityEditor();
@@ -42,7 +43,7 @@ const args = [
   '-projectPath',
   projectPath,
   '-executeMethod',
-  'GlimmerCradle.Avatar.Editor.UnityAvatarHostBuild.BuildWindows',
+  'GlimmerCradle.UnityAvatarHost.Editor.UnityAvatarHostBuild.BuildWindows',
   '-logFile',
   logPath,
 ];

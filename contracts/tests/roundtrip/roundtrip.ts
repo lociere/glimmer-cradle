@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { create, fromBinary, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
 import {
   EchoProbeRequestSchema,
   EchoProbeResponseSchema,
 } from '../../generated/ts/glimmer/common/v1/contract_probe_pb';
+import {
+  AvatarDownstreamFrameSchema,
+} from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 
 const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
@@ -42,6 +45,36 @@ if (
   || responseRoundTrip.document?.schemaVersion !== document.schema_version
 ) {
   throw new Error('TypeScript response protobuf round-trip lost the successful echo result');
+}
+
+
+const avatarFrame = create(AvatarDownstreamFrameSchema, {
+  kind: 'avatar_intent',
+  traceId: 'trace-avatar-contract',
+  timestamp: 42,
+  avatarIntent: {
+    actionId: 'wave-hand',
+    operation: 'trigger',
+    source: 'user',
+    priority: 7,
+  },
+});
+const avatarJson = toJsonString(AvatarDownstreamFrameSchema, avatarFrame, {
+  useProtoFieldName: true,
+});
+if (
+  !avatarJson.includes('"trace_id"')
+  || !avatarJson.includes('"avatar_intent"')
+  || !avatarJson.includes('"action_id"')
+  || avatarJson.includes('traceId')
+  || avatarJson.includes('avatarIntent')
+) {
+  throw new Error('TypeScript Avatar JSON projection did not preserve published snake_case wire names');
+}
+const avatarJsonRoundTrip = fromJsonString(AvatarDownstreamFrameSchema, avatarJson);
+if (avatarJsonRoundTrip.avatarIntent?.actionId !== 'wave-hand'
+    || avatarJsonRoundTrip.avatarIntent.priority !== 7) {
+  throw new Error('TypeScript Avatar JSON round-trip lost the control payload');
 }
 
 console.log('contracts roundtrip ts: ok');

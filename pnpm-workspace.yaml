@@ -1,7 +1,7 @@
 packages:
   - 'core/**'
   # Unity 工程由 Unity Package Manager 管理；不能让 pnpm 递归扫描其 Library/PackageCache。
-  - '!core/avatar/unity-host/**'
+  - '!hosts/unity-avatar-host/**'
   - 'products/**'
   - 'protocol'
   - 'contracts'

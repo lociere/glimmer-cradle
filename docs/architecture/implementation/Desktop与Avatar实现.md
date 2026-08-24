@@ -1,7 +1,7 @@
 # Desktop 与 Avatar 实现
 
 > 范围：Electron Desktop Surfaces、preload、renderer、音频 UI、Avatar、Unity SDK 和 Native Composition 如何在代码中落地；不写视觉 token 全表。
-> 源码依据：`products/desktop/src/`、`core/avatar/unity-host/Assets/Scripts/Avatar/`、`assets/avatar/`、Kernel control-surface/avatar capability、Protocol Presentation Plane。
+> 源码依据：`products/desktop/src/`、`core/avatar/`、`hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/`、`assets/avatar/`、Kernel control-surface/avatar capability 与 Contract Spine Avatar v1。
 > 维护触发：Electron main/preload/renderer、Control Center、Presence、Avatar frame、Unity SDK、Live2D driver、Native Composition、音频播放或状态投影变化。
 
 ## 目录
@@ -125,8 +125,9 @@ local surface scene (`scene:desktop-ui:*` / `conversation:desktop-ui:*` / `scene
 | 文件 | 职责 |
 |---|---|
 | `Host/UnityAvatarHostBootstrap.cs` | UnityAvatarHost 启动与 wiring |
+| `Adapters/AvatarContractAdapter.cs` | Contract Spine C# DTO 与 Core control model 的唯一双向映射；JSON 保留 snake_case wire name |
 | `Host/AvatarProtocolClient.cs` | 与 Kernel Presentation Plane 的协议连接 |
-| `Contracts/PresentationFrames.g.cs` | 由 Presentation Frame Schema 自动生成的 Unity 上下行模型，只读 |
+| `Adapters/AvatarContractAdapter.cs` | Contract Spine Avatar C# projection 与 Core model 的唯一映射边界 |
 | `Domain/` | Avatar Package、行为、模型描述与模型驱动契约 |
 | `Application/` | 动作调度、连续行为求值和空闲动作策略 |
 | `Infrastructure/Cubism/` | Cubism/Live2D driver、资源注册与模型清单读取 |
@@ -134,7 +135,9 @@ local surface scene (`scene:desktop-ui:*` / `conversation:desktop-ui:*` / `scene
 | `Host/AvatarCompositionHost.cs` | Native Composition Host 边界 |
 | `Editor/UnityAvatarHostBuild.cs` | 构建辅助 |
 
-Unity 只消费 Avatar 协议和模型 catalog 投影，不读取 Kernel 内部配置。项目 Assembly Definition 固化 `Contracts / Domain -> Application、Infrastructure -> Host -> Editor` 的单向引用；只有 Infrastructure 可以引用第三方 `Live2D.Cubism`。`protocol/codegen/gen-cs.ts` 从 `PresentationDownstreamFrame.schema.json` 与 `PresentationUpstreamFrame.schema.json` 生成 `PresentationFrames.g.cs`，手写 frame 镜像已经删除。模型投影和 StreamingAssets 是构建/同步产物，不是手工事实源。
+Avatar 领域模型、控制 frame、Application dispatcher 与 Host port 位于 `core/avatar/src/{Domain,Application,Ports}/`，由 netstandard2.1 `GlimmerCradle.Avatar.Core.dll` 独立构建测试；Core 不引用 Unity、Cubism、gRPC、Protobuf 或 generated DTO。Unity 工程只通过显式 precompiled reference 单向消费 Core；生成的 `GlimmerCradle.Avatar.Contracts.dll` 与 `Google.Protobuf.dll` 仅由 Host Adapter assembly 消费。
+
+Unity 只消费 Avatar Contract Spine projection 和模型 catalog 投影，不读取 Kernel 内部配置。项目 Assembly Definition 固化 `Core + generated Contracts -> Adapters、Core + Live2D.Cubism -> Infrastructure、Adapters + Infrastructure + Core -> Host -> Editor` 的单向引用；只有 Infrastructure 可以引用第三方 `Live2D.Cubism`。Avatar wire 由 `contracts/proto/glimmer/avatar/v1/avatar_host.proto` 权威拥有，Adapter 用 preserve-proto-field-name JSON 维持已发布 snake_case wire；legacy `PresentationFrames.g.cs` 已删除。模型投影和 StreamingAssets 是构建/同步产物，不是手工事实源。
 
 Kernel Avatar WebSocket 绑定动态回环端点，并通过 `GLIMMER_CRADLE_AVATAR_WS_URL` 注入受管 Unity Host；`avatar-host.json` 不保存端口。Desktop main 同样从 `data/run/host/endpoints.json` 发现 `control-surface`，校验 owner PID 和回环地址后连接。安装态 `PackagedSupervisor` 还会把本次 `launch_session` 注入 Kernel，要求 endpoint catalog 的 generation 与 PID 同时匹配，并通过 control-surface 首帧的 `runtime_readiness` 验证所有 blocking runtime；端点存在本身不能宣称 ready。timeout 或 stop 只有确认进程树退出后才能投影 `stopped`，否则保留 `failed` 诊断。开发态 `dev-electron.mjs` 等待同一目录，不保留独立固定端口逻辑。
 

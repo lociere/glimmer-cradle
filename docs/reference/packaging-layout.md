@@ -13,7 +13,7 @@
 | Kernel | `core/kernel/` | 应用运行时组件，由 Desktop/启动脚本托管 |
 | Cognition | `core/cognition/` | Python runtime/包投影，按 uv 环境或发行方案携带 |
 | Audio Engine | `engines/audio/` | 官方 engine 组件，模型不随源码硬编码 |
-| UnityAvatarHost | `core/avatar/unity-host/` | `resources/components/avatar/unity-host/` 或本机 Host 构建投影 |
+| UnityAvatarHost | `hosts/unity-avatar-host/`；Core assembly 源为 `core/avatar/` | `resources/components/avatar/unity-host/` 或本机 Host 构建投影 |
 | Native DLL | `native/` 构建产物 | 组件或 Unity plugin 投影 |
 | Default assets | `assets/` | 只读默认资产，按 catalog 选择打包 |
 | User data | `data/` 或系统 user-data 域 | 安装外持久化，不被升级覆盖 |

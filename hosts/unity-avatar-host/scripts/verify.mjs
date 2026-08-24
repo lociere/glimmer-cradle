@@ -8,13 +8,12 @@ for (const relative of [
   'hosts/unity-avatar-host/scripts/build.mjs',
   'hosts/unity-avatar-host/scripts/project-sdk.mjs',
   'hosts/unity-avatar-host/scripts/sync-assets.mjs',
-  'core/avatar/unity-host/ProjectSettings/ProjectVersion.txt',
+  'hosts/unity-avatar-host/ProjectSettings/ProjectVersion.txt',
 ]) {
   await access(path.join(repoRoot, relative));
 }
 process.stdout.write(`${JSON.stringify({
   event: 'unity_avatar_host_verified',
-  current_project_root: 'core/avatar/unity-host',
-  target_project_root: 'hosts/unity-avatar-host',
-  project_migration_owner: 'M12 Slice 5',
+  project_root: 'hosts/unity-avatar-host',
+  owner: 'hosts/unity-avatar-host',
 })}\n`);

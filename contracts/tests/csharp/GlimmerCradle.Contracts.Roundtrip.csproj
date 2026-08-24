@@ -10,6 +10,7 @@
     <Compile Include="..\..\generated\csharp\ServiceContract.cs" Link="Generated\ServiceContract.cs" />
     <Compile Include="..\..\generated\csharp\CognitionService.cs" Link="Generated\CognitionService.cs" />
     <Compile Include="..\..\generated\csharp\KernelControlService.cs" Link="Generated\KernelControlService.cs" />
+    <Compile Include="..\..\generated\csharp\GlimmerCradle\avatar\v1\AvatarHost.cs" Link="Generated\AvatarHost.cs" />
     <PackageReference Include="Google.Protobuf" Version="3.33.0" />
   </ItemGroup>
 </Project>

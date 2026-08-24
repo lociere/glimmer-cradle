@@ -20,7 +20,7 @@
 
 - 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
 - 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
-- Kernel↔Cognition 已在 Slice 2 迁移；该边界只能由 `contracts/proto/glimmer/{common,kernel,cognition}/v1/` 定义，不得恢复旧 Protocol 镜像。
+- Kernel↔Cognition 已在 Slice 2 迁移，Avatar control 已在 Slice 5 迁移；这些边界只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar}/v1/` 定义，不得恢复旧 Protocol 镜像。
 
 现有 runtime Protocol 的生成投影和消费端包括：
 
@@ -31,14 +31,14 @@
 | `protocol/src/schemas/enums/` | 跨语言枚举，如 error、moment、metric |
 | `protocol/src/generated/` | TypeScript 生成物，只读 |
 | `engines/audio/src/glimmer_cradle/audio/generated/` | Audio legacy Python 生成物，只读；生成工具环境由 Audio owner 持有，Cognition legacy projection 已删除 |
-| `core/avatar/unity-host/Assets/Scripts/Avatar/Contracts/PresentationFrames.g.cs` | Unity C# Presentation Frame 生成物，只读 |
+| `contracts/generated/csharp/GlimmerCradle/avatar/v1/` | Avatar v1 C# projection，只读；Unity Host Adapter 消费 |
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 
 禁止手写镜像、修改生成物、让 UI view model 反向定义协议，或在某个消费者里维护“临时兼容字段”而不更新其实际 owner。
 
 ## M12 Contracts Baseline 与 Slice 2 Service
 
-M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔Cognition 运行主线。当前查表规则如下：
+M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔Cognition，Slice 5 已切换 Avatar control 运行主线。当前查表规则如下：
 
 | 路径 | 当前状态 | 规则 |
 |---|---|---|
@@ -56,7 +56,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| Kernel↔Cognition 已由 `contracts/` 权威定义；其他运行结构仍在 `protocol/` | 所有边界迁移后删除旧 `protocol/` |
+| Kernel↔Cognition 与 Avatar control 已由 `contracts/` 权威定义；其他运行结构仍在 `protocol/` | 所有边界迁移后删除旧 `protocol/` |
 | 尚未迁移的 JSON Schema 仍覆盖共享模型、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有文档契约 |
 | Kernel ↔ Cognition 已使用 gRPC；部分 Engine 仍使用 stdio，Surface/Host 仍有手写 WebSocket | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
@@ -80,7 +80,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | `CognitionService` / `KernelControlService` | Kernel 与 Cognition 的版本化请求、查询与回调 | deadline、cancellation、typed error、trace/causation/correlation、generation、幂等 |
 | `PerceptionEvent` / `ActionCommand` | 感知输入和行动语义 | 不暴露平台原始 payload；语义由 Cognition 解释 |
 | `CognitiveActivitySnapshot` / emotion model | 认知资源调度、情绪和表现投影 | 调度与 Affect 分离，不让 renderer 反推人格状态 |
-| `PresentationDownstreamFrame` / `PresentationUpstreamFrame` | Desktop/Avatar 消息 | `host_hello`、`host_ready`、`character_presentation_projection`、reply、emotion、audio、presentation 区分；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
+| `AvatarDownstreamFrame` / `AvatarUpstreamFrame` | Kernel↔UnityAvatarHost control | `host_hello`、`host_ready`、`character_presentation_projection`、emotion、motion、presentation 区分；JSON formatter 必须保留 proto snake_case field name；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
 | `ExtensionRuntimeProjection` | Extension Host 给 Desktop/Control Center 的运行投影 | Host 是唯一生产者；以 Contribution Point Registry、Capability Graph、Action Intent 和 Diagnostics 表达运行事实；Capability Graph node 与 action intent 必须带 `audience`；Renderer 不从 DB、日志、manifest 固定字段或端点还原扩展事实 |
 | `ExtensionInstallationProjection` / Extension install lifecycle | Extension Package Manager 给控制表面的安装态与安装事务 | 安装态只表达已安装版本集合和当前激活版本；prepare/preview/commit 先校验来源、摘要、SBOM、平台与权限，再原子安装；指定版本激活不与运行投影混为同一事实 |
 | `SkillCatalogSnapshot` | Kernel 给 Desktop/Control Center 的 Skill Plane 目录与 provider runtime 投影 | 只暴露 character audience skill/tool/resource/prompt；`providerRuntimes` 补充 core / extension / MCP / user provider 的连接、契约-only、降级与恢复动作 |

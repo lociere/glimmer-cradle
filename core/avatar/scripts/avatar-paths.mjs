@@ -4,7 +4,7 @@ export const MANAGED_AVATAR_HOST_COMMAND = 'build/components/avatar/unity-host/w
 export const MANAGED_AVATAR_HOST_CWD = 'build/components/avatar/unity-host/windows-x64';
 
 export function resolveAvatarUnityProjectPath(repoRoot) {
-  return path.join(repoRoot, 'core', 'avatar', 'unity-host');
+  return path.join(repoRoot, 'hosts', 'unity-avatar-host');
 }
 
 export function resolveAvatarSdkCatalogPath(repoRoot) {

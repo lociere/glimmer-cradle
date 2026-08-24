@@ -6,6 +6,7 @@ using Google.Protobuf;
 using GlimmerCradle.Contracts.Glimmer.Common.V1;
 using GlimmerCradle.Contracts.Glimmer.Cognition.V1;
 using GlimmerCradle.Contracts.Glimmer.Kernel.V1;
+using AvatarV1 = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -74,6 +75,37 @@ var perceptionRoundTrip = SubmitPerceptionResponse.Parser.ParseFrom(perception.T
 if (perceptionRoundTrip.State != PerceptionOperationState.Accepted)
 {
     throw new InvalidOperationException("C# CognitionService operation contract round-trip failed");
+}
+
+var avatarFrame = new AvatarV1.AvatarDownstreamFrame
+{
+    Kind = "avatar_intent",
+    TraceId = "trace-avatar-contract",
+    Timestamp = 42,
+    AvatarIntent = new AvatarV1.AvatarIntentPayload
+    {
+        ActionId = "wave-hand",
+        Operation = "trigger",
+        Source = "user",
+        Priority = 7,
+    },
+};
+var avatarJsonFormatter = new JsonFormatter(
+    JsonFormatter.Settings.Default.WithPreserveProtoFieldNames(true));
+var avatarJson = avatarJsonFormatter.Format(avatarFrame);
+if (!avatarJson.Contains("\"trace_id\"", StringComparison.Ordinal)
+    || !avatarJson.Contains("\"avatar_intent\"", StringComparison.Ordinal)
+    || !avatarJson.Contains("\"action_id\"", StringComparison.Ordinal)
+    || avatarJson.Contains("traceId", StringComparison.Ordinal)
+    || avatarJson.Contains("avatarIntent", StringComparison.Ordinal))
+{
+    throw new InvalidOperationException("C# Avatar JSON projection did not preserve published snake_case wire names");
+}
+var avatarJsonRoundTrip = AvatarV1.AvatarDownstreamFrame.Parser.ParseJson(avatarJson);
+if (avatarJsonRoundTrip.AvatarIntent.ActionId != "wave-hand"
+    || avatarJsonRoundTrip.AvatarIntent.Priority != 7)
+{
+    throw new InvalidOperationException("C# Avatar JSON round-trip lost the control payload");
 }
 
 Console.WriteLine("contracts roundtrip cs: ok");

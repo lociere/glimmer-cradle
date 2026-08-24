@@ -1,0 +1,14 @@
+{
+  "name": "GlimmerCradle.UnityAvatarHost.Host",
+  "rootNamespace": "GlimmerCradle.Avatar",
+  "references": [
+    "GlimmerCradle.UnityAvatarHost.Adapters",
+    "GlimmerCradle.UnityAvatarHost.Infrastructure",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "precompiledReferences": ["GlimmerCradle.Avatar.Core.dll"],
+  "overrideReferences": true,
+  "autoReferenced": true,
+  "noEngineReferences": false
+}
