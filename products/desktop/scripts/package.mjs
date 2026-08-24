@@ -71,7 +71,12 @@ await run(process.execPath, [
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: repoRoot, stdio: 'inherit', windowsHide: true });
+    const child = spawn(command, args, {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      windowsHide: true,
+      shell: process.platform === 'win32' && command.endsWith('.cmd'),
+    });
     child.once('error', reject);
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`${command} 退出码 ${code}`)));
   });
@@ -83,6 +88,7 @@ function runCapture(command, args) {
       cwd: repoRoot,
       stdio: ['ignore', 'pipe', 'inherit'],
       windowsHide: true,
+      shell: process.platform === 'win32' && command.endsWith('.cmd'),
     });
     let stdout = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });

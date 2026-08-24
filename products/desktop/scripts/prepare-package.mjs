@@ -50,7 +50,7 @@ try {
   await assertDirectory(runtimeSource, 'runtime');
   await fs.cp(runtimeSource, path.join(resourcesRoot, 'runtime'), {
     recursive: true,
-    dereference: false,
+    dereference: true,
   });
   for (const projection of projections) {
     if (!projection.source) continue;
@@ -58,7 +58,7 @@ try {
     await fs.cp(
       projection.source,
       path.join(resourcesRoot, projection.staged),
-      { recursive: true, dereference: false },
+      { recursive: true, dereference: true },
     );
     if (projection.id === 'native') {
       await assertFile(path.join(resourcesRoot, projection.staged, 'DesktopProcessTreeBridge.exe'), 'Desktop process-tree authority');
