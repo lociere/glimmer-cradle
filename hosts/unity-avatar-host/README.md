@@ -27,7 +27,7 @@
 ## Unity 基线与供应包
 
 - Unity Editor：`6000.0.77f1`
-- 渲染管线：URP `17.0.3`
+- 渲染管线：URP `17.0.4`（`universal-config` `17.0.3`）
 - Live2D SDK：Cubism SDK for Unity `5-r.5 (URP)`
 
 供应包位于 `data/packages/avatar-sdks/cubism-sdk-for-unity/`，不提交到 Git。`pnpm avatar:build` 会在 Unity 启动前解析 `.unitypackage`，只允许资产写入 catalog 的 `projectionScopes` 白名单，并保留供应包中的 `.meta` GUID。目录树与单文件授权分开声明，不会为了 SDK 编译响应文件而开放整个 `Assets`。被忽略的 `Assets/Live2D/Cubism/` 是可重建投影，不是第三方 SDK 事实源。`UnityAvatarHostProjectSetup` 负责创建并绑定唯一的 URP pipeline asset，避免每个场景或开发者机器各自维护一份渲染事实。

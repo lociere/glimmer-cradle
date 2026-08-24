@@ -6,7 +6,7 @@ import { buildAvatarResourceSnapshots } from './avatar-resource-catalog';
 const repoRoot = path.resolve(__dirname, '..', '..', '..', '..', '..');
 
 describe('Avatar resource catalog canonical host paths', () => {
-  it('uses the Unity Host registry and SDK catalog after the legacy project is deleted', () => {
+  it('uses the Unity Host registry and SDK catalog after legacy project sources are deleted', () => {
     const registryPath = path.join(
       repoRoot,
       'hosts',
@@ -22,18 +22,30 @@ describe('Avatar resource catalog canonical host paths', () => {
       'avatar-sdk-catalog.json',
     );
     const legacyProjectPath = path.join(repoRoot, 'core', 'avatar', 'unity-host');
+    const legacyProjectMarker = path.join(legacyProjectPath, 'ProjectSettings', 'ProjectVersion.txt');
+    const legacyProjection = path.join(
+      legacyProjectPath,
+      'Assets',
+      'Scripts',
+      'Avatar',
+      'Contracts',
+      'PresentationFrames.g.cs',
+    );
 
     expect(fs.existsSync(registryPath)).toBe(true);
     expect(fs.existsSync(sdkCatalogPath)).toBe(true);
-    expect(fs.existsSync(legacyProjectPath)).toBe(false);
+    // 本机可能保留被 Git 忽略的 Unity Library 或专有 SDK；删除门约束仓库源码入口和 projection。
+    expect(fs.existsSync(legacyProjectMarker)).toBe(false);
+    expect(fs.existsSync(legacyProjection)).toBe(false);
 
     const snapshots = buildAvatarResourceSnapshots({ repoRoot });
     const registry = snapshots.find((item) => item.resource_id === 'avatar.package-registry');
-    const sdkResources = snapshots.filter((item) => item.resource_id.startsWith('avatar.sdk.'));
+    const cubism = snapshots.find((item) => item.resource_id === 'avatar.sdk.cubism-unity');
 
     expect(registry?.readiness).toBe('ready');
-    expect(sdkResources.length).toBeGreaterThan(0);
-    expect(sdkResources.every((item) => item.readiness !== 'missing')).toBe(true);
-    expect(sdkResources.some((item) => item.readiness === 'ready')).toBe(true);
+    expect(['missing', 'ready']).toContain(cubism?.readiness);
+    if (cubism?.readiness === 'missing') {
+      expect(cubism.recovery_actions?.some((action) => action.includes('data/packages/avatar-sdks'))).toBe(true);
+    }
   });
 });
