@@ -25,6 +25,12 @@
       "import": "./dist/host/index.js",
       "default": "./dist/host/index.js"
     },
+    "./host/process-protocol": {
+      "types": "./dist/host/process-protocol.d.ts",
+      "require": "./dist/host/process-protocol.js",
+      "import": "./dist/host/process-protocol.js",
+      "default": "./dist/host/process-protocol.js"
+    },
     "./events": {
       "types": "./dist/events/index.d.ts",
       "require": "./dist/events/index.js",
@@ -77,6 +83,7 @@
     "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run test"
   },
   "dependencies": {
+    "@glimmer-cradle/contracts": "workspace:*",
     "@glimmer-cradle/protocol": "workspace:*",
     "fflate": "^0.8.2",
     "yaml": "^2.8.2",

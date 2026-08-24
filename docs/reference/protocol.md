@@ -78,6 +78,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | 契约族 | 典型用途 | 变更关注点 |
 |---|---|---|
 | `CognitionService` / `KernelControlService` | Kernel 与 Cognition 的版本化请求、查询与回调 | deadline、cancellation、typed error、trace/causation/correlation、generation、幂等 |
+| `ExtensionHostProcessService` | Extension Host lifecycle 的版本化 service/stage 契约；当前 Slice 6 Node IPC 仍由 SDK-owned compatibility shim 承载 channel/method wire | stage 必须对齐 generated enum；`packages/extension-sdk/src/host/process-protocol.ts` 是唯一 shim owner，`hosts/extension-host/src/process-protocol.ts` 只 re-export；后续 Host transport 完整迁移后删除 shim |
 | `PerceptionEvent` / `ActionCommand` | 感知输入和行动语义 | 不暴露平台原始 payload；语义由 Cognition 解释 |
 | `CognitiveActivitySnapshot` / emotion model | 认知资源调度、情绪和表现投影 | 调度与 Affect 分离，不让 renderer 反推人格状态 |
 | `AvatarHostService` / `AvatarDownstreamFrame` / `AvatarUpstreamFrame` | Kernel↔UnityAvatarHost control contract；当前 WebSocket edge 映射，Slice 8 接入 `Connect` runtime | `host_hello`、`host_ready`、`character_presentation_projection`、emotion、motion、presentation 区分；scalar presence 对齐 required JSON 语义；Adapter 拒绝未知字段、unknown kind/enum、缺失/多重/错配 payload，JSON formatter 保留 proto snake_case field name；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |

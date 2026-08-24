@@ -34,6 +34,9 @@
     "vitest": "^0.34.0",
     "zod": "^3.23.0"
   },
+  "dependencies": {
+    "@glimmer-cradle/extension-sdk": "workspace:*"
+  },
   "peerDependencies": {
     "zod": "^3.23.0"
   }

@@ -21,7 +21,7 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 | `hosts/extension-host/` | 第三方扩展入口加载、SDK Context bridge、handler registry 和 disposable lifecycle |
 | `core/kernel/src/application/skill-plane/` | Skill Plane catalog、policy、gateway、provider |
 
-跨仓库且需要序列化和版本化的 Extension Manifest、包、Release 与 Registry 格式仍由 `@glimmer-cradle/protocol` 定义；Extension Host process 的 Service/Document 契约位于 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。Kernel 拥有安装验证、权限裁决、生命周期、进程监督、catalog/projection 和内部 Port；`hosts/extension-host` 拥有第三方入口加载、SDK Context bridge、handler registry 和 disposable lifecycle；`@glimmer-cradle/extension-sdk` 为扩展作者和 Host process 提供公开 API 与进程协议。
+跨仓库且需要序列化和版本化的 Extension Manifest、包、Release 与 Registry 格式仍由 `@glimmer-cradle/protocol` 定义；Extension Host process 的 Service/Document 契约位于 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。其中 lifecycle service/stage 由 Contract Spine 拥有；当前 Slice 6 Node IPC channel/method wire 仍是兼容层，唯一公开 shim 位于 `packages/extension-sdk/src/host/process-protocol.ts`，`hosts/extension-host/src/process-protocol.ts` 只 re-export。Kernel 拥有安装验证、权限裁决、生命周期、进程监督、catalog/projection 和内部 Port；`hosts/extension-host` 拥有第三方入口加载、SDK Context bridge、handler registry 和 disposable lifecycle；`@glimmer-cradle/extension-sdk` 为扩展作者和 Host process 提供公开 API 与兼容进程协议。
 
 独立扩展发布物把 `@glimmer-cradle/extension-sdk` 与 `@glimmer-cradle/protocol` 声明为语义化版本 peer dependency；Extension Host 产品组装会在发行物内提供与当前主程序匹配的 SDK module root，这属于产品携带的扩展执行环境，不是扩展安装包对 Kernel 源码的依赖。扩展安装包不得复制 Kernel 源码或依赖主仓库相对路径。
 

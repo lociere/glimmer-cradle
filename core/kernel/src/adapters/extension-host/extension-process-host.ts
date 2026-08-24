@@ -39,6 +39,7 @@ export class ExtensionProcessHost {
   private resolveReady: (() => void) | null = null;
   private rejectReady: ((error: Error) => void) | null = null;
   private readonly runtimeId: string;
+  private stopping = false;
 
   public constructor(
     private readonly service: IExtensionHostService,
@@ -73,8 +74,12 @@ export class ExtensionProcessHost {
       this.rejectReady = reject;
     });
     child.on('message', (message: ExtensionHostProcessMessage) => this.onMessage(message));
+    child.once('disconnect', () => this.onDisconnect());
     child.once('error', (error) => this.onExit(error));
-    child.once('exit', (code, signal) => this.onExit(new Error(`Extension Host 退出: code=${code}, signal=${signal}`)));
+    child.once('exit', (code, signal) => {
+      const cleanExit = this.stopping || code === 0;
+      this.onExit(cleanExit ? null : new Error(`Extension Host 退出: code=${code}, signal=${signal}`));
+    });
     this.forwardOutput(child.stdout, 'debug');
     this.forwardOutput(child.stderr, 'warn');
 
@@ -93,16 +98,19 @@ export class ExtensionProcessHost {
   public async stop(): Promise<void> {
     const child = this.child;
     if (!child) return;
+    this.stopping = true;
     try {
       await this.request('deactivate', undefined).catch(() => undefined);
     } finally {
       await this.disposeRegistrations();
-      child.disconnect();
+      if (child.connected) child.disconnect();
       if (!(await waitForManagedProcessExit(child, 1500))) {
         await forceTerminateManagedProcessTree(child, `Extension Host ${this.manifest.id}`, 1500, process.platform !== 'win32');
       }
       this.child = null;
       this.rejectPending(new Error(`Extension Host ${this.manifest.id} 已停止`));
+      this.stopping = false;
+      this.reportHostStage('stopped', `Extension Host ${this.manifest.id} stopped`);
     }
   }
 
@@ -246,8 +254,25 @@ export class ExtensionProcessHost {
         this.pending.delete(requestId);
         reject(new Error(`Extension Host ${this.manifest.id} 请求超时: ${method}`));
       }, this.timeoutMs);
+      timer.unref?.();
+      const fail = (error: Error) => {
+        const waiter = this.pending.get(requestId);
+        if (!waiter) return;
+        this.pending.delete(requestId);
+        clearTimeout(waiter.timer);
+        waiter.reject(error);
+      };
       this.pending.set(requestId, { resolve, reject, timer });
-      child.send({ channel: 'extension-host-process-request', request_id: requestId, method, payload } satisfies ExtensionHostProcessMessage);
+      try {
+        child.send(
+          { channel: 'extension-host-process-request', request_id: requestId, method, payload } satisfies ExtensionHostProcessMessage,
+          (error) => {
+            if (error) fail(new Error(`Extension Host ${this.manifest.id} 请求发送失败: ${method}; ${error.message}`));
+          },
+        );
+      } catch (error) {
+        fail(new Error(`Extension Host ${this.manifest.id} 请求发送失败: ${method}; ${error instanceof Error ? error.message : String(error)}`));
+      }
     });
   }
 
@@ -275,7 +300,11 @@ export class ExtensionProcessHost {
     const disposable = this.registrations.get(id);
     if (!disposable) return;
     this.registrations.delete(id);
-    await disposable.dispose();
+    await withTimeout(
+      Promise.resolve(disposable.dispose()),
+      Math.min(this.timeoutMs, 1500),
+      `扩展 ${this.manifest.id} 注册项释放超时: ${id}`,
+    );
   }
 
   private async disposeRegistrations(): Promise<void> {
@@ -305,14 +334,30 @@ export class ExtensionProcessHost {
     );
   }
 
-  private onExit(error: Error): void {
+  private onDisconnect(): void {
+    const error = new Error(`Extension Host ${this.manifest.id} IPC disconnected`);
     this.rejectReady?.(error);
     this.resolveReady = null;
     this.rejectReady = null;
-    this.child = null;
     this.rejectPending(error);
+    if (!this.stopping) {
+      void this.disposeRegistrations();
+      this.reportHostStage('failed', `Extension Host ${this.manifest.id} IPC disconnected`, error.message);
+    }
+  }
+
+  private onExit(error: Error | null): void {
+    if (error) this.rejectReady?.(error);
+    this.resolveReady = null;
+    this.rejectReady = null;
+    this.child = null;
+    this.rejectPending(error ?? new Error(`Extension Host ${this.manifest.id} exited`));
     void this.disposeRegistrations();
-    this.reportHostStage('failed', `Extension Host ${this.manifest.id} process exited`, error.message);
+    if (error) {
+      this.reportHostStage('failed', `Extension Host ${this.manifest.id} process exited`, error.message);
+    } else {
+      this.reportHostStage('stopped', `Extension Host ${this.manifest.id} process exited`);
+    }
   }
 
   private rejectPending(error: Error): void {

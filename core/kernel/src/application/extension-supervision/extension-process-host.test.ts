@@ -102,11 +102,41 @@ describe('ExtensionProcessHost', () => {
 
     expect(service.commands.size).toBe(0);
   });
+
+  it('stops the isolated host when a registration disposable hangs', async () => {
+    process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
+    const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-host-hung-registration-'));
+    temporaryRoots.push(root);
+    const entry = path.join(root, 'extension.js');
+    await writeFile(entry, [
+      'module.exports = {',
+      '  onActivate(ctx) {',
+      "    ctx.ports.sceneAttention.requestAttentionLease({ channelId: 'demo-channel' });",
+      '  }',
+      '};',
+      '',
+    ].join('\n'), 'utf8');
+    const service = new FakeExtensionHostService();
+    service.attentionLeaseDispose = () => new Promise<void>(() => undefined);
+    const host = new ExtensionProcessHost(
+      service,
+      { id: 'demo.hung-registration', permissions: [] },
+      entry,
+      {},
+      250,
+    );
+
+    await host.start();
+    await expect(withTestTimeout(host.stop(), 1500)).resolves.toBeUndefined();
+
+    expect(service.lifecycleStages).toContain('Extension Host demo.hung-registration stopped');
+  });
 });
 
 class FakeExtensionHostService implements IExtensionHostService {
   public readonly commands = new Map<string, { extensionId: string; handler: ExtensionCommandHandler; metadata?: ExtensionCommandMetadata }>();
   public readonly lifecycleStages: string[] = [];
+  public attentionLeaseDispose: () => void | Promise<void> = () => undefined;
 
   public getConfig(): IExtensionSystemConfig {
     return { identity: { app_version: '0.1.8' }, extensions: { extension_root_dir: 'data/packages/extensions', sandbox: { timeout_ms: 5000 } } };
@@ -131,7 +161,9 @@ class FakeExtensionHostService implements IExtensionHostService {
   public publishExtensionEvent(_eventType: string, _eventId: string, _payload: unknown): void {}
   public publishDomainEvent(_event: never): void {}
   public async injectPerception(_extensionId: string, _proposal: ExtensionPerceptionProposal): Promise<void> {}
-  public requestSceneAttentionLease(_extensionId: string, _request: ExtensionAttentionLeaseRequest): Disposable { return { dispose: () => undefined }; }
+  public requestSceneAttentionLease(_extensionId: string, _request: ExtensionAttentionLeaseRequest): Disposable {
+    return { dispose: () => this.attentionLeaseDispose() };
+  }
   public async isSceneFocused(_channelId: string): Promise<boolean> { return false; }
   public registerSourcePolicies(_extensionId: string, _policies: Record<string, string>): void {}
   public registerAgent(_extensionId: string, _profile: ExtensionAgentRegistration): Disposable { return { dispose: () => undefined }; }
@@ -152,6 +184,14 @@ class FakeExtensionHostService implements IExtensionHostService {
   public unregisterExtensionRuntime(_extensionId: string): void {}
   public listExtensionRuntimeProjections(): ExtensionRuntimeProjection[] { return []; }
   public getExtensionRuntimeProjection(_extensionId: string): ExtensionRuntimeProjection | undefined { return createProjection(_extensionId); }
+}
+
+function withTestTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`test timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 const noopLogger: ExtensionLogger = {

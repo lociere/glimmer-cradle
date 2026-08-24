@@ -147,7 +147,7 @@ Extension Host 的实现落点：
 - `adapters/extension-host/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 `hosts/extension-host` 子进程；
 - `hosts/extension-host/src/main.ts` 是唯一加载第三方扩展入口的位置，激活结束前会等待同步注册请求完成，并把 process alive / connected / handshake / resource prepared / ready / degraded / failed / stopped 阶段回报给 Kernel；
 - `adapters/extension-host/extension-host-application-adapter.ts` 只通过 `ports/application-capabilities.port.ts` 与 `ports/skill-plane.port.ts` 调用 Application capability；
-- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Kernel supervision 与独立 Host process 的公开 IPC 消息，不暴露 Kernel 内部 service；
+- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Kernel supervision 与独立 Host process 的公开 Node IPC 兼容 shim，不暴露 Kernel 内部 service；`hosts/extension-host/src/process-protocol.ts` 只 re-export 该边界；`contracts/proto/glimmer/extension/v1/extension_host_process.proto` 拥有版本化 Host lifecycle service/stage，后续完整 transport 切换后删除 shim；
 - Extension 停止、激活失败或进程退出都会撤销运行 handler、声明式 catalog、订阅和 Capability Projection。
 - Kernel 保留 supervision、权限、catalog、编排和 Projection owner；第三方 handler registry、timer、订阅和扩展 module loader 均位于独立 Host 进程。
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  ExtensionHostProcessErrorCode,
   ExtensionHostProcessMessage,
   ExtensionHostProcessRequest,
   ExtensionHostProcessResponse,
@@ -18,15 +19,23 @@ type Handler = (...args: unknown[]) => unknown | Promise<unknown>;
 
 const runtimeId = process.env.GLIMMER_CRADLE_EXTENSION_RUNTIME_ID
   || `extension-host:${process.env.GLIMMER_CRADLE_EXTENSION_ID || 'unknown'}:${process.pid}`;
-const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const pending = new Map<string, {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+}>();
 const handlers = new Map<string, Handler>();
 const timers = new Set<NodeJS.Timeout>();
 const disposables = createDisposableRegistry();
+const requestTimeoutMs = readPositiveInteger(process.env.GLIMMER_CRADLE_EXTENSION_HOST_IPC_REQUEST_TIMEOUT_MS, 2000);
+const deactivationTimeoutMs = readPositiveInteger(process.env.GLIMMER_CRADLE_EXTENSION_HOST_DEACTIVATE_TIMEOUT_MS, 3000);
 
 let extension: LoadedExtensionModule | null = null;
 let context: ExtensionHostContext | null = null;
 let stopping = false;
+let ipcClosed = !process.connected;
 let activationRegistrations: Promise<string>[] | null = null;
+let deactivationPromise: Promise<{ stopped: true }> | null = null;
 
 process.on('message', (message: ExtensionHostProcessMessage) => {
   if (message.channel === 'extension-host-process-response') {
@@ -39,6 +48,7 @@ process.on('message', (message: ExtensionHostProcessMessage) => {
 });
 
 process.on('disconnect', () => {
+  closeIpc('Extension Host IPC disconnected');
   void deactivate().finally(() => process.exit(0));
 });
 
@@ -105,21 +115,46 @@ async function activate(payload: unknown): Promise<{ ready: true; runtime_id: st
 }
 
 async function deactivate(): Promise<{ stopped: true }> {
+  if (deactivationPromise) return deactivationPromise;
+  deactivationPromise = runDeactivate().finally(() => {
+    deactivationPromise = null;
+  });
+  return deactivationPromise;
+}
+
+async function runDeactivate(): Promise<{ stopped: true }> {
   if (stopping) return { stopped: true };
   stopping = true;
+  let firstError: Error | null = null;
   reportStage('stopping', 'Extension Host stopping.');
   try {
-    if (extension?.onDeactivate) await extension.onDeactivate();
+    if (extension?.onDeactivate) {
+      await withDeadline(
+        Promise.resolve(extension.onDeactivate()),
+        deactivationTimeoutMs,
+        'Extension Host onDeactivate timeout',
+      );
+    }
+  } catch (error) {
+    firstError = asError(error);
+    reportStage('failed', 'Extension Host onDeactivate failed.', firstError);
   } finally {
-    await disposables.disposeAll();
+    try {
+      await withDeadline(disposables.disposeAll(), deactivationTimeoutMs, 'Extension Host disposeAll timeout');
+    } catch (error) {
+      firstError ??= asError(error);
+      reportStage('failed', 'Extension Host disposeAll failed.', error);
+    }
     for (const timer of timers) clearTimeout(timer);
     timers.clear();
+    rejectPending(new ExtensionHostIpcError('ipc_disconnected', 'Extension Host stopping'));
     handlers.clear();
     extension = null;
     context = null;
     stopping = false;
     reportStage('stopped', 'Extension Host stopped.');
   }
+  if (firstError && !ipcClosed) throw firstError;
   return { stopped: true };
 }
 
@@ -223,10 +258,35 @@ async function invokeHandler(payload: unknown): Promise<unknown> {
 }
 
 function request(method: ExtensionKernelMethod, payload: unknown): Promise<unknown> {
+  const sendToParent = process.send;
+  if (ipcClosed || !process.connected || !sendToParent) {
+    return Promise.reject(new ExtensionHostIpcError('ipc_disconnected', `Extension Host IPC disconnected before ${method}`));
+  }
   const requestId = randomUUID();
   return new Promise((resolve, reject) => {
-    pending.set(requestId, { resolve, reject });
-    send({ channel: 'extension-kernel-request', request_id: requestId, method, payload });
+    const timeout = setTimeout(() => {
+      pending.delete(requestId);
+      timers.delete(timeout);
+      reject(new ExtensionHostIpcError('ipc_request_timeout', `Extension Host IPC request timeout: ${method}`));
+    }, requestTimeoutMs);
+    timeout.unref?.();
+    timers.add(timeout);
+    const fail = (error: Error) => {
+      const waiter = pending.get(requestId);
+      if (!waiter) return;
+      pending.delete(requestId);
+      clearTimeout(timeout);
+      timers.delete(timeout);
+      waiter.reject(error);
+    };
+    pending.set(requestId, { resolve, reject, timer: timeout });
+    try {
+      sendToParent.call(process, { channel: 'extension-kernel-request', request_id: requestId, method, payload } satisfies ExtensionHostProcessMessage, (error) => {
+        if (error) fail(new ExtensionHostIpcError('ipc_send_failed', error.message));
+      });
+    } catch (error) {
+      fail(new ExtensionHostIpcError('ipc_send_failed', error instanceof Error ? error.message : String(error)));
+    }
   });
 }
 
@@ -238,6 +298,8 @@ function settle(message: ExtensionHostProcessResponse): void {
   const waiter = pending.get(message.request_id);
   if (!waiter) return;
   pending.delete(message.request_id);
+  clearTimeout(waiter.timer);
+  timers.delete(waiter.timer);
   if (message.ok) waiter.resolve(message.result);
   else waiter.reject(new Error(message.error ?? 'Extension Host RPC failed'));
 }
@@ -259,6 +321,43 @@ function reportStage(stage: ExtensionHostProcessStage, summary: string, error?: 
 
 function send(message: ExtensionHostProcessMessage): void {
   if (process.connected && process.send) process.send(message);
+}
+
+function closeIpc(message: string): void {
+  ipcClosed = true;
+  rejectPending(new ExtensionHostIpcError('ipc_disconnected', message));
+}
+
+function rejectPending(error: Error): void {
+  for (const waiter of pending.values()) {
+    clearTimeout(waiter.timer);
+    timers.delete(waiter.timer);
+    waiter.reject(error);
+  }
+  pending.clear();
+}
+
+async function withDeadline<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new ExtensionHostIpcError('deactivation_timeout', message)), timeoutMs);
+    timeout.unref?.();
+    timers.add(timeout);
+  });
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+      timers.delete(timeout);
+    }
+  }
+}
+
+class ExtensionHostIpcError extends Error {
+  public constructor(public readonly code: ExtensionHostProcessErrorCode, message: string) {
+    super(`${code}: ${message}`);
+  }
 }
 
 function loadExtensionEntry(entryPath: string): Record<string, unknown> {
@@ -286,10 +385,19 @@ function safeErrorMeta(error: Error): Record<string, unknown> {
   return { error: error.message, stack: error.stack };
 }
 
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 function asRecord(value: unknown): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
 }
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function readPositiveInteger(value: unknown, fallback: number): number {
+  const parsed = typeof value === 'string' ? Number.parseInt(value, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }

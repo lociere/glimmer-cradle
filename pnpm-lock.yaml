@@ -146,6 +146,10 @@ importers:
         version: 0.34.6(playwright@1.61.0)
 
   hosts/extension-host:
+    dependencies:
+      '@glimmer-cradle/extension-sdk':
+        specifier: workspace:*
+        version: link:../../packages/extension-sdk
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -165,6 +169,9 @@ importers:
 
   packages/extension-sdk:
     dependencies:
+      '@glimmer-cradle/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
       '@glimmer-cradle/protocol':
         specifier: workspace:*
         version: link:../../protocol

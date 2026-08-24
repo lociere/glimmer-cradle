@@ -30,14 +30,15 @@
 | `core/kernel/src/adapters/extension-host/extension-manager.ts` | Kernel ExtensionManager |
 | `core/kernel/src/adapters/extension-host/extension-process-host.ts` | Kernel 侧 Host process 监督、权限和 Port RPC |
 | `hosts/extension-host/src/main.ts` | 扩展入口唯一加载点与 SDK Context bridge |
-| `packages/extension-sdk/src/host/process-protocol.ts` | Kernel supervision / Host process 双向进程消息 |
+| `packages/extension-sdk/src/host/process-protocol.ts` | Kernel supervision / Host process 的 Node IPC 兼容 shim，stage 对齐 Contract Spine generated enum |
+| `hosts/extension-host/src/process-protocol.ts` | 只 re-export SDK-owned process protocol，不维护第二份 channel/method/stage 定义 |
 | `core/kernel/src/adapters/extension-host/extension-runtime-readiness.ts` | 把 Host `ExtensionRuntimeProjection` 归一成 lifecycle `RuntimeReadinessSnapshot.reconciler` |
 | `core/kernel/src/adapters/extension-host/extension-dependency-installer.ts` | Extension 外部依赖准备、下载缓存和解压安装 |
 | `core/kernel/src/adapters/extension-host/managed-resource-supervisor.ts` | Extension 受管资源 readiness gate 检查，并产出 Capability Graph 节点 |
 | `core/kernel/src/adapters/extension-host/extension-host-application-adapter.ts` | Extension Host 到 Application capability Ports 的适配器 |
 | `core/kernel/src/adapters/extension-host/extension-runtime-registry.ts` | Host-owned Contribution Point Registry 到 Capability Graph projection 的转换器 |
 
-Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当前每个激活扩展运行在受 Kernel 直接监督的 `hosts/extension-host` 独立 Node 子进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Host process 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。Kernel 负责 manifest、权限、激活、停止、释放、超时、重启/失败投影和进程树错误隔离；Host process 负责第三方 module loader、handler registry、订阅/timer/disposable lifecycle 和扩展上下文。
+Extension 只能通过 SDK/Port 协作，不能 import Kernel 内部路径。当前每个激活扩展运行在受 Kernel 直接监督的 `hosts/extension-host` 独立 Node 子进程；Kernel 不 `require()` 扩展入口，只读取 manifest 和原始自有配置。Host process 内完成 config schema 校验和 `onActivate()`，所有 storage、event、command、agent、attention、perception、evidence 与运行投影调用都通过进程 RPC 回到 Kernel 权限边界。`contracts/proto/glimmer/extension/v1/extension_host_process.proto` 当前拥有 lifecycle service/stage；Node IPC channel/method 仍是 Slice 6 兼容层，由 SDK process protocol 唯一维护并用 drift test 对齐 generated stage。Kernel 负责 manifest、权限、激活、停止、释放、超时、重启/失败投影和进程树错误隔离；Host process 负责第三方 module loader、handler registry、订阅/timer/disposable lifecycle 和扩展上下文。
 
 记忆相关 SDK Port 当前落点：
 
