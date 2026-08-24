@@ -8,8 +8,8 @@
 | 入口 | 职责 |
 |---|---|
 | `contracts/proto/glimmer/engine/audio/v1/audio_engine.proto` | Kernel/Audio Engine gRPC Service 与媒体引用单一事实源 |
-| `protocol/src/schemas/config/AudioConfig.schema.json` | 系统 Audio 路由与执行策略 |
-| `protocol/src/schemas/config/VoiceConfig.schema.json` | Character Package 声音身份 |
+| `contracts/json-schema/config/v1/audio-config.schema.json` | 系统 Audio 路由与执行策略 Document |
+| `contracts/json-schema/config/v1/voice-config.schema.json` | Character Package 声音身份 Document |
 | `engines/audio/src/glimmer_cradle/audio/main.py` / `grpc_host.py` | TTS/ASR lane 入口、动态回环 gRPC Host、认证与媒体租约校验 |
 | `engines/audio/src/glimmer_cradle/audio/tts/route.py` | TTS 顺序路由、fallback、熔断和原子输出 |
 | `engines/audio/src/glimmer_cradle/audio/tts/dashscope_cosyvoice.py` | CosyVoice 持久 WebSocket adapter |

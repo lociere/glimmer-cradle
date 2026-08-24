@@ -5,18 +5,18 @@
 
 ## 步骤
 
-1. 用 `rg` 定位现有 Schema/IDL、生成物、生产者、消费者、映射层、测试和文档引用，并确认对应 M12 迁移切片。
+1. 用 `rg` 定位现有 Schema/IDL、生成物、生产者、消费者、映射层、测试和文档引用，并确认唯一 owner。
 2. 判断这是新增语义、重命名、删除、拆分还是兼容迁移；写清成功、错误、未知值和缺字段语义。
-3. 选择唯一 owner：尚未迁移的现有 runtime 结构修改 `protocol/src/schemas/`；新 Contract Spine Service/Document 修改 `contracts/{proto,json-schema}/`。不修改生成物，也不复制双份权威定义。
-4. 旧 runtime 路由运行 `pnpm sync:contracts`；新 Contract Spine 路由运行 `pnpm contracts:generate` 与 `pnpm contracts:verify`。
+3. 选择唯一 owner：Service 修改 `contracts/proto/`，Document 修改 `contracts/json-schema/`，公开 Extension API 修改 `packages/extension-sdk/`。不修改生成物，也不复制双份权威定义。
+4. 运行 `pnpm contracts:generate` 与 `pnpm contracts:verify`；有意 Document 变化只刷新 JSON Schema baseline。
 5. 先改生产者，再改映射层，再改消费者，最后改 UI/日志投影。
 6. 补测试：合法 payload、非法 payload、旧字段、未知枚举、错误 code、降级路径。
 7. 搜索并删除旧字段、旧事件、手写镜像和无期限兼容代码。
 8. 更新 `reference/protocol.md`、对应 Implementation 和实际开发指南。
 
-## M12 Slice 1 contracts baseline
+## Contract Spine
 
-`contracts/` 已建立长期 baseline，Kernel↔Cognition 运行主线已迁移。处理 Contract Spine 时使用：
+`contracts/` 是当前唯一 Contract Spine。处理 Service/Document 时使用：
 
 ```powershell
 pnpm contracts:generate
@@ -53,7 +53,6 @@ pnpm contracts:verify
 ## 验证
 
 ```powershell
-pnpm sync:contracts
 pnpm contracts:verify
 pnpm typecheck
 pnpm build

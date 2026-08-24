@@ -11,7 +11,7 @@ import type {
   ConfigurationTestResult,
   ConfigurationUpdateRequest,
   ConfigurationUpdateResult,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import {
   createProviderDraft,
   mergeDiscoveredModels,

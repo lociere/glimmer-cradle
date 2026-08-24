@@ -1,4 +1,4 @@
-import type { ExtensionSkillContribution } from '@glimmer-cradle/protocol';
+import type { ExtensionSkillContribution } from '@glimmer-cradle/extension-sdk';
 import type { ExtensionAgentRegistration } from '../../../ports';
 import type { SkillDescriptor, SkillAvailabilityContext, SkillPlanePolicyPort } from '../../../ports/skill-plane.port';
 

@@ -62,6 +62,6 @@
 
 ## 协议与验证
 
-- 迁移期按 owner 分流跨语言/跨进程契约：尚未进入对应 M12 迁移切片的现有 runtime 结构仍由 `protocol/src/schemas/` 权威拥有，修改后运行 `pnpm sync:contracts`；新 Contract Spine Service/Document 由 `contracts/{proto,json-schema}/` 权威拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。不得把 runtime consumer 已迁移写成事实，也不得手写镜像或修改生成物。
+- 跨语言/跨进程契约由 Contract Spine 唯一拥有：可调用 Service 修改 `contracts/proto/`，可独立存储、编辑和校验的 Document 修改 `contracts/json-schema/`，统一运行 `pnpm contracts:generate` / `pnpm contracts:verify`。公开 Extension 契约由 `packages/extension-sdk` 暴露，owner-local model/projection 不得反向成为第二事实源；禁止手写 generated DTO、恢复已删除的 `protocol/` 或创建兼容壳。
 - Kernel 不做人格和认知判断；Cognition 不接触平台 IO；Renderer 只消费受控投影；Extension 不 import Kernel 内部对象。
 - PR 最低验证：`pnpm typecheck`、`pnpm build`；改 Cognition 时在 `core/cognition` 执行 `uv run pytest -q`。按风险补充 schema、UI、启动、日志和 DLQ 验证。

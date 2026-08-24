@@ -1,4 +1,4 @@
-import type { PresentationDownstreamFrame, PresentationUpstreamFrame } from '@glimmer-cradle/protocol';
+import type { PresentationDownstreamFrame, PresentationUpstreamFrame } from '@glimmer-cradle/extension-sdk';
 import { WebSocket, type RawData } from 'ws';
 import {
   SurfaceGatewayClient,

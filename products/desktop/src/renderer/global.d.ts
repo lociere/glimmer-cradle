@@ -4,7 +4,7 @@ import type {
   ExtensionInstallResult,
   ExtensionUninstallResult,
   PresentationDownstreamFrame,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 
 interface ReplyPayload {
   trace_id: string;

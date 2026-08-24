@@ -1,4 +1,4 @@
-import type { ExtensionRuntimeProjection } from '@glimmer-cradle/protocol';
+import type { ExtensionRuntimeProjection } from '@glimmer-cradle/extension-sdk';
 
 export interface ExtensionInstallationView {
   readonly installedVersions: string[];

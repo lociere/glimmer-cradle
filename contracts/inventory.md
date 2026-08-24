@@ -1,10 +1,10 @@
-# M12 Protocol/Contracts Inventory
+# M12 Contract Spine Inventory
 
-> 范围：冻结 M12 Slice 1 输入 fixed state 下的旧 `protocol/`、生成链、consumer、validator/build/package 入口，以及本切片建立的 `contracts/` baseline 删除条件。
+> 范围：记录 M12 从 Slice 1 输入到 Slice 9 legacy protocol closure 的迁移账本；本文末尾“Slice 9 当前固定状态”覆盖前文历史输入表。
 > 事实依据：`protocol/`、root/package scripts、`core/`、`products/`、`packages/extension-sdk`、`templates/extension-basic`、`docs/reference/protocol.md` 与 `docs/architecture/implementation/Protocol契约层实现.md`。
 > 维护触发：旧 protocol 目录、生成链、runtime consumer、配置/SDK consumer、contracts baseline 或删除条件变化。
 
-## 输入 fixed state
+## 历史输入 fixed state（Slice 1）
 
 | 项 | 值 |
 |---|---|
@@ -15,7 +15,7 @@
 | M11 状态 | 暂停/延期，未完成，未关闭 |
 | M12 状态 | Slice 1 active；不进入 Slice 2 |
 
-## 旧 `protocol/` inventory
+## 历史旧 `protocol/` inventory（已由 Slice 9 关闭）
 
 | 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
 |---|---|---|---|---|---|
@@ -72,6 +72,59 @@
 |---|---|---|---|---|---|
 | `proto/glimmer/engine/audio/v1/audio_engine.proto` | `AudioEngineService` 版本化服务，声明 `AudioLane`、`MediaAccess`、`AudioMediaReference`、`AudioEngineFailure`、`HealthRequest`、`HealthResponse`、`WarmupRequest`、`WarmupResponse`、`SynthesizeRequest`、`SynthesizeResponse`、`RecognizeRequest`、`RecognizeResponse`、`ShutdownRequest`、`ShutdownResponse`，以及 `Health`、`Warmup`、`Synthesize`、`Recognize`、`Shutdown`。 | Audio Contract Adapter owner | `contracts/generated/{ts,python}/glimmer/engine/audio/v1/` | Slice 8 | Kernel 与 Python Audio 只消费该 projection；旧 command/response Schema、stdio RPC、Pydantic projection 与生成工具持续归零。 |
 | `AudioMediaReference` | 大型音频 data plane 不进入普通 RPC；Kernel 为输入创建 `READ_ONLY`、为输出创建 `WRITE_ONCE` 短租约，引用固定 `lease_id`、file URI、MIME、字节数、SHA-256 与过期时间。Engine 只能访问注入的 lane lease root，Kernel 在成功、失败、超时、停机和崩溃后回收。 | Kernel Audio Adapter + Audio Host Adapter | `proto/glimmer/engine/audio/v1/audio_engine.proto` | Slice 8 | 任一 consumer 重新传任意业务路径、inline bytes，或缺少 digest/expiry/access/cleanup 门均不得关闭切片。 |
+
+## M12 Slice 9 当前固定状态：legacy protocol closure
+
+`protocol/` 已被授权并物理删除；root workspace、lock、Docker、release/version、Desktop runtime projection、Kernel、Extension SDK、Desktop、Personal Server 与模板不再依赖 `@glimmer-cradle/protocol`。Contract Spine 只拥有 canonical Protobuf Service/DTO 与可独立存储的 JSON Schema Document；Extension SDK 拥有公开 authoring API，Kernel 与产品保留 owner-local model/helper。删除门 fail closed：`contracts/scripts/check-inventory.mjs` 要求整个 `protocol/` 不存在，架构检查同时拒绝 package dependency 与源码 import 回流。
+
+### 178 个迁移符号 ledger
+
+Slice 9 从 80 个直接 consumer 文件提取 178 个唯一 import、re-export 与 type-query symbol，并按主迁移落点分为五类：
+
+| 分类 | 主迁移落点 | symbols |
+|---|---|---|
+| Document → schema | `contracts/json-schema/{common,config,extension,product}/v1`；SDK/Kernel/Product 只保留 schema-derived edge type 与 validator | `ActivationProfileId`, `ActivationProfileRequirements`, `AppConfig`, `AudioConfig`, `AvatarConfig`, `CapabilityAudience`, `CapabilityScope`, `CharacterManifestConfig`, `CharacterProfileConfig`, `CognitionConfig`, `CognitionServiceConfig`, `ContributionDeclaration`, `ContributionDependency`, `ContributionPointDefinition`, `ContributionPointId`, `ContributionRequirements`, `ControlSurfaceGatewayConfig`, `DialoguePolicyConfig`, `EmbeddingConfig`, `ExtensionActivationProfile`, `ExtensionCapabilityContribution`, `ExtensionCommandContribution`, `ExtensionCommandPrecondition`, `ExtensionConfig`, `ExtensionContributions`, `ExtensionEngineConstraint`, `ExtensionHostPortId`, `ExtensionManagementSurfaceContribution`, `ExtensionManifest`, `ExtensionPackageChecksums`, `ExtensionPackageEnvelope`, `ExtensionPermission`, `ExtensionPlatform`, `ExtensionProductTarget`, `ExtensionRegistryCatalog`, `ExtensionRegistryRecord`, `ExtensionReleaseArtifact`, `ExtensionReleaseManifest`, `ExtensionSettingContribution`, `ExtensionSkillContribution`, `ExtensionSkillPolicyContribution`, `ExtensionSkillPromptContribution`, `ExtensionSkillResourceContribution`, `ExtensionSkillToolContribution`, `ExternalDependencySource`, `InferenceConfig`, `IngressGateConfig`, `KnowledgeBaseConfig`, `KnowledgeIndexConfig`, `LifecycleConfig`, `LLMConfig`, `ManagedResourceContribution`, `ManagedResourcePackage`, `ManagedResourceProcess`, `McpServerConfig`, `MemoryConfig`, `ObservabilityConfig`, `ProductComposition`, `ProductFeatureId`, `ProtocolBridgeContribution`, `ReadinessGateDeclaration`, `ReadinessProbe`, `SafetyConfig`, `SkillPlaneConfig`, `SurfaceConfig`, `VoiceConfig` |
+| Service edge / controlled projection | Canonical Service adapter、Extension SDK public projection 或产品 owner-local view mapping；不保留 JSON Schema 第二事实源 | `ActionIntentSnapshot`, `ActionIntentState`, `AudioStatusPayload`, `AvatarActionStateDocument`, `CapabilityGraphEdge`, `CapabilityGraphNode`, `CapabilityNodeState`, `ChannelReplyMessage`, `ChannelReplyPayload`, `CharacterPresentationProjectionPayload`, `ConfigurationModelAlias`, `ConfigurationProviderDraft`, `ConfigurationProviderSnapshot`, `ConfigurationProviderTestDraft`, `ConfigurationRouteSnapshot`, `ConfigurationSnapshot`, `ConfigurationSnapshotRequest`, `ConfigurationSnapshotResult`, `ConfigurationTestRequest`, `ConfigurationTestResult`, `ConfigurationUpdateRequest`, `ConfigurationUpdateResult`, `ContributionPointDefinitionSnapshot`, `ConversationAddress`, `ConversationHistoryEntry`, `ConversationHistoryRequest`, `ConversationHistoryResult`, `ConversationNotice`, `DiagnosticsEntry`, `DiagnosticsSnapshot`, `ExtensionCommandRequest`, `ExtensionInstallationProjection`, `ExtensionInstallCommitRequest`, `ExtensionInstallPrepareRequest`, `ExtensionInstallPreview`, `ExtensionInstallResult`, `ExtensionLifecycleRequest`, `ExtensionLifecycleResult`, `ExtensionRuntimeProjection`, `ExtensionRuntimeProjectionRequest`, `ExtensionRuntimeProjectionResult`, `ExtensionUninstallRequest`, `ExtensionUninstallResult`, `PerceptionEvent`, `PresentationDownstreamFrame`, `PresentationRuntimeReadinessCatalogPayload`, `PresentationRuntimeReadinessSnapshot`, `PresentationRuntimeReadinessState`, `PresentationUpstreamFrame`, `ReadinessGateSnapshot`, `RecoveryRequiredProjection`, `RuntimeReadinessCatalog`, `RuntimeReadinessOwner`, `RuntimeReadinessSnapshot`, `VisualCommand` |
+| Extension SDK public | `packages/extension-sdk` 的 manifest、permission、event、distribution 与 validator public API | `BuiltInContributionPoint`, `BuiltInContributionPointDefinitions`, `BuiltInContributionPointId`, `EXTENSION_ID_PATTERN`, `EXTENSION_PACKAGE_FORMAT_VERSION`, `EXTENSION_PACKAGE_MEDIA_TYPE`, `EXTENSION_PACKAGE_SCHEMA`, `EXTENSION_REGISTRY_SCHEMA`, `EXTENSION_RELEASE_SCHEMA`, `EXTENSION_VERSION_PATTERN`, `ExtensionActivationProfileAvailability`, `ExtensionActivationProfileContext`, `ExtensionActivationProfileResolution`, `ExtensionContractValidation`, `ExtensionErrorPayload`, `ExtensionEventPayloadMap`, `ExtensionLifecyclePayload`, `ExtensionManifestInput`, `ExtensionScopedEventTopic`, `ExtensionStreamBasePayload`, `ExtensionStreamCancelledPayload`, `ExtensionStreamCompletedPayload`, `ExtensionStreamStartedPayload`, `ExtensionSystemEventTopic`, `getEffectiveContributionIds`, `getExtensionContributions`, `getManagedResourceContributions`, `hasExtensionPermission`, `isSafeExtensionPackagePath`, `listExtensionActivationProfiles`, `materializeManifestForActivationProfile`, `resolveExtensionActivationProfile`, `validateExtensionManifest`, `validateExtensionPackageChecksums`, `validateExtensionPackageEnvelope`, `validateExtensionRegistryCatalog`, `validateExtensionReleaseManifest` |
+| owner-local model/helper | Kernel Config/Audio/Observability/Surface/Product adapter 或产品本地 view model；不得提升为万能 Contracts helper | `ASRRecognizeRequest`, `ASRRecognizeResponse`, `AuditRecord`, `ConfigSchemaName`, `ErrorCode`, `EventOutcome`, `getPresentationFrameClass`, `isPresentationFrameKind`, `MetricKind`, `ModelInvocationRecord`, `normalizeSystemYamlNulls`, `ObservabilityEvent`, `RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE`, `RECOVERY_REQUIRED_ERROR_CODE`, `TraceContext`, `TTSSynthesizeRequest`, `TTSSynthesizeResponse`, `validateConfig`, `validateProductComposition` |
+| dead delete | 仅为架构拒绝测试构造的占位 import，不进入任何 runtime/public API | `T` |
+
+### Slice 9 canonical Document set
+
+以下 Document 保留旧 required/default/additional-properties/fixture 语义，统一升级到 draft 2020-12，并通过有意的 `json-schema-baseline.json` refresh 固定兼容集合：
+
+| path | title | `$id` |
+|---|---|---|
+| `json-schema/common/v1/capability-scope.schema.json` | `CapabilityScope` | `https://glimmer-cradle.local/contracts/common/v1/capability-scope.schema.json` |
+| `json-schema/config/v1/app-config.schema.json` | `AppConfig` | `https://glimmer-cradle.local/contracts/config/v1/app-config.schema.json` |
+| `json-schema/config/v1/audio-config.schema.json` | `AudioConfig` | `https://glimmer-cradle.local/contracts/config/v1/audio-config.schema.json` |
+| `json-schema/config/v1/avatar-config.schema.json` | `AvatarConfig` | `https://glimmer-cradle.local/contracts/config/v1/avatar-config.schema.json` |
+| `json-schema/config/v1/character-manifest-config.schema.json` | `CharacterManifestConfig` | `https://glimmer-cradle.local/contracts/config/v1/character-manifest-config.schema.json` |
+| `json-schema/config/v1/character-profile-config.schema.json` | `CharacterProfileConfig` | `https://glimmer-cradle.local/contracts/config/v1/character-profile-config.schema.json` |
+| `json-schema/config/v1/cognition-config.schema.json` | `CognitionConfig` | `https://glimmer-cradle.local/contracts/config/v1/cognition-config.schema.json` |
+| `json-schema/config/v1/cognition-service-config.schema.json` | `CognitionServiceConfig` | `https://glimmer-cradle.local/contracts/config/v1/cognition-service-config.schema.json` |
+| `json-schema/config/v1/dialogue-policy-config.schema.json` | `DialoguePolicyConfig` | `https://glimmer-cradle.local/contracts/config/v1/dialogue-policy-config.schema.json` |
+| `json-schema/config/v1/embedding-config.schema.json` | `EmbeddingConfig` | `https://glimmer-cradle.local/contracts/config/v1/embedding-config.schema.json` |
+| `json-schema/config/v1/extension-config.schema.json` | `ExtensionConfig` | `https://glimmer-cradle.local/contracts/config/v1/extension-config.schema.json` |
+| `json-schema/config/v1/inference-config.schema.json` | `InferenceConfig` | `https://glimmer-cradle.local/contracts/config/v1/inference-config.schema.json` |
+| `json-schema/config/v1/ingress-gate-config.schema.json` | `IngressGateConfig` | `https://glimmer-cradle.local/contracts/config/v1/ingress-gate-config.schema.json` |
+| `json-schema/config/v1/knowledge-base-config.schema.json` | `KnowledgeBaseConfig` | `https://glimmer-cradle.local/contracts/config/v1/knowledge-base-config.schema.json` |
+| `json-schema/config/v1/knowledge-index-config.schema.json` | `KnowledgeIndexConfig` | `https://glimmer-cradle.local/contracts/config/v1/knowledge-index-config.schema.json` |
+| `json-schema/config/v1/lifecycle-config.schema.json` | `LifecycleConfig` | `https://glimmer-cradle.local/contracts/config/v1/lifecycle-config.schema.json` |
+| `json-schema/config/v1/llm-config.schema.json` | `LLMConfig` | `https://glimmer-cradle.local/contracts/config/v1/llm-config.schema.json` |
+| `json-schema/config/v1/memory-config.schema.json` | `MemoryConfig` | `https://glimmer-cradle.local/contracts/config/v1/memory-config.schema.json` |
+| `json-schema/config/v1/observability-config.schema.json` | `ObservabilityConfig` | `https://glimmer-cradle.local/contracts/config/v1/observability-config.schema.json` |
+| `json-schema/config/v1/safety-config.schema.json` | `SafetyConfig` | `https://glimmer-cradle.local/contracts/config/v1/safety-config.schema.json` |
+| `json-schema/config/v1/skill-plane-config.schema.json` | `SkillPlaneConfig` | `https://glimmer-cradle.local/contracts/config/v1/skill-plane-config.schema.json` |
+| `json-schema/config/v1/surface-config.schema.json` | `SurfaceConfig` | `https://glimmer-cradle.local/contracts/config/v1/surface-config.schema.json` |
+| `json-schema/config/v1/voice-config.schema.json` | `VoiceConfig` | `https://glimmer-cradle.local/contracts/config/v1/voice-config.schema.json` |
+| `json-schema/extension/v1/extension-manifest.schema.json` | `ExtensionManifest` | `https://glimmer-cradle.local/contracts/extension/v1/extension-manifest.schema.json` |
+| `json-schema/extension/v1/extension-package-checksums.schema.json` | `ExtensionPackageChecksums` | `https://glimmer-cradle.local/contracts/extension/v1/extension-package-checksums.schema.json` |
+| `json-schema/extension/v1/extension-package-envelope.schema.json` | `ExtensionPackageEnvelope` | `https://glimmer-cradle.local/contracts/extension/v1/extension-package-envelope.schema.json` |
+| `json-schema/extension/v1/extension-permission.schema.json` | `ExtensionPermission` | `https://glimmer-cradle.local/contracts/extension/v1/extension-permission.schema.json` |
+| `json-schema/extension/v1/extension-registry-catalog.schema.json` | `ExtensionRegistryCatalog` | `https://glimmer-cradle.local/contracts/extension/v1/extension-registry-catalog.schema.json` |
+| `json-schema/extension/v1/extension-release-manifest.schema.json` | `ExtensionReleaseManifest` | `https://glimmer-cradle.local/contracts/extension/v1/extension-release-manifest.schema.json` |
+| `json-schema/product/v1/product-composition.schema.json` | `ProductComposition` | `https://glimmer-cradle.local/contracts/product/v1/product-composition.schema.json` |
 
 | 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
 |---|---|---|---|---|---|

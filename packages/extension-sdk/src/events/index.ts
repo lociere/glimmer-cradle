@@ -1,6 +1,6 @@
 export {
   ExtensionSystemEventTopic,
-} from '@glimmer-cradle/protocol';
+} from './contracts';
 export type {
   ExtensionErrorPayload,
   ExtensionEventPayloadMap,
@@ -11,4 +11,4 @@ export type {
   ExtensionStreamCompletedPayload,
   ExtensionStreamStartedPayload,
   ExtensionSystemEventTopic as ExtensionSystemEventTopicValue,
-} from '@glimmer-cradle/protocol';
+} from './contracts';

@@ -76,12 +76,12 @@ export function newTraceId(): string {
 }
 
 /**
- * 创建一个 TraceContext 对象（从 protocol/src/core.ts 搬入，阶段 P.5）。
+ * 创建 Kernel Observability Adapter 使用的 TraceContext 对象。
  *
  * TraceContext 类型本身是 schema 契约（schemas/models/TraceContext）。
  * 这个工厂函数是 TS-only 便利（随机 UUID 填充 trace_id）—— 按铁律 2 不属于 protocol。
  */
-import type { TraceContext } from '@glimmer-cradle/protocol';
+import type { TraceContext } from './contracts/TraceContext';
 export function createTraceContext(options?: Partial<TraceContext>): TraceContext {
   return {
     trace_id: options?.trace_id ?? randomUUID(),

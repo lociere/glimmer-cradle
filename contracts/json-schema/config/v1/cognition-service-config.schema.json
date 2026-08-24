@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/config/v1/cognition-service-config.schema.json",
+  "title": "CognitionServiceConfig",
+  "description": "Kernel 调用受监督 CognitionService 的期限配置；端点由进程生命周期动态分配。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "request_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 30000,
+      "description": "单次 CognitionService RPC deadline（ms）"
+    },
+    "registration_timeout_ms": {
+      "type": "integer",
+      "minimum": 1000,
+      "default": 120000,
+      "description": "受监督 Cognition 进程注册动态端点的期限（ms）"
+    }
+  },
+  "x-glimmer-owner": "Kernel Config Application owner",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh."
+}

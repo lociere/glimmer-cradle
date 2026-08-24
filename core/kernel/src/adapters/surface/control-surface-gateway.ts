@@ -43,10 +43,10 @@ import { AvatarController } from '../avatar/avatar-controller';
 import { isLocalAvatarSurfaceScene } from '../../domain/surface/local-avatar-scene-policy';
 import {
   EXTENSION_ID_PATTERN,
-  RECOVERY_REQUIRED_ERROR_CODE,
-  getPresentationFrameClass,
   PerceptionEvent,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import { RECOVERY_REQUIRED_ERROR_CODE } from './recovery-contract';
+import { getPresentationFrameClass } from './presentation-frame-policy';
 import { AudioService } from '../audio/audio-service';
 import {
   ActionStreamCancelledEvent,
@@ -65,7 +65,6 @@ import type {
   AudioStatusPayload,
   ChannelReplyMessage,
   ConversationHistoryRequest,
-  ControlSurfaceGatewayConfig,
   ConfigurationSnapshotRequest,
   ConfigurationTestRequest,
   ConfigurationUpdateRequest,
@@ -77,8 +76,9 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionRuntimeProjectionRequest,
   ExtensionUninstallRequest,
-  RuntimeReadinessCatalog as ProtocolRuntimeReadinessCatalog,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { ControlSurfaceGatewayConfig } from '../../ports/application-capabilities.port';
+import type { RuntimeReadinessCatalog as ProtocolRuntimeReadinessCatalog } from './contracts/RuntimeReadinessCatalog';
 import type { RuntimeReadinessCatalog } from '../../ports/runtime-readiness.port';
 import type { SkillConfirmationRequest } from '../../ports/skill-plane.port';
 import { EndpointRegistry } from '../endpoints/endpoint-registry';

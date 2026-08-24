@@ -7,7 +7,7 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionRuntimeProjectionResult,
   ExtensionUninstallRequest,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type {
   LocalExtensionUploadResult,
   PersonalServerSurface,

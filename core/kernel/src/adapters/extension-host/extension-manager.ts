@@ -9,7 +9,6 @@ import { gte, rcompare, satisfies, valid, validRange } from 'semver';
 import yaml from 'yaml';
 import {
   BuiltInContributionPoint,
-  ErrorCode,
   EXTENSION_ID_PATTERN,
   EXTENSION_VERSION_PATTERN,
   materializeManifestForActivationProfile,
@@ -24,7 +23,8 @@ import {
   type ExtensionProductTarget,
   type ExtensionRuntimeProjection,
   type ExtensionSkillContribution,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import { ErrorCode } from '../../domain/error-code';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import { ExtensionErrorEvent, ExtensionLoadedEvent, ExtensionStartedEvent, ExtensionStoppedEvent } from '../../domain/events';
 import type { ActiveExtensionSelection, Disposable, IExtensionHostService } from '../../ports';

@@ -10,7 +10,7 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 | 域 | 示例 | Git | 语义 |
 |---|---|---|---|
-| 源码 | `core/`、`products/`、`protocol/`、`engines/`、`native/` | 是 | 主产品构建输入和代码事实；扩展源码属于独立仓库 |
+| 源码 | `core/`、`products/`、`contracts/`、`engines/`、`native/` | 是 | 主产品构建输入和代码事实；扩展源码属于独立仓库 |
 | 只读默认资产 | `assets/` | 是 | 随应用发布的默认资源源 |
 | 用户状态 | `data/state/` | 否 | 不可随意丢弃的用户连续性 |
 | 模型 | `data/models/` | 否 | 本机模型、用户导入模型、模型缓存 |

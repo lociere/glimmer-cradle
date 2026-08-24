@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { zipSync } from 'fflate';
-import { EXTENSION_PACKAGE_MEDIA_TYPE } from '@glimmer-cradle/protocol';
+import { EXTENSION_PACKAGE_MEDIA_TYPE } from '@glimmer-cradle/extension-sdk';
 import { ExtensionPackageManager } from '../../src/adapters/extension-installation/extension-package-manager';
 import { OutboundUrlPolicy } from '../../src/adapters/extension-installation/outbound-url-policy';
 

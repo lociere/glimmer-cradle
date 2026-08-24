@@ -13,7 +13,6 @@ import {
 } from '../filesystem/path-utils';
 import {
   type AudioConfig,
-  validateConfig,
   type EmbeddingConfig,
   type ConfigurationModelAlias,
   type ConfigurationProviderDraft,
@@ -25,10 +24,11 @@ import {
   type ConfigurationTestResult,
   type ConfigurationUpdateRequest,
   type ConfigurationUpdateResult,
-  type LLMConfig,
   type MemoryConfig,
   type SkillPlaneConfig,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { LLMConfig } from './documents/LLMConfig';
+import { validateConfig } from './document-validator';
 
 interface ConfigManagerPort {
   getConfig(): Readonly<GlobalConfig>;

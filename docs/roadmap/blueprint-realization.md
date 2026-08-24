@@ -117,7 +117,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 3：Observability 基础 | `done` | 建立 logs、metrics、traces 与 DLQ 排障基础。 | `reference/observability.md`、`guides/operations/日志、Trace与DLQ排障.md` | [阶段3 ADR](../history/architecture-decisions/阶段3-遥测设计.md)。 |
 | Phase 4：认知活动调度 | `done` | 将认知资源档位收归 Cognition，并与 UI、Affect、Attention、Maintenance 分层。 | `architecture/current/`、`reference/protocol.md` | 原始探索见[阶段4 ADR](../history/architecture-decisions/阶段4-觉醒态设计.md)，当前决策见 [ADR-0002](../architecture/decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)。 |
 | Phase 5：认知循环主干 | `done` | 落地 CycleController、GlobalWorkspace、Context Assembly、Volition 主干。 | `architecture/current/`、`implementation/` | [阶段5 ADR](../history/architecture-decisions/阶段5-认知循环设计.md)。 |
-| Phase P：Protocol 契约层重构 | `done` | 跨语言契约集中到 `protocol/src/schemas/`，生成物成为唯一镜像。 | `reference/protocol.md` | [阶段P ADR](../history/architecture-decisions/阶段P-Protocol契约层重构.md)。 |
+| Phase P：Protocol 契约层重构 | `done` | 当时把跨语言契约集中到 `protocol/src/schemas/`；该历史形态已由 M12 Contract Spine 取代。 | `reference/protocol.md` | [阶段P ADR](../history/architecture-decisions/阶段P-Protocol契约层重构.md)。 |
 | Phase P.9：契约层与包管理自洽化 | `done` | TypeScript workspace、Python 包、生成链与路径引用收敛。 | `guides/开发手册.md`、`implementation/` | [阶段P9 ADR](../history/architecture-decisions/阶段P9-契约层与包管理自洽化重构.md)。 |
 | Phase 6：反思、记忆图谱与叙事日记 | `done` | 建立 Reflection、Memory Graph 与 Narrative Journal 主线。 | `architecture/current/`、`reference/data-layout.md` | [阶段6 ADR](../history/architecture-decisions/阶段6-反思与记忆图谱设计.md)。 |
 | Phase 7：自主输出通路 | `done` | ActionCommand、自主输出、旧 ChatUseCase 退出主路径。 | `architecture/current/`、`implementation/` | [阶段7 ADR](../history/architecture-decisions/阶段7-自主输出通路设计.md)。 |
@@ -228,11 +228,11 @@ Phase 5 是当前角色从“应用”走向“主体”的关键阶段。后续
 | --- | --- |
 | 状态 | `done` |
 | 主问题 | 跨语言、跨进程结构必须有唯一权威定义，禁止手写镜像和漂移。 |
-| 核心成果 | `protocol/src/schemas/` 成为权威 Schema；生成物同步到 TypeScript 与 Python 消费端。 |
+| 核心成果 | 当时由 `protocol/src/schemas/` 统一 Schema 与 TypeScript/Python 投影；M12 已迁至 Contract Spine。 |
 | 非范围 | 不改变业务语义本身，不把生成物当作人工维护文件。 |
 | 当前事实归属 | [protocol reference](../reference/protocol.md)、[开发手册](../guides/开发手册.md)。 |
 | 历史证据 | [阶段P-Protocol契约层重构](../history/architecture-decisions/阶段P-Protocol契约层重构.md)。 |
-| 完成门 | 修改协议后运行 `pnpm sync:contracts`；生成物可复现；跨语言字段一致。 |
+| 完成门 | 历史完成门为同步旧生成物；当前契约变更统一运行 `pnpm contracts:generate` 与 `pnpm contracts:verify`。 |
 
 Protocol 阶段是后续所有能力平面、Extension、Provider 和 Renderer 投影的地基。它必须先于大规模接口扩展。
 
@@ -484,7 +484,7 @@ Phase 18 是“蓝图完成”的验收阶段，不是新功能阶段。它的�
 | 类别 | 完成要求 |
 | --- | --- |
 | 架构 | 责任边界清晰，没有新增影子架构；蓝图关系可解释。 |
-| 协议 | 跨语言/跨进程结构在 `protocol/src/schemas/` 或对应权威位置定义；生成物可复现。 |
+| 协议 | 跨进程 Service/Document 在 `contracts/{proto,json-schema}/` 定义，公开 Extension 边缘由 SDK 暴露；生成物可复现。 |
 | 实现 | 入口、装配、状态流、错误流和生命周期路径清晰。 |
 | 数据 | owner、路径、迁移、备份或清理策略明确；不会隐式覆盖用户数据。 |
 | 可观测性 | 日志、指标、trace、DLQ 或等价排障证据覆盖关键失败路径。 |

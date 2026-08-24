@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as grpc from '@grpc/grpc-js';
 import { create } from '@bufbuild/protobuf';
-import type { AvatarConfig } from '@glimmer-cradle/protocol';
+import type { AvatarConfig } from '../../../adapters/config/documents/AvatarConfig';
 import {
   AvatarDownstreamFrameSchema,
   AvatarUpstreamFrameSchema,

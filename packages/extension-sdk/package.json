@@ -76,15 +76,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run build",
+    "build:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run typecheck",
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run typecheck",
     "test": "vitest run src --threads false",
-    "test:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm run test"
+    "test:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run test"
   },
   "dependencies": {
     "@glimmer-cradle/contracts": "workspace:*",
-    "@glimmer-cradle/protocol": "workspace:*",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "fflate": "^0.8.2",
     "yaml": "^2.8.2",
     "ws": "^8.18.3"

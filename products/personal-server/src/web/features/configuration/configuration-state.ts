@@ -5,7 +5,7 @@ import type {
   EmbeddingConfig,
   MemoryConfig,
   SkillPlaneConfig,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 
 export interface ProviderDraftState {
   key: string;

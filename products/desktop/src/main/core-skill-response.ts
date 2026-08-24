@@ -1,10 +1,11 @@
-import {
-  RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
-  RECOVERY_REQUIRED_ERROR_CODE,
-  type RecoveryRequiredProjection,
-} from '@glimmer-cradle/protocol';
+const RECOVERY_REQUIRED_ERROR_CODE = 'recovery_required' as const;
+const RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE = 'confirm_side_effect_state' as const;
 
-export type CoreSkillFailureProjection = RecoveryRequiredProjection;
+export interface CoreSkillFailureProjection {
+  error_code: typeof RECOVERY_REQUIRED_ERROR_CODE;
+  operation_id: string;
+  recovery_actions: readonly (typeof RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE)[];
+}
 
 export function manualRecoveryProjection(operationId: string): CoreSkillFailureProjection {
   return {

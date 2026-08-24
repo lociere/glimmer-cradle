@@ -8,7 +8,7 @@ import {
   AvatarStatusChangedEvent,
 } from '../../domain/events';
 import type { VisualCommand } from '../../domain/kernel-contracts';
-import type { AvatarConfig } from '@glimmer-cradle/protocol';
+import type { AvatarConfig } from '../config/documents/AvatarConfig';
 import { create } from '@bufbuild/protobuf';
 import {
   AudioPlayPayloadSchema,

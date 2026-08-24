@@ -18,7 +18,7 @@ import {
   type ExtensionManifest,
   type ExtensionSkillContribution,
   type ManagedResourceContribution,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { ExtensionCapabilityGraphReport } from '../../ports';
 import type { SkillAvailabilityContext, SkillPlanePolicyPort } from '../../ports/skill-plane.port';
 

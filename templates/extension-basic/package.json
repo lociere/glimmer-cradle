@@ -6,19 +6,17 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run build",
+    "build:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/protocol run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run typecheck"
+    "typecheck:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm run typecheck"
   },
   "dependencies": {
     "@glimmer-cradle/extension-sdk": "workspace:*"
   },
   "peerDependencies": {
-    "@glimmer-cradle/protocol": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@glimmer-cradle/protocol": "workspace:*",
     "@types/node": "^24.13.3",
     "typescript": "^5.0.0",
     "zod": "^3.23.0"

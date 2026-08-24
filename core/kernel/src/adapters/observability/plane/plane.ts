@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import type { AuditRecord, EventOutcome, ObservabilityEvent } from '@glimmer-cradle/protocol';
+import type { AuditRecord } from '../contracts/AuditRecord';
+import type { EventOutcome } from '../contracts/EventOutcome';
+import type { ObservabilityEvent } from '../contracts/ObservabilityEvent';
 import { getCurrentSpanId, getCurrentTraceId, newTraceId } from '../trace-context';
 import { resolveAuditDir, resolveEventsDir } from '../../filesystem/path-utils';
 

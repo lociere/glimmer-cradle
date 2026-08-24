@@ -12,7 +12,7 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionSkillContribution,
   PerceptionEvent,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import { DomainEvent } from '../domain/events/domain-events';
 
 export interface Disposable {

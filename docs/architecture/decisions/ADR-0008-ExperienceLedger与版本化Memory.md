@@ -40,7 +40,7 @@ data/state/cognition/
 └── projections/episodes.db
 ```
 
-权威跨边界结构位于 `protocol/src/schemas/`；Python 内部存储模型位于 `experience/`、`conversation/` 与 `memory/`。
+权威跨边界 Service/DTO 位于 `contracts/proto/`，可独立存储的 Document 位于 `contracts/json-schema/`；Python 内部存储模型位于 `experience/`、`conversation/` 与 `memory/`。
 
 ## 结果
 
@@ -62,7 +62,7 @@ data/state/cognition/
 
 ## 验证
 
-- `pnpm sync:contracts`
+- `pnpm contracts:verify`
 - `pnpm typecheck`
 - `pnpm build`
 - `cd core/cognition && uv run pytest -q`

@@ -34,10 +34,10 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionUninstallRequest,
   PresentationDownstreamFrame,
-  RuntimeReadinessCatalog,
-  RuntimeReadinessOwner,
-  RuntimeReadinessSnapshot,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { RuntimeReadinessCatalog } from '../../../src/server/websocket/runtime-readiness-view';
+type RuntimeReadinessSnapshot = RuntimeReadinessCatalog['runtimes'][number];
+type RuntimeReadinessOwner = RuntimeReadinessSnapshot['owner'];
 import { PersonalServerApp } from '../../../src/server/bootstrap/personal-server-app';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;

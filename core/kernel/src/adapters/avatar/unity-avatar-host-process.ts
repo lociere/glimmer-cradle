@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import * as readline from 'node:readline';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { AvatarConfig } from '@glimmer-cradle/protocol';
+import type { AvatarConfig } from '../config/documents/AvatarConfig';
 import { getLogger } from '../observability/logger';
 import {
   resolveConfiguredProjectPath,

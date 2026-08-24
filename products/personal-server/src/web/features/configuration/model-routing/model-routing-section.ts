@@ -1,4 +1,4 @@
-import type { ConfigurationRouteSnapshot } from '@glimmer-cradle/protocol';
+import type { ConfigurationRouteSnapshot } from '@glimmer-cradle/extension-sdk';
 import type { ConfigurationDraftState } from '../configuration-state';
 import { escapeAttribute, escapeHtml } from '../configuration-support';
 

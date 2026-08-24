@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type {
-  ASRRecognizeRequest,
-  ASRRecognizeResponse,
   AudioConfig,
   AudioStatusPayload,
-  TTSSynthesizeRequest,
-  TTSSynthesizeResponse,
-  VoiceConfig,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { VoiceConfig } from '../config/documents/VoiceConfig';
+import type { ASRRecognizeRequest } from './contracts/ASRRecognizeRequest';
+import type { ASRRecognizeResponse } from './contracts/ASRRecognizeResponse';
+import type { TTSSynthesizeRequest } from './contracts/TTSSynthesizeRequest';
+import type { TTSSynthesizeResponse } from './contracts/TTSSynthesizeResponse';
 import { getLogger } from '../observability/logger';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import {

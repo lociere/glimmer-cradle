@@ -15,13 +15,13 @@ describe('extension host process protocol contract', () => {
     const generatedStages = Object.values(ContractExtensionHostProcessStage)
       .filter((value): value is number => typeof value === 'number' && value !== ContractExtensionHostProcessStage.UNSPECIFIED)
       .sort((left, right) => left - right);
-    const shimStages = Object.values(EXTENSION_HOST_PROCESS_STAGE_TO_CONTRACT)
+    const transportStages = Object.values(EXTENSION_HOST_PROCESS_STAGE_TO_CONTRACT)
       .sort((left, right) => left - right);
 
-    expect(shimStages).toEqual(generatedStages);
+    expect(transportStages).toEqual(generatedStages);
   });
 
-  it('pins the Node IPC compatibility symbols in the single SDK-owned shim', () => {
+  it('pins the Node IPC transport symbols in the single SDK-owned mapping', () => {
     expect(EXTENSION_HOST_PROCESS_CHANNELS).toEqual([
       'extension-kernel-request',
       'extension-host-process-request',

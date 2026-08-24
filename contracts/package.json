@@ -5,6 +5,7 @@
   "type": "commonjs",
   "main": "dist/glimmer/common/v1/contract_probe_pb.js",
   "exports": {
+    "./json-schema/*": "./json-schema/*",
     "./*": {
       "types": "./dist/*.d.ts",
       "require": "./dist/*.js",
@@ -15,6 +16,7 @@
     "generate": "node scripts/generate.mjs",
     "build": "tsc -p tsconfig.build.json",
     "baseline:refresh": "node scripts/refresh-baselines.mjs",
+    "baseline:refresh:json-schema": "node scripts/refresh-baselines.mjs --json-schema-only",
     "test:gates": "node --test tests/gates/*.test.mjs",
     "lint:proto": "buf lint",
     "breaking:proto": "buf breaking --against compatibility/proto-image.binpb",
@@ -32,6 +34,7 @@
   "dependencies": {
     "@bufbuild/protobuf": "2.13.0",
     "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "smol-toml": "^1.8.0"
   },
   "devDependencies": {

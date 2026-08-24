@@ -26,7 +26,7 @@
 平台协议接入扩展可以按需增加：
 
 ```text
-src/protocol/      平台 payload 清洗和协议类型
+src/protocol/      扩展侧 payload 清洗与 SDK public type mapping
 src/inbound/       标准感知或事件注入
 src/outbound/      受控平台动作
 src/connection/    WebSocket、HTTP、stdio 等连接协调

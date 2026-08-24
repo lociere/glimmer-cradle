@@ -58,7 +58,7 @@ function assertSourcePolicy(file: string, text: string): void {
   for (const edge of parseImportEdges(text)) {
     const to = layerFor(resolveImport(file, edge.source));
     expect(allows(from, to), `${path.relative(sourceRoot, file)} -> ${edge.source}`).toBe(true);
-    if (from === 'domain') expect(edge.source).not.toMatch(/@glimmer-cradle\/protocol|@glimmer-cradle\/contracts|\/generated\//);
+    if (from === 'domain') expect(edge.source).not.toMatch(/@glimmer-cradle\/(?:contracts|extension-sdk)|\/generated\//);
     if (from === 'domain' || from === 'application' || from === 'ports' || from === 'runtime') {
       expect(isGeneratedOrPlatformImport(edge.source), `${path.relative(sourceRoot, file)} -> ${edge.source}`).toBe(false);
     }
@@ -93,7 +93,7 @@ describe('Kernel physical layout', () => {
     expect(() => assertSourcePolicy(applicationFile, "import x from '../adapters/x';")).toThrow();
     expect(() => assertSourcePolicy(runtimeFile, "export * from '../composition/root';")).toThrow();
     expect(() => assertSourcePolicy(applicationFile, "const x = import('node:child_process');")).toThrow();
-    expect(() => assertSourcePolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), "import type { T } from '@glimmer-cradle/protocol';")).toThrow();
+    expect(() => assertSourcePolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), "import type { T } from '@glimmer-cradle/extension-sdk';")).toThrow();
     expect(() => assertApplicationTimingPolicy(applicationFile, 'const timer: NodeJS.Timeout = setTimeout(task, 1);')).toThrow();
     expect(() => assertApplicationTimingPolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), 'const startedAt = performance.now();')).toThrow();
   });

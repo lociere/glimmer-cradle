@@ -1,4 +1,4 @@
-import type { ConfigurationSnapshot } from '@glimmer-cradle/protocol';
+import type { ConfigurationSnapshot } from '@glimmer-cradle/extension-sdk';
 import type {
   DeploymentOperationResult,
   DeploymentOperationsSnapshot,

@@ -3,7 +3,7 @@ import {
   type ConversationHistoryRequest as ConversationHistoryQuery,
   type ConversationHistoryResult as ConversationHistoryResponse,
   type ConversationNotice,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { ConversationHistoryRequest, ConversationHistoryResponse as CognitionHistoryResponse } from '../../ports/cognition-service-port';
 import type { ConversationAddress, ConversationContext } from '../../ports/application-models';
 

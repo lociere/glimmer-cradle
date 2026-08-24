@@ -1,14 +1,14 @@
 # Reference
 
 > 范围：保存协议、配置、目录、日志、SDK、UI token 和打包布局的精确事实；不解释架构背景，不写开发步骤。
-> 事实依据：`protocol/`、`configs/`、`data/packages/extensions/`、`products/desktop/`、`products/personal-server/`、打包脚本和当前实现。
+> 事实依据：`contracts/`、`packages/extension-sdk/`、`configs/`、`data/packages/extensions/`、`products/desktop/`、`products/personal-server/`、打包脚本和当前实现。
 > 维护触发：字段、配置键、路径、SDK API、日志字段、UI token、发布投影或生成规则变化。
 
 Reference 是查表层。它应回答“准确叫什么、在哪里、谁拥有、怎样变更、怎样验证”。如果需要理解为什么这样设计，去 [Architecture](../architecture/README.md)；如果需要知道怎么操作，去 [Guides](../guides/README.md)。
 
 | 页面 | 权威内容 |
 |---|---|
-| [protocol.md](./protocol.md) | Schema、IPC/WS、Avatar frame、错误和 codegen 规则 |
+| [protocol.md](./protocol.md) | Contract Spine Service/Document、公开 SDK、错误、媒体引用和 codegen 规则 |
 | [configuration.md](./configuration.md) | 系统、Cognition、Extension、密钥与运行时配置来源 |
 | [data-layout.md](./data-layout.md) | `data/`、资产、模型、缓存、日志、备份和 legacy 域 |
 | [observability.md](./observability.md) | 日志、trace、metrics、DLQ、process log 字段和排障索引 |

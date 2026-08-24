@@ -1,13 +1,15 @@
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'yaml';
-import { ErrorCode, EXTENSION_ID_PATTERN, EXTENSION_VERSION_PATTERN } from '@glimmer-cradle/protocol';
-import type { KnowledgeBaseConfig, KnowledgeIndexConfig } from '@glimmer-cradle/protocol';
+import { EXTENSION_ID_PATTERN, EXTENSION_VERSION_PATTERN } from '@glimmer-cradle/extension-sdk';
+import { ErrorCode } from '../../domain/error-code';
+import type { KnowledgeBaseConfig, KnowledgeIndexConfig } from './documents';
 import { CoreException } from '../../domain/errors';
 import { getLogger } from '../observability/logger';
 import { resolveConfigDir, resolveConfigPath } from '../filesystem/path-utils';
 import { GlobalConfig } from './config-schema';
-import { validateConfig, normalizeSystemYamlNulls, type ConfigSchemaName } from '@glimmer-cradle/protocol';
+import { validateConfig, type ConfigSchemaName } from './document-validator';
+import { normalizeSystemYamlNulls } from './yaml-normalizers';
 import type { ActiveExtensionSelection } from '../../ports';
 
 const logger = getLogger('config-manager');

@@ -6,8 +6,8 @@ import type {
   ExtensionInstallResult,
   ExtensionUninstallResult,
   PresentationDownstreamFrame,
-  RuntimeReadinessCatalog,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { RuntimeReadinessCatalog } from './runtime-readiness-view';
 
 export interface ReplyPayload {
   trace_id: string;

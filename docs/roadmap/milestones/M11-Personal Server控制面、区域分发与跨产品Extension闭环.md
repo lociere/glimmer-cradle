@@ -44,7 +44,7 @@
 
 ### Extension 分发与管理
 
-- 正式发布 `@glimmer-cradle/protocol` 与 `@glimmer-cradle/extension-sdk` 语义化包，独立扩展不得依赖主仓库本地链接。
+- 正式发布 `@glimmer-cradle/extension-sdk` 语义化包及其所需 Contract Spine public edge，独立扩展不得依赖主仓库本地链接。
 - 提供社区仓库模板和 Release workflow，自动校验、测试并生成规范命名 `.gcex`、包内摘要和 SPDX SBOM；多平台时按需生成 Release Manifest。
 - 安装预览展示产品/平台/feature 兼容性、权限、发布者、Registry 审核、签名、构建证明、下载大小和受管资源计划。
 - 安装、激活、升级、回滚、禁用与卸载使用同一事务事实源；失败不得留下半安装目录或失效 active 选择。
@@ -82,7 +82,7 @@
 - M10 完成可重复安装、可信来源参数、版本固定、升级、回滚、备份和停机回收基线。
 - Protocol 能表达 Config Snapshot/Command、产品/平台兼容性、资源 profile、安装进度和 Extension 配置 Secret。
 - Kernel Config owner、Extension Package Manager、Capability Graph、Skill Policy/Gateway 与审计链路保持单一事实源。
-- `@glimmer-cradle/protocol`、`@glimmer-cradle/extension-sdk` 有可公开取得的精确版本和跨仓库 CI。
+- `@glimmer-cradle/extension-sdk` 及其所需 Contract Spine public edge 有可公开取得的精确版本和跨仓库 CI。
 - NapCat 上游提供可部署的 OneBot 11 服务，且其许可、账号数据和网络要求得到明确处理。
 
 ## 实施顺序

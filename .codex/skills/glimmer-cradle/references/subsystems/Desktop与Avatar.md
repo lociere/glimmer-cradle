@@ -10,7 +10,7 @@ Avatar 是 Character 本体的形象与身体领域；UnityAvatarHost 是具体�
 
 1. UI 改动先看 token 和组件状态。
 2. 本机能力先设计 preload 白名单。
-3. Avatar control 改动先确认 M12 owner：`AvatarHostService` IDL/projection/edge mapping 走 Contract Spine；当前 WebSocket consumer 到 `AvatarHostService.Connect` 的运行迁移属于 Slice 8，不在 Host 内复制契约。
+3. Avatar control 改动以 Contract Spine 的 `AvatarHostService` IDL/projection 为唯一事实；Kernel 与 Unity Host Adapter 通过动态回环 `Connect` 双向 gRPC 映射，不在 Host 内复制契约或恢复 WebSocket control consumer。
 4. Unity/模型能力通过 catalog、actionsPath、behaviorPath 和 driver，不写死文件或参数。
 5. `host_hello` 与 `host_ready` 分开；只有首帧和交互准备完成才 ready。
 6. Avatar Core 位于 `core/avatar/src/{Domain,Application,Ports}/` 并独立构建；Unity Host 位于 `hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/{Adapters,Host,Infrastructure,Editor}/`。Unity asmdef 遵守 `Core + generated Contracts -> Adapters、Core + SDK -> Infrastructure、Adapters + Infrastructure + Core -> Host -> Editor` 单向依赖；generated DTO 只进入 Adapters，SDK 只从本机供应包经 `projectionScopes` 白名单投影。
@@ -23,7 +23,7 @@ Renderer 直接读配置/数据/Unity 文件；privileged IPC 绕过 sender/main
 
 ## 常见入口
 
-Desktop 看 `products/desktop/src/main/`、`preload/`、`renderer/`、`components/control-center/`、`host/useDesktopHost.ts`。Avatar Core 看 `core/avatar/src/`；具体 Unity Host 看 `hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/`；平台透明与窗口边界看 `native/src/composition/`；Kernel transport/composition 入口看 `core/kernel/src/adapters/avatar/` 与 composition wiring。Core 拥有身体领域命令/事件与 Port，Host 拥有 generated DTO 映射、当前 WebSocket edge、Unity 生命周期、driver 和 native composition 接线。
+Desktop 看 `products/desktop/src/main/`、`preload/`、`renderer/`、`components/control-center/`、`host/useDesktopHost.ts`。Avatar Core 看 `core/avatar/src/`；具体 Unity Host 看 `hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/`；平台透明与窗口边界看 `native/src/composition/`；Kernel transport/composition 入口看 `core/kernel/src/adapters/avatar/` 与 composition wiring。Core 拥有身体领域命令/事件与 Port，Host 拥有 generated DTO 映射、gRPC transport edge、Unity 生命周期、driver 和 native composition 接线。
 
 ## 交付检查
 

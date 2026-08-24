@@ -67,7 +67,7 @@ test('组合任务只有 root 拓扑构建依赖，package atomic task 不含重
     assert.ok(Object.keys(manifest.scripts).some((name) => name.endsWith(':with-deps')));
   }
   const rootManifest = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
-  assert.match(rootManifest.scripts['build:all'], /protocol/);
-  assert.match(rootManifest.scripts['test:all'], /protocol/);
-  assert.match(rootManifest.scripts.typecheck, /protocol/);
+  assert.match(rootManifest.scripts['build:all'], /contracts/);
+  assert.match(rootManifest.scripts['test:all'], /contracts/);
+  assert.match(rootManifest.scripts.typecheck, /contracts/);
 });

@@ -3,13 +3,12 @@ import {
 } from '@glimmer-cradle/contracts/glimmer/extension/v1/extension_host_process_pb';
 
 /**
- * Public Node IPC compatibility shim between Kernel supervision and the isolated
+ * Public Node IPC transport mapping between Kernel supervision and the isolated
  * Extension Host process.
  *
  * `contracts/proto/glimmer/extension/v1/extension_host_process.proto` owns the
- * versioned service/stage vocabulary. This file owns only the current Slice 6
- * Node IPC channel/method names until the Host transport moves fully behind the
- * Contract Spine service.
+ * versioned service/stage vocabulary. This file owns the Node IPC channel/method
+ * names required by the current process transport; it does not redefine Service DTOs.
  */
 export const EXTENSION_HOST_PROCESS_CHANNELS = [
   'extension-kernel-request',

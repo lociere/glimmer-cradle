@@ -13,7 +13,7 @@ import {
   type ExtensionProductTarget,
   type ExtensionReleaseArtifact,
   type ExtensionReleaseManifest,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import { resolveCachePath, resolveStatePath } from '../filesystem/path-utils';
 import {
   extractVerifiedExtensionPackage,

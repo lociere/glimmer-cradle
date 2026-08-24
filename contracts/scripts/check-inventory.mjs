@@ -19,8 +19,8 @@ const workspace = option('--workspace-root', resolve(import.meta.dirname, '..', 
 const inventoryPath = option('--inventory', resolve(root, 'inventory.md'));
 const inventory = readFileSync(inventoryPath, 'utf8');
 const required = [
-  'protocol/src/schemas/',
-  'protocol/src/generated/',
+  'legacy protocol closure',
+  '178',
   'Cognition legacy Python projection 已删除',
   'proto/glimmer/avatar/v1/avatar_host.proto',
   'proto/glimmer/engine/audio/v1/audio_engine.proto',
@@ -81,17 +81,11 @@ const audioGenerated = resolve(
 if (existsSync(audioGenerated) && walk(audioGenerated).some((path) => path.endsWith('.py'))) {
   throw new Error('Audio legacy Python generated output must remain deleted');
 }
-const legacyAudioSchemaDir = resolve(workspace, 'protocol', 'src', 'schemas', 'engine');
-if (existsSync(legacyAudioSchemaDir) && walk(legacyAudioSchemaDir).length > 0) {
-  throw new Error(`Audio legacy contract path must remain deleted: ${legacyAudioSchemaDir}`);
-}
-const legacyAudioTsProjection = resolve(workspace, 'protocol', 'src', 'generated', 'engine');
-if (existsSync(legacyAudioTsProjection) && walk(legacyAudioTsProjection).length > 0) {
-  throw new Error(`Audio legacy generated projection must remain deleted: ${legacyAudioTsProjection}`);
+const legacyProtocol = resolve(workspace, 'protocol');
+if (existsSync(legacyProtocol)) {
+  throw new Error(`legacy Protocol directory must remain deleted: ${legacyProtocol}`);
 }
 for (const legacyPath of [
-  resolve(workspace, 'protocol', 'codegen', 'gen-py.py'),
-  resolve(workspace, 'protocol', 'codegen', 'gen-cs.ts'),
   resolve(workspace, 'engines', 'audio', 'src', 'glimmer_cradle', 'audio', 'protocol.py'),
 ]) {
   if (existsSync(legacyPath)) throw new Error(`Audio legacy contract path must remain deleted: ${legacyPath}`);
@@ -157,15 +151,6 @@ function lockDevDependencies(lock, projectName) {
   return Array.isArray(dependencies)
     ? dependencies.map((entry) => entry?.name).filter(Boolean)
     : [];
-}
-
-const protocolPackage = readJson(resolve(workspace, 'protocol', 'package.json'));
-if (
-  protocolPackage.scripts?.['gen:py']
-  || protocolPackage.scripts?.['gen:cs']
-  || /\bgen:(?:py|cs)\b/u.test(protocolPackage.scripts?.['gen:all'] ?? '')
-) {
-  throw new Error('Protocol must not retain Audio legacy Python/C# generator commands');
 }
 
 const cognitionProjectPath = resolve(workspace, 'core', 'cognition', 'pyproject.toml');

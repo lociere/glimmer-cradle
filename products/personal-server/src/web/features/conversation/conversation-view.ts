@@ -2,7 +2,7 @@ import type {
   ConversationHistoryEntry,
   ConversationHistoryRequest,
   ConversationHistoryResult,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { PersonalServerSurface, SurfaceFrame } from '../../shared/api/personal-server-client';
 
 interface ConversationItem {

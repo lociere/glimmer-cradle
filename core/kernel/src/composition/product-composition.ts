@@ -1,12 +1,10 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import {
-  validateProductComposition,
-  type ProductComposition,
-} from '@glimmer-cradle/protocol';
+import { validateProductComposition } from './product-composition-validator';
+import type { ProductComposition } from './product-composition-document';
 import { resolveRepoRoot } from '../adapters/filesystem/path-utils';
 
-export type { ProductComposition } from '@glimmer-cradle/protocol';
+export type { ProductComposition } from './product-composition-document';
 
 export function loadProductComposition(): ProductComposition {
   const repoRoot = resolveRepoRoot();

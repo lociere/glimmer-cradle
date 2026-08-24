@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/config/v1/cognition-config.schema.json",
+  "title": "CognitionConfig",
+  "description": "认知循环配置。CycleController 是感知、认知与行动仲裁的唯一主线。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "workspace_capacity": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 7,
+      "description": "工作区容量上限（GlobalWorkspace.capacity）"
+    },
+    "default_tick_interval_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 5000,
+      "description": "无 cognitive activity policy hint 时的默认 tick 间隔（毫秒）"
+    }
+  },
+  "x-glimmer-owner": "Kernel Config Application owner",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh."
+}

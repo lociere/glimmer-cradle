@@ -72,7 +72,6 @@ function workspaceFixture() {
     cpSync(resolve(contractsRoot, directory), resolve(fixtureContracts, directory), { recursive: true });
   }
   cpSync(resolve(contractsRoot, 'inventory.md'), resolve(fixtureContracts, 'inventory.md'));
-  write(workspace, 'protocol/package.json', JSON.stringify({ scripts: { 'gen:all': 'pnpm gen:ts' } }));
   write(workspace, 'engines/audio/pyproject.toml', project('glimmer-cradle-audio-engine'));
   write(workspace, 'engines/audio/uv.lock', lockFile('glimmer-cradle-audio-engine'));
   write(workspace, 'core/cognition/pyproject.toml', project('glimmer-cradle-cognition'));
@@ -110,7 +109,7 @@ test('wrong canonical path fails closed', () => {
   assert.match(result.stderr, /missing canonical proto path/);
 });
 
-test('structured workspace after Audio migration passes', () => {
+test('structured workspace after legacy protocol closure passes', () => {
   const fixture = workspaceFixture();
   const result = check(fixture.contracts, fixture.workspace);
   assert.equal(result.status, 0, result.stderr);
@@ -124,12 +123,12 @@ test('legacy Audio generated projection fails closed', () => {
   assert.match(result.stderr, /generated output must remain deleted/);
 });
 
-test('legacy Audio TypeScript projection fails closed', () => {
+test('legacy Protocol directory fails closed', () => {
   const fixture = workspaceFixture();
   write(fixture.workspace, 'protocol/src/generated/engine/AudioEngineCommand.ts', 'export interface AudioEngineCommand {}\n');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /legacy generated projection must remain deleted/);
+  assert.match(result.stderr, /legacy Protocol directory must remain deleted/);
 });
 
 test('Audio control contract rejects inline media bytes', () => {
@@ -144,12 +143,12 @@ test('Audio control contract rejects inline media bytes', () => {
   assert.match(result.stderr, /must not carry media bytes/);
 });
 
-test('legacy Protocol Python generator command fails closed', () => {
+test('legacy Protocol package fails closed', () => {
   const fixture = workspaceFixture();
   write(fixture.workspace, 'protocol/package.json', JSON.stringify({ scripts: { 'gen:py': 'python codegen/gen-py.py', 'gen:all': 'pnpm gen:ts && pnpm gen:py' } }));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /must not retain Audio legacy Python\/C# generator commands/);
+  assert.match(result.stderr, /legacy Protocol directory must remain deleted/);
 });
 
 test('legacy Protocol C# generator path fails closed', () => {
@@ -157,7 +156,7 @@ test('legacy Protocol C# generator path fails closed', () => {
   write(fixture.workspace, 'protocol/codegen/gen-cs.ts', '// legacy\n');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /legacy contract path must remain deleted/);
+  assert.match(result.stderr, /legacy Protocol directory must remain deleted/);
 });
 
 test('Audio dev dependency retaining the generator fails closed', () => {

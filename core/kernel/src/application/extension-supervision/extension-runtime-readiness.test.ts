@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ExtensionRuntimeProjection } from '@glimmer-cradle/protocol';
+import type { ExtensionRuntimeProjection } from '@glimmer-cradle/extension-sdk';
 import {
   buildExtensionRuntimeReadinessSnapshot,
   buildExtensionRuntimeReadinessSnapshots,

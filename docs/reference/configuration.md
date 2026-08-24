@@ -1,7 +1,7 @@
 # Configuration Reference
 
 > 范围：系统配置、Cognition 配置、Extension 配置、密钥、环境变量和运行时投影的权威规则。
-> 事实依据：`configs/`、`protocol/src/schemas/config/`、配置 normalizer、Kernel/Cognition/Desktop/Engine/Extension 读取代码。
+> 事实依据：`configs/`、`contracts/json-schema/config/v1/`、配置 normalizer、Kernel/Cognition/Desktop/Engine/Extension 读取代码。
 > 维护触发：新增配置文件、配置键、默认值、密钥来源、Schema、normalizer、UI 配置投影或 owner 变化。
 
 ## 配置域

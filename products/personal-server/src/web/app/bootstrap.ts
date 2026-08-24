@@ -1,7 +1,7 @@
 import type {
   ConfigurationSnapshot,
   PresentationRuntimeReadinessCatalogPayload,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import {
   PersonalServerClient,
   type PersonalServerSurface,

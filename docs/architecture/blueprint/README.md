@@ -11,7 +11,7 @@
 - “接下来承诺做什么”以 [../../roadmap/](../../roadmap/README.md) 为准；
 - 长期取舍以 ADR 为准。
 
-契约脊柱的长期目标由 [ADR-0013](../decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 固定：目标 `contracts/`、版本化 Protobuf Service、JSON Schema 文档契约和 Kernel Surface Gateway 均是 accepted 方向；当前 `protocol/` 与既有 transport 事实仍以 Current/Implementation/Reference 为准，迁移由 [M12](../../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md) 承担。
+契约脊柱由 [ADR-0013](../decisions/ADR-0013-契约脊柱与跨进程服务架构.md) 固定：`contracts/`、版本化 Protobuf Service、JSON Schema 文档契约和 Kernel Surface Gateway 已落到当前物理形态；当前 Service/Document 与 consumer 事实以 Current/Implementation/Reference 为准，M12 收口证据见 [里程碑](../../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md)。
 
 仓库根职责、Kernel/Cognition 模块化单体、Avatar/Unity Host 与 Extension Host 物理边界由 [ADR-0014](../decisions/ADR-0014-仓库物理分层与器官模块边界.md) 固定。目标 `hosts/` 和器官内部层次同样不是当前实现；M12 负责迁移和旧路径删除门。
 

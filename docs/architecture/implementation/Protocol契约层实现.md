@@ -1,121 +1,87 @@
-# Protocol 契约层实现
+# Contract Spine 实现
 
-> 范围：迁移期现有 runtime Protocol 与 M12 Contract Spine 如何分 owner 定义、生成、校验和消费；不列全部字段。
-> 源码依据：`protocol/src/schemas/`、`protocol/src/generated/`、`protocol/src/runtime/`、`protocol/src/config-schemas.ts`、`protocol/codegen/` 与 `contracts/`。
-> 维护触发：Schema、IPC 消息、Avatar frame、配置模型、生成脚本、runtime helper、跨语言消费者或错误码变化。
+> 范围：Contract Spine 如何定义、生成、校验并由 Service Adapter、Document validator 和 Extension SDK 消费。
+> 源码依据：`contracts/`、`packages/extension-sdk/`、各 owner 的 Adapter 与 composition root。
+> 维护触发：IDL、Document、生成链、兼容基线、公开 SDK 或跨边界 consumer 变化。
 
-## 目录与生成链
-
-```text
-protocol/src/
-├── schemas/{enums,models,config}/       # 未迁移边界的权威 Schema
-├── generated/{enums,models,config}/     # TypeScript 生成投影
-├── runtime/                             # validator、normalizer、reply/avatar helper
-├── models/ ipc/ utils/                  # 手写 runtime helper 和便利模型
-└── config-schemas.ts                    # config schema 聚合入口
-
-contracts/generated/{ts,python}/glimmer/engine/audio/v1/
-└── Audio Service generated projection；Kernel/Python Host Adapter 消费
-```
-
-对应 M12 迁移切片尚未开始的现有 runtime 跨语言结构先改 `protocol/src/schemas/`，再运行：
-
-```powershell
-pnpm sync:contracts
-```
-
-生成物不能手改。若生成物不满足消费需求，应改对应 owner 的 Schema/IDL、生成脚本或 runtime helper，而不是在消费者里复制字段。
-
-M12 Slice 1 建立 baseline，Slice 2 已将 Kernel↔Cognition Service、Slice 5 已将 Avatar control Service 迁入 `contracts/`：
+## 物理结构
 
 ```text
 contracts/
-├── proto/glimmer/common/v1/{contract_probe,service_contract}.proto
-├── proto/glimmer/cognition/v1/cognition_service.proto
-├── proto/glimmer/kernel/v1/kernel_control_service.proto
-├── proto/glimmer/avatar/v1/avatar_host.proto
-├── json-schema/skill/v1/tool-parameters.schema.json
+├── proto/glimmer/{common,kernel,cognition,surface,avatar,engine/audio,extension}/v1/
+├── json-schema/{common,config,extension,presentation,product,skill}/v1/
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
-├── pyproject.toml                     # 安装态 Python Contracts distribution
-├── toolchain.json、global.json
+├── scripts/
+├── tests/
 ├── inventory.md
 └── supply-chain.md
 ```
 
-新 Contract Spine Service/Document 只在 `contracts/{proto,json-schema}/` 演进，生成与验证入口为：
+`protocol/` 已删除。Root workspace、package scripts、lock、Docker/build/package、产品、模板与运行时均不再消费该 package，也不保留重命名后的万能 helper 目录。
+
+## Service 生成链
+
+`contracts/buf.gen.yaml` 从 `contracts/proto/` 生成 TS/Python/C# DTO 与 service stub。生成输出只在边缘消费：
+
+- Kernel Cognition Adapter ↔ Python Cognition `adapters/kernel/grpc_transport.py`；
+- Kernel Surface Adapter ↔ Desktop/Personal Server gateway client；
+- Kernel Avatar Adapter ↔ Unity Host `Adapters` assembly；
+- Kernel Audio Adapter ↔ Python Audio `grpc_host.py`；
+- Kernel Extension supervision ↔ 独立 Extension Host Adapter。
+
+Domain/Application/Port 使用 owner-local model；Adapter 显式映射 generated DTO。Avatar C# Adapter 直接读写二进制 generated DTO，不做 JSON formatter/parser round-trip。Python Contracts 通过 `glimmer-cradle-contracts` distribution 进入 Cognition、Audio、Desktop runtime 与 Personal Server OCI build，不依赖源码树 `PYTHONPATH`。
+
+## Document registry 与校验
+
+Canonical JSON Schema 位于 `contracts/json-schema/`。`@glimmer-cradle/contracts` 通过 package export 暴露 Schema 文件；Kernel config、Extension SDK manifest/package、Personal Server Product composition validator 各自注册所需 Schema 和外部 `$ref`，再用 AJV 2020-12 校验。
+
+职责保持分离：
+
+- Contracts 拥有 serialized Document schema、compatibility metadata 与最小 registry/validation primitive；
+- Kernel Config 拥有 YAML normalizer、默认加载、secret/path 与应用语义；
+- Extension SDK 拥有公开 manifest/package API、权限与 validator entry；
+- Product 拥有 composition/view mapping；
+- reply、Avatar、observability 与 UI helper 留在直接 owner，不进入 Contracts。
+
+schema-derived TypeScript projection 只服务对应 owner edge，不是第二 canonical source；Schema 变更必须同时更新 validator fixture、projection mapping 和 consumer tests。
+
+## 兼容基线
 
 ```powershell
 pnpm contracts:generate
 pnpm contracts:verify
+pnpm --filter @glimmer-cradle/contracts baseline:refresh:json-schema
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 直接映射 Avatar TS/C# generated DTO，通过 `AvatarHostService.Connect` 交换二进制 Protobuf。Kernel Audio adapter 与 Python `grpc_host.py` 消费 Audio TS/Python projection，通过 `AudioEngineService` 交换 control DTO，并以 `AudioMediaReference` 租约分离媒体 data plane。legacy `PresentationFrames.g.cs`、Audio command/response Schema、Pydantic projection、`gen-py.py`、`gen-cs.ts` 与 stdio RPC 均已删除；不得恢复 JSON formatter/parser 或多根生成主线。
+Proto image 是跨版本 breaking 参照，不能因 Document 迁移重建。JSON-only refresh 只更新 Schema path/id/metadata/digest baseline；通用 `baseline:refresh` 同时重建两类基线，必须限于明确评审两者都变化的场景。
 
-Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
-environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地
-distribution；运行时不得依赖源码树 `PYTHONPATH` 偶然暴露 `contracts/generated/python`。
+## 运行链
 
-## 契约分类
+Kernel composition root 为受管 service 分配动态回环 endpoint 与进程级 capability token，启动对应 Host/Engine 后等待真实 readiness。调用携带 deadline、cancellation、trace、causation/correlation 与 generation；typed failure 通过稳定 code/detail 返回。进程退出、超时或主动 stop 会撤销 endpoint/token、取消 in-flight operation 并回收 lease/进程树。
 
-| 分类 | 示例 | 消费者 |
-|---|---|---|
-| enums | `ErrorCode`、`CognitiveActivityState` | Kernel、Cognition、Renderer |
-| models | `PerceptionEvent`、`ActionCommand`、`TraceContext`、`SourceDescriptor` 字段 | 多语言/多进程共享模型 |
-| Protobuf Service | `CognitionService`、`KernelControlService`、`CallMetadata`、`ServiceErrorDetail` | Kernel ↔ Cognition Adapter；人工恢复以稳定 code/action/operation 投影，不解析 message |
-| config | `AppConfig`、`SkillPlaneConfig`、`SurfaceConfig`、`CognitionConfig` | config normalizer 与生命周期 runtime |
-| runtime helper | `reply-messages`、`avatar-frame`、validator | TS runtime 消费 |
-
-公开 SDK 使用的结构也必须来自稳定契约或 SDK 自己的公开 contract，不允许 Extension 依赖 Kernel 内部类型。
-
-## 变更顺序
-
-1. 判断是否跨语言/跨进程/公开 SDK，并确认它是对应切片前的现有 runtime 契约，还是新 Contract Spine Service/Document。
-2. 为新增字段写清 owner、默认值、是否必填、兼容语义和错误 code。
-3. 现有 runtime 契约改 `protocol/src/schemas/` 并运行 `pnpm sync:contracts`；新契约改 `contracts/{proto,json-schema}/` 并运行 `pnpm contracts:generate` / `pnpm contracts:verify`。
-4. 改生产者、映射层、消费者、投影和测试。
-5. 搜索旧字段、旧消息、手写镜像和无期限 fallback。
-6. 更新 Reference、Implementation 和 Guide。
-
-破坏性变更优先显式迁移并删除旧路径。短期双轨必须有 owner、删除条件和验证方式。
-
-## 运行时校验
-
-Protocol 的 runtime helper 负责：
-
-- 校验入站 payload；
-- normalizer 配置；
-- 构造 reply/avatar 等受控消息；
-- 对未知枚举、缺字段、非法组合产生可诊断错误；
-- 让错误 code 能跨边界传播。
-
-不要把远端 MCP schema、provider schema 或平台 payload 当项目 Protocol 直接传给 Cognition。外部 schema 必须先映射到 Glimmer Cradle 自己的契约。
-
-`ActionCommand` 的 `skill_request` 和 `MomentKind.action` 由 Schema 定义后生成到 TS/Python 两端。Cognition 发出的 `skill_request` 只表达结构化行动语义：`original_goal`、`capability_kind`、`confidence`、`reason` 和可选 `planning_hint`；Kernel 侧 controller、character audience 的 ready catalog、Skill Plane policy/gateway 和 synthesis RPC 才解释执行事务。修改这些字段时必须先改 `protocol/src/schemas/models/ActionCommand.schema.json` 或 `schemas/enums/MomentKind.schema.json`，再运行 `pnpm sync:contracts`。
-
-`ExtensionRuntimeProjection` 的 Capability Graph node 与 action intent 必须携带 `audience`。该字段由 `protocol/src/schemas/models/ExtensionRuntimeProjection.schema.json` 生成到 SDK、Kernel 和 Cognition；非 `character` 的能力不得进入人物 Skill catalog，`user` action intent 才供 Control Center 管理 UI 使用，`host`/`adapter`/`renderer`/`extension` 只服务对应 owner 边界。
+Surface 的浏览器 WebSocket 只属于 Personal Server 产品 ingress；它代理到内部 `SurfaceGatewayService`，不是器官间手写协议。Audio 的音频字节通过 `AudioMediaReference` lease data plane，普通 gRPC 只携带 control DTO。Avatar 使用 `AvatarHostService.Connect` 双向 stream，旧 WebSocket control consumer 不存在。
 
 ## 调试入口
 
 | 症状 | 先查 |
 |---|---|
-| TS/Python 字段不一致 | Schema、生成物、`pnpm sync:contracts` 输出 |
-| contracts 生成物有 diff | `pnpm contracts:generate`、`contracts/buf.gen.yaml`、本地 `protoc`/插件版本 |
-| contracts compatibility 失败 | `contracts/compatibility/` baseline、`buf breaking --against`、JSON Schema baseline |
-| 运行时报未知字段 | validator、producer payload、consumer 版本 |
-| 配置读不出 | config schema、normalizer、默认值和实际 YAML |
-| Avatar frame 不兼容 | `contracts/proto/glimmer/avatar/v1/avatar_host.proto`、Kernel/Unity Host Adapter 与二进制 Protobuf round-trip |
-| Cognition payload 解析失败 | Contract Spine Python DTO、Kernel contract adapter、错误 code |
+| TS/Python/C# 字段不一致 | canonical `.proto`、`pnpm contracts:generate`、generated-clean gate |
+| Document 校验失败 | canonical Schema `$id`/`$ref`、registry 注册顺序、owner normalizer 与 fixture |
+| compatibility 失败 | `contracts/compatibility/`、是否误刷新 Proto image、JSON Schema baseline diff |
+| gRPC unknown/typed error | producer model → Adapter mapping → generated DTO → consumer mapping |
+| Avatar frame 不兼容 | Avatar IDL、Kernel/Unity Adapter、binary round-trip 与 unknown payload fail-close |
+| Audio 引用失效 | lease owner/access/expiry/root/size/SHA-256 与 crash cleanup |
+| Extension public type 漂移 | Extension SDK export、canonical Document Schema、Kernel/Product owner-local mapping |
 
 ## 验证
 
 ```powershell
-pnpm sync:contracts
 pnpm contracts:verify
-pnpm --filter @glimmer-cradle/protocol typecheck
+pnpm --filter @glimmer-cradle/extension-sdk typecheck
 pnpm --filter @glimmer-cradle/kernel typecheck
-cd core/cognition
-uv run pytest -q
+pnpm typecheck
+pnpm build
 ```
 
-按风险补充合法 payload、缺字段、未知枚举、非法组合、旧字段搜索、错误 code、降级路径和 producer/consumer 端到端验证。
+按变更补充 Cognition/Audio Python tests、C# Core/Adapter tests、Unity Host/Player、Surface 产品测试、Extension Host lifecycle、安装/打包和旧引用扫描。`scripts/check-architecture.mjs` 与 `contracts/scripts/check-inventory.mjs` 对 `protocol/` 目录和 package dependency fail-close。

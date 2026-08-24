@@ -4,7 +4,6 @@ import path from 'path';
 import YAML from 'yaml';
 import {
   type AudioStatusPayload,
-  type AvatarActionStateDocument,
   type PresentationDownstreamFrame,
   type PresentationUpstreamFrame,
   type CharacterPresentationProjectionPayload,
@@ -15,10 +14,9 @@ import {
   type ExtensionInstallationProjection,
   type ExtensionRuntimeProjection,
   type ExtensionUninstallResult,
-  type RuntimeReadinessCatalog,
-  getPresentationFrameClass,
-  isPresentationFrameKind,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { AvatarActionStateDocument, RuntimeReadinessCatalog } from './surface-view-model';
+import { getPresentationFrameClass, isPresentationFrameKind } from './surface-view-model';
 import {
   loadAvatarPackageCatalog,
   resolveAvatarPackage,

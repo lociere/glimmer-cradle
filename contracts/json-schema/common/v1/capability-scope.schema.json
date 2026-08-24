@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/common/v1/capability-scope.schema.json",
+  "title": "CapabilityScope",
+  "description": "能力在全局、来源、场景或会话边界内的可见范围。",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "global"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "kind",
+        "ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "source_provider",
+            "scene",
+            "conversation"
+          ]
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    }
+  ],
+  "x-glimmer-owner": "Extension SDK capability scope owner",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh."
+}

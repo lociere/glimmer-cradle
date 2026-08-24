@@ -21,21 +21,22 @@ const sharedTaskInputs = [
 const previousState = await readJson(statePath, { schema_version: 1, tasks: {} });
 const nextState = { schema_version: 1, tasks: {} };
 
-const protocolDigest = await ensureTask({
-  id: 'protocol',
+const contractsDigest = await ensureTask({
+  id: 'contracts',
   inputs: [
     ...sharedTaskInputs,
-    path.join(repoRoot, 'protocol', 'src'),
-    path.join(repoRoot, 'protocol', 'package.json'),
-    path.join(repoRoot, 'protocol', 'tsconfig.json'),
+    path.join(repoRoot, 'contracts', 'generated', 'ts'),
+    path.join(repoRoot, 'contracts', 'json-schema'),
+    path.join(repoRoot, 'contracts', 'package.json'),
+    path.join(repoRoot, 'contracts', 'tsconfig.build.json'),
   ],
-  outputs: [path.join(repoRoot, 'protocol', 'dist', 'index.js')],
-  run: () => run(pnpmCommand, ['--filter', '@glimmer-cradle/protocol', 'exec', 'tsc', '-p', 'tsconfig.json']),
+  outputs: [path.join(repoRoot, 'contracts', 'dist', 'glimmer', 'common', 'v1', 'contract_probe_pb.js')],
+  run: () => run(pnpmCommand, ['--filter', '@glimmer-cradle/contracts', 'build']),
 });
 
 const extensionSdkDigest = await ensureTask({
   id: 'extension-sdk',
-  dependencyDigests: [protocolDigest],
+  dependencyDigests: [contractsDigest],
   inputs: [
     ...sharedTaskInputs,
     path.join(repoRoot, 'packages', 'extension-sdk', 'src'),

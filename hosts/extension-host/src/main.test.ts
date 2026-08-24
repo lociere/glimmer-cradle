@@ -42,7 +42,7 @@ describe('extension-host process lifecycle', () => {
     await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it('re-exports the SDK-owned Node IPC compatibility symbols', () => {
+  it('re-exports the SDK-owned Node IPC transport symbols', () => {
     expect(HOST_CHANNELS).toBe(SDK_CHANNELS);
     expect(HOST_KERNEL_METHODS).toBe(SDK_KERNEL_METHODS);
   });

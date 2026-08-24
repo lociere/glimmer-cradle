@@ -1,14 +1,14 @@
 # Now
 
-> 审阅日期：2026-08-24
+> 审阅日期：2026-08-25
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进面：M12 Slice 8
+## 当前推进面：M12 Slice 9 candidate
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～7 已集成，Slice 8 已形成候选：Kernel↔UnityAvatarHost control consumer 使用动态回环 `AvatarHostService.Connect` 双向 gRPC；Kernel↔Audio Engine 使用动态回环 `AudioEngineService` unary gRPC 与进程级随机令牌。Audio data plane 只传带 access/expiry/size/SHA-256 的短期 `AudioMediaReference`，ASR 输入只读、TTS 输出单次写入，成功、错误、超时、停机和崩溃均回收 lane lease；旧 Audio stdio Schema/consumer、Pydantic projection、Python/C# legacy generator 已归零。Contract Spine、Kernel/Audio 生命周期、Python Host 风险门、真实 `Grpc.Core` transport、Unity Adapter 编译与完整 Unity Host/Windows Player 门均已通过；第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。当前进入 Slice 9 legacy protocol closure。M11 仍暂停/延期且未完成。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～8 已形成固定提交，Slice 9 legacy protocol closure 正在固定 candidate：旧 `protocol/` 已物理删除；独立 Document 已迁入 `contracts/json-schema/` compatibility baseline，Service/DTO consumer 已切到 Contract Spine edge，公开 Extension 契约由 Extension SDK 暴露，其余类型与 helper 回归 owner-local 边界。全仓旧 package/import、生成器、构建和运行投影 consumer 已归零；Contracts、Kernel、Cognition、Audio、Extension、Desktop、Personal Server、Avatar/Unity Host 的受影响构建测试均已通过。Personal Server 生产 smoke 的启动与 readiness 已通过，但真实 conversation reply 因外部推理 provider 返回 HTTP 402 且未配置本地 backend 而未关闭；固定 candidate 不把该环境阻断写成通过。第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。M11 仍暂停/延期且未完成。
 
 [M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成第二轮审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选继续把未绑定固定 candidate 的 update check/apply 设为 unsupported/fail-closed；Kernel DLQ 已有 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍未注册 replay。该状态尚未再次独立复审或集成，不能写成 main 已完成。
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ControlSurfaceGateway } from '../../../adapters/surface/control-surface-gateway';
-import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/protocol';
+import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/extension-sdk';
 import type { ConversationHistoryService } from '../../../adapters/surface/conversation-history-service';
 import { RecoveryRequiredError } from '../../../domain/errors';
 import { RuntimeReadinessProjectionMapper } from '../../projection/runtime-readiness-projection';

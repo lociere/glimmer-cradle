@@ -4,9 +4,9 @@
 核心作用：定义分层异常体系，区分系统异常和业务异常，便于问题定位
 设计原则：异常分层分类，不同层级有专属异常类型，异常携带 typed ErrorCode
 
-错误码单一事实源：protocol/src/schemas/enums/ErrorCode.schema.json，
-由 sync:contracts codegen（Protocol 契约铁律 1）。异常类的 ``code`` 字段
-统一用 ErrorCode 枚举 —— 随 IPC 错误响应跨进程传递，与 Kernel 内核对齐。
+错误码是 Cognition domain 的本地异常分类；跨进程错误由 Contract Spine Service detail 拥有，
+由 Contract Spine Service Adapter 映射。异常类的 ``code`` 字段使用 Cognition
+owner-local ErrorCode 枚举；跨进程时再映射为稳定的 Service error detail。
 """
 from enum import StrEnum
 

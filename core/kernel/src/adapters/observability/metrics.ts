@@ -11,14 +11,14 @@
  */
 import fs from 'fs';
 import path from 'path';
-import type { MetricKind } from '@glimmer-cradle/protocol';
+import type { MetricKind } from './contracts/MetricKind';
 import { getCurrentTraceId } from './trace-context';
 import { getLogger } from './logger';
 import { resolveMetricsDir } from '../filesystem/path-utils';
 
 const logger = getLogger('metrics');
 
-// MetricKind 单一事实源是 protocol/src/schemas/enums/MetricKind.schema.json
+// MetricKind 是 Kernel Observability adapter 的 owner-local投影。
 // （Protocol 契约铁律 1）。re-export 保持既有 `import { MetricKind }` 调用方可用。
 export type { MetricKind };
 

@@ -37,7 +37,9 @@ function sha256(file) {
 }
 
 mkdirSync(resolve(root, 'compatibility'), { recursive: true });
-run('buf', ['build', '-o', 'compatibility/proto-image.binpb']);
+if (!process.argv.includes('--json-schema-only')) {
+  run('buf', ['build', '-o', 'compatibility/proto-image.binpb']);
+}
 
 const schemaRoot = resolve(root, 'json-schema');
 const schemas = walk(schemaRoot).filter((file) => file.endsWith('.schema.json'));

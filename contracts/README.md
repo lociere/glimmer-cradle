@@ -1,18 +1,18 @@
-# Contracts Baseline
+# Contract Spine
 
-> 范围：M12 已落地的 canonical `contracts/` baseline、Kernel↔Cognition 与 Avatar v1 Service、生成链、兼容基线和验证入口。
+> 范围：canonical `contracts/` Service/Document、生成链、兼容基线和验证入口。
 > 事实依据：本目录下的 `proto/`、`json-schema/`、`compatibility/`、`generated/`、`scripts/` 与 `tests/`。
 > 维护触发：新增或修改 Contract Spine IDL、JSON Schema Document、生成工具链、兼容基线或跨语言验证门。
 
-`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition、Surface Gateway 与 Kernel↔UnityAvatarHost Avatar control 主线已使用本目录的 v1 Protobuf Service/DTO；Avatar runtime 通过动态回环 `AvatarHostService.Connect` 双向 gRPC 传输二进制 Protobuf。其他尚未迁移边界仍按 M12 切片使用 `protocol/` 或 stdio。
+`contracts/` 是唯一 Contract Spine。Kernel↔Cognition、Surface Gateway、Kernel↔UnityAvatarHost、Kernel↔Audio Engine 与 Extension Host 的跨进程 Service 使用版本化 Protobuf；配置、Extension package、产品组合、Presentation 与 Skill 参数等可独立编辑 Document 使用 JSON Schema。旧 `protocol/`、stdio RPC、ZMQ envelope 和被替代的手写 WebSocket 主线均已退出运行事实。
 
 ## 目录
 
 | 路径 | Owner | 说明 |
 |---|---|---|
-| `proto/glimmer/common/v1/` | Contract Spine owner | Protobuf Service baseline，当前只包含最小 `ContractProbeService`。 |
+| `proto/glimmer/` | Contract Spine 与各 Service owner | `common`、Kernel、Cognition、Surface、Avatar、Audio 与 Extension 的版本化 Service IDL。 |
 | `proto/glimmer/avatar/v1/` | Avatar Contract owner | Avatar Host 上下行控制帧与 `AvatarHostService`；IDL 字段号和 snake_case 字段名是跨语言生成事实源。 |
-| `json-schema/skill/v1/` | Skill Plane Document owner | JSON Schema Document baseline，当前只包含最小动态 tool parameters Document。 |
+| `json-schema/` | 各 Document owner | config、extension、product、presentation、skill 等 canonical JSON Schema Document。 |
 | `generated/` | Contract Spine Adapter edge | Buf 生成的 TS/Python/C# DTO；只读，不进入 Domain/Application/Port。 |
 | `compatibility/` | Contract Spine owner | 仓库内 Protobuf image 与 JSON Schema compatibility baseline；`buf breaking` 不依赖 BSR。 |
 | `fixtures/`、`tests/` | Contract Spine owner | 有效/无效 Document fixture 与三语言最小 round-trip。 |
@@ -29,10 +29,10 @@ pnpm contracts:verify
 `pnpm contracts:generate` 只重新生成 `generated/`。兼容基线需要有意刷新时运行：
 
 ```powershell
-pnpm --filter @glimmer-cradle/contracts baseline:refresh
+pnpm --filter @glimmer-cradle/contracts baseline:refresh:json-schema
 ```
 
-普通验证要求当前 canonical JSON Schema 的 path + `$id` 集合与 baseline 完全相等，并逐项核对内容摘要；新增未登记、删除、path/`$id` 变化或内容变化都会失败。只有评审确认后的显式 `baseline:refresh` 才能登记变化。
+普通验证要求当前 canonical JSON Schema 的 path + `$id` 集合与 baseline 完全相等，并逐项核对内容摘要；新增未登记、删除、path/`$id` 变化或内容变化都会失败。Document 变更评审通过后只运行 `baseline:refresh:json-schema`；`baseline:refresh` 会同时重建 Proto image，只用于有意刷新两类兼容基线，避免无关覆盖历史 `buf breaking` 参照。
 
 `pnpm contracts:verify` 运行 compatibility/inventory/toolchain 负例回归、inventory、Buf lint/breaking、JSON Schema dialect/fixture/compatibility、固定工具链、TS/Python/C# round-trip 与连续生成无 diff 检查。
 
@@ -49,4 +49,4 @@ pnpm --filter @glimmer-cradle/contracts baseline:refresh
 - Protobuf 只拥有跨进程可调用能力；JSON Schema 只拥有 Document。
 - 同一结构不得同时在 Protobuf 和 JSON Schema 中拥有权威定义。当前 proto 只引用 Document 的 id、version 和 digest，不复制 Document 字段。
 - `generated/` 只属于 Adapter/Transport 边缘；Kernel/Cognition/UnityAvatarHost Adapter 是当前运行 consumer。
-- Engine、Extension 和 Surface 只能在对应 M12 切片中迁入 `contracts/`；Avatar control 已在 Slice 5 迁入。
+- Extension SDK 只公开稳定 public API 与 schema-derived edge mapping；Kernel/Product 使用 owner-local model/view mapping，不能把 `contracts` 变成万能业务 helper。

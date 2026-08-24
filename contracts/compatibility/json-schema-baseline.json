@@ -3,6 +3,213 @@
   "compatibility": "Schema additions, removals, path or id changes, and content changes require an intentional baseline update and review.",
   "schemas": [
     {
+      "path": "json-schema/common/v1/capability-scope.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/common/v1/capability-scope.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK capability scope owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "9b54c9303882c078110ca44c43d3b589154c1bb14b677ce36f3227c7b222bfd6"
+    },
+    {
+      "path": "json-schema/config/v1/app-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/app-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "ebe3078caecd10afc0af8ca11f41fcfe1c5a3149a803551f2bea565ad2b46e7f"
+    },
+    {
+      "path": "json-schema/config/v1/audio-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/audio-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "b14371e81bd3ca0d61fe01db03a3fe99d01abc035e2d6a60f57ddabcbcc83e50"
+    },
+    {
+      "path": "json-schema/config/v1/avatar-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/avatar-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "5d70ee110d2c4c1668d6f88295931b0b4045cf5fbabc3aeeefb14ef5ef0312b0"
+    },
+    {
+      "path": "json-schema/config/v1/character-manifest-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/character-manifest-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "ff3bb9c30455edf479ada0b3c405c256f0801736cf17f6db15fc04b0b6d840a1"
+    },
+    {
+      "path": "json-schema/config/v1/character-profile-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/character-profile-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "2a60d9b3bd0f4854f3d947496e240a1f72346fbadf3d3d2c000ccce4d847bd5d"
+    },
+    {
+      "path": "json-schema/config/v1/cognition-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/cognition-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "6a98db7f3973168d5018d04887fe9d16dab5161112f3f8bfc5a32b16598beeef"
+    },
+    {
+      "path": "json-schema/config/v1/cognition-service-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/cognition-service-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "198fef6de05c80d856d953ea653d5c73277d19ad6b55e7992d7069e585e75de2"
+    },
+    {
+      "path": "json-schema/config/v1/dialogue-policy-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/dialogue-policy-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "b6a00379bc3057d34dab87d0b8116dfebe2fb8d24059438f7ecaed7dadd67564"
+    },
+    {
+      "path": "json-schema/config/v1/embedding-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/embedding-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "7fa8744581c8f8688d2215a83deffb8fef786e9f77e0e236c7904e7534d48a26"
+    },
+    {
+      "path": "json-schema/config/v1/extension-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/extension-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "31914c352c525bbbea1024bb78b5923ba5aad67ba296bc4d3e340ddaea581a59"
+    },
+    {
+      "path": "json-schema/config/v1/inference-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/inference-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "ce7eefeeeac407c99a7cd6c076ca8ef734eda53dfa722503c9333a236c2b618d"
+    },
+    {
+      "path": "json-schema/config/v1/ingress-gate-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/ingress-gate-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "d75d4bc5ce7f057199e8c6c7dea4769f7a181bae987d9711a14971cc3a361be8"
+    },
+    {
+      "path": "json-schema/config/v1/knowledge-base-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/knowledge-base-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "87454310ae45e9c43043ca011dc88670bbcdc0889356e603d4a687666d5289af"
+    },
+    {
+      "path": "json-schema/config/v1/knowledge-index-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/knowledge-index-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "df4423c90f27891c1158405036144440ea1a9e9ae24ca9fb773cef7d7b2aa4fe"
+    },
+    {
+      "path": "json-schema/config/v1/lifecycle-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/lifecycle-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "05f01834611cb59df33225a0173549a080c1b2d72582511f4be51da6e270245e"
+    },
+    {
+      "path": "json-schema/config/v1/llm-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/llm-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "31830d54859dc6310b25610857fb9735c2e22b903cee10e3527792ff5937f20a"
+    },
+    {
+      "path": "json-schema/config/v1/memory-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/memory-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "4f334cb76dbc95e7b85b48c5ac9354bad9dea30f89d9174384b7b6c614ae30b3"
+    },
+    {
+      "path": "json-schema/config/v1/observability-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/observability-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "bf8457e77d696a5a68466970e90b3fb07373bbb48b1d79d0b13f91f2082562f3"
+    },
+    {
+      "path": "json-schema/config/v1/safety-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/safety-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "eabf2ea99b36dcfd9e60021d009e570ee770211fa3137d09e58afed7c83c444c"
+    },
+    {
+      "path": "json-schema/config/v1/skill-plane-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/skill-plane-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "624ea9eec1887e46f46d604e5f6f2a8dad5c61f828a7e11dc1f988cb53bc72f2"
+    },
+    {
+      "path": "json-schema/config/v1/surface-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/surface-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "e2e5baa50f4ecd214ebf847b1c4de3cc140ebf066096806f1179e4c9773b65fe"
+    },
+    {
+      "path": "json-schema/config/v1/voice-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/voice-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Config Application owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "6d469ea628f83bb02a42e4dd0a63fee22343a23b2051b91c22dcce2de275a1b4"
+    },
+    {
       "path": "json-schema/extension/v1/extension-host-process.schema.json",
       "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-host-process.schema.json",
       "dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -12,6 +219,60 @@
       "sha256": "1809c8f86cfd7ef680b9e6bfe7d55e2a2dba4ead550dc81c57f4d8ba9270f88c"
     },
     {
+      "path": "json-schema/extension/v1/extension-manifest.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-manifest.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "f2b27f87e24ca1360b148edf9cf83836551ef3af466f002f02b5e5e93f62db87"
+    },
+    {
+      "path": "json-schema/extension/v1/extension-package-checksums.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-package-checksums.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "59be19de8a319d81c4ef75c1d226825eff4ae9a8605f24eae94db6beb80993bf"
+    },
+    {
+      "path": "json-schema/extension/v1/extension-package-envelope.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-package-envelope.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "8aff5905c93098115139a43fb19d8a5e5295918075caf44e456eac8e59da5a5c"
+    },
+    {
+      "path": "json-schema/extension/v1/extension-permission.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-permission.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "eea8c11be76c7a23332ba577ed9097faf388ee1c3f367aa56a4ad028a19e351a"
+    },
+    {
+      "path": "json-schema/extension/v1/extension-registry-catalog.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-registry-catalog.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "93b5195354169bbdf53546e26df4bf129720022a8de63adc4ed728df50df4b13"
+    },
+    {
+      "path": "json-schema/extension/v1/extension-release-manifest.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/extension/v1/extension-release-manifest.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Extension SDK and Package owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "fdaf1d2de7b0b8692fa45e0ea31b9fc154d93709ade755c834f46974f3d397a3"
+    },
+    {
       "path": "json-schema/presentation/v1/presentation-frame.schema.json",
       "id": "https://glimmer-cradle.local/contracts/presentation/v1/presentation-frame.schema.json",
       "dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -19,6 +280,15 @@
       "kind": "Document",
       "compatibility": "M12 Slice 7 additive-v1; payload kinds evolve only through an owned projection review.",
       "sha256": "50ae6ca06f08587f828abd5ea3571945f84a8e314204acdcf1268a2432be86b8"
+    },
+    {
+      "path": "json-schema/product/v1/product-composition.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/product/v1/product-composition.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Product Composition owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
+      "sha256": "af4ea3d354c6617396d8cfe304b1b7234d4cab1ebff49053d2f5f933bade7a6e"
     },
     {
       "path": "json-schema/skill/v1/tool-parameters.schema.json",

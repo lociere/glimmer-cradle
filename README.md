@@ -115,7 +115,7 @@ pnpm dev:personal-server
 提交前最低验证：
 
 ```powershell
-pnpm sync:contracts
+pnpm contracts:verify
 pnpm check:encoding
 pnpm test
 pnpm typecheck
@@ -150,6 +150,7 @@ Extension 使用 [Extension SDK](packages/extension-sdk/) 和 [基础模板](tem
 assets/       可公开资产声明与只读默认资源
 configs/      系统配置、Character Package 与密钥模板
 core/         Kernel、Cognition 与 Avatar Host
+contracts/    Protobuf Service、JSON Schema Document、生成物与兼容基线
 data/         本地数据域契约
 deploy/       产品部署和发布编排
 docs/         架构、参考、指南、路线图、ADR 与历史证据
@@ -157,7 +158,6 @@ engines/      第一方能力引擎
 native/       平台原生组件
 packages/     可独立发布的 SDK
 products/     Desktop 与 Personal Server 产品宿主
-protocol/     Schema、代码生成器与跨语言契约
 scripts/      构建、同步、启动和验证工具
 templates/    Extension 等开发模板
 ```

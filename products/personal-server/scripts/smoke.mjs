@@ -76,7 +76,7 @@ async function main() {
     throw error;
   } finally {
     if (surface && surface.readyState !== WebSocket.CLOSED) surface.close();
-    await rm(dataRoot, { recursive: true, force: true });
+    await rm(dataRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }
 

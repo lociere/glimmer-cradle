@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   cpSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -15,6 +16,7 @@ import test from 'node:test';
 
 const contractsRoot = resolve(import.meta.dirname, '..', '..');
 const checker = resolve(contractsRoot, 'scripts/check-json-schema.mjs');
+const baselineRefresher = resolve(contractsRoot, 'scripts/refresh-baselines.mjs');
 const temporaryRoots = [];
 
 function fixtureRoot() {
@@ -40,6 +42,23 @@ test.after(() => {
 test('normal dialect, fixture and compatibility baseline passes', () => {
   const result = check(fixtureRoot());
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('JSON-only baseline refresh preserves the Proto compatibility image', () => {
+  const root = fixtureRoot();
+  mkdirSync(resolve(root, 'scripts'), { recursive: true });
+  cpSync(baselineRefresher, resolve(root, 'scripts/refresh-baselines.mjs'));
+  const protoImage = resolve(root, 'compatibility/proto-image.binpb');
+  const before = readFileSync(protoImage);
+
+  const result = spawnSync(
+    process.execPath,
+    [resolve(root, 'scripts/refresh-baselines.mjs'), '--json-schema-only'],
+    { encoding: 'utf8', shell: false },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readFileSync(protoImage), before);
 });
 
 test('new unregistered canonical schema fails closed', () => {

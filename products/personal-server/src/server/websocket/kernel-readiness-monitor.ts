@@ -1,4 +1,4 @@
-import type { RuntimeReadinessCatalog } from '@glimmer-cradle/protocol';
+import type { RuntimeReadinessCatalog } from './runtime-readiness-view';
 import {
   SurfaceGatewayClient,
   type SurfaceGatewayClientFactory,

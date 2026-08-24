@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BuiltInContributionPoint, type ContributionRequirements } from '@glimmer-cradle/protocol';
+import { BuiltInContributionPoint, type ContributionRequirements } from '@glimmer-cradle/extension-sdk';
 import { ExtensionHostAppService } from '../../adapters/extension-host/extension-host-application-adapter';
 import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
 import { SkillCatalogAppService } from './skill-catalog-app.service';

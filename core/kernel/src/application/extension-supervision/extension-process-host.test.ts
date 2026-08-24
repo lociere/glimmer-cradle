@@ -9,7 +9,7 @@ import {
   type ExtensionManifest,
   type ExtensionRuntimeProjection,
   type ExtensionSkillContribution,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import { ExtensionProcessHost } from '../../adapters/extension-host/extension-process-host';
 import type {
   ActiveExtensionSelection,

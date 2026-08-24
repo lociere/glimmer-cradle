@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BuiltInContributionPoint, ExtensionPermission, type ContributionRequirements } from '@glimmer-cradle/protocol';
+import { BuiltInContributionPoint, ExtensionPermission, type ContributionRequirements } from '@glimmer-cradle/extension-sdk';
 import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
 import { SkillPlanePolicy } from '../skill-plane/availability';
 import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';

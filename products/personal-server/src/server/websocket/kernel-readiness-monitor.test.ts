@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { RuntimeReadinessCatalog } from '@glimmer-cradle/protocol';
+import type { RuntimeReadinessCatalog } from './runtime-readiness-view';
 import { deriveKernelReadinessStatus } from './kernel-readiness-monitor';
 import { KernelReadinessMonitor } from './kernel-readiness-monitor';
 import { SurfaceGatewayTestDouble } from './surface-gateway-test-double';

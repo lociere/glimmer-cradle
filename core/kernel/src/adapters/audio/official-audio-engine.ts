@@ -7,7 +7,8 @@ import * as readline from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { spawn, type ChildProcess, type ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
-import type { AudioConfig, VoiceConfig } from '@glimmer-cradle/protocol';
+import type { AudioConfig } from '@glimmer-cradle/extension-sdk';
+import type { VoiceConfig } from '../config/documents/VoiceConfig';
 import {
   AudioLane,
   AudioMediaReferenceSchema,

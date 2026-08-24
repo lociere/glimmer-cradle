@@ -12,7 +12,7 @@ import {
   type ExtensionManifest,
   type ExtensionPackageChecksums,
   type ExtensionPackageEnvelope,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 
 const DEFAULT_MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const DEFAULT_MAX_EXPANDED_BYTES = 1024 * 1024 * 1024;

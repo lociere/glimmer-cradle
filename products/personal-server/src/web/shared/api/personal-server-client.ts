@@ -21,7 +21,7 @@ import type {
   PresentationDownstreamFrame,
   PresentationUpstreamFrame,
   PresentationRuntimeReadinessSnapshot,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 
 export interface ProductProjection {
   readonly display_name: string;

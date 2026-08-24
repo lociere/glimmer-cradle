@@ -13,7 +13,7 @@ if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(rootVersion)) {
 }
 
 for (const relativePath of [
-  'protocol/package.json',
+  'contracts/package.json',
   'core/kernel/package.json',
   'products/desktop/package.json',
   'products/personal-server/package.json',
@@ -39,7 +39,7 @@ for (const relativePath of [
 
 const expectedFacts = [
   ['configs/system/identity.yaml', `app_version: "${rootVersion}"`],
-  ['protocol/src/schemas/config/AppConfig.schema.json', `"default": "${rootVersion}"`],
+  ['contracts/json-schema/config/v1/app-config.schema.json', `"default": "${rootVersion}"`],
   ['engines/audio/src/glimmer_cradle/audio/__init__.py', `__version__ = "${rootVersion}"`],
   ['core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts', `version: '${rootVersion}'`],
   ['hosts/unity-avatar-host/Assets/StreamingAssets/avatar-host.json', `"hostVersion": "${rootVersion}"`],

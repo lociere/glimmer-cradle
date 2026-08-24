@@ -147,7 +147,7 @@ Extension Host 的实现落点：
 - `adapters/extension-host/extension-process-host.ts` 在 Kernel 侧校验权限、代理 Host Port、持有 handler/disposable 并监督 `hosts/extension-host` 子进程；
 - `hosts/extension-host/src/main.ts` 是唯一加载第三方扩展入口的位置，激活结束前会等待同步注册请求完成，并把 process alive / connected / handshake / resource prepared / ready / degraded / failed / stopped 阶段回报给 Kernel；
 - `adapters/extension-host/extension-host-application-adapter.ts` 只通过 `ports/application-capabilities.port.ts` 与 `ports/skill-plane.port.ts` 调用 Application capability；
-- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Kernel supervision 与独立 Host process 的公开 Node IPC 兼容 shim，不暴露 Kernel 内部 service；`hosts/extension-host/src/process-protocol.ts` 只 re-export 该边界；`contracts/proto/glimmer/extension/v1/extension_host_process.proto` 拥有版本化 Host lifecycle service/stage，后续完整 transport 切换后删除 shim；
+- `packages/extension-sdk/src/host/process-protocol.ts` 定义 Kernel supervision 与独立 Host process 的公开 Node IPC transport mapping，不暴露 Kernel 内部 service；`hosts/extension-host/src/process-protocol.ts` 只 re-export 该边界；`contracts/proto/glimmer/extension/v1/extension_host_process.proto` 拥有版本化 Host lifecycle service/stage；
 - Extension 停止、激活失败或进程退出都会撤销运行 handler、声明式 catalog、订阅和 Capability Projection。
 - Kernel 保留 supervision、权限、catalog、编排和 Projection owner；第三方 handler registry、timer、订阅和扩展 module loader 均位于独立 Host 进程。
 
@@ -182,9 +182,9 @@ Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能
 
 | 类型 | 入口 |
 |---|---|
-| 系统配置 | `configs/system/*.yaml` 经 protocol config schema/normalizer 消费 |
+| 系统配置 | `configs/system/*.yaml` 经 `contracts/json-schema/config/v1/` 与 Kernel config normalizer 消费 |
 | Kernel↔Cognition Service | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` 与 `contracts/generated/` |
-| 其他未迁移协议/事件模型 | `protocol/src/schemas/` 与 `protocol/src/generated/` |
+| Extension 公开 projection | `packages/extension-sdk/src/contracts/`，Kernel Adapter 映射 owner-local model |
 | Kernel 数据 | `data/state/kernel/` |
 | Extension 数据 | `data/state/extensions/` |
 | Conversation 拓扑契约 | `ConversationAddress`（外部地址）与 `ConversationContext`（Kernel canonical 结果） |

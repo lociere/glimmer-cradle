@@ -8,7 +8,7 @@ import {
   type CapabilityGraphNode,
   type CapabilityNodeState,
   type ReadinessGateSnapshot,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { ExtensionLogger } from '../../ports';
 import { resolveConfiguredProjectPath, resolveDataDir } from '../filesystem/path-utils';
 

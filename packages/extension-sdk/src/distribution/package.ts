@@ -16,7 +16,7 @@ import {
   type ExtensionPackageEnvelope,
   type ExtensionPlatform,
   type ExtensionReleaseManifest,
-} from '@glimmer-cradle/protocol';
+} from '../index';
 import {
   type ExtensionReleaseChannel,
 } from './contracts';

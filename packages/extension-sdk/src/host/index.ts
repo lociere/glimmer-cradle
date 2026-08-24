@@ -1,17 +1,18 @@
-import type { ConversationAddress, PerceptionEvent } from '@glimmer-cradle/protocol';
+import type { ConversationAddress } from '../contracts/models/ConversationAddress';
+import type { PerceptionEvent } from '../contracts/models/PerceptionEvent';
 import type {
   ActionIntentSnapshot,
   CapabilityGraphEdge,
   CapabilityGraphNode,
   DiagnosticsSnapshot,
-} from '@glimmer-cradle/protocol';
+} from '../contracts/models/ExtensionRuntimeProjection';
 import type {
   CapabilityAudience,
   CapabilityScope,
   ContributionRequirements,
   ExtensionCommandContribution,
   ExtensionEventPayloadMap,
-} from '@glimmer-cradle/protocol';
+} from '../index';
 
 export type SensoryType =
   | 'VISUAL'

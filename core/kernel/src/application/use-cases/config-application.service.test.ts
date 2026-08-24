@@ -9,10 +9,10 @@ import type {
   AudioConfig,
   ConfigurationUpdateRequest,
   EmbeddingConfig,
-  LLMConfig,
   MemoryConfig,
   SkillPlaneConfig,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
+import type { LLMConfig } from '../../adapters/config/documents/LLMConfig';
 
 const cleanupRoots = new Set<string>();
 const envSnapshot = {

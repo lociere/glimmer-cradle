@@ -5,7 +5,7 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionSkillContribution,
   PerceptionEvent,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import { randomUUID } from 'node:crypto';
 import { DomainEvent } from '../../domain/events';
 import {

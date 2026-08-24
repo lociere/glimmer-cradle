@@ -1,6 +1,6 @@
 import { open, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { AuditRecord, ObservabilityEvent } from '@glimmer-cradle/protocol';
+import type { AuditRecord, ObservabilityEvent } from './observability-view-model';
 
 export type ObservabilityLogSource = 'event' | 'audit' | 'application';
 export type ObservabilityLogLevel = 'debug' | 'info' | 'warn' | 'error';

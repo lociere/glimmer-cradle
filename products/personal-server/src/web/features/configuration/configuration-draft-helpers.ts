@@ -3,7 +3,7 @@ import type {
   ConfigurationProviderTestDraft,
   ConfigurationSnapshot,
   ConfigurationUpdateRequest,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import { asTupleModels, snapshotToDraft, type ConfigurationDraftState, type ProviderDraftState } from './configuration-state';
 import { createRequestId } from './configuration-support';
 

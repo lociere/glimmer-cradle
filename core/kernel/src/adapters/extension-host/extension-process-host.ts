@@ -10,7 +10,7 @@ import {
   hasExtensionPermission,
   type ExtensionManifest,
   type ExtensionPermission as ExtensionPermissionValue,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type {
   ExtensionHostProcessMessage,
   ExtensionHostProcessResponse,
@@ -18,7 +18,7 @@ import type {
   ExtensionKernelRequest,
   ExtensionHostProcessMethod,
 } from '@glimmer-cradle/extension-host/process-protocol';
-import { ErrorCode } from '@glimmer-cradle/protocol';
+import { ErrorCode } from '../../domain/error-code';
 import { ExtensionException } from '../../domain/errors';
 import type { Disposable, ExtensionAgentRegistration, IExtensionHostService } from '../../ports';
 import { forceTerminateManagedProcessTree, waitForManagedProcessExit } from '../../adapters/process/process-supervisor';

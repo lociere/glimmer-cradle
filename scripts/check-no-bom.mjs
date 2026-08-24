@@ -22,7 +22,6 @@ const roots = [
   'native',
   'packages',
   'products',
-  'protocol',
   'scripts',
   'templates',
   'package.json',

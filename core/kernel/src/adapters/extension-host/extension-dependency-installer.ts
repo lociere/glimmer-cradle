@@ -7,7 +7,7 @@ import path from 'path';
 import type {
   ExternalDependencySource,
   ManagedResourceContribution,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { ExtensionLogger } from '../../ports';
 import { resolveConfiguredProjectPath } from '../filesystem/path-utils';
 

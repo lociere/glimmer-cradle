@@ -7,8 +7,7 @@ import type {
   ConversationHistoryRequest,
   ConversationHistoryResult,
   ConversationNotice,
-  ControlSurfaceGatewayConfig,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 import type { StateSyncEvent } from '../domain/events';
 import type {
   AttentionLease,
@@ -30,6 +29,10 @@ import type {
   SkillProviderRef,
   SkillProviderRuntimeSnapshot,
 } from './skill-plane.port';
+
+export interface ControlSurfaceGatewayConfig {
+  enabled: boolean;
+}
 
 export interface ConversationDirectoryPort {
   resolve(address: ConversationAddress, interactionId?: string): {

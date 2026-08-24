@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ManagedResourceContribution } from '@glimmer-cradle/protocol';
+import type { ManagedResourceContribution } from '@glimmer-cradle/extension-sdk';
 import type { ExtensionLogger } from '../../src/ports';
 import { ExtensionDependencyInstaller } from '../../src/adapters/extension-host/extension-dependency-installer';
 

@@ -6,6 +6,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const violations = [];
 
 const removedWorkspaceFiles = [
+  'protocol',
   'protocol/project.json',
   'core/kernel/project.json',
   'core/kernel/src/foundation',
@@ -86,7 +87,6 @@ const requiredWorkspaceDirectories = [
   'core/kernel/src/runtime',
   'core/cognition/src/glimmer_cradle/cognition',
   'engines/audio/src/glimmer_cradle/audio',
-  'protocol/codegen',
   'packages/extension-sdk',
   'templates/extension-basic',
   'deploy/personal-server/lib',
@@ -339,7 +339,6 @@ if (/^enabled\s*:/m.test(activeExtensions)) {
 }
 
 const genericSourceRoots = [
-  'protocol/src',
   'core/kernel/src',
   'products/desktop/src',
   'packages/extension-sdk/src',
@@ -365,31 +364,26 @@ for (const filePath of walkFiles(desktopMainRoot)) {
     'Desktop IPC 必须通过 DesktopIpcRouter 注册');
 }
 
-const protocolPackage = JSON.parse(
-  fs.readFileSync(path.join(repoRoot, 'protocol/package.json'), 'utf8'),
-);
-if (protocolPackage.scripts?.['gen:py']
-  !== 'uv run --project ../engines/audio --extra dev python codegen/gen-py.py') {
-  violations.push('protocol/package.json: gen:py 必须由 Audio uv project 提供解释器和依赖');
-}
-
 const extensionSdkPackage = JSON.parse(
   fs.readFileSync(path.join(repoRoot, 'packages/extension-sdk/package.json'), 'utf8'),
 );
-if (extensionSdkPackage.dependencies?.['@glimmer-cradle/protocol'] !== 'workspace:*') {
-  violations.push('packages/extension-sdk/package.json: Extension SDK 必须单向依赖 Protocol');
+if (extensionSdkPackage.dependencies?.['@glimmer-cradle/contracts'] !== 'workspace:*') {
+  violations.push('packages/extension-sdk/package.json: Extension SDK 必须单向依赖 Contract Spine');
 }
 
 for (const packagePath of [
-  'protocol/package.json',
+  'contracts/package.json',
+  'packages/extension-sdk/package.json',
+  'hosts/extension-host/package.json',
   'core/kernel/package.json',
   'products/desktop/package.json',
   'products/personal-server/package.json',
+  'templates/extension-basic/package.json',
 ]) {
   const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, packagePath), 'utf8'));
   for (const dependencyField of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
-    if (manifest[dependencyField]?.['@glimmer-cradle/extension-sdk']) {
-      violations.push(`${packagePath}: ${dependencyField} 不得反向依赖 Extension SDK`);
+    if (manifest[dependencyField]?.['@glimmer-cradle/protocol']) {
+      violations.push(`${packagePath}: ${dependencyField} 不得重新依赖已删除的 Protocol package`);
     }
     if (manifest[dependencyField]?.['@glimmer-cradle/extension-contracts']) {
       violations.push(`${packagePath}: 不得重新引入已删除的 extension-contracts`);
@@ -398,18 +392,19 @@ for (const packagePath of [
 }
 
 for (const relativeRoot of [
-  'protocol/src',
   'core/kernel/src',
+  'packages/extension-sdk/src',
   'products/desktop/src',
   'products/personal-server/src',
+  'templates/extension-basic/src',
 ]) {
   for (const filePath of walkFiles(path.join(repoRoot, relativeRoot))) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) continue;
     reportMatches(
       toRepoPath(filePath),
       fs.readFileSync(filePath, 'utf8'),
-      /(?:from\s+|import\s*\(|require\s*\()\s*['"]@glimmer-cradle\/extension-sdk(?:\/[^'"]*)?['"]/g,
-      'Kernel、Protocol 与产品源码不得 import Extension SDK',
+      /(?:from\s+|import\s*\(|require\s*\()\s*['"]@glimmer-cradle\/protocol(?:\/[^'"]*)?['"]/g,
+      '源码不得 import 已删除的 Protocol package',
     );
   }
 }

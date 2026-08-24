@@ -9,7 +9,7 @@
 | `desktop` | Glimmer Cradle Desktop | `products/desktop/product.json` | Electron main/preload/renderer |
 | `personal-server` | Glimmer Cradle Personal Server | `products/personal-server/product.json` | Node HTTP/WebSocket Host |
 
-两个清单都遵循 Protocol 的 `protocol/src/schemas/models/ProductComposition.schema.json`，并由 `validateProductComposition` 统一校验。`products/` 只保存产品组合实例，不拥有第二份类型或校验规则。`features` 表示发行物是否包含某项能力，不表示该能力已经启用，也不保存用户偏好。当前 Server 组合包含 Control Surface Gateway、云端 TTS lane 和 Extension Host，排除 ASR、本机 Avatar，以及打开网页、剪贴板、桌面通知和屏幕上下文等 Desktop 本机设备 Skill。TTS 是否启用由 `configs/system/audio.yaml` 决定；默认关闭属于正常基础运行形态。
+两个清单都遵循 `contracts/json-schema/product/v1/product-composition.schema.json`，由 Kernel/Product owner validator 校验；`products/` 只保存产品组合实例与 owner-local projection，不拥有第二份 Schema。`features` 表示发行物是否包含某项能力，不表示该能力已经启用，也不保存用户偏好。当前 Server 组合包含 Control Surface Gateway、云端 TTS lane 和 Extension Host，排除 ASR、本机 Avatar，以及打开网页、剪贴板、桌面通知和屏幕上下文等 Desktop 本机设备 Skill。TTS 是否启用由 `configs/system/audio.yaml` 决定；默认关闭属于正常基础运行形态。
 
 ## 控制面板与能力边界
 

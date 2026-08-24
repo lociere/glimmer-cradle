@@ -1,2 +1,3 @@
-export { ExtensionPermission, hasExtensionPermission } from '@glimmer-cradle/protocol';
-export type { ExtensionPermission as ExtensionPermissionValue } from '@glimmer-cradle/protocol';
+export { ExtensionPermission } from '../manifest/schema-types/ExtensionPermission';
+export { hasExtensionPermission } from './contracts';
+export type { ExtensionPermission as ExtensionPermissionValue } from '../manifest/schema-types/ExtensionPermission';

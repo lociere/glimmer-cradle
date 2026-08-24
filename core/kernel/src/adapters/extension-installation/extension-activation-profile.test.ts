@@ -7,7 +7,7 @@ import {
   type ActivationProfileRequirements,
   type ContributionRequirements,
   type ExtensionManifest,
-} from '@glimmer-cradle/protocol';
+} from '@glimmer-cradle/extension-sdk';
 
 function createDefaultProfileRequirements(): ActivationProfileRequirements {
   return {

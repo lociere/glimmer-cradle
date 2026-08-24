@@ -5,11 +5,13 @@ export {
   EXTENSION_REGISTRY_SCHEMA,
   EXTENSION_RELEASE_SCHEMA,
   isSafeExtensionPackagePath,
+} from './package-format';
+export {
   validateExtensionPackageChecksums,
   validateExtensionPackageEnvelope,
   validateExtensionRegistryCatalog,
   validateExtensionReleaseManifest,
-} from '@glimmer-cradle/protocol';
+} from '../manifest/validation';
 export type {
   ExtensionPackageChecksums,
   ExtensionPackageEnvelope,
@@ -17,5 +19,5 @@ export type {
   ExtensionRegistryRecord,
   ExtensionReleaseArtifact,
   ExtensionReleaseManifest,
-} from '@glimmer-cradle/protocol';
-export type ExtensionReleaseChannel = import('@glimmer-cradle/protocol').ExtensionReleaseManifest['channel'];
+} from '../manifest/schema-types';
+export type ExtensionReleaseChannel = import('../manifest/schema-types/ExtensionReleaseManifest').ExtensionReleaseManifest['channel'];

@@ -8,13 +8,17 @@
  * 运行时由 ConfigManager 走 ajv 校验填默认值；本文件只承担类型聚合职责。
  */
 import type {
+  AudioConfig,
+  EmbeddingConfig,
+  MemoryConfig,
+  SkillPlaneConfig,
+} from '@glimmer-cradle/extension-sdk';
+import type {
   AppConfig,
   AvatarConfig,
-  AudioConfig,
   CharacterManifestConfig,
   CharacterProfileConfig,
   DialoguePolicyConfig,
-  EmbeddingConfig,
   ExtensionConfig,
   IngressGateConfig,
   CognitionServiceConfig,
@@ -22,13 +26,14 @@ import type {
   InferenceConfig,
   LifecycleConfig,
   LLMConfig,
-  MemoryConfig,
   ObservabilityConfig,
   SafetyConfig,
   SurfaceConfig,
-  SkillPlaneConfig,
   VoiceConfig,
-} from '@glimmer-cradle/protocol';
+} from './documents';
+
+export type * from './documents';
+export type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '@glimmer-cradle/extension-sdk';
 
 /** configs/system/*.yaml 组合后的解析结果（系统身份/当前角色/备份 + Kernel 运行时子块） */
 export type SystemConfig = AppConfig & {

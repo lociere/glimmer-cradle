@@ -9,12 +9,17 @@ export {
   listExtensionActivationProfiles,
   materializeManifestForActivationProfile,
   resolveExtensionActivationProfile,
-  validateExtensionManifest,
-} from '@glimmer-cradle/protocol';
+} from './contracts';
+export type {
+  BuiltInContributionPointId,
+  ExtensionActivationProfileAvailability,
+  ExtensionActivationProfileContext,
+  ExtensionActivationProfileResolution,
+  ExtensionManifestInput,
+} from './contracts';
 export type {
   ActivationProfileId,
   ActivationProfileRequirements,
-  BuiltInContributionPointId,
   CapabilityAudience,
   CapabilityScope,
   ContributionDeclaration,
@@ -23,16 +28,12 @@ export type {
   ContributionPointId,
   ContributionRequirements,
   ExtensionActivationProfile,
-  ExtensionActivationProfileAvailability,
-  ExtensionActivationProfileContext,
-  ExtensionActivationProfileResolution,
   ExtensionCapabilityContribution,
   ExtensionCommandContribution,
   ExtensionCommandPrecondition,
   ExtensionContributions,
   ExtensionEngineConstraint,
   ExtensionManifest,
-  ExtensionManifestInput,
   ExtensionManagementSurfaceContribution,
   ExtensionPlatform,
   ExtensionProductTarget,
@@ -51,4 +52,8 @@ export type {
   ProtocolBridgeContribution,
   ReadinessGateDeclaration,
   ReadinessProbe,
-} from '@glimmer-cradle/protocol';
+} from './schema-types';
+export {
+  validateExtensionManifest,
+} from './validation';
+export type { ExtensionContractValidation } from './validation';

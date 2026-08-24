@@ -1,4 +1,4 @@
-import type { ConfigurationSnapshot, PresentationRuntimeReadinessState } from '@glimmer-cradle/protocol';
+import type { ConfigurationSnapshot, PresentationRuntimeReadinessState } from '@glimmer-cradle/extension-sdk';
 import type { ReadinessStatus, RuntimeProjection } from '../../shared/api/personal-server-client';
 
 export interface StatusViewSnapshot {

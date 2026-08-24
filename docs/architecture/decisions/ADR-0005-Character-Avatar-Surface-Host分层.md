@@ -33,5 +33,5 @@
 ## 验证
 
 - 搜索旧 `Avatar Shell`、`avatar_shell`、`avatar-shell`、`shell_hello`、`shell_ready` 和旧目录无活跃主线残留。
-- `pnpm sync:contracts`、`pnpm typecheck`、`pnpm build` 通过。
+- `pnpm contracts:verify`、`pnpm typecheck`、`pnpm build` 通过。
 - Avatar 专项验证覆盖 Host 启动、`host_hello`、`host_ready`、首帧、透明合成、动作状态、停机回收与路径投影。

@@ -1,4 +1,4 @@
-import type { McpServerConfig } from '@glimmer-cradle/protocol';
+import type { McpServerConfig } from '@glimmer-cradle/extension-sdk';
 import type { ConfigurationDraftState } from './configuration-state';
 
 export function bindSystemSectionInputs(

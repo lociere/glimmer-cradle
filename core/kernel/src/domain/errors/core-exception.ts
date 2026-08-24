@@ -1,5 +1,5 @@
 /**
- * 内核异常类（从 protocol/src/core.ts 搬入，阶段 P.5）
+ * Kernel owner-local 异常类；跨进程错误由 Contract Spine Service detail 映射。
  *
  * 这些是 TypeScript 端 ``Error`` 子类、运行时实现 —— 跨语言无法序列化（JS Error 不可迁移）。
  * ErrorCode 枚举本身是 schema 契约（schemas/enums/ErrorCode），跨语言；这里只装类。

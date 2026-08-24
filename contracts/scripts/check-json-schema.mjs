@@ -1,4 +1,5 @@
 import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -37,12 +38,14 @@ if (schemas.length === 0) {
 }
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
+addFormats(ajv);
 for (const keyword of ['x-glimmer-owner', 'x-glimmer-contract-kind', 'x-glimmer-compatibility']) {
   ajv.addKeyword(keyword);
 }
 const seenIds = new Set();
 const current = new Map();
 const compiled = new Map();
+const documents = [];
 
 for (const file of schemas) {
   const schema = JSON.parse(readFileSync(file, 'utf8'));
@@ -58,7 +61,7 @@ for (const file of schemas) {
   }
   if (seenIds.has(schema.$id)) throw new Error(`duplicate JSON Schema $id: ${schema.$id}`);
   seenIds.add(schema.$id);
-  compiled.set(path, ajv.compile(schema));
+  documents.push({ path, schema });
   current.set(path, {
     path,
     id: schema.$id,
@@ -69,6 +72,9 @@ for (const file of schemas) {
     sha256: sha256(file),
   });
 }
+
+for (const { schema } of documents) ajv.addSchema(schema);
+for (const { path, schema } of documents) compiled.set(path, ajv.getSchema(schema.$id));
 
 const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
 if (!Array.isArray(baseline.schemas)) {

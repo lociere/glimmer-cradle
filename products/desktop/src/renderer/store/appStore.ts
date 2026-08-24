@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChannelReplyMessage } from '@glimmer-cradle/protocol';
+import type { ChannelReplyMessage } from '@glimmer-cradle/extension-sdk';
 type CharacterPresentationProjection = Awaited<ReturnType<Window['desktopHost']['getCharacterPresentationProjection']>>;
 type RuntimeReadinessCatalog = Awaited<ReturnType<Window['desktopHost']['getRuntimeReadiness']>>;
 
