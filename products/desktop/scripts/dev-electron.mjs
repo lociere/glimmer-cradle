@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(__dirname, '..');
 const VITE_DEV_SERVER_URL = process.env.GLIMMER_CRADLE_RENDERER_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
 const VITE_READY_URL = `${VITE_DEV_SERVER_URL}/presence.html`;
-const KERNEL_READY_URL = process.env.GLIMMER_CRADLE_DESKTOP_UI_WS_URL ?? '';
+const KERNEL_READY_URL = process.env.GLIMMER_CRADLE_DESKTOP_SURFACE_GRPC_URL ?? '';
 const REPO_ROOT = path.resolve(PKG_ROOT, '..', '..');
 const ENDPOINT_CATALOG_PATH = path.join(
   process.env.GLIMMER_CRADLE_RUN_ROOT
@@ -156,7 +156,7 @@ function probeHttp(url) {
 
 function parseTcpEndpoint(url) {
   const parsed = new URL(url);
-  const port = Number(parsed.port || (parsed.protocol === 'wss:' ? 443 : 80));
+  const port = Number(parsed.port || (parsed.protocol === 'grpcs:' ? 443 : 80));
   return {
     host: parsed.hostname,
     port,
@@ -247,7 +247,7 @@ async function discoverKernelDesktopEndpoint() {
     const record = Array.isArray(catalog.endpoints)
       ? catalog.endpoints.find((item) => item?.purpose === 'control-surface')
       : null;
-    return typeof record?.endpoint === 'string' && record.endpoint.startsWith('ws://127.0.0.1:')
+    return typeof record?.endpoint === 'string' && record.endpoint.startsWith('grpc://127.0.0.1:')
       ? record.endpoint
       : '';
   } catch {

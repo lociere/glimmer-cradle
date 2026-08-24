@@ -203,9 +203,18 @@ importers:
 
   products/desktop:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.13.0
+        version: 2.13.0
+      '@glimmer-cradle/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
       '@glimmer-cradle/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      '@grpc/grpc-js':
+        specifier: 1.14.0
+        version: 1.14.0
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -261,9 +270,18 @@ importers:
 
   products/personal-server:
     dependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.13.0
+        version: 2.13.0
+      '@glimmer-cradle/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
       '@glimmer-cradle/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      '@grpc/grpc-js':
+        specifier: 1.14.0
+        version: 1.14.0
       ws:
         specifier: ^8.20.0
         version: 8.20.0

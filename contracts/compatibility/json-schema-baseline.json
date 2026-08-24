@@ -12,6 +12,15 @@
       "sha256": "1809c8f86cfd7ef680b9e6bfe7d55e2a2dba4ead550dc81c57f4d8ba9270f88c"
     },
     {
+      "path": "json-schema/presentation/v1/presentation-frame.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/presentation/v1/presentation-frame.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Surface Gateway owner",
+      "kind": "Document",
+      "compatibility": "M12 Slice 7 additive-v1; payload kinds evolve only through an owned projection review.",
+      "sha256": "50ae6ca06f08587f828abd5ea3571945f84a8e314204acdcf1268a2432be86b8"
+    },
+    {
       "path": "json-schema/skill/v1/tool-parameters.schema.json",
       "id": "https://glimmer-cradle.local/contracts/skill/v1/tool-parameters.schema.json",
       "dialect": "https://json-schema.org/draft/2020-12/schema",

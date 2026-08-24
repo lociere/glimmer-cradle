@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/presentation/v1/presentation-frame.schema.json",
+  "title": "PresentationFrameDocument",
+  "description": "Kernel Surface Gateway 的边缘呈现投影。领域事实仍由 Kernel owner 持有，产品只消费 kind、trace、时间和受控 payload。",
+  "x-glimmer-owner": "Kernel Surface Gateway owner",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "M12 Slice 7 additive-v1; payload kinds evolve only through an owned projection review.",
+  "type": "object",
+  "required": ["kind", "timestamp", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string" },
+    "timestamp": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object", "additionalProperties": true }
+  }
+}

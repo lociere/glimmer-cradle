@@ -20,7 +20,7 @@
 
 - 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
 - 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
-- Kernel↔Cognition runtime 已在 Slice 2 迁移；Avatar control 的 IDL/projection/edge mapping 已在 Slice 5 迁移到 Contract Spine，但 Kernel↔UnityAvatarHost runtime consumer 仍是 WebSocket，`AvatarHostService.Connect` 切换属于 Slice 8。这些契约只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar}/v1/` 定义，不得恢复旧 Protocol 镜像。
+- Kernel↔Cognition runtime 已在 Slice 2 迁移；Surface Gateway 的 IDL 与 presentation projection 已在 Slice 7 迁移到 Contract Spine。Kernel↔UnityAvatarHost runtime consumer 仍是 WebSocket，`AvatarHostService.Connect` 切换属于 Slice 8。这些契约只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar,surface}/v1/` 定义，不得恢复旧 Protocol 镜像。
 
 现有 runtime Protocol 的生成投影和消费端包括：
 
@@ -42,13 +42,13 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 路径 | 当前状态 | 规则 |
 |---|---|---|
-| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService`、已运行的 `CognitionService` / `KernelControlService` v1，以及已生成但 runtime consumer 尚待 Slice 8 接入的 `AvatarHostService` v1。 |
-| `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；Slice 1 只包含最小 Skill tool parameters Document。 |
+| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService`、`CognitionService` / `KernelControlService` v1、Slice 7 `SurfaceGatewayService` v1，以及已生成但 runtime consumer 尚待 Slice 8 接入的 `AvatarHostService` v1。 |
+| `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；包含 Skill tool parameters 与 Slice 7 presentation frame projection envelope。 |
 | `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 已消费对应生成物。 |
 | `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
 | `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
 
-迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力与 Avatar control IDL/projection 由 `contracts/` 拥有；Avatar 当前 WebSocket runtime consumer 由 Slice 8 负责切到 `AvatarHostService.Connect`，其余尚未迁移运行结构仍由 `protocol/` 拥有。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Contract Spine DTO/stub 只能在对应 contract Adapter/transport 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+迁移期必须按切片区分 owner：Kernel↔Cognition、Surface Gateway 与 Avatar control IDL/projection 由 `contracts/` 拥有；Avatar 当前 WebSocket runtime consumer 由 Slice 8 负责切到 `AvatarHostService.Connect`，其余尚未迁移运行结构仍由 `protocol/` 拥有。Slice 7 的 Desktop 与 Personal Server 只通过 `SurfaceGatewayService` 访问 Kernel；Personal Server 对浏览器保留受认证 WebSocket ingress，由 Product Host 代理到内部 gRPC Gateway。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Contract Spine DTO/stub 只能在对应 contract Adapter/transport 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
 
 ## Accepted 目标与当前差距
 
@@ -56,9 +56,9 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| Kernel↔Cognition runtime 已使用 Contract Spine；Avatar control IDL/projection/edge mapping 已由 `contracts/` 权威定义，但 runtime 仍走 WebSocket；其他运行结构仍在 `protocol/` | Slice 8 将 Avatar consumer 切到 `AvatarHostService.Connect`；所有边界迁移后删除旧 `protocol/` |
+| Kernel↔Cognition 与 Desktop/Personal Server↔Surface Gateway runtime 已使用 Contract Spine；Avatar runtime 仍走 WebSocket；其他运行结构仍在 `protocol/` | Slice 8 将 Avatar consumer 切到 `AvatarHostService.Connect`；所有边界迁移后删除旧 `protocol/` |
 | 尚未迁移的 JSON Schema 仍覆盖共享模型、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有文档契约 |
-| Kernel ↔ Cognition 已使用 gRPC；部分 Engine 仍使用 stdio，Surface/Host 仍有手写 WebSocket | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
+| Kernel ↔ Cognition 与产品到 Kernel Surface 已使用 gRPC；部分 Engine 仍使用 stdio，Avatar Host 仍有手写 WebSocket | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器入口保留产品自有认证 WebSocket |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
 | 大对象主要依赖资源引用、路径投影或现有帧约定 | control/data plane 分离，使用 typed reference、stream、Blob lease 或经验证的数据通道 |
 | 兼容主要依赖 Schema 同步、类型/测试与旧字段搜索 | 增加 Buf breaking、JSON Schema compatibility、TS/Python/C# round-trip 和 Adapter contract test |

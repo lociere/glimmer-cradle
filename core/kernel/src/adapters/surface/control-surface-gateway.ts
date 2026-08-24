@@ -1,8 +1,34 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import * as grpc from '@grpc/grpc-js';
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { AddressInfo } from 'node:net';
+import { create, fromJson, type JsonObject } from '@bufbuild/protobuf';
+import { StructSchema } from '@bufbuild/protobuf/wkt';
+import {
+  SurfaceGatewayServiceCommandRequestSchema,
+  SurfaceGatewayServiceCommandResponseSchema,
+  SurfaceGatewayServiceConnectRequestSchema,
+  SurfaceGatewayServiceConnectResponseSchema,
+  SurfaceGatewayServiceQueryRequestSchema,
+  SurfaceGatewayServiceQueryResponseSchema,
+  SurfaceGatewayServiceStreamResponseSchema,
+  SurfaceGatewayServiceStreamRequestSchema,
+} from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
+import {
+  ServiceErrorCode,
+  ServiceErrorDetailSchema,
+} from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import type {
+  SurfaceGatewayServiceCommandRequest,
+  SurfaceGatewayServiceCommandResponse,
+  SurfaceGatewayServiceConnectRequest,
+  SurfaceGatewayServiceConnectResponse,
+  SurfaceGatewayServiceQueryRequest,
+  SurfaceGatewayServiceQueryResponse,
+  SurfaceGatewayServiceStreamResponse,
+  SurfaceGatewayServiceStreamRequest,
+} from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import { EventBus } from '../events/event-bus';
 import { getLogger } from '../observability/logger';
 import type { RuntimeProjectionPort } from '../../ports/kernel-lifecycle.port';
@@ -60,8 +86,37 @@ import {
   RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE,
   RecoveryRequiredError,
 } from '../../domain/errors';
+import { serverStreamingMethod, unaryMethod } from '../cognition/grpc-contract';
 
 const logger = getLogger('control-surface-gateway');
+const SURFACE_OPEN = 1;
+const surfaceGatewayDefinition = {
+  Connect: unaryMethod(
+    '/glimmer.surface.v1.SurfaceGatewayService/Connect',
+    SurfaceGatewayServiceConnectRequestSchema,
+    SurfaceGatewayServiceConnectResponseSchema,
+  ),
+  Query: unaryMethod(
+    '/glimmer.surface.v1.SurfaceGatewayService/Query',
+    SurfaceGatewayServiceQueryRequestSchema,
+    SurfaceGatewayServiceQueryResponseSchema,
+  ),
+  Command: unaryMethod(
+    '/glimmer.surface.v1.SurfaceGatewayService/Command',
+    SurfaceGatewayServiceCommandRequestSchema,
+    SurfaceGatewayServiceCommandResponseSchema,
+  ),
+  Stream: serverStreamingMethod(
+    '/glimmer.surface.v1.SurfaceGatewayService/Stream',
+    SurfaceGatewayServiceStreamRequestSchema,
+    SurfaceGatewayServiceStreamResponseSchema,
+  ),
+};
+type SurfaceClient = {
+  readonly readyState: number;
+  send(data: string): void;
+  close?: () => void;
+};
 type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
 type SkillCatalogResponsePayload = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
 
@@ -114,8 +169,10 @@ interface PendingSurfaceRequest {
 }
 
 export class ControlSurfaceGateway {
-  private _wss: WebSocketServer | null = null;
-  private _clients: Set<WebSocket> = new Set();
+  private _server: grpc.Server | null = null;
+  private _serverAddress: string | null = null;
+  private _clients: Set<SurfaceClient> = new Set();
+  private readonly _surfaceSessions = new Map<string, { productId: string; scopes: Set<string> }>();
   private _initialized = false;
   private _perceptionAppService: PerceptionApplicationPort | null = null;
   private _skillCatalogAppService: SkillCatalogApplicationPort | null = null;
@@ -148,55 +205,22 @@ export class ControlSurfaceGateway {
     this._perceptionAppService = perceptionAppService;
     this._skillCatalogAppService = skillCatalogAppService;
     this._requestApplicationShutdown = requestApplicationShutdown;
-    this._wss = new WebSocketServer({ host: '127.0.0.1', port: 0, maxPayload: 2 * 1024 * 1024 });
-    await waitForWebSocketServer(this._wss);
-    const address = this._wss.address() as AddressInfo;
-    await EndpointRegistry.instance.publish('control-surface', `ws://127.0.0.1:${address.port}`);
-
-    this._wss.on('connection', (ws: WebSocket) => {
-      logger.info('产品控制表面已连接');
-      this._clients.add(ws);
-      // 阶段 8.3:首帧用 PresentationDownstreamFrame(kind=avatar_status)
-      this._sendFrame(ws, {
-        kind: 'avatar_status',
-        timestamp: Date.now(),
-        avatar_status: { host_kind: this._getAvatarRenderState() },
-      });
-      // null 表示本轮生命周期尚未收到 Shell 权威状态，不能用默认空数组
-      // 覆盖 Desktop 已持久化的用户动作偏好。
-      if (this._lastAvatarActionState) {
-        this._sendFrame(ws, {
-          kind: 'avatar_action_state',
-          timestamp: Date.now(),
-          avatar_action_state: this._lastAvatarActionState,
-        });
-      }
-      this._sendFrame(ws, {
-        kind: 'character_presentation_projection',
-        timestamp: Date.now(),
-        character_presentation_projection: this.avatar.getCharacterPresentationProjection(),
-      });
-      this._sendRuntimeReadiness(ws, this.readinessProjection.getCatalog());
-      void this._sendAudioStatus(ws);
-
-      ws.on('message', (message: string) => {
-        try {
-          const data = JSON.parse(message.toString());
-          this._handleMessage(data, ws);
-        } catch (err) {
-          logger.warn('Failed to parse message', { message: message.toString() });
-        }
-      });
-
-      ws.on('close', () => {
-        logger.info('产品控制表面已断开');
-        this._clients.delete(ws);
-      });
-
-      ws.on('error', (err) => {
-        logger.error('产品控制表面 WebSocket 异常', { err });
+    const server = new grpc.Server();
+    server.addService(surfaceGatewayDefinition, {
+      Connect: this._connectSurface.bind(this),
+      Query: this._querySurface.bind(this),
+      Command: this._commandSurface.bind(this),
+      Stream: this._streamSurface.bind(this),
+    });
+    const port = await new Promise<number>((resolve, reject) => {
+      server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
+        if (error) reject(error);
+        else resolve(boundPort);
       });
     });
+    this._server = server;
+    this._serverAddress = `127.0.0.1:${port}`;
+    const endpointRecord = await EndpointRegistry.instance.publish('control-surface', `grpc://127.0.0.1:${port}`);
 
     EventBus.instance.subscribe('ActionStreamStartedEvent', async (event: any) => {
       const started = event as ActionStreamStartedEvent;
@@ -360,7 +384,222 @@ export class ControlSurfaceGateway {
     });
 
     this._initialized = true;
-    logger.info('ControlSurfaceGateway started', { endpoint: `ws://127.0.0.1:${address.port}` });
+    logger.info('ControlSurfaceGateway started', { endpoint: this._serverAddress, generation: endpointRecord.generation });
+  }
+
+  private _connectSurface(
+    call: grpc.ServerUnaryCall<SurfaceGatewayServiceConnectRequest, SurfaceGatewayServiceConnectResponse>,
+    callback: grpc.sendUnaryData<SurfaceGatewayServiceConnectResponse>,
+  ): void {
+    const productId = call.request.productId.trim();
+    const generation = call.request.generation.trim();
+    const expectedGeneration = EndpointRegistry.instance.get('control-surface')?.generation;
+    const requestedScopes = new Set(call.request.scopes.map((scope) => scope.trim()).filter(Boolean));
+    const allowedProduct = productId === 'desktop' || productId === 'personal-server';
+    const allowedScopes = [...requestedScopes].every((scope) => scope === 'surface:read' || scope === 'surface:write');
+    if (!allowedProduct || !allowedScopes || !expectedGeneration || generation !== expectedGeneration) {
+      callback(null, create(SurfaceGatewayServiceConnectResponseSchema, {
+        accepted: false,
+        generation: expectedGeneration ?? '',
+        message: !expectedGeneration
+          ? 'Surface Gateway 尚未发布'
+          : 'Surface Gateway 身份、权限或 generation 校验失败',
+        scopes: [],
+      }));
+      logger.warn('拒绝 Surface Gateway Connect', {
+        product_id: productId,
+        generation_mismatch: generation !== expectedGeneration,
+        requested_scopes: [...requestedScopes],
+      });
+      return;
+    }
+
+    const sessionId = randomUUID();
+    this._surfaceSessions.set(sessionId, { productId, scopes: requestedScopes });
+    callback(null, create(SurfaceGatewayServiceConnectResponseSchema, {
+      accepted: true,
+      sessionId,
+      generation: expectedGeneration,
+      message: 'Surface Gateway session accepted',
+      scopes: [...requestedScopes],
+    }));
+  }
+
+  private _querySurface(
+    call: grpc.ServerUnaryCall<SurfaceGatewayServiceQueryRequest, SurfaceGatewayServiceQueryResponse>,
+    callback: grpc.sendUnaryData<SurfaceGatewayServiceQueryResponse>,
+  ): void {
+    void this._dispatchSurfaceRpc(
+      call.request.sessionId,
+      'surface:read',
+      call.request.arguments,
+      (error, response) => callback(error, response as SurfaceGatewayServiceQueryResponse),
+      'query',
+    );
+  }
+
+  private _commandSurface(
+    call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
+    callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
+  ): void {
+    void this._dispatchSurfaceRpc(
+      call.request.sessionId,
+      'surface:write',
+      call.request.arguments,
+      (error, response) => callback(error, response as SurfaceGatewayServiceCommandResponse),
+      'command',
+    );
+  }
+
+  private _streamSurface(
+    call: grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>,
+  ): void {
+    const session = this._surfaceSessions.get(call.request.sessionId);
+    if (!session || !session.scopes.has('surface:read')) {
+      call.destroy(new Error('Surface Gateway stream permission denied'));
+      return;
+    }
+    const pendingFrames: string[] = [];
+    let streamClosed = false;
+    let waitingForDrain = false;
+    const flush = (): void => {
+      if (streamClosed || call.destroyed) return;
+      waitingForDrain = false;
+      while (pendingFrames.length > 0) {
+        const serialized = pendingFrames.shift();
+        if (!serialized) continue;
+        try {
+          const frame = JSON.parse(serialized) as PresentationDownstreamFrame;
+          if (!call.write(this._frameToStreamEvent(frame))) {
+            waitingForDrain = true;
+            call.once('drain', flush);
+            return;
+          }
+        } catch (error) {
+          logger.warn('Surface Gateway stream projection encoding failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    };
+    const client: SurfaceClient = {
+      readyState: SURFACE_OPEN,
+      send: (serialized) => {
+        if (streamClosed || call.destroyed) return;
+        if (pendingFrames.length >= 128) {
+          call.destroy(new Error('Surface Gateway stream backpressure limit exceeded'));
+          return;
+        }
+        pendingFrames.push(serialized);
+        if (!waitingForDrain) flush();
+      },
+      close: () => {
+        streamClosed = true;
+        pendingFrames.length = 0;
+        call.end();
+      },
+    };
+    this._clients.add(client);
+    this._sendInitialSurfaceFrames(client);
+    const cleanup = (): void => {
+      streamClosed = true;
+      pendingFrames.length = 0;
+      this._clients.delete(client);
+      this._surfaceSessions.delete(call.request.sessionId);
+    };
+    call.once('cancelled', cleanup);
+    call.once('close', cleanup);
+    call.once('error', cleanup);
+  }
+
+  private async _dispatchSurfaceRpc(
+    sessionId: string,
+    requiredScope: 'surface:read' | 'surface:write',
+    rawArguments: JsonObject | undefined,
+    callback: (error: Error | null, response: SurfaceGatewayServiceQueryResponse | SurfaceGatewayServiceCommandResponse) => void,
+    operation: 'query' | 'command',
+  ): Promise<void> {
+    const session = this._surfaceSessions.get(sessionId);
+    const requestId = `surface-${operation}-${Date.now()}-${randomUUID().slice(0, 8)}`;
+    if (!session || !session.scopes.has(requiredScope)) {
+      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway 权限不足'));
+      return;
+    }
+    const frame = extractSurfaceFrame(rawArguments);
+    if (!frame || typeof frame.kind !== 'string') {
+      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway frame 无效'));
+      return;
+    }
+    const output: unknown[] = [];
+    const client: SurfaceClient = {
+      readyState: SURFACE_OPEN,
+      send: (serialized) => {
+        try { output.push(JSON.parse(serialized)); } catch { /* fail closed below */ }
+      },
+    };
+    await this._handleMessage(frame, client);
+    const projection = output.find((value) => value && typeof value === 'object') as JsonObject | undefined;
+    callback(null, operation === 'query'
+      ? create(SurfaceGatewayServiceQueryResponseSchema, {
+        requestId: surfaceRequestId(projection) || requestId,
+        status: projection ? 'success' : 'accepted',
+        projection: projection ? fromJson(StructSchema, projection) as unknown as JsonObject : undefined,
+      })
+      : create(SurfaceGatewayServiceCommandResponseSchema, {
+        requestId: surfaceRequestId(projection) || requestId,
+        status: projection ? 'success' : 'accepted',
+        result: projection ? fromJson(StructSchema, projection) as unknown as JsonObject : undefined,
+      }));
+  }
+
+  private _surfaceRpcError(
+    operation: 'query' | 'command',
+    requestId: string,
+    code: ServiceErrorCode,
+    message: string,
+  ): SurfaceGatewayServiceQueryResponse | SurfaceGatewayServiceCommandResponse {
+    const error = create(ServiceErrorDetailSchema, {
+      code,
+      safeMessage: message,
+      retryable: code === ServiceErrorCode.NOT_READY || code === ServiceErrorCode.UNAVAILABLE,
+      recoveryActions: [],
+      operationId: requestId,
+    });
+    return operation === 'query'
+      ? create(SurfaceGatewayServiceQueryResponseSchema, { requestId, status: 'error', error })
+      : create(SurfaceGatewayServiceCommandResponseSchema, { requestId, status: 'error', error });
+  }
+
+  private _frameToStreamEvent(frame: PresentationDownstreamFrame): SurfaceGatewayServiceStreamResponse {
+    return create(SurfaceGatewayServiceStreamResponseSchema, {
+      eventId: randomUUID(),
+      kind: frame.kind,
+      traceId: frame.trace_id ?? '',
+      timestampMs: BigInt(Math.max(0, Math.trunc(frame.timestamp))),
+      projection: fromJson(StructSchema, JSON.parse(JSON.stringify(frame)) as JsonObject) as unknown as JsonObject,
+    });
+  }
+
+  private _sendInitialSurfaceFrames(client: SurfaceClient): void {
+    this._sendFrame(client, {
+      kind: 'avatar_status',
+      timestamp: Date.now(),
+      avatar_status: { host_kind: this._getAvatarRenderState() },
+    });
+    if (this._lastAvatarActionState) {
+      this._sendFrame(client, {
+        kind: 'avatar_action_state',
+        timestamp: Date.now(),
+        avatar_action_state: this._lastAvatarActionState,
+      });
+    }
+    this._sendFrame(client, {
+      kind: 'character_presentation_projection',
+      timestamp: Date.now(),
+      character_presentation_projection: this.avatar.getCharacterPresentationProjection(),
+    });
+    this._sendRuntimeReadiness(client, this.readinessProjection.getCatalog());
+    void this._sendAudioStatus(client);
   }
 
   private _getAvatarRenderState(): KernelAvatarStatus {
@@ -387,7 +626,7 @@ export class ControlSurfaceGateway {
 
   private broadcast(data: string) {
     for (const client of this._clients) {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client.readyState === SURFACE_OPEN) {
         client.send(data);
       }
     }
@@ -447,7 +686,7 @@ export class ControlSurfaceGateway {
   }
 
   private _requestSurfaceRoundTrip(kind: string, payload: Record<string, unknown>, stableRequestId?: string): Promise<unknown> {
-    const client = Array.from(this._clients).find((item) => item.readyState === WebSocket.OPEN);
+    const client = Array.from(this._clients).find((item) => item.readyState === SURFACE_OPEN);
     if (!client) {
       return Promise.reject(new Error('产品控制表面未连接，无法执行本地 Skill'));
     }
@@ -557,8 +796,8 @@ export class ControlSurfaceGateway {
     return merged.slice(0, 8);
   }
 
-  private _sendFrame(ws: WebSocket, frame: PresentationDownstreamFrame): void {
-    if (ws.readyState === WebSocket.OPEN) {
+  private _sendFrame(ws: SurfaceClient, frame: PresentationDownstreamFrame): void {
+    if (ws.readyState === SURFACE_OPEN) {
       logger.debug('Send PresentationFrame', {
         frame_class: getPresentationFrameClass(frame.kind),
         kind: frame.kind,
@@ -568,7 +807,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private _sendRuntimeReadiness(ws: WebSocket, catalog: RuntimeReadinessCatalog): void {
+  private _sendRuntimeReadiness(ws: SurfaceClient, catalog: RuntimeReadinessCatalog): void {
     this._sendFrame(ws, {
       kind: 'runtime_readiness',
       timestamp: Date.now(),
@@ -585,7 +824,7 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private async _sendAudioStatus(ws: WebSocket): Promise<void> {
+  private async _sendAudioStatus(ws: SurfaceClient): Promise<void> {
     this._sendFrame(ws, {
       kind: 'audio_status',
       timestamp: Date.now(),
@@ -593,7 +832,7 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private _handleMessage(data: any, ws: WebSocket) {
+  private async _handleMessage(data: any, ws: SurfaceClient): Promise<void> {
     // 阶段 8.4：上行帧只接受 PresentationUpstreamFrame.kind。
     const kind: string = (typeof data.kind === 'string' && data.kind) || '';
     if (kind !== 'avatar_presentation') {
@@ -676,25 +915,25 @@ export class ControlSurfaceGateway {
     } else if (kind === 'core_skill_action_response' || kind === 'core_skill_confirmation_response') {
       this._handleCoreSkillResponse(data);
     } else if (kind === 'config_snapshot_request') {
-      void this._handleConfigSnapshotRequest(data.config_snapshot_request, ws);
+      await this._handleConfigSnapshotRequest(data.config_snapshot_request, ws);
     } else if (kind === 'conversation_history_request') {
-      void this._handleConversationHistoryRequest(data.conversation_history_request, ws);
+      await this._handleConversationHistoryRequest(data.conversation_history_request, ws);
     } else if (kind === 'config_update_request') {
-      void this._handleConfigUpdateRequest(data.config_update_request, ws);
+      await this._handleConfigUpdateRequest(data.config_update_request, ws);
     } else if (kind === 'config_test_request') {
-      void this._handleConfigTestRequest(data.config_test_request, ws);
+      await this._handleConfigTestRequest(data.config_test_request, ws);
     } else if (kind === 'extension_lifecycle_request') {
-      void this._handleExtensionLifecycleRequest(data, ws);
+      await this._handleExtensionLifecycleRequest(data, ws);
     } else if (kind === 'extension_install_prepare') {
-      void this._handleExtensionInstallPrepare(data.extension_install_prepare, ws);
+      await this._handleExtensionInstallPrepare(data.extension_install_prepare, ws);
     } else if (kind === 'extension_install_commit') {
-      void this._handleExtensionInstallCommit(data.extension_install_commit, ws);
+      await this._handleExtensionInstallCommit(data.extension_install_commit, ws);
     } else if (kind === 'extension_install_cancel') {
-      void this._handleExtensionInstallCancel(data.extension_install_cancel, ws);
+      await this._handleExtensionInstallCancel(data.extension_install_cancel, ws);
     } else if (kind === 'extension_uninstall_request') {
-      void this._handleExtensionUninstall(data.extension_uninstall_request, ws);
+      await this._handleExtensionUninstall(data.extension_uninstall_request, ws);
     } else if (kind === 'extension_command_request') {
-      void this._handleExtensionCommandRequest(data, ws);
+      await this._handleExtensionCommandRequest(data, ws);
     } else if (kind === 'extension_runtime_projection_request') {
       this._handleExtensionRuntimeProjectionRequest(data.extension_runtime_projection_request, ws);
     } else if (kind === 'skill_catalog_request') {
@@ -716,7 +955,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleConfigSnapshotRequest(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleConfigSnapshotRequest(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ConfigurationSnapshotRequest | undefined;
     const requestId = request?.request_id?.trim() || `config-snapshot-${Date.now()}`;
     if (!this._configApplicationService) {
@@ -755,7 +994,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleConversationHistoryRequest(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleConversationHistoryRequest(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ConversationHistoryRequest | undefined;
     const requestId = request?.request_id?.trim()
       ? request.request_id.trim()
@@ -806,7 +1045,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleConfigUpdateRequest(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleConfigUpdateRequest(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ConfigurationUpdateRequest | undefined;
     const requestId = request?.request_id?.trim() || `config-update-${Date.now()}`;
     if (!request || !this._configApplicationService) {
@@ -847,7 +1086,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleConfigTestRequest(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleConfigTestRequest(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ConfigurationTestRequest | undefined;
     const requestId = request?.request_id?.trim() || `config-test-${Date.now()}`;
     if (!request || !this._configApplicationService) {
@@ -871,7 +1110,7 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private async _handleExtensionInstallPrepare(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleExtensionInstallPrepare(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ExtensionInstallPrepareRequest | undefined;
     const requestId = request?.request_id?.trim() || `extension-install-prepare-${Date.now()}`;
     if (!request?.source || !this._extensionLifecycleController) {
@@ -906,7 +1145,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleExtensionInstallCommit(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleExtensionInstallCommit(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ExtensionInstallCommitRequest | undefined;
     const requestId = request?.request_id?.trim() || `extension-install-commit-${Date.now()}`;
     if (!request?.transaction_id || !Array.isArray(request.approved_permissions) || !this._extensionLifecycleController) {
@@ -940,7 +1179,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private async _handleExtensionInstallCancel(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleExtensionInstallCancel(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as { request_id?: string; transaction_id?: string } | undefined;
     const requestId = request?.request_id?.trim() || `extension-install-cancel-${Date.now()}`;
     if (request?.transaction_id && this._extensionLifecycleController) {
@@ -953,7 +1192,7 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private async _handleExtensionUninstall(raw: unknown, ws: WebSocket): Promise<void> {
+  private async _handleExtensionUninstall(raw: unknown, ws: SurfaceClient): Promise<void> {
     const request = raw as ExtensionUninstallRequest | undefined;
     const requestId = request?.request_id?.trim() || `extension-uninstall-${Date.now()}`;
     const extensionId = request?.extension_id?.trim() || '';
@@ -994,7 +1233,7 @@ export class ControlSurfaceGateway {
     }
   }
 
-  private _handleExtensionRuntimeProjectionRequest(raw: unknown, ws: WebSocket): void {
+  private _handleExtensionRuntimeProjectionRequest(raw: unknown, ws: SurfaceClient): void {
     const request = raw as ExtensionRuntimeProjectionRequest | undefined;
     const requestId = request?.request_id?.trim()
       ? request.request_id.trim()
@@ -1020,14 +1259,14 @@ export class ControlSurfaceGateway {
   }
 
   private _sendExtensionRuntimeProjectionResponse(
-    ws: WebSocket,
+    ws: SurfaceClient,
     requestId: string,
     status: 'success' | 'error',
     projections: ExtensionRuntimeProjection[] = [],
     installations: ExtensionInstallationProjection[] = [],
     message?: string,
   ): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (ws.readyState !== SURFACE_OPEN) return;
     ws.send(JSON.stringify({
       kind: 'extension_runtime_projection_result',
       timestamp: Date.now(),
@@ -1035,7 +1274,7 @@ export class ControlSurfaceGateway {
     }));
   }
 
-  private _handleSkillCatalogRequest(data: any, ws: WebSocket): void {
+  private _handleSkillCatalogRequest(data: any, ws: SurfaceClient): void {
     const request = data.skill_catalog_request as SkillCatalogRequestPayload | undefined;
     const requestId = typeof request?.request_id === 'string' && request.request_id.trim()
       ? request.request_id.trim()
@@ -1055,13 +1294,13 @@ export class ControlSurfaceGateway {
   }
 
   private _sendSkillCatalogResponse(
-    ws: WebSocket,
+    ws: SurfaceClient,
     requestId: string,
     status: 'success' | 'error',
     snapshot?: SkillCatalogResponsePayload['snapshot'],
     message?: string,
   ): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (ws.readyState !== SURFACE_OPEN) return;
     ws.send(JSON.stringify({
       kind: 'skill_catalog_response',
       timestamp: Date.now(),
@@ -1102,7 +1341,7 @@ export class ControlSurfaceGateway {
     pending.reject(new Error(typeof data.message === 'string' ? data.message : 'Desktop Skill 执行失败'));
   }
 
-  private async _handleExtensionCommandRequest(data: any, ws: WebSocket): Promise<void> {
+  private async _handleExtensionCommandRequest(data: any, ws: SurfaceClient): Promise<void> {
     const request = data.extension_command_request as ExtensionCommandRequest | undefined;
     const requestId = request?.request_id?.trim()
       ? request.request_id.trim()
@@ -1136,14 +1375,14 @@ export class ControlSurfaceGateway {
   }
 
   private _sendExtensionCommandResponse(
-    ws: WebSocket,
+    ws: SurfaceClient,
     requestId: string,
     commandId: string,
     status: 'success' | 'error',
     result?: unknown,
     message?: string,
   ): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (ws.readyState !== SURFACE_OPEN) return;
     ws.send(JSON.stringify({
       kind: 'extension_command_result',
       timestamp: Date.now(),
@@ -1157,7 +1396,7 @@ export class ControlSurfaceGateway {
     }));
   }
 
-  private async _handleExtensionLifecycleRequest(data: any, ws: WebSocket): Promise<void> {
+  private async _handleExtensionLifecycleRequest(data: any, ws: SurfaceClient): Promise<void> {
     const request = data.extension_lifecycle_request as ExtensionLifecycleRequest | undefined;
     const requestId = request?.request_id?.trim()
       ? request.request_id.trim()
@@ -1200,7 +1439,7 @@ export class ControlSurfaceGateway {
   }
 
   private _sendExtensionLifecycleResponse(
-    ws: WebSocket,
+    ws: SurfaceClient,
     requestId: string,
     extensionId: string,
     version: string,
@@ -1208,7 +1447,7 @@ export class ControlSurfaceGateway {
     status: 'success' | 'error',
     message?: string,
   ): void {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (ws.readyState !== SURFACE_OPEN) return;
     ws.send(JSON.stringify({
       kind: 'extension_lifecycle_result',
       timestamp: Date.now(),
@@ -1409,18 +1648,20 @@ export class ControlSurfaceGateway {
 
   public async stop(): Promise<void> {
     // 阶段 8.2:setInterval 已删,无需 clearInterval。
-    if (this._wss) {
-      const server = this._wss;
+    if (this._server) {
+      const server = this._server;
       const shutdownFrame: PresentationDownstreamFrame = {
         kind: 'shutdown',
         timestamp: Date.now(),
       };
-      await Promise.all([...server.clients].map((client) => closeSurfaceClient(client, shutdownFrame)));
-      await closeWebSocketServer(server);
-      this._wss = null;
+      await Promise.all([...this._clients].map((client) => closeSurfaceClient(client, shutdownFrame)));
+      await new Promise<void>((resolve) => server.tryShutdown(() => resolve()));
+      this._server = null;
+      this._serverAddress = null;
     }
     await EndpointRegistry.instance.revoke('control-surface');
     this._clients.clear();
+    this._surfaceSessions.clear();
     this._disposeRuntimeReadinessSubscription?.();
     this._disposeRuntimeReadinessSubscription = null;
     for (const [requestId, pending] of this._pendingSurfaceRequests) {
@@ -1436,19 +1677,6 @@ export class ControlSurfaceGateway {
     this._initialized = false;
     logger.info('ControlSurfaceGateway stopped');
   }
-}
-
-function waitForWebSocketServer(server: WebSocketServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onListening = (): void => { cleanup(); resolve(); };
-    const onError = (error: Error): void => { cleanup(); reject(error); };
-    const cleanup = (): void => {
-      server.off('listening', onListening);
-      server.off('error', onError);
-    };
-    server.once('listening', onListening);
-    server.once('error', onError);
-  });
 }
 
 function toProtocolRuntimeReadinessCatalog(
@@ -1473,36 +1701,25 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function closeSurfaceClient(client: WebSocket, frame: PresentationDownstreamFrame): Promise<void> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      client.off('close', finish);
-      resolve();
-    };
-    const timer = setTimeout(() => {
-      client.terminate();
-      finish();
-    }, 500);
-    timer.unref();
-    client.once('close', finish);
-    if (client.readyState !== WebSocket.OPEN) {
-      client.terminate();
-      finish();
-      return;
-    }
-    client.send(JSON.stringify(frame), (error) => {
-      if (error) client.terminate();
-      else client.close(1001, 'kernel_shutdown');
-    });
-  });
+function extractSurfaceFrame(argumentsValue: JsonObject | undefined): Record<string, unknown> | null {
+  if (!argumentsValue || typeof argumentsValue !== 'object') return null;
+  const frame = argumentsValue.frame;
+  if (frame && typeof frame === 'object' && !Array.isArray(frame)) {
+    return frame as Record<string, unknown>;
+  }
+  return argumentsValue as Record<string, unknown>;
 }
 
-function closeWebSocketServer(server: WebSocketServer): Promise<void> {
-  return new Promise((resolve) => {
-    server.close(() => resolve());
-  });
+function surfaceRequestId(frame: JsonObject | undefined): string | undefined {
+  if (!frame) return undefined;
+  const payload = Object.values(frame).find((value) => value && typeof value === 'object') as JsonObject | undefined;
+  const requestId = payload?.request_id;
+  return typeof requestId === 'string' && requestId ? requestId : undefined;
+}
+
+function closeSurfaceClient(client: SurfaceClient, frame: PresentationDownstreamFrame): Promise<void> {
+  if (client.readyState !== SURFACE_OPEN) return Promise.resolve();
+  client.send(JSON.stringify(frame));
+  client.close?.();
+  return Promise.resolve();
 }

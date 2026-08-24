@@ -1,5 +1,12 @@
 import type { RuntimeReadinessCatalog } from '@glimmer-cradle/protocol';
-import { WebSocket } from 'ws';
+import {
+  SurfaceGatewayClient,
+  type SurfaceGatewayClientFactory,
+  type SurfaceGatewayClientLike,
+  SURFACE_GATEWAY_OPEN,
+  SURFACE_GATEWAY_CONNECTING,
+} from './surface-gateway-client';
+import type { EndpointCatalogEntry } from '../adapters/endpoint-catalog';
 
 export interface KernelReadinessStatus {
   readonly ready: boolean;
@@ -15,10 +22,10 @@ export interface KernelReadinessStatus {
   }>;
 }
 
-type EndpointResolver = () => Promise<string | null>;
+type EndpointResolver = () => Promise<EndpointCatalogEntry | string | null>;
 
 export class KernelReadinessMonitor {
-  private socket: WebSocket | null = null;
+  private socket: SurfaceGatewayClientLike | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private connectTimer: NodeJS.Timeout | null = null;
   private catalog: RuntimeReadinessCatalog | null = null;
@@ -31,6 +38,7 @@ export class KernelReadinessMonitor {
     private readonly resolveEndpoint: EndpointResolver,
     private readonly reconnectDelayMs = 500,
     private readonly onKernelShutdown?: () => void,
+    private readonly surfaceGatewayClientFactory: SurfaceGatewayClientFactory = () => new SurfaceGatewayClient(),
   ) {}
 
   public start(): void {
@@ -55,7 +63,7 @@ export class KernelReadinessMonitor {
     }
     const socket = this.socket;
     this.socket = null;
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    if (socket && (socket.readyState === SURFACE_GATEWAY_OPEN || socket.readyState === SURFACE_GATEWAY_CONNECTING)) {
       socket.close();
     }
   }
@@ -71,7 +79,7 @@ export class KernelReadinessMonitor {
 
   private async connect(): Promise<void> {
     if (this.stopped || this.socket) return;
-    let endpoint: string | null;
+    let endpoint: EndpointCatalogEntry | string | null;
     try {
       endpoint = await this.resolveEndpoint();
     } catch (error) {
@@ -80,19 +88,20 @@ export class KernelReadinessMonitor {
       return;
     }
     if (this.stopped) return;
-    if (!endpoint) {
+    if (!endpoint || typeof endpoint === 'string') {
+      if (typeof endpoint === 'string') this.connectionError = '旧 Surface endpoint 已被拒绝';
       this.scheduleReconnect();
       return;
     }
 
-    const socket = new WebSocket(endpoint);
+    const socket = this.surfaceGatewayClientFactory();
     this.socket = socket;
     this.connectionState = 'connecting';
     this.connectionError = undefined;
     this.connectTimer = setTimeout(() => {
-      if (this.socket === socket && socket.readyState === WebSocket.CONNECTING) {
+      if (this.socket === socket && socket.readyState === SURFACE_GATEWAY_CONNECTING) {
         this.connectionError = '连接 Kernel Control Surface 超时';
-        socket.terminate();
+        socket.close();
       }
     }, 3_000);
     this.connectTimer.unref();
@@ -102,7 +111,7 @@ export class KernelReadinessMonitor {
       this.connectionState = 'observing';
       this.connectionError = undefined;
     });
-    socket.on('message', (raw) => {
+    socket.on('message', (raw: Buffer) => {
       let frame: unknown;
       try {
         frame = JSON.parse(raw.toString());
@@ -124,9 +133,14 @@ export class KernelReadinessMonitor {
     socket.once('error', (error) => {
       if (this.socket === socket) this.connectionError = error.message;
     });
+    void socket.connect(endpoint.endpoint, endpoint.generation, 'personal-server').catch((error: unknown) => {
+      if (this.socket !== socket) return;
+      this.connectionError = error instanceof Error ? error.message : String(error);
+      socket.close();
+    });
   }
 
-  private handleDisconnect(socket: WebSocket): void {
+  private handleDisconnect(socket: SurfaceGatewayClientLike): void {
     if (this.socket !== socket) return;
     this.clearConnectTimer();
     this.socket = null;

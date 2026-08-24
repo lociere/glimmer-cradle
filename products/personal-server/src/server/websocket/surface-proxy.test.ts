@@ -2,47 +2,47 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { proxySurfaceConnection } from './surface-proxy';
+import { SurfaceGatewayTestDouble } from './surface-gateway-test-double';
 
 test('cancels previewed extension transactions when the browser websocket disconnects', async () => {
-  const upstream = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-  await waitForServer(upstream);
-  const upstreamUrl = socketUrl(upstream);
+  let upstream: SurfaceGatewayTestDouble | null = null;
   const clientIngress = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await waitForServer(clientIngress);
-  clientIngress.on('connection', (socket) => {
-    proxySurfaceConnection(socket, upstreamUrl, {
-      extensionUploadAuthorization: {
-        principalId: 'token-a',
-        sessionBinding: 'session:a',
-      },
-    });
-  });
-
   const cancelSeen = new Promise<void>((resolve, reject) => {
-    upstream.on('connection', (socket) => {
-      socket.on('message', (raw) => {
-        const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
-        if (frame.kind === 'extension_install_prepare') {
-          socket.send(JSON.stringify({
-            kind: 'extension_install_preview',
-            timestamp: Date.now(),
-            extension_install_preview: {
-              request_id: 'prepare-1',
-              status: 'ready',
-              transaction_id: 'tx-preview-1',
-            },
-          }));
-          return;
-        }
-        if (frame.kind === 'extension_install_cancel') {
-          try {
-            const payload = frame.extension_install_cancel as Record<string, unknown>;
-            assert.equal(payload.transaction_id, 'tx-preview-1');
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        }
+    clientIngress.on('connection', (socket) => {
+      proxySurfaceConnection(socket, 'grpc://surface-test', 'generation-a', {
+        extensionUploadAuthorization: {
+          principalId: 'token-a',
+          sessionBinding: 'session:a',
+        },
+        surfaceGatewayClientFactory: () => {
+          upstream = new SurfaceGatewayTestDouble();
+          upstream.onSend = (serialized) => {
+            const frame = JSON.parse(serialized) as Record<string, unknown>;
+            if (frame.kind === 'extension_install_prepare') {
+              upstream?.emitFrame({
+                kind: 'extension_install_preview',
+                timestamp: Date.now(),
+                extension_install_preview: {
+                  request_id: 'prepare-1',
+                  status: 'ready',
+                  transaction_id: 'tx-preview-1',
+                },
+              });
+              return;
+            }
+            if (frame.kind === 'extension_install_cancel') {
+              try {
+                const payload = frame.extension_install_cancel as Record<string, unknown>;
+                assert.equal(payload.transaction_id, 'tx-preview-1');
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            }
+          };
+          return upstream;
+        },
       });
     });
   });
@@ -67,34 +67,30 @@ test('cancels previewed extension transactions when the browser websocket discon
   await withTimeout(cancelSeen, 2_000, 'expected proxy to cancel previewed transaction after disconnect');
   await closeSocket(browser);
   await closeServer(clientIngress);
-  await closeServer(upstream);
 });
 
 test('rejects commit requests for transactions owned by another session or unknown to this connection', async () => {
-  const upstream = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-  await waitForServer(upstream);
-  const upstreamUrl = socketUrl(upstream);
   let upstreamCommitSeen = false;
-  upstream.on('connection', (socket) => {
-    socket.on('message', (raw) => {
-      const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
-      if (frame.kind === 'extension_install_commit') upstreamCommitSeen = true;
-    });
-  });
-
   const ingressA = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   const ingressB = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await Promise.all([waitForServer(ingressA), waitForServer(ingressB)]);
-  ingressA.on('connection', (socket) => {
-    proxySurfaceConnection(socket, upstreamUrl, {
-      extensionUploadAuthorization: { principalId: 'token-a', sessionBinding: 'session:a' },
+  const connect = (sessionBinding: string, ingress: WebSocketServer): void => {
+    ingress.on('connection', (socket) => {
+      proxySurfaceConnection(socket, 'grpc://surface-test', 'generation-a', {
+        extensionUploadAuthorization: { principalId: 'token-a', sessionBinding },
+        surfaceGatewayClientFactory: () => {
+          const upstream = new SurfaceGatewayTestDouble();
+          upstream.onSend = (serialized) => {
+            const frame = JSON.parse(serialized) as Record<string, unknown>;
+            if (frame.kind === 'extension_install_commit') upstreamCommitSeen = true;
+          };
+          return upstream;
+        },
+      });
     });
-  });
-  ingressB.on('connection', (socket) => {
-    proxySurfaceConnection(socket, upstreamUrl, {
-      extensionUploadAuthorization: { principalId: 'token-b', sessionBinding: 'session:b' },
-    });
-  });
+  };
+  connect('session:a', ingressA);
+  connect('session:b', ingressB);
 
   const browserA = new WebSocket(socketUrl(ingressA));
   await waitForOpen(browserA);
@@ -121,15 +117,12 @@ test('rejects commit requests for transactions owned by another session or unkno
     closeSocket(browserB),
     closeServer(ingressA),
     closeServer(ingressB),
-    closeServer(upstream),
   ]);
 });
 
 function socketUrl(server: WebSocketServer): string {
   const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('websocket server did not bind');
-  }
+  if (!address || typeof address === 'string') throw new Error('websocket server did not bind');
   return `ws://127.0.0.1:${address.port}`;
 }
 
@@ -161,16 +154,9 @@ function onceJsonMessage(socket: WebSocket): Promise<any> {
   return new Promise((resolve, reject) => {
     const onMessage = (raw: RawData): void => {
       cleanup();
-      try {
-        resolve(JSON.parse(raw.toString()));
-      } catch (error) {
-        reject(error);
-      }
+      try { resolve(JSON.parse(raw.toString())); } catch (error) { reject(error); }
     };
-    const onError = (error: Error): void => {
-      cleanup();
-      reject(error);
-    };
+    const onError = (error: Error): void => { cleanup(); reject(error); };
     const cleanup = (): void => {
       socket.off('message', onMessage);
       socket.off('error', onError);

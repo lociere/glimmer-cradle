@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package glimmer.surface.v1;
+
+import "google/protobuf/struct.proto";
+import "glimmer/common/v1/service_contract.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Surface.V1";
+
+// Product-to-Kernel session handshake. The generation is bound to the
+// EndpointRegistry record and is never accepted from a public browser client.
+message SurfaceGatewayServiceConnectRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string product_id = 2;
+  string generation = 3;
+  repeated string scopes = 4;
+}
+
+message SurfaceGatewayServiceConnectResponse {
+  bool accepted = 1;
+  string session_id = 2;
+  string generation = 3;
+  string message = 4;
+  repeated string scopes = 5;
+}
+
+message SurfaceGatewayServiceQueryRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string session_id = 2;
+  string query = 3;
+  google.protobuf.Struct arguments = 4;
+}
+
+message SurfaceGatewayServiceQueryResponse {
+  string request_id = 1;
+  string status = 2;
+  google.protobuf.Struct projection = 3;
+  glimmer.common.v1.ServiceErrorDetail error = 4;
+}
+
+message SurfaceGatewayServiceCommandRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string session_id = 2;
+  string command = 3;
+  google.protobuf.Struct arguments = 4;
+}
+
+message SurfaceGatewayServiceCommandResponse {
+  string request_id = 1;
+  string status = 2;
+  google.protobuf.Struct result = 3;
+  glimmer.common.v1.ServiceErrorDetail error = 4;
+}
+
+message SurfaceGatewayServiceStreamRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string session_id = 2;
+  repeated string topics = 3;
+}
+
+message SurfaceGatewayServiceStreamResponse {
+  string event_id = 1;
+  string kind = 2;
+  string trace_id = 3;
+  int64 timestamp_ms = 4;
+  google.protobuf.Struct projection = 5;
+}
+
+service SurfaceGatewayService {
+  rpc Connect(SurfaceGatewayServiceConnectRequest) returns (SurfaceGatewayServiceConnectResponse);
+  rpc Query(SurfaceGatewayServiceQueryRequest) returns (SurfaceGatewayServiceQueryResponse);
+  rpc Command(SurfaceGatewayServiceCommandRequest) returns (SurfaceGatewayServiceCommandResponse);
+  rpc Stream(SurfaceGatewayServiceStreamRequest) returns (stream SurfaceGatewayServiceStreamResponse);
+}

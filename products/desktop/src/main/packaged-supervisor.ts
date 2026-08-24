@@ -3,8 +3,8 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import WebSocket, { type RawData } from 'ws';
 import type { PackagedDesktopPaths } from './packaged-paths';
+import { SurfaceGatewayClient } from './surface-gateway-client';
 
 export type PackagedSupervisorState =
   | 'stopped'
@@ -270,26 +270,26 @@ export async function probePackagedKernelReadiness(
       || endpoint.owner_pid !== child.pid
       || endpoint.generation !== launchSession
       || typeof endpoint.endpoint !== 'string') return 'waiting';
-    return probeRuntimeReadinessCatalog(endpoint.endpoint);
+    return probeRuntimeReadinessCatalog(endpoint.endpoint, endpoint.generation);
   } catch {
     return 'waiting';
   }
 }
 
-async function probeRuntimeReadinessCatalog(endpoint: string): Promise<ProbeReadiness> {
+async function probeRuntimeReadinessCatalog(endpoint: string, generation = ''): Promise<ProbeReadiness> {
   return new Promise((resolve) => {
-    const socket = new WebSocket(endpoint, { handshakeTimeout: 1_000, maxPayload: 2 * 1024 * 1024 });
+    const socket = new SurfaceGatewayClient();
     let settled = false;
     const finish = (result: ProbeReadiness): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       socket.removeAllListeners();
-      socket.terminate();
+      socket.close();
       resolve(result);
     };
     const timeout = setTimeout(() => finish('waiting'), 1_500);
-    socket.on('message', (raw: RawData) => {
+    socket.on('message', (raw: Buffer) => {
       try {
         const frame = JSON.parse(raw.toString()) as { kind?: unknown; runtime_readiness?: unknown };
         if (frame.kind === 'runtime_readiness') finish(classifyRuntimeReadiness(frame.runtime_readiness));
@@ -299,6 +299,7 @@ async function probeRuntimeReadinessCatalog(endpoint: string): Promise<ProbeRead
     });
     socket.once('error', () => finish('waiting'));
     socket.once('close', () => finish('waiting'));
+    void socket.connect(endpoint, generation).catch(() => finish('waiting'));
   });
 }
 

@@ -16,7 +16,7 @@ import {
   type DeploymentOperationResult,
   type DeploymentOperationStatus,
 } from '../adapters/deployment-operations-service';
-import { readEndpointCatalogEntry } from '../adapters/endpoint-catalog';
+import { readEndpointCatalogEntryRecord } from '../adapters/endpoint-catalog';
 import { ObservabilityLogService, type ObservabilityLogQuery } from '../adapters/observability-log-service';
 import {
   AccessTokenStore,
@@ -105,7 +105,7 @@ export class PersonalServerApp {
     });
     this.websocketServer = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
     this.kernelReadiness = new KernelReadinessMonitor(
-      async () => readEndpointCatalogEntry(this.endpointCatalogPath, 'control-surface'),
+      async () => readEndpointCatalogEntryRecord(this.endpointCatalogPath, 'control-surface'),
       500,
       () => void this.stop(),
     );
@@ -133,14 +133,14 @@ export class PersonalServerApp {
         socket.destroy();
         return;
       }
-      const endpoint = await readEndpointCatalogEntry(this.endpointCatalogPath, 'control-surface');
+      const endpoint = await readEndpointCatalogEntryRecord(this.endpointCatalogPath, 'control-surface');
       if (!endpoint) {
         socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
         socket.destroy();
         return;
       }
       this.websocketServer.handleUpgrade(request, socket, head, (client) => {
-        proxySurfaceConnection(client, endpoint, {
+        proxySurfaceConnection(client, endpoint.endpoint, endpoint.generation, {
           extensionUploadAuthorization: toUploadAuthorization(authorization),
           localExtensionUploads: this.localExtensionUploads,
         });

@@ -39,10 +39,10 @@ products/personal-server/
 
 约束如下：
 
-- `src/server/` 只承载 Node Product Host：认证、HTTP ingress、WebSocket 代理、静态资源装配与 Product 生命周期对接；不得 import 浏览器业务模块。
+- `src/server/` 只承载 Node Product Host：认证、HTTP ingress、浏览器 WebSocket ingress、到 Kernel `SurfaceGatewayService` 的 gRPC 代理、静态资源装配与 Product 生命周期对接；不得 import 浏览器业务模块。
 - `src/web/` 只承载浏览器控制面：路由、shell、feature、shared API client、Protocol decode 与样式；不得直接访问服务器文件、YAML、secret 或 Node-only API。
 - `routes/` 只做页面装配；feature 按领域 owner 切分，Provider、模型路由、Audio、Memory、Skill、安全、存储、更新各自拥有 view model、表单和局部状态。
-- `shared/api/` 是唯一 HTTP/WebSocket client 与跨边界 decode 入口；Web 不手写第二套 payload 类型。
+- `shared/api/` 是唯一 HTTP/WebSocket client 与跨边界 decode 入口；Web 不手写第二套 payload 类型。浏览器 WebSocket 只属于 Personal Server 外部认证 ingress，Kernel consumer 由 `src/server/` 的 Surface Gateway client 持有。
 - `shared/styles/` 只放 token、global、motion、responsive 等共享样式；feature 局部样式与视图同 owner，不回流成单个全局 `app.css`。
 - `public/` 不再承载业务 `app.js`、`app.css` 或单体页面逻辑；新构建接管后，旧三文件入口必须删除，且通过架构门禁阻止回流。
 

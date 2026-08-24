@@ -1,7 +1,6 @@
 import { app, BrowserWindow, shell, dialog, clipboard, Notification, type OpenDialogOptions } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
-import WebSocket from 'ws';
 import YAML from 'yaml';
 import {
   type AudioStatusPayload,
@@ -56,6 +55,11 @@ import {
   manualRecoveryProjection,
   type CoreSkillFailureProjection,
 } from './core-skill-response';
+import {
+  SurfaceGatewayClient,
+  SURFACE_GATEWAY_CONNECTING,
+  SURFACE_GATEWAY_OPEN,
+} from './surface-gateway-client';
 
 const RECONNECT_INTERVAL_MS = 3000;
 const PROJECT_ROOTS = resolveDesktopProjectRoots({
@@ -97,8 +101,8 @@ interface ExtensionStatusChangedPayload {
   timestamp: number;
 }
 
-let kernelSocket: WebSocket | null = null;
-let kernelWsUrl = '';
+let kernelSocket: SurfaceGatewayClient | null = null;
+let kernelSurfaceEndpoint = '';
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const rendererWindows = new Set<BrowserWindow>();
 const rendererSurfaces = new Map<BrowserWindow, SurfaceId>();
@@ -847,7 +851,7 @@ function applyAvatarActionIntent(
 
 /** Control Center 只提交语义呈现请求，实际身体由 Kernel 转发给正式 Avatar。 */
 function sendAvatarPresentation(appearance: AvatarAppearanceSettings, resetPlacement = false): void {
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return;
   }
 
@@ -898,7 +902,7 @@ async function readAvatarManualActions(): Promise<AvatarManualAction[]> {
 }
 
 async function sendAvatarActionIntent(raw: unknown): Promise<void> {
-  if (kernelSocket?.readyState !== WebSocket.OPEN || !raw || typeof raw !== 'object') {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN || !raw || typeof raw !== 'object') {
     throw new Error('Avatar 尚未连接');
   }
 
@@ -1388,7 +1392,7 @@ function sendExtensionInstallRequest<T>(
   waiters: Map<string, { resolve: (result: T) => void; timer: ReturnType<typeof setTimeout> }>,
   frame: PresentationUpstreamFrame,
 ): Promise<T> {
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.reject(new Error('Kernel 尚未连接，无法管理扩展包。'));
   }
   return new Promise((resolve, reject) => {
@@ -1428,7 +1432,7 @@ function requestExtensionLifecycle(raw: ExtensionLifecycleRequest): Promise<Exte
   if (version && !EXTENSION_VERSION_PATTERN.test(version)) {
     throw new Error('无效的扩展版本');
   }
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.reject(new Error('Kernel 尚未连接，配置已保存但无法热启动或热关闭扩展。'));
   }
 
@@ -1497,7 +1501,7 @@ function executeExtensionCommand(raw: ExtensionCommandRequest): Promise<Extensio
     throw new Error('无效的扩展命令 ID');
   }
   const args = Array.isArray(raw.args) ? raw.args : [];
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.reject(new Error('Kernel 尚未连接，无法执行扩展命令。'));
   }
 
@@ -1559,7 +1563,7 @@ function executeExtensionCommand(raw: ExtensionCommandRequest): Promise<Extensio
 }
 
 function requestExtensionRuntimeProjections(): Promise<ExtensionRuntimeProjectionResponse> {
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.resolve({
       status: 'error',
       projections: lastExtensionRuntimeProjections,
@@ -1631,7 +1635,7 @@ function extractExtensionResultUrl(result: unknown): string {
 }
 
 function requestSkillCatalog(): Promise<SkillCatalogResponse> {
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.resolve({
       status: 'error',
       request_id: 'skill-catalog-unavailable',
@@ -2566,21 +2570,22 @@ function setConnectionStatus(status: KernelConnectionStatus): void {
 
 async function connectToKernel(): Promise<void> {
   if (
-    kernelSocket?.readyState === WebSocket.OPEN
-    || kernelSocket?.readyState === WebSocket.CONNECTING
+    kernelSocket?.readyState === SURFACE_GATEWAY_OPEN
+    || kernelSocket?.readyState === SURFACE_GATEWAY_CONNECTING
   ) {
     return;
   }
 
+  let resolved: { endpoint: string; generation: string } | null;
   try {
-    const endpoint = await resolveKernelWsEndpoint();
-    if (!endpoint) {
+    resolved = await resolveKernelSurfaceEndpoint();
+    if (!resolved) {
       setConnectionStatus('offline');
       scheduleReconnect();
       return;
     }
-    kernelWsUrl = endpoint;
-    kernelSocket = new WebSocket(endpoint, { maxPayload: 2 * 1024 * 1024 });
+    kernelSurfaceEndpoint = resolved.endpoint;
+    kernelSocket = new SurfaceGatewayClient();
   } catch {
     setConnectionStatus('offline');
     scheduleReconnect();
@@ -2588,14 +2593,14 @@ async function connectToKernel(): Promise<void> {
   }
 
   kernelSocket.on('open', () => {
-    console.log('[ipc-bridge] Connected to kernel WebSocket');
+    console.log('[ipc-bridge] Connected to Kernel Surface Gateway');
     hasConnectedToKernel = true;
     waitingForKernelLogged = false;
     setConnectionStatus('online');
     void readAvatarAppearance().then((appearance) => sendAvatarPresentation(appearance));
   });
 
-  kernelSocket.on('message', (raw: WebSocket.RawData) => {
+  kernelSocket.on('message', (raw: Buffer) => {
     try {
       const frame = JSON.parse(raw.toString());
       const kindValue: string = (typeof frame.kind === 'string' && frame.kind) || '';
@@ -2844,7 +2849,7 @@ async function connectToKernel(): Promise<void> {
 
   kernelSocket.on('close', () => {
     if (hasConnectedToKernel) {
-      console.log('[ipc-bridge] Kernel WebSocket closed');
+      console.log('[ipc-bridge] Kernel Surface Gateway closed');
     }
     setConnectionStatus('offline');
     kernelSocket = null;
@@ -2893,16 +2898,23 @@ async function connectToKernel(): Promise<void> {
   kernelSocket.on('error', (err: NodeJS.ErrnoException) => {
     if (!hasConnectedToKernel && err.code === 'ECONNREFUSED') {
       if (!waitingForKernelLogged) {
-        console.log(`[ipc-bridge] Waiting for kernel WebSocket at ${kernelWsUrl}`);
+        console.log(`[ipc-bridge] Waiting for Kernel Surface Gateway at ${kernelSurfaceEndpoint}`);
         waitingForKernelLogged = true;
       }
       setConnectionStatus('offline');
     } else {
-      console.warn('[ipc-bridge] Kernel WebSocket error:', err.message);
+      console.warn('[ipc-bridge] Kernel Surface Gateway error:', err.message);
       setConnectionStatus('offline');
     }
     kernelSocket?.close();
     kernelSocket = null;
+  });
+  void kernelSocket.connect(resolved.endpoint, resolved.generation).catch((error: unknown) => {
+    if (!hasConnectedToKernel) setConnectionStatus('offline');
+    console.warn('[ipc-bridge] Surface Gateway Connect failed:', error instanceof Error ? error.message : String(error));
+    kernelSocket?.close();
+    kernelSocket = null;
+    scheduleReconnect();
   });
 }
 
@@ -2914,27 +2926,37 @@ function scheduleReconnect(): void {
   }, RECONNECT_INTERVAL_MS);
 }
 
-async function resolveKernelWsEndpoint(): Promise<string | null> {
-  const configured = process.env.GLIMMER_CRADLE_DESKTOP_UI_WS_URL?.trim();
-  if (configured) return isLoopbackWebSocketEndpoint(configured) ? configured : null;
+async function resolveKernelSurfaceEndpoint(): Promise<{ endpoint: string; generation: string } | null> {
+  const configured = process.env.GLIMMER_CRADLE_DESKTOP_SURFACE_GRPC_URL?.trim();
+  const configuredGeneration = process.env.GLIMMER_CRADLE_SURFACE_GENERATION?.trim();
+  if (configured) {
+    return isLoopbackGrpcEndpoint(configured) && configuredGeneration
+      ? { endpoint: configured, generation: configuredGeneration }
+      : null;
+  }
 
   try {
     const catalogPath = resolveDesktopRunPath(PROJECT_ROOTS, 'host', 'endpoints.json');
     const catalog = JSON.parse(await fs.readFile(catalogPath, 'utf8')) as {
       owner_pid?: unknown;
+      generation?: unknown;
       endpoints?: Array<{ purpose?: unknown; endpoint?: unknown }>;
     };
     const ownerPid = Number(catalog.owner_pid);
     if (!Number.isInteger(ownerPid) || ownerPid <= 0 || !isProcessAlive(ownerPid)) return null;
     const endpoint = catalog.endpoints?.find((item) => item.purpose === 'control-surface')?.endpoint;
-    return typeof endpoint === 'string' && isLoopbackWebSocketEndpoint(endpoint) ? endpoint : null;
+    return typeof endpoint === 'string'
+      && typeof catalog.generation === 'string'
+      && isLoopbackGrpcEndpoint(endpoint)
+      ? { endpoint, generation: catalog.generation }
+      : null;
   } catch {
     return null;
   }
 }
 
-function isLoopbackWebSocketEndpoint(endpoint: string): boolean {
-  return /^ws:\/\/(?:127\.0\.0\.1|\[::1\]):\d+$/u.test(endpoint);
+function isLoopbackGrpcEndpoint(endpoint: string): boolean {
+  return /^grpc:\/\/(?:127\.0\.0\.1|\[::1\]):\d+$/u.test(endpoint);
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -3098,7 +3120,7 @@ function sendCoreSkillResponse(
   message?: string,
   failure?: CoreSkillFailureProjection,
 ): void {
-  if (kernelSocket?.readyState !== WebSocket.OPEN || !requestId) return;
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN || !requestId) return;
   kernelSocket.send(JSON.stringify(buildCoreSkillResponseFrame(
     kind,
     requestId,
@@ -3304,7 +3326,7 @@ export function registerIPCHandlers(
   desktopIpcRouter.handle('ui:send-perception', async (_event, payload: unknown) => {
     const content = (payload as { content?: string })?.content ?? '';
 
-    if (kernelSocket?.readyState === WebSocket.OPEN) {
+    if (kernelSocket?.readyState === SURFACE_GATEWAY_OPEN) {
       kernelSocket.send(JSON.stringify({
         kind: 'chat_input',
         timestamp: Date.now(),
@@ -3326,7 +3348,7 @@ export function registerIPCHandlers(
   });
 
   desktopIpcRouter.handle('ui:send-audio-input', async (_event, payload: AudioInputPayload) => {
-    if (kernelSocket?.readyState === WebSocket.OPEN) {
+    if (kernelSocket?.readyState === SURFACE_GATEWAY_OPEN) {
       kernelSocket.send(JSON.stringify({
         kind: 'audio_input',
         trace_id: payload.trace_id || `ui_audio_${Date.now()}`,
@@ -3366,7 +3388,7 @@ export function disconnectKernel(): void {
 }
 
 export async function requestKernelShutdown(timeoutMs = 10000): Promise<boolean> {
-  if (kernelSocket?.readyState !== WebSocket.OPEN) {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     kernelShutdownRequested = true;
     return false;
   }

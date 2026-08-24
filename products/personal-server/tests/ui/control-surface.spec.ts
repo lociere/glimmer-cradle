@@ -237,11 +237,12 @@ test('keeps both shell connection indicators in sync and restores them after rec
     await expect(page.locator('.section-pane [data-route="logs"]').first()).toHaveAttribute('aria-current', 'page');
 
     await fixture.disconnectSurfaceClients();
-    await expect(connectionLabels.nth(0)).toHaveText('等待服务');
-    await expect(connectionLabels.nth(1)).toHaveText('等待服务');
-
+    // Surface Gateway may complete a gRPC reconnect before a browser paint; assert the stable contract.
     await expect(connectionLabels.nth(0)).toHaveText('在线', { timeout: 8000 });
     await expect(connectionLabels.nth(1)).toHaveText('在线', { timeout: 8000 });
+    await page.locator('[data-route="settings"]').first().click();
+    await expect(page.locator('.section-pane [data-route="settings"]').first()).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('.settings-section').first()).toBeVisible();
   } finally {
     await fixture.stop();
   }

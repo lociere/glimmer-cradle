@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { RuntimeReadinessCatalog } from '@glimmer-cradle/protocol';
-import { WebSocketServer } from 'ws';
 import { deriveKernelReadinessStatus } from './kernel-readiness-monitor';
 import { KernelReadinessMonitor } from './kernel-readiness-monitor';
+import { SurfaceGatewayTestDouble } from './surface-gateway-test-double';
 
 function catalog(
   ingressState: 'starting' | 'ready' | 'failed',
@@ -50,31 +50,27 @@ test('projects blocking failures as failed readiness', () => {
 });
 
 test('reconnects when the endpoint appears after product startup and observes canonical readiness', async (t) => {
-  let endpoint: string | null = null;
-  const monitor = new KernelReadinessMonitor(async () => endpoint, 20);
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-  await new Promise<void>((resolve, reject) => {
-    server.once('listening', resolve);
-    server.once('error', reject);
-  });
-  t.after(() => {
-    monitor.stop();
-    server.close();
-  });
+  let endpoint: { endpoint: string; generation: string } | null = null;
+  let latestClient: SurfaceGatewayTestDouble | null = null;
+  const monitor = new KernelReadinessMonitor(
+    async () => endpoint,
+    20,
+    undefined,
+    () => {
+      latestClient = new SurfaceGatewayTestDouble();
+      latestClient.once('open', () => latestClient?.emitFrame({
+        kind: 'runtime_readiness',
+        timestamp: Date.now(),
+        runtime_readiness: catalog('ready', 'ready'),
+      }));
+      return latestClient;
+    },
+  );
+  t.after(() => monitor.stop());
 
   monitor.start();
   assert.equal(monitor.getStatus().connection_state, 'disconnected');
-
-  const address = server.address();
-  assert.ok(address && typeof address === 'object');
-  endpoint = `ws://127.0.0.1:${address.port}`;
-  server.once('connection', (socket) => {
-    socket.send(JSON.stringify({
-      kind: 'runtime_readiness',
-      timestamp: Date.now(),
-      runtime_readiness: catalog('ready', 'ready'),
-    }));
-  });
+  endpoint = { endpoint: 'grpc://surface-test', generation: 'generation-a' };
 
   await waitUntil(() => monitor.getStatus().ready, 2_000);
   const status = monitor.getStatus();
@@ -84,26 +80,18 @@ test('reconnects when the endpoint appears after product startup and observes ca
 });
 
 test('forwards the Kernel shutdown frame to the product lifecycle owner', async (t) => {
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-  await new Promise<void>((resolve, reject) => {
-    server.once('listening', resolve);
-    server.once('error', reject);
-  });
-  const address = server.address();
-  assert.ok(address && typeof address === 'object');
   let shutdownRequests = 0;
   const monitor = new KernelReadinessMonitor(
-    async () => `ws://127.0.0.1:${address.port}`,
+    async () => ({ endpoint: 'grpc://surface-test', generation: 'generation-a' }),
     20,
     () => { shutdownRequests += 1; },
+    () => {
+      const client = new SurfaceGatewayTestDouble();
+      client.once('open', () => client.emitFrame({ kind: 'shutdown', timestamp: Date.now() }));
+      return client;
+    },
   );
-  t.after(() => {
-    monitor.stop();
-    server.close();
-  });
-  server.once('connection', (socket) => {
-    socket.send(JSON.stringify({ kind: 'shutdown', timestamp: Date.now() }));
-  });
+  t.after(() => monitor.stop());
 
   monitor.start();
   await waitUntil(() => shutdownRequests === 1, 2_000);

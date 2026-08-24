@@ -1,6 +1,13 @@
 import type { PresentationDownstreamFrame, PresentationUpstreamFrame } from '@glimmer-cradle/protocol';
 import { WebSocket, type RawData } from 'ws';
 import {
+  SurfaceGatewayClient,
+  type SurfaceGatewayClientFactory,
+  type SurfaceGatewayClientLike,
+  SURFACE_GATEWAY_OPEN,
+  SURFACE_GATEWAY_CONNECTING,
+} from './surface-gateway-client';
+import {
   LocalExtensionUploadStore,
   type LocalExtensionUploadAuthorization,
 } from '../adapters/local-extension-upload-store';
@@ -11,6 +18,7 @@ const EXTENSION_CANCEL_TIMEOUT_MS = 1500;
 interface ProxyOptions {
   readonly extensionUploadAuthorization?: LocalExtensionUploadAuthorization;
   readonly localExtensionUploads?: LocalExtensionUploadStore;
+  readonly surfaceGatewayClientFactory?: SurfaceGatewayClientFactory;
 }
 
 interface PendingPrepareRequest {
@@ -32,9 +40,12 @@ interface PendingCancellation {
 export function proxySurfaceConnection(
   client: WebSocket,
   endpoint: string,
-  options: ProxyOptions = {},
+  generationOrOptions: string | ProxyOptions,
+  maybeOptions: ProxyOptions = {},
 ): void {
-  const upstream = new WebSocket(endpoint);
+  const generation = typeof generationOrOptions === 'string' ? generationOrOptions : '';
+  const options = typeof generationOrOptions === 'string' ? maybeOptions : generationOrOptions;
+  const upstream: SurfaceGatewayClientLike = options.surfaceGatewayClientFactory?.() ?? new SurfaceGatewayClient();
   const pending: Array<{ data: RawData; binary: boolean }> = [];
   const pendingPrepareRequests = new Map<string, PendingPrepareRequest>();
   const transactionBindings = new Map<string, BoundTransaction>();
@@ -51,12 +62,12 @@ export function proxySurfaceConnection(
 
   upstream.on('open', () => {
     for (const item of pending.splice(0)) {
-      upstream.send(item.data, { binary: item.binary });
+      upstream.send(item.data.toString());
     }
   });
 
-  upstream.on('message', (data, binary) => {
-    void handleUpstreamMessage(data, binary);
+  upstream.on('message', (data: RawData) => {
+    void handleUpstreamMessage(data, false);
   });
 
   client.on('close', () => {
@@ -84,11 +95,11 @@ export function proxySurfaceConnection(
   ): Promise<void> {
     const forwarded = await rewriteClientFrame(data, binary);
     if (!forwarded) return;
-    if (upstream.readyState === WebSocket.OPEN) {
-      upstream.send(forwarded.data, { binary: forwarded.binary });
+    if (upstream.readyState === SURFACE_GATEWAY_OPEN) {
+      upstream.send(forwarded.data.toString());
       return;
     }
-    if (upstream.readyState === WebSocket.CONNECTING) {
+    if (upstream.readyState === SURFACE_GATEWAY_CONNECTING) {
       pending.push(forwarded);
     }
   }
@@ -308,7 +319,7 @@ export function proxySurfaceConnection(
         request_id: requestId,
         transaction_id: transactionId,
       },
-    }));
+    }).toString());
     await waitForResult;
   }
 
@@ -335,6 +346,12 @@ export function proxySurfaceConnection(
     await cleanupForDisconnect();
     closePeer(upstream);
   }
+
+  void upstream.connect(endpoint, generation, 'personal-server').catch(() => {
+    acceptingMessages = false;
+    localCleanupPromise ??= cleanupLocalState();
+    closePeer(client);
+  });
 }
 
 function buildPreviewError(requestId: string, message: string): PresentationDownstreamFrame {
@@ -361,8 +378,9 @@ function buildInstallResultError(requestId: string, message: string): Presentati
   };
 }
 
-function closePeer(peer: WebSocket): void {
-  if (peer.readyState === WebSocket.OPEN || peer.readyState === WebSocket.CONNECTING) {
+function closePeer(peer: WebSocket | SurfaceGatewayClientLike): void {
+  if (peer.readyState === WebSocket.OPEN || peer.readyState === WebSocket.CONNECTING
+    || peer.readyState === SURFACE_GATEWAY_OPEN || peer.readyState === SURFACE_GATEWAY_CONNECTING) {
     peer.close();
   }
 }

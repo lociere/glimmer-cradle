@@ -55,6 +55,17 @@
 
 ## Slice 1 `contracts/` baseline inventory
 
+## M12 Slice 7 Surface Gateway additions
+
+| 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
+|---|---|---|---|---|---|
+| `proto/glimmer/surface/v1/surface_gateway.proto` | `SurfaceGatewayService`、`SurfaceGatewayServiceConnectRequest`、`SurfaceGatewayServiceConnectResponse`、`SurfaceGatewayServiceQueryRequest`、`SurfaceGatewayServiceQueryResponse`、`SurfaceGatewayServiceCommandRequest`、`SurfaceGatewayServiceCommandResponse`、`SurfaceGatewayServiceStreamRequest`、`SurfaceGatewayServiceStreamResponse` 以及 `Connect`、`Query`、`Command`、`Stream`；请求绑定产品、generation、scope 和通用调用 metadata，投影 payload 使用受控 `google.protobuf.Struct`，不复制领域 DTO。 | Kernel Surface Gateway owner | `proto/glimmer/surface/v1/surface_gateway.proto` | Slice 7 | Desktop/Personal Server 只经该 Service 与 Kernel Gateway，旧产品→Kernel Surface WebSocket consumer 和回退入口归零后关闭 Slice 7。 |
+| `proto/glimmer/surface/v1/SurfaceGatewayServiceConnectRequest` | 产品侧连接请求；`product_id`、EndpointRegistry `generation` 和 scopes 在 Kernel 认证，浏览器不能直接提交。 | Kernel Surface Gateway owner | `proto/glimmer/surface/v1/surface_gateway.proto` | Slice 7 | Connect 认证/权限拒绝和 generation mismatch 门通过，旧握手/回退入口删除。 |
+| `proto/glimmer/surface/v1/SurfaceGatewayServiceQueryRequest` | 只读 Surface Query；参数为 JSON Struct，结果为受控 projection。 | Kernel Surface Gateway owner | `proto/glimmer/surface/v1/surface_gateway.proto` | Slice 7 | Query consumer 全部转为 Service Adapter。 |
+| `proto/glimmer/surface/v1/SurfaceGatewayServiceCommandRequest` | 有副作用 Surface Command；由 Kernel 统一权限和幂等 metadata，结果不得伪装为 Event。 | Kernel Surface Gateway owner | `proto/glimmer/surface/v1/surface_gateway.proto` | Slice 7 | Command consumer 全部转为 Service Adapter，权限拒绝门通过。 |
+| `proto/glimmer/surface/v1/SurfaceGatewayServiceStreamResponse` | 有序、可取消的 presentation projection stream；产品侧消费 backpressure 受 gRPC stream 控制。 | Kernel Surface Gateway owner | `proto/glimmer/surface/v1/surface_gateway.proto` | Slice 7 | Stream 断连/取消/重连门通过。 |
+| `json-schema/presentation/v1/presentation-frame.schema.json` | `PresentationFrameDocument`，`$id` 为 `https://glimmer-cradle.local/contracts/presentation/v1/presentation-frame.schema.json`；Surface 边缘投影 Document，不成为 Kernel 领域事实源，也不复制 Protobuf Service DTO。 | Kernel Surface Gateway owner | `json-schema/presentation/v1/presentation-frame.schema.json` | Slice 7 | 所有 Surface projection consumer 与文档同步后保留为唯一 presentation Document owner。 |
+
 | 项 | 当前事实 | owner | 当前权威源 | 迁移切片 | 删除条件 |
 |---|---|---|---|---|---|
 | Protobuf Service baseline | `proto/glimmer/common/v1/contract_probe.proto` 定义最小 `ContractProbeService`、`EchoProbe`、`EchoProbeRequest`、`EchoProbeResponse`、`DocumentReference` 和 `TraceMetadata`。 | Contract Spine owner | `contracts/proto/` | Slice 1 | 只在新兼容世代或审查通过的 baseline refresh 中演进；不得由 runtime consumer 手写镜像替代。 |

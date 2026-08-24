@@ -1,7 +1,27 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { WebSocketServer, type WebSocket } from 'ws';
+import * as grpc from '@grpc/grpc-js';
+import { create, fromBinary, fromJson, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
+import { StructSchema } from '@bufbuild/protobuf/wkt';
+import {
+  SurfaceGatewayServiceCommandRequestSchema,
+  SurfaceGatewayServiceCommandResponseSchema,
+  SurfaceGatewayServiceConnectRequestSchema,
+  SurfaceGatewayServiceConnectResponseSchema,
+  SurfaceGatewayServiceQueryRequestSchema,
+  SurfaceGatewayServiceQueryResponseSchema,
+  SurfaceGatewayServiceStreamRequestSchema,
+  SurfaceGatewayServiceStreamResponseSchema,
+  type SurfaceGatewayServiceCommandRequest,
+  type SurfaceGatewayServiceCommandResponse,
+  type SurfaceGatewayServiceConnectRequest,
+  type SurfaceGatewayServiceConnectResponse,
+  type SurfaceGatewayServiceQueryRequest,
+  type SurfaceGatewayServiceQueryResponse,
+  type SurfaceGatewayServiceStreamRequest,
+  type SurfaceGatewayServiceStreamResponse,
+} from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import type {
   ConfigurationProviderSnapshot,
   ConfigurationSnapshot,
@@ -21,6 +41,34 @@ import type {
 import { PersonalServerApp } from '../../../src/server/bootstrap/personal-server-app';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
+
+type FixtureSurfacePeer = { send(data: string): void };
+
+function unaryMethod<I extends DescMessage, O extends DescMessage>(
+  pathName: string,
+  input: I,
+  output: O,
+): grpc.MethodDefinition<MessageShape<I>, MessageShape<O>> {
+  return {
+    path: pathName,
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value) => Buffer.from(toBinary(input, value)),
+    requestDeserialize: (value) => fromBinary(input, value),
+    responseSerialize: (value) => Buffer.from(toBinary(output, value)),
+    responseDeserialize: (value) => fromBinary(output, value),
+  };
+}
+
+const surfaceGatewayDefinition: grpc.ServiceDefinition = {
+  Connect: unaryMethod('/glimmer.surface.v1.SurfaceGatewayService/Connect', SurfaceGatewayServiceConnectRequestSchema, SurfaceGatewayServiceConnectResponseSchema),
+  Query: unaryMethod('/glimmer.surface.v1.SurfaceGatewayService/Query', SurfaceGatewayServiceQueryRequestSchema, SurfaceGatewayServiceQueryResponseSchema),
+  Command: unaryMethod('/glimmer.surface.v1.SurfaceGatewayService/Command', SurfaceGatewayServiceCommandRequestSchema, SurfaceGatewayServiceCommandResponseSchema),
+  Stream: {
+    ...unaryMethod('/glimmer.surface.v1.SurfaceGatewayService/Stream', SurfaceGatewayServiceStreamRequestSchema, SurfaceGatewayServiceStreamResponseSchema),
+    responseStream: true,
+  },
+};
 
 export interface PersonalServerUiFixture {
   readonly baseUrl: string;
@@ -76,38 +124,77 @@ export async function startPersonalServerUiFixture(options?: {
   })}\n`, 'utf8');
 
   const state = createFixtureState(Boolean(options?.zeroProvider));
-  const kernelSurface = new WebSocketServer({ host: '127.0.0.1', port: 0 });
-  await waitForWebSocketServer(kernelSurface);
-  const kernelAddress = kernelSurface.address();
-  if (!kernelAddress || typeof kernelAddress === 'string') {
-    throw new Error('kernel surface did not bind');
-  }
+  const kernelSurface = new grpc.Server();
+  const surfaceStreams = new Set<grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>>();
+  kernelSurface.addService(surfaceGatewayDefinition, {
+    Connect: (
+      call: grpc.ServerUnaryCall<SurfaceGatewayServiceConnectRequest, SurfaceGatewayServiceConnectResponse>,
+      callback: grpc.sendUnaryData<SurfaceGatewayServiceConnectResponse>,
+    ) => callback(null, create(SurfaceGatewayServiceConnectResponseSchema, {
+      accepted: call.request.productId === 'personal-server'
+        && call.request.generation === 'fixture-1',
+      sessionId: call.request.productId === 'personal-server' ? `fixture-session-${Date.now()}` : '',
+      generation: 'fixture-1',
+      message: 'fixture surface session',
+      scopes: ['surface:read', 'surface:write'],
+    })),
+    Query: (
+      call: grpc.ServerUnaryCall<SurfaceGatewayServiceQueryRequest, SurfaceGatewayServiceQueryResponse>,
+      callback: grpc.sendUnaryData<SurfaceGatewayServiceQueryResponse>,
+    ) => {
+      const frame = fixtureRequestFrame(call.request.arguments);
+      const response = fixtureResponseFrame(frame, state);
+      callback(null, create(SurfaceGatewayServiceQueryResponseSchema, {
+        requestId: `fixture-query-${Date.now()}`,
+        status: response ? 'success' : 'accepted',
+        projection: response ? fromJson(StructSchema, response as never) as never : undefined,
+      }));
+    },
+    Command: (
+      call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
+      callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
+    ) => {
+      const frame = fixtureRequestFrame(call.request.arguments);
+      const response = fixtureResponseFrame(frame, state);
+      callback(null, create(SurfaceGatewayServiceCommandResponseSchema, {
+        requestId: `fixture-command-${Date.now()}`,
+        status: response ? 'success' : 'accepted',
+        result: response ? fromJson(StructSchema, response as never) as never : undefined,
+      }));
+    },
+    Stream: (
+      call: grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>,
+    ) => {
+      surfaceStreams.add(call);
+      call.once('cancelled', () => surfaceStreams.delete(call));
+      call.once('close', () => surfaceStreams.delete(call));
+      call.write(fixtureStreamFrame({
+        kind: 'runtime_readiness',
+        timestamp: Date.now(),
+        runtime_readiness: {
+          updated_at: Date.now(),
+          runtimes: [
+            readyRuntime('kernel.ingress', 'kernel', 'ingress', 'HTTP ingress 已就绪', true),
+            readyRuntime('cognition', 'cognition', 'core_ready', 'Cognition 已连接', true),
+            readyRuntime('extension.host', 'extension', 'capability_plane', 'Extension Host 已连接', false),
+          ],
+        } satisfies RuntimeReadinessCatalog,
+      } satisfies PresentationDownstreamFrame));
+    },
+  });
+  const kernelPort = await new Promise<number>((resolve, reject) => {
+    kernelSurface.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, port) => {
+      if (error) reject(error);
+      else resolve(port);
+    });
+  });
   writeFileSync(path.join(runRoot, 'endpoints.json'), JSON.stringify({
     generation: 'fixture-1',
     endpoints: [{
       purpose: 'control-surface',
-      endpoint: `ws://127.0.0.1:${kernelAddress.port}`,
+      endpoint: `grpc://127.0.0.1:${kernelPort}`,
     }],
   }), 'utf8');
-
-  kernelSurface.on('connection', (socket) => {
-    socket.send(JSON.stringify({
-      kind: 'runtime_readiness',
-      timestamp: Date.now(),
-      runtime_readiness: {
-        updated_at: Date.now(),
-        runtimes: [
-          readyRuntime('kernel.ingress', 'kernel', 'ingress', 'HTTP ingress 已就绪', true),
-          readyRuntime('cognition', 'cognition', 'core_ready', 'Cognition 已连接', true),
-          readyRuntime('extension.host', 'extension', 'capability_plane', 'Extension Host 已连接', false),
-        ],
-      } satisfies RuntimeReadinessCatalog,
-    } satisfies PresentationDownstreamFrame));
-    socket.on('message', (raw) => {
-      const frame = JSON.parse(raw.toString()) as Record<string, unknown>;
-      handleFixtureFrame(socket, frame, state);
-    });
-  });
 
   const previousDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
   const previousConfigRoot = process.env.GLIMMER_CRADLE_CONFIG_ROOT;
@@ -130,13 +217,11 @@ export async function startPersonalServerUiFixture(options?: {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     async disconnectSurfaceClients() {
-      await Promise.all([...kernelSurface.clients].map(async (client) => {
-        client.close();
-      }));
+      for (const stream of surfaceStreams) stream.end();
     },
     async stop() {
       await app.stop();
-      await new Promise<void>((resolve) => kernelSurface.close(() => resolve()));
+      await new Promise<void>((resolve) => kernelSurface.tryShutdown(() => resolve()));
       if (previousDataRoot === undefined) delete process.env.GLIMMER_CRADLE_DATA_ROOT;
       else process.env.GLIMMER_CRADLE_DATA_ROOT = previousDataRoot;
       if (previousConfigRoot === undefined) delete process.env.GLIMMER_CRADLE_CONFIG_ROOT;
@@ -487,7 +572,35 @@ function createFixtureState(zeroProvider: boolean): FixtureState {
   };
 }
 
-function handleFixtureFrame(socket: WebSocket, frame: Record<string, unknown>, state: FixtureState): void {
+function fixtureRequestFrame(argumentsValue: unknown): Record<string, unknown> {
+  if (!argumentsValue || typeof argumentsValue !== 'object') return {};
+  const json = argumentsValue as Record<string, unknown>;
+  return json.frame && typeof json.frame === 'object'
+    ? json.frame as Record<string, unknown>
+    : {};
+}
+
+function fixtureResponseFrame(frame: Record<string, unknown>, state: FixtureState): Record<string, unknown> | undefined {
+  let response: Record<string, unknown> | undefined;
+  handleFixtureFrame({
+    send: (serialized) => {
+      response = JSON.parse(serialized) as Record<string, unknown>;
+    },
+  }, frame, state);
+  return response;
+}
+
+function fixtureStreamFrame(frame: PresentationDownstreamFrame): SurfaceGatewayServiceStreamResponse {
+  return create(SurfaceGatewayServiceStreamResponseSchema, {
+    eventId: `fixture-event-${Date.now()}`,
+    kind: frame.kind,
+    traceId: frame.trace_id ?? '',
+    timestampMs: BigInt(Math.max(0, Math.trunc(frame.timestamp))),
+    projection: fromJson(StructSchema, JSON.parse(JSON.stringify(frame)) as never) as never,
+  });
+}
+
+function handleFixtureFrame(socket: FixtureSurfacePeer, frame: Record<string, unknown>, state: FixtureState): void {
   switch (frame.kind) {
     case 'conversation_history_request': {
       const request = frame.conversation_history_request as { request_id?: string; cursor?: string } | undefined;
@@ -1078,17 +1191,4 @@ function sortInstalledVersions(versions: string[]): [string, ...string[]] {
   const unique = [...new Set(versions)];
   unique.sort((left, right) => right.localeCompare(left, undefined, { numeric: true, sensitivity: 'base' }));
   return unique as [string, ...string[]];
-}
-
-function waitForWebSocketServer(server: WebSocketServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onListening = (): void => { cleanup(); resolve(); };
-    const onError = (error: Error): void => { cleanup(); reject(error); };
-    const cleanup = (): void => {
-      server.off('listening', onListening);
-      server.off('error', onError);
-    };
-    server.once('listening', onListening);
-    server.once('error', onError);
-  });
 }
