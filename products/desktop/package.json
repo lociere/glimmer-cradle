@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@glimmer-cradle/protocol": "workspace:*",
-    "better-sqlite3": "11.10.0",
+    "better-sqlite3": "13.0.3",
     "lucide-react": "^0.468.0",
     "ws": "^8.20.0",
     "yaml": "^2.8.1",

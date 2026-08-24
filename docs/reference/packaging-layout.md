@@ -82,6 +82,13 @@ Avatar/native 先由独立 clean Windows job 使用固定摘要工具链构建�
 digest 复验后投影到 Desktop staging。缺许可、工具链、固定制品或任一 runtime manifest
 输入时 package 失败闭合。
 
+Desktop 与 bundled Kernel 共用固定的 `better-sqlite3` `13.0.3`；当前 Electron `43.x`
+安装态为 Node `24.18.0` / V8 `15.0`。该依赖从 `13.0.0` 起使用 N-API，package 仍必须保留
+electron-builder native dependency rebuild，并分别在实际 Electron 与 bundled Node 中加载、
+打开内存数据库和完成读写；不得通过关闭 `npmRebuild`、externalize 到安装机或吞掉 ABI
+错误生成安装包。root、Kernel 与 Desktop manifest 必须锁定同一精确版本，避免 staging
+同时携带多套 native binary。
+
 ## Personal Server OCI 投影
 
 `deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；builder 显式复制并构建 Contracts TS workspace，同时把 `contracts/` 作为 Cognition 的 Python 本地 distribution 安装，Cognition 与 Audio 使用 uv 锁文件创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移，也不依赖源码树路径注入。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。

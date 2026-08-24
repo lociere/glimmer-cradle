@@ -24,6 +24,18 @@ const builderConfig = JSON.parse(await readFile(
   path.join(repoRoot, 'products', 'desktop', 'electron-builder.json'),
   'utf8',
 ));
+const desktopManifest = JSON.parse(await readFile(
+  path.join(repoRoot, 'products', 'desktop', 'package.json'),
+  'utf8',
+));
+const rootManifest = JSON.parse(await readFile(
+  path.join(repoRoot, 'package.json'),
+  'utf8',
+));
+const kernelManifest = JSON.parse(await readFile(
+  path.join(repoRoot, 'core', 'kernel', 'package.json'),
+  'utf8',
+));
 const workflow = await readFile(
   path.join(repoRoot, '.github', 'workflows', 'release-desktop.yml'),
   'utf8',
@@ -46,6 +58,14 @@ test('Desktop package dry-run 是独立 Windows fixed-artifact 任务且不发�
   assert.equal(contract.publish, false);
   assert.match(contract.output.replaceAll('\\', '/'), /dist\/desktop\/0\.1\.8\/windows-x64$/);
   assert.ok(!JSON.stringify(contract).includes('personal-server'));
+});
+
+test('Desktop native SQLite 与 Electron 43 使用受支持且不绕过 rebuild 的固定矩阵', () => {
+  for (const manifest of [rootManifest, kernelManifest, desktopManifest]) {
+    assert.equal(manifest.dependencies['better-sqlite3'], '13.0.3');
+  }
+  assert.match(desktopManifest.devDependencies.electron, /^\^43\./);
+  assert.notEqual(builderConfig.npmRebuild, false);
 });
 
 test('Desktop package 在 clean Windows owner task 准备六类 runtime projection', () => {
