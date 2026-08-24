@@ -8,7 +8,7 @@
 
 ## 当前推进面：M12 Slice 8
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～7 已集成。Slice 8 正在推进：Kernel↔UnityAvatarHost control consumer 已切到动态回环 `AvatarHostService.Connect` 双向 gRPC，使用进程级随机令牌认证；Unity Adapter 直接消费二进制 generated DTO，旧 WebSocket 主线、固定端口和环境变量已删除。Contract Spine、Kernel 生命周期与真实 `Grpc.Core` transport 定向门已通过；Unity Editor 已编译并 IL 后处理独立 gRPC Adapter assembly。完整 Unity Host/Player 门当前真实缺口是仓库外专有 Cubism SDK 未安装，不是 .NET、Unity license 或 gRPC 工具链。Audio control/data plane 仍是 Slice 8 下一主线，Slice 8 尚未关闭，禁止进入 Slice 9。M11 仍暂停/延期且未完成。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～7 已集成，Slice 8 已形成候选：Kernel↔UnityAvatarHost control consumer 使用动态回环 `AvatarHostService.Connect` 双向 gRPC；Kernel↔Audio Engine 使用动态回环 `AudioEngineService` unary gRPC 与进程级随机令牌。Audio data plane 只传带 access/expiry/size/SHA-256 的短期 `AudioMediaReference`，ASR 输入只读、TTS 输出单次写入，成功、错误、超时、停机和崩溃均回收 lane lease；旧 Audio stdio Schema/consumer、Pydantic projection、Python/C# legacy generator 已归零。Contract Spine、Kernel/Audio 生命周期、Python Host 风险门、真实 `Grpc.Core` transport、Unity Adapter 编译与完整 Unity Host/Windows Player 门均已通过；第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。当前进入 Slice 9 legacy protocol closure。M11 仍暂停/延期且未完成。
 
 [M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成第二轮审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选继续把未绑定固定 candidate 的 update check/apply 设为 unsupported/fail-closed；Kernel DLQ 已有 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍未注册 replay。该状态尚未再次独立复审或集成，不能写成 main 已完成。
 

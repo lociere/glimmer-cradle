@@ -1,11 +1,15 @@
-from io import StringIO
 from pathlib import Path
-import json
+import hashlib
 import struct
+import time
+
+import grpc
+import pytest
+from glimmer.engine.audio.v1 import audio_engine_pb2 as audio_pb
 
 from glimmer_cradle.audio.asr.funasr_engine import normalize_funasr_result
-from glimmer_cradle.audio.main import AudioEngineApp, run_stdio
-from glimmer_cradle.audio.protocol import parse_command
+from glimmer_cradle.audio.grpc_host import AudioGrpcHost
+from glimmer_cradle.audio.main import AudioEngineApp
 from glimmer_cradle.audio.tts import DashScopeCosyVoiceEngine, TTSRoute
 
 
@@ -85,33 +89,111 @@ class FakeSocket:
         return None
 
 
-def test_parse_health_command_from_generated_contract() -> None:
-    command = parse_command({"id": "1", "command": "health", "payload": {}})
-    assert command.id == "1"
-    assert command.command == "health"
+class FakeContext:
+    def __init__(self, token: str = "test-token") -> None:
+        self.token = token
+
+    def invocation_metadata(self):
+        return (("x-glimmer-audio-token", self.token),)
+
+    def abort(self, code: grpc.StatusCode, details: str):
+        raise RuntimeError(f"{code.name}: {details}")
 
 
-def test_stdio_shutdown_acknowledges_then_closes_host() -> None:
-    stdin = StringIO(
-        "\n".join(
-            [
-                json.dumps({"id": "health-1", "command": "health", "payload": {}}),
-                json.dumps({"id": "stop-1", "command": "host.shutdown", "payload": {}}),
-                json.dumps({"id": "ignored", "command": "health", "payload": {}}),
-            ]
-        )
+class FakeAudioApp:
+    def health_snapshot(self):
+        return {"engine": "audio", "lane": "all", "providers": {}}
+
+    def warmup(self, lane: str):
+        return {"provider_id": f"fake-{lane}"}
+
+    def synthesize(self, text: str, output_path: str):
+        Path(output_path).write_bytes(b"RIFF....WAVE")
+        return {"provider_id": "fake", "fallback_used": False, "duration_ms": 1.5}
+
+    def recognize(self, audio_path: str):
+        assert Path(audio_path).read_bytes() == b"audio-input"
+        return {"text": "月见", "provider_id": "fake", "duration_ms": 2.5}
+
+
+def _reference(path: Path, lease_id: str, access: int, *, digest: str = "", size: int = 0):
+    return audio_pb.AudioMediaReference(
+        lease_id=lease_id,
+        uri=path.as_uri(),
+        mime_type="audio/wav",
+        size_bytes=size,
+        sha256=digest,
+        expires_at_ms=int(time.time() * 1000) + 30_000,
+        access=access,
     )
-    stdout = StringIO()
 
-    assert run_stdio(stdin, stdout) == 0
 
-    responses = [json.loads(line) for line in stdout.getvalue().splitlines()]
-    assert [response["id"] for response in responses] == ["health-1", "stop-1"]
-    assert responses[-1] == {
-        "id": "stop-1",
-        "status": "success",
-        "payload": {"accepted": True, "lane": "all"},
-    }
+def test_grpc_host_requires_process_token(tmp_path: Path) -> None:
+    host = AudioGrpcHost(FakeAudioApp(), tmp_path, "test-token")
+    with pytest.raises(RuntimeError, match="UNAUTHENTICATED"):
+        host.health(audio_pb.HealthRequest(), FakeContext("wrong-token"))
+
+
+def test_grpc_host_exposes_health_and_warmup_control_plane(tmp_path: Path) -> None:
+    host = AudioGrpcHost(FakeAudioApp(), tmp_path, "test-token")
+    health = host.health(audio_pb.HealthRequest(), FakeContext())
+    warmup = host.warmup(
+        audio_pb.WarmupRequest(lane=audio_pb.AUDIO_LANE_TTS),
+        FakeContext(),
+    )
+    assert health.snapshot["engine"] == "audio"
+    assert warmup.snapshot["provider_id"] == "fake-tts"
+
+
+def test_grpc_host_completes_write_once_media_reference(tmp_path: Path) -> None:
+    lease_id = "lease-output"
+    output = tmp_path / lease_id / "output.wav"
+    output.parent.mkdir()
+    host = AudioGrpcHost(FakeAudioApp(), tmp_path, "test-token")
+    response = host.synthesize(
+        audio_pb.SynthesizeRequest(
+            text="你好",
+            output=_reference(output, lease_id, audio_pb.MEDIA_ACCESS_WRITE_ONCE),
+        ),
+        FakeContext(),
+    )
+    assert not response.HasField("failure")
+    assert response.output.size_bytes == len(b"RIFF....WAVE")
+    assert response.output.sha256 == hashlib.sha256(b"RIFF....WAVE").hexdigest()
+
+
+def test_grpc_host_validates_read_only_digest_and_lease_boundary(tmp_path: Path) -> None:
+    lease_id = "lease-input"
+    input_path = tmp_path / lease_id / "input.wav"
+    input_path.parent.mkdir()
+    input_path.write_bytes(b"audio-input")
+    host = AudioGrpcHost(FakeAudioApp(), tmp_path, "test-token")
+    digest = hashlib.sha256(b"audio-input").hexdigest()
+    response = host.recognize(
+        audio_pb.RecognizeRequest(
+            input=_reference(input_path, lease_id, audio_pb.MEDIA_ACCESS_READ_ONLY, digest=digest, size=len(b"audio-input")),
+        ),
+        FakeContext(),
+    )
+    assert response.text == "月见"
+    tampered = host.recognize(
+        audio_pb.RecognizeRequest(
+            input=_reference(input_path, lease_id, audio_pb.MEDIA_ACCESS_READ_ONLY, digest="0" * 64, size=len(b"audio-input")),
+        ),
+        FakeContext(),
+    )
+    assert tampered.failure.code == "asr_failed"
+
+
+def test_grpc_host_rejects_expired_media_reference(tmp_path: Path) -> None:
+    lease_id = "expired"
+    output = tmp_path / lease_id / "output.wav"
+    output.parent.mkdir()
+    reference = _reference(output, lease_id, audio_pb.MEDIA_ACCESS_WRITE_ONCE)
+    reference.expires_at_ms = int(time.time() * 1000) - 1
+    host = AudioGrpcHost(FakeAudioApp(), tmp_path, "test-token")
+    response = host.synthesize(audio_pb.SynthesizeRequest(text="你好", output=reference), FakeContext())
+    assert response.failure.code == "tts_route_failed"
 
 
 def test_tts_route_falls_back_and_reports_actual_provider(tmp_path: Path) -> None:
@@ -161,11 +243,8 @@ def test_dashscope_provider_uses_one_task_id_and_binary_audio(tmp_path: Path) ->
 
 def test_audio_engine_health_exposes_route_without_experimental_providers() -> None:
     app = AudioEngineApp(lane="tts")
-    response = app.handle(
-        parse_command({"id": "health-1", "command": "health", "payload": {}})
-    )
-    assert response["status"] == "success"
-    tts = response["payload"]["providers"]["tts"]
+    response = app.health_snapshot()
+    tts = response["providers"]["tts"]
     assert tts["route_state"] == "unavailable"
     assert [provider["provider_id"] for provider in tts["providers"]] == [
         "dashscope-cosyvoice"

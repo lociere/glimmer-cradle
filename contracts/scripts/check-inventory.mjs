@@ -5,8 +5,6 @@ import { parse as parseToml } from 'smol-toml';
 const GENERATOR_PACKAGE = 'datamodel-code-generator';
 const AUDIO_PROJECT = 'glimmer-cradle-audio-engine';
 const COGNITION_PROJECT = 'glimmer-cradle-cognition';
-const AUDIO_GENERATOR_COMMAND =
-  'uv run --project ../engines/audio --extra dev python codegen/gen-py.py';
 
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -25,6 +23,7 @@ const required = [
   'protocol/src/generated/',
   'Cognition legacy Python projection 已删除',
   'proto/glimmer/avatar/v1/avatar_host.proto',
+  'proto/glimmer/engine/audio/v1/audio_engine.proto',
   'hosts/unity-avatar-host/Assets/Scripts/GlimmerCradle/Adapters/AvatarContractAdapter.cs',
   '配置 consumers',
   'SDK consumers',
@@ -79,14 +78,42 @@ for (const file of walk(resolve(root, 'json-schema')).filter((path) => path.ends
 const audioGenerated = resolve(
   workspace, 'engines', 'audio', 'src', 'glimmer_cradle', 'audio', 'generated',
 );
-if (!existsSync(audioGenerated) || !walk(audioGenerated).some((path) => path.endsWith('.py'))) {
-  throw new Error('Audio legacy Python generated output is missing at its real owner path');
+if (existsSync(audioGenerated) && walk(audioGenerated).some((path) => path.endsWith('.py'))) {
+  throw new Error('Audio legacy Python generated output must remain deleted');
+}
+const legacyAudioSchemaDir = resolve(workspace, 'protocol', 'src', 'schemas', 'engine');
+if (existsSync(legacyAudioSchemaDir) && walk(legacyAudioSchemaDir).length > 0) {
+  throw new Error(`Audio legacy contract path must remain deleted: ${legacyAudioSchemaDir}`);
+}
+const legacyAudioTsProjection = resolve(workspace, 'protocol', 'src', 'generated', 'engine');
+if (existsSync(legacyAudioTsProjection) && walk(legacyAudioTsProjection).length > 0) {
+  throw new Error(`Audio legacy generated projection must remain deleted: ${legacyAudioTsProjection}`);
+}
+for (const legacyPath of [
+  resolve(workspace, 'protocol', 'codegen', 'gen-py.py'),
+  resolve(workspace, 'protocol', 'codegen', 'gen-cs.ts'),
+  resolve(workspace, 'engines', 'audio', 'src', 'glimmer_cradle', 'audio', 'protocol.py'),
+]) {
+  if (existsSync(legacyPath)) throw new Error(`Audio legacy contract path must remain deleted: ${legacyPath}`);
 }
 const cognitionLegacy = resolve(
   workspace, 'core', 'cognition', 'src', 'glimmer_cradle', 'cognition', 'protocol', 'generated',
 );
 if (existsSync(cognitionLegacy)) {
   throw new Error('Cognition legacy Python generated output must remain deleted');
+}
+
+const audioProto = readFileSync(
+  resolve(root, 'proto', 'glimmer', 'engine', 'audio', 'v1', 'audio_engine.proto'),
+  'utf8',
+);
+if (/\bbytes\s+[A-Za-z][A-Za-z0-9_]*\s*=/u.test(audioProto)) {
+  throw new Error('Audio control contract must not carry media bytes in ordinary RPC messages');
+}
+for (const field of ['lease_id', 'uri', 'size_bytes', 'sha256', 'expires_at_ms', 'access']) {
+  if (!new RegExp(`\\b${field}\\s*=`, 'u').test(audioProto)) {
+    throw new Error(`AudioMediaReference missing required data-plane field: ${field}`);
+  }
 }
 
 function readJson(path) {
@@ -133,8 +160,12 @@ function lockDevDependencies(lock, projectName) {
 }
 
 const protocolPackage = readJson(resolve(workspace, 'protocol', 'package.json'));
-if (protocolPackage.scripts?.['gen:py'] !== AUDIO_GENERATOR_COMMAND) {
-  throw new Error('Protocol Python generator must execute in the Audio owner project');
+if (
+  protocolPackage.scripts?.['gen:py']
+  || protocolPackage.scripts?.['gen:cs']
+  || /\bgen:(?:py|cs)\b/u.test(protocolPackage.scripts?.['gen:all'] ?? '')
+) {
+  throw new Error('Protocol must not retain Audio legacy Python/C# generator commands');
 }
 
 const cognitionProjectPath = resolve(workspace, 'core', 'cognition', 'pyproject.toml');
@@ -149,16 +180,16 @@ const audioLock = readToml(audioLockPath, 'Audio lock');
 if (projectDevDependencies(cognitionProject).includes(GENERATOR_PACKAGE)) {
   throw new Error('Cognition must not retain the Audio legacy generator tool dependency');
 }
-if (!projectDevDependencies(audioProject).includes(GENERATOR_PACKAGE)) {
-  throw new Error('Audio owner project must declare its legacy generator tool dependency');
+if (projectDevDependencies(audioProject).includes(GENERATOR_PACKAGE)) {
+  throw new Error('Audio must not retain the legacy generator tool dependency');
 }
 if (lockPackage(cognitionLock, GENERATOR_PACKAGE)
   || lockDevDependencies(cognitionLock, COGNITION_PROJECT).includes(GENERATOR_PACKAGE)) {
   throw new Error('Cognition lock must not retain the Audio legacy generator tool dependency');
 }
-if (!lockPackage(audioLock, GENERATOR_PACKAGE)
-  || !lockDevDependencies(audioLock, AUDIO_PROJECT).includes(GENERATOR_PACKAGE)) {
-  throw new Error('Audio lock must resolve the legacy generator from the Audio dev dependency');
+if (lockPackage(audioLock, GENERATOR_PACKAGE)
+  || lockDevDependencies(audioLock, AUDIO_PROJECT).includes(GENERATOR_PACKAGE)) {
+  throw new Error('Audio lock must not retain the legacy generator tool dependency');
 }
 
 console.log('contracts inventory: ok');

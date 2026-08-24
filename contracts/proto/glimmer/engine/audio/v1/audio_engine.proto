@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package glimmer.engine.audio.v1;
+
+import "glimmer/common/v1/service_contract.proto";
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Engine.Audio.V1";
+
+enum AudioLane {
+  AUDIO_LANE_UNSPECIFIED = 0;
+  AUDIO_LANE_TTS = 1;
+  AUDIO_LANE_ASR = 2;
+}
+
+enum MediaAccess {
+  MEDIA_ACCESS_UNSPECIFIED = 0;
+  MEDIA_ACCESS_READ_ONLY = 1;
+  MEDIA_ACCESS_WRITE_ONCE = 2;
+}
+
+message AudioMediaReference {
+  string lease_id = 1;
+  string uri = 2;
+  string mime_type = 3;
+  int64 size_bytes = 4;
+  string sha256 = 5;
+  int64 expires_at_ms = 6;
+  MediaAccess access = 7;
+}
+
+message AudioEngineFailure {
+  string code = 1;
+  string safe_message = 2;
+  bool retryable = 3;
+}
+
+message HealthRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+}
+
+message HealthResponse {
+  google.protobuf.Struct snapshot = 1;
+  AudioEngineFailure failure = 2;
+}
+
+message WarmupRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  AudioLane lane = 2;
+}
+
+message WarmupResponse {
+  google.protobuf.Struct snapshot = 1;
+  AudioEngineFailure failure = 2;
+}
+
+message SynthesizeRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string text = 2;
+  AudioMediaReference output = 3;
+}
+
+message SynthesizeResponse {
+  AudioMediaReference output = 1;
+  string provider_id = 2;
+  bool fallback_used = 3;
+  double duration_ms = 4;
+  AudioEngineFailure failure = 5;
+}
+
+message RecognizeRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  AudioMediaReference input = 2;
+}
+
+message RecognizeResponse {
+  string text = 1;
+  string provider_id = 2;
+  double duration_ms = 3;
+  AudioEngineFailure failure = 4;
+}
+
+message ShutdownRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string reason = 2;
+}
+
+message ShutdownResponse {
+  bool accepted = 1;
+  AudioEngineFailure failure = 2;
+}
+
+service AudioEngineService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Warmup(WarmupRequest) returns (WarmupResponse);
+  rpc Synthesize(SynthesizeRequest) returns (SynthesizeResponse);
+  rpc Recognize(RecognizeRequest) returns (RecognizeResponse);
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}

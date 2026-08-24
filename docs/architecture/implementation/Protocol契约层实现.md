@@ -14,8 +14,8 @@ protocol/src/
 ├── models/ ipc/ utils/                  # 手写 runtime helper 和便利模型
 └── config-schemas.ts                    # config schema 聚合入口
 
-engines/audio/src/glimmer_cradle/audio/generated/
-└── Audio legacy Python 生成投影；Cognition legacy Python projection 已删除
+contracts/generated/{ts,python}/glimmer/engine/audio/v1/
+└── Audio Service generated projection；Kernel/Python Host Adapter 消费
 ```
 
 对应 M12 迁移切片尚未开始的现有 runtime 跨语言结构先改 `protocol/src/schemas/`，再运行：
@@ -50,7 +50,7 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 直接映射 Avatar TS/C# generated DTO，通过 `AvatarHostService.Connect` 交换二进制 Protobuf，不保留 JSON formatter/parser consumer。legacy `PresentationFrames.g.cs` 已删除。Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 直接映射 Avatar TS/C# generated DTO，通过 `AvatarHostService.Connect` 交换二进制 Protobuf。Kernel Audio adapter 与 Python `grpc_host.py` 消费 Audio TS/Python projection，通过 `AudioEngineService` 交换 control DTO，并以 `AudioMediaReference` 租约分离媒体 data plane。legacy `PresentationFrames.g.cs`、Audio command/response Schema、Pydantic projection、`gen-py.py`、`gen-cs.ts` 与 stdio RPC 均已删除；不得恢复 JSON formatter/parser 或多根生成主线。
 
 Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
 environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地

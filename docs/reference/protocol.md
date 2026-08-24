@@ -20,7 +20,7 @@
 
 - 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
 - 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
-- Kernel↔Cognition runtime 已在 Slice 2 迁移；Surface Gateway 的 IDL 与 presentation projection 已在 Slice 7 迁移到 Contract Spine。Slice 8 候选已把 Kernel↔UnityAvatarHost runtime consumer 切到动态回环 `AvatarHostService.Connect` 双向 gRPC。这些契约只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar,surface}/v1/` 定义，不得恢复旧 Protocol 镜像。
+- Kernel↔Cognition、Surface Gateway、Kernel↔UnityAvatarHost 与 Kernel↔Audio Engine runtime 已迁移到 Contract Spine。Audio 使用动态回环 `AudioEngineService` unary gRPC，Avatar 使用 `AvatarHostService.Connect` 双向 gRPC；这些契约只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar,surface,engine/audio}/v1/` 定义，不得恢复旧 Protocol 镜像。
 
 现有 runtime Protocol 的生成投影和消费端包括：
 
@@ -30,7 +30,7 @@
 | `protocol/src/schemas/config/` | 配置结构的可校验契约 |
 | `protocol/src/schemas/enums/` | 跨语言枚举，如 error、moment、metric |
 | `protocol/src/generated/` | TypeScript 生成物，只读 |
-| `engines/audio/src/glimmer_cradle/audio/generated/` | Audio legacy Python 生成物，只读；生成工具环境由 Audio owner 持有，Cognition legacy projection 已删除 |
+| `contracts/generated/{ts,python}/glimmer/engine/audio/v1/` | Audio v1 Service projection，只读；Kernel 与 Python Host Adapter 消费 |
 | `contracts/generated/csharp/GlimmerCradle/avatar/v1/` | Avatar v1 C# projection，只读；Unity Host Adapter 消费 |
 | `protocol/src/runtime/` | 运行时校验、normalizer 和回复/Avatar frame helper |
 
@@ -42,13 +42,13 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 路径 | 当前状态 | 规则 |
 |---|---|---|
-| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService`、`CognitionService` / `KernelControlService` v1、Slice 7 `SurfaceGatewayService` v1，以及 Slice 8 runtime consumer 已接入的 `AvatarHostService` v1。 |
+| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService`、`CognitionService` / `KernelControlService`、`SurfaceGatewayService`、`AvatarHostService` 与 `AudioEngineService` v1。 |
 | `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；包含 Skill tool parameters 与 Slice 7 presentation frame projection envelope。 |
 | `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 已消费对应生成物。 |
 | `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
 | `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
 
-迁移期必须按切片区分 owner：Kernel↔Cognition、Surface Gateway 与 Avatar control IDL/projection 由 `contracts/` 拥有；Slice 8 候选已把 Avatar runtime consumer 切到 `AvatarHostService.Connect`，其余尚未迁移运行结构仍由 `protocol/` 拥有。Slice 7 的 Desktop 与 Personal Server 只通过 `SurfaceGatewayService` 访问 Kernel；Personal Server 对浏览器保留受认证 WebSocket ingress，由 Product Host 代理到内部 gRPC Gateway。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Contract Spine DTO/stub 只能在对应 contract Adapter/transport 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+迁移期必须按切片区分 owner：Kernel↔Cognition、Surface Gateway、Avatar 与 Audio Service IDL/projection 由 `contracts/` 拥有。Desktop 与 Personal Server 只通过 `SurfaceGatewayService` 访问 Kernel；Personal Server 对浏览器保留受认证 WebSocket ingress，由 Product Host 代理到内部 gRPC Gateway。Cognition/Audio legacy Python projection、Audio stdio Schema/generator 与 Avatar C# legacy projection 已删除；Contract Spine DTO/stub 只能在对应 contract Adapter/transport 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
 
 ## Accepted 目标与当前差距
 
@@ -56,9 +56,9 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| Kernel↔Cognition、Desktop/Personal Server↔Surface Gateway 与 Avatar runtime 已使用 Contract Spine；Audio 等其他运行结构仍在 `protocol/` | Slice 8 完成 Audio consumer 迁移；所有边界迁移后删除旧 `protocol/` |
+| Kernel↔Cognition、Desktop/Personal Server↔Surface Gateway、Avatar 与 Audio runtime 已使用 Contract Spine；剩余 Document/helper consumer 仍在 `protocol/` | Slice 9 迁移剩余 consumer 后删除旧 `protocol/` |
 | 尚未迁移的 JSON Schema 仍覆盖共享模型、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有文档契约 |
-| Kernel ↔ Cognition、产品到 Kernel Surface 与 Avatar Host 已使用 gRPC；部分 Engine 仍使用 stdio | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器入口保留产品自有认证 WebSocket |
+| Kernel ↔ Cognition、产品到 Kernel Surface、Avatar Host 与 Audio Engine 已使用 gRPC | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器入口保留产品自有认证 WebSocket |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
 | 大对象主要依赖资源引用、路径投影或现有帧约定 | control/data plane 分离，使用 typed reference、stream、Blob lease 或经验证的数据通道 |
 | 兼容主要依赖 Schema 同步、类型/测试与旧字段搜索 | 增加 Buf breaking、JSON Schema compatibility、TS/Python/C# round-trip 和 Adapter contract test |
@@ -82,6 +82,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | `PerceptionEvent` / `ActionCommand` | 感知输入和行动语义 | 不暴露平台原始 payload；语义由 Cognition 解释 |
 | `CognitiveActivitySnapshot` / emotion model | 认知资源调度、情绪和表现投影 | 调度与 Affect 分离，不让 renderer 反推人格状态 |
 | `AvatarHostService` / `AvatarDownstreamFrame` / `AvatarUpstreamFrame` | Kernel↔UnityAvatarHost 二进制 gRPC control contract；`Connect` 是唯一 runtime consumer | `host_hello`、`host_ready`、`character_presentation_projection`、emotion、motion、presentation 区分；scalar presence 对齐必填语义；双方 Adapter 直接映射 generated DTO，并拒绝 unknown kind/enum、缺失/多重/错配 payload；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
+| `AudioEngineService` / `AudioMediaReference` | Kernel↔Audio Engine 二进制 unary gRPC control contract；媒体内容只经短租约引用 | 动态回环、进程级令牌、deadline、health/warmup/synthesize/recognize/shutdown；ASR `READ_ONLY`、TTS `WRITE_ONCE`，校验 lease/expiry/root/size/SHA-256，并在成功、失败、超时、停机和崩溃后清理 |
 | `ExtensionRuntimeProjection` | Extension Host 给 Desktop/Control Center 的运行投影 | Host 是唯一生产者；以 Contribution Point Registry、Capability Graph、Action Intent 和 Diagnostics 表达运行事实；Capability Graph node 与 action intent 必须带 `audience`；Renderer 不从 DB、日志、manifest 固定字段或端点还原扩展事实 |
 | `ExtensionInstallationProjection` / Extension install lifecycle | Extension Package Manager 给控制表面的安装态与安装事务 | 安装态只表达已安装版本集合和当前激活版本；prepare/preview/commit 先校验来源、摘要、SBOM、平台与权限，再原子安装；指定版本激活不与运行投影混为同一事实 |
 | `SkillCatalogSnapshot` | Kernel 给 Desktop/Control Center 的 Skill Plane 目录与 provider runtime 投影 | 只暴露 character audience skill/tool/resource/prompt；`providerRuntimes` 补充 core / extension / MCP / user provider 的连接、契约-only、降级与恢复动作 |
@@ -161,7 +162,7 @@ Kernel 入站、注意力批处理和 Cognition Service 全程保留同一份感
 
 - 现有 runtime 变更在 `pnpm sync:contracts` 后保证 TypeScript、Python 与 Unity C# 生成物一致；新 Contract Spine 变更通过 `pnpm contracts:verify` 的兼容、工具链与三语言门。
 - TypeScript 与 Python 消费端都能通过类型/单元测试。
-- IPC/WS/stdio 链路能处理成功、缺字段、未知枚举、错误 code 和降级。
+- IPC/WS/gRPC 链路能处理成功、缺字段、未知枚举、错误 code 和降级；媒体引用另覆盖权限、过期、摘要、越界与崩溃清理。
 - 旧字段搜索无运行时残留。
 
 架构背景见 [构件、分层与依赖](../architecture/current/04-构件、分层与依赖.md)，代码实现见 [Protocol 契约层实现](../architecture/implementation/Protocol契约层实现.md)，操作指南见 [Schema 与跨进程契约变更](../guides/development/Schema与跨进程契约变更.md)。

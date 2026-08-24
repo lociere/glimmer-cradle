@@ -1,25 +1,27 @@
 # Engines 与 Native 实现
 
 > 范围：官方 Engine、Audio 云端/本地路线、模型 warmup、Kernel capability 接线、process log、native 平台原语和发布投影。
-> 源码依据：`engines/audio/src/glimmer_cradle/audio/`、Kernel audio capability、Protocol Engine Schema、`data/models/`、`native/` 与 Avatar Composition。
+> 源码依据：`engines/audio/src/glimmer_cradle/audio/`、Kernel audio capability、Audio Contract Spine、`data/models/`、`data/work/audio/media-leases/`、`native/` 与 Avatar Composition。
 
 ## Audio 物理入口
 
 | 入口 | 职责 |
 |---|---|
-| `protocol/src/schemas/engine/AudioEngine*.schema.json` | Kernel/Audio Engine stdio 帧单一事实源 |
+| `contracts/proto/glimmer/engine/audio/v1/audio_engine.proto` | Kernel/Audio Engine gRPC Service 与媒体引用单一事实源 |
 | `protocol/src/schemas/config/AudioConfig.schema.json` | 系统 Audio 路由与执行策略 |
 | `protocol/src/schemas/config/VoiceConfig.schema.json` | Character Package 声音身份 |
-| `engines/audio/src/glimmer_cradle/audio/main.py` | TTS/ASR lane 命令入口 |
+| `engines/audio/src/glimmer_cradle/audio/main.py` / `grpc_host.py` | TTS/ASR lane 入口、动态回环 gRPC Host、认证与媒体租约校验 |
 | `engines/audio/src/glimmer_cradle/audio/tts/route.py` | TTS 顺序路由、fallback、熔断和原子输出 |
 | `engines/audio/src/glimmer_cradle/audio/tts/dashscope_cosyvoice.py` | CosyVoice 持久 WebSocket adapter |
 | `engines/audio/src/glimmer_cradle/audio/asr/funasr_engine.py` | FunASR ASR provider |
 | Kernel `audio-service.ts` | 能力门、缓存、状态与 readiness 投影 |
-| Kernel `official-audio-engine.ts` | 双 lane 子进程监督和协议 adapter |
+| Kernel `official-audio-engine.ts` | 双 lane 子进程监督、动态端点 gRPC client 与媒体租约 owner |
 
 Audio Engine 是摇篮本体能力，不通过 Extension 安装。Kernel 不维护 provider 数组，不循环尝试 provider，也不理解具体 TTS/ASR provider 的内部参数。
 
-TTS 与 ASR lane 均通过 stdio `host.shutdown` 完成协议级停机：Engine 先返回 ACK、关闭 provider 资源并以 `0` 退出，Kernel 等待 2.5 秒后才升级为进程树强制回收。停机控制请求使用独立的短超时，不继承 ASR/TTS 业务请求的长超时；模型仍在 warmup 时也不能让全局停机等待数分钟。正常停机不得记录成 Engine 崩溃；超时、协议损坏和非零退出仍保留为 lifecycle warning。
+TTS 与 ASR lane 绑定 `127.0.0.1:0`，用一次性 stdout 启动帧向直接父进程报告动态端点；主请求/响应只走二进制 `AudioEngineService`，stdout/stderr 此后只承载日志。Kernel 为每个进程注入随机 `x-glimmer-audio-token`，令牌不进入配置、catalog 或日志。两条 lane 均通过 `Shutdown` RPC 完成协议级停机：Engine 先 ACK、关闭 provider 资源并以 `0` 退出，Kernel 等待 2.5 秒后才升级为进程树强制回收。停机控制请求使用独立短超时，不继承业务长超时。
+
+大型音频不进入普通 RPC。Kernel 在 `data/work/audio/media-leases/<lane>/<lease-id>/` 为 ASR 输入创建 `READ_ONLY` 副本，为 TTS 输出创建 `WRITE_ONCE` 目标；`AudioMediaReference` 固定 file URI、MIME、长度、SHA-256、访问模式和过期时间。Engine 只能解析注入的 lane root，拒绝越界、过期、摘要不符或重复写入；Kernel 验证 TTS 回执后才把产物移入最终缓存/目标路径，并在成功、错误、超时、正常停机与崩溃后回收租约根。
 
 ## TTS 链路
 
@@ -27,7 +29,7 @@ TTS 与 ASR lane 均通过 stdio `host.shutdown` 完成协议级停机：Engine 
 Cognition reply
   -> ControlSurfaceGateway 按语义标点分段
   -> AudioService 缓存键(text + route + provider config + voice profile)
-  -> Audio Engine TTS lane
+  -> WRITE_ONCE media lease + Audio Engine TTS lane gRPC
   -> TTSRoute(primary, fallbacks)
   -> DashScopeCosyVoiceEngine
   -> 原子 WAV 文件
@@ -44,7 +46,7 @@ CosyVoice adapter 在进程内复用 WebSocket，严格执行 `run-task -> task-
 
 ```text
 Desktop recorder -> data/work/audio/asr/*.wav
-  -> AudioService -> Audio Engine ASR lane
+  -> AudioService -> READ_ONLY media lease -> Audio Engine ASR lane gRPC
   -> FunASR -> transcript projection
   -> PerceptionAppService -> Cognition
 ```
@@ -73,6 +75,7 @@ Native 当前只服务 Avatar Composition：平台窗口/surface、per-pixel alp
 cd engines/audio
 uv run --extra dev pytest -q
 cd ../..
+pnpm contracts:verify
 pnpm typecheck
 pnpm build
 ```

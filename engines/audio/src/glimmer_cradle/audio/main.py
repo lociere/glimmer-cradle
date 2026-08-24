@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import time
-from contextlib import redirect_stdout
-from typing import Any, Literal, TextIO
+from typing import Any, Literal
 
 from .asr import FunASREngine
-from .protocol import EngineCommand, error, ok, parse_command
 from .tts import DashScopeCosyVoiceEngine, TTSRoute
 
 AudioLane = Literal["tts", "asr", "all"]
@@ -48,12 +45,11 @@ class AudioEngineApp:
             self._tts_route = self._build_tts_route()
         return self._tts_route
 
-    def handle(self, command: EngineCommand) -> dict[str, Any]:
-        if command.command == "health":
-            providers: dict[str, Any] = {}
-            if self.lane in ("asr", "all"):
-                asr_ok, asr_reason = self.asr.available()
-                providers["asr"] = {
+    def health_snapshot(self) -> dict[str, Any]:
+        providers: dict[str, Any] = {}
+        if self.lane in ("asr", "all"):
+            asr_ok, asr_reason = self.asr.available()
+            providers["asr"] = {
                     "route_state": "ready" if asr_ok else "unavailable",
                     "active_provider": self.asr.name if asr_ok else None,
                     "providers": [
@@ -67,73 +63,33 @@ class AudioEngineApp:
                     ],
                     "config": self.asr.config_snapshot(),
                     "model_readiness": self.asr.model_readiness(),
-                }
-            if self.lane in ("tts", "all"):
-                providers["tts"] = self.tts_route.snapshot()
-            return ok(
-                command.id,
-                {"engine": "audio", "lane": self.lane, "providers": providers},
-            )
+            }
+        if self.lane in ("tts", "all"):
+            providers["tts"] = self.tts_route.snapshot()
+        return {"engine": "audio", "lane": self.lane, "providers": providers}
 
-        if command.command == "host.shutdown":
-            return ok(command.id, {"accepted": True, "lane": self.lane})
+    def warmup(self, lane: Literal["tts", "asr"]) -> dict[str, Any]:
+        self._require_lane(lane)
+        if lane == "tts":
+            return self.tts_route.warmup()
+        self.asr.warmup()
+        return {"provider_id": self.asr.name}
 
-        if command.command == "asr.warmup":
-            self._require_lane("asr")
-            try:
-                self.asr.warmup()
-            except Exception as exc:
-                return error(command.id, str(exc), "asr_warmup_failed")
-            return ok(command.id, {"provider_id": self.asr.name})
+    def synthesize(self, text: str, output_path: str) -> dict[str, Any]:
+        self._require_lane("tts")
+        if not text.strip():
+            raise ValueError("text is required")
+        return self.tts_route.synthesize_to_file(text, output_path)
 
-        if command.command == "asr.recognize":
-            self._require_lane("asr")
-            audio_path = command.payload.get("audio_path")
-            if not isinstance(audio_path, str) or not audio_path:
-                return error(
-                    command.id, "payload.audio_path is required", "invalid_payload"
-                )
-            started = time.monotonic()
-            try:
-                text = self.asr.recognize_file(audio_path)
-            except Exception as exc:
-                return error(command.id, str(exc), "asr_failed")
-            return ok(
-                command.id,
-                {
-                    "text": text,
-                    "provider_id": self.asr.name,
-                    "duration_ms": round((time.monotonic() - started) * 1000, 2),
-                },
-            )
-
-        if command.command == "tts.warmup":
-            self._require_lane("tts")
-            try:
-                snapshot = self.tts_route.warmup()
-            except Exception as exc:
-                return error(command.id, str(exc), "tts_warmup_failed")
-            return ok(command.id, snapshot)
-
-        if command.command == "tts.synthesize":
-            self._require_lane("tts")
-            text = command.payload.get("text")
-            output_path = command.payload.get("output_path")
-            if not isinstance(text, str) or not text.strip():
-                return error(command.id, "payload.text is required", "invalid_payload")
-            if not isinstance(output_path, str) or not output_path:
-                return error(
-                    command.id, "payload.output_path is required", "invalid_payload"
-                )
-            try:
-                result = self.tts_route.synthesize_to_file(text, output_path)
-            except Exception as exc:
-                return error(command.id, str(exc), "tts_route_failed")
-            return ok(command.id, result)
-
-        return error(
-            command.id, f"unsupported command: {command.command}", "unsupported_command"
-        )
+    def recognize(self, audio_path: str) -> dict[str, Any]:
+        self._require_lane("asr")
+        started = time.monotonic()
+        text = self.asr.recognize_file(audio_path)
+        return {
+            "text": text,
+            "provider_id": self.asr.name,
+            "duration_ms": round((time.monotonic() - started) * 1000, 2),
+        }
 
     def close(self) -> None:
         if self._tts_route is not None:
@@ -257,30 +213,10 @@ def _default_voice_config() -> dict[str, Any]:
     }
 
 
-def run_stdio(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> int:
-    app = AudioEngineApp()
-    try:
-        for line in stdin:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                command = parse_command(json.loads(line))
-                with redirect_stdout(sys.stderr):
-                    response = app.handle(command)
-            except Exception as exc:
-                response = error("unknown", str(exc), "bad_request")
-            stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
-            stdout.flush()
-            if command.command == "host.shutdown" and response["status"] == "success":
-                break
-    finally:
-        app.close()
-    return 0
-
-
 def main() -> int:
-    return run_stdio()
+    from .grpc_host import run_grpc_host
+
+    return run_grpc_host()
 
 
 if __name__ == "__main__":

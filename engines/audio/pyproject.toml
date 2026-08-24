@@ -4,8 +4,13 @@ version = "0.1.8"
 description = "Official audio engine for Glimmer Cradle ASR/TTS providers."
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "pydantic>=2.7,<3",
+    "glimmer-cradle-contracts==0.1.8",
+    "grpcio>=1.74,<2",
+    "protobuf==6.33.0",
 ]
+
+[tool.uv.sources]
+glimmer-cradle-contracts = { path = "../../contracts" }
 
 [project.optional-dependencies]
 asr = [
@@ -19,7 +24,6 @@ tts = [
     "websockets>=14,<16",
 ]
 dev = [
-    "datamodel-code-generator>=0.25,<1",
     "pytest>=8.0",
     "ruff>=0.5",
 ]

@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -16,8 +8,6 @@ import test from 'node:test';
 const contractsRoot = resolve(import.meta.dirname, '..', '..');
 const checker = resolve(contractsRoot, 'scripts/check-inventory.mjs');
 const temporaryRoots = [];
-const expectedGeneratorCommand =
-  'uv run --project ../engines/audio --extra dev python codegen/gen-py.py';
 
 function fixtureRoot() {
   const root = mkdtempSync(join(tmpdir(), 'glimmer-contracts-inventory-'));
@@ -32,22 +22,19 @@ function fixtureRoot() {
 function check(root, workspaceRoot) {
   const args = [checker, '--contracts-root', root];
   if (workspaceRoot) args.push('--workspace-root', workspaceRoot);
-  return spawnSync(process.execPath, args, {
-    encoding: 'utf8',
-    shell: false,
-  });
+  return spawnSync(process.execPath, args, { encoding: 'utf8', shell: false });
 }
 
 function write(root, relativePath, content) {
-  const path = resolve(root, relativePath);
-  mkdirSync(resolve(path, '..'), { recursive: true });
-  writeFileSync(path, content, 'utf8');
+  const target = resolve(root, relativePath);
+  mkdirSync(resolve(target, '..'), { recursive: true });
+  writeFileSync(target, content, 'utf8');
 }
 
-function audioProject(devDependencies = ['datamodel-code-generator>=0.25,<1']) {
+function project(name, devDependencies = ['pytest>=8']) {
   return [
     '[project]',
-    'name = "glimmer-cradle-audio-engine"',
+    `name = "${name}"`,
     'version = "0.0.0"',
     '',
     '[project.optional-dependencies]',
@@ -56,22 +43,7 @@ function audioProject(devDependencies = ['datamodel-code-generator>=0.25,<1']) {
   ].join('\n');
 }
 
-function cognitionProject(devDependencies = ['pytest>=8']) {
-  return [
-    '[project]',
-    'name = "glimmer-cradle-cognition"',
-    'version = "0.0.0"',
-    '',
-    '[project.optional-dependencies]',
-    `dev = ${JSON.stringify(devDependencies)}`,
-    '',
-  ].join('\n');
-}
-
-function lockFile(projectName, devDependencies, lockedPackages = devDependencies) {
-  const lockedDevDependencies = devDependencies
-    .map((name) => `{ name = ${JSON.stringify(name)} }`)
-    .join(', ');
+function lockFile(projectName, devDependencies = ['pytest'], lockedPackages = ['pytest']) {
   const sections = [
     'version = 1',
     'revision = 3',
@@ -83,16 +55,10 @@ function lockFile(projectName, devDependencies, lockedPackages = devDependencies
     'source = { editable = "." }',
     '',
     '[package.optional-dependencies]',
-    `dev = [${lockedDevDependencies}]`,
+    `dev = [${devDependencies.map((name) => `{ name = "${name}" }`).join(', ')}]`,
   ];
   for (const name of lockedPackages) {
-    sections.push(
-      '',
-      '[[package]]',
-      `name = "${name}"`,
-      'version = "1.0.0"',
-      'source = { registry = "https://pypi.org/simple" }',
-    );
+    sections.push('', '[[package]]', `name = "${name}"`, 'version = "1.0.0"', 'source = { registry = "https://pypi.org/simple" }');
   }
   return `${sections.join('\n')}\n`;
 }
@@ -106,22 +72,11 @@ function workspaceFixture() {
     cpSync(resolve(contractsRoot, directory), resolve(fixtureContracts, directory), { recursive: true });
   }
   cpSync(resolve(contractsRoot, 'inventory.md'), resolve(fixtureContracts, 'inventory.md'));
-  write(workspace, 'protocol/package.json', JSON.stringify({
-    scripts: { 'gen:py': expectedGeneratorCommand },
-  }));
-  write(workspace, 'engines/audio/pyproject.toml', audioProject());
-  write(workspace, 'engines/audio/uv.lock', lockFile(
-    'glimmer-cradle-audio-engine',
-    ['datamodel-code-generator'],
-    ['datamodel-code-generator'],
-  ));
-  write(workspace, 'engines/audio/src/glimmer_cradle/audio/generated/model.py', '# generated\n');
-  write(workspace, 'core/cognition/pyproject.toml', cognitionProject());
-  write(workspace, 'core/cognition/uv.lock', lockFile(
-    'glimmer-cradle-cognition',
-    ['pytest'],
-    ['pytest'],
-  ));
+  write(workspace, 'protocol/package.json', JSON.stringify({ scripts: { 'gen:all': 'pnpm gen:ts' } }));
+  write(workspace, 'engines/audio/pyproject.toml', project('glimmer-cradle-audio-engine'));
+  write(workspace, 'engines/audio/uv.lock', lockFile('glimmer-cradle-audio-engine'));
+  write(workspace, 'core/cognition/pyproject.toml', project('glimmer-cradle-cognition'));
+  write(workspace, 'core/cognition/uv.lock', lockFile('glimmer-cradle-cognition'));
   return { workspace, contracts: fixtureContracts };
 }
 
@@ -137,9 +92,7 @@ test('canonical paths and symbols in inventory match IDL', () => {
 test('wrong canonical message symbol fails closed', () => {
   const root = fixtureRoot();
   const inventoryPath = resolve(root, 'inventory.md');
-  const inventory = readFileSync(inventoryPath, 'utf8').replaceAll('`EchoProbeResponse`', '`ContractProbeResponse`');
-  writeFileSync(inventoryPath, inventory, 'utf8');
-
+  writeFileSync(inventoryPath, readFileSync(inventoryPath, 'utf8').replaceAll('`EchoProbeResponse`', '`ContractProbeResponse`'), 'utf8');
   const result = check(root);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing canonical proto symbol.*EchoProbeResponse/);
@@ -148,115 +101,84 @@ test('wrong canonical message symbol fails closed', () => {
 test('wrong canonical path fails closed', () => {
   const root = fixtureRoot();
   const inventoryPath = resolve(root, 'inventory.md');
-  const inventory = readFileSync(inventoryPath, 'utf8').replaceAll(
+  writeFileSync(inventoryPath, readFileSync(inventoryPath, 'utf8').replaceAll(
     '`proto/glimmer/common/v1/contract_probe.proto`',
     '`proto/glimmer/common/v1/contract_probe_v2.proto`',
-  );
-  writeFileSync(inventoryPath, inventory, 'utf8');
-
+  ), 'utf8');
   const result = check(root);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /missing canonical proto path/);
 });
 
-test('structured workspace owner fixture passes with explicit roots', () => {
+test('structured workspace after Audio migration passes', () => {
   const fixture = workspaceFixture();
   const result = check(fixture.contracts, fixture.workspace);
   assert.equal(result.status, 0, result.stderr);
 });
 
-test('comments and inactive TOML sections cannot impersonate the Audio dev dependency', () => {
+test('legacy Audio generated projection fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'engines/audio/pyproject.toml', [
-    audioProject([]),
-    '# datamodel-code-generator belongs to an unrelated comment',
-    '[tool.unrelated]',
-    'description = "datamodel-code-generator"',
-  ].join('\n'));
-
+  write(fixture.workspace, 'engines/audio/src/glimmer_cradle/audio/generated/model.py', '# legacy\n');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Audio owner project must declare/);
+  assert.match(result.stderr, /generated output must remain deleted/);
 });
 
-test('inactive script cannot conceal a wrong active generator project', () => {
+test('legacy Audio TypeScript projection fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'protocol/package.json', JSON.stringify({
-    scripts: {
-      'gen:py': 'uv run --project ../core/cognition python codegen/gen-py.py',
-      'inactive:gen:py': expectedGeneratorCommand,
-    },
-  }));
-
+  write(fixture.workspace, 'protocol/src/generated/engine/AudioEngineCommand.ts', 'export interface AudioEngineCommand {}\n');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /must execute in the Audio owner project/);
+  assert.match(result.stderr, /legacy generated projection must remain deleted/);
 });
 
-test('wrong Audio project spelling fails the exact active command gate', () => {
+test('Audio control contract rejects inline media bytes', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'protocol/package.json', JSON.stringify({
-    scripts: {
-      'gen:py': 'uv run --project ../engines/audio-tools --extra dev python codegen/gen-py.py',
-    },
-  }));
-
+  const protoPath = resolve(fixture.contracts, 'proto/glimmer/engine/audio/v1/audio_engine.proto');
+  writeFileSync(protoPath, readFileSync(protoPath, 'utf8').replace(
+    'message SynthesizeRequest {',
+    'message SynthesizeRequest {\n  bytes audio = 99;',
+  ), 'utf8');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /must execute in the Audio owner project/);
+  assert.match(result.stderr, /must not carry media bytes/);
 });
 
-test('Cognition dev dependency retains the generator fails closed', () => {
+test('legacy Protocol Python generator command fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'core/cognition/pyproject.toml', cognitionProject([
-    'pytest>=8',
-    'datamodel-code-generator>=0.25,<1',
-  ]));
-
+  write(fixture.workspace, 'protocol/package.json', JSON.stringify({ scripts: { 'gen:py': 'python codegen/gen-py.py', 'gen:all': 'pnpm gen:ts && pnpm gen:py' } }));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Cognition must not retain/);
+  assert.match(result.stderr, /must not retain Audio legacy Python\/C# generator commands/);
 });
 
-test('Audio project missing its generator dependency fails closed', () => {
+test('legacy Protocol C# generator path fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'engines/audio/pyproject.toml', audioProject(['pytest>=8']));
-
+  write(fixture.workspace, 'protocol/codegen/gen-cs.ts', '// legacy\n');
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Audio owner project must declare/);
+  assert.match(result.stderr, /legacy contract path must remain deleted/);
 });
 
-test('Audio lock missing its generator resolution fails closed', () => {
+test('Audio dev dependency retaining the generator fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'engines/audio/uv.lock', lockFile(
-    'glimmer-cradle-audio-engine',
-    ['datamodel-code-generator'],
-    [],
-  ));
-
+  write(fixture.workspace, 'engines/audio/pyproject.toml', project('glimmer-cradle-audio-engine', ['pytest>=8', 'datamodel-code-generator>=0.25,<1']));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Audio lock must resolve/);
+  assert.match(result.stderr, /Audio must not retain/);
 });
 
-test('missing Audio lock fails closed', () => {
+test('Audio lock retaining the generator fails closed', () => {
   const fixture = workspaceFixture();
-  unlinkSync(resolve(fixture.workspace, 'engines/audio/uv.lock'));
-
+  write(fixture.workspace, 'engines/audio/uv.lock', lockFile('glimmer-cradle-audio-engine', ['datamodel-code-generator'], ['datamodel-code-generator']));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Audio lock is missing/);
+  assert.match(result.stderr, /Audio lock must not retain/);
 });
 
 test('Cognition lock retaining the generator fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'core/cognition/uv.lock', lockFile(
-    'glimmer-cradle-cognition',
-    ['datamodel-code-generator'],
-    ['datamodel-code-generator'],
-  ));
-
+  write(fixture.workspace, 'core/cognition/uv.lock', lockFile('glimmer-cradle-cognition', ['datamodel-code-generator'], ['datamodel-code-generator']));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Cognition lock must not retain/);

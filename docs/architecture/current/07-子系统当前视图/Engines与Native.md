@@ -2,7 +2,7 @@
 
 > 范围：官方能力引擎、音频 TTS/ASR、资源 readiness、native 平台原语和性能热路径的当前边界；不写具体模型 API。
 > 事实依据：`engines/audio/`、`native/`、Kernel audio capability、Avatar/Composition 约束、`data/models/`、`data/packages/` 与当前打包策略。
-> 维护触发：官方 engine、模型资源、stdio/http 协议、warmup、native ABI、FFI、Composition Host 或资源 catalog 变化。
+> 维护触发：官方 engine、模型资源、gRPC/media reference 协议、warmup、native ABI、FFI、Composition Host 或资源 catalog 变化。
 
 Engine 是 Glimmer Cradle 的官方能力器官，不是 Extension。它们可以独立进程、独立环境、独立资源 warmup，但 owner 仍是项目本体；Extension/MCP 是生态能力，不能替代官方器官的 readiness、观测和发布责任。
 
@@ -22,6 +22,7 @@ Engine 是 Glimmer Cradle 的官方能力器官，不是 Extension。它们可�
 - 主日志只记录摘要和路径；完整 stdout/stderr 进入 `data/observability/logs/application/`。
 - Engine 协议是受控边界；不能让 Engine 回调 UI 或直接写 Cognition 私有状态。
 - Engine 产物和模型在 `data/models/`、`data/packages/`、`data/cache/`、`data/work/` 分域保存，不进入源码事实源。
+- Audio control plane 使用版本化 `AudioEngineService`；data plane 只传短期 `AudioMediaReference`，音频字节不进入普通 RPC。Engine 只能访问 Kernel 注入的 lane lease root，租约必须带访问模式、过期时间、长度与 SHA-256，并在终态或崩溃后回收。
 
 ## Audio 当前语义
 
