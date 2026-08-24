@@ -5,7 +5,6 @@ import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { WebSocketServer } from 'ws';
 import { resolvePackagedDesktopPaths } from '../src/main/packaged-paths.ts';
 import { PackagedSupervisor, probePackagedKernelReadiness } from '../src/main/packaged-supervisor.ts';
 
@@ -101,33 +100,13 @@ test('正式 supervisor 投影 degraded，并在缺运行组件时首启失败�
 
 test('readiness 必须绑定本次 launch session/PID 并消费真实 runtime catalog', async () => {
   const fixture = await createInstallProjection();
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   try {
-    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
-    const address = server.address();
-    assert.ok(address && typeof address !== 'string');
-    server.on('connection', (socket) => {
-      socket.send(JSON.stringify({
-        kind: 'runtime_readiness',
-        runtime_readiness: {
-          updated_at: Date.now(),
-          runtimes: [{
-            runtime_id: 'kernel.ingress',
-            owner: 'kernel',
-            phase: 'ready',
-            state: 'ready',
-            blocking: true,
-            summary: 'ready',
-          }],
-        },
-      }));
-    });
     const paths = await resolvePackagedDesktopPaths({
       resourcesPath: fixture.resources,
       userDataPath: fixture.userData,
     });
     const launchSession = randomUUID();
-    const endpoint = `ws://127.0.0.1:${address.port}`;
+    const endpoint = 'grpc://127.0.0.1:41000';
     await mkdir(path.join(paths.runRoot, 'host'), { recursive: true });
     await writeFile(path.join(paths.runRoot, 'host', 'endpoints.json'), JSON.stringify({
       schema_version: 1,
@@ -144,16 +123,29 @@ test('readiness 必须绑定本次 launch session/PID 并消费真实 runtime ca
         published_at: new Date().toISOString(),
       }],
     }));
+    const clientFactory = () => new FakeSurfaceGatewayClient({
+      kind: 'runtime_readiness',
+      runtime_readiness: {
+        updated_at: Date.now(),
+        runtimes: [{
+          runtime_id: 'kernel.ingress',
+          owner: 'kernel',
+          phase: 'ready',
+          state: 'ready',
+          blocking: true,
+          summary: 'ready',
+        }],
+      },
+    }, endpoint, launchSession);
     assert.equal(
-      await probePackagedKernelReadiness(paths, new FakeChild(4901), launchSession),
+      await probePackagedKernelReadiness(paths, new FakeChild(4901), launchSession, clientFactory),
       'ready',
     );
     assert.equal(
-      await probePackagedKernelReadiness(paths, new FakeChild(4901), randomUUID()),
+      await probePackagedKernelReadiness(paths, new FakeChild(4901), randomUUID(), clientFactory),
       'waiting',
     );
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
     await rm(fixture.root, { recursive: true, force: true });
   }
 });
@@ -216,6 +208,28 @@ class FakeChild extends EventEmitter {
     this.signalCode = signal;
     this.emit('exit', null, signal);
     return true;
+  }
+}
+
+class FakeSurfaceGatewayClient extends EventEmitter {
+  public constructor(
+    private readonly frame: Record<string, unknown>,
+    private readonly expectedEndpoint: string,
+    private readonly expectedGeneration: string,
+  ) {
+    super();
+  }
+
+  public async connect(endpoint: string, generation: string): Promise<void> {
+    if (endpoint !== this.expectedEndpoint || generation !== this.expectedGeneration) {
+      this.emit('close');
+      return;
+    }
+    queueMicrotask(() => this.emit('message', Buffer.from(JSON.stringify(this.frame), 'utf8')));
+  }
+
+  public close(): void {
+    this.emit('close');
   }
 }
 

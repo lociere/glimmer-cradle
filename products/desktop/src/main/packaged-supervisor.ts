@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PackagedDesktopPaths } from './packaged-paths';
-import { SurfaceGatewayClient } from './surface-gateway-client';
 
 export type PackagedSupervisorState =
   | 'stopped'
@@ -22,6 +21,14 @@ export interface PackagedSupervisorSnapshot {
 }
 
 type ProbeReadiness = 'waiting' | 'ready' | 'degraded' | 'failed';
+interface SurfaceGatewayProbeClient {
+  on(event: 'message', listener: (raw: Buffer) => void): this;
+  once(event: 'error' | 'close', listener: () => void): this;
+  removeAllListeners(): this;
+  connect(endpoint: string, generation: string): Promise<void>;
+  close(): void;
+}
+type SurfaceGatewayProbeClientFactory = () => Promise<SurfaceGatewayProbeClient> | SurfaceGatewayProbeClient;
 
 interface SupervisorChild {
   readonly pid?: number;
@@ -246,6 +253,7 @@ export async function probePackagedKernelReadiness(
   paths: PackagedDesktopPaths,
   child: SupervisorChild,
   launchSession: string,
+  surfaceGatewayClientFactory: SurfaceGatewayProbeClientFactory = createSurfaceGatewayProbeClient,
 ): Promise<ProbeReadiness> {
   try {
     const catalog = JSON.parse(
@@ -270,15 +278,19 @@ export async function probePackagedKernelReadiness(
       || endpoint.owner_pid !== child.pid
       || endpoint.generation !== launchSession
       || typeof endpoint.endpoint !== 'string') return 'waiting';
-    return probeRuntimeReadinessCatalog(endpoint.endpoint, endpoint.generation);
+    return probeRuntimeReadinessCatalog(endpoint.endpoint, endpoint.generation, surfaceGatewayClientFactory);
   } catch {
     return 'waiting';
   }
 }
 
-async function probeRuntimeReadinessCatalog(endpoint: string, generation = ''): Promise<ProbeReadiness> {
+async function probeRuntimeReadinessCatalog(
+  endpoint: string,
+  generation = '',
+  surfaceGatewayClientFactory: SurfaceGatewayProbeClientFactory = createSurfaceGatewayProbeClient,
+): Promise<ProbeReadiness> {
+  const socket = await surfaceGatewayClientFactory();
   return new Promise((resolve) => {
-    const socket = new SurfaceGatewayClient();
     let settled = false;
     const finish = (result: ProbeReadiness): void => {
       if (settled) return;
@@ -301,6 +313,11 @@ async function probeRuntimeReadinessCatalog(endpoint: string, generation = ''): 
     socket.once('close', () => finish('waiting'));
     void socket.connect(endpoint, generation).catch(() => finish('waiting'));
   });
+}
+
+async function createSurfaceGatewayProbeClient(): Promise<SurfaceGatewayProbeClient> {
+  const { SurfaceGatewayClient } = await import('./surface-gateway-client.js');
+  return new SurfaceGatewayClient();
 }
 
 function classifyRuntimeReadiness(value: unknown): ProbeReadiness {

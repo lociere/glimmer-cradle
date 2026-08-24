@@ -21,12 +21,14 @@ describe('ControlSurfaceGateway', () => {
       _configApplicationService: unknown;
       _conversationHistoryService: unknown;
       _clients: Set<unknown>;
+      _surfaceSessions: Map<string, unknown>;
       _coreSkillExecutions: Map<string, unknown>;
       _completedCoreSkillExecutions: Map<string, unknown>;
     };
     subject._configApplicationService = null;
     subject._conversationHistoryService = null;
     subject._clients.clear();
+    subject._surfaceSessions.clear();
     subject._coreSkillExecutions.clear();
     subject._completedCoreSkillExecutions.clear();
   });
@@ -398,6 +400,74 @@ describe('ControlSurfaceGateway', () => {
     expect(frames[0]).not.toHaveProperty('request_id');
     expect(frames[0]).not.toHaveProperty('skill_catalog');
   });
+
+  it('rejects Query requests whose declared operation does not match frame.kind', async () => {
+    const subject = gateway as unknown as {
+      _surfaceSessions: Map<string, { productId: string; scopes: Set<string> }>;
+      _dispatchSurfaceRpc(
+        sessionId: string,
+        requiredScope: 'surface:read' | 'surface:write',
+        declaredOperation: string,
+        rawArguments: Record<string, unknown>,
+        callback: (error: Error | null, response: unknown) => void,
+        operation: 'query' | 'command',
+      ): Promise<void>;
+      _configApplicationService: { hasUsableModelRoute: () => boolean };
+    };
+    subject._surfaceSessions.set('read-session', { productId: 'desktop', scopes: new Set(['surface:read']) });
+    subject._configApplicationService = { hasUsableModelRoute: () => true };
+    const response = await dispatchSurfaceRpc(subject, {
+      sessionId: 'read-session',
+      requiredScope: 'surface:read',
+      declaredOperation: 'config_snapshot_request',
+      rawArguments: { frame: { kind: 'chat_input', chat_input: { text: 'must not dispatch' } } },
+      operation: 'query',
+    });
+
+    expect(response).toMatchObject({
+      status: 'error',
+      error: {
+        safeMessage: 'Surface Gateway operation 与 frame.kind 不一致',
+      },
+    });
+  });
+
+  it('rejects command-shaped frames sent through the read-only Query RPC', async () => {
+    const subject = gateway as unknown as {
+      _surfaceSessions: Map<string, { productId: string; scopes: Set<string> }>;
+      _dispatchSurfaceRpc(
+        sessionId: string,
+        requiredScope: 'surface:read' | 'surface:write',
+        declaredOperation: string,
+        rawArguments: Record<string, unknown>,
+        callback: (error: Error | null, response: unknown) => void,
+        operation: 'query' | 'command',
+      ): Promise<void>;
+      _conversationHistoryService: { recordSubmittedUserMessage: (text: string, traceId: string) => void };
+      _configApplicationService: { hasUsableModelRoute: () => boolean };
+    };
+    const submitted: string[] = [];
+    subject._surfaceSessions.set('read-session', { productId: 'desktop', scopes: new Set(['surface:read']) });
+    subject._configApplicationService = { hasUsableModelRoute: () => true };
+    subject._conversationHistoryService = {
+      recordSubmittedUserMessage: (text) => submitted.push(text),
+    };
+    const response = await dispatchSurfaceRpc(subject, {
+      sessionId: 'read-session',
+      requiredScope: 'surface:read',
+      declaredOperation: 'chat_input',
+      rawArguments: { frame: { kind: 'chat_input', chat_input: { text: 'must not dispatch' } } },
+      operation: 'query',
+    });
+
+    expect(response).toMatchObject({
+      status: 'error',
+      error: {
+        safeMessage: 'Surface Gateway query 不支持 chat_input',
+      },
+    });
+    expect(submitted).toEqual([]);
+  });
 });
 
 function createSocket(frames: unknown[]): { readyState: number; send: (payload: string) => void } {
@@ -407,4 +477,35 @@ function createSocket(frames: unknown[]): { readyState: number; send: (payload: 
       frames.push(JSON.parse(payload));
     },
   };
+}
+
+function dispatchSurfaceRpc(
+  subject: {
+    _dispatchSurfaceRpc(
+      sessionId: string,
+      requiredScope: 'surface:read' | 'surface:write',
+      declaredOperation: string,
+      rawArguments: Record<string, unknown>,
+      callback: (error: Error | null, response: unknown) => void,
+      operation: 'query' | 'command',
+    ): Promise<void>;
+  },
+  input: {
+    sessionId: string;
+    requiredScope: 'surface:read' | 'surface:write';
+    declaredOperation: string;
+    rawArguments: Record<string, unknown>;
+    operation: 'query' | 'command';
+  },
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    void subject._dispatchSurfaceRpc(
+      input.sessionId,
+      input.requiredScope,
+      input.declaredOperation,
+      input.rawArguments,
+      (error, response) => error ? reject(error) : resolve(response),
+      input.operation,
+    );
+  });
 }

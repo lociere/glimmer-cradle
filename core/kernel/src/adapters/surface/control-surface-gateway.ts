@@ -90,6 +90,32 @@ import { serverStreamingMethod, unaryMethod } from '../cognition/grpc-contract';
 
 const logger = getLogger('control-surface-gateway');
 const SURFACE_OPEN = 1;
+const SURFACE_QUERY_KINDS = new Set([
+  'config_snapshot_request',
+  'conversation_history_request',
+  'skill_catalog_request',
+  'extension_runtime_projection_request',
+]);
+const SURFACE_COMMAND_KINDS = new Set([
+  'heartbeat',
+  'ping',
+  'host_hello',
+  'chat_input',
+  'audio_input',
+  'avatar_presentation',
+  'avatar_intent',
+  'core_skill_action_response',
+  'core_skill_confirmation_response',
+  'config_update_request',
+  'config_test_request',
+  'extension_lifecycle_request',
+  'extension_install_prepare',
+  'extension_install_commit',
+  'extension_install_cancel',
+  'extension_uninstall_request',
+  'extension_command_request',
+  'shutdown_request',
+]);
 const surfaceGatewayDefinition = {
   Connect: unaryMethod(
     '/glimmer.surface.v1.SurfaceGatewayService/Connect',
@@ -396,7 +422,8 @@ export class ControlSurfaceGateway {
     const expectedGeneration = EndpointRegistry.instance.get('control-surface')?.generation;
     const requestedScopes = new Set(call.request.scopes.map((scope) => scope.trim()).filter(Boolean));
     const allowedProduct = productId === 'desktop' || productId === 'personal-server';
-    const allowedScopes = [...requestedScopes].every((scope) => scope === 'surface:read' || scope === 'surface:write');
+    const allowedScopes = requestedScopes.size > 0
+      && [...requestedScopes].every((scope) => scope === 'surface:read' || scope === 'surface:write');
     if (!allowedProduct || !allowedScopes || !expectedGeneration || generation !== expectedGeneration) {
       callback(null, create(SurfaceGatewayServiceConnectResponseSchema, {
         accepted: false,
@@ -432,6 +459,7 @@ export class ControlSurfaceGateway {
     void this._dispatchSurfaceRpc(
       call.request.sessionId,
       'surface:read',
+      call.request.query,
       call.request.arguments,
       (error, response) => callback(error, response as SurfaceGatewayServiceQueryResponse),
       'query',
@@ -445,6 +473,7 @@ export class ControlSurfaceGateway {
     void this._dispatchSurfaceRpc(
       call.request.sessionId,
       'surface:write',
+      call.request.command,
       call.request.arguments,
       (error, response) => callback(error, response as SurfaceGatewayServiceCommandResponse),
       'command',
@@ -515,6 +544,7 @@ export class ControlSurfaceGateway {
   private async _dispatchSurfaceRpc(
     sessionId: string,
     requiredScope: 'surface:read' | 'surface:write',
+    declaredOperation: string,
     rawArguments: JsonObject | undefined,
     callback: (error: Error | null, response: SurfaceGatewayServiceQueryResponse | SurfaceGatewayServiceCommandResponse) => void,
     operation: 'query' | 'command',
@@ -528,6 +558,18 @@ export class ControlSurfaceGateway {
     const frame = extractSurfaceFrame(rawArguments);
     if (!frame || typeof frame.kind !== 'string') {
       callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway frame 无效'));
+      return;
+    }
+    const declaredKind = declaredOperation.trim();
+    if (declaredKind !== frame.kind) {
+      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway operation 与 frame.kind 不一致'));
+      return;
+    }
+    const allowedKind = operation === 'query'
+      ? SURFACE_QUERY_KINDS.has(frame.kind)
+      : SURFACE_COMMAND_KINDS.has(frame.kind);
+    if (!allowedKind) {
+      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, `Surface Gateway ${operation} 不支持 ${frame.kind}`));
       return;
     }
     const output: unknown[] = [];
