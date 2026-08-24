@@ -5,7 +5,9 @@
   "precompiledReferences": [
     "GlimmerCradle.Avatar.Core.dll",
     "GlimmerCradle.Avatar.Contracts.dll",
-    "Google.Protobuf.dll"
+    "Google.Protobuf.dll",
+    "Grpc.Core.Api.dll",
+    "Grpc.Core.dll"
   ],
   "overrideReferences": true,
   "autoReferenced": true,

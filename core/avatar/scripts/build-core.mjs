@@ -22,12 +22,39 @@ const sources = [
   path.join(repoRoot, 'core', 'avatar', 'bin', 'Release', 'netstandard2.1', 'GlimmerCradle.Avatar.Core.dll'),
   path.join(repoRoot, 'contracts', 'csharp', 'bin', 'Release', 'netstandard2.1', 'GlimmerCradle.Avatar.Contracts.dll'),
   await resolveNugetAssembly(dotnet, 'google.protobuf', '3.33.0', 'lib', 'netstandard2.0', 'Google.Protobuf.dll'),
+  await resolveNugetAssembly(dotnet, 'grpc.core.api', '2.46.6', 'lib', 'netstandard2.0', 'Grpc.Core.Api.dll'),
+  await resolveNugetAssembly(dotnet, 'grpc.core', '2.46.6', 'lib', 'netstandard2.0', 'Grpc.Core.dll'),
 ];
 await fs.mkdir(stageDirectory, { recursive: true });
 await fs.mkdir(pluginDirectory, { recursive: true });
 for (const source of sources) {
   await fs.copyFile(source, path.join(stageDirectory, path.basename(source)));
   await fs.copyFile(source, path.join(pluginDirectory, path.basename(source)));
+}
+if (process.platform === 'win32') {
+  const nativeSource = await resolveNugetAssembly(
+    dotnet,
+    'grpc.core',
+    '2.46.6',
+    'runtimes',
+    'win-x64',
+    'native',
+    'grpc_csharp_ext.x64.dll',
+  );
+  const nativeStageDirectory = path.join(stageDirectory, 'native', 'win-x64');
+  const nativePluginDirectory = path.join(
+    repoRoot,
+    'hosts',
+    'unity-avatar-host',
+    'Assets',
+    'Plugins',
+    'AvatarPlugins',
+    'x86_64',
+  );
+  await fs.mkdir(nativeStageDirectory, { recursive: true });
+  await fs.mkdir(nativePluginDirectory, { recursive: true });
+  await fs.copyFile(nativeSource, path.join(nativeStageDirectory, path.basename(nativeSource)));
+  await fs.copyFile(nativeSource, path.join(nativePluginDirectory, path.basename(nativeSource)));
 }
 console.log(`[avatar-core] 已生成离线程序集并投影到 Unity Host: ${stageDirectory}`);
 

@@ -116,6 +116,11 @@
       "version": "3.33.0",
       "license": "BSD-3-Clause",
       "source": "https://github.com/protocolbuffers/protobuf"
+    },
+    "grpc_core": {
+      "version": "2.46.6",
+      "license": "Apache-2.0",
+      "source": "https://github.com/grpc/grpc"
     }
   }
 }

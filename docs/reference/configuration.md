@@ -119,7 +119,7 @@ ASR 当前主线为 FunASR，因此 Control Center 只暴露启停，不提供�
 | `kernel.cognition_service.request_timeout_ms` | Kernel 调用 Cognition Service 的默认 deadline；不配置稳定端口。 |
 | `kernel.cognition_service.registration_timeout_ms` | Kernel 等待受监 Cognition 以本代 generation 与匿名 pipe challenge 完成认证注册的上限。 |
 | `surfaces.yaml` | 不含 Desktop WebSocket 端口；Desktop 从本代 endpoint catalog 发现。 |
-| `avatar.yaml` | 不含 Avatar WebSocket 端口；Kernel 启动 Unity 时直接注入。 |
+| `avatar.yaml` | 不含 Avatar gRPC 端口或认证令牌；Kernel 启动 Unity 时通过进程环境直接注入。 |
 | `data/run/host/endpoints.json` | Kernel 生成的可再生目录，不是用户配置，不得手改或跨启动缓存。 |
 
 NapCat 的 `transport.port` 属于 Extension 自有第三方协议配置。默认 `0` 由 Adapter 启动时选择空闲回环端口；远程 NapCat 连接必须显式填写端口。它不进入 Kernel 内部 endpoint catalog。

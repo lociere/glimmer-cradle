@@ -112,8 +112,6 @@ function assertLoopbackEndpoint(endpoint: string): void {
   if (
     !endpoint.startsWith('tcp://127.0.0.1:')
     && !endpoint.startsWith('grpc://127.0.0.1:')
-    && !endpoint.startsWith('ws://127.0.0.1:')
-    && !endpoint.startsWith('ws://[::1]:')
   ) {
     throw new Error(`内部端点必须绑定回环地址: ${endpoint}`);
   }

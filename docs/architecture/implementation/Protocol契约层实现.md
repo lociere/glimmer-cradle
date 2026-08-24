@@ -50,7 +50,7 @@ pnpm contracts:generate
 pnpm contracts:verify
 ```
 
-`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 分别消费 Avatar TS/C# projection，并用 preserve-proto-field-name JSON 保持已发布 snake_case wire。legacy `PresentationFrames.g.cs` 已删除。Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
+`contracts/` 的 Buf 生成物只属于 Adapter/Transport 边缘。Kernel 与 Cognition 分别消费版本化 TS/Python Service；Kernel Avatar adapter 与 Unity Host Adapter 直接映射 Avatar TS/C# generated DTO，通过 `AvatarHostService.Connect` 交换二进制 Protobuf，不保留 JSON formatter/parser consumer。legacy `PresentationFrames.g.cs` 已删除。Cognition generated DTO/stub 只允许出现在 `adapters/kernel/grpc_transport.py`。`protocol/codegen/gen-py.py` 现在只生成 Audio projection；Desktop、Engine、Extension 和 Personal Server 仍按各自未迁移切片使用 `@glimmer-cradle/protocol`。
 
 Python generated DTO 通过 `glimmer-cradle-contracts` distribution 安装。Cognition 的开发
 environment、Desktop 聚合 Python runtime 与 Personal Server OCI builder 都显式消费该本地
@@ -104,7 +104,7 @@ Protocol 的 runtime helper 负责：
 | contracts compatibility 失败 | `contracts/compatibility/` baseline、`buf breaking --against`、JSON Schema baseline |
 | 运行时报未知字段 | validator、producer payload、consumer 版本 |
 | 配置读不出 | config schema、normalizer、默认值和实际 YAML |
-| Avatar frame 不兼容 | `contracts/proto/glimmer/avatar/v1/avatar_host.proto`、Kernel/Unity Host Adapter 与 snake_case round-trip |
+| Avatar frame 不兼容 | `contracts/proto/glimmer/avatar/v1/avatar_host.proto`、Kernel/Unity Host Adapter 与二进制 Protobuf round-trip |
 | Cognition payload 解析失败 | Contract Spine Python DTO、Kernel contract adapter、错误 code |
 
 ## 验证

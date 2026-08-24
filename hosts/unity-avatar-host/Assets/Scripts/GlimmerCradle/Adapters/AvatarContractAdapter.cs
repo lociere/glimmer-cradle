@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Google.Protobuf;
 using Contract = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 using GlimmerCradle.Avatar;
 
@@ -8,7 +7,7 @@ namespace GlimmerCradle.UnityAvatarHost.Adapters
 {
     public enum AvatarContractFailureCode
     {
-        MalformedJson,
+        MalformedMessage,
         MissingRequiredField,
         UnknownKind,
         MissingPayload,
@@ -34,7 +33,7 @@ namespace GlimmerCradle.UnityAvatarHost.Adapters
         {
             switch (code)
             {
-                case AvatarContractFailureCode.MalformedJson: return "malformed_json";
+                case AvatarContractFailureCode.MalformedMessage: return "malformed_message";
                 case AvatarContractFailureCode.MissingRequiredField: return "missing_required_field";
                 case AvatarContractFailureCode.UnknownKind: return "unknown_kind";
                 case AvatarContractFailureCode.MissingPayload: return "missing_payload";
@@ -88,26 +87,13 @@ namespace GlimmerCradle.UnityAvatarHost.Adapters
 
     public static class AvatarContractAdapter
     {
-        private static readonly JsonFormatter Formatter = new JsonFormatter(
-            JsonFormatter.Settings.Default.WithPreserveProtoFieldNames(true));
-
-        public static AvatarContractReadResult ParseDownstream(string json)
+        public static AvatarContractReadResult ReadDownstream(Contract.AvatarDownstreamFrame source)
         {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return AvatarContractReadResult.Fail(AvatarContractFailureCode.MalformedJson, "Avatar 下行帧不是有效 JSON 文本");
-            }
-
-            Contract.AvatarDownstreamFrame source;
-            try
-            {
-                source = JsonParser.Default.Parse<Contract.AvatarDownstreamFrame>(json);
-            }
-            catch (Exception ex)
+            if (source == null)
             {
                 return AvatarContractReadResult.Fail(
-                    AvatarContractFailureCode.MalformedJson,
-                    "Avatar 下行帧 JSON 解析失败: " + ex.Message);
+                    AvatarContractFailureCode.MalformedMessage,
+                    "Avatar 下行 Protobuf 帧为空");
             }
 
             if (!source.HasKind || string.IsNullOrWhiteSpace(source.Kind))
@@ -154,7 +140,7 @@ namespace GlimmerCradle.UnityAvatarHost.Adapters
             }
         }
 
-        public static string SerializeHostEvent(AvatarHostEvent source, string traceId, double timestamp)
+        public static Contract.AvatarUpstreamFrame MapHostEvent(AvatarHostEvent source, string traceId, double timestamp)
         {
             if (source == null) throw new ArgumentNullException(nameof(source));
             ValidateTimestamp(timestamp);
@@ -205,13 +191,13 @@ namespace GlimmerCradle.UnityAvatarHost.Adapters
                 default:
                     throw new AvatarContractSerializationException(AvatarContractFailureCode.UnknownKind, "不支持的 Avatar Host event: " + source.GetType().FullName);
             }
-            return Formatter.Format(target);
+            return target;
         }
 
-        public static string SerializePong(string traceId, double timestamp)
+        public static Contract.AvatarUpstreamFrame MapPong(string traceId, double timestamp)
         {
             ValidateTimestamp(timestamp);
-            return Formatter.Format(new Contract.AvatarUpstreamFrame { Kind = "pong", TraceId = traceId ?? string.Empty, Timestamp = timestamp });
+            return new Contract.AvatarUpstreamFrame { Kind = "pong", TraceId = traceId ?? string.Empty, Timestamp = timestamp };
         }
 
         private static AvatarContractReadResult MapEmotion(Contract.AvatarDownstreamFrame source)

@@ -11,5 +11,6 @@
   <ItemGroup>
     <Compile Include="..\generated\csharp\GlimmerCradle\avatar\v1\AvatarHost.cs" Link="Generated\AvatarHost.cs" />
     <PackageReference Include="Google.Protobuf" Version="3.33.0" />
+    <PackageReference Include="Grpc.Core" Version="2.46.6" />
   </ItemGroup>
 </Project>

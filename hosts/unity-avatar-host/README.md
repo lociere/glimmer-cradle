@@ -4,7 +4,7 @@
 
 ## 边界
 
-- UnityAvatarHost 连接 Kernel `ws://127.0.0.1:8082`，只收发 `PresentationUpstreamFrame` / `PresentationDownstreamFrame`。
+- UnityAvatarHost 通过动态回环 `AvatarHostService.Connect` 双向 gRPC stream 连接 Kernel；端点和进程级认证令牌只由受管启动环境注入。
 - Unity 不读取 `configs/`，不调用 Cognition，也不负责管理面板。
 - Kernel 只理解稳定的身体语义，不泄露 Unity 或 Cubism 对象。
 - `host_hello` 仅表示进程已连接；`host_ready` 只在 Cubism 模型、正式驱动、Composition Host 与首帧呈现均就绪后发送。

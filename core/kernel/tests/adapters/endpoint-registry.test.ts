@@ -24,7 +24,7 @@ describe('EndpointRegistry', () => {
     process.env.GLIMMER_CRADLE_DATA_ROOT = tempRoot;
     delete process.env.GLIMMER_CRADLE_RUN_ROOT;
 
-    await EndpointRegistry.instance.publish('control-surface', 'ws://127.0.0.1:49152');
+    await EndpointRegistry.instance.publish('control-surface', 'grpc://127.0.0.1:49152');
     await EndpointRegistry.instance.publish('cognition-rpc', 'tcp://127.0.0.1:49153');
 
     const catalogPath = path.join(tempRoot, 'run', 'host', 'endpoints.json');
@@ -46,7 +46,7 @@ describe('EndpointRegistry', () => {
     process.env.GLIMMER_CRADLE_DATA_ROOT = tempRoot;
     delete process.env.GLIMMER_CRADLE_RUN_ROOT;
     await expect(
-      EndpointRegistry.instance.publish('avatar-host', 'ws://0.0.0.0:49154'),
+      EndpointRegistry.instance.publish('avatar-host', 'grpc://0.0.0.0:49154'),
     ).rejects.toThrow('内部端点必须绑定回环地址');
   });
 });

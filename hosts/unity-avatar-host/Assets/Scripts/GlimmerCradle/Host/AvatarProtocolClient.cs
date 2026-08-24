@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using GlimmerCradle.UnityAvatarHost.Adapters;
+using Contract = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 
 namespace GlimmerCradle.Avatar
 {
@@ -21,7 +20,7 @@ namespace GlimmerCradle.Avatar
         [SerializeField] private bool connectOnStart = true;
 
         private readonly ConcurrentQueue<Action> mainThreadQueue = new ConcurrentQueue<Action>();
-        private ClientWebSocket socket;
+        private AvatarGrpcTransport transport;
         private CancellationTokenSource lifetime;
         private UnityAvatarHostConfig config;
         private bool avatarReady;
@@ -110,16 +109,13 @@ namespace GlimmerCradle.Avatar
             }
             try
             {
-                if (socket != null && socket.State == WebSocketState.Open)
-                {
-                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Unity shell shutdown", CancellationToken.None);
-                }
+                if (transport != null) await transport.ShutdownAsync();
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[UnityAvatarHost] 关闭 WebSocket 时忽略异常: {ex.Message}");
+                Debug.LogWarning($"[UnityAvatarHost] 关闭 gRPC stream 时忽略异常: {ex.Message}");
             }
-            socket?.Dispose();
+            transport?.Dispose();
             lifetime?.Dispose();
             sendLock.Dispose();
         }
@@ -132,7 +128,7 @@ namespace GlimmerCradle.Avatar
             }
 
             var failure = new AvatarHostFailed(code, message);
-            if (socket == null || socket.State != WebSocketState.Open)
+            if (transport == null || !transport.IsConnected)
             {
                 startupErrors.Add(failure);
                 return;
@@ -179,8 +175,9 @@ namespace GlimmerCradle.Avatar
                 }
                 finally
                 {
-                    socket?.Dispose();
-                    socket = null;
+                    if (transport != null) await transport.ShutdownAsync();
+                    transport?.Dispose();
+                    transport = null;
                 }
 
                 var delayMs = Mathf.Max(0.5f, config?.reconnectDelaySeconds ?? 2.0f) * 1000;
@@ -190,8 +187,8 @@ namespace GlimmerCradle.Avatar
 
         private async Task ConnectAsync(CancellationToken token)
         {
-            socket = new ClientWebSocket();
-            await socket.ConnectAsync(new Uri(kernelUrl), token);
+            transport = new AvatarGrpcTransport();
+            await transport.ConnectAsync(kernelUrl, config.authToken, token);
             readyAnnounced = false;
             helloSent = false;
             await SendHelloAsync(token);
@@ -214,8 +211,8 @@ namespace GlimmerCradle.Avatar
                 || !avatarReady
                 || !presentationReady
                 || !firstFramePresented
-                || socket == null
-                || socket.State != WebSocketState.Open
+                || transport == null
+                || !transport.IsConnected
                 || lifetime == null
                 || lifetime.IsCancellationRequested)
             {
@@ -281,28 +278,12 @@ namespace GlimmerCradle.Avatar
 
         private async Task ReceiveLoopAsync(CancellationToken token)
         {
-            var buffer = new byte[64 * 1024];
-            while (!token.IsCancellationRequested && socket.State == WebSocketState.Open)
-            {
-                var builder = new StringBuilder();
-                WebSocketReceiveResult result;
-                do
-                {
-                    result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        return;
-                    }
-                    builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                } while (!result.EndOfMessage);
-
-                HandleFrame(builder.ToString());
-            }
+            await transport.ReceiveAsync(HandleFrame, token);
         }
 
-        private void HandleFrame(string json)
+        private void HandleFrame(Contract.AvatarDownstreamFrame frame)
         {
-            var result = AvatarContractAdapter.ParseDownstream(json);
+            var result = AvatarContractAdapter.ReadDownstream(frame);
             if (!result.IsSuccess)
             {
                 Debug.LogWarning($"[UnityAvatarHost] 拒绝无效 Avatar 帧 code={result.Failure.WireCode} detail={result.Failure.Message}");
@@ -364,17 +345,17 @@ namespace GlimmerCradle.Avatar
 
         private async Task SendHostEventAsync(AvatarHostEvent hostEvent, CancellationToken token, string traceId = null)
         {
-            await SendWireJsonAsync(AvatarContractAdapter.SerializeHostEvent(hostEvent, traceId, NowMs()), token);
+            await SendMessageAsync(AvatarContractAdapter.MapHostEvent(hostEvent, traceId, NowMs()), token);
         }
 
         private async Task SendPongAsync(string traceId, CancellationToken token)
         {
-            await SendWireJsonAsync(AvatarContractAdapter.SerializePong(traceId, NowMs()), token);
+            await SendMessageAsync(AvatarContractAdapter.MapPong(traceId, NowMs()), token);
         }
 
-        private async Task SendWireJsonAsync(string json, CancellationToken token)
+        private async Task SendMessageAsync(Contract.AvatarUpstreamFrame message, CancellationToken token)
         {
-            if (socket == null || socket.State != WebSocketState.Open)
+            if (transport == null || !transport.IsConnected)
             {
                 return;
             }
@@ -382,8 +363,8 @@ namespace GlimmerCradle.Avatar
             await sendLock.WaitAsync(token);
             try
             {
-                var payload = Encoding.UTF8.GetBytes(json);
-                await socket.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true, token);
+                token.ThrowIfCancellationRequested();
+                await transport.WriteAsync(message, token);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {

@@ -34,6 +34,22 @@ export function serverStreamingMethod<I extends DescMessage, O extends DescMessa
   };
 }
 
+export function duplexStreamingMethod<I extends DescMessage, O extends DescMessage>(
+  path: string,
+  input: I,
+  output: O,
+): MethodDefinition<MessageShape<I>, MessageShape<O>> {
+  return {
+    path,
+    requestStream: true,
+    responseStream: true,
+    requestSerialize: (value) => Buffer.from(toBinary(input, value)),
+    requestDeserialize: (value) => fromBinary(input, value),
+    responseSerialize: (value) => Buffer.from(toBinary(output, value)),
+    responseDeserialize: (value) => fromBinary(output, value),
+  };
+}
+
 export function serviceDefinition(
   serviceName: string,
   methods: Record<string, readonly [DescMessage, DescMessage]>,

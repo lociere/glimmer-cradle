@@ -107,9 +107,6 @@ importers:
       winston:
         specifier: ^3.13.0
         version: 3.19.0
-      ws:
-        specifier: ^8.19.0
-        version: 8.20.0
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
@@ -126,9 +123,6 @@ importers:
       '@types/semver':
         specifier: ^7.7.1
         version: 7.7.1
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
       node-gyp:
         specifier: ^9.0.0
         version: 9.4.1

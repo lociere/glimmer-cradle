@@ -70,6 +70,7 @@ export class UnityAvatarHostProcess {
   private _resolvedCommand: string | undefined;
   private _resolvedCwd: string | undefined;
   private _kernelEndpoint = '';
+  private _kernelAuthToken = '';
   private readonly _listeners = new Set<UnityAvatarHostProcessListener>();
 
   public static get instance(): UnityAvatarHostProcess {
@@ -81,9 +82,10 @@ export class UnityAvatarHostProcess {
 
   private constructor() {}
 
-  public configure(config: UnityAvatarHostConfig, kernelEndpoint: string): void {
+  public configure(config: UnityAvatarHostConfig, kernelEndpoint: string, authToken: string): void {
     this._config = config;
     this._kernelEndpoint = kernelEndpoint;
+    this._kernelAuthToken = authToken;
     if (config.launch_mode !== 'managed') {
       this._state = config.launch_mode === 'manual' ? 'manual' : 'disabled';
       this._emitSnapshot();
@@ -142,7 +144,8 @@ export class UnityAvatarHostProcess {
         ...process.env,
         GLIMMER_CRADLE_AVATAR_PLACEMENT_PATH: resolveStatePath('desktop/avatar-placement.json'),
         GLIMMER_CRADLE_AVATAR_ACTION_STATE_PATH: resolveStatePath('avatar/action-state.json'),
-        GLIMMER_CRADLE_AVATAR_WS_URL: this._kernelEndpoint,
+        GLIMMER_CRADLE_AVATAR_GRPC_URL: this._kernelEndpoint,
+        GLIMMER_CRADLE_AVATAR_AUTH_TOKEN: this._kernelAuthToken,
         GLIMMER_CRADLE_SUPERVISOR_PID: String(process.pid),
         ...config.env,
       },

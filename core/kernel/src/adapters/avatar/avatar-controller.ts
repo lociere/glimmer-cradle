@@ -1,5 +1,5 @@
-import { WebSocketServer, WebSocket, type RawData } from 'ws';
-import type { AddressInfo } from 'node:net';
+import * as grpc from '@grpc/grpc-js';
+import { randomBytes } from 'node:crypto';
 import { EventBus } from '../events/event-bus';
 import { getLogger } from '../observability/logger';
 import {
@@ -9,10 +9,28 @@ import {
 } from '../../domain/events';
 import type { VisualCommand } from '../../domain/kernel-contracts';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
-import { fromJsonString, toJsonString } from '@bufbuild/protobuf';
+import { create } from '@bufbuild/protobuf';
 import {
+  AudioPlayPayloadSchema,
   AvatarDownstreamFrameSchema,
+  AvatarExpressionPayloadSchema,
+  AvatarIntentPayloadSchema,
+  AvatarLipSyncPayloadSchema,
+  AvatarMotionPayloadSchema,
+  AvatarParameterPayloadSchema,
+  AvatarPresentationPayloadSchema,
   AvatarUpstreamFrameSchema,
+  CharacterPresentationAppearancePayloadSchema,
+  CharacterPresentationLifecyclePayloadSchema,
+  CharacterPresentationProjectionPayloadSchema,
+  EmotionPayloadSchema,
+  LoadScenePayloadSchema,
+  ThoughtPayloadSchema,
+  UnloadScenePayloadSchema,
+} from '@glimmer-cradle/contracts/glimmer/avatar/v1/avatar_host_pb';
+import type {
+  AvatarDownstreamFrame,
+  AvatarUpstreamFrame,
 } from '@glimmer-cradle/contracts/glimmer/avatar/v1/avatar_host_pb';
 import type {
   PresentationDownstreamFrame,
@@ -30,9 +48,19 @@ import type { RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.po
 import { UnityAvatarHostProcess } from './unity-avatar-host-process';
 import { buildAvatarResourceSnapshots } from './avatar-resource-catalog';
 import { EndpointRegistry } from '../endpoints/endpoint-registry';
+import { duplexStreamingMethod } from '../cognition/grpc-contract';
 
 const logger = getLogger('avatar-engine');
 const AVATAR_RUNTIME_MODULE_NAME = 'avatar-runtime';
+const AVATAR_AUTH_METADATA = 'x-glimmer-avatar-token';
+const avatarHostDefinition = {
+  Connect: duplexStreamingMethod(
+    '/glimmer.avatar.v1.AvatarHostService/Connect',
+    AvatarUpstreamFrameSchema,
+    AvatarDownstreamFrameSchema,
+  ),
+};
+type AvatarStream = grpc.ServerDuplexStream<AvatarUpstreamFrame, AvatarDownstreamFrame>;
 
 type AvatarLifecycleState = NonNullable<CharacterPresentationProjectionPayload['avatar_state']>;
 
@@ -49,11 +77,13 @@ const DEFAULT_HOST_READY: AvatarHostReadyPayload = {
 };
 
 export class AvatarController {
-  private _wss: WebSocketServer | null = null;
-  private readonly _clients: Set<WebSocket> = new Set();
-  private readonly _readyClients: Set<WebSocket> = new Set();
-  private readonly _lastHeartbeatByClient: Map<WebSocket, number> = new Map();
-  private readonly _lastErrorByClient: Map<WebSocket, string> = new Map();
+  private _server: grpc.Server | null = null;
+  private _serverAddress: string | null = null;
+  private readonly _clients: Set<AvatarStream> = new Set();
+  private readonly _readyClients: Set<AvatarStream> = new Set();
+  private readonly _lastHeartbeatByClient: Map<AvatarStream, number> = new Map();
+  private readonly _lastErrorByClient: Map<AvatarStream, string> = new Map();
+  private _authToken = '';
   private _heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private _initialized = false;
   private _heartbeatIntervalMs = 10000;
@@ -76,37 +106,25 @@ export class AvatarController {
     this._disposeProcessSubscription = UnityAvatarHostProcess.instance.subscribe(() => {
       this._syncRuntimeReadiness();
     });
-    this._wss = new WebSocketServer({ host: '127.0.0.1', port: 0, maxPayload: 2 * 1024 * 1024 });
-    await waitForWebSocketServer(this._wss);
-    const address = this._wss.address() as AddressInfo;
-    const endpoint = `ws://127.0.0.1:${address.port}`;
-    await EndpointRegistry.instance.publish('avatar-host', endpoint);
-    UnityAvatarHostProcess.instance.configure(config.host, endpoint);
-
-    this._wss.on('connection', (ws: WebSocket) => {
-      logger.info('Avatar 已连接');
-      this._clients.add(ws);
-      this._lastHeartbeatByClient.set(ws, Date.now());
-      this._emitStatusIfChanged('connected');
-
-      ws.on('message', (message: RawData) => {
-        this._handleRawMessage(message, ws);
-      });
-
-      ws.on('close', () => {
-        logger.warn('Avatar 已断开');
-        this._clients.delete(ws);
-        this._readyClients.delete(ws);
-        this._lastHeartbeatByClient.delete(ws);
-        this._lastErrorByClient.delete(ws);
-        this._emitStatusIfChanged('disconnected');
-      });
-
-      ws.on('error', (err: any) => {
-        logger.error('Avatar WebSocket 错误', { err });
-        this._syncRuntimeReadiness();
+    this._authToken = randomBytes(32).toString('hex');
+    const server = new grpc.Server({
+      'grpc.max_receive_message_length': 2 * 1024 * 1024,
+      'grpc.max_send_message_length': 2 * 1024 * 1024,
+    });
+    server.addService(avatarHostDefinition, {
+      Connect: this._connectAvatar.bind(this),
+    });
+    const port = await new Promise<number>((resolve, reject) => {
+      server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
+        if (error) reject(error);
+        else resolve(boundPort);
       });
     });
+    this._server = server;
+    this._serverAddress = `127.0.0.1:${port}`;
+    const endpoint = `grpc://127.0.0.1:${port}`;
+    await EndpointRegistry.instance.publish('avatar-host', endpoint);
+    UnityAvatarHostProcess.instance.configure(config.host, endpoint, this._authToken);
 
     EventBus.instance.subscribe('VisualCommandDispatchEvent', async (event: any) => {
       const payload = (event as VisualCommandDispatchEvent).payload;
@@ -132,17 +150,27 @@ export class AvatarController {
       kind: 'shutdown',
       timestamp: Date.now(),
     };
-    const shutdownPayload = encodeDownstream(shutdownFrame);
     for (const client of this._clients) {
-      this._sendRaw(client, shutdownPayload);
+      this._sendFrame(client, shutdownFrame);
+      client.end();
     }
 
     await UnityAvatarHostProcess.instance.stop();
 
-    if (this._wss) {
-      this._wss.clients.forEach((client) => client.terminate());
-      this._wss.close();
-      this._wss = null;
+    if (this._server) {
+      const server = this._server;
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          server.forceShutdown();
+          resolve();
+        }, 2000);
+        server.tryShutdown(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+      this._server = null;
+      this._serverAddress = null;
     }
     await EndpointRegistry.instance.revoke('avatar-host');
     this._clients.clear();
@@ -156,6 +184,7 @@ export class AvatarController {
     this._disposeProcessSubscription = null;
     this._emitStatusIfChanged('disconnected');
     this._config = null;
+    this._authToken = '';
     logger.info('Avatar 网关已停止');
   }
 
@@ -388,7 +417,6 @@ export class AvatarController {
   }
 
   public broadcastFrame(frame: PresentationDownstreamFrame): void {
-    const payload = encodeDownstream(frame);
     if (frame.kind !== 'presentation') {
       logger.debug('向 Avatar 广播帧', {
         frame_class: 'avatar-control',
@@ -398,7 +426,7 @@ export class AvatarController {
     }
 
     for (const client of this._readyClients) {
-      this._sendRaw(client, payload);
+      this._sendFrame(client, frame);
     }
   }
 
@@ -411,24 +439,58 @@ export class AvatarController {
     return true;
   }
 
-  private _handleRawMessage(message: RawData, ws: WebSocket): void {
-    try {
-      const frame = decodeUpstream(message.toString());
-      this._handleUpstream(frame, ws);
-    } catch (err) {
-      logger.warn('无法解析 Avatar 消息', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+  private _connectAvatar(call: AvatarStream): void {
+    const suppliedToken = call.metadata.get(AVATAR_AUTH_METADATA)[0];
+    if (typeof suppliedToken !== 'string' || suppliedToken !== this._authToken) {
+      call.emit('error', Object.assign(new Error('Avatar Host 认证失败'), {
+        code: grpc.status.PERMISSION_DENIED,
+        details: 'avatar_auth_failed',
+        metadata: new grpc.Metadata(),
+      }));
+      return;
     }
+
+    logger.info('Avatar 已连接');
+    this._clients.add(call);
+    this._lastHeartbeatByClient.set(call, Date.now());
+    this._emitStatusIfChanged('connected');
+
+    call.on('data', (message: AvatarUpstreamFrame) => {
+      try {
+        this._handleUpstream(decodeUpstream(message), call);
+      } catch (error) {
+        logger.warn('拒绝无效 Avatar gRPC 帧', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+    const cleanup = (): void => {
+      if (!this._clients.delete(call)) return;
+      logger.warn('Avatar 已断开');
+      this._readyClients.delete(call);
+      this._lastHeartbeatByClient.delete(call);
+      this._lastErrorByClient.delete(call);
+      this._emitStatusIfChanged('disconnected');
+    };
+    call.on('end', () => {
+      cleanup();
+      call.end();
+    });
+    call.on('close', cleanup);
+    call.on('cancelled', cleanup);
+    call.on('error', (err: Error) => {
+      logger.error('Avatar gRPC stream 错误', { err });
+      cleanup();
+    });
   }
 
-  private _handleUpstream(frame: PresentationUpstreamFrame, ws: WebSocket): void {
+  private _handleUpstream(frame: PresentationUpstreamFrame, client: AvatarStream): void {
     if (!frame || typeof frame.kind !== 'string') {
       logger.warn('Avatar 发送了无效帧');
       return;
     }
 
-    this._lastHeartbeatByClient.set(ws, Date.now());
+    this._lastHeartbeatByClient.set(client, Date.now());
 
     switch (frame.kind) {
       case 'host_hello': {
@@ -455,14 +517,14 @@ export class AvatarController {
         );
         this._lastHostReady = readyPayload;
         if (ready) {
-          this._readyClients.add(ws);
-          this._lastErrorByClient.delete(ws);
+          this._readyClients.add(client);
+          this._lastErrorByClient.delete(client);
           logger.info('Avatar 已完成首帧呈现并就绪', {
             model_id: readyPayload?.model_id,
             avatar_package_id: readyPayload?.avatar_package_id,
           });
         } else {
-          this._readyClients.delete(ws);
+          this._readyClients.delete(client);
           logger.warn('Avatar 上报了未满足 ready gate 的 host_ready', { host_ready: readyPayload });
         }
         this._emitStatusIfChanged(ready ? 'host_ready' : 'connected', true);
@@ -487,7 +549,7 @@ export class AvatarController {
         break;
       case 'error':
         this._lastErrorByClient.set(
-          ws,
+          client,
           frame.error?.message ?? frame.error?.code ?? 'Avatar 上报未知错误',
         );
         logger.error('Avatar 上报错误', { error: frame.error });
@@ -516,10 +578,8 @@ export class AvatarController {
       kind: 'ping',
       timestamp: now,
     };
-    const pingPayload = encodeDownstream(pingFrame);
-
     for (const client of this._clients) {
-      this._sendRaw(client, pingPayload);
+      this._sendFrame(client, pingFrame);
 
       if (!this._readyClients.has(client)) continue;
       const lastHeartbeat = this._lastHeartbeatByClient.get(client) ?? 0;
@@ -531,9 +591,12 @@ export class AvatarController {
     }
   }
 
-  private _sendRaw(client: WebSocket, payload: string): void {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+  private _sendFrame(client: AvatarStream, frame: PresentationDownstreamFrame): void {
+    if (client.cancelled || client.destroyed) return;
+    if (!client.write(encodeDownstream(frame))) {
+      logger.warn('Avatar gRPC stream 进入背压，暂停 ready 投递');
+      this._readyClients.delete(client);
+      this._emitStatusIfChanged('heartbeat_timeout');
     }
   }
 
@@ -633,25 +696,278 @@ export class AvatarController {
   }
 }
 
-function encodeDownstream(frame: PresentationDownstreamFrame): string {
-  const message = fromJsonString(AvatarDownstreamFrameSchema, JSON.stringify(frame));
-  return toJsonString(AvatarDownstreamFrameSchema, message, { useProtoFieldName: true });
+function encodeDownstream(frame: PresentationDownstreamFrame): AvatarDownstreamFrame {
+  const base = {
+    kind: frame.kind,
+    traceId: frame.trace_id ?? '',
+    timestamp: frame.timestamp,
+  };
+
+  switch (frame.kind) {
+    case 'shutdown':
+    case 'ping':
+    case 'idle':
+      return create(AvatarDownstreamFrameSchema, base);
+    case 'emotion': {
+      const payload = requirePayload(frame.emotion, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        emotion: create(EmotionPayloadSchema, {
+          emotionType: payload.emotion_type,
+          intensity: payload.intensity,
+          trigger: payload.trigger ?? '',
+          blendTimeMs: payload.blend_time_ms ?? 0,
+        }),
+      });
+    }
+    case 'thought': {
+      const payload = requirePayload(frame.thought, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        thought: create(ThoughtPayloadSchema, {
+          active: payload.active,
+          hint: payload.hint ?? '',
+        }),
+      });
+    }
+    case 'audio_play': {
+      const payload = requirePayload(frame.audio_play, frame.kind);
+      if (payload.audio_data) {
+        throw new Error('Avatar control plane 不接受内联 audio_data');
+      }
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        audioPlay: create(AudioPlayPayloadSchema, {
+          audioId: payload.audio_id,
+          audioUri: payload.audio_uri ?? '',
+          mimeType: payload.mime_type ?? '',
+          durationMs: payload.duration_ms ?? 0,
+        }),
+      });
+    }
+    case 'expression': {
+      const payload = requirePayload(frame.expression, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        expression: create(AvatarExpressionPayloadSchema, {
+          expressionId: payload.expression_id,
+          blendTimeMs: payload.blend_time_ms ?? 0,
+          autoReset: payload.auto_reset ?? false,
+        }),
+      });
+    }
+    case 'motion': {
+      const payload = requirePayload(frame.motion, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        motion: create(AvatarMotionPayloadSchema, {
+          motionId: payload.motion_id,
+          loop: payload.loop ?? false,
+          priority: payload.priority ?? 0,
+        }),
+      });
+    }
+    case 'lip_sync': {
+      const payload = requirePayload(frame.lip_sync, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        lipSync: create(AvatarLipSyncPayloadSchema, {
+          amplitude: payload.amplitude,
+          source: payload.source ?? '',
+        }),
+      });
+    }
+    case 'parameter': {
+      const payload = requirePayload(frame.parameter, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        parameter: create(AvatarParameterPayloadSchema, {
+          paramId: payload.param_id,
+          value: payload.value,
+          fadeMs: payload.fade_ms ?? 0,
+        }),
+      });
+    }
+    case 'avatar_intent': {
+      const payload = requirePayload(frame.avatar_intent, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        avatarIntent: create(AvatarIntentPayloadSchema, {
+          actionId: payload.action_id,
+          operation: payload.operation,
+          source: payload.source,
+          priority: payload.priority ?? 0,
+        }),
+      });
+    }
+    case 'presentation': {
+      const payload = requirePayload(frame.presentation, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        presentation: create(AvatarPresentationPayloadSchema, {
+          placementId: payload.placement_id ?? '',
+          displayScale: payload.display_scale ?? 0,
+          resetPlacement: payload.reset_placement ?? false,
+        }),
+      });
+    }
+    case 'character_presentation_projection': {
+      const payload = requirePayload(frame.character_presentation_projection, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        characterPresentationProjection: create(CharacterPresentationProjectionPayloadSchema, {
+          avatarPackageId: payload.avatar_package_id,
+          modelId: payload.model_id,
+          displayName: payload.display_name,
+          kind: payload.kind,
+          backend: payload.backend,
+          hostKind: payload.host_kind,
+          avatarState: payload.avatar_state,
+          appearance: create(CharacterPresentationAppearancePayloadSchema, {
+            placementId: payload.appearance.placement_id ?? '',
+            displayScale: payload.appearance.display_scale,
+          }),
+          lifecycle: create(CharacterPresentationLifecyclePayloadSchema, {
+            workerWindowState: payload.lifecycle.worker_window_state,
+            compositionSurfaceState: payload.lifecycle.composition_surface_state,
+            firstFramePresented: payload.lifecycle.first_frame_presented,
+            interactionReady: payload.lifecycle.interaction_ready,
+            ready: payload.lifecycle.ready,
+            summary: payload.lifecycle.summary,
+          }),
+        }),
+      });
+    }
+    case 'load_scene': {
+      const payload = requirePayload(frame.load_scene, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        loadScene: create(LoadScenePayloadSchema, {
+          sceneId: payload.scene_id,
+          fadeMs: payload.fade_ms ?? 0,
+        }),
+      });
+    }
+    case 'unload_scene': {
+      const payload = requirePayload(frame.unload_scene, frame.kind);
+      return create(AvatarDownstreamFrameSchema, {
+        ...base,
+        unloadScene: create(UnloadScenePayloadSchema, {
+          fadeMs: payload.fade_ms ?? 0,
+        }),
+      });
+    }
+    default:
+      throw new Error(`AvatarHostService 不支持下行帧 ${frame.kind}`);
+  }
 }
 
-function decodeUpstream(json: string): PresentationUpstreamFrame {
-  const message = fromJsonString(AvatarUpstreamFrameSchema, json, { ignoreUnknownFields: true });
-  return JSON.parse(toJsonString(AvatarUpstreamFrameSchema, message, { useProtoFieldName: true })) as PresentationUpstreamFrame;
+function decodeUpstream(message: AvatarUpstreamFrame): PresentationUpstreamFrame {
+  if (!message.kind || message.timestamp === undefined || !Number.isFinite(message.timestamp)) {
+    throw new Error('Avatar 上行帧缺少 kind 或有效 timestamp');
+  }
+  assertExpectedUpstreamPayload(message);
+  const base = {
+    kind: message.kind,
+    trace_id: message.traceId || undefined,
+    timestamp: message.timestamp,
+  };
+
+  switch (message.kind) {
+    case 'heartbeat':
+    case 'pong':
+      return base as PresentationUpstreamFrame;
+    case 'host_hello': {
+      const payload = requirePayload(message.hostHello, message.kind);
+      if (payload.hostKind !== 'unity') throw new Error('Avatar host_hello.host_kind 必须为 unity');
+      return {
+        ...base,
+        kind: 'host_hello',
+        host_hello: {
+          host_kind: 'unity',
+          host_id: payload.hostId || undefined,
+          host_version: payload.hostVersion || undefined,
+          capabilities: payload.capabilities as NonNullable<AvatarHostHelloPayload['capabilities']>,
+          model_id: payload.modelId || undefined,
+          avatar_package_id: payload.avatarPackageId || undefined,
+        },
+      };
+    }
+    case 'host_ready': {
+      const payload = requirePayload(message.hostReady, message.kind);
+      if (payload.firstFramePresented === undefined || payload.interactionReady === undefined) {
+        throw new Error('host_ready 缺少 first_frame_presented 或 interaction_ready');
+      }
+      return {
+        ...base,
+        kind: 'host_ready',
+        host_ready: {
+          host_id: payload.hostId || undefined,
+          model_id: payload.modelId || undefined,
+          avatar_package_id: payload.avatarPackageId || undefined,
+          worker_window_state: payload.workerWindowState as AvatarHostReadyPayload['worker_window_state'],
+          composition_surface_state: payload.compositionSurfaceState as AvatarHostReadyPayload['composition_surface_state'],
+          first_frame_presented: payload.firstFramePresented,
+          interaction_ready: payload.interactionReady,
+          summary: payload.summary ?? '',
+        },
+      };
+    }
+    case 'avatar_action_state': {
+      const payload = requirePayload(message.avatarActionState, message.kind);
+      return {
+        ...base,
+        kind: 'avatar_action_state',
+        avatar_action_state: {
+          action_id: payload.actionId || undefined,
+          state: payload.state ? payload.state as NonNullable<PresentationUpstreamFrame['avatar_action_state']>['state'] : undefined,
+          active_action_ids: [...payload.activeActionIds],
+          message: payload.message || undefined,
+        },
+      };
+    }
+    case 'animation_complete': {
+      const payload = requirePayload(message.animationComplete, message.kind);
+      return {
+        ...base,
+        kind: 'animation_complete',
+        animation_complete: { animation_id: payload.animationId ?? '' },
+      };
+    }
+    case 'error': {
+      const payload = requirePayload(message.error, message.kind);
+      return {
+        ...base,
+        kind: 'error',
+        error: { code: payload.code ?? '', message: payload.message ?? '' },
+      };
+    }
+    default:
+      throw new Error(`AvatarHostService 不支持上行帧 ${message.kind}`);
+  }
 }
 
-function waitForWebSocketServer(server: WebSocketServer): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const onListening = (): void => { cleanup(); resolve(); };
-    const onError = (error: Error): void => { cleanup(); reject(error); };
-    const cleanup = (): void => {
-      server.off('listening', onListening);
-      server.off('error', onError);
-    };
-    server.once('listening', onListening);
-    server.once('error', onError);
-  });
+function requirePayload<T>(payload: T | null | undefined, kind: string): T {
+  if (payload === null || payload === undefined) {
+    throw new Error(`${kind} 缺少契约 payload`);
+  }
+  return payload;
+}
+
+function assertExpectedUpstreamPayload(message: AvatarUpstreamFrame): void {
+  const payloads = [
+    ['host_hello', message.hostHello],
+    ['host_ready', message.hostReady],
+    ['avatar_action_state', message.avatarActionState],
+    ['animation_complete', message.animationComplete],
+    ['error', message.error],
+  ].filter(([, value]) => value !== undefined);
+  const expected = message.kind === 'heartbeat' || message.kind === 'pong' ? null : message.kind;
+  if (expected === null) {
+    if (payloads.length > 0) throw new Error(`${message.kind} 不允许携带 payload`);
+    return;
+  }
+  if (payloads.length !== 1 || payloads[0]?.[0] !== expected) {
+    throw new Error(`${message.kind} 的 payload 缺失或不匹配`);
+  }
 }

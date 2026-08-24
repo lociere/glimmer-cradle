@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bd8ec90d773c8b4899d3f314029c7cf, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  kernelUrl: ws://127.0.0.1:8082
+  kernelUrl:
   hostId: unity-avatar
   hostVersion: 0.1.8
   modelId:

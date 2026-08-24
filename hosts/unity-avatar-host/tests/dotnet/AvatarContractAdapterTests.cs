@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using GlimmerCradle.Avatar;
 using GlimmerCradle.UnityAvatarHost.Adapters;
 using Xunit;
+using Contract = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 
 namespace GlimmerCradle.UnityAvatarHost.Tests;
 
@@ -10,11 +12,21 @@ public sealed class AvatarContractAdapterTests
     [Fact]
     public void ValidIntentMapsToTypedCoreCommandAndPreservesTraceAtEdge()
     {
-        const string json = """
-            {"kind":"avatar_intent","trace_id":"trace-1","timestamp":42,"avatar_intent":{"action_id":"wave-hand","operation":"trigger","source":"user","priority":7}}
-            """;
+        var frame = new Contract.AvatarDownstreamFrame
+        {
+            Kind = "avatar_intent",
+            TraceId = "trace-1",
+            Timestamp = 42,
+            AvatarIntent = new Contract.AvatarIntentPayload
+            {
+                ActionId = "wave-hand",
+                Operation = "trigger",
+                Source = "user",
+                Priority = 7,
+            },
+        };
 
-        var result = AvatarContractAdapter.ParseDownstream(json);
+        var result = AvatarContractAdapter.ReadDownstream(frame);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("trace-1", result.Message.TraceId);
@@ -25,14 +37,48 @@ public sealed class AvatarContractAdapterTests
         Assert.Equal(7, command.Priority);
     }
 
-    [Theory]
-    [InlineData("{\"kind\":\"extension_install\",\"timestamp\":1}", AvatarContractFailureCode.UnknownKind)]
-    [InlineData("{\"kind\":\"expression\",\"timestamp\":1}", AvatarContractFailureCode.MissingPayload)]
-    [InlineData("{\"kind\":\"expression\",\"timestamp\":1,\"motion\":{\"motion_id\":\"wave\"}}", AvatarContractFailureCode.MismatchedPayload)]
-    [InlineData("{\"kind\":\"expression\",\"timestamp\":1,\"expression\":{\"expression_id\":\"smile\"},\"motion\":{\"motion_id\":\"wave\"}}", AvatarContractFailureCode.MismatchedPayload)]
-    public void InvalidKindPayloadMatrixFailsClosed(string json, AvatarContractFailureCode expected)
+    public static IEnumerable<object[]> InvalidKindPayloadCases()
     {
-        var result = AvatarContractAdapter.ParseDownstream(json);
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame { Kind = "extension_install", Timestamp = 1 },
+            AvatarContractFailureCode.UnknownKind,
+        };
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame { Kind = "expression", Timestamp = 1 },
+            AvatarContractFailureCode.MissingPayload,
+        };
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame
+            {
+                Kind = "expression",
+                Timestamp = 1,
+                Motion = new Contract.AvatarMotionPayload { MotionId = "wave" },
+            },
+            AvatarContractFailureCode.MismatchedPayload,
+        };
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame
+            {
+                Kind = "expression",
+                Timestamp = 1,
+                Expression = new Contract.AvatarExpressionPayload { ExpressionId = "smile" },
+                Motion = new Contract.AvatarMotionPayload { MotionId = "wave" },
+            },
+            AvatarContractFailureCode.MismatchedPayload,
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidKindPayloadCases))]
+    public void InvalidKindPayloadMatrixFailsClosed(
+        Contract.AvatarDownstreamFrame frame,
+        AvatarContractFailureCode expected)
+    {
+        var result = AvatarContractAdapter.ReadDownstream(frame);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(expected, result.Failure.Code);
@@ -42,34 +88,69 @@ public sealed class AvatarContractAdapterTests
     [Fact]
     public void UnknownSemanticEnumFailsClosed()
     {
-        const string json = """
-            {"kind":"avatar_intent","timestamp":1,"avatar_intent":{"action_id":"wave","operation":"toggle","source":"user"}}
-            """;
+        var frame = new Contract.AvatarDownstreamFrame
+        {
+            Kind = "avatar_intent",
+            Timestamp = 1,
+            AvatarIntent = new Contract.AvatarIntentPayload
+            {
+                ActionId = "wave",
+                Operation = "toggle",
+                Source = "user",
+            },
+        };
 
-        var result = AvatarContractAdapter.ParseDownstream(json);
+        var result = AvatarContractAdapter.ReadDownstream(frame);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AvatarContractFailureCode.UnknownEnum, result.Failure.Code);
     }
 
-    [Theory]
-    [InlineData("{not-json")]
-    [InlineData("{\"kind\":\"idle\",\"timestamp\":1,\"legacy_unowned\":true}")]
-    public void MalformedOrUnknownJsonFieldFailsClosed(string json)
+    [Fact]
+    public void NullBinaryMessageFailsClosed()
     {
-        var result = AvatarContractAdapter.ParseDownstream(json);
+        var result = AvatarContractAdapter.ReadDownstream(null);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(AvatarContractFailureCode.MalformedJson, result.Failure.Code);
+        Assert.Equal(AvatarContractFailureCode.MalformedMessage, result.Failure.Code);
+    }
+
+    public static IEnumerable<object[]> MissingRequiredFieldCases()
+    {
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame
+            {
+                Kind = "thought",
+                Timestamp = 1,
+                Thought = new Contract.ThoughtPayload(),
+            },
+        };
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame
+            {
+                Kind = "parameter",
+                Timestamp = 1,
+                Parameter = new Contract.AvatarParameterPayload { ParamId = "ParamAngleX" },
+            },
+        };
+        yield return new object[]
+        {
+            new Contract.AvatarDownstreamFrame
+            {
+                Kind = "load_scene",
+                Timestamp = 1,
+                LoadScene = new Contract.LoadScenePayload(),
+            },
+        };
     }
 
     [Theory]
-    [InlineData("{\"kind\":\"thought\",\"timestamp\":1,\"thought\":{}}")]
-    [InlineData("{\"kind\":\"parameter\",\"timestamp\":1,\"parameter\":{\"param_id\":\"ParamAngleX\"}}")]
-    [InlineData("{\"kind\":\"load_scene\",\"timestamp\":1,\"load_scene\":{}}")]
-    public void MissingPublishedRequiredFieldFailsClosed(string json)
+    [MemberData(nameof(MissingRequiredFieldCases))]
+    public void MissingPublishedRequiredFieldFailsClosed(Contract.AvatarDownstreamFrame frame)
     {
-        var result = AvatarContractAdapter.ParseDownstream(json);
+        var result = AvatarContractAdapter.ReadDownstream(frame);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AvatarContractFailureCode.MissingRequiredField, result.Failure.Code);
@@ -78,33 +159,39 @@ public sealed class AvatarContractAdapterTests
     [Fact]
     public void PingIsHandledAtTransportEdgeWithoutCreatingCoreCommand()
     {
-        var result = AvatarContractAdapter.ParseDownstream("{\"kind\":\"ping\",\"trace_id\":\"trace-ping\",\"timestamp\":1}");
+        var result = AvatarContractAdapter.ReadDownstream(new Contract.AvatarDownstreamFrame
+        {
+            Kind = "ping",
+            TraceId = "trace-ping",
+            Timestamp = 1,
+        });
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Message.IsPing);
         Assert.Null(result.Message.Command);
-        Assert.Contains("\"kind\": \"pong\"", AvatarContractAdapter.SerializePong(result.Message.TraceId, 2));
+        var pong = AvatarContractAdapter.MapPong(result.Message.TraceId, 2);
+        Assert.Equal("pong", pong.Kind);
+        Assert.Equal("trace-ping", pong.TraceId);
     }
 
     [Fact]
-    public void UpstreamErrorUsesPublishedSnakeCaseWireShape()
+    public void UpstreamErrorMapsDirectlyToGeneratedDto()
     {
-        var json = AvatarContractAdapter.SerializeHostEvent(
+        var frame = AvatarContractAdapter.MapHostEvent(
             new AvatarHostFailed("avatar_contract_unknown_kind", "unknown kind"),
             "trace-error",
             43);
 
-        Assert.Contains("\"kind\": \"error\"", json);
-        Assert.Contains("\"trace_id\": \"trace-error\"", json);
-        Assert.Contains("\"error\"", json);
-        Assert.Contains("\"code\": \"avatar_contract_unknown_kind\"", json);
-        Assert.DoesNotContain("traceId", json);
+        Assert.Equal("error", frame.Kind);
+        Assert.Equal("trace-error", frame.TraceId);
+        Assert.Equal("avatar_contract_unknown_kind", frame.Error.Code);
+        Assert.Equal("unknown kind", frame.Error.Message);
     }
 
     [Fact]
     public void UpstreamActionResultMapsTypedStateAndRepeatedIds()
     {
-        var json = AvatarContractAdapter.SerializeHostEvent(
+        var frame = AvatarContractAdapter.MapHostEvent(
             new AvatarActionStateChanged(
                 "wave",
                 AvatarActionExecutionState.Completed,
@@ -113,10 +200,8 @@ public sealed class AvatarContractAdapterTests
             "trace-result",
             44);
 
-        Assert.Contains("\"kind\": \"avatar_action_state\"", json);
-        Assert.Contains("\"active_action_ids\"", json);
-        Assert.Contains("\"completed\"", json);
-        Assert.Contains("\"hat\"", json);
-        Assert.Contains("\"wave\"", json);
+        Assert.Equal("avatar_action_state", frame.Kind);
+        Assert.Equal("completed", frame.AvatarActionState.State);
+        Assert.Equal(new[] { "hat", "wave" }, frame.AvatarActionState.ActiveActionIds);
     }
 }

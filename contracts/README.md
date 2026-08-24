@@ -4,14 +4,14 @@
 > 事实依据：本目录下的 `proto/`、`json-schema/`、`compatibility/`、`generated/`、`scripts/` 与 `tests/`。
 > 维护触发：新增或修改 Contract Spine IDL、JSON Schema Document、生成工具链、兼容基线或跨语言验证门。
 
-`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition 与 Kernel↔UnityAvatarHost 的 Avatar control 主线已使用本目录的 v1 Protobuf Service/DTO；Avatar 当前 WebSocket transport 只承载该 canonical JSON projection。其他尚未迁移边界仍按 M12 切片使用 `protocol/`、stdio 或手写 WebSocket。
+`contracts/` 是长期 Contract Spine 的 canonical 事实源。Kernel↔Cognition、Surface Gateway 与 Kernel↔UnityAvatarHost Avatar control 主线已使用本目录的 v1 Protobuf Service/DTO；Avatar runtime 通过动态回环 `AvatarHostService.Connect` 双向 gRPC 传输二进制 Protobuf。其他尚未迁移边界仍按 M12 切片使用 `protocol/` 或 stdio。
 
 ## 目录
 
 | 路径 | Owner | 说明 |
 |---|---|---|
 | `proto/glimmer/common/v1/` | Contract Spine owner | Protobuf Service baseline，当前只包含最小 `ContractProbeService`。 |
-| `proto/glimmer/avatar/v1/` | Avatar Contract owner | Avatar Host 上下行控制帧与 `AvatarHostService`；snake_case 是已发布 JSON wire name。 |
+| `proto/glimmer/avatar/v1/` | Avatar Contract owner | Avatar Host 上下行控制帧与 `AvatarHostService`；IDL 字段号和 snake_case 字段名是跨语言生成事实源。 |
 | `json-schema/skill/v1/` | Skill Plane Document owner | JSON Schema Document baseline，当前只包含最小动态 tool parameters Document。 |
 | `generated/` | Contract Spine Adapter edge | Buf 生成的 TS/Python/C# DTO；只读，不进入 Domain/Application/Port。 |
 | `compatibility/` | Contract Spine owner | 仓库内 Protobuf image 与 JSON Schema compatibility baseline；`buf breaking` 不依赖 BSR。 |

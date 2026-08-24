@@ -1,8 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import WebSocket from 'ws';
+import * as grpc from '@grpc/grpc-js';
+import { create } from '@bufbuild/protobuf';
 import type { AvatarConfig } from '@glimmer-cradle/protocol';
+import {
+  AvatarDownstreamFrameSchema,
+  AvatarUpstreamFrameSchema,
+} from '@glimmer-cradle/contracts/glimmer/avatar/v1/avatar_host_pb';
 import { RuntimeReadinessProjectionMapper } from '../../../application/projection/runtime-readiness-projection';
 import { AvatarController } from '../../../adapters/avatar/avatar-controller';
+import { duplexStreamingMethod } from '../../../adapters/cognition/grpc-contract';
+
+const avatarConnectMethod = duplexStreamingMethod(
+  '/glimmer.avatar.v1.AvatarHostService/Connect',
+  AvatarUpstreamFrameSchema,
+  AvatarDownstreamFrameSchema,
+);
 
 const readinessProjection = new RuntimeReadinessProjectionMapper();
 const avatarController = new AvatarController(readinessProjection);
@@ -66,45 +78,51 @@ describe('AvatarController runtime readiness sync', () => {
       || resource.resource_kind === 'unity_sdk'
     ))).toBe(true);
 
-    const server = (avatarController as unknown as {
-      _wss?: { address: () => string | { port: number } | null };
-    })._wss;
-    const address = server?.address();
-    const port = typeof address === 'object' && address ? address.port : 0;
-    expect(port).toBeGreaterThan(0);
-
-    const socket = new WebSocket(`ws://127.0.0.1:${port}`);
-    await new Promise<void>((resolve, reject) => {
-      socket.once('open', () => resolve());
-      socket.once('error', reject);
-    });
+    const transport = avatarController as unknown as {
+      _serverAddress: string;
+      _authToken: string;
+    };
+    expect(transport._serverAddress).toMatch(/^127\.0\.0\.1:\d+$/);
+    const client = new grpc.Client(transport._serverAddress, grpc.credentials.createInsecure());
+    const metadata = new grpc.Metadata();
+    metadata.set('x-glimmer-avatar-token', transport._authToken);
+    const stream = client.makeBidiStreamRequest(
+      avatarConnectMethod.path,
+      avatarConnectMethod.requestSerialize,
+      avatarConnectMethod.responseDeserialize,
+      metadata,
+    );
+    const downstreamFrames: Array<{
+      kind?: string;
+      traceId?: string;
+      thought?: { active?: boolean; hint?: string };
+    }> = [];
+    stream.on('data', (frame) => downstreamFrames.push(frame));
 
     await waitFor(() => getAvatarRuntime()?.reconciler?.actual === 'connected-waiting-ready-gates');
 
-    socket.send(JSON.stringify({
+    stream.write(create(AvatarUpstreamFrameSchema, {
       kind: 'host_hello',
       timestamp: Date.now(),
-      host_hello: {
-        host_kind: 'unity',
-        host_id: 'test-shell',
-        host_version: '0.0.1',
-        model_id: 'selrena-youling',
-        avatar_package_id: 'selrena-youling',
+      hostHello: {
+        hostKind: 'unity',
+        hostId: 'test-shell',
+        hostVersion: '0.0.1',
+        modelId: 'selrena-youling',
+        avatarPackageId: 'selrena-youling',
       },
     }));
-    socket.send(JSON.stringify({
+    stream.write(create(AvatarUpstreamFrameSchema, {
       kind: 'host_ready',
       timestamp: Date.now(),
-      host_ready: {
-        host_kind: 'unity',
-        host_id: 'test-shell',
-        host_version: '0.0.1',
-        model_id: 'selrena-youling',
-        avatar_package_id: 'selrena-youling',
-        worker_window_state: 'isolated',
-        composition_surface_state: 'attached',
-        first_frame_presented: true,
-        interaction_ready: true,
+      hostReady: {
+        hostId: 'test-shell',
+        modelId: 'selrena-youling',
+        avatarPackageId: 'selrena-youling',
+        workerWindowState: 'isolated',
+        compositionSurfaceState: 'attached',
+        firstFramePresented: true,
+        interactionReady: true,
         summary: '首帧 ready',
       },
     }));
@@ -112,9 +130,23 @@ describe('AvatarController runtime readiness sync', () => {
     await waitFor(() => getAvatarRuntime()?.state === 'ready');
     expect(getAvatarRuntime()?.reconciler?.actual).toBe('connected-first-frame-presented');
 
-    socket.close();
+    avatarController.broadcastFrame({
+      kind: 'thought',
+      trace_id: 'trace-binary-dto',
+      timestamp: Date.now(),
+      thought: { active: true, hint: 'direct-generated-dto' },
+    });
+    await waitFor(() => downstreamFrames.some((frame) => frame.kind === 'thought'));
+    expect(downstreamFrames.find((frame) => frame.kind === 'thought')).toMatchObject({
+      kind: 'thought',
+      traceId: 'trace-binary-dto',
+      thought: { active: true, hint: 'direct-generated-dto' },
+    });
+
+    stream.end();
     await waitFor(() => getAvatarRuntime()?.reconciler?.actual === 'waiting-manual-launch');
     expect(getAvatarRuntime()?.state).toBe('degraded');
+    client.close();
   });
 
   it('maps audio visual commands to media references instead of inline data', () => {
@@ -152,5 +184,25 @@ describe('AvatarController runtime readiness sync', () => {
       },
     });
     expect(frames[0].audio_play).not.toHaveProperty('audio_data');
+  });
+
+  it('rejects AvatarHostService.Connect without the process-scoped token', async () => {
+    await avatarController.init(createUnityAvatarHostConfig());
+    const transport = avatarController as unknown as { _serverAddress: string };
+    const client = new grpc.Client(transport._serverAddress, grpc.credentials.createInsecure());
+    const metadata = new grpc.Metadata();
+    metadata.set('x-glimmer-avatar-token', 'wrong-token');
+    const stream = client.makeBidiStreamRequest(
+      avatarConnectMethod.path,
+      avatarConnectMethod.requestSerialize,
+      avatarConnectMethod.responseDeserialize,
+      metadata,
+    );
+    stream.on('data', () => undefined);
+    const failure = new Promise<grpc.ServiceError>((resolve) => stream.once('error', resolve));
+    stream.write(create(AvatarUpstreamFrameSchema, { kind: 'host_hello', timestamp: Date.now() }));
+
+    await expect(failure).resolves.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    client.close();
   });
 });

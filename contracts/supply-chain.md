@@ -19,6 +19,7 @@
 | Python `protobuf` | `6.33.0` | Python round-trip runtime | [protobuf](https://github.com/protocolbuffers/protobuf) | BSD-3-Clause | `pyproject.toml` exact pin；`uv.lock` 中 sdist/wheel SHA-256 |
 | `.NET SDK` | `8.0.423` | C# build/run | [dotnet/sdk](https://github.com/dotnet/sdk) | MIT | `global.json` 禁止 roll-forward；Microsoft release metadata archive SHA-512；解压 launcher SHA-256；运行时 exact-version guard |
 | `Google.Protobuf` | `3.33.0` | C# round-trip runtime | [protobuf](https://github.com/protocolbuffers/protobuf) | BSD-3-Clause | `packages.lock.json` resolved version 与 NuGet content hash |
+| `Grpc.Core` | `2.46.6` | UnityAvatarHost Windows x64 的本地双向 gRPC transport 与 native runtime | [grpc](https://github.com/grpc/grpc) | Apache-2.0 | `contracts/csharp/packages.lock.json` 的 NuGet content hash；managed/native artifact 由 `core/avatar/scripts/build-core.mjs` 从固定 global-packages 投影 |
 
 ## 工具 archive 与本地缓存
 
@@ -39,3 +40,4 @@ Python round-trip 固定执行 `uv run --locked --offline --no-python-downloads`
 - `buf breaking` 使用 `contracts/compatibility/proto-image.binpb`，不访问 Buf Schema Registry。
 - `buf generate` 只使用本地 builtin 或本地 npm plugin，不使用 remote plugin。
 - NuGet、npm、PyPI 只用于取得固定且有 lock 摘要的依赖；它们不是 Contract Spine 的权威事实源。
+- `Grpc.Core` 已停止功能演进，因此仅作为当前 Unity 6000 Windows x64 的已实测原生 HTTP/2 transport；升级 Unity、扩展平台或替换 runtime 时必须重新跑 Player 双向流与 native load 门，不能静态外推兼容性。

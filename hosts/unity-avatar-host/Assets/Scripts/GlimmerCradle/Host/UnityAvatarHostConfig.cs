@@ -16,6 +16,7 @@ namespace GlimmerCradle.Avatar
     public sealed class UnityAvatarHostConfig
     {
         public string kernelUrl = "";
+        public string authToken = "";
         public string hostId = "unity-avatar";
         public string hostVersion = "0.1.8";
         public string modelId = "";
@@ -52,8 +53,10 @@ namespace GlimmerCradle.Avatar
 
         private static UnityAvatarHostConfig ApplyHostEnvironment(UnityAvatarHostConfig config)
         {
-            var endpoint = Environment.GetEnvironmentVariable("GLIMMER_CRADLE_AVATAR_WS_URL");
+            var endpoint = Environment.GetEnvironmentVariable("GLIMMER_CRADLE_AVATAR_GRPC_URL");
             if (!string.IsNullOrWhiteSpace(endpoint)) config.kernelUrl = endpoint;
+            var authToken = Environment.GetEnvironmentVariable("GLIMMER_CRADLE_AVATAR_AUTH_TOKEN");
+            if (!string.IsNullOrWhiteSpace(authToken)) config.authToken = authToken;
             return config;
         }
     }

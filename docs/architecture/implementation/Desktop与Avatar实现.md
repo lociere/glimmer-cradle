@@ -127,10 +127,10 @@ local surface scene (`scene:desktop-ui:*` / `conversation:desktop-ui:*` / `scene
 | `core/avatar/src/Domain/` | 无 transport envelope 的 Avatar typed command、Host event、Package 与行为领域类型 |
 | `core/avatar/src/Application/AvatarCommandDispatcher.cs` | 只按封闭命令类型分派到 Core Port，不解析 wire `kind` |
 | `core/avatar/src/Ports/IAvatarCommandSink.cs` | Unity Host 实现的 Core command Port |
-| `core/kernel/src/adapters/avatar/avatar-controller.ts` | 当前 Kernel Avatar WebSocket control owner、readiness 与投影映射 |
+| `core/kernel/src/adapters/avatar/avatar-controller.ts` | Kernel `AvatarHostService.Connect` control owner、认证、readiness 与投影映射 |
 | `Host/UnityAvatarHostBootstrap.cs` | UnityAvatarHost 启动与 wiring |
-| `Adapters/AvatarContractAdapter.cs` | Contract Spine C# DTO 与 Core command/event 的唯一双向映射；验证 kind、唯一 payload、必填 presence 与语义枚举，JSON 未知字段 fail closed，并保留 snake_case wire name |
-| `Host/AvatarProtocolClient.cs` | 当前 Kernel Presentation Plane WebSocket client；把 Adapter typed failure 映射为稳定上行 `error` 与受控诊断，不让解析失败触发无分类重连 |
+| `Adapters/AvatarContractAdapter.cs` | Contract Spine C# generated DTO 与 Core command/event 的唯一双向映射；验证 kind、唯一 payload、必填 presence 与语义枚举，不经过 JSON round-trip |
+| `Adapters/AvatarGrpcTransport.cs` / `Host/AvatarProtocolClient.cs` | 固定 `Grpc.Core` 双向 stream transport 与 Host 生命周期 client；二进制帧只在 Adapter 边缘映射，typed failure 上报稳定 `error` |
 | `Infrastructure/Cubism/` | Cubism/Live2D driver、资源注册与模型清单读取 |
 | `Host/AvatarLive2DController.cs` / `AvatarBehaviorController.cs` | 组装 Application 与 Infrastructure，拥有 Unity 生命周期 |
 | `Host/AvatarCompositionHost.cs` | Native Composition Host 边界 |
@@ -139,9 +139,9 @@ local surface scene (`scene:desktop-ui:*` / `conversation:desktop-ui:*` / `scene
 
 Avatar 领域模型、typed command/event、Application dispatcher 与 Host port 位于 `core/avatar/src/{Domain,Application,Ports}/`，由 netstandard2.1 `GlimmerCradle.Avatar.Core.dll` 独立构建测试；Core 不保存 JSON/Protobuf envelope、`kind/trace_id/timestamp` 或 snake_case payload，不引用 Unity、Cubism、gRPC、Protobuf 或 generated DTO。Unity 工程只通过显式 precompiled reference 单向消费 Core；生成的 `GlimmerCradle.Avatar.Contracts.dll` 与 `Google.Protobuf.dll` 仅由 Host Adapter assembly 消费。
 
-Unity 只消费 Avatar Contract Spine projection 和模型 catalog 投影，不读取 Kernel 内部配置。项目 Assembly Definition 固化 `Core + generated Contracts -> Adapters、Core + Live2D.Cubism -> Infrastructure、Adapters + Infrastructure + Core -> Host -> Editor` 的单向引用；只有 Infrastructure 可以引用第三方 `Live2D.Cubism`。Avatar wire 由 `contracts/proto/glimmer/avatar/v1/avatar_host.proto` 权威拥有；proto3 scalar presence 与既有 required JSON 语义对齐，使 Adapter 能区分缺失与显式 `false/0`，不改变字段号或 JSON wire name。Adapter 使用默认拒绝未知字段的 parser 和 preserve-proto-field-name formatter；legacy `PresentationFrames.g.cs` 已删除。模型投影和 StreamingAssets 是构建/同步产物，不是手工事实源。
+Unity 只消费 Avatar Contract Spine projection 和模型 catalog 投影，不读取 Kernel 内部配置。项目 Assembly Definition 固化 `Core + generated Contracts -> Adapters、Core + Live2D.Cubism -> Infrastructure、Adapters + Infrastructure + Core -> Host -> Editor` 的单向引用；只有 Infrastructure 可以引用第三方 `Live2D.Cubism`。Avatar wire 由 `contracts/proto/glimmer/avatar/v1/avatar_host.proto` 权威拥有；proto3 scalar presence 与必填语义对齐，使 Adapter 能区分缺失与显式 `false/0`。Kernel 与 Unity Adapter 都直接映射 generated DTO，旧 JSON envelope、formatter/parser consumer 与 legacy `PresentationFrames.g.cs` 已删除。模型投影和 StreamingAssets 是构建/同步产物，不是手工事实源。
 
-Kernel Avatar WebSocket 绑定动态回环端点，并通过 `GLIMMER_CRADLE_AVATAR_WS_URL` 注入受管 Unity Host；`avatar-host.json` 不保存端口。该 WebSocket 是当前真实 Avatar runtime transport：Slice 5 只让它在 Host 边缘消费 `AvatarHostService` 生成 DTO 的兼容 snake_case JSON shape，不代表已经调用 `AvatarHostService.Connect`。把 Kernel↔UnityAvatarHost consumer 切到双向 Connect stream，以及 deadline、cancellation、status、认证、readiness、断线重连和停机回收，属于 M12 Slice 8；在该门通过前不得删除或伪装当前 WebSocket。M12 Slice 7 的 Desktop main 与 `PackagedSupervisor` 则通过 `main/surface-gateway-client.ts` 连接 `control-surface` 的 `SurfaceGatewayService` gRPC，使用 catalog generation 完成 Connect 认证，并以 Stream 首帧 `runtime_readiness` 验证所有 blocking runtime；端点存在本身不能宣称 ready。timeout 或 stop 只有确认进程树退出后才能投影 `stopped`，否则保留 `failed` 诊断。开发态 `dev-electron.mjs` 等待同一目录，不保留独立固定端口逻辑。
+Kernel `AvatarHostService.Connect` 绑定动态回环 gRPC 端点，并通过 `GLIMMER_CRADLE_AVATAR_GRPC_URL` 与 `GLIMMER_CRADLE_AVATAR_AUTH_TOKEN` 注入受管 Unity Host；`avatar-host.json` 不保存端口或令牌。Kernel 使用 `@grpc/grpc-js` 承载双向 stream，Unity Adapter 使用固定 `Grpc.Core 2.46.6` managed/native runtime；generated DTO 只在双方 Adapter 边缘。缺失令牌、错误令牌、取消、断连、心跳超时和停机都会撤销 ready，旧 Kernel↔UnityAvatarHost WebSocket control consumer 与环境变量已删除。M12 Slice 7 的 Desktop main 与 `PackagedSupervisor` 则通过 `main/surface-gateway-client.ts` 连接 `control-surface` 的 `SurfaceGatewayService` gRPC，使用 catalog generation 完成 Connect 认证，并以 Stream 首帧 `runtime_readiness` 验证所有 blocking runtime；端点存在本身不能宣称 ready。timeout 或 stop 只有确认进程树退出后才能投影 `stopped`，否则保留 `failed` 诊断。开发态 `dev-electron.mjs` 等待同一目录，不保留独立固定端口逻辑。
 
 Cubism `.unitypackage` 是 `data/packages/avatar-sdks/` 下的本机供应包。`hosts/unity-avatar-host/scripts/unitypackage-projector.mjs` 在 Unity 启动前解析包内容，只把 catalog `projectionScopes` 明确允许的目录树或单文件写入工程，保留 `.meta` GUID；供应包 SHA-256、SDK 版本、投影规则和投影器版本共同形成 `Library/GlimmerCradle/sdk-projections/` 下的有效性戳。版本标记与有效性戳不同时先使旧戳失效再重建，避免 Unity 在依赖尚未导入时先编译项目代码，也不把中断残留当作完整 SDK。
 

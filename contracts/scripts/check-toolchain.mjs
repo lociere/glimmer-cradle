@@ -115,6 +115,7 @@ for (const [name, evidence] of [
   ['.NET SDK', { ...manifest.dotnet, source: manifest.dotnet.release_metadata }],
   ['Python protobuf', manifest.language_packages.python_protobuf],
   ['Google.Protobuf', manifest.language_packages.google_protobuf],
+  ['Grpc.Core', manifest.language_packages.grpc_core],
 ]) {
   for (const value of [evidence.version, evidence.license, evidence.source]) {
     if (!value || !supplyChain.includes(value)) {
@@ -144,6 +145,18 @@ if (
   || !csharpLockedPackage.contentHash
 ) {
   throw new Error(`Google.Protobuf ${csharpVersion} is not fixed with a NuGet content hash`);
+}
+
+const avatarCsharpProject = readFileSync(resolve(root, 'csharp/GlimmerCradle.Avatar.Contracts.csproj'), 'utf8');
+const avatarCsharpLock = JSON.parse(readFileSync(resolve(root, 'csharp/packages.lock.json'), 'utf8'));
+const grpcCoreVersion = manifest.language_packages.grpc_core.version;
+const grpcCoreLockedPackage = avatarCsharpLock.dependencies?.['.NETStandard,Version=v2.1']?.['Grpc.Core'];
+if (
+  !avatarCsharpProject.includes(`Version="${grpcCoreVersion}"`)
+  || grpcCoreLockedPackage?.resolved !== grpcCoreVersion
+  || !grpcCoreLockedPackage.contentHash
+) {
+  throw new Error(`Grpc.Core ${grpcCoreVersion} is not fixed with a NuGet content hash`);
 }
 
 const uvExecutable = verifyUv(root);
