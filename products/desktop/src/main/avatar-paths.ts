@@ -5,7 +5,7 @@ import {
   resolveDesktopRepoChildPath,
 } from './project-paths';
 
-export const MANAGED_AVATAR_HOST_COMMAND = 'build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe';
+export const MANAGED_AVATAR_HOST_COMMAND = 'build/components/native/composition-host/windows-x64/bin/Release/UnityAvatarHostLauncher.exe';
 export const MANAGED_AVATAR_HOST_CWD = 'build/components/avatar/unity-host/windows-x64';
 
 export interface DesktopAvatarPaths {
@@ -26,25 +26,22 @@ export function resolveDesktopAvatarPaths(
 ): DesktopAvatarPaths {
   const unityProjectPath = resolveDesktopRepoChildPath(
     roots,
-    'core',
-    'avatar',
-    'unity-host',
+    'hosts',
+    'unity-avatar-host',
   );
 
   return {
     unityProjectPath,
     sdkCatalogPath: resolveDesktopRepoChildPath(
       roots,
-      'core',
-      'avatar',
-      'unity-host',
+      'hosts',
+      'unity-avatar-host',
       'avatar-sdk-catalog.json',
     ),
     packageRegistryPath: resolveDesktopRepoChildPath(
       roots,
-      'core',
-      'avatar',
-      'unity-host',
+      'hosts',
+      'unity-avatar-host',
       'Assets',
       'StreamingAssets',
       'avatar-package-registry.json',
@@ -57,9 +54,11 @@ export function resolveDesktopAvatarPaths(
       roots,
       'build',
       'components',
-      'avatar',
-      'unity-host',
+      'native',
+      'composition-host',
       'windows-x64',
+      'bin',
+      'Release',
       'UnityAvatarHostLauncher.exe',
     ),
     processLogPath: resolveDesktopObservabilityPath(roots, 'logs', 'application', 'avatar-host.console.log'),

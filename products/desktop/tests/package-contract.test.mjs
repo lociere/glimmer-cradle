@@ -20,6 +20,22 @@ const runtimeScript = await readFile(
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-package-runtimes.mjs'),
   'utf8',
 );
+const avatarBuildScript = await readFile(
+  path.join(repoRoot, 'hosts', 'unity-avatar-host', 'scripts', 'build.mjs'),
+  'utf8',
+);
+const avatarPathsScript = await readFile(
+  path.join(repoRoot, 'core', 'avatar', 'scripts', 'avatar-paths.mjs'),
+  'utf8',
+);
+const desktopAvatarPathsSource = await readFile(
+  path.join(repoRoot, 'products', 'desktop', 'src', 'main', 'avatar-paths.ts'),
+  'utf8',
+);
+const packagedSupervisorSource = await readFile(
+  path.join(repoRoot, 'products', 'desktop', 'src', 'main', 'packaged-supervisor.ts'),
+  'utf8',
+);
 const builderConfig = JSON.parse(await readFile(
   path.join(repoRoot, 'products', 'desktop', 'electron-builder.json'),
   'utf8',
@@ -77,6 +93,7 @@ test('Desktop package 在 clean Windows owner task 准备六类 runtime projecti
   }
   assert.doesNotMatch(packageScript, /\['avatar:build'\]/);
   assert.match(packageScript, /prepare-package-runtimes\.mjs/);
+  assert.match(packageScript, /verify-packaged-runtime\.mjs/);
   assert.match(workflow, /pnpm avatar:build/);
   assert.match(workflow, /needs: avatar-fixed-artifact/);
   assert.match(workflow, /GLIMMER_CRADLE_CUBISM_UNITY_SDK/);
@@ -105,6 +122,38 @@ test('Desktop package 在 clean Windows owner task 准备六类 runtime projecti
   for (const component of ['kernel', 'cognition', 'audio', 'avatar', 'extension-host', 'native']) {
     assert.match(prepareScript, new RegExp(`id: '${component}'`));
   }
+  assert.doesNotMatch(avatarBuildScript, /installNativeLauncher|Avatar 原生启动器已安装/);
+  assert.match(
+    avatarPathsScript,
+    /build\/components\/native\/composition-host\/windows-x64\/bin\/Release\/UnityAvatarHostLauncher\.exe/,
+  );
+  assert.match(
+    desktopAvatarPathsSource,
+    /build\/components\/native\/composition-host\/windows-x64\/bin\/Release\/UnityAvatarHostLauncher\.exe/,
+  );
+  assert.doesNotMatch(desktopAvatarPathsSource, /'core',\s*'avatar',\s*'unity-host'/);
+  assert.ok(
+    packageScript.indexOf('verify-packaged-runtime.mjs')
+      < packageScript.indexOf('release-manifest.mjs'),
+  );
+  const supervisorPathFields = new Set(
+    [...packagedSupervisorSource.matchAll(/(?:this\.)?paths\.([A-Za-z]+)/g)]
+      .map((match) => match[1]),
+  );
+  assert.deepEqual([...supervisorPathFields].sort(), [
+    'appRoot',
+    'avatarHostExecutable',
+    'configRoot',
+    'dataRoot',
+    'extensionModuleRoot',
+    'kernelEntry',
+    'nativeLibrary',
+    'nodeExecutable',
+    'processTreeHelper',
+    'productManifest',
+    'pythonExecutable',
+    'runRoot',
+  ]);
   const stagingResource = builderConfig.extraResources.find((entry) => (
     entry.from === '../../build/staging/desktop/windows-x64/resources'
   ));
@@ -119,36 +168,78 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
     await writePeFixture(path.join(output, 'win-unpacked', 'GlimmerCradle.exe'));
     const resources = path.join(output, 'win-unpacked', 'resources');
     await writeFileTree(path.join(resources, 'app.asar'), 'fixture app archive');
+    const componentDefinitions = [
+      {
+        id: 'kernel',
+        owner: 'core/kernel',
+        projection: 'runtime/kernel',
+        paths: ['runtime/kernel/dist/index.js'],
+      },
+      {
+        id: 'cognition',
+        owner: 'core/cognition',
+        projection: 'runtime/python/Lib/site-packages/glimmer_cradle/cognition',
+        paths: ['runtime/python/Lib/site-packages/glimmer_cradle/cognition/__init__.py'],
+      },
+      {
+        id: 'audio',
+        owner: 'engines/audio',
+        projection: 'runtime/python/Lib/site-packages/glimmer_cradle/audio',
+        paths: ['runtime/python/Lib/site-packages/glimmer_cradle/audio/__init__.py'],
+      },
+      {
+        id: 'avatar',
+        owner: 'hosts/unity-avatar-host',
+        projection: 'components/avatar/unity-host',
+        paths: ['components/avatar/unity-host/UnityAvatarHost.exe'],
+      },
+      {
+        id: 'extension-host',
+        owner: 'packages/extension-sdk',
+        projection: 'extension-host/modules',
+        paths: ['extension-host/modules/host.mjs'],
+      },
+      {
+        id: 'native',
+        owner: 'native',
+        projection: 'components/native/composition-host',
+        paths: [
+          'components/native/composition-host/bin/Release/platform_native.dll',
+          'components/native/composition-host/DesktopProcessTreeBridge.exe',
+          'components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe',
+        ],
+      },
+    ];
     const components = [];
-    const componentPaths = new Map([
-      ['kernel', 'runtime/kernel/dist/index.js'],
-      ['cognition', 'runtime/python/Lib/site-packages/glimmer_cradle/cognition/__init__.py'],
-      ['audio', 'runtime/python/Lib/site-packages/glimmer_cradle/audio/__init__.py'],
-      ['avatar', 'components/avatar/unity-host/UnityAvatarHostLauncher.exe'],
-      ['extension-host', 'extension-host/modules/host.mjs'],
-      ['native', 'components/native/composition-host/platform_native.dll'],
-      ['native-helper', 'components/native/composition-host/DesktopProcessTreeBridge.exe'],
-    ]);
     const runtimeFiles = [];
-    for (const [id, relative] of componentPaths) {
-      const target = path.join(resources, relative);
-      const bytes = Buffer.from(`fixture ${id}`);
-      await mkdir(path.dirname(target), { recursive: true });
-      await writeFile(target, bytes);
-      components.push({
-        id,
-        owner: `owner/${id}`,
-        projection: `components/${id}`,
-        files: [{
+    for (const definition of componentDefinitions) {
+      const files = [];
+      for (const relative of definition.paths) {
+        const target = path.join(resources, relative);
+        const bytes = Buffer.from(`fixture ${definition.id} ${relative}`);
+        await mkdir(path.dirname(target), { recursive: true });
+        await writeFile(target, bytes);
+        files.push({
           path: relative,
           size: bytes.length,
           sha256: createHash('sha256').update(bytes).digest('hex'),
-        }],
-      });
-      if (relative.startsWith('runtime/')) {
-        runtimeFiles.push(components.at(-1).files[0]);
+        });
       }
+      components.push({
+        id: definition.id,
+        owner: definition.owner,
+        projection: definition.projection,
+        files,
+      });
+      runtimeFiles.push(...files.filter((file) => file.path.startsWith('runtime/')));
     }
+    const nativeComponent = components.find((component) => component.id === 'native');
+    const avatarComponent = components.find((component) => component.id === 'avatar');
+    assert.equal(nativeComponent.owner, 'native');
+    assert.ok(nativeComponent.files.some((file) => (
+      file.path === 'components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe'
+    )));
+    assert.ok(!avatarComponent.files.some((file) => file.path.endsWith('UnityAvatarHostLauncher.exe')));
     for (const relative of [
       'runtime/node/node.exe',
       'runtime/python/Scripts/python.exe',
@@ -259,7 +350,7 @@ test('Avatar owner fixed artifact 绑定 commit/digest，漂移或缺失产物�
       'avatar',
       'unity-host',
       'windows-x64',
-      'UnityAvatarHostLauncher.exe',
+      'UnityAvatarHost.exe',
     ), 'avatar');
     await writeFileTree(path.join(
       buildRoot,
@@ -269,6 +360,16 @@ test('Avatar owner fixed artifact 绑定 commit/digest，漂移或缺失产物�
       'windows-x64',
       'platform_native.dll',
     ), 'native');
+    await writeFileTree(path.join(
+      buildRoot,
+      'components',
+      'native',
+      'composition-host',
+      'windows-x64',
+      'bin',
+      'Release',
+      'UnityAvatarHostLauncher.exe',
+    ), 'launcher');
     const created = JSON.parse(await execOwnerArtifact(
       ['create', artifactRoot, commit],
       buildRoot,
@@ -285,9 +386,22 @@ test('Avatar owner fixed artifact 绑定 commit/digest，漂移或缺失产物�
         'avatar',
         'unity-host',
         'windows-x64',
-        'UnityAvatarHostLauncher.exe',
+        'UnityAvatarHost.exe',
       ), 'utf8'),
       'avatar',
+    );
+    assert.equal(
+      await readFile(path.join(
+        buildRoot,
+        'components',
+        'native',
+        'composition-host',
+        'windows-x64',
+        'bin',
+        'Release',
+        'UnityAvatarHostLauncher.exe',
+      ), 'utf8'),
+      'launcher',
     );
     await writeFile(path.join(artifactRoot, 'avatar', 'tampered.bin'), 'tampered');
     await assert.rejects(() => execOwnerArtifact(

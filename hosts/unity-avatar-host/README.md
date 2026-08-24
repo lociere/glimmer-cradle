@@ -42,7 +42,7 @@ pnpm avatar:build
 pnpm dev
 ```
 
-构建产物位于 `build/components/avatar/unity-host/windows-x64/`：Kernel 通过 `AvatarRuntime` 以 managed Host 方式拉起 `UnityAvatarHostLauncher.exe`，launcher 隔离 Unity worker 窗口后再运行同包内的 `UnityAvatarHost.exe`，停机时按同一进程树回收；`manual` 只用于 Unity Editor 调试。
+Unity Player 构建产物位于 `build/components/avatar/unity-host/windows-x64/UnityAvatarHost.exe`；`UnityAvatarHostLauncher.exe` 由 Native Composition 唯一拥有，canonical 路径为 `build/components/native/composition-host/windows-x64/bin/Release/UnityAvatarHostLauncher.exe`。Kernel 通过 `AvatarRuntime` 以 managed Host 方式拉起 launcher，并以 Avatar Player 目录作为工作目录；launcher 隔离 Unity worker 窗口后运行 Player，停机时按同一进程树回收。`manual` 只用于 Unity Editor 调试。
 
 ## 身体呈现与交互
 

@@ -42,9 +42,8 @@ export function buildAvatarResourceSnapshots(
 
   const registryPath = path.join(
     repoRoot,
-    'core',
-    'avatar',
-    'unity-host',
+    'hosts',
+    'unity-avatar-host',
     'Assets',
     'StreamingAssets',
     'avatar-package-registry.json',
@@ -89,7 +88,7 @@ export function buildAvatarResourceSnapshots(
 }
 
 function buildAvatarSdkResources(repoRoot: string): RuntimeResourceSnapshot[] {
-  const sdkCatalogPath = path.join(repoRoot, 'core', 'avatar', 'unity-host', 'avatar-sdk-catalog.json');
+  const sdkCatalogPath = path.join(repoRoot, 'hosts', 'unity-avatar-host', 'avatar-sdk-catalog.json');
   const sdkCatalog = readJsonFile<{ sdks?: AvatarSdkDescriptorLike[] }>(sdkCatalogPath);
   if (!sdkCatalog) {
     return [inspectRuntimeFileResource({

@@ -101,6 +101,8 @@ for (const requiredPath of [
   'win-unpacked/resources/runtime/kernel/dist/index.js',
   'win-unpacked/resources/runtime/runtime-manifest.json',
   'win-unpacked/resources/products/desktop/product.json',
+  'win-unpacked/resources/components/native/composition-host/bin/Release/platform_native.dll',
+  'win-unpacked/resources/components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe',
   'win-unpacked/resources/components/native/composition-host/DesktopProcessTreeBridge.exe',
 ]) {
   if (!artifactFiles.has(requiredPath)) throw new Error(`Desktop installer 运行入口缺失: ${requiredPath}`);

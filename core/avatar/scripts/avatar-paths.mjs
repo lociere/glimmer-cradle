@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export const MANAGED_AVATAR_HOST_COMMAND = 'build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe';
+export const MANAGED_AVATAR_HOST_COMMAND = 'build/components/native/composition-host/windows-x64/bin/Release/UnityAvatarHostLauncher.exe';
 export const MANAGED_AVATAR_HOST_CWD = 'build/components/avatar/unity-host/windows-x64';
 
 export function resolveAvatarUnityProjectPath(repoRoot) {
@@ -37,7 +37,17 @@ export function resolveManagedAvatarHostExecutablePath(repoRoot) {
 }
 
 export function resolveManagedAvatarHostLauncherPath(repoRoot) {
-  return path.join(resolveManagedUnityAvatarHostWorkingDir(repoRoot), 'UnityAvatarHostLauncher.exe');
+  return path.join(
+    repoRoot,
+    'build',
+    'components',
+    'native',
+    'composition-host',
+    'windows-x64',
+    'bin',
+    'Release',
+    'UnityAvatarHostLauncher.exe',
+  );
 }
 
 export function resolveAvatarSdkPackageDir(repoRoot) {

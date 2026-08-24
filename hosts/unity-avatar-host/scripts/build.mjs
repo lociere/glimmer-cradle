@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -61,26 +60,8 @@ if (code !== 0) {
   process.exit(code ?? 1);
 }
 
-await installNativeLauncher();
 await normalizeGeneratedScene(path.join(projectPath, 'Assets', 'Scenes', 'UnityAvatarHost.unity'));
 console.log(`[avatar:build] Unity Avatar 构建完成: ${outputPath}`);
-
-async function installNativeLauncher() {
-  if (process.platform !== 'win32') return;
-  const buildRoot = path.join(repoRoot, 'build', 'components', 'native', 'composition-host', 'windows-x64');
-  const candidates = [
-    path.join(buildRoot, 'bin', 'UnityAvatarHostLauncher.exe'),
-    path.join(buildRoot, 'bin', 'Release', 'UnityAvatarHostLauncher.exe'),
-    path.join(buildRoot, 'Release', 'UnityAvatarHostLauncher.exe'),
-  ];
-  const launcher = candidates.find((candidate) => existsSync(candidate));
-  if (!launcher) {
-    throw new Error(`[avatar:build] 未找到 Avatar 原生启动器: ${candidates.join(', ')}`);
-  }
-  const target = path.join(path.dirname(outputPath), 'UnityAvatarHostLauncher.exe');
-  await fs.copyFile(launcher, target);
-  console.log(`[avatar:build] Avatar 原生启动器已安装: ${target}`);
-}
 
 async function runNodeScript(scriptName) {
   const scriptPath = path.join(repoRoot, scriptName);

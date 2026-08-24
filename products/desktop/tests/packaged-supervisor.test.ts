@@ -37,11 +37,16 @@ test('package→安装投影→正式 resolver/supervisor 首启 ready 并清理
     assert.equal((await supervisor.start()).state, 'ready');
     assert.equal(launch.command, paths.nodeExecutable);
     assert.deepEqual(launch.args, [paths.kernelEntry]);
+    assert.equal(launch.env?.GLIMMER_CRADLE_APP_ROOT, paths.appRoot);
+    assert.equal(launch.env?.GLIMMER_CRADLE_DATA_ROOT, paths.dataRoot);
+    assert.equal(launch.env?.GLIMMER_CRADLE_CONFIG_ROOT, paths.configRoot);
+    assert.equal(launch.env?.GLIMMER_CRADLE_RUN_ROOT, paths.runRoot);
     assert.equal(launch.env?.GLIMMER_CRADLE_PYTHON_RUNTIME, paths.pythonExecutable);
     assert.equal(launch.env?.GLIMMER_CRADLE_AVATAR_HOST_COMMAND, paths.avatarHostExecutable);
     assert.equal(launch.env?.GLIMMER_CRADLE_EXTENSION_MODULE_ROOT, paths.extensionModuleRoot);
     assert.equal(launch.env?.GLIMMER_CRADLE_PRODUCT_MANIFEST, paths.productManifest);
     assert.equal(launch.env?.GLIMMER_CRADLE_NATIVE_LIB, paths.nativeLibrary);
+    assert.equal((await lstat(paths.processTreeHelper)).isFile(), true);
     assert.equal(
       JSON.parse(await readFile(
         path.join(paths.runRoot, 'desktop-supervisor.json'),
@@ -227,8 +232,8 @@ async function createInstallProjection(): Promise<{
     ['runtime/python/Scripts/python.exe', 'python'],
     ['runtime/kernel/dist/index.js', 'kernel'],
     ['products/desktop/product.json', '{}'],
-    ['components/avatar/unity-host/UnityAvatarHostLauncher.exe', 'avatar'],
-    ['components/native/composition-host/platform_native.dll', 'native'],
+    ['components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe', 'avatar-launcher'],
+    ['components/native/composition-host/bin/Release/platform_native.dll', 'native'],
     ['components/native/composition-host/DesktopProcessTreeBridge.exe', 'native-helper'],
     ['configs/defaults/runtime.yaml', 'mode: packaged\n'],
   ]);

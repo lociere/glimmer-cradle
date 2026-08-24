@@ -48,6 +48,10 @@ await run(process.execPath, [
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'prepare-package.mjs'),
 ]);
 await run('pnpm.cmd', packageArgs);
+await run(process.execPath, [
+  path.join(repoRoot, 'products', 'desktop', 'scripts', 'verify-packaged-runtime.mjs'),
+  output,
+]);
 const manifestOutput = await runCapture(process.execPath, [
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'release-manifest.mjs'),
   output,

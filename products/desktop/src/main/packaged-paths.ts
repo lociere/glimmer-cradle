@@ -34,11 +34,11 @@ export async function resolvePackagedDesktopPaths(options: {
     extensionModuleRoot: trustedResource(appRoot, 'extension-host/modules'),
     avatarHostExecutable: trustedResource(
       appRoot,
-      'components/avatar/unity-host/UnityAvatarHostLauncher.exe',
+      'components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe',
     ),
     nativeLibrary: trustedResource(
       appRoot,
-      'components/native/composition-host/platform_native.dll',
+      'components/native/composition-host/bin/Release/platform_native.dll',
     ),
     processTreeHelper: trustedResource(
       appRoot,

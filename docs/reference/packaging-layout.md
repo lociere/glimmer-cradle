@@ -14,7 +14,7 @@
 | Cognition | `core/cognition/` | Python runtime/包投影，按 uv 环境或发行方案携带 |
 | Audio Engine | `engines/audio/` | 官方 engine 组件，模型不随源码硬编码 |
 | UnityAvatarHost | `hosts/unity-avatar-host/`；Core assembly 源为 `core/avatar/` | `resources/components/avatar/unity-host/` 或本机 Host 构建投影 |
-| Native DLL | `native/` 构建产物 | 组件或 Unity plugin 投影 |
+| Native Composition | `native/` 构建产物 | `resources/components/native/composition-host/`；`bin/Release/` 包含 canonical native DLL 与 UnityAvatarHostLauncher，组件根包含 Desktop process-tree helper |
 | Default assets | `assets/` | 只读默认资产，按 catalog 选择打包 |
 | User data | `data/` 或系统 user-data 域 | 安装外持久化，不被升级覆盖 |
 | Third-party package | `data/packages/*` | 本机托管上游包或可选组件，不进 Git |
@@ -33,7 +33,7 @@
 
 ## Avatar 投影
 
-当前开发期 Avatar 可由 `pnpm avatar:build` 生成到本机投影：`build/components/avatar/unity-host/windows-x64/UnityAvatarHostLauncher.exe` 是 Kernel 受管入口，负责在 HWND 创建阶段隔离 worker；同目录 `UnityAvatarHost.exe` 是 Unity Player。打包暂存进入 `build/staging/desktop/<platform>/resources/components/avatar/unity-host/`，最终 Desktop 分发物进入 `dist/desktop/`。Unity 正式身体的源资产来自 `assets/avatar/avatar-packages/*/avatar-package.json`，同步脚本生成 Unity project 投影和 `avatar-package-registry.json`；私人模型内容不进入 Git。
+当前开发期 Avatar 可由 `pnpm avatar:build` 生成到本机投影：Unity Player 位于 `build/components/avatar/unity-host/windows-x64/UnityAvatarHost.exe`；负责 HWND 创建与 worker 隔离的 launcher 由 Native Composition 唯一拥有，canonical 开发投影为 `build/components/native/composition-host/windows-x64/bin/Release/UnityAvatarHostLauncher.exe`。构建脚本不再把 launcher 复制到 Avatar component。安装态对应路径分别为 `resources/components/avatar/unity-host/UnityAvatarHost.exe` 与 `resources/components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe`。Unity 正式身体的源资产来自 `assets/avatar/avatar-packages/*/avatar-package.json`，同步脚本生成 `hosts/unity-avatar-host/` 下的 Unity project 投影和 `avatar-package-registry.json`；私人模型内容不进入 Git。
 
 当前开发链路中，Desktop main 通过 `products/desktop/src/main/avatar-paths.ts` 解析 Unity project、Avatar Package Registry、SDK catalog、受管 Host 包和构建日志；脚本侧通过 `core/avatar/scripts/avatar-paths.mjs` 生成同一套开发期物理位置。Kernel 运行时资源投影再通过 `core/kernel/src/adapters/filesystem/resource-resolver.ts` 把 Avatar Package Registry、Host executable、workdir 和 `avatar.sdk.*` SDK 状态并入 `avatar.host.reconciler.resources`。新增 Avatar 相关入口时，必须先扩展 resolver，不再直接散落仓库相对路径。
 
@@ -58,6 +58,7 @@ runtime/
 components/
 ├── avatar/unity-host/
 └── native/composition-host/
+    └── bin/Release/{platform_native.dll,UnityAvatarHostLauncher.exe}
 extension-host/modules/
 products/desktop/product.json
 component-manifest.json
@@ -75,7 +76,9 @@ Extension、native 与 product manifest 路径。它不调用仓库 root
 `scripts/launch-product.mjs`。打包后的物理入口为
 `win-unpacked/resources/app.asar.unpacked/dist/main/{packaged-paths,packaged-supervisor}.js`；
 verifier 同时要求真实 PE installer、`win-unpacked/GlimmerCradle.exe`、`app.asar`、上述
-unpacked 入口和完整组件清单存在并与固定制品 manifest/SBOM 摘要一致。
+unpacked 入口、native owner 下的 launcher 和完整组件清单存在并与固定制品
+manifest/SBOM 摘要一致。package 管线还会对真实 `win-unpacked` 调用正式 resolver，核对
+launcher 解析结果、component owner/path 与摘要，手工 fixture 不能替代该 smoke。
 
 Avatar/native 先由独立 clean Windows job 使用固定摘要工具链构建为
 `build/artifacts/avatar-windows-x64/`，再经 GitHub attestation、source commit 与 manifest
