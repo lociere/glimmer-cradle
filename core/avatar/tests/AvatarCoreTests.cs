@@ -19,33 +19,32 @@ public sealed class AvatarCoreTests
     }
 
     [Fact]
-    public void FrameClassifierRejectsUnknownTransportInput()
+    public void CommandDispatcherRoutesByClosedCommandType()
     {
-        Assert.True(AvatarFrameClassifier.IsSupported(new AvatarDownstreamFrame { kind = "emotion" }));
-        Assert.False(AvatarFrameClassifier.IsSupported(new AvatarDownstreamFrame { kind = "extension_install" }));
+        var sink = new RecordingCommandSink();
+        var command = new SetAvatarExpressionCommand("smile");
+
+        AvatarCommandDispatcher.Dispatch(command, sink);
+
+        Assert.Same(command, sink.Expression);
     }
 
     [Fact]
-    public void FrameDispatcherRoutesThroughCorePort()
+    public void CoreControlModelDoesNotMirrorWireEnvelopesOrSnakeCasePayloads()
     {
-        var sink = new RecordingCommandSink();
-        var payload = new AvatarExpressionPayload { expression_id = "smile" };
+        var exported = typeof(AvatarCommand).Assembly.GetExportedTypes();
 
-        Assert.True(AvatarFrameDispatcher.TryDispatch(
-            new AvatarDownstreamFrame { kind = "expression", expression = payload },
-            sink
-        ));
-        Assert.Same(payload, sink.Expression);
-        Assert.False(AvatarFrameDispatcher.TryDispatch(
-            new AvatarDownstreamFrame { kind = "extension_install" },
-            sink
-        ));
+        Assert.DoesNotContain(exported, value => value.Name.Contains("Frame", StringComparison.Ordinal));
+        Assert.DoesNotContain(exported, value => value.Name.EndsWith("Payload", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            exported.SelectMany(value => value.GetProperties()),
+            value => value.Name.Contains("_", StringComparison.Ordinal) || value.Name == "Kind" || value.Name == "TraceId" || value.Name == "Timestamp");
     }
 
     [Fact]
     public void CoreAssemblyHasNoUnityGrpcGeneratedOrTransportDependency()
     {
-        var references = typeof(AvatarFrameClassifier).Assembly.GetReferencedAssemblies().Select(value => value.Name).ToArray();
+        var references = typeof(AvatarCommandDispatcher).Assembly.GetReferencedAssemblies().Select(value => value.Name).ToArray();
         Assert.DoesNotContain(references, value => value!.StartsWith("Unity", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(references, value => value!.Contains("Grpc", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(references, value => value!.Contains("Protobuf", StringComparison.OrdinalIgnoreCase));
@@ -54,21 +53,21 @@ public sealed class AvatarCoreTests
 
     private sealed class RecordingCommandSink : IAvatarCommandSink
     {
-        public AvatarExpressionPayload Expression { get; private set; }
+        public SetAvatarExpressionCommand Expression { get; private set; }
 
-        public void Shutdown() { }
-        public void ApplyEmotion(EmotionPayload payload) { }
-        public void ApplyExpression(AvatarExpressionPayload payload) => Expression = payload;
-        public void PlayMotion(AvatarMotionPayload payload) { }
-        public void ApplyLipSync(AvatarLipSyncPayload payload) { }
-        public void ApplyParameter(AvatarParameterPayload payload) { }
-        public void ApplyIntent(AvatarIntentPayload payload) { }
-        public void ApplyPresentation(AvatarPresentationPayload payload) { }
-        public void ApplyCharacterPresentation(CharacterPresentationProjectionPayload payload) { }
-        public void PlayAudio(AudioPlayPayload payload) { }
-        public void ApplyThought(ThoughtPayload payload) { }
-        public void PlayIdle() { }
-        public void LoadScene(LoadScenePayload payload) { }
-        public void UnloadScene(UnloadScenePayload payload) { }
+        public void Shutdown(ShutdownAvatarCommand command) { }
+        public void ApplyEmotion(SetAvatarEmotionCommand command) { }
+        public void ApplyExpression(SetAvatarExpressionCommand command) => Expression = command;
+        public void PlayMotion(PlayAvatarMotionCommand command) { }
+        public void ApplyLipSync(SetAvatarLipSyncCommand command) { }
+        public void ApplyParameter(SetAvatarParameterCommand command) { }
+        public void ApplyIntent(ExecuteAvatarActionCommand command) { }
+        public void ApplyPresentation(SetAvatarPresentationCommand command) { }
+        public void ApplyCharacterPresentation(ApplyCharacterPresentationCommand command) { }
+        public void PlayAudio(PlayAvatarAudioCommand command) { }
+        public void ApplyThought(SetAvatarThoughtCommand command) { }
+        public void PlayIdle(PlayIdleAvatarCommand command) { }
+        public void LoadScene(LoadAvatarSceneCommand command) { }
+        public void UnloadScene(UnloadAvatarSceneCommand command) { }
     }
 }

@@ -2,19 +2,19 @@ namespace GlimmerCradle.Avatar
 {
     public interface IAvatarCommandSink
     {
-        void Shutdown();
-        void ApplyEmotion(EmotionPayload payload);
-        void ApplyExpression(AvatarExpressionPayload payload);
-        void PlayMotion(AvatarMotionPayload payload);
-        void ApplyLipSync(AvatarLipSyncPayload payload);
-        void ApplyParameter(AvatarParameterPayload payload);
-        void ApplyIntent(AvatarIntentPayload payload);
-        void ApplyPresentation(AvatarPresentationPayload payload);
-        void ApplyCharacterPresentation(CharacterPresentationProjectionPayload payload);
-        void PlayAudio(AudioPlayPayload payload);
-        void ApplyThought(ThoughtPayload payload);
-        void PlayIdle();
-        void LoadScene(LoadScenePayload payload);
-        void UnloadScene(UnloadScenePayload payload);
+        void Shutdown(ShutdownAvatarCommand command);
+        void ApplyEmotion(SetAvatarEmotionCommand command);
+        void ApplyExpression(SetAvatarExpressionCommand command);
+        void PlayMotion(PlayAvatarMotionCommand command);
+        void ApplyLipSync(SetAvatarLipSyncCommand command);
+        void ApplyParameter(SetAvatarParameterCommand command);
+        void ApplyIntent(ExecuteAvatarActionCommand command);
+        void ApplyPresentation(SetAvatarPresentationCommand command);
+        void ApplyCharacterPresentation(ApplyCharacterPresentationCommand command);
+        void PlayAudio(PlayAvatarAudioCommand command);
+        void ApplyThought(SetAvatarThoughtCommand command);
+        void PlayIdle(PlayIdleAvatarCommand command);
+        void LoadScene(LoadAvatarSceneCommand command);
+        void UnloadScene(UnloadAvatarSceneCommand command);
     }
 }

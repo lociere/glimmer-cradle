@@ -83,59 +83,59 @@ namespace GlimmerCradle.Avatar
             behaviorController?.Tick(Time.deltaTime);
         }
 
-        public void ApplyEmotion(EmotionPayload payload)
+        public void ApplyEmotion(SetAvatarEmotionCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.emotion_type))
+            if (command == null || string.IsNullOrWhiteSpace(command.EmotionType))
             {
                 return;
             }
 
-            behaviorController?.ApplyEmotion(payload);
+            behaviorController?.ApplyEmotion(command);
         }
 
-        public void ApplyExpression(AvatarExpressionPayload payload)
+        public void ApplyExpression(SetAvatarExpressionCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.expression_id))
+            if (command == null || string.IsNullOrWhiteSpace(command.ExpressionId))
             {
                 return;
             }
 
-            behaviorController?.ApplyExpression(payload);
+            behaviorController?.ApplyExpression(command);
         }
 
-        public void PlayMotion(AvatarMotionPayload payload)
+        public void PlayMotion(PlayAvatarMotionCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.motion_id))
+            if (command == null || string.IsNullOrWhiteSpace(command.MotionId))
             {
                 return;
             }
 
-            behaviorController?.PlayMotion(payload);
+            behaviorController?.PlayMotion(command);
         }
 
-        public void ApplyLipSync(AvatarLipSyncPayload payload)
+        public void ApplyLipSync(SetAvatarLipSyncCommand command)
         {
-            if (payload == null)
+            if (command == null)
             {
                 return;
             }
 
-            behaviorController?.SetSpeechPulse(payload.amplitude);
+            behaviorController?.SetSpeechPulse(command.Amplitude);
         }
 
-        public void ApplyParameter(AvatarParameterPayload payload)
+        public void ApplyParameter(SetAvatarParameterCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.param_id))
+            if (command == null || string.IsNullOrWhiteSpace(command.ParameterId))
             {
                 return;
             }
 
-            driver?.SetParameter(payload.param_id, payload.value);
+            driver?.SetParameter(command.ParameterId, command.Value);
         }
 
-        public void ApplyPresentation(AvatarPresentationPayload payload)
+        public void ApplyPresentation(SetAvatarPresentationCommand command)
         {
-            if (payload == null)
+            if (command == null)
             {
                 return;
             }
@@ -149,42 +149,32 @@ namespace GlimmerCradle.Avatar
             return driver != null && driver.TryGetInteractionHull(UnityAvatarHostBootstrap.GetPresentationCamera(), out viewportHull);
         }
 
-        public void PlayAudio(AudioPlayPayload payload)
+        public void PlayAudio(PlayAvatarAudioCommand command)
         {
-            if (payload == null || audioSource == null)
+            if (command == null || audioSource == null)
             {
                 return;
             }
 
-            StartCoroutine(PlayAudioCoroutine(payload));
+            StartCoroutine(PlayAudioCoroutine(command));
         }
 
-        public void ApplyThought(ThoughtPayload payload)
+        public void ApplyThought(SetAvatarThoughtCommand command)
         {
-            if (payload == null)
+            if (command == null)
             {
                 return;
             }
 
-            if (payload.active && manifest != null && manifest.actions.TryResolve("state.thinking", out _))
+            if (command.Active && manifest != null && manifest.actions.TryResolve("state.thinking", out _))
             {
-                behaviorController?.ApplyIntent(new AvatarIntentPayload
-                {
-                    action_id = "state.thinking",
-                    operation = "activate",
-                    source = "system",
-                    priority = 30,
-                });
+                behaviorController?.ApplyIntent(new ExecuteAvatarActionCommand(
+                    "state.thinking", AvatarActionOperation.Activate, AvatarActionSource.System, 30));
             }
-            else if (!payload.active && manifest != null && manifest.actions.TryResolve("state.thinking", out _))
+            else if (!command.Active && manifest != null && manifest.actions.TryResolve("state.thinking", out _))
             {
-                behaviorController?.ApplyIntent(new AvatarIntentPayload
-                {
-                    action_id = "state.thinking",
-                    operation = "deactivate",
-                    source = "system",
-                    priority = 30,
-                });
+                behaviorController?.ApplyIntent(new ExecuteAvatarActionCommand(
+                    "state.thinking", AvatarActionOperation.Deactivate, AvatarActionSource.System, 30));
             }
         }
 
@@ -193,22 +183,22 @@ namespace GlimmerCradle.Avatar
             behaviorController?.EnsureIdleMotion();
         }
 
-        public void ApplyIntent(AvatarIntentPayload payload)
+        public void ApplyIntent(ExecuteAvatarActionCommand command)
         {
-            behaviorController?.ApplyIntent(payload);
+            behaviorController?.ApplyIntent(command);
         }
 
-        public void LoadScene(LoadScenePayload payload)
+        public void LoadScene(LoadAvatarSceneCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.scene_id))
+            if (command == null || string.IsNullOrWhiteSpace(command.SceneId))
             {
                 return;
             }
 
-            ReportError("scene_not_implemented", $"Unity 场景加载尚未接入: {payload.scene_id}");
+            ReportError("scene_not_implemented", $"Unity 场景加载尚未接入: {command.SceneId}");
         }
 
-        public void UnloadScene(UnloadScenePayload payload)
+        public void UnloadScene(UnloadAvatarSceneCommand command)
         {
         }
 
@@ -224,11 +214,11 @@ namespace GlimmerCradle.Avatar
             return null;
         }
 
-        private IEnumerator PlayAudioCoroutine(AudioPlayPayload payload)
+        private IEnumerator PlayAudioCoroutine(PlayAvatarAudioCommand command)
         {
-            if (!string.IsNullOrWhiteSpace(payload.audio_data))
+            if (!string.IsNullOrWhiteSpace(command.AudioData))
             {
-                var clip = WavUtility.FromBase64(payload.audio_data, payload.audio_id);
+                var clip = WavUtility.FromBase64(command.AudioData, command.AudioId);
                 if (clip != null)
                 {
                     PlayClip(clip);
@@ -236,12 +226,12 @@ namespace GlimmerCradle.Avatar
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(payload.audio_uri))
+            if (string.IsNullOrWhiteSpace(command.AudioUri))
             {
                 yield break;
             }
 
-            using (var request = UnityWebRequestMultimedia.GetAudioClip(payload.audio_uri, AudioType.WAV))
+            using (var request = UnityWebRequestMultimedia.GetAudioClip(command.AudioUri, AudioType.WAV))
             {
                 yield return request.SendWebRequest();
 #if UNITY_2020_2_OR_NEWER
@@ -293,15 +283,13 @@ namespace GlimmerCradle.Avatar
             behaviorController?.SetSpeechPulse(1f);
         }
 
-        public AvatarActionStatePayload GetActionStateSnapshot()
+        public AvatarActionStateChanged GetActionStateSnapshot()
         {
-            return behaviorController?.GetActionStateSnapshot() ?? new AvatarActionStatePayload
-            {
-                active_action_ids = Array.Empty<string>(),
-            };
+            return behaviorController?.GetActionStateSnapshot()
+                ?? new AvatarActionStateChanged(null, null, Array.Empty<string>(), null);
         }
 
-        private void OnActionStateChanged(AvatarActionStatePayload state)
+        private void OnActionStateChanged(AvatarActionStateChanged state)
         {
             shellClient?.ReportActionState(state);
         }

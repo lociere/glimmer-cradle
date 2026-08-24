@@ -1,6 +1,6 @@
 # Now
 
-> 审阅日期：2026-08-23
+> 审阅日期：2026-08-24
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
@@ -8,7 +8,7 @@
 
 ## 当前推进面：M12 Slice 5 fixed candidate 验收与 M13 fixed-state 复审
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～4 已集成：`contracts/` baseline、Kernel↔Cognition v1 Service、受 Kernel 监督的动态回环 gRPC、Kernel 物理分层与 Cognition `domain/application/ports/adapters/host` 物理收口均已落到 `main`。Slice 4 集成 commit 为 `788647b5234f24f07723cc15105e52769588d4ce`。Slice 5 fixed candidate 已拆分 `core/avatar/` 与 `hosts/unity-avatar-host/`，并把 Avatar control contract/C# projection 从 Slice 8 前移到 `contracts/proto/glimmer/avatar/v1/`；legacy Unity C# projection、旧六 asmdef 与旧 Unity 路径已删除，当前等待 fixed candidate 验收。Slice 6～9 尚未形成 candidate，M11 仍暂停/延期且未完成。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～4 已集成：`contracts/` baseline、Kernel↔Cognition v1 Service、受 Kernel 监督的动态回环 gRPC、Kernel 物理分层与 Cognition `domain/application/ports/adapters/host` 物理收口均已落到 `main`。Slice 4 集成 commit 为 `788647b5234f24f07723cc15105e52769588d4ce`。Slice 5 fixed candidate 已拆分 `core/avatar/` 与 `hosts/unity-avatar-host/`，并把 Avatar control IDL、三语言/C# projection 与当前 transport edge mapping 从 Slice 8 前移到 `contracts/proto/glimmer/avatar/v1/`；Core 使用无 wire envelope 的 typed command/event，Unity Host Adapter 对 kind/payload/必填字段/枚举 fail closed；legacy Unity C# projection、旧六 asmdef 与旧 Unity 路径已删除，当前等待 fixed candidate 验收。Kernel↔UnityAvatarHost 运行 consumer 当前仍为受管动态回环 WebSocket；切到 `AvatarHostService.Connect` 及其 deadline/cancellation/status/readiness/reconnect 门明确属于 Slice 8。Slice 6～9 尚未形成 candidate，M11 仍暂停/延期且未完成。
 
 [M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成第二轮审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选继续把未绑定固定 candidate 的 update check/apply 设为 unsupported/fail-closed；Kernel DLQ 已有 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍未注册 replay。该状态尚未再次独立复审或集成，不能写成 main 已完成。
 

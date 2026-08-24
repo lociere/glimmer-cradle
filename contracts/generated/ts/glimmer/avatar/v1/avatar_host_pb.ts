@@ -10,21 +10,21 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/avatar/v1/avatar_host.proto.
  */
 export const file_glimmer_avatar_v1_avatar_host: GenFile = /*@__PURE__*/
-  fileDesc("CiNnbGltbWVyL2F2YXRhci92MS9hdmF0YXJfaG9zdC5wcm90bxIRZ2xpbW1lci5hdmF0YXIudjEiYQoORW1vdGlvblBheWxvYWQSFAoMZW1vdGlvbl90eXBlGAEgASgJEhEKCWludGVuc2l0eRgCIAEoAhIPCgd0cmlnZ2VyGAMgASgJEhUKDWJsZW5kX3RpbWVfbXMYBCABKAUiLgoOVGhvdWdodFBheWxvYWQSDgoGYWN0aXZlGAEgASgIEgwKBGhpbnQYAiABKAkicwoQQXVkaW9QbGF5UGF5bG9hZBIQCghhdWRpb19pZBgBIAEoCRIRCglhdWRpb191cmkYAiABKAkSEgoKYXVkaW9fZGF0YRgDIAEoCRIRCgltaW1lX3R5cGUYBCABKAkSEwoLZHVyYXRpb25fbXMYBSABKAUiWwoXQXZhdGFyRXhwcmVzc2lvblBheWxvYWQSFQoNZXhwcmVzc2lvbl9pZBgBIAEoCRIVCg1ibGVuZF90aW1lX21zGAIgASgFEhIKCmF1dG9fcmVzZXQYAyABKAgiSAoTQXZhdGFyTW90aW9uUGF5bG9hZBIRCgltb3Rpb25faWQYASABKAkSDAoEbG9vcBgCIAEoCBIQCghwcmlvcml0eRgDIAEoBSI5ChRBdmF0YXJMaXBTeW5jUGF5bG9hZBIRCglhbXBsaXR1ZGUYASABKAISDgoGc291cmNlGAIgASgJIkoKFkF2YXRhclBhcmFtZXRlclBheWxvYWQSEAoIcGFyYW1faWQYASABKAkSDQoFdmFsdWUYAiABKAISDwoHZmFkZV9tcxgDIAEoBSJdChNBdmF0YXJJbnRlbnRQYXlsb2FkEhEKCWFjdGlvbl9pZBgBIAEoCRIRCglvcGVyYXRpb24YAiABKAkSDgoGc291cmNlGAMgASgJEhAKCHByaW9yaXR5GAQgASgFImgKGEF2YXRhckFjdGlvblN0YXRlUGF5bG9hZBIRCglhY3Rpb25faWQYASABKAkSDQoFc3RhdGUYAiABKAkSGQoRYWN0aXZlX2FjdGlvbl9pZHMYAyADKAkSDwoHbWVzc2FnZRgEIAEoCSJhChlBdmF0YXJQcmVzZW50YXRpb25QYXlsb2FkEhQKDHBsYWNlbWVudF9pZBgBIAEoCRIVCg1kaXNwbGF5X3NjYWxlGAIgASgCEhcKD3Jlc2V0X3BsYWNlbWVudBgDIAEoCCJVCiZDaGFyYWN0ZXJQcmVzZW50YXRpb25BcHBlYXJhbmNlUGF5bG9hZBIUCgxwbGFjZW1lbnRfaWQYASABKAkSFQoNZGlzcGxheV9zY2FsZRgCIAEoAiLBAQolQ2hhcmFjdGVyUHJlc2VudGF0aW9uTGlmZWN5Y2xlUGF5bG9hZBIbChN3b3JrZXJfd2luZG93X3N0YXRlGAEgASgJEiEKGWNvbXBvc2l0aW9uX3N1cmZhY2Vfc3RhdGUYAiABKAkSHQoVZmlyc3RfZnJhbWVfcHJlc2VudGVkGAMgASgIEhkKEWludGVyYWN0aW9uX3JlYWR5GAQgASgIEg0KBXJlYWR5GAUgASgIEg8KB3N1bW1hcnkYBiABKAkizwIKJkNoYXJhY3RlclByZXNlbnRhdGlvblByb2plY3Rpb25QYXlsb2FkEhkKEWF2YXRhcl9wYWNrYWdlX2lkGAEgASgJEhAKCG1vZGVsX2lkGAIgASgJEhQKDGRpc3BsYXlfbmFtZRgDIAEoCRIMCgRraW5kGAQgASgJEg8KB2JhY2tlbmQYBSABKAkSEQoJaG9zdF9raW5kGAYgASgJEhQKDGF2YXRhcl9zdGF0ZRgHIAEoCRJNCgphcHBlYXJhbmNlGAggASgLMjkuZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJlc2VudGF0aW9uQXBwZWFyYW5jZVBheWxvYWQSSwoJbGlmZWN5Y2xlGAkgASgLMjguZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJlc2VudGF0aW9uTGlmZWN5Y2xlUGF5bG9hZCI1ChBMb2FkU2NlbmVQYXlsb2FkEhAKCHNjZW5lX2lkGAEgASgJEg8KB2ZhZGVfbXMYAiABKAUiJQoSVW5sb2FkU2NlbmVQYXlsb2FkEg8KB2ZhZGVfbXMYASABKAUilQEKFkF2YXRhckhvc3RIZWxsb1BheWxvYWQSEQoJaG9zdF9raW5kGAEgASgJEg8KB2hvc3RfaWQYAiABKAkSFAoMaG9zdF92ZXJzaW9uGAMgASgJEhQKDGNhcGFiaWxpdGllcxgEIAMoCRIQCghtb2RlbF9pZBgFIAEoCRIZChFhdmF0YXJfcGFja2FnZV9pZBgGIAEoCSLhAQoWQXZhdGFySG9zdFJlYWR5UGF5bG9hZBIPCgdob3N0X2lkGAEgASgJEhAKCG1vZGVsX2lkGAIgASgJEhkKEWF2YXRhcl9wYWNrYWdlX2lkGAMgASgJEhsKE3dvcmtlcl93aW5kb3dfc3RhdGUYBCABKAkSIQoZY29tcG9zaXRpb25fc3VyZmFjZV9zdGF0ZRgFIAEoCRIdChVmaXJzdF9mcmFtZV9wcmVzZW50ZWQYBiABKAgSGQoRaW50ZXJhY3Rpb25fcmVhZHkYByABKAgSDwoHc3VtbWFyeRgIIAEoCSIwChhBbmltYXRpb25Db21wbGV0ZVBheWxvYWQSFAoMYW5pbWF0aW9uX2lkGAEgASgJIjcKFkF2YXRhckhvc3RFcnJvclBheWxvYWQSDAoEY29kZRgBIAEoCRIPCgdtZXNzYWdlGAIgASgJIrsGChVBdmF0YXJEb3duc3RyZWFtRnJhbWUSDAoEa2luZBgBIAEoCRIQCgh0cmFjZV9pZBgCIAEoCRIRCgl0aW1lc3RhbXAYAyABKAESMgoHZW1vdGlvbhgEIAEoCzIhLmdsaW1tZXIuYXZhdGFyLnYxLkVtb3Rpb25QYXlsb2FkEjIKB3Rob3VnaHQYBSABKAsyIS5nbGltbWVyLmF2YXRhci52MS5UaG91Z2h0UGF5bG9hZBI3CgphdWRpb19wbGF5GAYgASgLMiMuZ2xpbW1lci5hdmF0YXIudjEuQXVkaW9QbGF5UGF5bG9hZBI+CgpleHByZXNzaW9uGAcgASgLMiouZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyRXhwcmVzc2lvblBheWxvYWQSNgoGbW90aW9uGAggASgLMiYuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyTW90aW9uUGF5bG9hZBI5CghsaXBfc3luYxgJIAEoCzInLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckxpcFN5bmNQYXlsb2FkEjwKCXBhcmFtZXRlchgKIAEoCzIpLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhclBhcmFtZXRlclBheWxvYWQSPQoNYXZhdGFyX2ludGVudBgLIAEoCzImLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckludGVudFBheWxvYWQSQgoMcHJlc2VudGF0aW9uGAwgASgLMiwuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyUHJlc2VudGF0aW9uUGF5bG9hZBJkCiFjaGFyYWN0ZXJfcHJlc2VudGF0aW9uX3Byb2plY3Rpb24YDSABKAsyOS5nbGltbWVyLmF2YXRhci52MS5DaGFyYWN0ZXJQcmVzZW50YXRpb25Qcm9qZWN0aW9uUGF5bG9hZBI3Cgpsb2FkX3NjZW5lGA4gASgLMiMuZ2xpbW1lci5hdmF0YXIudjEuTG9hZFNjZW5lUGF5bG9hZBI7Cgx1bmxvYWRfc2NlbmUYDyABKAsyJS5nbGltbWVyLmF2YXRhci52MS5VbmxvYWRTY2VuZVBheWxvYWQikwMKE0F2YXRhclVwc3RyZWFtRnJhbWUSDAoEa2luZBgBIAEoCRIQCgh0cmFjZV9pZBgCIAEoCRIRCgl0aW1lc3RhbXAYAyABKAESPQoKaG9zdF9oZWxsbxgEIAEoCzIpLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckhvc3RIZWxsb1BheWxvYWQSPQoKaG9zdF9yZWFkeRgFIAEoCzIpLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckhvc3RSZWFkeVBheWxvYWQSSAoTYXZhdGFyX2FjdGlvbl9zdGF0ZRgGIAEoCzIrLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckFjdGlvblN0YXRlUGF5bG9hZBJHChJhbmltYXRpb25fY29tcGxldGUYByABKAsyKy5nbGltbWVyLmF2YXRhci52MS5BbmltYXRpb25Db21wbGV0ZVBheWxvYWQSOAoFZXJyb3IYCCABKAsyKS5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJIb3N0RXJyb3JQYXlsb2FkMnQKEUF2YXRhckhvc3RTZXJ2aWNlEl8KB0Nvbm5lY3QSJi5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJVcHN0cmVhbUZyYW1lGiguZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyRG93bnN0cmVhbUZyYW1lKAEwAUIsqgIpR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5BdmF0YXIuVjFiBnByb3RvMw");
+  fileDesc("CiNnbGltbWVyL2F2YXRhci92MS9hdmF0YXJfaG9zdC5wcm90bxIRZ2xpbW1lci5hdmF0YXIudjEiigEKDkVtb3Rpb25QYXlsb2FkEhkKDGVtb3Rpb25fdHlwZRgBIAEoCUgAiAEBEhYKCWludGVuc2l0eRgCIAEoAkgBiAEBEg8KB3RyaWdnZXIYAyABKAkSFQoNYmxlbmRfdGltZV9tcxgEIAEoBUIPCg1fZW1vdGlvbl90eXBlQgwKCl9pbnRlbnNpdHkiPgoOVGhvdWdodFBheWxvYWQSEwoGYWN0aXZlGAEgASgISACIAQESDAoEaGludBgCIAEoCUIJCgdfYWN0aXZlIoUBChBBdWRpb1BsYXlQYXlsb2FkEhUKCGF1ZGlvX2lkGAEgASgJSACIAQESEQoJYXVkaW9fdXJpGAIgASgJEhIKCmF1ZGlvX2RhdGEYAyABKAkSEQoJbWltZV90eXBlGAQgASgJEhMKC2R1cmF0aW9uX21zGAUgASgFQgsKCV9hdWRpb19pZCJyChdBdmF0YXJFeHByZXNzaW9uUGF5bG9hZBIaCg1leHByZXNzaW9uX2lkGAEgASgJSACIAQESFQoNYmxlbmRfdGltZV9tcxgCIAEoBRISCgphdXRvX3Jlc2V0GAMgASgIQhAKDl9leHByZXNzaW9uX2lkIlsKE0F2YXRhck1vdGlvblBheWxvYWQSFgoJbW90aW9uX2lkGAEgASgJSACIAQESDAoEbG9vcBgCIAEoCBIQCghwcmlvcml0eRgDIAEoBUIMCgpfbW90aW9uX2lkIkwKFEF2YXRhckxpcFN5bmNQYXlsb2FkEhYKCWFtcGxpdHVkZRgBIAEoAkgAiAEBEg4KBnNvdXJjZRgCIAEoCUIMCgpfYW1wbGl0dWRlImsKFkF2YXRhclBhcmFtZXRlclBheWxvYWQSFQoIcGFyYW1faWQYASABKAlIAIgBARISCgV2YWx1ZRgCIAEoAkgBiAEBEg8KB2ZhZGVfbXMYAyABKAVCCwoJX3BhcmFtX2lkQggKBl92YWx1ZSKTAQoTQXZhdGFySW50ZW50UGF5bG9hZBIWCglhY3Rpb25faWQYASABKAlIAIgBARIWCglvcGVyYXRpb24YAiABKAlIAYgBARITCgZzb3VyY2UYAyABKAlIAogBARIQCghwcmlvcml0eRgEIAEoBUIMCgpfYWN0aW9uX2lkQgwKCl9vcGVyYXRpb25CCQoHX3NvdXJjZSJoChhBdmF0YXJBY3Rpb25TdGF0ZVBheWxvYWQSEQoJYWN0aW9uX2lkGAEgASgJEg0KBXN0YXRlGAIgASgJEhkKEWFjdGl2ZV9hY3Rpb25faWRzGAMgAygJEg8KB21lc3NhZ2UYBCABKAkiYQoZQXZhdGFyUHJlc2VudGF0aW9uUGF5bG9hZBIUCgxwbGFjZW1lbnRfaWQYASABKAkSFQoNZGlzcGxheV9zY2FsZRgCIAEoAhIXCg9yZXNldF9wbGFjZW1lbnQYAyABKAgibAomQ2hhcmFjdGVyUHJlc2VudGF0aW9uQXBwZWFyYW5jZVBheWxvYWQSFAoMcGxhY2VtZW50X2lkGAEgASgJEhoKDWRpc3BsYXlfc2NhbGUYAiABKAJIAIgBAUIQCg5fZGlzcGxheV9zY2FsZSLbAgolQ2hhcmFjdGVyUHJlc2VudGF0aW9uTGlmZWN5Y2xlUGF5bG9hZBIgChN3b3JrZXJfd2luZG93X3N0YXRlGAEgASgJSACIAQESJgoZY29tcG9zaXRpb25fc3VyZmFjZV9zdGF0ZRgCIAEoCUgBiAEBEiIKFWZpcnN0X2ZyYW1lX3ByZXNlbnRlZBgDIAEoCEgCiAEBEh4KEWludGVyYWN0aW9uX3JlYWR5GAQgASgISAOIAQESEgoFcmVhZHkYBSABKAhIBIgBARIUCgdzdW1tYXJ5GAYgASgJSAWIAQFCFgoUX3dvcmtlcl93aW5kb3dfc3RhdGVCHAoaX2NvbXBvc2l0aW9uX3N1cmZhY2Vfc3RhdGVCGAoWX2ZpcnN0X2ZyYW1lX3ByZXNlbnRlZEIUChJfaW50ZXJhY3Rpb25fcmVhZHlCCAoGX3JlYWR5QgoKCF9zdW1tYXJ5ItoDCiZDaGFyYWN0ZXJQcmVzZW50YXRpb25Qcm9qZWN0aW9uUGF5bG9hZBIeChFhdmF0YXJfcGFja2FnZV9pZBgBIAEoCUgAiAEBEhUKCG1vZGVsX2lkGAIgASgJSAGIAQESGQoMZGlzcGxheV9uYW1lGAMgASgJSAKIAQESEQoEa2luZBgEIAEoCUgDiAEBEhQKB2JhY2tlbmQYBSABKAlIBIgBARIWCglob3N0X2tpbmQYBiABKAlIBYgBARIZCgxhdmF0YXJfc3RhdGUYByABKAlIBogBARJNCgphcHBlYXJhbmNlGAggASgLMjkuZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJlc2VudGF0aW9uQXBwZWFyYW5jZVBheWxvYWQSSwoJbGlmZWN5Y2xlGAkgASgLMjguZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJlc2VudGF0aW9uTGlmZWN5Y2xlUGF5bG9hZEIUChJfYXZhdGFyX3BhY2thZ2VfaWRCCwoJX21vZGVsX2lkQg8KDV9kaXNwbGF5X25hbWVCBwoFX2tpbmRCCgoIX2JhY2tlbmRCDAoKX2hvc3Rfa2luZEIPCg1fYXZhdGFyX3N0YXRlIkcKEExvYWRTY2VuZVBheWxvYWQSFQoIc2NlbmVfaWQYASABKAlIAIgBARIPCgdmYWRlX21zGAIgASgFQgsKCV9zY2VuZV9pZCIlChJVbmxvYWRTY2VuZVBheWxvYWQSDwoHZmFkZV9tcxgBIAEoBSKoAQoWQXZhdGFySG9zdEhlbGxvUGF5bG9hZBIWCglob3N0X2tpbmQYASABKAlIAIgBARIPCgdob3N0X2lkGAIgASgJEhQKDGhvc3RfdmVyc2lvbhgDIAEoCRIUCgxjYXBhYmlsaXRpZXMYBCADKAkSEAoIbW9kZWxfaWQYBSABKAkSGQoRYXZhdGFyX3BhY2thZ2VfaWQYBiABKAlCDAoKX2hvc3Rfa2luZCLbAgoWQXZhdGFySG9zdFJlYWR5UGF5bG9hZBIPCgdob3N0X2lkGAEgASgJEhAKCG1vZGVsX2lkGAIgASgJEhkKEWF2YXRhcl9wYWNrYWdlX2lkGAMgASgJEiAKE3dvcmtlcl93aW5kb3dfc3RhdGUYBCABKAlIAIgBARImChljb21wb3NpdGlvbl9zdXJmYWNlX3N0YXRlGAUgASgJSAGIAQESIgoVZmlyc3RfZnJhbWVfcHJlc2VudGVkGAYgASgISAKIAQESHgoRaW50ZXJhY3Rpb25fcmVhZHkYByABKAhIA4gBARIPCgdzdW1tYXJ5GAggASgJQhYKFF93b3JrZXJfd2luZG93X3N0YXRlQhwKGl9jb21wb3NpdGlvbl9zdXJmYWNlX3N0YXRlQhgKFl9maXJzdF9mcmFtZV9wcmVzZW50ZWRCFAoSX2ludGVyYWN0aW9uX3JlYWR5IkYKGEFuaW1hdGlvbkNvbXBsZXRlUGF5bG9hZBIZCgxhbmltYXRpb25faWQYASABKAlIAIgBAUIPCg1fYW5pbWF0aW9uX2lkIlYKFkF2YXRhckhvc3RFcnJvclBheWxvYWQSEQoEY29kZRgBIAEoCUgAiAEBEhQKB21lc3NhZ2UYAiABKAlIAYgBAUIHCgVfY29kZUIKCghfbWVzc2FnZSLcBgoVQXZhdGFyRG93bnN0cmVhbUZyYW1lEhEKBGtpbmQYASABKAlIAIgBARIQCgh0cmFjZV9pZBgCIAEoCRIWCgl0aW1lc3RhbXAYAyABKAFIAYgBARIyCgdlbW90aW9uGAQgASgLMiEuZ2xpbW1lci5hdmF0YXIudjEuRW1vdGlvblBheWxvYWQSMgoHdGhvdWdodBgFIAEoCzIhLmdsaW1tZXIuYXZhdGFyLnYxLlRob3VnaHRQYXlsb2FkEjcKCmF1ZGlvX3BsYXkYBiABKAsyIy5nbGltbWVyLmF2YXRhci52MS5BdWRpb1BsYXlQYXlsb2FkEj4KCmV4cHJlc3Npb24YByABKAsyKi5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJFeHByZXNzaW9uUGF5bG9hZBI2CgZtb3Rpb24YCCABKAsyJi5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJNb3Rpb25QYXlsb2FkEjkKCGxpcF9zeW5jGAkgASgLMicuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyTGlwU3luY1BheWxvYWQSPAoJcGFyYW1ldGVyGAogASgLMikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyUGFyYW1ldGVyUGF5bG9hZBI9Cg1hdmF0YXJfaW50ZW50GAsgASgLMiYuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFySW50ZW50UGF5bG9hZBJCCgxwcmVzZW50YXRpb24YDCABKAsyLC5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJQcmVzZW50YXRpb25QYXlsb2FkEmQKIWNoYXJhY3Rlcl9wcmVzZW50YXRpb25fcHJvamVjdGlvbhgNIAEoCzI5LmdsaW1tZXIuYXZhdGFyLnYxLkNoYXJhY3RlclByZXNlbnRhdGlvblByb2plY3Rpb25QYXlsb2FkEjcKCmxvYWRfc2NlbmUYDiABKAsyIy5nbGltbWVyLmF2YXRhci52MS5Mb2FkU2NlbmVQYXlsb2FkEjsKDHVubG9hZF9zY2VuZRgPIAEoCzIlLmdsaW1tZXIuYXZhdGFyLnYxLlVubG9hZFNjZW5lUGF5bG9hZEIHCgVfa2luZEIMCgpfdGltZXN0YW1wIrQDChNBdmF0YXJVcHN0cmVhbUZyYW1lEhEKBGtpbmQYASABKAlIAIgBARIQCgh0cmFjZV9pZBgCIAEoCRIWCgl0aW1lc3RhbXAYAyABKAFIAYgBARI9Cgpob3N0X2hlbGxvGAQgASgLMikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFySG9zdEhlbGxvUGF5bG9hZBI9Cgpob3N0X3JlYWR5GAUgASgLMikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFySG9zdFJlYWR5UGF5bG9hZBJIChNhdmF0YXJfYWN0aW9uX3N0YXRlGAYgASgLMisuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyQWN0aW9uU3RhdGVQYXlsb2FkEkcKEmFuaW1hdGlvbl9jb21wbGV0ZRgHIAEoCzIrLmdsaW1tZXIuYXZhdGFyLnYxLkFuaW1hdGlvbkNvbXBsZXRlUGF5bG9hZBI4CgVlcnJvchgIIAEoCzIpLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckhvc3RFcnJvclBheWxvYWRCBwoFX2tpbmRCDAoKX3RpbWVzdGFtcDJ0ChFBdmF0YXJIb3N0U2VydmljZRJfCgdDb25uZWN0EiYuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyVXBzdHJlYW1GcmFtZRooLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckRvd25zdHJlYW1GcmFtZSgBMAFCLKoCKUdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQXZhdGFyLlYxYgZwcm90bzM");
 
 /**
  * @generated from message glimmer.avatar.v1.EmotionPayload
  */
 export type EmotionPayload = Message<"glimmer.avatar.v1.EmotionPayload"> & {
   /**
-   * @generated from field: string emotion_type = 1;
+   * @generated from field: optional string emotion_type = 1;
    */
-  emotionType: string;
+  emotionType?: string | undefined;
 
   /**
-   * @generated from field: float intensity = 2;
+   * @generated from field: optional float intensity = 2;
    */
-  intensity: number;
+  intensity?: number | undefined;
 
   /**
    * @generated from field: string trigger = 3;
@@ -49,9 +49,9 @@ export const EmotionPayloadSchema: GenMessage<EmotionPayload> = /*@__PURE__*/
  */
 export type ThoughtPayload = Message<"glimmer.avatar.v1.ThoughtPayload"> & {
   /**
-   * @generated from field: bool active = 1;
+   * @generated from field: optional bool active = 1;
    */
-  active: boolean;
+  active?: boolean | undefined;
 
   /**
    * @generated from field: string hint = 2;
@@ -71,9 +71,9 @@ export const ThoughtPayloadSchema: GenMessage<ThoughtPayload> = /*@__PURE__*/
  */
 export type AudioPlayPayload = Message<"glimmer.avatar.v1.AudioPlayPayload"> & {
   /**
-   * @generated from field: string audio_id = 1;
+   * @generated from field: optional string audio_id = 1;
    */
-  audioId: string;
+  audioId?: string | undefined;
 
   /**
    * @generated from field: string audio_uri = 2;
@@ -108,9 +108,9 @@ export const AudioPlayPayloadSchema: GenMessage<AudioPlayPayload> = /*@__PURE__*
  */
 export type AvatarExpressionPayload = Message<"glimmer.avatar.v1.AvatarExpressionPayload"> & {
   /**
-   * @generated from field: string expression_id = 1;
+   * @generated from field: optional string expression_id = 1;
    */
-  expressionId: string;
+  expressionId?: string | undefined;
 
   /**
    * @generated from field: int32 blend_time_ms = 2;
@@ -135,9 +135,9 @@ export const AvatarExpressionPayloadSchema: GenMessage<AvatarExpressionPayload> 
  */
 export type AvatarMotionPayload = Message<"glimmer.avatar.v1.AvatarMotionPayload"> & {
   /**
-   * @generated from field: string motion_id = 1;
+   * @generated from field: optional string motion_id = 1;
    */
-  motionId: string;
+  motionId?: string | undefined;
 
   /**
    * @generated from field: bool loop = 2;
@@ -162,9 +162,9 @@ export const AvatarMotionPayloadSchema: GenMessage<AvatarMotionPayload> = /*@__P
  */
 export type AvatarLipSyncPayload = Message<"glimmer.avatar.v1.AvatarLipSyncPayload"> & {
   /**
-   * @generated from field: float amplitude = 1;
+   * @generated from field: optional float amplitude = 1;
    */
-  amplitude: number;
+  amplitude?: number | undefined;
 
   /**
    * @generated from field: string source = 2;
@@ -184,14 +184,14 @@ export const AvatarLipSyncPayloadSchema: GenMessage<AvatarLipSyncPayload> = /*@_
  */
 export type AvatarParameterPayload = Message<"glimmer.avatar.v1.AvatarParameterPayload"> & {
   /**
-   * @generated from field: string param_id = 1;
+   * @generated from field: optional string param_id = 1;
    */
-  paramId: string;
+  paramId?: string | undefined;
 
   /**
-   * @generated from field: float value = 2;
+   * @generated from field: optional float value = 2;
    */
-  value: number;
+  value?: number | undefined;
 
   /**
    * @generated from field: int32 fade_ms = 3;
@@ -211,19 +211,19 @@ export const AvatarParameterPayloadSchema: GenMessage<AvatarParameterPayload> = 
  */
 export type AvatarIntentPayload = Message<"glimmer.avatar.v1.AvatarIntentPayload"> & {
   /**
-   * @generated from field: string action_id = 1;
+   * @generated from field: optional string action_id = 1;
    */
-  actionId: string;
+  actionId?: string | undefined;
 
   /**
-   * @generated from field: string operation = 2;
+   * @generated from field: optional string operation = 2;
    */
-  operation: string;
+  operation?: string | undefined;
 
   /**
-   * @generated from field: string source = 3;
+   * @generated from field: optional string source = 3;
    */
-  source: string;
+  source?: string | undefined;
 
   /**
    * @generated from field: int32 priority = 4;
@@ -307,9 +307,9 @@ export type CharacterPresentationAppearancePayload = Message<"glimmer.avatar.v1.
   placementId: string;
 
   /**
-   * @generated from field: float display_scale = 2;
+   * @generated from field: optional float display_scale = 2;
    */
-  displayScale: number;
+  displayScale?: number | undefined;
 };
 
 /**
@@ -324,34 +324,34 @@ export const CharacterPresentationAppearancePayloadSchema: GenMessage<CharacterP
  */
 export type CharacterPresentationLifecyclePayload = Message<"glimmer.avatar.v1.CharacterPresentationLifecyclePayload"> & {
   /**
-   * @generated from field: string worker_window_state = 1;
+   * @generated from field: optional string worker_window_state = 1;
    */
-  workerWindowState: string;
+  workerWindowState?: string | undefined;
 
   /**
-   * @generated from field: string composition_surface_state = 2;
+   * @generated from field: optional string composition_surface_state = 2;
    */
-  compositionSurfaceState: string;
+  compositionSurfaceState?: string | undefined;
 
   /**
-   * @generated from field: bool first_frame_presented = 3;
+   * @generated from field: optional bool first_frame_presented = 3;
    */
-  firstFramePresented: boolean;
+  firstFramePresented?: boolean | undefined;
 
   /**
-   * @generated from field: bool interaction_ready = 4;
+   * @generated from field: optional bool interaction_ready = 4;
    */
-  interactionReady: boolean;
+  interactionReady?: boolean | undefined;
 
   /**
-   * @generated from field: bool ready = 5;
+   * @generated from field: optional bool ready = 5;
    */
-  ready: boolean;
+  ready?: boolean | undefined;
 
   /**
-   * @generated from field: string summary = 6;
+   * @generated from field: optional string summary = 6;
    */
-  summary: string;
+  summary?: string | undefined;
 };
 
 /**
@@ -366,39 +366,39 @@ export const CharacterPresentationLifecyclePayloadSchema: GenMessage<CharacterPr
  */
 export type CharacterPresentationProjectionPayload = Message<"glimmer.avatar.v1.CharacterPresentationProjectionPayload"> & {
   /**
-   * @generated from field: string avatar_package_id = 1;
+   * @generated from field: optional string avatar_package_id = 1;
    */
-  avatarPackageId: string;
+  avatarPackageId?: string | undefined;
 
   /**
-   * @generated from field: string model_id = 2;
+   * @generated from field: optional string model_id = 2;
    */
-  modelId: string;
+  modelId?: string | undefined;
 
   /**
-   * @generated from field: string display_name = 3;
+   * @generated from field: optional string display_name = 3;
    */
-  displayName: string;
+  displayName?: string | undefined;
 
   /**
-   * @generated from field: string kind = 4;
+   * @generated from field: optional string kind = 4;
    */
-  kind: string;
+  kind?: string | undefined;
 
   /**
-   * @generated from field: string backend = 5;
+   * @generated from field: optional string backend = 5;
    */
-  backend: string;
+  backend?: string | undefined;
 
   /**
-   * @generated from field: string host_kind = 6;
+   * @generated from field: optional string host_kind = 6;
    */
-  hostKind: string;
+  hostKind?: string | undefined;
 
   /**
-   * @generated from field: string avatar_state = 7;
+   * @generated from field: optional string avatar_state = 7;
    */
-  avatarState: string;
+  avatarState?: string | undefined;
 
   /**
    * @generated from field: glimmer.avatar.v1.CharacterPresentationAppearancePayload appearance = 8;
@@ -423,9 +423,9 @@ export const CharacterPresentationProjectionPayloadSchema: GenMessage<CharacterP
  */
 export type LoadScenePayload = Message<"glimmer.avatar.v1.LoadScenePayload"> & {
   /**
-   * @generated from field: string scene_id = 1;
+   * @generated from field: optional string scene_id = 1;
    */
-  sceneId: string;
+  sceneId?: string | undefined;
 
   /**
    * @generated from field: int32 fade_ms = 2;
@@ -462,9 +462,9 @@ export const UnloadScenePayloadSchema: GenMessage<UnloadScenePayload> = /*@__PUR
  */
 export type AvatarHostHelloPayload = Message<"glimmer.avatar.v1.AvatarHostHelloPayload"> & {
   /**
-   * @generated from field: string host_kind = 1;
+   * @generated from field: optional string host_kind = 1;
    */
-  hostKind: string;
+  hostKind?: string | undefined;
 
   /**
    * @generated from field: string host_id = 2;
@@ -519,24 +519,24 @@ export type AvatarHostReadyPayload = Message<"glimmer.avatar.v1.AvatarHostReadyP
   avatarPackageId: string;
 
   /**
-   * @generated from field: string worker_window_state = 4;
+   * @generated from field: optional string worker_window_state = 4;
    */
-  workerWindowState: string;
+  workerWindowState?: string | undefined;
 
   /**
-   * @generated from field: string composition_surface_state = 5;
+   * @generated from field: optional string composition_surface_state = 5;
    */
-  compositionSurfaceState: string;
+  compositionSurfaceState?: string | undefined;
 
   /**
-   * @generated from field: bool first_frame_presented = 6;
+   * @generated from field: optional bool first_frame_presented = 6;
    */
-  firstFramePresented: boolean;
+  firstFramePresented?: boolean | undefined;
 
   /**
-   * @generated from field: bool interaction_ready = 7;
+   * @generated from field: optional bool interaction_ready = 7;
    */
-  interactionReady: boolean;
+  interactionReady?: boolean | undefined;
 
   /**
    * @generated from field: string summary = 8;
@@ -556,9 +556,9 @@ export const AvatarHostReadyPayloadSchema: GenMessage<AvatarHostReadyPayload> = 
  */
 export type AnimationCompletePayload = Message<"glimmer.avatar.v1.AnimationCompletePayload"> & {
   /**
-   * @generated from field: string animation_id = 1;
+   * @generated from field: optional string animation_id = 1;
    */
-  animationId: string;
+  animationId?: string | undefined;
 };
 
 /**
@@ -573,14 +573,14 @@ export const AnimationCompletePayloadSchema: GenMessage<AnimationCompletePayload
  */
 export type AvatarHostErrorPayload = Message<"glimmer.avatar.v1.AvatarHostErrorPayload"> & {
   /**
-   * @generated from field: string code = 1;
+   * @generated from field: optional string code = 1;
    */
-  code: string;
+  code?: string | undefined;
 
   /**
-   * @generated from field: string message = 2;
+   * @generated from field: optional string message = 2;
    */
-  message: string;
+  message?: string | undefined;
 };
 
 /**
@@ -595,9 +595,9 @@ export const AvatarHostErrorPayloadSchema: GenMessage<AvatarHostErrorPayload> = 
  */
 export type AvatarDownstreamFrame = Message<"glimmer.avatar.v1.AvatarDownstreamFrame"> & {
   /**
-   * @generated from field: string kind = 1;
+   * @generated from field: optional string kind = 1;
    */
-  kind: string;
+  kind?: string | undefined;
 
   /**
    * @generated from field: string trace_id = 2;
@@ -605,9 +605,9 @@ export type AvatarDownstreamFrame = Message<"glimmer.avatar.v1.AvatarDownstreamF
   traceId: string;
 
   /**
-   * @generated from field: double timestamp = 3;
+   * @generated from field: optional double timestamp = 3;
    */
-  timestamp: number;
+  timestamp?: number | undefined;
 
   /**
    * @generated from field: glimmer.avatar.v1.EmotionPayload emotion = 4;
@@ -682,9 +682,9 @@ export const AvatarDownstreamFrameSchema: GenMessage<AvatarDownstreamFrame> = /*
  */
 export type AvatarUpstreamFrame = Message<"glimmer.avatar.v1.AvatarUpstreamFrame"> & {
   /**
-   * @generated from field: string kind = 1;
+   * @generated from field: optional string kind = 1;
    */
-  kind: string;
+  kind?: string | undefined;
 
   /**
    * @generated from field: string trace_id = 2;
@@ -692,9 +692,9 @@ export type AvatarUpstreamFrame = Message<"glimmer.avatar.v1.AvatarUpstreamFrame
   traceId: string;
 
   /**
-   * @generated from field: double timestamp = 3;
+   * @generated from field: optional double timestamp = 3;
    */
-  timestamp: number;
+  timestamp?: number | undefined;
 
   /**
    * @generated from field: glimmer.avatar.v1.AvatarHostHelloPayload host_hello = 4;

@@ -20,7 +20,7 @@
 
 - 对应 M12 迁移切片前，现有 runtime 已消费的跨语言/跨进程结构仍由 `protocol/src/schemas/` 拥有，使用 `pnpm sync:contracts`。
 - 新 Contract Spine 跨进程可调用能力由 `contracts/proto/` 拥有；新文档型契约由 `contracts/json-schema/` 拥有，使用 `pnpm contracts:generate` / `pnpm contracts:verify`。
-- Kernel↔Cognition 已在 Slice 2 迁移，Avatar control 已在 Slice 5 迁移；这些边界只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar}/v1/` 定义，不得恢复旧 Protocol 镜像。
+- Kernel↔Cognition runtime 已在 Slice 2 迁移；Avatar control 的 IDL/projection/edge mapping 已在 Slice 5 迁移到 Contract Spine，但 Kernel↔UnityAvatarHost runtime consumer 仍是 WebSocket，`AvatarHostService.Connect` 切换属于 Slice 8。这些契约只能由 `contracts/proto/glimmer/{common,kernel,cognition,avatar}/v1/` 定义，不得恢复旧 Protocol 镜像。
 
 现有 runtime Protocol 的生成投影和消费端包括：
 
@@ -38,17 +38,17 @@
 
 ## M12 Contracts Baseline 与 Slice 2 Service
 
-M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔Cognition，Slice 5 已切换 Avatar control 运行主线。当前查表规则如下：
+M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔Cognition runtime，Slice 5 已建立 Avatar control IDL/projection 与当前 transport edge mapping。当前查表规则如下：
 
 | 路径 | 当前状态 | 规则 |
 |---|---|---|
-| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService` 与已运行的 `CognitionService` / `KernelControlService` v1。 |
+| `contracts/proto/` | canonical Protobuf Service | 包含 baseline `ContractProbeService`、已运行的 `CognitionService` / `KernelControlService` v1，以及已生成但 runtime consumer 尚待 Slice 8 接入的 `AvatarHostService` v1。 |
 | `contracts/json-schema/` | canonical JSON Schema Document baseline | 文档型契约目标位置；Slice 1 只包含最小 Skill tool parameters Document。 |
 | `contracts/generated/` | Buf 生成的 TS/Python/C# DTO | 只读，只属于 Adapter/Transport 边缘；Kernel/Cognition Adapter 已消费对应生成物。 |
 | `contracts/compatibility/` | 仓库内 Protobuf image 与 JSON Schema baseline | `buf breaking` 与项目 JSON Schema compatibility 不依赖 BSR。 |
 | `contracts/inventory.md` | Slice 1 inventory | 冻结旧 `protocol/`、生成链、consumer、owner、迁移切片与删除条件。 |
 
-迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力由 `contracts/` 拥有，其他尚未迁移运行结构仍由 `protocol/` 拥有。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Cognition 的 Contract Spine DTO/stub 只在 Kernel contract Adapter 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
+迁移期必须按切片区分 owner：Kernel↔Cognition 可调用能力与 Avatar control IDL/projection 由 `contracts/` 拥有；Avatar 当前 WebSocket runtime consumer 由 Slice 8 负责切到 `AvatarHostService.Connect`，其余尚未迁移运行结构仍由 `protocol/` 拥有。Cognition legacy Python projection 已在 Slice 4 删除，`protocol/codegen/gen-py.py` 仅保留 Audio consumer；Contract Spine DTO/stub 只能在对应 contract Adapter/transport 边缘消费。配置、Character Package、Extension manifest/package 和动态 Skill/tool 参数继续由 JSON Schema 拥有；Protobuf 只能引用 Document id、version 和 digest，不复制同一 Document 结构。
 
 ## Accepted 目标与当前差距
 
@@ -56,7 +56,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 
 | 当前事实 | Accepted 目标 |
 |---|---|
-| Kernel↔Cognition 与 Avatar control 已由 `contracts/` 权威定义；其他运行结构仍在 `protocol/` | 所有边界迁移后删除旧 `protocol/` |
+| Kernel↔Cognition runtime 已使用 Contract Spine；Avatar control IDL/projection/edge mapping 已由 `contracts/` 权威定义，但 runtime 仍走 WebSocket；其他运行结构仍在 `protocol/` | Slice 8 将 Avatar consumer 切到 `AvatarHostService.Connect`；所有边界迁移后删除旧 `protocol/` |
 | 尚未迁移的 JSON Schema 仍覆盖共享模型、配置与部分 SDK 投影 | Protobuf Service 拥有跨进程可调用能力；JSON Schema 只拥有文档契约 |
 | Kernel ↔ Cognition 已使用 gRPC；部分 Engine 仍使用 stdio，Surface/Host 仍有手写 WebSocket | 核心器官默认 gRPC；Web/Desktop 只访问 Kernel Surface Gateway，浏览器优先 Connect |
 | 多类消息通过 envelope、`kind/type` 和 payload 约定区分 | Command、Query、Event、Stream、Document 五类语义显式分离 |
@@ -80,7 +80,7 @@ M12 Slice 1 已建立长期 `contracts/` baseline，Slice 2 已切换 Kernel↔C
 | `CognitionService` / `KernelControlService` | Kernel 与 Cognition 的版本化请求、查询与回调 | deadline、cancellation、typed error、trace/causation/correlation、generation、幂等 |
 | `PerceptionEvent` / `ActionCommand` | 感知输入和行动语义 | 不暴露平台原始 payload；语义由 Cognition 解释 |
 | `CognitiveActivitySnapshot` / emotion model | 认知资源调度、情绪和表现投影 | 调度与 Affect 分离，不让 renderer 反推人格状态 |
-| `AvatarDownstreamFrame` / `AvatarUpstreamFrame` | Kernel↔UnityAvatarHost control | `host_hello`、`host_ready`、`character_presentation_projection`、emotion、motion、presentation 区分；JSON formatter 必须保留 proto snake_case field name；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
+| `AvatarHostService` / `AvatarDownstreamFrame` / `AvatarUpstreamFrame` | Kernel↔UnityAvatarHost control contract；当前 WebSocket edge 映射，Slice 8 接入 `Connect` runtime | `host_hello`、`host_ready`、`character_presentation_projection`、emotion、motion、presentation 区分；scalar presence 对齐 required JSON 语义；Adapter 拒绝未知字段、unknown kind/enum、缺失/多重/错配 payload，JSON formatter 保留 proto snake_case field name；`host_ready` 必须晚于 Avatar Package / composition surface / first frame / interaction ready |
 | `ExtensionRuntimeProjection` | Extension Host 给 Desktop/Control Center 的运行投影 | Host 是唯一生产者；以 Contribution Point Registry、Capability Graph、Action Intent 和 Diagnostics 表达运行事实；Capability Graph node 与 action intent 必须带 `audience`；Renderer 不从 DB、日志、manifest 固定字段或端点还原扩展事实 |
 | `ExtensionInstallationProjection` / Extension install lifecycle | Extension Package Manager 给控制表面的安装态与安装事务 | 安装态只表达已安装版本集合和当前激活版本；prepare/preview/commit 先校验来源、摘要、SBOM、平台与权限，再原子安装；指定版本激活不与运行投影混为同一事实 |
 | `SkillCatalogSnapshot` | Kernel 给 Desktop/Control Center 的 Skill Plane 目录与 provider runtime 投影 | 只暴露 character audience skill/tool/resource/prompt；`providerRuntimes` 补充 core / extension / MCP / user provider 的连接、契约-only、降级与恢复动作 |

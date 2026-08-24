@@ -25,132 +25,151 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiNnbGltbWVyL2F2YXRhci92MS9hdmF0YXJfaG9zdC5wcm90bxIRZ2xpbW1l",
-            "ci5hdmF0YXIudjEijwEKDkVtb3Rpb25QYXlsb2FkEiEKDGVtb3Rpb25fdHlw",
-            "ZRgBIAEoCVILZW1vdGlvblR5cGUSHAoJaW50ZW5zaXR5GAIgASgCUglpbnRl",
-            "bnNpdHkSGAoHdHJpZ2dlchgDIAEoCVIHdHJpZ2dlchIiCg1ibGVuZF90aW1l",
-            "X21zGAQgASgFUgtibGVuZFRpbWVNcyI8Cg5UaG91Z2h0UGF5bG9hZBIWCgZh",
-            "Y3RpdmUYASABKAhSBmFjdGl2ZRISCgRoaW50GAIgASgJUgRoaW50IqcBChBB",
-            "dWRpb1BsYXlQYXlsb2FkEhkKCGF1ZGlvX2lkGAEgASgJUgdhdWRpb0lkEhsK",
-            "CWF1ZGlvX3VyaRgCIAEoCVIIYXVkaW9VcmkSHQoKYXVkaW9fZGF0YRgDIAEo",
-            "CVIJYXVkaW9EYXRhEhsKCW1pbWVfdHlwZRgEIAEoCVIIbWltZVR5cGUSHwoL",
-            "ZHVyYXRpb25fbXMYBSABKAVSCmR1cmF0aW9uTXMigQEKF0F2YXRhckV4cHJl",
-            "c3Npb25QYXlsb2FkEiMKDWV4cHJlc3Npb25faWQYASABKAlSDGV4cHJlc3Np",
-            "b25JZBIiCg1ibGVuZF90aW1lX21zGAIgASgFUgtibGVuZFRpbWVNcxIdCgph",
-            "dXRvX3Jlc2V0GAMgASgIUglhdXRvUmVzZXQiYgoTQXZhdGFyTW90aW9uUGF5",
-            "bG9hZBIbCgltb3Rpb25faWQYASABKAlSCG1vdGlvbklkEhIKBGxvb3AYAiAB",
-            "KAhSBGxvb3ASGgoIcHJpb3JpdHkYAyABKAVSCHByaW9yaXR5IkwKFEF2YXRh",
-            "ckxpcFN5bmNQYXlsb2FkEhwKCWFtcGxpdHVkZRgBIAEoAlIJYW1wbGl0dWRl",
-            "EhYKBnNvdXJjZRgCIAEoCVIGc291cmNlImIKFkF2YXRhclBhcmFtZXRlclBh",
-            "eWxvYWQSGQoIcGFyYW1faWQYASABKAlSB3BhcmFtSWQSFAoFdmFsdWUYAiAB",
-            "KAJSBXZhbHVlEhcKB2ZhZGVfbXMYAyABKAVSBmZhZGVNcyKEAQoTQXZhdGFy",
-            "SW50ZW50UGF5bG9hZBIbCglhY3Rpb25faWQYASABKAlSCGFjdGlvbklkEhwK",
-            "CW9wZXJhdGlvbhgCIAEoCVIJb3BlcmF0aW9uEhYKBnNvdXJjZRgDIAEoCVIG",
-            "c291cmNlEhoKCHByaW9yaXR5GAQgASgFUghwcmlvcml0eSKTAQoYQXZhdGFy",
-            "QWN0aW9uU3RhdGVQYXlsb2FkEhsKCWFjdGlvbl9pZBgBIAEoCVIIYWN0aW9u",
-            "SWQSFAoFc3RhdGUYAiABKAlSBXN0YXRlEioKEWFjdGl2ZV9hY3Rpb25faWRz",
-            "GAMgAygJUg9hY3RpdmVBY3Rpb25JZHMSGAoHbWVzc2FnZRgEIAEoCVIHbWVz",
-            "c2FnZSKMAQoZQXZhdGFyUHJlc2VudGF0aW9uUGF5bG9hZBIhCgxwbGFjZW1l",
-            "bnRfaWQYASABKAlSC3BsYWNlbWVudElkEiMKDWRpc3BsYXlfc2NhbGUYAiAB",
-            "KAJSDGRpc3BsYXlTY2FsZRInCg9yZXNldF9wbGFjZW1lbnQYAyABKAhSDnJl",
-            "c2V0UGxhY2VtZW50InAKJkNoYXJhY3RlclByZXNlbnRhdGlvbkFwcGVhcmFu",
+            "ci5hdmF0YXIudjEiuAEKDkVtb3Rpb25QYXlsb2FkEiYKDGVtb3Rpb25fdHlw",
+            "ZRgBIAEoCUgAUgtlbW90aW9uVHlwZYgBARIhCglpbnRlbnNpdHkYAiABKAJI",
+            "AVIJaW50ZW5zaXR5iAEBEhgKB3RyaWdnZXIYAyABKAlSB3RyaWdnZXISIgoN",
+            "YmxlbmRfdGltZV9tcxgEIAEoBVILYmxlbmRUaW1lTXNCDwoNX2Vtb3Rpb25f",
+            "dHlwZUIMCgpfaW50ZW5zaXR5IkwKDlRob3VnaHRQYXlsb2FkEhsKBmFjdGl2",
+            "ZRgBIAEoCEgAUgZhY3RpdmWIAQESEgoEaGludBgCIAEoCVIEaGludEIJCgdf",
+            "YWN0aXZlIrkBChBBdWRpb1BsYXlQYXlsb2FkEh4KCGF1ZGlvX2lkGAEgASgJ",
+            "SABSB2F1ZGlvSWSIAQESGwoJYXVkaW9fdXJpGAIgASgJUghhdWRpb1VyaRId",
+            "CgphdWRpb19kYXRhGAMgASgJUglhdWRpb0RhdGESGwoJbWltZV90eXBlGAQg",
+            "ASgJUghtaW1lVHlwZRIfCgtkdXJhdGlvbl9tcxgFIAEoBVIKZHVyYXRpb25N",
+            "c0ILCglfYXVkaW9faWQimAEKF0F2YXRhckV4cHJlc3Npb25QYXlsb2FkEigK",
+            "DWV4cHJlc3Npb25faWQYASABKAlIAFIMZXhwcmVzc2lvbklkiAEBEiIKDWJs",
+            "ZW5kX3RpbWVfbXMYAiABKAVSC2JsZW5kVGltZU1zEh0KCmF1dG9fcmVzZXQY",
+            "AyABKAhSCWF1dG9SZXNldEIQCg5fZXhwcmVzc2lvbl9pZCJ1ChNBdmF0YXJN",
+            "b3Rpb25QYXlsb2FkEiAKCW1vdGlvbl9pZBgBIAEoCUgAUghtb3Rpb25JZIgB",
+            "ARISCgRsb29wGAIgASgIUgRsb29wEhoKCHByaW9yaXR5GAMgASgFUghwcmlv",
+            "cml0eUIMCgpfbW90aW9uX2lkIl8KFEF2YXRhckxpcFN5bmNQYXlsb2FkEiEK",
+            "CWFtcGxpdHVkZRgBIAEoAkgAUglhbXBsaXR1ZGWIAQESFgoGc291cmNlGAIg",
+            "ASgJUgZzb3VyY2VCDAoKX2FtcGxpdHVkZSKDAQoWQXZhdGFyUGFyYW1ldGVy",
+            "UGF5bG9hZBIeCghwYXJhbV9pZBgBIAEoCUgAUgdwYXJhbUlkiAEBEhkKBXZh",
+            "bHVlGAIgASgCSAFSBXZhbHVliAEBEhcKB2ZhZGVfbXMYAyABKAVSBmZhZGVN",
+            "c0ILCglfcGFyYW1faWRCCAoGX3ZhbHVlIroBChNBdmF0YXJJbnRlbnRQYXls",
+            "b2FkEiAKCWFjdGlvbl9pZBgBIAEoCUgAUghhY3Rpb25JZIgBARIhCglvcGVy",
+            "YXRpb24YAiABKAlIAVIJb3BlcmF0aW9uiAEBEhsKBnNvdXJjZRgDIAEoCUgC",
+            "UgZzb3VyY2WIAQESGgoIcHJpb3JpdHkYBCABKAVSCHByaW9yaXR5QgwKCl9h",
+            "Y3Rpb25faWRCDAoKX29wZXJhdGlvbkIJCgdfc291cmNlIpMBChhBdmF0YXJB",
+            "Y3Rpb25TdGF0ZVBheWxvYWQSGwoJYWN0aW9uX2lkGAEgASgJUghhY3Rpb25J",
+            "ZBIUCgVzdGF0ZRgCIAEoCVIFc3RhdGUSKgoRYWN0aXZlX2FjdGlvbl9pZHMY",
+            "AyADKAlSD2FjdGl2ZUFjdGlvbklkcxIYCgdtZXNzYWdlGAQgASgJUgdtZXNz",
+            "YWdlIowBChlBdmF0YXJQcmVzZW50YXRpb25QYXlsb2FkEiEKDHBsYWNlbWVu",
+            "dF9pZBgBIAEoCVILcGxhY2VtZW50SWQSIwoNZGlzcGxheV9zY2FsZRgCIAEo",
+            "AlIMZGlzcGxheVNjYWxlEicKD3Jlc2V0X3BsYWNlbWVudBgDIAEoCFIOcmVz",
+            "ZXRQbGFjZW1lbnQihwEKJkNoYXJhY3RlclByZXNlbnRhdGlvbkFwcGVhcmFu",
             "Y2VQYXlsb2FkEiEKDHBsYWNlbWVudF9pZBgBIAEoCVILcGxhY2VtZW50SWQS",
-            "IwoNZGlzcGxheV9zY2FsZRgCIAEoAlIMZGlzcGxheVNjYWxlIqQCCiVDaGFy",
-            "YWN0ZXJQcmVzZW50YXRpb25MaWZlY3ljbGVQYXlsb2FkEi4KE3dvcmtlcl93",
-            "aW5kb3dfc3RhdGUYASABKAlSEXdvcmtlcldpbmRvd1N0YXRlEjoKGWNvbXBv",
-            "c2l0aW9uX3N1cmZhY2Vfc3RhdGUYAiABKAlSF2NvbXBvc2l0aW9uU3VyZmFj",
-            "ZVN0YXRlEjIKFWZpcnN0X2ZyYW1lX3ByZXNlbnRlZBgDIAEoCFITZmlyc3RG",
-            "cmFtZVByZXNlbnRlZBIrChFpbnRlcmFjdGlvbl9yZWFkeRgEIAEoCFIQaW50",
-            "ZXJhY3Rpb25SZWFkeRIUCgVyZWFkeRgFIAEoCFIFcmVhZHkSGAoHc3VtbWFy",
-            "eRgGIAEoCVIHc3VtbWFyeSKzAwomQ2hhcmFjdGVyUHJlc2VudGF0aW9uUHJv",
-            "amVjdGlvblBheWxvYWQSKgoRYXZhdGFyX3BhY2thZ2VfaWQYASABKAlSD2F2",
-            "YXRhclBhY2thZ2VJZBIZCghtb2RlbF9pZBgCIAEoCVIHbW9kZWxJZBIhCgxk",
-            "aXNwbGF5X25hbWUYAyABKAlSC2Rpc3BsYXlOYW1lEhIKBGtpbmQYBCABKAlS",
-            "BGtpbmQSGAoHYmFja2VuZBgFIAEoCVIHYmFja2VuZBIbCglob3N0X2tpbmQY",
-            "BiABKAlSCGhvc3RLaW5kEiEKDGF2YXRhcl9zdGF0ZRgHIAEoCVILYXZhdGFy",
-            "U3RhdGUSWQoKYXBwZWFyYW5jZRgIIAEoCzI5LmdsaW1tZXIuYXZhdGFyLnYx",
-            "LkNoYXJhY3RlclByZXNlbnRhdGlvbkFwcGVhcmFuY2VQYXlsb2FkUgphcHBl",
-            "YXJhbmNlElYKCWxpZmVjeWNsZRgJIAEoCzI4LmdsaW1tZXIuYXZhdGFyLnYx",
-            "LkNoYXJhY3RlclByZXNlbnRhdGlvbkxpZmVjeWNsZVBheWxvYWRSCWxpZmVj",
-            "eWNsZSJGChBMb2FkU2NlbmVQYXlsb2FkEhkKCHNjZW5lX2lkGAEgASgJUgdz",
-            "Y2VuZUlkEhcKB2ZhZGVfbXMYAiABKAVSBmZhZGVNcyItChJVbmxvYWRTY2Vu",
-            "ZVBheWxvYWQSFwoHZmFkZV9tcxgBIAEoBVIGZmFkZU1zItwBChZBdmF0YXJI",
-            "b3N0SGVsbG9QYXlsb2FkEhsKCWhvc3Rfa2luZBgBIAEoCVIIaG9zdEtpbmQS",
-            "FwoHaG9zdF9pZBgCIAEoCVIGaG9zdElkEiEKDGhvc3RfdmVyc2lvbhgDIAEo",
-            "CVILaG9zdFZlcnNpb24SIgoMY2FwYWJpbGl0aWVzGAQgAygJUgxjYXBhYmls",
-            "aXRpZXMSGQoIbW9kZWxfaWQYBSABKAlSB21vZGVsSWQSKgoRYXZhdGFyX3Bh",
-            "Y2thZ2VfaWQYBiABKAlSD2F2YXRhclBhY2thZ2VJZCLfAgoWQXZhdGFySG9z",
-            "dFJlYWR5UGF5bG9hZBIXCgdob3N0X2lkGAEgASgJUgZob3N0SWQSGQoIbW9k",
-            "ZWxfaWQYAiABKAlSB21vZGVsSWQSKgoRYXZhdGFyX3BhY2thZ2VfaWQYAyAB",
-            "KAlSD2F2YXRhclBhY2thZ2VJZBIuChN3b3JrZXJfd2luZG93X3N0YXRlGAQg",
-            "ASgJUhF3b3JrZXJXaW5kb3dTdGF0ZRI6Chljb21wb3NpdGlvbl9zdXJmYWNl",
-            "X3N0YXRlGAUgASgJUhdjb21wb3NpdGlvblN1cmZhY2VTdGF0ZRIyChVmaXJz",
-            "dF9mcmFtZV9wcmVzZW50ZWQYBiABKAhSE2ZpcnN0RnJhbWVQcmVzZW50ZWQS",
-            "KwoRaW50ZXJhY3Rpb25fcmVhZHkYByABKAhSEGludGVyYWN0aW9uUmVhZHkS",
-            "GAoHc3VtbWFyeRgIIAEoCVIHc3VtbWFyeSI9ChhBbmltYXRpb25Db21wbGV0",
-            "ZVBheWxvYWQSIQoMYW5pbWF0aW9uX2lkGAEgASgJUgthbmltYXRpb25JZCJG",
-            "ChZBdmF0YXJIb3N0RXJyb3JQYXlsb2FkEhIKBGNvZGUYASABKAlSBGNvZGUS",
-            "GAoHbWVzc2FnZRgCIAEoCVIHbWVzc2FnZSLwBwoVQXZhdGFyRG93bnN0cmVh",
-            "bUZyYW1lEhIKBGtpbmQYASABKAlSBGtpbmQSGQoIdHJhY2VfaWQYAiABKAlS",
-            "B3RyYWNlSWQSHAoJdGltZXN0YW1wGAMgASgBUgl0aW1lc3RhbXASOwoHZW1v",
-            "dGlvbhgEIAEoCzIhLmdsaW1tZXIuYXZhdGFyLnYxLkVtb3Rpb25QYXlsb2Fk",
-            "UgdlbW90aW9uEjsKB3Rob3VnaHQYBSABKAsyIS5nbGltbWVyLmF2YXRhci52",
-            "MS5UaG91Z2h0UGF5bG9hZFIHdGhvdWdodBJCCgphdWRpb19wbGF5GAYgASgL",
-            "MiMuZ2xpbW1lci5hdmF0YXIudjEuQXVkaW9QbGF5UGF5bG9hZFIJYXVkaW9Q",
-            "bGF5EkoKCmV4cHJlc3Npb24YByABKAsyKi5nbGltbWVyLmF2YXRhci52MS5B",
-            "dmF0YXJFeHByZXNzaW9uUGF5bG9hZFIKZXhwcmVzc2lvbhI+CgZtb3Rpb24Y",
-            "CCABKAsyJi5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJNb3Rpb25QYXlsb2Fk",
-            "UgZtb3Rpb24SQgoIbGlwX3N5bmMYCSABKAsyJy5nbGltbWVyLmF2YXRhci52",
-            "MS5BdmF0YXJMaXBTeW5jUGF5bG9hZFIHbGlwU3luYxJHCglwYXJhbWV0ZXIY",
-            "CiABKAsyKS5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJQYXJhbWV0ZXJQYXls",
-            "b2FkUglwYXJhbWV0ZXISSwoNYXZhdGFyX2ludGVudBgLIAEoCzImLmdsaW1t",
-            "ZXIuYXZhdGFyLnYxLkF2YXRhckludGVudFBheWxvYWRSDGF2YXRhckludGVu",
-            "dBJQCgxwcmVzZW50YXRpb24YDCABKAsyLC5nbGltbWVyLmF2YXRhci52MS5B",
-            "dmF0YXJQcmVzZW50YXRpb25QYXlsb2FkUgxwcmVzZW50YXRpb24ShQEKIWNo",
-            "YXJhY3Rlcl9wcmVzZW50YXRpb25fcHJvamVjdGlvbhgNIAEoCzI5LmdsaW1t",
-            "ZXIuYXZhdGFyLnYxLkNoYXJhY3RlclByZXNlbnRhdGlvblByb2plY3Rpb25Q",
-            "YXlsb2FkUh9jaGFyYWN0ZXJQcmVzZW50YXRpb25Qcm9qZWN0aW9uEkIKCmxv",
-            "YWRfc2NlbmUYDiABKAsyIy5nbGltbWVyLmF2YXRhci52MS5Mb2FkU2NlbmVQ",
-            "YXlsb2FkUglsb2FkU2NlbmUSSAoMdW5sb2FkX3NjZW5lGA8gASgLMiUuZ2xp",
-            "bW1lci5hdmF0YXIudjEuVW5sb2FkU2NlbmVQYXlsb2FkUgt1bmxvYWRTY2Vu",
-            "ZSLwAwoTQXZhdGFyVXBzdHJlYW1GcmFtZRISCgRraW5kGAEgASgJUgRraW5k",
-            "EhkKCHRyYWNlX2lkGAIgASgJUgd0cmFjZUlkEhwKCXRpbWVzdGFtcBgDIAEo",
-            "AVIJdGltZXN0YW1wEkgKCmhvc3RfaGVsbG8YBCABKAsyKS5nbGltbWVyLmF2",
-            "YXRhci52MS5BdmF0YXJIb3N0SGVsbG9QYXlsb2FkUglob3N0SGVsbG8SSAoK",
-            "aG9zdF9yZWFkeRgFIAEoCzIpLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhckhv",
-            "c3RSZWFkeVBheWxvYWRSCWhvc3RSZWFkeRJbChNhdmF0YXJfYWN0aW9uX3N0",
-            "YXRlGAYgASgLMisuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyQWN0aW9uU3Rh",
-            "dGVQYXlsb2FkUhFhdmF0YXJBY3Rpb25TdGF0ZRJaChJhbmltYXRpb25fY29t",
-            "cGxldGUYByABKAsyKy5nbGltbWVyLmF2YXRhci52MS5BbmltYXRpb25Db21w",
-            "bGV0ZVBheWxvYWRSEWFuaW1hdGlvbkNvbXBsZXRlEj8KBWVycm9yGAggASgL",
-            "MikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFySG9zdEVycm9yUGF5bG9hZFIF",
-            "ZXJyb3IydAoRQXZhdGFySG9zdFNlcnZpY2USXwoHQ29ubmVjdBImLmdsaW1t",
-            "ZXIuYXZhdGFyLnYxLkF2YXRhclVwc3RyZWFtRnJhbWUaKC5nbGltbWVyLmF2",
-            "YXRhci52MS5BdmF0YXJEb3duc3RyZWFtRnJhbWUoATABQiyqAilHbGltbWVy",
-            "Q3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkF2YXRhci5WMWIGcHJvdG8z"));
+            "KAoNZGlzcGxheV9zY2FsZRgCIAEoAkgAUgxkaXNwbGF5U2NhbGWIAQFCEAoO",
+            "X2Rpc3BsYXlfc2NhbGUivgMKJUNoYXJhY3RlclByZXNlbnRhdGlvbkxpZmVj",
+            "eWNsZVBheWxvYWQSMwoTd29ya2VyX3dpbmRvd19zdGF0ZRgBIAEoCUgAUhF3",
+            "b3JrZXJXaW5kb3dTdGF0ZYgBARI/Chljb21wb3NpdGlvbl9zdXJmYWNlX3N0",
+            "YXRlGAIgASgJSAFSF2NvbXBvc2l0aW9uU3VyZmFjZVN0YXRliAEBEjcKFWZp",
+            "cnN0X2ZyYW1lX3ByZXNlbnRlZBgDIAEoCEgCUhNmaXJzdEZyYW1lUHJlc2Vu",
+            "dGVkiAEBEjAKEWludGVyYWN0aW9uX3JlYWR5GAQgASgISANSEGludGVyYWN0",
+            "aW9uUmVhZHmIAQESGQoFcmVhZHkYBSABKAhIBFIFcmVhZHmIAQESHQoHc3Vt",
+            "bWFyeRgGIAEoCUgFUgdzdW1tYXJ5iAEBQhYKFF93b3JrZXJfd2luZG93X3N0",
+            "YXRlQhwKGl9jb21wb3NpdGlvbl9zdXJmYWNlX3N0YXRlQhgKFl9maXJzdF9m",
+            "cmFtZV9wcmVzZW50ZWRCFAoSX2ludGVyYWN0aW9uX3JlYWR5QggKBl9yZWFk",
+            "eUIKCghfc3VtbWFyeSK+BAomQ2hhcmFjdGVyUHJlc2VudGF0aW9uUHJvamVj",
+            "dGlvblBheWxvYWQSLwoRYXZhdGFyX3BhY2thZ2VfaWQYASABKAlIAFIPYXZh",
+            "dGFyUGFja2FnZUlkiAEBEh4KCG1vZGVsX2lkGAIgASgJSAFSB21vZGVsSWSI",
+            "AQESJgoMZGlzcGxheV9uYW1lGAMgASgJSAJSC2Rpc3BsYXlOYW1liAEBEhcK",
+            "BGtpbmQYBCABKAlIA1IEa2luZIgBARIdCgdiYWNrZW5kGAUgASgJSARSB2Jh",
+            "Y2tlbmSIAQESIAoJaG9zdF9raW5kGAYgASgJSAVSCGhvc3RLaW5kiAEBEiYK",
+            "DGF2YXRhcl9zdGF0ZRgHIAEoCUgGUgthdmF0YXJTdGF0ZYgBARJZCgphcHBl",
+            "YXJhbmNlGAggASgLMjkuZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJl",
+            "c2VudGF0aW9uQXBwZWFyYW5jZVBheWxvYWRSCmFwcGVhcmFuY2USVgoJbGlm",
+            "ZWN5Y2xlGAkgASgLMjguZ2xpbW1lci5hdmF0YXIudjEuQ2hhcmFjdGVyUHJl",
+            "c2VudGF0aW9uTGlmZWN5Y2xlUGF5bG9hZFIJbGlmZWN5Y2xlQhQKEl9hdmF0",
+            "YXJfcGFja2FnZV9pZEILCglfbW9kZWxfaWRCDwoNX2Rpc3BsYXlfbmFtZUIH",
+            "CgVfa2luZEIKCghfYmFja2VuZEIMCgpfaG9zdF9raW5kQg8KDV9hdmF0YXJf",
+            "c3RhdGUiWAoQTG9hZFNjZW5lUGF5bG9hZBIeCghzY2VuZV9pZBgBIAEoCUgA",
+            "UgdzY2VuZUlkiAEBEhcKB2ZhZGVfbXMYAiABKAVSBmZhZGVNc0ILCglfc2Nl",
+            "bmVfaWQiLQoSVW5sb2FkU2NlbmVQYXlsb2FkEhcKB2ZhZGVfbXMYASABKAVS",
+            "BmZhZGVNcyLvAQoWQXZhdGFySG9zdEhlbGxvUGF5bG9hZBIgCglob3N0X2tp",
+            "bmQYASABKAlIAFIIaG9zdEtpbmSIAQESFwoHaG9zdF9pZBgCIAEoCVIGaG9z",
+            "dElkEiEKDGhvc3RfdmVyc2lvbhgDIAEoCVILaG9zdFZlcnNpb24SIgoMY2Fw",
+            "YWJpbGl0aWVzGAQgAygJUgxjYXBhYmlsaXRpZXMSGQoIbW9kZWxfaWQYBSAB",
+            "KAlSB21vZGVsSWQSKgoRYXZhdGFyX3BhY2thZ2VfaWQYBiABKAlSD2F2YXRh",
+            "clBhY2thZ2VJZEIMCgpfaG9zdF9raW5kItkDChZBdmF0YXJIb3N0UmVhZHlQ",
+            "YXlsb2FkEhcKB2hvc3RfaWQYASABKAlSBmhvc3RJZBIZCghtb2RlbF9pZBgC",
+            "IAEoCVIHbW9kZWxJZBIqChFhdmF0YXJfcGFja2FnZV9pZBgDIAEoCVIPYXZh",
+            "dGFyUGFja2FnZUlkEjMKE3dvcmtlcl93aW5kb3dfc3RhdGUYBCABKAlIAFIR",
+            "d29ya2VyV2luZG93U3RhdGWIAQESPwoZY29tcG9zaXRpb25fc3VyZmFjZV9z",
+            "dGF0ZRgFIAEoCUgBUhdjb21wb3NpdGlvblN1cmZhY2VTdGF0ZYgBARI3ChVm",
+            "aXJzdF9mcmFtZV9wcmVzZW50ZWQYBiABKAhIAlITZmlyc3RGcmFtZVByZXNl",
+            "bnRlZIgBARIwChFpbnRlcmFjdGlvbl9yZWFkeRgHIAEoCEgDUhBpbnRlcmFj",
+            "dGlvblJlYWR5iAEBEhgKB3N1bW1hcnkYCCABKAlSB3N1bW1hcnlCFgoUX3dv",
+            "cmtlcl93aW5kb3dfc3RhdGVCHAoaX2NvbXBvc2l0aW9uX3N1cmZhY2Vfc3Rh",
+            "dGVCGAoWX2ZpcnN0X2ZyYW1lX3ByZXNlbnRlZEIUChJfaW50ZXJhY3Rpb25f",
+            "cmVhZHkiUwoYQW5pbWF0aW9uQ29tcGxldGVQYXlsb2FkEiYKDGFuaW1hdGlv",
+            "bl9pZBgBIAEoCUgAUgthbmltYXRpb25JZIgBAUIPCg1fYW5pbWF0aW9uX2lk",
+            "ImUKFkF2YXRhckhvc3RFcnJvclBheWxvYWQSFwoEY29kZRgBIAEoCUgAUgRj",
+            "b2RliAEBEh0KB21lc3NhZ2UYAiABKAlIAVIHbWVzc2FnZYgBAUIHCgVfY29k",
+            "ZUIKCghfbWVzc2FnZSKRCAoVQXZhdGFyRG93bnN0cmVhbUZyYW1lEhcKBGtp",
+            "bmQYASABKAlIAFIEa2luZIgBARIZCgh0cmFjZV9pZBgCIAEoCVIHdHJhY2VJ",
+            "ZBIhCgl0aW1lc3RhbXAYAyABKAFIAVIJdGltZXN0YW1wiAEBEjsKB2Vtb3Rp",
+            "b24YBCABKAsyIS5nbGltbWVyLmF2YXRhci52MS5FbW90aW9uUGF5bG9hZFIH",
+            "ZW1vdGlvbhI7Cgd0aG91Z2h0GAUgASgLMiEuZ2xpbW1lci5hdmF0YXIudjEu",
+            "VGhvdWdodFBheWxvYWRSB3Rob3VnaHQSQgoKYXVkaW9fcGxheRgGIAEoCzIj",
+            "LmdsaW1tZXIuYXZhdGFyLnYxLkF1ZGlvUGxheVBheWxvYWRSCWF1ZGlvUGxh",
+            "eRJKCgpleHByZXNzaW9uGAcgASgLMiouZ2xpbW1lci5hdmF0YXIudjEuQXZh",
+            "dGFyRXhwcmVzc2lvblBheWxvYWRSCmV4cHJlc3Npb24SPgoGbW90aW9uGAgg",
+            "ASgLMiYuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyTW90aW9uUGF5bG9hZFIG",
+            "bW90aW9uEkIKCGxpcF9zeW5jGAkgASgLMicuZ2xpbW1lci5hdmF0YXIudjEu",
+            "QXZhdGFyTGlwU3luY1BheWxvYWRSB2xpcFN5bmMSRwoJcGFyYW1ldGVyGAog",
+            "ASgLMikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFyUGFyYW1ldGVyUGF5bG9h",
+            "ZFIJcGFyYW1ldGVyEksKDWF2YXRhcl9pbnRlbnQYCyABKAsyJi5nbGltbWVy",
+            "LmF2YXRhci52MS5BdmF0YXJJbnRlbnRQYXlsb2FkUgxhdmF0YXJJbnRlbnQS",
+            "UAoMcHJlc2VudGF0aW9uGAwgASgLMiwuZ2xpbW1lci5hdmF0YXIudjEuQXZh",
+            "dGFyUHJlc2VudGF0aW9uUGF5bG9hZFIMcHJlc2VudGF0aW9uEoUBCiFjaGFy",
+            "YWN0ZXJfcHJlc2VudGF0aW9uX3Byb2plY3Rpb24YDSABKAsyOS5nbGltbWVy",
+            "LmF2YXRhci52MS5DaGFyYWN0ZXJQcmVzZW50YXRpb25Qcm9qZWN0aW9uUGF5",
+            "bG9hZFIfY2hhcmFjdGVyUHJlc2VudGF0aW9uUHJvamVjdGlvbhJCCgpsb2Fk",
+            "X3NjZW5lGA4gASgLMiMuZ2xpbW1lci5hdmF0YXIudjEuTG9hZFNjZW5lUGF5",
+            "bG9hZFIJbG9hZFNjZW5lEkgKDHVubG9hZF9zY2VuZRgPIAEoCzIlLmdsaW1t",
+            "ZXIuYXZhdGFyLnYxLlVubG9hZFNjZW5lUGF5bG9hZFILdW5sb2FkU2NlbmVC",
+            "BwoFX2tpbmRCDAoKX3RpbWVzdGFtcCKRBAoTQXZhdGFyVXBzdHJlYW1GcmFt",
+            "ZRIXCgRraW5kGAEgASgJSABSBGtpbmSIAQESGQoIdHJhY2VfaWQYAiABKAlS",
+            "B3RyYWNlSWQSIQoJdGltZXN0YW1wGAMgASgBSAFSCXRpbWVzdGFtcIgBARJI",
+            "Cgpob3N0X2hlbGxvGAQgASgLMikuZ2xpbW1lci5hdmF0YXIudjEuQXZhdGFy",
+            "SG9zdEhlbGxvUGF5bG9hZFIJaG9zdEhlbGxvEkgKCmhvc3RfcmVhZHkYBSAB",
+            "KAsyKS5nbGltbWVyLmF2YXRhci52MS5BdmF0YXJIb3N0UmVhZHlQYXlsb2Fk",
+            "Uglob3N0UmVhZHkSWwoTYXZhdGFyX2FjdGlvbl9zdGF0ZRgGIAEoCzIrLmds",
+            "aW1tZXIuYXZhdGFyLnYxLkF2YXRhckFjdGlvblN0YXRlUGF5bG9hZFIRYXZh",
+            "dGFyQWN0aW9uU3RhdGUSWgoSYW5pbWF0aW9uX2NvbXBsZXRlGAcgASgLMisu",
+            "Z2xpbW1lci5hdmF0YXIudjEuQW5pbWF0aW9uQ29tcGxldGVQYXlsb2FkUhFh",
+            "bmltYXRpb25Db21wbGV0ZRI/CgVlcnJvchgIIAEoCzIpLmdsaW1tZXIuYXZh",
+            "dGFyLnYxLkF2YXRhckhvc3RFcnJvclBheWxvYWRSBWVycm9yQgcKBV9raW5k",
+            "QgwKCl90aW1lc3RhbXAydAoRQXZhdGFySG9zdFNlcnZpY2USXwoHQ29ubmVj",
+            "dBImLmdsaW1tZXIuYXZhdGFyLnYxLkF2YXRhclVwc3RyZWFtRnJhbWUaKC5n",
+            "bGltbWVyLmF2YXRhci52MS5BdmF0YXJEb3duc3RyZWFtRnJhbWUoATABQiyq",
+            "AilHbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkF2YXRhci5WMWIG",
+            "cHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.EmotionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.EmotionPayload.Parser, new[]{ "EmotionType", "Intensity", "Trigger", "BlendTimeMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.ThoughtPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.ThoughtPayload.Parser, new[]{ "Active", "Hint" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AudioPlayPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AudioPlayPayload.Parser, new[]{ "AudioId", "AudioUri", "AudioData", "MimeType", "DurationMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarExpressionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarExpressionPayload.Parser, new[]{ "ExpressionId", "BlendTimeMs", "AutoReset" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarMotionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarMotionPayload.Parser, new[]{ "MotionId", "Loop", "Priority" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarLipSyncPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarLipSyncPayload.Parser, new[]{ "Amplitude", "Source" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarParameterPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarParameterPayload.Parser, new[]{ "ParamId", "Value", "FadeMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarIntentPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarIntentPayload.Parser, new[]{ "ActionId", "Operation", "Source", "Priority" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.EmotionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.EmotionPayload.Parser, new[]{ "EmotionType", "Intensity", "Trigger", "BlendTimeMs" }, new[]{ "EmotionType", "Intensity" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.ThoughtPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.ThoughtPayload.Parser, new[]{ "Active", "Hint" }, new[]{ "Active" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AudioPlayPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AudioPlayPayload.Parser, new[]{ "AudioId", "AudioUri", "AudioData", "MimeType", "DurationMs" }, new[]{ "AudioId" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarExpressionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarExpressionPayload.Parser, new[]{ "ExpressionId", "BlendTimeMs", "AutoReset" }, new[]{ "ExpressionId" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarMotionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarMotionPayload.Parser, new[]{ "MotionId", "Loop", "Priority" }, new[]{ "MotionId" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarLipSyncPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarLipSyncPayload.Parser, new[]{ "Amplitude", "Source" }, new[]{ "Amplitude" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarParameterPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarParameterPayload.Parser, new[]{ "ParamId", "Value", "FadeMs" }, new[]{ "ParamId", "Value" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarIntentPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarIntentPayload.Parser, new[]{ "ActionId", "Operation", "Source", "Priority" }, new[]{ "ActionId", "Operation", "Source" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarActionStatePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarActionStatePayload.Parser, new[]{ "ActionId", "State", "ActiveActionIds", "Message" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarPresentationPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarPresentationPayload.Parser, new[]{ "PlacementId", "DisplayScale", "ResetPlacement" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationAppearancePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationAppearancePayload.Parser, new[]{ "PlacementId", "DisplayScale" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationLifecyclePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationLifecyclePayload.Parser, new[]{ "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady", "Ready", "Summary" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationProjectionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationProjectionPayload.Parser, new[]{ "AvatarPackageId", "ModelId", "DisplayName", "Kind", "Backend", "HostKind", "AvatarState", "Appearance", "Lifecycle" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.LoadScenePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.LoadScenePayload.Parser, new[]{ "SceneId", "FadeMs" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationAppearancePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationAppearancePayload.Parser, new[]{ "PlacementId", "DisplayScale" }, new[]{ "DisplayScale" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationLifecyclePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationLifecyclePayload.Parser, new[]{ "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady", "Ready", "Summary" }, new[]{ "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady", "Ready", "Summary" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationProjectionPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.CharacterPresentationProjectionPayload.Parser, new[]{ "AvatarPackageId", "ModelId", "DisplayName", "Kind", "Backend", "HostKind", "AvatarState", "Appearance", "Lifecycle" }, new[]{ "AvatarPackageId", "ModelId", "DisplayName", "Kind", "Backend", "HostKind", "AvatarState" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.LoadScenePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.LoadScenePayload.Parser, new[]{ "SceneId", "FadeMs" }, new[]{ "SceneId" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.UnloadScenePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.UnloadScenePayload.Parser, new[]{ "FadeMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostHelloPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostHelloPayload.Parser, new[]{ "HostKind", "HostId", "HostVersion", "Capabilities", "ModelId", "AvatarPackageId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostReadyPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostReadyPayload.Parser, new[]{ "HostId", "ModelId", "AvatarPackageId", "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady", "Summary" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AnimationCompletePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AnimationCompletePayload.Parser, new[]{ "AnimationId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostErrorPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostErrorPayload.Parser, new[]{ "Code", "Message" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarDownstreamFrame), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarDownstreamFrame.Parser, new[]{ "Kind", "TraceId", "Timestamp", "Emotion", "Thought", "AudioPlay", "Expression", "Motion", "LipSync", "Parameter", "AvatarIntent", "Presentation", "CharacterPresentationProjection", "LoadScene", "UnloadScene" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarUpstreamFrame), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarUpstreamFrame.Parser, new[]{ "Kind", "TraceId", "Timestamp", "HostHello", "HostReady", "AvatarActionState", "AnimationComplete", "Error" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostHelloPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostHelloPayload.Parser, new[]{ "HostKind", "HostId", "HostVersion", "Capabilities", "ModelId", "AvatarPackageId" }, new[]{ "HostKind" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostReadyPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostReadyPayload.Parser, new[]{ "HostId", "ModelId", "AvatarPackageId", "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady", "Summary" }, new[]{ "WorkerWindowState", "CompositionSurfaceState", "FirstFramePresented", "InteractionReady" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AnimationCompletePayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AnimationCompletePayload.Parser, new[]{ "AnimationId" }, new[]{ "AnimationId" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostErrorPayload), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarHostErrorPayload.Parser, new[]{ "Code", "Message" }, new[]{ "Code", "Message" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarDownstreamFrame), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarDownstreamFrame.Parser, new[]{ "Kind", "TraceId", "Timestamp", "Emotion", "Thought", "AudioPlay", "Expression", "Motion", "LipSync", "Parameter", "AvatarIntent", "Presentation", "CharacterPresentationProjection", "LoadScene", "UnloadScene" }, new[]{ "Kind", "Timestamp" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarUpstreamFrame), global::GlimmerCradle.Contracts.Glimmer.Avatar.V1.AvatarUpstreamFrame.Parser, new[]{ "Kind", "TraceId", "Timestamp", "HostHello", "HostReady", "AvatarActionState", "AnimationComplete", "Error" }, new[]{ "Kind", "Timestamp" }, null, null, null)
           }));
     }
     #endregion
@@ -165,6 +184,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<EmotionPayload> _parser = new pb::MessageParser<EmotionPayload>(() => new EmotionPayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<EmotionPayload> Parser { get { return _parser; } }
@@ -192,6 +212,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public EmotionPayload(EmotionPayload other) : this() {
+      _hasBits0 = other._hasBits0;
       emotionType_ = other.emotionType_;
       intensity_ = other.intensity_;
       trigger_ = other.trigger_;
@@ -207,26 +228,55 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "emotion_type" field.</summary>
     public const int EmotionTypeFieldNumber = 1;
-    private string emotionType_ = "";
+    private readonly static string EmotionTypeDefaultValue = "";
+
+    private string emotionType_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string EmotionType {
-      get { return emotionType_; }
+      get { return emotionType_ ?? EmotionTypeDefaultValue; }
       set {
         emotionType_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "emotion_type" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasEmotionType {
+      get { return emotionType_ != null; }
+    }
+    /// <summary>Clears the value of the "emotion_type" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearEmotionType() {
+      emotionType_ = null;
+    }
 
     /// <summary>Field number for the "intensity" field.</summary>
     public const int IntensityFieldNumber = 2;
+    private readonly static float IntensityDefaultValue = 0F;
+
     private float intensity_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Intensity {
-      get { return intensity_; }
+      get { if ((_hasBits0 & 1) != 0) { return intensity_; } else { return IntensityDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         intensity_ = value;
       }
+    }
+    /// <summary>Gets whether the "intensity" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasIntensity {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "intensity" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearIntensity() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "trigger" field.</summary>
@@ -279,8 +329,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (EmotionType.Length != 0) hash ^= EmotionType.GetHashCode();
-      if (Intensity != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Intensity);
+      if (HasEmotionType) hash ^= EmotionType.GetHashCode();
+      if (HasIntensity) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Intensity);
       if (Trigger.Length != 0) hash ^= Trigger.GetHashCode();
       if (BlendTimeMs != 0) hash ^= BlendTimeMs.GetHashCode();
       if (_unknownFields != null) {
@@ -301,11 +351,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (EmotionType.Length != 0) {
+      if (HasEmotionType) {
         output.WriteRawTag(10);
         output.WriteString(EmotionType);
       }
-      if (Intensity != 0F) {
+      if (HasIntensity) {
         output.WriteRawTag(21);
         output.WriteFloat(Intensity);
       }
@@ -327,11 +377,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (EmotionType.Length != 0) {
+      if (HasEmotionType) {
         output.WriteRawTag(10);
         output.WriteString(EmotionType);
       }
-      if (Intensity != 0F) {
+      if (HasIntensity) {
         output.WriteRawTag(21);
         output.WriteFloat(Intensity);
       }
@@ -353,10 +403,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (EmotionType.Length != 0) {
+      if (HasEmotionType) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(EmotionType);
       }
-      if (Intensity != 0F) {
+      if (HasIntensity) {
         size += 1 + 4;
       }
       if (Trigger.Length != 0) {
@@ -377,10 +427,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.EmotionType.Length != 0) {
+      if (other.HasEmotionType) {
         EmotionType = other.EmotionType;
       }
-      if (other.Intensity != 0F) {
+      if (other.HasIntensity) {
         Intensity = other.Intensity;
       }
       if (other.Trigger.Length != 0) {
@@ -474,6 +524,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<ThoughtPayload> _parser = new pb::MessageParser<ThoughtPayload>(() => new ThoughtPayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<ThoughtPayload> Parser { get { return _parser; } }
@@ -501,6 +552,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public ThoughtPayload(ThoughtPayload other) : this() {
+      _hasBits0 = other._hasBits0;
       active_ = other.active_;
       hint_ = other.hint_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -514,14 +566,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "active" field.</summary>
     public const int ActiveFieldNumber = 1;
+    private readonly static bool ActiveDefaultValue = false;
+
     private bool active_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool Active {
-      get { return active_; }
+      get { if ((_hasBits0 & 1) != 0) { return active_; } else { return ActiveDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         active_ = value;
       }
+    }
+    /// <summary>Gets whether the "active" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasActive {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "active" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearActive() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "hint" field.</summary>
@@ -560,7 +627,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Active != false) hash ^= Active.GetHashCode();
+      if (HasActive) hash ^= Active.GetHashCode();
       if (Hint.Length != 0) hash ^= Hint.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -580,7 +647,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Active != false) {
+      if (HasActive) {
         output.WriteRawTag(8);
         output.WriteBool(Active);
       }
@@ -598,7 +665,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Active != false) {
+      if (HasActive) {
         output.WriteRawTag(8);
         output.WriteBool(Active);
       }
@@ -616,7 +683,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Active != false) {
+      if (HasActive) {
         size += 1 + 1;
       }
       if (Hint.Length != 0) {
@@ -634,7 +701,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.Active != false) {
+      if (other.HasActive) {
         Active = other.Active;
       }
       if (other.Hint.Length != 0) {
@@ -752,14 +819,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "audio_id" field.</summary>
     public const int AudioIdFieldNumber = 1;
-    private string audioId_ = "";
+    private readonly static string AudioIdDefaultValue = "";
+
+    private string audioId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string AudioId {
-      get { return audioId_; }
+      get { return audioId_ ?? AudioIdDefaultValue; }
       set {
         audioId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "audio_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAudioId {
+      get { return audioId_ != null; }
+    }
+    /// <summary>Clears the value of the "audio_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAudioId() {
+      audioId_ = null;
     }
 
     /// <summary>Field number for the "audio_uri" field.</summary>
@@ -837,7 +918,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (AudioId.Length != 0) hash ^= AudioId.GetHashCode();
+      if (HasAudioId) hash ^= AudioId.GetHashCode();
       if (AudioUri.Length != 0) hash ^= AudioUri.GetHashCode();
       if (AudioData.Length != 0) hash ^= AudioData.GetHashCode();
       if (MimeType.Length != 0) hash ^= MimeType.GetHashCode();
@@ -860,7 +941,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (AudioId.Length != 0) {
+      if (HasAudioId) {
         output.WriteRawTag(10);
         output.WriteString(AudioId);
       }
@@ -890,7 +971,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (AudioId.Length != 0) {
+      if (HasAudioId) {
         output.WriteRawTag(10);
         output.WriteString(AudioId);
       }
@@ -920,7 +1001,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (AudioId.Length != 0) {
+      if (HasAudioId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(AudioId);
       }
       if (AudioUri.Length != 0) {
@@ -947,7 +1028,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.AudioId.Length != 0) {
+      if (other.HasAudioId) {
         AudioId = other.AudioId;
       }
       if (other.AudioUri.Length != 0) {
@@ -1096,14 +1177,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "expression_id" field.</summary>
     public const int ExpressionIdFieldNumber = 1;
-    private string expressionId_ = "";
+    private readonly static string ExpressionIdDefaultValue = "";
+
+    private string expressionId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string ExpressionId {
-      get { return expressionId_; }
+      get { return expressionId_ ?? ExpressionIdDefaultValue; }
       set {
         expressionId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "expression_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasExpressionId {
+      get { return expressionId_ != null; }
+    }
+    /// <summary>Clears the value of the "expression_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearExpressionId() {
+      expressionId_ = null;
     }
 
     /// <summary>Field number for the "blend_time_ms" field.</summary>
@@ -1155,7 +1250,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (ExpressionId.Length != 0) hash ^= ExpressionId.GetHashCode();
+      if (HasExpressionId) hash ^= ExpressionId.GetHashCode();
       if (BlendTimeMs != 0) hash ^= BlendTimeMs.GetHashCode();
       if (AutoReset != false) hash ^= AutoReset.GetHashCode();
       if (_unknownFields != null) {
@@ -1176,7 +1271,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (ExpressionId.Length != 0) {
+      if (HasExpressionId) {
         output.WriteRawTag(10);
         output.WriteString(ExpressionId);
       }
@@ -1198,7 +1293,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (ExpressionId.Length != 0) {
+      if (HasExpressionId) {
         output.WriteRawTag(10);
         output.WriteString(ExpressionId);
       }
@@ -1220,7 +1315,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (ExpressionId.Length != 0) {
+      if (HasExpressionId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(ExpressionId);
       }
       if (BlendTimeMs != 0) {
@@ -1241,7 +1336,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.ExpressionId.Length != 0) {
+      if (other.HasExpressionId) {
         ExpressionId = other.ExpressionId;
       }
       if (other.BlendTimeMs != 0) {
@@ -1368,14 +1463,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "motion_id" field.</summary>
     public const int MotionIdFieldNumber = 1;
-    private string motionId_ = "";
+    private readonly static string MotionIdDefaultValue = "";
+
+    private string motionId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string MotionId {
-      get { return motionId_; }
+      get { return motionId_ ?? MotionIdDefaultValue; }
       set {
         motionId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "motion_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasMotionId {
+      get { return motionId_ != null; }
+    }
+    /// <summary>Clears the value of the "motion_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearMotionId() {
+      motionId_ = null;
     }
 
     /// <summary>Field number for the "loop" field.</summary>
@@ -1427,7 +1536,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (MotionId.Length != 0) hash ^= MotionId.GetHashCode();
+      if (HasMotionId) hash ^= MotionId.GetHashCode();
       if (Loop != false) hash ^= Loop.GetHashCode();
       if (Priority != 0) hash ^= Priority.GetHashCode();
       if (_unknownFields != null) {
@@ -1448,7 +1557,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (MotionId.Length != 0) {
+      if (HasMotionId) {
         output.WriteRawTag(10);
         output.WriteString(MotionId);
       }
@@ -1470,7 +1579,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (MotionId.Length != 0) {
+      if (HasMotionId) {
         output.WriteRawTag(10);
         output.WriteString(MotionId);
       }
@@ -1492,7 +1601,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (MotionId.Length != 0) {
+      if (HasMotionId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(MotionId);
       }
       if (Loop != false) {
@@ -1513,7 +1622,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.MotionId.Length != 0) {
+      if (other.HasMotionId) {
         MotionId = other.MotionId;
       }
       if (other.Loop != false) {
@@ -1599,6 +1708,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<AvatarLipSyncPayload> _parser = new pb::MessageParser<AvatarLipSyncPayload>(() => new AvatarLipSyncPayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AvatarLipSyncPayload> Parser { get { return _parser; } }
@@ -1626,6 +1736,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AvatarLipSyncPayload(AvatarLipSyncPayload other) : this() {
+      _hasBits0 = other._hasBits0;
       amplitude_ = other.amplitude_;
       source_ = other.source_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -1639,14 +1750,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "amplitude" field.</summary>
     public const int AmplitudeFieldNumber = 1;
+    private readonly static float AmplitudeDefaultValue = 0F;
+
     private float amplitude_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Amplitude {
-      get { return amplitude_; }
+      get { if ((_hasBits0 & 1) != 0) { return amplitude_; } else { return AmplitudeDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         amplitude_ = value;
       }
+    }
+    /// <summary>Gets whether the "amplitude" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAmplitude {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "amplitude" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAmplitude() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "source" field.</summary>
@@ -1685,7 +1811,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Amplitude != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Amplitude);
+      if (HasAmplitude) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Amplitude);
       if (Source.Length != 0) hash ^= Source.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -1705,7 +1831,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Amplitude != 0F) {
+      if (HasAmplitude) {
         output.WriteRawTag(13);
         output.WriteFloat(Amplitude);
       }
@@ -1723,7 +1849,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Amplitude != 0F) {
+      if (HasAmplitude) {
         output.WriteRawTag(13);
         output.WriteFloat(Amplitude);
       }
@@ -1741,7 +1867,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Amplitude != 0F) {
+      if (HasAmplitude) {
         size += 1 + 4;
       }
       if (Source.Length != 0) {
@@ -1759,7 +1885,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.Amplitude != 0F) {
+      if (other.HasAmplitude) {
         Amplitude = other.Amplitude;
       }
       if (other.Source.Length != 0) {
@@ -1834,6 +1960,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<AvatarParameterPayload> _parser = new pb::MessageParser<AvatarParameterPayload>(() => new AvatarParameterPayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AvatarParameterPayload> Parser { get { return _parser; } }
@@ -1861,6 +1988,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AvatarParameterPayload(AvatarParameterPayload other) : this() {
+      _hasBits0 = other._hasBits0;
       paramId_ = other.paramId_;
       value_ = other.value_;
       fadeMs_ = other.fadeMs_;
@@ -1875,26 +2003,55 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "param_id" field.</summary>
     public const int ParamIdFieldNumber = 1;
-    private string paramId_ = "";
+    private readonly static string ParamIdDefaultValue = "";
+
+    private string paramId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string ParamId {
-      get { return paramId_; }
+      get { return paramId_ ?? ParamIdDefaultValue; }
       set {
         paramId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "param_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParamId {
+      get { return paramId_ != null; }
+    }
+    /// <summary>Clears the value of the "param_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParamId() {
+      paramId_ = null;
+    }
 
     /// <summary>Field number for the "value" field.</summary>
     public const int ValueFieldNumber = 2;
+    private readonly static float ValueDefaultValue = 0F;
+
     private float value_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Value {
-      get { return value_; }
+      get { if ((_hasBits0 & 1) != 0) { return value_; } else { return ValueDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         value_ = value;
       }
+    }
+    /// <summary>Gets whether the "value" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasValue {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "value" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearValue() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "fade_ms" field.</summary>
@@ -1934,8 +2091,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (ParamId.Length != 0) hash ^= ParamId.GetHashCode();
-      if (Value != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Value);
+      if (HasParamId) hash ^= ParamId.GetHashCode();
+      if (HasValue) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Value);
       if (FadeMs != 0) hash ^= FadeMs.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -1955,11 +2112,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (ParamId.Length != 0) {
+      if (HasParamId) {
         output.WriteRawTag(10);
         output.WriteString(ParamId);
       }
-      if (Value != 0F) {
+      if (HasValue) {
         output.WriteRawTag(21);
         output.WriteFloat(Value);
       }
@@ -1977,11 +2134,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (ParamId.Length != 0) {
+      if (HasParamId) {
         output.WriteRawTag(10);
         output.WriteString(ParamId);
       }
-      if (Value != 0F) {
+      if (HasValue) {
         output.WriteRawTag(21);
         output.WriteFloat(Value);
       }
@@ -1999,10 +2156,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (ParamId.Length != 0) {
+      if (HasParamId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(ParamId);
       }
-      if (Value != 0F) {
+      if (HasValue) {
         size += 1 + 4;
       }
       if (FadeMs != 0) {
@@ -2020,10 +2177,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.ParamId.Length != 0) {
+      if (other.HasParamId) {
         ParamId = other.ParamId;
       }
-      if (other.Value != 0F) {
+      if (other.HasValue) {
         Value = other.Value;
       }
       if (other.FadeMs != 0) {
@@ -2148,38 +2305,80 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "action_id" field.</summary>
     public const int ActionIdFieldNumber = 1;
-    private string actionId_ = "";
+    private readonly static string ActionIdDefaultValue = "";
+
+    private string actionId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string ActionId {
-      get { return actionId_; }
+      get { return actionId_ ?? ActionIdDefaultValue; }
       set {
         actionId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "action_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasActionId {
+      get { return actionId_ != null; }
+    }
+    /// <summary>Clears the value of the "action_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearActionId() {
+      actionId_ = null;
+    }
 
     /// <summary>Field number for the "operation" field.</summary>
     public const int OperationFieldNumber = 2;
-    private string operation_ = "";
+    private readonly static string OperationDefaultValue = "";
+
+    private string operation_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Operation {
-      get { return operation_; }
+      get { return operation_ ?? OperationDefaultValue; }
       set {
         operation_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "operation" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasOperation {
+      get { return operation_ != null; }
+    }
+    /// <summary>Clears the value of the "operation" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearOperation() {
+      operation_ = null;
+    }
 
     /// <summary>Field number for the "source" field.</summary>
     public const int SourceFieldNumber = 3;
-    private string source_ = "";
+    private readonly static string SourceDefaultValue = "";
+
+    private string source_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Source {
-      get { return source_; }
+      get { return source_ ?? SourceDefaultValue; }
       set {
         source_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "source" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSource {
+      get { return source_ != null; }
+    }
+    /// <summary>Clears the value of the "source" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSource() {
+      source_ = null;
     }
 
     /// <summary>Field number for the "priority" field.</summary>
@@ -2220,9 +2419,9 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (ActionId.Length != 0) hash ^= ActionId.GetHashCode();
-      if (Operation.Length != 0) hash ^= Operation.GetHashCode();
-      if (Source.Length != 0) hash ^= Source.GetHashCode();
+      if (HasActionId) hash ^= ActionId.GetHashCode();
+      if (HasOperation) hash ^= Operation.GetHashCode();
+      if (HasSource) hash ^= Source.GetHashCode();
       if (Priority != 0) hash ^= Priority.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -2242,15 +2441,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (ActionId.Length != 0) {
+      if (HasActionId) {
         output.WriteRawTag(10);
         output.WriteString(ActionId);
       }
-      if (Operation.Length != 0) {
+      if (HasOperation) {
         output.WriteRawTag(18);
         output.WriteString(Operation);
       }
-      if (Source.Length != 0) {
+      if (HasSource) {
         output.WriteRawTag(26);
         output.WriteString(Source);
       }
@@ -2268,15 +2467,15 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (ActionId.Length != 0) {
+      if (HasActionId) {
         output.WriteRawTag(10);
         output.WriteString(ActionId);
       }
-      if (Operation.Length != 0) {
+      if (HasOperation) {
         output.WriteRawTag(18);
         output.WriteString(Operation);
       }
-      if (Source.Length != 0) {
+      if (HasSource) {
         output.WriteRawTag(26);
         output.WriteString(Source);
       }
@@ -2294,13 +2493,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (ActionId.Length != 0) {
+      if (HasActionId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(ActionId);
       }
-      if (Operation.Length != 0) {
+      if (HasOperation) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Operation);
       }
-      if (Source.Length != 0) {
+      if (HasSource) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Source);
       }
       if (Priority != 0) {
@@ -2318,13 +2517,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.ActionId.Length != 0) {
+      if (other.HasActionId) {
         ActionId = other.ActionId;
       }
-      if (other.Operation.Length != 0) {
+      if (other.HasOperation) {
         Operation = other.Operation;
       }
-      if (other.Source.Length != 0) {
+      if (other.HasSource) {
         Source = other.Source;
       }
       if (other.Priority != 0) {
@@ -2985,6 +3184,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<CharacterPresentationAppearancePayload> _parser = new pb::MessageParser<CharacterPresentationAppearancePayload>(() => new CharacterPresentationAppearancePayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<CharacterPresentationAppearancePayload> Parser { get { return _parser; } }
@@ -3012,6 +3212,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CharacterPresentationAppearancePayload(CharacterPresentationAppearancePayload other) : this() {
+      _hasBits0 = other._hasBits0;
       placementId_ = other.placementId_;
       displayScale_ = other.displayScale_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -3037,14 +3238,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "display_scale" field.</summary>
     public const int DisplayScaleFieldNumber = 2;
+    private readonly static float DisplayScaleDefaultValue = 0F;
+
     private float displayScale_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float DisplayScale {
-      get { return displayScale_; }
+      get { if ((_hasBits0 & 1) != 0) { return displayScale_; } else { return DisplayScaleDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         displayScale_ = value;
       }
+    }
+    /// <summary>Gets whether the "display_scale" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasDisplayScale {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "display_scale" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearDisplayScale() {
+      _hasBits0 &= ~1;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3072,7 +3288,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     public override int GetHashCode() {
       int hash = 1;
       if (PlacementId.Length != 0) hash ^= PlacementId.GetHashCode();
-      if (DisplayScale != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(DisplayScale);
+      if (HasDisplayScale) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(DisplayScale);
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -3095,7 +3311,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(10);
         output.WriteString(PlacementId);
       }
-      if (DisplayScale != 0F) {
+      if (HasDisplayScale) {
         output.WriteRawTag(21);
         output.WriteFloat(DisplayScale);
       }
@@ -3113,7 +3329,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(10);
         output.WriteString(PlacementId);
       }
-      if (DisplayScale != 0F) {
+      if (HasDisplayScale) {
         output.WriteRawTag(21);
         output.WriteFloat(DisplayScale);
       }
@@ -3130,7 +3346,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (PlacementId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(PlacementId);
       }
-      if (DisplayScale != 0F) {
+      if (HasDisplayScale) {
         size += 1 + 4;
       }
       if (_unknownFields != null) {
@@ -3148,7 +3364,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other.PlacementId.Length != 0) {
         PlacementId = other.PlacementId;
       }
-      if (other.DisplayScale != 0F) {
+      if (other.HasDisplayScale) {
         DisplayScale = other.DisplayScale;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -3220,6 +3436,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<CharacterPresentationLifecyclePayload> _parser = new pb::MessageParser<CharacterPresentationLifecyclePayload>(() => new CharacterPresentationLifecyclePayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<CharacterPresentationLifecyclePayload> Parser { get { return _parser; } }
@@ -3247,6 +3464,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public CharacterPresentationLifecyclePayload(CharacterPresentationLifecyclePayload other) : this() {
+      _hasBits0 = other._hasBits0;
       workerWindowState_ = other.workerWindowState_;
       compositionSurfaceState_ = other.compositionSurfaceState_;
       firstFramePresented_ = other.firstFramePresented_;
@@ -3264,74 +3482,161 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "worker_window_state" field.</summary>
     public const int WorkerWindowStateFieldNumber = 1;
-    private string workerWindowState_ = "";
+    private readonly static string WorkerWindowStateDefaultValue = "";
+
+    private string workerWindowState_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string WorkerWindowState {
-      get { return workerWindowState_; }
+      get { return workerWindowState_ ?? WorkerWindowStateDefaultValue; }
       set {
         workerWindowState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "worker_window_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWorkerWindowState {
+      get { return workerWindowState_ != null; }
+    }
+    /// <summary>Clears the value of the "worker_window_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWorkerWindowState() {
+      workerWindowState_ = null;
+    }
 
     /// <summary>Field number for the "composition_surface_state" field.</summary>
     public const int CompositionSurfaceStateFieldNumber = 2;
-    private string compositionSurfaceState_ = "";
+    private readonly static string CompositionSurfaceStateDefaultValue = "";
+
+    private string compositionSurfaceState_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string CompositionSurfaceState {
-      get { return compositionSurfaceState_; }
+      get { return compositionSurfaceState_ ?? CompositionSurfaceStateDefaultValue; }
       set {
         compositionSurfaceState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "composition_surface_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCompositionSurfaceState {
+      get { return compositionSurfaceState_ != null; }
+    }
+    /// <summary>Clears the value of the "composition_surface_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCompositionSurfaceState() {
+      compositionSurfaceState_ = null;
+    }
 
     /// <summary>Field number for the "first_frame_presented" field.</summary>
     public const int FirstFramePresentedFieldNumber = 3;
+    private readonly static bool FirstFramePresentedDefaultValue = false;
+
     private bool firstFramePresented_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool FirstFramePresented {
-      get { return firstFramePresented_; }
+      get { if ((_hasBits0 & 1) != 0) { return firstFramePresented_; } else { return FirstFramePresentedDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         firstFramePresented_ = value;
       }
+    }
+    /// <summary>Gets whether the "first_frame_presented" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasFirstFramePresented {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "first_frame_presented" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearFirstFramePresented() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "interaction_ready" field.</summary>
     public const int InteractionReadyFieldNumber = 4;
+    private readonly static bool InteractionReadyDefaultValue = false;
+
     private bool interactionReady_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool InteractionReady {
-      get { return interactionReady_; }
+      get { if ((_hasBits0 & 2) != 0) { return interactionReady_; } else { return InteractionReadyDefaultValue; } }
       set {
+        _hasBits0 |= 2;
         interactionReady_ = value;
       }
+    }
+    /// <summary>Gets whether the "interaction_ready" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasInteractionReady {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "interaction_ready" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearInteractionReady() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "ready" field.</summary>
     public const int ReadyFieldNumber = 5;
+    private readonly static bool ReadyDefaultValue = false;
+
     private bool ready_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool Ready {
-      get { return ready_; }
+      get { if ((_hasBits0 & 4) != 0) { return ready_; } else { return ReadyDefaultValue; } }
       set {
+        _hasBits0 |= 4;
         ready_ = value;
       }
+    }
+    /// <summary>Gets whether the "ready" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasReady {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "ready" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearReady() {
+      _hasBits0 &= ~4;
     }
 
     /// <summary>Field number for the "summary" field.</summary>
     public const int SummaryFieldNumber = 6;
-    private string summary_ = "";
+    private readonly static string SummaryDefaultValue = "";
+
+    private string summary_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Summary {
-      get { return summary_; }
+      get { return summary_ ?? SummaryDefaultValue; }
       set {
         summary_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "summary" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSummary {
+      get { return summary_ != null; }
+    }
+    /// <summary>Clears the value of the "summary" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSummary() {
+      summary_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3362,12 +3667,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (WorkerWindowState.Length != 0) hash ^= WorkerWindowState.GetHashCode();
-      if (CompositionSurfaceState.Length != 0) hash ^= CompositionSurfaceState.GetHashCode();
-      if (FirstFramePresented != false) hash ^= FirstFramePresented.GetHashCode();
-      if (InteractionReady != false) hash ^= InteractionReady.GetHashCode();
-      if (Ready != false) hash ^= Ready.GetHashCode();
-      if (Summary.Length != 0) hash ^= Summary.GetHashCode();
+      if (HasWorkerWindowState) hash ^= WorkerWindowState.GetHashCode();
+      if (HasCompositionSurfaceState) hash ^= CompositionSurfaceState.GetHashCode();
+      if (HasFirstFramePresented) hash ^= FirstFramePresented.GetHashCode();
+      if (HasInteractionReady) hash ^= InteractionReady.GetHashCode();
+      if (HasReady) hash ^= Ready.GetHashCode();
+      if (HasSummary) hash ^= Summary.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -3386,27 +3691,27 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         output.WriteRawTag(10);
         output.WriteString(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         output.WriteRawTag(18);
         output.WriteString(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         output.WriteRawTag(24);
         output.WriteBool(FirstFramePresented);
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         output.WriteRawTag(32);
         output.WriteBool(InteractionReady);
       }
-      if (Ready != false) {
+      if (HasReady) {
         output.WriteRawTag(40);
         output.WriteBool(Ready);
       }
-      if (Summary.Length != 0) {
+      if (HasSummary) {
         output.WriteRawTag(50);
         output.WriteString(Summary);
       }
@@ -3420,27 +3725,27 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         output.WriteRawTag(10);
         output.WriteString(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         output.WriteRawTag(18);
         output.WriteString(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         output.WriteRawTag(24);
         output.WriteBool(FirstFramePresented);
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         output.WriteRawTag(32);
         output.WriteBool(InteractionReady);
       }
-      if (Ready != false) {
+      if (HasReady) {
         output.WriteRawTag(40);
         output.WriteBool(Ready);
       }
-      if (Summary.Length != 0) {
+      if (HasSummary) {
         output.WriteRawTag(50);
         output.WriteString(Summary);
       }
@@ -3454,22 +3759,22 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         size += 1 + 1;
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         size += 1 + 1;
       }
-      if (Ready != false) {
+      if (HasReady) {
         size += 1 + 1;
       }
-      if (Summary.Length != 0) {
+      if (HasSummary) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Summary);
       }
       if (_unknownFields != null) {
@@ -3484,22 +3789,22 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.WorkerWindowState.Length != 0) {
+      if (other.HasWorkerWindowState) {
         WorkerWindowState = other.WorkerWindowState;
       }
-      if (other.CompositionSurfaceState.Length != 0) {
+      if (other.HasCompositionSurfaceState) {
         CompositionSurfaceState = other.CompositionSurfaceState;
       }
-      if (other.FirstFramePresented != false) {
+      if (other.HasFirstFramePresented) {
         FirstFramePresented = other.FirstFramePresented;
       }
-      if (other.InteractionReady != false) {
+      if (other.HasInteractionReady) {
         InteractionReady = other.InteractionReady;
       }
-      if (other.Ready != false) {
+      if (other.HasReady) {
         Ready = other.Ready;
       }
-      if (other.Summary.Length != 0) {
+      if (other.HasSummary) {
         Summary = other.Summary;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -3650,86 +3955,184 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "avatar_package_id" field.</summary>
     public const int AvatarPackageIdFieldNumber = 1;
-    private string avatarPackageId_ = "";
+    private readonly static string AvatarPackageIdDefaultValue = "";
+
+    private string avatarPackageId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string AvatarPackageId {
-      get { return avatarPackageId_; }
+      get { return avatarPackageId_ ?? AvatarPackageIdDefaultValue; }
       set {
         avatarPackageId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "avatar_package_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAvatarPackageId {
+      get { return avatarPackageId_ != null; }
+    }
+    /// <summary>Clears the value of the "avatar_package_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAvatarPackageId() {
+      avatarPackageId_ = null;
+    }
 
     /// <summary>Field number for the "model_id" field.</summary>
     public const int ModelIdFieldNumber = 2;
-    private string modelId_ = "";
+    private readonly static string ModelIdDefaultValue = "";
+
+    private string modelId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string ModelId {
-      get { return modelId_; }
+      get { return modelId_ ?? ModelIdDefaultValue; }
       set {
         modelId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "model_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasModelId {
+      get { return modelId_ != null; }
+    }
+    /// <summary>Clears the value of the "model_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearModelId() {
+      modelId_ = null;
+    }
 
     /// <summary>Field number for the "display_name" field.</summary>
     public const int DisplayNameFieldNumber = 3;
-    private string displayName_ = "";
+    private readonly static string DisplayNameDefaultValue = "";
+
+    private string displayName_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string DisplayName {
-      get { return displayName_; }
+      get { return displayName_ ?? DisplayNameDefaultValue; }
       set {
         displayName_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "display_name" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasDisplayName {
+      get { return displayName_ != null; }
+    }
+    /// <summary>Clears the value of the "display_name" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearDisplayName() {
+      displayName_ = null;
+    }
 
     /// <summary>Field number for the "kind" field.</summary>
     public const int KindFieldNumber = 4;
-    private string kind_ = "";
+    private readonly static string KindDefaultValue = "";
+
+    private string kind_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Kind {
-      get { return kind_; }
+      get { return kind_ ?? KindDefaultValue; }
       set {
         kind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "kind" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasKind {
+      get { return kind_ != null; }
+    }
+    /// <summary>Clears the value of the "kind" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearKind() {
+      kind_ = null;
+    }
 
     /// <summary>Field number for the "backend" field.</summary>
     public const int BackendFieldNumber = 5;
-    private string backend_ = "";
+    private readonly static string BackendDefaultValue = "";
+
+    private string backend_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Backend {
-      get { return backend_; }
+      get { return backend_ ?? BackendDefaultValue; }
       set {
         backend_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "backend" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasBackend {
+      get { return backend_ != null; }
+    }
+    /// <summary>Clears the value of the "backend" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearBackend() {
+      backend_ = null;
+    }
 
     /// <summary>Field number for the "host_kind" field.</summary>
     public const int HostKindFieldNumber = 6;
-    private string hostKind_ = "";
+    private readonly static string HostKindDefaultValue = "";
+
+    private string hostKind_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string HostKind {
-      get { return hostKind_; }
+      get { return hostKind_ ?? HostKindDefaultValue; }
       set {
         hostKind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "host_kind" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasHostKind {
+      get { return hostKind_ != null; }
+    }
+    /// <summary>Clears the value of the "host_kind" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearHostKind() {
+      hostKind_ = null;
+    }
 
     /// <summary>Field number for the "avatar_state" field.</summary>
     public const int AvatarStateFieldNumber = 7;
-    private string avatarState_ = "";
+    private readonly static string AvatarStateDefaultValue = "";
+
+    private string avatarState_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string AvatarState {
-      get { return avatarState_; }
+      get { return avatarState_ ?? AvatarStateDefaultValue; }
       set {
         avatarState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "avatar_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAvatarState {
+      get { return avatarState_ != null; }
+    }
+    /// <summary>Clears the value of the "avatar_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAvatarState() {
+      avatarState_ = null;
     }
 
     /// <summary>Field number for the "appearance" field.</summary>
@@ -3787,13 +4190,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (AvatarPackageId.Length != 0) hash ^= AvatarPackageId.GetHashCode();
-      if (ModelId.Length != 0) hash ^= ModelId.GetHashCode();
-      if (DisplayName.Length != 0) hash ^= DisplayName.GetHashCode();
-      if (Kind.Length != 0) hash ^= Kind.GetHashCode();
-      if (Backend.Length != 0) hash ^= Backend.GetHashCode();
-      if (HostKind.Length != 0) hash ^= HostKind.GetHashCode();
-      if (AvatarState.Length != 0) hash ^= AvatarState.GetHashCode();
+      if (HasAvatarPackageId) hash ^= AvatarPackageId.GetHashCode();
+      if (HasModelId) hash ^= ModelId.GetHashCode();
+      if (HasDisplayName) hash ^= DisplayName.GetHashCode();
+      if (HasKind) hash ^= Kind.GetHashCode();
+      if (HasBackend) hash ^= Backend.GetHashCode();
+      if (HasHostKind) hash ^= HostKind.GetHashCode();
+      if (HasAvatarState) hash ^= AvatarState.GetHashCode();
       if (appearance_ != null) hash ^= Appearance.GetHashCode();
       if (lifecycle_ != null) hash ^= Lifecycle.GetHashCode();
       if (_unknownFields != null) {
@@ -3814,31 +4217,31 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (AvatarPackageId.Length != 0) {
+      if (HasAvatarPackageId) {
         output.WriteRawTag(10);
         output.WriteString(AvatarPackageId);
       }
-      if (ModelId.Length != 0) {
+      if (HasModelId) {
         output.WriteRawTag(18);
         output.WriteString(ModelId);
       }
-      if (DisplayName.Length != 0) {
+      if (HasDisplayName) {
         output.WriteRawTag(26);
         output.WriteString(DisplayName);
       }
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(34);
         output.WriteString(Kind);
       }
-      if (Backend.Length != 0) {
+      if (HasBackend) {
         output.WriteRawTag(42);
         output.WriteString(Backend);
       }
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         output.WriteRawTag(50);
         output.WriteString(HostKind);
       }
-      if (AvatarState.Length != 0) {
+      if (HasAvatarState) {
         output.WriteRawTag(58);
         output.WriteString(AvatarState);
       }
@@ -3860,31 +4263,31 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (AvatarPackageId.Length != 0) {
+      if (HasAvatarPackageId) {
         output.WriteRawTag(10);
         output.WriteString(AvatarPackageId);
       }
-      if (ModelId.Length != 0) {
+      if (HasModelId) {
         output.WriteRawTag(18);
         output.WriteString(ModelId);
       }
-      if (DisplayName.Length != 0) {
+      if (HasDisplayName) {
         output.WriteRawTag(26);
         output.WriteString(DisplayName);
       }
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(34);
         output.WriteString(Kind);
       }
-      if (Backend.Length != 0) {
+      if (HasBackend) {
         output.WriteRawTag(42);
         output.WriteString(Backend);
       }
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         output.WriteRawTag(50);
         output.WriteString(HostKind);
       }
-      if (AvatarState.Length != 0) {
+      if (HasAvatarState) {
         output.WriteRawTag(58);
         output.WriteString(AvatarState);
       }
@@ -3906,25 +4309,25 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (AvatarPackageId.Length != 0) {
+      if (HasAvatarPackageId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(AvatarPackageId);
       }
-      if (ModelId.Length != 0) {
+      if (HasModelId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(ModelId);
       }
-      if (DisplayName.Length != 0) {
+      if (HasDisplayName) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(DisplayName);
       }
-      if (Kind.Length != 0) {
+      if (HasKind) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Kind);
       }
-      if (Backend.Length != 0) {
+      if (HasBackend) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Backend);
       }
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(HostKind);
       }
-      if (AvatarState.Length != 0) {
+      if (HasAvatarState) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(AvatarState);
       }
       if (appearance_ != null) {
@@ -3945,25 +4348,25 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.AvatarPackageId.Length != 0) {
+      if (other.HasAvatarPackageId) {
         AvatarPackageId = other.AvatarPackageId;
       }
-      if (other.ModelId.Length != 0) {
+      if (other.HasModelId) {
         ModelId = other.ModelId;
       }
-      if (other.DisplayName.Length != 0) {
+      if (other.HasDisplayName) {
         DisplayName = other.DisplayName;
       }
-      if (other.Kind.Length != 0) {
+      if (other.HasKind) {
         Kind = other.Kind;
       }
-      if (other.Backend.Length != 0) {
+      if (other.HasBackend) {
         Backend = other.Backend;
       }
-      if (other.HostKind.Length != 0) {
+      if (other.HasHostKind) {
         HostKind = other.HostKind;
       }
-      if (other.AvatarState.Length != 0) {
+      if (other.HasAvatarState) {
         AvatarState = other.AvatarState;
       }
       if (other.appearance_ != null) {
@@ -4155,14 +4558,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "scene_id" field.</summary>
     public const int SceneIdFieldNumber = 1;
-    private string sceneId_ = "";
+    private readonly static string SceneIdDefaultValue = "";
+
+    private string sceneId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string SceneId {
-      get { return sceneId_; }
+      get { return sceneId_ ?? SceneIdDefaultValue; }
       set {
         sceneId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "scene_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSceneId {
+      get { return sceneId_ != null; }
+    }
+    /// <summary>Clears the value of the "scene_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSceneId() {
+      sceneId_ = null;
     }
 
     /// <summary>Field number for the "fade_ms" field.</summary>
@@ -4201,7 +4618,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (SceneId.Length != 0) hash ^= SceneId.GetHashCode();
+      if (HasSceneId) hash ^= SceneId.GetHashCode();
       if (FadeMs != 0) hash ^= FadeMs.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -4221,7 +4638,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (SceneId.Length != 0) {
+      if (HasSceneId) {
         output.WriteRawTag(10);
         output.WriteString(SceneId);
       }
@@ -4239,7 +4656,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (SceneId.Length != 0) {
+      if (HasSceneId) {
         output.WriteRawTag(10);
         output.WriteString(SceneId);
       }
@@ -4257,7 +4674,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (SceneId.Length != 0) {
+      if (HasSceneId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(SceneId);
       }
       if (FadeMs != 0) {
@@ -4275,7 +4692,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.SceneId.Length != 0) {
+      if (other.HasSceneId) {
         SceneId = other.SceneId;
       }
       if (other.FadeMs != 0) {
@@ -4592,14 +5009,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "host_kind" field.</summary>
     public const int HostKindFieldNumber = 1;
-    private string hostKind_ = "";
+    private readonly static string HostKindDefaultValue = "";
+
+    private string hostKind_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string HostKind {
-      get { return hostKind_; }
+      get { return hostKind_ ?? HostKindDefaultValue; }
       set {
         hostKind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "host_kind" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasHostKind {
+      get { return hostKind_ != null; }
+    }
+    /// <summary>Clears the value of the "host_kind" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearHostKind() {
+      hostKind_ = null;
     }
 
     /// <summary>Field number for the "host_id" field.</summary>
@@ -4689,7 +5120,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (HostKind.Length != 0) hash ^= HostKind.GetHashCode();
+      if (HasHostKind) hash ^= HostKind.GetHashCode();
       if (HostId.Length != 0) hash ^= HostId.GetHashCode();
       if (HostVersion.Length != 0) hash ^= HostVersion.GetHashCode();
       hash ^= capabilities_.GetHashCode();
@@ -4713,7 +5144,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         output.WriteRawTag(10);
         output.WriteString(HostKind);
       }
@@ -4744,7 +5175,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         output.WriteRawTag(10);
         output.WriteString(HostKind);
       }
@@ -4775,7 +5206,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (HostKind.Length != 0) {
+      if (HasHostKind) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(HostKind);
       }
       if (HostId.Length != 0) {
@@ -4803,7 +5234,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.HostKind.Length != 0) {
+      if (other.HasHostKind) {
         HostKind = other.HostKind;
       }
       if (other.HostId.Length != 0) {
@@ -4920,6 +5351,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<AvatarHostReadyPayload> _parser = new pb::MessageParser<AvatarHostReadyPayload>(() => new AvatarHostReadyPayload());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AvatarHostReadyPayload> Parser { get { return _parser; } }
@@ -4947,6 +5379,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AvatarHostReadyPayload(AvatarHostReadyPayload other) : this() {
+      _hasBits0 = other._hasBits0;
       hostId_ = other.hostId_;
       modelId_ = other.modelId_;
       avatarPackageId_ = other.avatarPackageId_;
@@ -5002,50 +5435,108 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "worker_window_state" field.</summary>
     public const int WorkerWindowStateFieldNumber = 4;
-    private string workerWindowState_ = "";
+    private readonly static string WorkerWindowStateDefaultValue = "";
+
+    private string workerWindowState_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string WorkerWindowState {
-      get { return workerWindowState_; }
+      get { return workerWindowState_ ?? WorkerWindowStateDefaultValue; }
       set {
         workerWindowState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "worker_window_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWorkerWindowState {
+      get { return workerWindowState_ != null; }
+    }
+    /// <summary>Clears the value of the "worker_window_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWorkerWindowState() {
+      workerWindowState_ = null;
+    }
 
     /// <summary>Field number for the "composition_surface_state" field.</summary>
     public const int CompositionSurfaceStateFieldNumber = 5;
-    private string compositionSurfaceState_ = "";
+    private readonly static string CompositionSurfaceStateDefaultValue = "";
+
+    private string compositionSurfaceState_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string CompositionSurfaceState {
-      get { return compositionSurfaceState_; }
+      get { return compositionSurfaceState_ ?? CompositionSurfaceStateDefaultValue; }
       set {
         compositionSurfaceState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "composition_surface_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCompositionSurfaceState {
+      get { return compositionSurfaceState_ != null; }
+    }
+    /// <summary>Clears the value of the "composition_surface_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCompositionSurfaceState() {
+      compositionSurfaceState_ = null;
+    }
 
     /// <summary>Field number for the "first_frame_presented" field.</summary>
     public const int FirstFramePresentedFieldNumber = 6;
+    private readonly static bool FirstFramePresentedDefaultValue = false;
+
     private bool firstFramePresented_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool FirstFramePresented {
-      get { return firstFramePresented_; }
+      get { if ((_hasBits0 & 1) != 0) { return firstFramePresented_; } else { return FirstFramePresentedDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         firstFramePresented_ = value;
       }
+    }
+    /// <summary>Gets whether the "first_frame_presented" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasFirstFramePresented {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "first_frame_presented" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearFirstFramePresented() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "interaction_ready" field.</summary>
     public const int InteractionReadyFieldNumber = 7;
+    private readonly static bool InteractionReadyDefaultValue = false;
+
     private bool interactionReady_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool InteractionReady {
-      get { return interactionReady_; }
+      get { if ((_hasBits0 & 2) != 0) { return interactionReady_; } else { return InteractionReadyDefaultValue; } }
       set {
+        _hasBits0 |= 2;
         interactionReady_ = value;
       }
+    }
+    /// <summary>Gets whether the "interaction_ready" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasInteractionReady {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "interaction_ready" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearInteractionReady() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "summary" field.</summary>
@@ -5093,10 +5584,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (HostId.Length != 0) hash ^= HostId.GetHashCode();
       if (ModelId.Length != 0) hash ^= ModelId.GetHashCode();
       if (AvatarPackageId.Length != 0) hash ^= AvatarPackageId.GetHashCode();
-      if (WorkerWindowState.Length != 0) hash ^= WorkerWindowState.GetHashCode();
-      if (CompositionSurfaceState.Length != 0) hash ^= CompositionSurfaceState.GetHashCode();
-      if (FirstFramePresented != false) hash ^= FirstFramePresented.GetHashCode();
-      if (InteractionReady != false) hash ^= InteractionReady.GetHashCode();
+      if (HasWorkerWindowState) hash ^= WorkerWindowState.GetHashCode();
+      if (HasCompositionSurfaceState) hash ^= CompositionSurfaceState.GetHashCode();
+      if (HasFirstFramePresented) hash ^= FirstFramePresented.GetHashCode();
+      if (HasInteractionReady) hash ^= InteractionReady.GetHashCode();
       if (Summary.Length != 0) hash ^= Summary.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -5128,19 +5619,19 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(26);
         output.WriteString(AvatarPackageId);
       }
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         output.WriteRawTag(34);
         output.WriteString(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         output.WriteRawTag(42);
         output.WriteString(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         output.WriteRawTag(48);
         output.WriteBool(FirstFramePresented);
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         output.WriteRawTag(56);
         output.WriteBool(InteractionReady);
       }
@@ -5170,19 +5661,19 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(26);
         output.WriteString(AvatarPackageId);
       }
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         output.WriteRawTag(34);
         output.WriteString(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         output.WriteRawTag(42);
         output.WriteString(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         output.WriteRawTag(48);
         output.WriteBool(FirstFramePresented);
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         output.WriteRawTag(56);
         output.WriteBool(InteractionReady);
       }
@@ -5209,16 +5700,16 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (AvatarPackageId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(AvatarPackageId);
       }
-      if (WorkerWindowState.Length != 0) {
+      if (HasWorkerWindowState) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(WorkerWindowState);
       }
-      if (CompositionSurfaceState.Length != 0) {
+      if (HasCompositionSurfaceState) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(CompositionSurfaceState);
       }
-      if (FirstFramePresented != false) {
+      if (HasFirstFramePresented) {
         size += 1 + 1;
       }
-      if (InteractionReady != false) {
+      if (HasInteractionReady) {
         size += 1 + 1;
       }
       if (Summary.Length != 0) {
@@ -5245,16 +5736,16 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other.AvatarPackageId.Length != 0) {
         AvatarPackageId = other.AvatarPackageId;
       }
-      if (other.WorkerWindowState.Length != 0) {
+      if (other.HasWorkerWindowState) {
         WorkerWindowState = other.WorkerWindowState;
       }
-      if (other.CompositionSurfaceState.Length != 0) {
+      if (other.HasCompositionSurfaceState) {
         CompositionSurfaceState = other.CompositionSurfaceState;
       }
-      if (other.FirstFramePresented != false) {
+      if (other.HasFirstFramePresented) {
         FirstFramePresented = other.FirstFramePresented;
       }
-      if (other.InteractionReady != false) {
+      if (other.HasInteractionReady) {
         InteractionReady = other.InteractionReady;
       }
       if (other.Summary.Length != 0) {
@@ -5416,14 +5907,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "animation_id" field.</summary>
     public const int AnimationIdFieldNumber = 1;
-    private string animationId_ = "";
+    private readonly static string AnimationIdDefaultValue = "";
+
+    private string animationId_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string AnimationId {
-      get { return animationId_; }
+      get { return animationId_ ?? AnimationIdDefaultValue; }
       set {
         animationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "animation_id" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAnimationId {
+      get { return animationId_ != null; }
+    }
+    /// <summary>Clears the value of the "animation_id" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAnimationId() {
+      animationId_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5449,7 +5954,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (AnimationId.Length != 0) hash ^= AnimationId.GetHashCode();
+      if (HasAnimationId) hash ^= AnimationId.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5468,7 +5973,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (AnimationId.Length != 0) {
+      if (HasAnimationId) {
         output.WriteRawTag(10);
         output.WriteString(AnimationId);
       }
@@ -5482,7 +5987,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (AnimationId.Length != 0) {
+      if (HasAnimationId) {
         output.WriteRawTag(10);
         output.WriteString(AnimationId);
       }
@@ -5496,7 +6001,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (AnimationId.Length != 0) {
+      if (HasAnimationId) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(AnimationId);
       }
       if (_unknownFields != null) {
@@ -5511,7 +6016,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.AnimationId.Length != 0) {
+      if (other.HasAnimationId) {
         AnimationId = other.AnimationId;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -5615,26 +6120,54 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "code" field.</summary>
     public const int CodeFieldNumber = 1;
-    private string code_ = "";
+    private readonly static string CodeDefaultValue = "";
+
+    private string code_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Code {
-      get { return code_; }
+      get { return code_ ?? CodeDefaultValue; }
       set {
         code_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
+    /// <summary>Gets whether the "code" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCode {
+      get { return code_ != null; }
+    }
+    /// <summary>Clears the value of the "code" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCode() {
+      code_ = null;
+    }
 
     /// <summary>Field number for the "message" field.</summary>
     public const int MessageFieldNumber = 2;
-    private string message_ = "";
+    private readonly static string MessageDefaultValue = "";
+
+    private string message_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Message {
-      get { return message_; }
+      get { return message_ ?? MessageDefaultValue; }
       set {
         message_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "message" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasMessage {
+      get { return message_ != null; }
+    }
+    /// <summary>Clears the value of the "message" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearMessage() {
+      message_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5661,8 +6194,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Code.Length != 0) hash ^= Code.GetHashCode();
-      if (Message.Length != 0) hash ^= Message.GetHashCode();
+      if (HasCode) hash ^= Code.GetHashCode();
+      if (HasMessage) hash ^= Message.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5681,11 +6214,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Code.Length != 0) {
+      if (HasCode) {
         output.WriteRawTag(10);
         output.WriteString(Code);
       }
-      if (Message.Length != 0) {
+      if (HasMessage) {
         output.WriteRawTag(18);
         output.WriteString(Message);
       }
@@ -5699,11 +6232,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Code.Length != 0) {
+      if (HasCode) {
         output.WriteRawTag(10);
         output.WriteString(Code);
       }
-      if (Message.Length != 0) {
+      if (HasMessage) {
         output.WriteRawTag(18);
         output.WriteString(Message);
       }
@@ -5717,10 +6250,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Code.Length != 0) {
+      if (HasCode) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Code);
       }
-      if (Message.Length != 0) {
+      if (HasMessage) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Message);
       }
       if (_unknownFields != null) {
@@ -5735,10 +6268,10 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.Code.Length != 0) {
+      if (other.HasCode) {
         Code = other.Code;
       }
-      if (other.Message.Length != 0) {
+      if (other.HasMessage) {
         Message = other.Message;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
@@ -5810,6 +6343,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<AvatarDownstreamFrame> _parser = new pb::MessageParser<AvatarDownstreamFrame>(() => new AvatarDownstreamFrame());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AvatarDownstreamFrame> Parser { get { return _parser; } }
@@ -5837,6 +6371,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AvatarDownstreamFrame(AvatarDownstreamFrame other) : this() {
+      _hasBits0 = other._hasBits0;
       kind_ = other.kind_;
       traceId_ = other.traceId_;
       timestamp_ = other.timestamp_;
@@ -5863,14 +6398,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "kind" field.</summary>
     public const int KindFieldNumber = 1;
-    private string kind_ = "";
+    private readonly static string KindDefaultValue = "";
+
+    private string kind_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Kind {
-      get { return kind_; }
+      get { return kind_ ?? KindDefaultValue; }
       set {
         kind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "kind" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasKind {
+      get { return kind_ != null; }
+    }
+    /// <summary>Clears the value of the "kind" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearKind() {
+      kind_ = null;
     }
 
     /// <summary>Field number for the "trace_id" field.</summary>
@@ -5887,14 +6436,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "timestamp" field.</summary>
     public const int TimestampFieldNumber = 3;
+    private readonly static double TimestampDefaultValue = 0D;
+
     private double timestamp_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public double Timestamp {
-      get { return timestamp_; }
+      get { if ((_hasBits0 & 1) != 0) { return timestamp_; } else { return TimestampDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         timestamp_ = value;
       }
+    }
+    /// <summary>Gets whether the "timestamp" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasTimestamp {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "timestamp" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearTimestamp() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "emotion" field.</summary>
@@ -6078,9 +6642,9 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Kind.Length != 0) hash ^= Kind.GetHashCode();
+      if (HasKind) hash ^= Kind.GetHashCode();
       if (TraceId.Length != 0) hash ^= TraceId.GetHashCode();
-      if (Timestamp != 0D) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode(Timestamp);
+      if (HasTimestamp) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode(Timestamp);
       if (emotion_ != null) hash ^= Emotion.GetHashCode();
       if (thought_ != null) hash ^= Thought.GetHashCode();
       if (audioPlay_ != null) hash ^= AudioPlay.GetHashCode();
@@ -6111,7 +6675,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(10);
         output.WriteString(Kind);
       }
@@ -6119,7 +6683,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(18);
         output.WriteString(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         output.WriteRawTag(25);
         output.WriteDouble(Timestamp);
       }
@@ -6181,7 +6745,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(10);
         output.WriteString(Kind);
       }
@@ -6189,7 +6753,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(18);
         output.WriteString(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         output.WriteRawTag(25);
         output.WriteDouble(Timestamp);
       }
@@ -6251,13 +6815,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Kind.Length != 0) {
+      if (HasKind) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Kind);
       }
       if (TraceId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         size += 1 + 8;
       }
       if (emotion_ != null) {
@@ -6308,13 +6872,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.Kind.Length != 0) {
+      if (other.HasKind) {
         Kind = other.Kind;
       }
       if (other.TraceId.Length != 0) {
         TraceId = other.TraceId;
       }
-      if (other.Timestamp != 0D) {
+      if (other.HasTimestamp) {
         Timestamp = other.Timestamp;
       }
       if (other.emotion_ != null) {
@@ -6634,6 +7198,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
   {
     private static readonly pb::MessageParser<AvatarUpstreamFrame> _parser = new pb::MessageParser<AvatarUpstreamFrame>(() => new AvatarUpstreamFrame());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AvatarUpstreamFrame> Parser { get { return _parser; } }
@@ -6661,6 +7226,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AvatarUpstreamFrame(AvatarUpstreamFrame other) : this() {
+      _hasBits0 = other._hasBits0;
       kind_ = other.kind_;
       traceId_ = other.traceId_;
       timestamp_ = other.timestamp_;
@@ -6680,14 +7246,28 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "kind" field.</summary>
     public const int KindFieldNumber = 1;
-    private string kind_ = "";
+    private readonly static string KindDefaultValue = "";
+
+    private string kind_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string Kind {
-      get { return kind_; }
+      get { return kind_ ?? KindDefaultValue; }
       set {
         kind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
+    }
+    /// <summary>Gets whether the "kind" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasKind {
+      get { return kind_ != null; }
+    }
+    /// <summary>Clears the value of the "kind" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearKind() {
+      kind_ = null;
     }
 
     /// <summary>Field number for the "trace_id" field.</summary>
@@ -6704,14 +7284,29 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
 
     /// <summary>Field number for the "timestamp" field.</summary>
     public const int TimestampFieldNumber = 3;
+    private readonly static double TimestampDefaultValue = 0D;
+
     private double timestamp_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public double Timestamp {
-      get { return timestamp_; }
+      get { if ((_hasBits0 & 1) != 0) { return timestamp_; } else { return TimestampDefaultValue; } }
       set {
+        _hasBits0 |= 1;
         timestamp_ = value;
       }
+    }
+    /// <summary>Gets whether the "timestamp" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasTimestamp {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "timestamp" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearTimestamp() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "host_hello" field.</summary>
@@ -6804,9 +7399,9 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Kind.Length != 0) hash ^= Kind.GetHashCode();
+      if (HasKind) hash ^= Kind.GetHashCode();
       if (TraceId.Length != 0) hash ^= TraceId.GetHashCode();
-      if (Timestamp != 0D) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode(Timestamp);
+      if (HasTimestamp) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode(Timestamp);
       if (hostHello_ != null) hash ^= HostHello.GetHashCode();
       if (hostReady_ != null) hash ^= HostReady.GetHashCode();
       if (avatarActionState_ != null) hash ^= AvatarActionState.GetHashCode();
@@ -6830,7 +7425,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(10);
         output.WriteString(Kind);
       }
@@ -6838,7 +7433,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(18);
         output.WriteString(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         output.WriteRawTag(25);
         output.WriteDouble(Timestamp);
       }
@@ -6872,7 +7467,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Kind.Length != 0) {
+      if (HasKind) {
         output.WriteRawTag(10);
         output.WriteString(Kind);
       }
@@ -6880,7 +7475,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
         output.WriteRawTag(18);
         output.WriteString(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         output.WriteRawTag(25);
         output.WriteDouble(Timestamp);
       }
@@ -6914,13 +7509,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Kind.Length != 0) {
+      if (HasKind) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Kind);
       }
       if (TraceId.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(TraceId);
       }
-      if (Timestamp != 0D) {
+      if (HasTimestamp) {
         size += 1 + 8;
       }
       if (hostHello_ != null) {
@@ -6950,13 +7545,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Avatar.V1 {
       if (other == null) {
         return;
       }
-      if (other.Kind.Length != 0) {
+      if (other.HasKind) {
         Kind = other.Kind;
       }
       if (other.TraceId.Length != 0) {
         TraceId = other.TraceId;
       }
-      if (other.Timestamp != 0D) {
+      if (other.HasTimestamp) {
         Timestamp = other.Timestamp;
       }
       if (other.hostHello_ != null) {

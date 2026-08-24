@@ -17,7 +17,7 @@ namespace GlimmerCradle.Avatar
         private AvatarModelManifest manifest;
         private AvatarPresentationController presentationController;
 
-        public event Action<AvatarActionStatePayload> ActionStateChanged;
+        public event Action<AvatarActionStateChanged> ActionStateChanged;
 
         public void Initialize(AvatarModelManifest nextManifest, IAvatarModelDriver nextDriver)
         {
@@ -44,46 +44,46 @@ namespace GlimmerCradle.Avatar
             driver.ApplyBehaviorFrame(frame);
         }
 
-        public AvatarActionStatePayload GetActionStateSnapshot()
+        public AvatarActionStateChanged GetActionStateSnapshot()
         {
             return actionScheduler.Snapshot();
         }
 
-        public void ApplyIntent(AvatarIntentPayload payload)
+        public void ApplyIntent(ExecuteAvatarActionCommand command)
         {
-            var state = actionScheduler.Apply(payload);
-            if (state.state == "rejected")
+            var state = actionScheduler.Apply(command);
+            if (state.State == AvatarActionExecutionState.Rejected)
             {
-                Debug.LogWarning($"[UnityAvatarHost] 动作请求被拒绝 action={state.action_id} reason={state.message}");
+                Debug.LogWarning($"[UnityAvatarHost] 动作请求被拒绝 action={state.ActionId} reason={state.Message}");
             }
             ActionStateChanged?.Invoke(state);
         }
 
-        public void ApplyEmotion(EmotionPayload payload)
+        public void ApplyEmotion(SetAvatarEmotionCommand command)
         {
-            if (payload == null || string.IsNullOrWhiteSpace(payload.emotion_type) || driver == null)
+            if (command == null || string.IsNullOrWhiteSpace(command.EmotionType) || driver == null)
             {
                 return;
             }
-            var expressionId = manifest.emotionToExpression.TryGetValue(payload.emotion_type, out var mapped)
+            var expressionId = manifest.emotionToExpression.TryGetValue(command.EmotionType, out var mapped)
                 ? mapped
-                : payload.emotion_type;
-            driver.SetEmotion(expressionId, Mathf.Clamp01(payload.intensity));
+                : command.EmotionType;
+            driver.SetEmotion(expressionId, Mathf.Clamp01(command.Intensity));
         }
 
-        public void ApplyExpression(AvatarExpressionPayload payload)
+        public void ApplyExpression(SetAvatarExpressionCommand command)
         {
-            if (payload != null && !string.IsNullOrWhiteSpace(payload.expression_id))
+            if (command != null && !string.IsNullOrWhiteSpace(command.ExpressionId))
             {
-                driver?.SetExpression(payload.expression_id);
+                driver?.SetExpression(command.ExpressionId);
             }
         }
 
-        public void PlayMotion(AvatarMotionPayload payload)
+        public void PlayMotion(PlayAvatarMotionCommand command)
         {
-            if (payload != null && !string.IsNullOrWhiteSpace(payload.motion_id))
+            if (command != null && !string.IsNullOrWhiteSpace(command.MotionId))
             {
-                driver?.PlayMotion(manifest.ResolveMotionId(payload.motion_id), payload.loop, payload.priority);
+                driver?.PlayMotion(manifest.ResolveMotionId(command.MotionId), command.Loop, command.Priority);
             }
         }
 

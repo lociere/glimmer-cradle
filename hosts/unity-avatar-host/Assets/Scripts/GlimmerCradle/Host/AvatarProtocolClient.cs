@@ -29,7 +29,7 @@ namespace GlimmerCradle.Avatar
         private bool helloSent;
         private bool presentationReady;
         private AvatarPresentationController presentationController;
-        private readonly List<AvatarHostErrorPayload> startupErrors = new List<AvatarHostErrorPayload>();
+        private readonly List<AvatarHostFailed> startupErrors = new List<AvatarHostFailed>();
         private readonly SemaphoreSlim sendLock = new SemaphoreSlim(1, 1);
 
         private async void Start()
@@ -124,30 +124,21 @@ namespace GlimmerCradle.Avatar
             sendLock.Dispose();
         }
 
-        public void ReportError(string code, string message)
+        public void ReportError(string code, string message, string traceId = null)
         {
             if (lifetime == null || lifetime.IsCancellationRequested)
             {
                 return;
             }
 
-            var payload = new AvatarHostErrorPayload
-            {
-                code = code,
-                message = message,
-            };
+            var failure = new AvatarHostFailed(code, message);
             if (socket == null || socket.State != WebSocketState.Open)
             {
-                startupErrors.Add(payload);
+                startupErrors.Add(failure);
                 return;
             }
 
-            _ = SendFrameAsync(new AvatarUpstreamFrame
-            {
-                kind = "error",
-                timestamp = NowMs(),
-                error = payload,
-            }, lifetime.Token);
+            _ = SendHostEventAsync(failure, lifetime.Token, traceId);
         }
 
         public void ReportAnimationComplete(string animationId)
@@ -157,35 +148,16 @@ namespace GlimmerCradle.Avatar
                 return;
             }
 
-            _ = SendFrameAsync(new AvatarUpstreamFrame
-            {
-                kind = "animation_complete",
-                timestamp = NowMs(),
-                animation_complete = new AnimationCompletePayload
-                {
-                    animation_id = animationId,
-                },
-            }, lifetime.Token);
+            _ = SendHostEventAsync(new AvatarAnimationCompleted(animationId), lifetime.Token);
         }
 
-        public void ReportActionState(AvatarActionStatePayload state)
+        public void ReportActionState(AvatarActionStateChanged state)
         {
             if (state == null || lifetime == null || lifetime.IsCancellationRequested)
             {
                 return;
             }
-            _ = SendFrameAsync(new AvatarUpstreamFrame
-            {
-                kind = "avatar_action_state",
-                timestamp = NowMs(),
-                avatar_action_state = new AvatarActionStatePayload
-                {
-                    action_id = state.action_id,
-                    state = state.state,
-                    active_action_ids = state.active_action_ids ?? Array.Empty<string>(),
-                    message = state.message,
-                },
-            }, lifetime.Token);
+            _ = SendHostEventAsync(state, lifetime.Token);
         }
 
         private async Task ConnectLoopAsync(CancellationToken token)
@@ -269,60 +241,40 @@ namespace GlimmerCradle.Avatar
                 return;
             }
 
-            await SendFrameAsync(new AvatarUpstreamFrame
-            {
-                kind = "host_ready",
-                timestamp = NowMs(),
-                host_ready = new AvatarHostReadyPayload
-                {
-                    host_id = hostId,
-                    model_id = modelId,
-                    avatar_package_id = avatarPackageId,
-                    worker_window_state = compositionHost?.GetWorkerWindowState() ?? "unknown",
-                    composition_surface_state = compositionHost?.GetCompositionSurfaceState() ?? "unknown",
-                    first_frame_presented = firstFramePresented,
-                    interaction_ready = interactionReady,
-                    summary = "Avatar Package / composition surface / first frame / interaction ready",
-                },
-            }, token);
+            await SendHostEventAsync(new AvatarHostBecameReady(
+                hostId,
+                modelId,
+                avatarPackageId,
+                ParseWorkerWindowState(compositionHost?.GetWorkerWindowState()),
+                ParseCompositionSurfaceState(compositionHost?.GetCompositionSurfaceState()),
+                firstFramePresented,
+                interactionReady,
+                "Avatar Package / composition surface / first frame / interaction ready"), token);
             Debug.Log("[UnityAvatarHost] Avatar 已就绪：模型、合成与首帧均已完成");
             ReportActionState(avatarController?.GetActionStateSnapshot());
         }
 
         private async Task SendHelloAsync(CancellationToken token)
         {
-            await SendFrameAsync(new AvatarUpstreamFrame
-            {
-                kind = "host_hello",
-                timestamp = NowMs(),
-                host_hello = new AvatarHostHelloPayload
+            await SendHostEventAsync(new AvatarHostStarted(
+                hostId,
+                hostVersion,
+                modelId,
+                avatarPackageId,
+                new[]
                 {
-                    host_kind = "unity",
-                    host_id = hostId,
-                    host_version = hostVersion,
-                    model_id = modelId,
-                    avatar_package_id = avatarPackageId,
-                    capabilities = new[]
-                    {
-                        "expression",
-                        "motion",
-                        "avatar_intent",
-                        "lip_sync",
-                        "parameter",
-                        "audio_play",
-                        "load_scene"
-                    },
-                },
-            }, token);
+                    AvatarHostCapability.Expression,
+                    AvatarHostCapability.Motion,
+                    AvatarHostCapability.AvatarIntent,
+                    AvatarHostCapability.LipSync,
+                    AvatarHostCapability.Parameter,
+                    AvatarHostCapability.AudioPlay,
+                    AvatarHostCapability.LoadScene,
+                }), token);
 
             foreach (var error in startupErrors)
             {
-                await SendFrameAsync(new AvatarUpstreamFrame
-                {
-                    kind = "error",
-                    timestamp = NowMs(),
-                    error = error,
-                }, token);
+                await SendHostEventAsync(error, token);
             }
             startupErrors.Clear();
         }
@@ -350,69 +302,77 @@ namespace GlimmerCradle.Avatar
 
         private void HandleFrame(string json)
         {
-            var frame = AvatarContractAdapter.DeserializeDownstream(json);
-            if (frame == null || string.IsNullOrWhiteSpace(frame.kind))
+            var result = AvatarContractAdapter.ParseDownstream(json);
+            if (!result.IsSuccess)
             {
+                Debug.LogWarning($"[UnityAvatarHost] 拒绝无效 Avatar 帧 code={result.Failure.WireCode} detail={result.Failure.Message}");
+                ReportError(result.Failure.WireCode, result.Failure.Message, result.Failure.TraceId);
                 return;
             }
 
-            if (frame.kind == "ping")
+            if (result.Message.IsPing)
             {
-                _ = SendFrameAsync(new AvatarUpstreamFrame
-                {
-                    kind = "pong",
-                    timestamp = NowMs(),
-                }, lifetime.Token);
+                _ = SendPongAsync(result.Message.TraceId, lifetime.Token);
                 return;
             }
 
-            mainThreadQueue.Enqueue(() => ApplyFrame(frame));
+            mainThreadQueue.Enqueue(() => ApplyCommand(result.Message.Command));
         }
 
-        private void ApplyFrame(AvatarDownstreamFrame frame)
+        private void ApplyCommand(AvatarCommand command)
         {
             if (avatarController == null)
             {
                 return;
             }
 
-            AvatarFrameDispatcher.TryDispatch(frame, this);
+            AvatarCommandDispatcher.Dispatch(command, this);
         }
 
-        public void Shutdown() => Application.Quit();
-        public void ApplyEmotion(EmotionPayload payload) => avatarController.ApplyEmotion(payload);
-        public void ApplyExpression(AvatarExpressionPayload payload) => avatarController.ApplyExpression(payload);
-        public void PlayMotion(AvatarMotionPayload payload) => avatarController.PlayMotion(payload);
-        public void ApplyLipSync(AvatarLipSyncPayload payload) => avatarController.ApplyLipSync(payload);
-        public void ApplyParameter(AvatarParameterPayload payload) => avatarController.ApplyParameter(payload);
-        public void ApplyIntent(AvatarIntentPayload payload) => avatarController.ApplyIntent(payload);
+        public void Shutdown(ShutdownAvatarCommand command) => Application.Quit();
+        public void ApplyEmotion(SetAvatarEmotionCommand command) => avatarController.ApplyEmotion(command);
+        public void ApplyExpression(SetAvatarExpressionCommand command) => avatarController.ApplyExpression(command);
+        public void PlayMotion(PlayAvatarMotionCommand command) => avatarController.PlayMotion(command);
+        public void ApplyLipSync(SetAvatarLipSyncCommand command) => avatarController.ApplyLipSync(command);
+        public void ApplyParameter(SetAvatarParameterCommand command) => avatarController.ApplyParameter(command);
+        public void ApplyIntent(ExecuteAvatarActionCommand command) => avatarController.ApplyIntent(command);
 
-        public void ApplyPresentation(AvatarPresentationPayload payload)
+        public void ApplyPresentation(SetAvatarPresentationCommand command)
         {
-            avatarController.ApplyPresentation(payload);
+            avatarController.ApplyPresentation(command);
             presentationController?.ApplyPresentationCommand(
-                payload?.placement_id,
-                payload?.display_scale ?? 0f,
-                payload != null && payload.reset_placement
+                command?.PlacementId,
+                command?.DisplayScale ?? 0f,
+                command != null && command.ResetPlacement
             );
         }
 
-        public void ApplyCharacterPresentation(CharacterPresentationProjectionPayload payload)
+        public void ApplyCharacterPresentation(ApplyCharacterPresentationCommand command)
         {
             presentationController?.ApplyPresentationCommand(
-                payload?.appearance?.placement_id,
-                payload?.appearance?.display_scale ?? 0f,
+                command?.PlacementId,
+                command?.DisplayScale ?? 0f,
                 false
             );
         }
 
-        public void PlayAudio(AudioPlayPayload payload) => avatarController.PlayAudio(payload);
-        public void ApplyThought(ThoughtPayload payload) => avatarController.ApplyThought(payload);
-        public void PlayIdle() => avatarController.PlayIdle();
-        public void LoadScene(LoadScenePayload payload) => avatarController.LoadScene(payload);
-        public void UnloadScene(UnloadScenePayload payload) => avatarController.UnloadScene(payload);
+        public void PlayAudio(PlayAvatarAudioCommand command) => avatarController.PlayAudio(command);
+        public void ApplyThought(SetAvatarThoughtCommand command) => avatarController.ApplyThought(command);
+        public void PlayIdle(PlayIdleAvatarCommand command) => avatarController.PlayIdle();
+        public void LoadScene(LoadAvatarSceneCommand command) => avatarController.LoadScene(command);
+        public void UnloadScene(UnloadAvatarSceneCommand command) => avatarController.UnloadScene(command);
 
-        private async Task SendFrameAsync(AvatarUpstreamFrame frame, CancellationToken token)
+        private async Task SendHostEventAsync(AvatarHostEvent hostEvent, CancellationToken token, string traceId = null)
+        {
+            await SendWireJsonAsync(AvatarContractAdapter.SerializeHostEvent(hostEvent, traceId, NowMs()), token);
+        }
+
+        private async Task SendPongAsync(string traceId, CancellationToken token)
+        {
+            await SendWireJsonAsync(AvatarContractAdapter.SerializePong(traceId, NowMs()), token);
+        }
+
+        private async Task SendWireJsonAsync(string json, CancellationToken token)
         {
             if (socket == null || socket.State != WebSocketState.Open)
             {
@@ -422,7 +382,7 @@ namespace GlimmerCradle.Avatar
             await sendLock.WaitAsync(token);
             try
             {
-                var payload = Encoding.UTF8.GetBytes(AvatarContractAdapter.SerializeUpstream(frame));
+                var payload = Encoding.UTF8.GetBytes(json);
                 await socket.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true, token);
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
@@ -438,6 +398,26 @@ namespace GlimmerCradle.Avatar
         private static double NowMs()
         {
             return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+
+        private static AvatarWorkerWindowState ParseWorkerWindowState(string value)
+        {
+            switch (value)
+            {
+                case "isolated": return AvatarWorkerWindowState.Isolated;
+                case "visible": return AvatarWorkerWindowState.Visible;
+                default: return AvatarWorkerWindowState.Unknown;
+            }
+        }
+
+        private static AvatarCompositionSurfaceState ParseCompositionSurfaceState(string value)
+        {
+            switch (value)
+            {
+                case "attached": return AvatarCompositionSurfaceState.Attached;
+                case "failed": return AvatarCompositionSurfaceState.Failed;
+                default: return AvatarCompositionSurfaceState.Unknown;
+            }
         }
     }
 }

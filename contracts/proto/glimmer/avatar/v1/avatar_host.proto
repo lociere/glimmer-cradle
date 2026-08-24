@@ -5,19 +5,19 @@ package glimmer.avatar.v1;
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Avatar.V1";
 
 message EmotionPayload {
-  string emotion_type = 1;
-  float intensity = 2;
+  optional string emotion_type = 1;
+  optional float intensity = 2;
   string trigger = 3;
   int32 blend_time_ms = 4;
 }
 
 message ThoughtPayload {
-  bool active = 1;
+  optional bool active = 1;
   string hint = 2;
 }
 
 message AudioPlayPayload {
-  string audio_id = 1;
+  optional string audio_id = 1;
   string audio_uri = 2;
   string audio_data = 3;
   string mime_type = 4;
@@ -25,32 +25,32 @@ message AudioPlayPayload {
 }
 
 message AvatarExpressionPayload {
-  string expression_id = 1;
+  optional string expression_id = 1;
   int32 blend_time_ms = 2;
   bool auto_reset = 3;
 }
 
 message AvatarMotionPayload {
-  string motion_id = 1;
+  optional string motion_id = 1;
   bool loop = 2;
   int32 priority = 3;
 }
 
 message AvatarLipSyncPayload {
-  float amplitude = 1;
+  optional float amplitude = 1;
   string source = 2;
 }
 
 message AvatarParameterPayload {
-  string param_id = 1;
-  float value = 2;
+  optional string param_id = 1;
+  optional float value = 2;
   int32 fade_ms = 3;
 }
 
 message AvatarIntentPayload {
-  string action_id = 1;
-  string operation = 2;
-  string source = 3;
+  optional string action_id = 1;
+  optional string operation = 2;
+  optional string source = 3;
   int32 priority = 4;
 }
 
@@ -69,32 +69,32 @@ message AvatarPresentationPayload {
 
 message CharacterPresentationAppearancePayload {
   string placement_id = 1;
-  float display_scale = 2;
+  optional float display_scale = 2;
 }
 
 message CharacterPresentationLifecyclePayload {
-  string worker_window_state = 1;
-  string composition_surface_state = 2;
-  bool first_frame_presented = 3;
-  bool interaction_ready = 4;
-  bool ready = 5;
-  string summary = 6;
+  optional string worker_window_state = 1;
+  optional string composition_surface_state = 2;
+  optional bool first_frame_presented = 3;
+  optional bool interaction_ready = 4;
+  optional bool ready = 5;
+  optional string summary = 6;
 }
 
 message CharacterPresentationProjectionPayload {
-  string avatar_package_id = 1;
-  string model_id = 2;
-  string display_name = 3;
-  string kind = 4;
-  string backend = 5;
-  string host_kind = 6;
-  string avatar_state = 7;
+  optional string avatar_package_id = 1;
+  optional string model_id = 2;
+  optional string display_name = 3;
+  optional string kind = 4;
+  optional string backend = 5;
+  optional string host_kind = 6;
+  optional string avatar_state = 7;
   CharacterPresentationAppearancePayload appearance = 8;
   CharacterPresentationLifecyclePayload lifecycle = 9;
 }
 
 message LoadScenePayload {
-  string scene_id = 1;
+  optional string scene_id = 1;
   int32 fade_ms = 2;
 }
 
@@ -103,7 +103,7 @@ message UnloadScenePayload {
 }
 
 message AvatarHostHelloPayload {
-  string host_kind = 1;
+  optional string host_kind = 1;
   string host_id = 2;
   string host_version = 3;
   repeated string capabilities = 4;
@@ -115,26 +115,26 @@ message AvatarHostReadyPayload {
   string host_id = 1;
   string model_id = 2;
   string avatar_package_id = 3;
-  string worker_window_state = 4;
-  string composition_surface_state = 5;
-  bool first_frame_presented = 6;
-  bool interaction_ready = 7;
+  optional string worker_window_state = 4;
+  optional string composition_surface_state = 5;
+  optional bool first_frame_presented = 6;
+  optional bool interaction_ready = 7;
   string summary = 8;
 }
 
 message AnimationCompletePayload {
-  string animation_id = 1;
+  optional string animation_id = 1;
 }
 
 message AvatarHostErrorPayload {
-  string code = 1;
-  string message = 2;
+  optional string code = 1;
+  optional string message = 2;
 }
 
 message AvatarDownstreamFrame {
-  string kind = 1;
+  optional string kind = 1;
   string trace_id = 2;
-  double timestamp = 3;
+  optional double timestamp = 3;
   EmotionPayload emotion = 4;
   ThoughtPayload thought = 5;
   AudioPlayPayload audio_play = 6;
@@ -150,9 +150,9 @@ message AvatarDownstreamFrame {
 }
 
 message AvatarUpstreamFrame {
-  string kind = 1;
+  optional string kind = 1;
   string trace_id = 2;
-  double timestamp = 3;
+  optional double timestamp = 3;
   AvatarHostHelloPayload host_hello = 4;
   AvatarHostReadyPayload host_ready = 5;
   AvatarActionStatePayload avatar_action_state = 6;

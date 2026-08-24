@@ -23,60 +23,59 @@ namespace GlimmerCradle.Avatar
             RestorePersistedState();
         }
 
-        public AvatarActionStatePayload Apply(AvatarIntentPayload intent)
+        public AvatarActionStateChanged Apply(ExecuteAvatarActionCommand command)
         {
-            if (intent == null || string.IsNullOrWhiteSpace(intent.action_id) || driver == null)
+            if (command == null || string.IsNullOrWhiteSpace(command.ActionId) || driver == null)
             {
-                return Snapshot(intent?.action_id, "rejected", "动作请求不完整");
+                return Snapshot(command?.ActionId, AvatarActionExecutionState.Rejected, "动作请求不完整");
             }
-            if (!manifest.TryResolve(intent.action_id, out var action))
+            if (!manifest.TryResolve(command.ActionId, out var action))
             {
-                return Snapshot(intent.action_id, "rejected", $"模型未声明动作 {intent.action_id}");
+                return Snapshot(command.ActionId, AvatarActionExecutionState.Rejected, $"模型未声明动作 {command.ActionId}");
             }
-            if (action.manualOnly && !string.Equals(intent.source, "user", StringComparison.OrdinalIgnoreCase))
+            if (action.manualOnly && command.Source != AvatarActionSource.User)
             {
-                return Snapshot(action.id, "rejected", "该动作只允许用户手动控制");
+                return Snapshot(action.id, AvatarActionExecutionState.Rejected, "该动作只允许用户手动控制");
             }
 
-            var operation = intent.operation ?? string.Empty;
             if (!action.toggle)
             {
-                if (!string.Equals(operation, "trigger", StringComparison.OrdinalIgnoreCase))
+                if (command.Operation != AvatarActionOperation.Trigger)
                 {
-                    return Snapshot(action.id, "rejected", "一次性动作只接受 trigger 操作");
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, "一次性动作只接受 trigger 操作");
                 }
                 if (!TryValidateRequirements(action, out var missingRequirement))
                 {
-                    return Snapshot(action.id, "rejected", $"需先开启 {missingRequirement}");
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, $"需先开启 {missingRequirement}");
                 }
-                return Trigger(action, intent.priority);
+                return Trigger(action, command.Priority);
             }
 
-            if (string.Equals(operation, "activate", StringComparison.OrdinalIgnoreCase))
+            if (command.Operation == AvatarActionOperation.Activate)
             {
                 if (activeActions.Contains(action.id))
                 {
-                    return Snapshot(action.id, "active", null);
+                    return Snapshot(action.id, AvatarActionExecutionState.Active, null);
                 }
                 if (!TryValidateRequirements(action, out var missingRequirement))
                 {
-                    return Snapshot(action.id, "rejected", $"需先开启 {missingRequirement}");
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, $"需先开启 {missingRequirement}");
                 }
                 var exclusiveAction = FindActiveExclusiveAction(action);
                 if (exclusiveAction != null)
                 {
-                    return Snapshot(action.id, "rejected", $"请先关闭互斥动作 {exclusiveAction.label}");
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, $"请先关闭互斥动作 {exclusiveAction.label}");
                 }
                 if (!TryApplyToggle(action, true, out var error))
                 {
-                    return Snapshot(action.id, "rejected", error);
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, error);
                 }
                 activeActions.Add(action.id);
                 SavePersistedState();
-                return Snapshot(action.id, "active", null);
+                return Snapshot(action.id, AvatarActionExecutionState.Active, null);
             }
 
-            if (string.Equals(operation, "deactivate", StringComparison.OrdinalIgnoreCase))
+            if (command.Operation == AvatarActionOperation.Deactivate)
             {
                 var dependent = manifest.All.FirstOrDefault(candidate =>
                     activeActions.Contains(candidate.id)
@@ -84,33 +83,31 @@ namespace GlimmerCradle.Avatar
                         string.Equals(requirement, action.id, StringComparison.OrdinalIgnoreCase)));
                 if (dependent != null)
                 {
-                    return Snapshot(action.id, "rejected", $"请先关闭 {dependent.label}");
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, $"请先关闭 {dependent.label}");
                 }
                 if (!activeActions.Contains(action.id))
                 {
-                    return Snapshot(action.id, "inactive", null);
+                    return Snapshot(action.id, AvatarActionExecutionState.Inactive, null);
                 }
                 if (!TryApplyToggle(action, false, out var error))
                 {
-                    return Snapshot(action.id, "rejected", error);
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, error);
                 }
                 activeActions.Remove(action.id);
                 SavePersistedState();
-                return Snapshot(action.id, "inactive", null);
+                return Snapshot(action.id, AvatarActionExecutionState.Inactive, null);
             }
 
-            return Snapshot(action.id, "rejected", "保持动作必须明确 activate 或 deactivate");
+            return Snapshot(action.id, AvatarActionExecutionState.Rejected, "保持动作必须明确 activate 或 deactivate");
         }
 
-        public AvatarActionStatePayload Snapshot(string actionId = null, string state = null, string message = null)
+        public AvatarActionStateChanged Snapshot(string actionId = null, AvatarActionExecutionState? state = null, string message = null)
         {
-            return new AvatarActionStatePayload
-            {
-                action_id = actionId,
-                state = state,
-                active_action_ids = activeActions.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
-                message = message,
-            };
+            return new AvatarActionStateChanged(
+                actionId,
+                state,
+                activeActions.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
+                message);
         }
 
         private bool TryValidateRequirements(AvatarActionDefinition action, out string missingRequirement)
@@ -142,25 +139,25 @@ namespace GlimmerCradle.Avatar
                 && string.Equals(candidate.exclusiveGroup, action.exclusiveGroup, StringComparison.OrdinalIgnoreCase));
         }
 
-        private AvatarActionStatePayload Trigger(AvatarActionDefinition action, int priority)
+        private AvatarActionStateChanged Trigger(AvatarActionDefinition action, int priority)
         {
             if (string.Equals(action.targetKind, "expression", StringComparison.OrdinalIgnoreCase))
             {
                 if (!driver.TryTriggerExpression(action.targetId, out var error))
                 {
-                    return Snapshot(action.id, "rejected", error);
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, error);
                 }
-                return Snapshot(action.id, "completed", null);
+                return Snapshot(action.id, AvatarActionExecutionState.Completed, null);
             }
             if (string.Equals(action.targetKind, "motion", StringComparison.OrdinalIgnoreCase))
             {
                 if (!driver.TryPlayMotion(action.targetId, false, priority, out var error))
                 {
-                    return Snapshot(action.id, "rejected", error);
+                    return Snapshot(action.id, AvatarActionExecutionState.Rejected, error);
                 }
-                return Snapshot(action.id, "running", null);
+                return Snapshot(action.id, AvatarActionExecutionState.Running, null);
             }
-            return Snapshot(action.id, "rejected", $"不支持动作目标类型 {action.targetKind}");
+            return Snapshot(action.id, AvatarActionExecutionState.Rejected, $"不支持动作目标类型 {action.targetKind}");
         }
 
         private bool TryApplyToggle(AvatarActionDefinition action, bool active, out string error)
