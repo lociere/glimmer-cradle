@@ -56,6 +56,7 @@ const artifactTextExtensions = new Set([
   '.cjs', '.cs', '.iss', '.js', '.json', '.mjs', '.nsi', '.ps1', '.py', '.sh', '.toml',
   '.ts', '.tsx', '.wxs', '.yaml', '.yml',
 ]);
+const javascriptLikeExtensions = new Set(['.cjs', '.js', '.mjs', '.ts', '.tsx']);
 
 function parseWorkspacePatterns(workspaceText) {
   const patterns = [];
@@ -100,6 +101,52 @@ function isArtifactConsumer(relativePath) {
 
 function normalizeReferenceText(value) {
   return value.replace(/\\\\/g, '\\').replaceAll('\\', '/').replace(/\/{2,}/g, '/');
+}
+
+function sanitizeJavaScriptCommentTrivia(source) {
+  const sanitized = source.split('');
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (['\'', '"', '`'].includes(character)) {
+      quote = character;
+      continue;
+    }
+    if (character !== '/' || index + 1 >= source.length) continue;
+    if (source[index + 1] === '/') {
+      let cursor = index;
+      while (cursor < source.length && !['\r', '\n'].includes(source[cursor])) {
+        sanitized[cursor] = ' ';
+        cursor += 1;
+      }
+      index = cursor - 1;
+      continue;
+    }
+    if (source[index + 1] === '*') {
+      let cursor = index;
+      while (cursor < source.length) {
+        const closesComment = source[cursor] === '*' && source[cursor + 1] === '/';
+        if (!['\r', '\n'].includes(source[cursor])) sanitized[cursor] = ' ';
+        cursor += 1;
+        if (closesComment) {
+          if (cursor < source.length && !['\r', '\n'].includes(source[cursor])) {
+            sanitized[cursor] = ' ';
+          }
+          cursor += 1;
+          break;
+        }
+      }
+      index = cursor - 1;
+    }
+  }
+  return sanitized.join('');
 }
 
 function parseQuotedLiteral(value) {
@@ -212,8 +259,9 @@ function containsCanonicalReference(candidate, reference) {
     .test(normalizeReferenceText(candidate));
 }
 
-export function findCanonicalRepositoryReferences(source) {
-  const candidates = [source, ...joinedLiteralPathCandidates(source)];
+export function findCanonicalRepositoryReferences(source, { javascriptComments = true } = {}) {
+  const searchableSource = javascriptComments ? sanitizeJavaScriptCommentTrivia(source) : source;
+  const candidates = [searchableSource, ...joinedLiteralPathCandidates(searchableSource)];
   return repositoryReferences.filter((reference) => (
     candidates.some((candidate) => containsCanonicalReference(candidate, reference))
   ));
@@ -221,6 +269,12 @@ export function findCanonicalRepositoryReferences(source) {
 
 function readSource(filePath) {
   return fs.readFileSync(filePath, 'utf8');
+}
+
+function findFileReferences(filePath) {
+  return findCanonicalRepositoryReferences(readSource(filePath), {
+    javascriptComments: javascriptLikeExtensions.has(path.extname(filePath).toLowerCase()),
+  });
 }
 
 function activeArtifactConsumers(repositoryRoot) {
@@ -254,7 +308,7 @@ function checkLegacyConsumers(repositoryRoot, consumerFiles) {
   if (fs.existsSync(rootManifest)) files.add(rootManifest);
   for (const filePath of files) {
     const relativePath = toRepoPath(repositoryRoot, filePath);
-    const references = findCanonicalRepositoryReferences(readSource(filePath));
+    const references = findFileReferences(filePath);
     for (const legacyEntrypoint of references.filter((item) => legacyRootEntrypoints.includes(item))) {
       if (acceptedAdrLegacyReferences.get(relativePath)?.has(legacyEntrypoint)) continue;
       violations.push(`${relativePath}: active consumer/fact source 不得引用已删除入口 ${legacyEntrypoint}`);
@@ -271,12 +325,16 @@ function checkRepositoryToolConsumers(repositoryRoot, consumerFiles) {
       const manifest = readJson(filePath);
       const nonFacadeFields = { ...manifest };
       delete nonFacadeFields.scripts;
-      const nonFacadeReferences = findCanonicalRepositoryReferences(JSON.stringify(nonFacadeFields));
+      const nonFacadeReferences = findCanonicalRepositoryReferences(JSON.stringify(nonFacadeFields), {
+        javascriptComments: false,
+      });
       for (const reference of nonFacadeReferences.filter((item) => repositoryToolReferences.includes(item))) {
         violations.push(`package.json: root 非 façade 字段不得消费私有仓库工具 ${reference}`);
       }
       for (const [scriptName, command] of Object.entries(manifest.scripts ?? {})) {
-        const commandReferences = findCanonicalRepositoryReferences(String(command));
+        const commandReferences = findCanonicalRepositoryReferences(String(command), {
+          javascriptComments: false,
+        });
         for (const reference of commandReferences.filter((item) => repositoryToolReferences.includes(item))) {
           if (!allowedRootFacadeReferences.get(scriptName)?.has(reference)) {
             violations.push(`package.json#scripts.${scriptName}: root 仅允许既定 façade 消费私有仓库工具 ${reference}`);
@@ -285,7 +343,7 @@ function checkRepositoryToolConsumers(repositoryRoot, consumerFiles) {
       }
       continue;
     }
-    const references = findCanonicalRepositoryReferences(readSource(filePath));
+    const references = findFileReferences(filePath);
     for (const reference of references.filter((item) => repositoryToolReferences.includes(item))) {
       if (allowedDevelopmentToolReferences.get(relativePath)?.has(reference)) continue;
       violations.push(`${relativePath}: runtime/package/deploy/workflow/installer/OCI 不得消费私有仓库工具 ${reference}`);

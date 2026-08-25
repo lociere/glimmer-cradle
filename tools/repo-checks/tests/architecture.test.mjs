@@ -53,6 +53,12 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
     assert.deepEqual(findCanonicalRepositoryReferences(
       "path.join(repoRoot, 'tools', selectedTool, 'repo-checks')",
     ), []);
+    assert.deepEqual(findCanonicalRepositoryReferences(
+      '// tools/repo-checks\n/* scripts/launch-product.mjs */',
+    ), []);
+    assert.deepEqual(new Set(findCanonicalRepositoryReferences(
+      'const a = "https://host/tools/repo-checks"; const b = "/* tools/workspace-supervisor */";',
+    )), new Set(['tools/repo-checks', 'tools/workspace-supervisor']));
 
     writeFixture(fixture, 'pnpm-workspace.yaml', validWorkspace);
     writeFixture(fixture, 'package.json', JSON.stringify({
@@ -114,6 +120,28 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
       '@glimmer-cradle',
       'workspace-supervisor')"`);
     assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('@glimmer-cradle/workspace-supervisor')));
+    fs.rmSync(path.join(fixture, 'deploy'), { recursive: true, force: true });
+
+    writeFixture(fixture, 'deploy/commented-paths.mjs', `path.join(repoRoot, 'tools', // grouping, ) "ignored"
+      'repo-checks', 'src');
+path.join(repoRoot, 'tools',
+  // development grouping, ) "ignored"
+  'workspace-supervisor', 'src');
+path.resolve(repoRoot, 'scripts', /* removed owner, ) "ignored" */ 'launch-product.mjs');`);
+    const commentedViolations = checkWorkspaceArtifactBoundaries(fixture);
+    assert.ok(commentedViolations.some((item) => item.includes('tools/repo-checks')));
+    assert.ok(commentedViolations.some((item) => item.includes('tools/workspace-supervisor')));
+    assert.ok(commentedViolations.some((item) => item.includes('scripts/launch-product.mjs')));
+    fs.rmSync(path.join(fixture, 'deploy'), { recursive: true, force: true });
+
+    writeFixture(fixture, 'deploy/comment-only.mjs', `// tools/repo-checks
+/* path.join(repoRoot, 'scripts', 'launch-product.mjs') */`);
+    assert.deepEqual(checkWorkspaceArtifactBoundaries(fixture), []);
+    writeFixture(fixture, 'deploy/string-markers.mjs',
+      'const a = "https://host/tools/repo-checks"; const b = "/* tools/workspace-supervisor */";');
+    const stringMarkerViolations = checkWorkspaceArtifactBoundaries(fixture);
+    assert.ok(stringMarkerViolations.some((item) => item.includes('tools/repo-checks')));
+    assert.ok(stringMarkerViolations.some((item) => item.includes('tools/workspace-supervisor')));
     fs.rmSync(path.join(fixture, 'deploy'), { recursive: true, force: true });
 
     writeFixture(fixture, 'products/desktop/installer/setup.iss',
