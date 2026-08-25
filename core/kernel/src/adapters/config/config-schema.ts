@@ -24,13 +24,11 @@ import type {
   SafetyConfig,
   SurfaceConfig,
   VoiceConfig,
-  AudioConfig,
-  EmbeddingConfig,
-  MemoryConfig,
-  SkillPlaneConfig,
 } from './documents';
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../../domain/config';
 
 export type * from './documents';
+export type * from '../../domain/config';
 
 /** configs/system/*.yaml 组合后的解析结果（系统身份/当前角色/备份 + Kernel 运行时子块） */
 export type SystemConfig = AppConfig & {

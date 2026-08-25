@@ -1,4 +1,4 @@
-import type { ExtensionRuntimeProjection } from './extension-runtime-projection';
+import type { ExtensionRuntimeProjection } from '../../ports/extension-runtime-projection';
 import {
   strongestRuntimeReadinessState,
   type RuntimeReadinessSnapshot,

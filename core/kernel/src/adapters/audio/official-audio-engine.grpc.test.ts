@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import type { ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { AudioConfig } from '../config/documents';
+import type { AudioConfig } from '../../domain/config';
 import type { VoiceConfig } from '../config/documents/VoiceConfig';
 import { resolveWorkPath } from '../filesystem/path-utils';
 import { stopManagedProcess } from '../process/process-supervisor';

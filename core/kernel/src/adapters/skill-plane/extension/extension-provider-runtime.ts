@@ -1,4 +1,4 @@
-import type { CapabilityGraphNode, ExtensionRuntimeProjection } from '../../extension-host/extension-runtime-projection';
+import type { CapabilityGraphNode, ExtensionRuntimeProjection } from '../../../ports/extension-runtime-projection';
 import type { SkillProviderRuntimeSnapshot } from '../../../ports/skill-plane.port';
 
 export function toExtensionProviderRuntimeSnapshot(

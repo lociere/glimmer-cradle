@@ -22,7 +22,7 @@ import {
   type ExtensionProductTarget,
   type ExtensionSkillContribution,
 } from '@glimmer-cradle/extension-sdk';
-import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from './extension-runtime-projection';
+import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../../ports/extension-runtime-projection';
 import { ErrorCode } from '../../domain/error-code';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import { ExtensionErrorEvent, ExtensionLoadedEvent, ExtensionStartedEvent, ExtensionStoppedEvent } from '../../domain/events';

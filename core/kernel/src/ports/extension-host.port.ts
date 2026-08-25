@@ -14,7 +14,7 @@ import type {
   CapabilityGraphNode,
   DiagnosticsSnapshot,
   ExtensionRuntimeProjection,
-} from '../adapters/extension-host/extension-runtime-projection';
+} from './extension-runtime-projection';
 import { DomainEvent } from '../domain/events/domain-events';
 
 export interface Disposable {

@@ -6,7 +6,7 @@ import {
   type ManagedResourceContribution,
   type ReadinessGateDeclaration,
 } from '@glimmer-cradle/extension-sdk';
-import type { CapabilityGraphNode, CapabilityNodeState, ReadinessGateSnapshot } from './extension-runtime-projection';
+import type { CapabilityGraphNode, CapabilityNodeState, ReadinessGateSnapshot } from '../../ports/extension-runtime-projection';
 import type { ExtensionLogger } from '../../ports';
 import { resolveConfiguredProjectPath, resolveDataDir } from '../filesystem/path-utils';
 

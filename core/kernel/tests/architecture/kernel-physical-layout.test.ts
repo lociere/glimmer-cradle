@@ -88,9 +88,11 @@ describe('Kernel physical layout', () => {
 
   it('proves the parser and matrix reject inverted, generated and Node-OS samples', () => {
     const applicationFile = path.join(sourceRoot, 'application', 'fixture.ts');
+    const portsFile = path.join(sourceRoot, 'ports', 'fixture.ts');
     const runtimeFile = path.join(sourceRoot, 'runtime', 'fixture.ts');
     expect(parseImportEdges("export { x } from '../adapters/x'; import('node:fs');").map((edge) => edge.source)).toEqual(['../adapters/x', 'node:fs']);
     expect(() => assertSourcePolicy(applicationFile, "import x from '../adapters/x';")).toThrow();
+    expect(() => assertSourcePolicy(portsFile, "export type { X } from '../adapters/x';")).toThrow();
     expect(() => assertSourcePolicy(runtimeFile, "export * from '../composition/root';")).toThrow();
     expect(() => assertSourcePolicy(applicationFile, "const x = import('node:child_process');")).toThrow();
     expect(() => assertSourcePolicy(path.join(sourceRoot, 'domain', 'fixture.ts'), "import type { T } from '@glimmer-cradle/extension-sdk';")).toThrow();

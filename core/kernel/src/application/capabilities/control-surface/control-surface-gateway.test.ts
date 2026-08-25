@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ControlSurfaceGateway } from '../../../adapters/surface/control-surface-gateway';
-import type { ConfigurationSnapshot } from '../../../adapters/config/configuration-models';
+import type { ConfigurationSnapshot } from '../../../ports/configuration-models';
 import type { SkillCatalogSnapshot } from '../../../ports/skill-plane.port';
 import type { ConversationHistoryService } from '../../../adapters/surface/conversation-history-service';
 import { RecoveryRequiredError } from '../../../domain/errors';

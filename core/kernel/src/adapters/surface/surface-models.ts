@@ -1,8 +1,8 @@
 import type { ChannelReplyMessage, ConversationNotice } from '@glimmer-cradle/extension-sdk';
 import type { AudioStatusPayload } from '../audio/audio-status-projection';
-import type { ConfigurationSnapshotRequest, ConfigurationSnapshotResult, ConfigurationTestRequest, ConfigurationTestResult, ConfigurationUpdateRequest, ConfigurationUpdateResult } from '../config/configuration-models';
-import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../extension-host/extension-runtime-projection';
-import type { ConversationHistoryRequest, ConversationHistoryResult } from './conversation-history-models';
+import type { ConfigurationSnapshotRequest, ConfigurationSnapshotResult, ConfigurationTestRequest, ConfigurationTestResult, ConfigurationUpdateRequest, ConfigurationUpdateResult } from '../../ports/configuration-models';
+import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../../ports/extension-runtime-projection';
+import type { ConversationHistoryRequest, ConversationHistoryResult } from '../../ports/conversation-history.port-models';
 import type { ExtensionInstallSource } from '../extension-installation/extension-package-manager';
 
 export interface ExtensionInstallPrepareRequest { request_id: string; source: ExtensionInstallSource; }

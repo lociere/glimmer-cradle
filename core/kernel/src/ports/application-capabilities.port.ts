@@ -4,12 +4,12 @@ import type {
   ConfigurationTestResult,
   ConfigurationUpdateRequest,
   ConfigurationUpdateResult,
-} from '../adapters/config/configuration-models';
+} from './configuration-models';
 import type { ConversationNotice } from '@glimmer-cradle/extension-sdk';
 import type {
   ConversationHistoryRequest,
   ConversationHistoryResult,
-} from '../adapters/surface/conversation-history-models';
+} from './conversation-history.port-models';
 import type { StateSyncEvent } from '../domain/events';
 import type {
   AttentionLease,

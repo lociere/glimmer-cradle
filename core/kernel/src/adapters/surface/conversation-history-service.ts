@@ -5,7 +5,7 @@ import type {
   ConversationHistoryEntry,
   ConversationHistoryRequest as ConversationHistoryQuery,
   ConversationHistoryResult as ConversationHistoryResponse,
-} from './conversation-history-models';
+} from '../../ports/conversation-history.port-models';
 import type { ConversationHistoryRequest, ConversationHistoryResponse as CognitionHistoryResponse } from '../../ports/cognition-service-port';
 import type { ConversationAddress, ConversationContext } from '../../ports/application-models';
 

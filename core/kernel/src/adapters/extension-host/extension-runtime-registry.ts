@@ -20,7 +20,7 @@ import type {
   DiagnosticsSnapshot,
   ExtensionRuntimeProjection,
   ReadinessGateSnapshot,
-} from './extension-runtime-projection';
+} from '../../ports/extension-runtime-projection';
 import type { ExtensionCapabilityGraphReport } from '../../ports';
 import type { SkillAvailabilityContext, SkillPlanePolicyPort } from '../../ports/skill-plane.port';
 

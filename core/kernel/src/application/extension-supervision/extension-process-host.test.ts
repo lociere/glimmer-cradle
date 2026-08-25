@@ -8,7 +8,7 @@ import {
   type ExtensionManifest,
   type ExtensionSkillContribution,
 } from '@glimmer-cradle/extension-sdk';
-import type { DiagnosticsSnapshot, ExtensionRuntimeProjection } from '../../adapters/extension-host/extension-runtime-projection';
+import type { DiagnosticsSnapshot, ExtensionRuntimeProjection } from '../../ports/extension-runtime-projection';
 import { ExtensionProcessHost } from '../../adapters/extension-host/extension-process-host';
 import type {
   ActiveExtensionSelection,

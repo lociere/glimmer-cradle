@@ -5,8 +5,8 @@ import yaml from 'yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GlobalConfig } from '../../adapters/config/config-schema';
 import { ConfigApplicationService } from '../../adapters/config/config-application-adapter';
-import type { ConfigurationUpdateRequest } from '../../adapters/config/configuration-models';
-import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../../adapters/config/documents';
+import type { ConfigurationUpdateRequest } from '../../ports/configuration-models';
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../../domain/config';
 import type { LLMConfig } from '../../adapters/config/documents/LLMConfig';
 
 const cleanupRoots = new Set<string>();

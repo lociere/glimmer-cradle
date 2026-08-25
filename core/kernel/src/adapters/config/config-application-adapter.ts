@@ -22,8 +22,8 @@ import {
   type ConfigurationTestResult,
   type ConfigurationUpdateRequest,
   type ConfigurationUpdateResult,
-} from './configuration-models';
-import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from './documents';
+} from '../../ports/configuration-models';
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../../domain/config';
 import type { LLMConfig } from './documents/LLMConfig';
 import { validateConfig } from './document-validator';
 

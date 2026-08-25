@@ -63,9 +63,9 @@ import type {
   ChannelReplyMessage,
 } from '@glimmer-cradle/extension-sdk';
 import type { AudioStatusPayload } from '../audio/audio-status-projection';
-import type { ConfigurationSnapshotRequest, ConfigurationTestRequest, ConfigurationUpdateRequest } from '../config/configuration-models';
-import type { ConversationHistoryRequest } from './conversation-history-models';
-import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../extension-host/extension-runtime-projection';
+import type { ConfigurationSnapshotRequest, ConfigurationTestRequest, ConfigurationUpdateRequest } from '../../ports/configuration-models';
+import type { ConversationHistoryRequest } from '../../ports/conversation-history.port-models';
+import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../../ports/extension-runtime-projection';
 import type { ExtensionInstallPreview } from '../extension-installation/extension-package-manager';
 import type {
   ExtensionCommandRequest,

@@ -1,4 +1,4 @@
-import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from './documents';
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../domain/config';
 export interface ConfigurationModelAlias { alias: string; model_id: string; }
 export interface ConfigurationProviderDraft { key: string; api_type: string; base_url?: string; api_key?: string; clear_api_key?: boolean; temperature?: number; request_method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; request_path?: string; request_headers?: Record<string, string>; request_body_template?: string; response_extract?: string; models: [ConfigurationModelAlias, ...ConfigurationModelAlias[]]; }
 export interface ConfigurationProviderTestDraft extends Omit<ConfigurationProviderDraft, 'models'> {}
