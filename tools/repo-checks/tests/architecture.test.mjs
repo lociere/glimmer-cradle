@@ -6,7 +6,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { checkArchitecture } from '../src/architecture/check-architecture.mjs';
 import { checkRepositoryTopology } from '../src/architecture/rules/repository-topology.mjs';
-import { checkWorkspaceArtifactBoundaries } from '../src/architecture/rules/workspace-artifact-boundaries.mjs';
+import {
+  checkWorkspaceArtifactBoundaries,
+  findCanonicalRepositoryReferences,
+} from '../src/architecture/rules/workspace-artifact-boundaries.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -30,6 +33,11 @@ injectWorkspacePackages: true
 test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/artifact consumer 删除门', () => {
   const leaf = path.join(repositoryRoot, 'tools', 'future-fixture-tool');
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-workspace-artifact-'));
+  const smokePath = 'products/personal-server/scripts/smoke.mjs';
+  const smokeReference = `path.join(repoRoot,
+    'tools',
+    'workspace-supervisor',
+    'src', 'cli.mjs')`;
   try {
     fs.mkdirSync(path.join(leaf, 'src'), { recursive: true });
     fs.mkdirSync(path.join(leaf, 'tests'), { recursive: true });
@@ -39,6 +47,12 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
       scripts: { test: 'node --test' },
     }));
     assert.deepEqual(checkRepositoryTopology(repositoryRoot), []);
+    const realSmoke = fs.readFileSync(path.join(repositoryRoot, smokePath), 'utf8');
+    assert.ok(findCanonicalRepositoryReferences(realSmoke).includes('tools/workspace-supervisor'));
+    assert.deepEqual(findCanonicalRepositoryReferences("const parts = ['tools', 'repo-checks'];"), []);
+    assert.deepEqual(findCanonicalRepositoryReferences(
+      "path.join(repoRoot, 'tools', selectedTool, 'repo-checks')",
+    ), []);
 
     writeFixture(fixture, 'pnpm-workspace.yaml', validWorkspace);
     writeFixture(fixture, 'package.json', JSON.stringify({
@@ -48,7 +62,15 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
     }));
     writeFixture(fixture, 'docs/architecture/decisions/ADR-0009-本地监督树与动态端点治理.md',
       '`scripts/launch-product.mjs` 是被 ADR-0016 修订的历史落点。');
+    writeFixture(fixture, smokePath, smokeReference);
+    assert.ok(findCanonicalRepositoryReferences(smokeReference).includes('tools/workspace-supervisor'));
     assert.deepEqual(checkWorkspaceArtifactBoundaries(fixture), []);
+
+    writeFixture(fixture, smokePath, `${smokeReference}\npath.join(repoRoot, 'tools', 'repo-checks')`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/repo-checks')));
+    writeFixture(fixture, smokePath, `${smokeReference}\npath.join(repoRoot, 'scripts', 'launch-product.mjs')`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('scripts/launch-product.mjs')));
+    writeFixture(fixture, smokePath, smokeReference);
 
     writeFixture(fixture, 'pnpm-workspace.yaml', validWorkspace.replace("  - 'products/**'\n", ''));
     assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('products/**')));
@@ -67,16 +89,39 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
     assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('scripts/check-architecture.mjs')));
     fs.rmSync(path.join(fixture, '.github'), { recursive: true, force: true });
 
+    writeFixture(fixture, '.github/workflows/pr.yml', `run: |
+  node -e "path.resolve(repoRoot,
+    'tools',
+    'repo-checks',
+    'src', 'architecture', 'cli.mjs')"`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/repo-checks')));
+    fs.rmSync(path.join(fixture, '.github'), { recursive: true, force: true });
+
     writeFixture(fixture, 'docs/current-runtime.md', '`scripts/check-no-bom.mjs` 仍是当前入口。');
     assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('docs/current-runtime.md')));
     fs.rmSync(path.join(fixture, 'docs', 'current-runtime.md'));
 
-    writeFixture(fixture, 'deploy/Dockerfile', 'COPY tools/repo-checks /opt/repo-checks');
-    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/repo-checks')));
+    writeFixture(fixture, 'deploy/consumer.mjs', `path.join(repoRoot,
+      'tools',
+      'workspace-supervisor',
+      'src', 'cli.mjs')`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/workspace-supervisor')));
+    writeFixture(fixture, 'deploy/legacy.mjs', `path.join(repoRoot,
+      'scripts',
+      'launch-product.mjs')`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('scripts/launch-product.mjs')));
+    writeFixture(fixture, 'deploy/Dockerfile', `RUN node -e "path.resolve(root,
+      '@glimmer-cradle',
+      'workspace-supervisor')"`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('@glimmer-cradle/workspace-supervisor')));
     fs.rmSync(path.join(fixture, 'deploy'), { recursive: true, force: true });
 
-    writeFixture(fixture, 'products/desktop/installer/setup.iss', 'Source: "@glimmer-cradle/workspace-supervisor"');
-    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('@glimmer-cradle/workspace-supervisor')));
+    writeFixture(fixture, 'products/desktop/installer/setup.iss',
+      `Source: "path.join(root, 'tools', 'repo-checks', 'src', 'architecture')"`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/repo-checks')));
+    writeFixture(fixture, 'products/desktop/installer/setup.iss',
+      String.raw`Source: "tools\workspace-supervisor\src\cli.mjs"`);
+    assert.ok(checkWorkspaceArtifactBoundaries(fixture).some((item) => item.includes('tools/workspace-supervisor')));
 
     writeFixture(fixture, 'package.json', JSON.stringify({
       scripts: { 'package:desktop': 'node tools/workspace-supervisor/src/cli.mjs desktop' },

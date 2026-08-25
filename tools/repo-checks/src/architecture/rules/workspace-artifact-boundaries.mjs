@@ -14,6 +14,7 @@ const repositoryToolReferences = [
   'tools/repo-checks',
   'tools/workspace-supervisor',
 ];
+const repositoryReferences = [...legacyRootEntrypoints, ...repositoryToolReferences];
 
 // Source-only smoke composition exercises the development supervisor and is not shipped in product files.
 const allowedDevelopmentToolReferences = new Map([
@@ -97,8 +98,129 @@ function isArtifactConsumer(relativePath) {
   return false;
 }
 
-function readNormalized(filePath) {
-  return fs.readFileSync(filePath, 'utf8').replaceAll('\\', '/');
+function normalizeReferenceText(value) {
+  return value.replace(/\\\\/g, '\\').replaceAll('\\', '/').replace(/\/{2,}/g, '/');
+}
+
+function parseQuotedLiteral(value) {
+  const text = value.trim();
+  const quote = text[0];
+  if (!['\'', '"', '`'].includes(quote)) return null;
+  let result = '';
+  for (let index = 1; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === quote) {
+      if (text.slice(index + 1).trim().length > 0) return null;
+      if (quote === '`' && result.includes('${')) return null;
+      return result;
+    }
+    if (character === '\\' && index + 1 < text.length) {
+      const next = text[index + 1];
+      if (next === '\\' || next === '/' || next === quote) {
+        result += next;
+        index += 1;
+        continue;
+      }
+    }
+    result += character;
+  }
+  return null;
+}
+
+function readCallArguments(source, openParenthesis) {
+  let depth = 1;
+  let quote = null;
+  let escaped = false;
+  for (let index = openParenthesis + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (['\'', '"', '`'].includes(character)) {
+      quote = character;
+      continue;
+    }
+    if (character === '(') depth += 1;
+    else if (character === ')') {
+      depth -= 1;
+      if (depth === 0) return source.slice(openParenthesis + 1, index);
+    }
+  }
+  return null;
+}
+
+function splitTopLevelArguments(argumentsText) {
+  const argumentsList = [];
+  let start = 0;
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < argumentsText.length; index += 1) {
+    const character = argumentsText[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (['\'', '"', '`'].includes(character)) {
+      quote = character;
+      continue;
+    }
+    if (['(', '[', '{'].includes(character)) depth += 1;
+    else if ([')', ']', '}'].includes(character)) depth -= 1;
+    else if (character === ',' && depth === 0) {
+      argumentsList.push(argumentsText.slice(start, index));
+      start = index + 1;
+    }
+  }
+  argumentsList.push(argumentsText.slice(start));
+  return argumentsList;
+}
+
+// Only complete literal arguments in path.join/resolve may form a path; dynamic arguments break the group.
+function joinedLiteralPathCandidates(source) {
+  const candidates = [];
+  const callPattern = /\bpath\s*\.\s*(?:join|resolve)\s*\(/g;
+  for (const match of source.matchAll(callPattern)) {
+    const openParenthesis = match.index + match[0].lastIndexOf('(');
+    const argumentsText = readCallArguments(source, openParenthesis);
+    if (argumentsText === null) continue;
+    let adjacentSegments = [];
+    const flushSegments = () => {
+      if (adjacentSegments.length > 0) {
+        candidates.push(normalizeReferenceText(adjacentSegments.join('/')));
+        adjacentSegments = [];
+      }
+    };
+    for (const argument of splitTopLevelArguments(argumentsText)) {
+      const literal = parseQuotedLiteral(argument);
+      if (literal === null) flushSegments();
+      else adjacentSegments.push(literal.replace(/^[/\\]+|[/\\]+$/g, ''));
+    }
+    flushSegments();
+  }
+  return candidates;
+}
+
+function containsCanonicalReference(candidate, reference) {
+  const escaped = reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^A-Za-z0-9_.@-])${escaped}(?=$|[/\\s'"\`),:;\\]}])`, 'm')
+    .test(normalizeReferenceText(candidate));
+}
+
+export function findCanonicalRepositoryReferences(source) {
+  const candidates = [source, ...joinedLiteralPathCandidates(source)];
+  return repositoryReferences.filter((reference) => (
+    candidates.some((candidate) => containsCanonicalReference(candidate, reference))
+  ));
+}
+
+function readSource(filePath) {
+  return fs.readFileSync(filePath, 'utf8');
 }
 
 function activeArtifactConsumers(repositoryRoot) {
@@ -132,9 +254,8 @@ function checkLegacyConsumers(repositoryRoot, consumerFiles) {
   if (fs.existsSync(rootManifest)) files.add(rootManifest);
   for (const filePath of files) {
     const relativePath = toRepoPath(repositoryRoot, filePath);
-    const text = readNormalized(filePath);
-    for (const legacyEntrypoint of legacyRootEntrypoints) {
-      if (!text.includes(legacyEntrypoint)) continue;
+    const references = findCanonicalRepositoryReferences(readSource(filePath));
+    for (const legacyEntrypoint of references.filter((item) => legacyRootEntrypoints.includes(item))) {
       if (acceptedAdrLegacyReferences.get(relativePath)?.has(legacyEntrypoint)) continue;
       violations.push(`${relativePath}: active consumer/fact source 不得引用已删除入口 ${legacyEntrypoint}`);
     }
@@ -150,28 +271,24 @@ function checkRepositoryToolConsumers(repositoryRoot, consumerFiles) {
       const manifest = readJson(filePath);
       const nonFacadeFields = { ...manifest };
       delete nonFacadeFields.scripts;
-      const nonFacadeText = JSON.stringify(nonFacadeFields).replaceAll('\\', '/');
-      for (const reference of repositoryToolReferences) {
-        if (nonFacadeText.includes(reference)) {
-          violations.push(`package.json: root 非 façade 字段不得消费私有仓库工具 ${reference}`);
-        }
+      const nonFacadeReferences = findCanonicalRepositoryReferences(JSON.stringify(nonFacadeFields));
+      for (const reference of nonFacadeReferences.filter((item) => repositoryToolReferences.includes(item))) {
+        violations.push(`package.json: root 非 façade 字段不得消费私有仓库工具 ${reference}`);
       }
       for (const [scriptName, command] of Object.entries(manifest.scripts ?? {})) {
-        for (const reference of repositoryToolReferences) {
-          if (String(command).replaceAll('\\', '/').includes(reference)
-            && !allowedRootFacadeReferences.get(scriptName)?.has(reference)) {
+        const commandReferences = findCanonicalRepositoryReferences(String(command));
+        for (const reference of commandReferences.filter((item) => repositoryToolReferences.includes(item))) {
+          if (!allowedRootFacadeReferences.get(scriptName)?.has(reference)) {
             violations.push(`package.json#scripts.${scriptName}: root 仅允许既定 façade 消费私有仓库工具 ${reference}`);
           }
         }
       }
       continue;
     }
-    const text = readNormalized(filePath);
-    for (const reference of repositoryToolReferences) {
+    const references = findCanonicalRepositoryReferences(readSource(filePath));
+    for (const reference of references.filter((item) => repositoryToolReferences.includes(item))) {
       if (allowedDevelopmentToolReferences.get(relativePath)?.has(reference)) continue;
-      if (text.includes(reference)) {
-        violations.push(`${relativePath}: runtime/package/deploy/workflow/installer/OCI 不得消费私有仓库工具 ${reference}`);
-      }
+      violations.push(`${relativePath}: runtime/package/deploy/workflow/installer/OCI 不得消费私有仓库工具 ${reference}`);
     }
   }
   return violations;
