@@ -7,6 +7,10 @@ import {
   SURFACE_GATEWAY_OPEN,
   SURFACE_GATEWAY_CONNECTING,
 } from './surface-gateway-client';
+import type {
+  ProductSurfaceProjection,
+  ProductSurfaceRequest,
+} from './surface-grpc-mapper';
 import {
   LocalExtensionUploadStore,
   type LocalExtensionUploadAuthorization,
@@ -46,7 +50,7 @@ export function proxySurfaceConnection(
   const generation = typeof generationOrOptions === 'string' ? generationOrOptions : '';
   const options = typeof generationOrOptions === 'string' ? maybeOptions : generationOrOptions;
   const upstream: SurfaceGatewayClientLike = options.surfaceGatewayClientFactory?.() ?? new SurfaceGatewayClient();
-  const pending: Array<{ data: RawData; binary: boolean }> = [];
+  const pending: ProductSurfaceRequest[] = [];
   const pendingPrepareRequests = new Map<string, PendingPrepareRequest>();
   const transactionBindings = new Map<string, BoundTransaction>();
   const commitRequests = new Map<string, string>();
@@ -62,12 +66,12 @@ export function proxySurfaceConnection(
 
   upstream.on('open', () => {
     for (const item of pending.splice(0)) {
-      upstream.send(item.data.toString());
+      upstream.submit(item);
     }
   });
 
-  upstream.on('message', (data: RawData) => {
-    void handleUpstreamMessage(data, false);
+  upstream.on('message', (frame: ProductSurfaceProjection) => {
+    void handleUpstreamMessage(frame);
   });
 
   client.on('close', () => {
@@ -93,43 +97,45 @@ export function proxySurfaceConnection(
     data: RawData,
     binary: boolean,
   ): Promise<void> {
-    const forwarded = await rewriteClientFrame(data, binary);
-    if (!forwarded) return;
+    const frame = await rewriteClientFrame(data, binary);
+    if (!frame) return;
     if (upstream.readyState === SURFACE_GATEWAY_OPEN) {
-      upstream.send(forwarded.data.toString());
+      upstream.submit(frame);
       return;
     }
     if (upstream.readyState === SURFACE_GATEWAY_CONNECTING) {
-      pending.push(forwarded);
+      pending.push(frame);
     }
   }
 
   async function handleUpstreamMessage(
-    data: RawData,
-    binary: boolean,
+    frame: ProductSurfaceProjection,
   ): Promise<void> {
-    if (!binary) {
-      const frame = parseFrame<PresentationDownstreamFrame>(data);
-      if (frame?.kind === 'extension_install_preview' && frame.extension_install_preview?.request_id) {
+      if (frame.kind === 'extension_install_preview' && frame.extension_install_preview?.request_id) {
         await handlePrepareResponse(frame.extension_install_preview.request_id, frame.extension_install_preview.transaction_id);
-      } else if (frame?.kind === 'extension_install_result' && frame.extension_install_result?.request_id) {
+      } else if (frame.kind === 'extension_install_result' && frame.extension_install_result?.request_id) {
         const requestId = frame.extension_install_result.request_id;
         cleanupRequestTransaction(commitRequests, requestId);
         cleanupRequestTransaction(cancelRequests, requestId);
       }
-    }
     if (acceptingMessages && client.readyState === WebSocket.OPEN) {
-      client.send(data, { binary });
+      client.send(JSON.stringify(frame));
     }
   }
 
   async function rewriteClientFrame(
     data: RawData,
     binary: boolean,
-  ): Promise<{ data: RawData; binary: boolean } | null> {
-    if (binary) return { data, binary };
+  ): Promise<ProductSurfaceRequest | null> {
+    if (binary) {
+      client.close(1003, 'Surface Gateway 仅接受 JSON 文本请求');
+      return null;
+    }
     const frame = parseFrame<PresentationUpstreamFrame>(data);
-    if (!frame) return { data, binary };
+    if (!frame || typeof frame.kind !== 'string') {
+      client.close(1007, 'Surface Gateway 请求不是有效 JSON DTO');
+      return null;
+    }
 
     if (frame.kind === 'extension_install_prepare' && frame.extension_install_prepare) {
       return rewritePrepareRequest(frame);
@@ -140,14 +146,14 @@ export function proxySurfaceConnection(
     if (frame.kind === 'extension_install_cancel' && frame.extension_install_cancel) {
       return authorizeTransactionRequest(frame, 'cancel');
     }
-    return { data, binary };
+    return frame;
   }
 
   async function rewritePrepareRequest(
     frame: PresentationUpstreamFrame,
-  ): Promise<{ data: RawData; binary: boolean } | null> {
+  ): Promise<ProductSurfaceRequest | null> {
     const request = frame.extension_install_prepare;
-    if (!request) return { data: serializeFrame(frame), binary: false };
+    if (!request) return null;
     const authorization = options.extensionUploadAuthorization;
     if (!authorization) {
       client.send(JSON.stringify(buildPreviewError(request.request_id, '当前连接未建立扩展安装授权上下文。')));
@@ -167,7 +173,7 @@ export function proxySurfaceConnection(
     });
 
     if (request.source.kind !== 'uploaded_package') {
-      return { data: serializeFrame(frame), binary: false };
+      return frame;
     }
     if (!options.localExtensionUploads) {
       pendingPrepareRequests.delete(request.request_id);
@@ -181,7 +187,6 @@ export function proxySurfaceConnection(
         authorization,
       );
       return {
-        data: serializeFrame({
           ...frame,
           extension_install_prepare: {
             ...request,
@@ -190,9 +195,7 @@ export function proxySurfaceConnection(
               path: materialized.path,
             },
           },
-        } satisfies PresentationUpstreamFrame),
-        binary: false,
-      };
+        } satisfies PresentationUpstreamFrame;
     } catch (error) {
       pendingPrepareRequests.delete(request.request_id);
       client.send(JSON.stringify(buildPreviewError(
@@ -206,10 +209,10 @@ export function proxySurfaceConnection(
   async function authorizeTransactionRequest(
     frame: PresentationUpstreamFrame,
     kind: 'commit' | 'cancel',
-  ): Promise<{ data: RawData; binary: boolean } | null> {
+  ): Promise<ProductSurfaceRequest | null> {
     const authorization = options.extensionUploadAuthorization;
     const request = kind === 'commit' ? frame.extension_install_commit : frame.extension_install_cancel;
-    if (!request) return { data: serializeFrame(frame), binary: false };
+    if (!request) return null;
     const binding = transactionBindings.get(request.transaction_id);
     if (!authorization || !binding) {
       client.send(JSON.stringify(buildInstallResultError(
@@ -228,7 +231,7 @@ export function proxySurfaceConnection(
     }
     if (kind === 'commit') commitRequests.set(request.request_id, request.transaction_id);
     else cancelRequests.set(request.request_id, request.transaction_id);
-    return { data: serializeFrame(frame), binary: false };
+    return frame;
   }
 
   async function handlePrepareResponse(requestId: string, transactionId?: string): Promise<void> {
@@ -312,14 +315,14 @@ export function proxySurfaceConnection(
       });
     });
     cancelRequests.set(requestId, transactionId);
-    upstream.send(serializeFrame({
+    upstream.submit({
       kind: 'extension_install_cancel',
       timestamp: Date.now(),
       extension_install_cancel: {
         request_id: requestId,
         transaction_id: transactionId,
       },
-    }).toString());
+    });
     await waitForResult;
   }
 
@@ -391,8 +394,4 @@ function parseFrame<T>(data: RawData): T | null {
   } catch {
     return null;
   }
-}
-
-function serializeFrame(frame: PresentationUpstreamFrame): RawData {
-  return Buffer.from(JSON.stringify(frame), 'utf8');
 }

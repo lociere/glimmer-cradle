@@ -6,6 +6,12 @@ import { RecoveryRequiredError } from '../../../domain/errors';
 import { RuntimeReadinessProjectionMapper } from '../../projection/runtime-readiness-projection';
 import { AvatarController } from '../../../adapters/avatar/avatar-controller';
 import { AudioService } from '../../../adapters/audio/audio-service';
+import type { SurfaceEvent } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
+import {
+  commandRequestToSurfaceFrame,
+  queryRequestToSurfaceFrame,
+  type SurfaceRequestFrame,
+} from '../../../adapters/surface/surface-grpc-mapper';
 
 type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
 const readinessProjection = new RuntimeReadinessProjectionMapper();
@@ -39,15 +45,15 @@ describe('ControlSurfaceGateway', () => {
       _handleCoreSkillResponse(data: unknown): void;
       requestCoreSkillAction(action: string, payload: Record<string, unknown>, invocationId?: string): Promise<unknown>;
     };
-    const sent: Array<Record<string, unknown>> = [];
+    const sent: SurfaceEvent[] = [];
     subject._clients.add({
       readyState: 1,
-      send(data: string) {
-        const frame = JSON.parse(data) as Record<string, unknown>;
-        sent.push(frame);
+      send(event: SurfaceEvent) {
+        sent.push(event);
+        const requestId = event.event.case === 'coreSkillActionRequest' ? event.event.value.requestId : '';
         queueMicrotask(() => subject._handleCoreSkillResponse({
           kind: 'core_skill_action_response',
-          request_id: frame.request_id,
+          request_id: requestId,
           status: 'success',
           result: { ok: true },
         }));
@@ -62,7 +68,8 @@ describe('ControlSurfaceGateway', () => {
     )).resolves.toEqual({ ok: true });
 
     expect(sent).toHaveLength(1);
-    expect(sent[0].request_id).toBe('action:1:tool:0');
+    expect(sent[0].event.case).toBe('coreSkillActionRequest');
+    expect(sent[0].event.value).toMatchObject({ requestId: 'action:1:tool:0' });
   });
 
   it('maps a Desktop manual-recovery projection to a programmatic terminal error', async () => {
@@ -73,15 +80,15 @@ describe('ControlSurfaceGateway', () => {
     };
     subject._clients.add({
       readyState: 1,
-      send(data: string) {
-        const frame = JSON.parse(data) as Record<string, unknown>;
+      send(event: SurfaceEvent) {
+        const requestId = event.event.case === 'coreSkillActionRequest' ? event.event.value.requestId : '';
         queueMicrotask(() => subject._handleCoreSkillResponse({
           kind: 'core_skill_action_response',
-          request_id: frame.request_id,
+          request_id: requestId,
           status: 'error',
           message: 'arbitrary localized text',
           error_code: 'recovery_required',
-          operation_id: frame.request_id,
+          operation_id: requestId,
           recovery_actions: ['confirm_side_effect_state'],
         }));
       },
@@ -98,18 +105,19 @@ describe('ControlSurfaceGateway', () => {
     });
   });
 
-  it('returns an explicit conversation notice when no usable LLM route is configured', () => {
+  it('returns an explicit conversation notice when no usable LLM route is configured', async () => {
     const subject = gateway as unknown as {
       _configApplicationService: { hasUsableModelRoute: () => boolean };
-      _handleMessage: (data: unknown, ws: unknown) => void;
+      _dispatchSurfaceRequest: (data: SurfaceRequestFrame, ws: unknown) => Promise<void>;
     };
     const frames: unknown[] = [];
     subject._configApplicationService = {
       hasUsableModelRoute: () => false,
     };
 
-    subject._handleMessage({
+    await subject._dispatchSurfaceRequest({
       kind: 'chat_input',
+      timestamp: Date.now(),
       trace_id: 'trace-no-llm',
       chat_input: { text: '你好' },
     }, createSocket(frames));
@@ -128,7 +136,7 @@ describe('ControlSurfaceGateway', () => {
   it('serves conversation history through the control surface protocol', async () => {
     const subject = gateway as unknown as {
       _conversationHistoryService: Pick<ConversationHistoryService, 'readHistory'>;
-      _handleMessage: (data: unknown, ws: unknown) => void;
+      _dispatchSurfaceRequest: (data: SurfaceRequestFrame, ws: unknown) => Promise<void>;
     };
     const frames: unknown[] = [];
     subject._conversationHistoryService = {
@@ -160,11 +168,11 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    subject._handleMessage({
+    await subject._dispatchSurfaceRequest({
       kind: 'conversation_history_request',
+      timestamp: Date.now(),
       conversation_history_request: { request_id: 'history-1', limit: 20 },
     }, createSocket(frames));
-    await Promise.resolve();
 
     expect(frames).toHaveLength(1);
     expect(frames[0]).toMatchObject({
@@ -181,7 +189,7 @@ describe('ControlSurfaceGateway', () => {
   it('serves configuration snapshots through the control surface protocol', async () => {
     const subject = gateway as unknown as {
       _configApplicationService: { getSnapshot: () => Promise<ConfigurationSnapshot> };
-      _handleMessage: (data: unknown, ws: unknown) => void;
+      _dispatchSurfaceRequest: (data: SurfaceRequestFrame, ws: unknown) => Promise<void>;
     };
     const frames: unknown[] = [];
     subject._configApplicationService = {
@@ -307,11 +315,11 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    subject._handleMessage({
+    await subject._dispatchSurfaceRequest({
       kind: 'config_snapshot_request',
+      timestamp: Date.now(),
       config_snapshot_request: { request_id: 'config-snapshot-1' },
     }, createSocket(frames));
-    await Promise.resolve();
 
     expect(frames).toHaveLength(1);
     expect(frames[0]).toMatchObject({
@@ -326,10 +334,10 @@ describe('ControlSurfaceGateway', () => {
     });
   });
 
-  it('serves skill catalog snapshots through the formal presentation payload', () => {
+  it('serves skill catalog snapshots through the formal presentation payload', async () => {
     const subject = gateway as unknown as {
       _skillCatalogAppService: { getCatalogSnapshot: () => SkillCatalogSnapshot };
-      _handleMessage: (data: unknown, ws: unknown) => void;
+      _dispatchSurfaceRequest: (data: SurfaceRequestFrame, ws: unknown) => Promise<void>;
     };
     const frames: unknown[] = [];
     subject._skillCatalogAppService = {
@@ -380,8 +388,9 @@ describe('ControlSurfaceGateway', () => {
       }),
     };
 
-    subject._handleMessage({
+    await subject._dispatchSurfaceRequest({
       kind: 'skill_catalog_request',
+      timestamp: Date.now(),
       skill_catalog_request: { request_id: 'skill-catalog-1' },
     }, createSocket(frames));
 
@@ -433,111 +442,47 @@ describe('ControlSurfaceGateway', () => {
     expect((frames[0] as { audio_play?: { audio_data?: unknown } }).audio_play).not.toHaveProperty('audio_data');
   });
 
-  it('rejects Query requests whose declared operation does not match frame.kind', async () => {
-    const subject = gateway as unknown as {
-      _surfaceSessions: Map<string, { productId: string; scopes: Set<string> }>;
-      _dispatchSurfaceRpc(
-        sessionId: string,
-        requiredScope: 'surface:read' | 'surface:write',
-        declaredOperation: string,
-        rawArguments: Record<string, unknown>,
-        callback: (error: Error | null, response: unknown) => void,
-        operation: 'query' | 'command',
-      ): Promise<void>;
-      _configApplicationService: { hasUsableModelRoute: () => boolean };
-    };
-    subject._surfaceSessions.set('read-session', { productId: 'desktop', scopes: new Set(['surface:read']) });
-    subject._configApplicationService = { hasUsableModelRoute: () => true };
-    const response = await dispatchSurfaceRpc(subject, {
-      sessionId: 'read-session',
-      requiredScope: 'surface:read',
-      declaredOperation: 'config_snapshot_request',
-      rawArguments: { frame: { kind: 'chat_input', chat_input: { text: 'must not dispatch' } } },
-      operation: 'query',
-    });
-
-    expect(response).toMatchObject({
-      status: 'error',
-      error: {
-        safeMessage: 'Surface Gateway operation 与 frame.kind 不一致',
-      },
-    });
+  it('rejects a Query DTO without a typed oneof case', () => {
+    expect(queryRequestToSurfaceFrame({ query: { case: undefined } } as never)).toBeNull();
   });
 
-  it('rejects command-shaped frames sent through the read-only Query RPC', async () => {
-    const subject = gateway as unknown as {
-      _surfaceSessions: Map<string, { productId: string; scopes: Set<string> }>;
-      _dispatchSurfaceRpc(
-        sessionId: string,
-        requiredScope: 'surface:read' | 'surface:write',
-        declaredOperation: string,
-        rawArguments: Record<string, unknown>,
-        callback: (error: Error | null, response: unknown) => void,
-        operation: 'query' | 'command',
-      ): Promise<void>;
-      _conversationHistoryService: { recordSubmittedUserMessage: (text: string, traceId: string) => void };
-      _configApplicationService: { hasUsableModelRoute: () => boolean };
-    };
-    const submitted: string[] = [];
-    subject._surfaceSessions.set('read-session', { productId: 'desktop', scopes: new Set(['surface:read']) });
-    subject._configApplicationService = { hasUsableModelRoute: () => true };
-    subject._conversationHistoryService = {
-      recordSubmittedUserMessage: (text) => submitted.push(text),
-    };
-    const response = await dispatchSurfaceRpc(subject, {
-      sessionId: 'read-session',
-      requiredScope: 'surface:read',
-      declaredOperation: 'chat_input',
-      rawArguments: { frame: { kind: 'chat_input', chat_input: { text: 'must not dispatch' } } },
-      operation: 'query',
-    });
-
-    expect(response).toMatchObject({
-      status: 'error',
-      error: {
-        safeMessage: 'Surface Gateway query 不支持 chat_input',
-      },
-    });
-    expect(submitted).toEqual([]);
+  it('rejects an unknown Command oneof case instead of dispatching a generic payload', () => {
+    expect(commandRequestToSurfaceFrame({ command: { case: 'hostHello', value: {} } } as never)).toBeNull();
   });
 });
 
-function createSocket(frames: unknown[]): { readyState: number; send: (payload: string) => void } {
+function createSocket(frames: unknown[]): { readyState: number; send: (event: SurfaceEvent) => void } {
   return {
     readyState: 1,
-    send: (payload: string) => {
-      frames.push(JSON.parse(payload));
+    send: (event: SurfaceEvent) => {
+      frames.push(surfaceEventToTestFrame(event));
     },
   };
 }
 
-function dispatchSurfaceRpc(
-  subject: {
-    _dispatchSurfaceRpc(
-      sessionId: string,
-      requiredScope: 'surface:read' | 'surface:write',
-      declaredOperation: string,
-      rawArguments: Record<string, unknown>,
-      callback: (error: Error | null, response: unknown) => void,
-      operation: 'query' | 'command',
-    ): Promise<void>;
-  },
-  input: {
-    sessionId: string;
-    requiredScope: 'surface:read' | 'surface:write';
-    declaredOperation: string;
-    rawArguments: Record<string, unknown>;
-    operation: 'query' | 'command';
-  },
-): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    void subject._dispatchSurfaceRpc(
-      input.sessionId,
-      input.requiredScope,
-      input.declaredOperation,
-      input.rawArguments,
-      (error, response) => error ? reject(error) : resolve(response),
-      input.operation,
-    );
-  });
+function surfaceEventToTestFrame(event: SurfaceEvent): Record<string, unknown> {
+  const base = { trace_id: event.traceId, timestamp: Number(event.timestampMs) };
+  switch (event.event.case) {
+    case 'conversationNotice': return { kind: 'conversation_notice', ...base, conversation_notice: {
+      code: event.event.value.code, action_route: event.event.value.actionRoute,
+    } };
+    case 'conversationHistoryResult': return { kind: 'conversation_history_result', ...base, conversation_history_result: {
+      request_id: event.event.value.requestId, status: event.event.value.status,
+      items: event.event.value.items.map((item) => ({ entry_id: item.entryId, text: item.text })),
+      has_more: event.event.value.hasMore,
+    } };
+    case 'configurationSnapshot': return { kind: 'configuration_snapshot_result', ...base, configuration_snapshot_result: {
+      request_id: event.event.value.requestId, status: event.event.value.status,
+      snapshot: event.event.value.snapshot,
+    } };
+    case 'skillCatalog': return { kind: 'skill_catalog_response', ...base, skill_catalog_response: {
+      request_id: event.event.value.requestId, status: event.event.value.status,
+      snapshot: event.event.value.snapshot,
+    } };
+    case 'audioPlay': return { kind: 'audio_play', ...base, audio_play: {
+      audio_id: event.event.value.audioId, audio_uri: event.event.value.audioUri,
+      mime_type: event.event.value.mimeType, duration_ms: event.event.value.durationMs,
+    } };
+    default: return { kind: event.event.case ?? 'unknown', ...base };
+  }
 }

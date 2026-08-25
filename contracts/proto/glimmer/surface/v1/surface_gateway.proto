@@ -7,8 +7,8 @@ import "glimmer/common/v1/service_contract.proto";
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Surface.V1";
 
-// Product-to-Kernel session handshake. The generation is bound to the
-// EndpointRegistry record and is never accepted from a public browser client.
+// Product-to-Kernel session handshake. generation is resolved from the
+// supervised EndpointRegistry record and never accepted from a browser edge.
 message SurfaceGatewayServiceConnectRequest {
   glimmer.common.v1.CallMetadata call = 1;
   string product_id = 2;
@@ -24,47 +24,332 @@ message SurfaceGatewayServiceConnectResponse {
   repeated string scopes = 5;
 }
 
+message ConfigurationSnapshotQuery { string request_id = 1; }
+message ConversationHistoryQuery {
+  string request_id = 1;
+  string conversation_id = 2;
+  string scene_id = 3;
+  string thread_id = 4;
+  string actor_id = 5;
+  string source_provider_id = 6;
+  string cursor = 7;
+  uint32 limit = 8;
+}
+message SkillCatalogQuery { string request_id = 1; }
+message ExtensionRuntimeProjectionQuery {
+  string request_id = 1;
+  string extension_id = 2;
+}
+
 message SurfaceGatewayServiceQueryRequest {
   glimmer.common.v1.CallMetadata call = 1;
   string session_id = 2;
-  string query = 3;
-  google.protobuf.Struct arguments = 4;
+  oneof query {
+    ConfigurationSnapshotQuery configuration_snapshot = 10;
+    ConversationHistoryQuery conversation_history = 11;
+    SkillCatalogQuery skill_catalog = 12;
+    ExtensionRuntimeProjectionQuery extension_runtime_projection = 13;
+  }
 }
 
-message SurfaceGatewayServiceQueryResponse {
+message HeartbeatCommand {}
+message ChatInputCommand { string text = 1; string source_suffix = 2; }
+message AudioInputCommand {
+  string audio_id = 1;
+  bytes audio = 2;
+  string mime_type = 3;
+  uint32 duration_ms = 4;
+  uint32 sample_rate = 5;
+}
+message AvatarPresentationCommand {
+  string placement_id = 1;
+  double display_scale = 2;
+  bool reset_placement = 3;
+}
+message AvatarIntentCommand {
+  string action_id = 1;
+  string operation = 2;
+  uint32 priority = 3;
+}
+message CoreSkillActionResponseCommand {
   string request_id = 1;
   string status = 2;
-  google.protobuf.Struct projection = 3;
-  glimmer.common.v1.ServiceErrorDetail error = 4;
+  google.protobuf.Value result = 3;
+  string message = 4;
+  string error_code = 5;
+  string operation_id = 6;
+  repeated string recovery_actions = 7;
 }
+message CoreSkillConfirmationResponseCommand {
+  string request_id = 1;
+  string status = 2;
+  bool approved = 3;
+  string message = 4;
+}
+message ConfigurationUpdateCommand {
+  string request_id = 1;
+  string revision = 2;
+  bool dry_run = 3;
+  google.protobuf.Struct llm = 4;
+  google.protobuf.Struct audio = 5;
+  google.protobuf.Struct embedding = 6;
+  google.protobuf.Struct memory = 7;
+  google.protobuf.Struct skills = 8;
+}
+message ConfigurationTestCommand {
+  string request_id = 1;
+  google.protobuf.Struct provider = 2;
+}
+message ExtensionInstallSource {
+  string kind = 1;
+  string path = 2;
+  string url = 3;
+  string catalog_url = 4;
+  string extension_id = 5;
+  string channel = 6;
+  string repository = 7;
+  string tag = 8;
+}
+message ExtensionInstallPrepareCommand { string request_id = 1; ExtensionInstallSource source = 2; }
+message ExtensionInstallCommitCommand {
+  string request_id = 1;
+  string transaction_id = 2;
+  repeated string approved_permissions = 3;
+}
+message ExtensionInstallCancelCommand { string request_id = 1; string transaction_id = 2; }
+message ExtensionUninstallCommand { string request_id = 1; string extension_id = 2; string version = 3; }
+message ExtensionLifecycleCommand {
+  string request_id = 1;
+  string extension_id = 2;
+  string version = 3;
+  string operation = 4;
+}
+message ExtensionCommand {
+  string request_id = 1;
+  string command_id = 2;
+  repeated google.protobuf.Value args = 3;
+}
+message ShutdownCommand { string reason = 1; }
 
 message SurfaceGatewayServiceCommandRequest {
   glimmer.common.v1.CallMetadata call = 1;
   string session_id = 2;
-  string command = 3;
-  google.protobuf.Struct arguments = 4;
+  oneof command {
+    HeartbeatCommand heartbeat = 10;
+    ChatInputCommand chat_input = 11;
+    AudioInputCommand audio_input = 12;
+    AvatarPresentationCommand avatar_presentation = 13;
+    AvatarIntentCommand avatar_intent = 14;
+    CoreSkillActionResponseCommand core_skill_action_response = 15;
+    CoreSkillConfirmationResponseCommand core_skill_confirmation_response = 16;
+    ConfigurationUpdateCommand configuration_update = 17;
+    ConfigurationTestCommand configuration_test = 18;
+    ExtensionInstallPrepareCommand extension_install_prepare = 19;
+    ExtensionInstallCommitCommand extension_install_commit = 20;
+    ExtensionInstallCancelCommand extension_install_cancel = 21;
+    ExtensionUninstallCommand extension_uninstall = 22;
+    ExtensionLifecycleCommand extension_lifecycle = 23;
+    ExtensionCommand extension_command = 24;
+    ShutdownCommand shutdown = 25;
+  }
 }
 
-message SurfaceGatewayServiceCommandResponse {
+message ReplyMessage { uint32 sequence = 1; string content_type = 2; string text = 3; string language = 4; }
+message EmotionProjection { string emotion_type = 1; double intensity = 2; string trigger = 3; uint32 blend_time_ms = 4; }
+message ReplyEvent { string text = 1; repeated ReplyMessage messages = 2; EmotionProjection emotion_snapshot = 3; }
+message EmotionEvent { EmotionProjection emotion = 1; }
+message ThoughtEvent { bool active = 1; string hint = 2; }
+message AudioPlayEvent { string audio_id = 1; string audio_uri = 2; string mime_type = 3; uint32 duration_ms = 4; }
+message AudioTranscriptEvent { string audio_id = 1; string status = 2; string text = 3; string message = 4; }
+message CharacterPresentationEvent {
+  string avatar_package_id = 1;
+  string model_id = 2;
+  string display_name = 3;
+  string kind = 4;
+  string backend = 5;
+  string host_kind = 6;
+  string avatar_state = 7;
+  string placement_id = 8;
+  double display_scale = 9;
+  string worker_window_state = 10;
+  string composition_surface_state = 11;
+  bool first_frame_presented = 12;
+  bool interaction_ready = 13;
+  bool ready = 14;
+  string summary = 15;
+}
+message AvatarStatusEvent { string host_kind = 1; string host_id = 2; }
+message AvatarActionStateEvent { string action_id = 1; string state = 2; repeated string active_action_ids = 3; string message = 4; }
+message RuntimeResourceProjection {
+  string resource_id = 1;
+  string resource_kind = 2;
+  string desired_state = 3;
+  string actual_state = 4;
+  string readiness = 5;
+  string summary = 6;
+  repeated string recovery_actions = 7;
+}
+message RuntimeReconcilerProjection { string desired = 1; string actual = 2; string readiness = 3; repeated RuntimeResourceProjection resources = 4; }
+message RuntimeReadinessItem {
+  string runtime_id = 1;
+  string owner = 2;
+  string phase = 3;
+  string state = 4;
+  bool blocking = 5;
+  string summary = 6;
+  string details_ref = 7;
+  uint64 duration_ms = 8;
+  RuntimeReconcilerProjection reconciler = 9;
+}
+message RuntimeReadinessEvent { int64 updated_at_ms = 1; repeated RuntimeReadinessItem runtimes = 2; }
+message AudioProviderProjection { string provider_id = 1; string role = 2; string execution = 3; string status = 4; string message = 5; }
+message AudioCapabilityProjection {
+  bool enabled = 1;
+  string disabled_reason = 2;
+  string active_provider = 3;
+  string route_state = 4;
+  repeated AudioProviderProjection providers = 5;
+}
+message AudioStatusEvent { int64 updated_at_ms = 1; AudioCapabilityProjection tts = 2; AudioCapabilityProjection asr = 3; }
+message ConversationNoticeEvent {
+  string code = 1;
+  string level = 2;
+  string title = 3;
+  string message = 4;
+  string action_route = 5;
+  string action_label = 6;
+}
+message ConversationAddressProjection {
+  string source_provider_id = 1;
+  string scene_id = 2;
+  string conversation_id = 3;
+  string thread_id = 4;
+  string recall_scope = 5;
+  string disclosure_scope = 6;
+}
+message ConversationHistoryEntryProjection {
+  string entry_id = 1;
+  string source_kind = 2;
+  string role = 3;
+  string status = 4;
+  string text = 5;
+  string occurred_at = 6;
+  string conversation_id = 7;
+  string scene_id = 8;
+  string thread_id = 9;
+  string recall_scope = 10;
+  string disclosure_scope = 11;
+}
+message ConversationHistoryResultEvent {
   string request_id = 1;
   string status = 2;
-  google.protobuf.Struct result = 3;
+  ConversationAddressProjection conversation = 3;
+  repeated ConversationHistoryEntryProjection items = 4;
+  string next_cursor = 5;
+  bool has_more = 6;
+  string message = 7;
+}
+message ConfigurationSnapshotEvent { string request_id = 1; string status = 2; google.protobuf.Struct snapshot = 3; string message = 4; }
+message ConfigurationUpdateEvent {
+  string request_id = 1;
+  string status = 2;
+  string apply_state = 3;
+  repeated string change_summary = 4;
+  google.protobuf.Struct snapshot = 5;
+  string message = 6;
+}
+message ConfigurationTestEvent { string request_id = 1; string status = 2; string message = 3; repeated string discovered_models = 4; uint64 latency_ms = 5; }
+message SkillCatalogEvent { string request_id = 1; string status = 2; google.protobuf.Struct snapshot = 3; string message = 4; }
+message ExtensionInstallPreviewEvent {
+  string request_id = 1;
+  string status = 2;
+  string transaction_id = 3;
+  google.protobuf.Struct extension = 4;
+  google.protobuf.Struct artifact = 5;
+  google.protobuf.Struct trust = 6;
+  string message = 7;
+}
+message ExtensionInstallResultEvent {
+  string request_id = 1;
+  string status = 2;
+  string extension_id = 3;
+  string version = 4;
+  bool already_installed = 5;
+  string message = 6;
+}
+message ExtensionUninstallResultEvent { string request_id = 1; string extension_id = 2; string version = 3; string status = 4; string message = 5; }
+message ExtensionLifecycleResultEvent { string request_id = 1; string extension_id = 2; string version = 3; string operation = 4; string status = 5; string message = 6; }
+message ExtensionCommandResultEvent { string request_id = 1; string command_id = 2; string status = 3; google.protobuf.Value result = 4; string message = 5; }
+message ExtensionRuntimeProjectionResultEvent {
+  string request_id = 1;
+  string status = 2;
+  repeated google.protobuf.Struct projections = 3;
+  repeated google.protobuf.Struct installations = 4;
+  string message = 5;
+}
+message ExtensionRuntimeProjectionChangedEvent { google.protobuf.Struct projection = 1; }
+message ExtensionStatusChangedEvent { string extension_id = 1; string event = 2; string message = 3; }
+message CoreSkillActionRequestEvent { string request_id = 1; string action = 2; google.protobuf.Struct payload = 3; }
+message CoreSkillConfirmationRequestEvent {
+  string request_id = 1;
+  string trace_id = 2;
+  string skill_id = 3;
+  string target_kind = 4;
+  string target_name = 5;
+  string risk_level = 6;
+  repeated string side_effects = 7;
+}
+message ShutdownEvent {}
+
+message SurfaceEvent {
+  string event_id = 1;
+  string trace_id = 2;
+  int64 timestamp_ms = 3;
+  oneof event {
+    ReplyEvent reply = 10;
+    EmotionEvent emotion = 11;
+    ThoughtEvent thought = 12;
+    AudioPlayEvent audio_play = 13;
+    AudioTranscriptEvent audio_transcript = 14;
+    CharacterPresentationEvent character_presentation = 15;
+    AvatarStatusEvent avatar_status = 16;
+    AvatarActionStateEvent avatar_action_state = 17;
+    RuntimeReadinessEvent runtime_readiness = 18;
+    AudioStatusEvent audio_status = 19;
+    ConversationNoticeEvent conversation_notice = 20;
+    ConversationHistoryResultEvent conversation_history_result = 21;
+    ConfigurationSnapshotEvent configuration_snapshot = 22;
+    ConfigurationUpdateEvent configuration_update = 23;
+    ConfigurationTestEvent configuration_test = 24;
+    SkillCatalogEvent skill_catalog = 25;
+    ExtensionInstallPreviewEvent extension_install_preview = 26;
+    ExtensionInstallResultEvent extension_install_result = 27;
+    ExtensionUninstallResultEvent extension_uninstall_result = 28;
+    ExtensionLifecycleResultEvent extension_lifecycle_result = 29;
+    ExtensionCommandResultEvent extension_command_result = 30;
+    ExtensionRuntimeProjectionResultEvent extension_runtime_projection_result = 31;
+    ExtensionRuntimeProjectionChangedEvent extension_runtime_projection_changed = 32;
+    ExtensionStatusChangedEvent extension_status_changed = 33;
+    CoreSkillActionRequestEvent core_skill_action_request = 34;
+    CoreSkillConfirmationRequestEvent core_skill_confirmation_request = 35;
+    ShutdownEvent shutdown = 36;
+  }
+}
+
+message SurfaceGatewayServiceQueryResponse {
+  string operation_id = 1;
+  string status = 2;
+  SurfaceEvent event = 3;
   glimmer.common.v1.ServiceErrorDetail error = 4;
 }
-
-message SurfaceGatewayServiceStreamRequest {
-  glimmer.common.v1.CallMetadata call = 1;
-  string session_id = 2;
-  repeated string topics = 3;
+message SurfaceGatewayServiceCommandResponse {
+  string operation_id = 1;
+  string status = 2;
+  SurfaceEvent event = 3;
+  glimmer.common.v1.ServiceErrorDetail error = 4;
 }
-
-message SurfaceGatewayServiceStreamResponse {
-  string event_id = 1;
-  string kind = 2;
-  string trace_id = 3;
-  int64 timestamp_ms = 4;
-  google.protobuf.Struct projection = 5;
-}
+message SurfaceGatewayServiceStreamRequest { glimmer.common.v1.CallMetadata call = 1; string session_id = 2; }
+message SurfaceGatewayServiceStreamResponse { SurfaceEvent event = 1; }
 
 service SurfaceGatewayService {
   rpc Connect(SurfaceGatewayServiceConnectRequest) returns (SurfaceGatewayServiceConnectResponse);

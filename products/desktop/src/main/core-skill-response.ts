@@ -22,7 +22,17 @@ export function buildCoreSkillResponseFrame(
   result?: unknown,
   message?: string,
   failure?: CoreSkillFailureProjection,
-): Record<string, unknown> {
+): {
+  kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
+  request_id: string;
+  status: 'success' | 'error';
+  result?: unknown;
+  message?: string;
+  error_code?: string;
+  operation_id?: string;
+  recovery_actions?: string[];
+  timestamp: number;
+} {
   return {
     kind,
     request_id: requestId,
@@ -31,7 +41,7 @@ export function buildCoreSkillResponseFrame(
     message,
     error_code: failure?.error_code,
     operation_id: failure?.operation_id,
-    recovery_actions: failure?.recovery_actions,
+    recovery_actions: failure ? [...failure.recovery_actions] : undefined,
     timestamp: Date.now(),
   };
 }

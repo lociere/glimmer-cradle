@@ -7,6 +7,7 @@ import {
   SURFACE_GATEWAY_CONNECTING,
 } from './surface-gateway-client';
 import type { EndpointCatalogEntry } from '../adapters/endpoint-catalog';
+import type { ProductSurfaceProjection } from './surface-grpc-mapper';
 
 export interface KernelReadinessStatus {
   readonly ready: boolean;
@@ -111,13 +112,7 @@ export class KernelReadinessMonitor {
       this.connectionState = 'observing';
       this.connectionError = undefined;
     });
-    socket.on('message', (raw: Buffer) => {
-      let frame: unknown;
-      try {
-        frame = JSON.parse(raw.toString());
-      } catch {
-        return;
-      }
+    socket.on('message', (frame: ProductSurfaceProjection) => {
       if (isShutdownFrame(frame)) {
         this.catalog = null;
         this.connectionState = 'disconnected';

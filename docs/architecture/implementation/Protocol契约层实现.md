@@ -60,7 +60,7 @@ Proto image 是跨版本 breaking 参照，不能因 Document 迁移重建。JSO
 
 Kernel composition root 为受管 service 分配动态回环 endpoint 与进程级 capability token，启动对应 Host/Engine 后等待真实 readiness。调用携带 deadline、cancellation、trace、causation/correlation 与 generation；typed failure 通过稳定 code/detail 返回。进程退出、超时或主动 stop 会撤销 endpoint/token、取消 in-flight operation 并回收 lease/进程树。
 
-Surface 的浏览器 WebSocket 只属于 Personal Server 产品 ingress；它代理到内部 `SurfaceGatewayService`，不是器官间手写协议。Audio 的音频字节通过 `AudioMediaReference` lease data plane，普通 gRPC 只携带 control DTO。Avatar 使用 `AvatarHostService.Connect` 双向 stream，旧 WebSocket control consumer 不存在。
+Surface 的浏览器 WebSocket 只属于 Personal Server 产品 ingress；产品 Adapter 先验证 JSON 并映射为 `SurfaceGatewayService` 的有限 typed Query/Command DTO，Kernel Adapter 再映射到明确 Application use case。内部主线不传序列化 `{frame}`，stream 只发送 typed `SurfaceEvent`。Avatar Host lifecycle/control 只走 `AvatarHostService.Connect`，Surface 只消费受控 readiness/status projection。Audio 的音频字节通过 `AudioMediaReference` lease data plane，普通 gRPC 只携带 control DTO。
 
 ## 调试入口
 

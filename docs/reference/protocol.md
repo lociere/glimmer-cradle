@@ -20,7 +20,7 @@
 | 契约族 | 路径/公开边缘 | 关键不变量 |
 |---|---|---|
 | Common / Kernel / Cognition | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` | deadline、cancellation、typed error、trace/causation/correlation、generation 与幂等。 |
-| Surface Gateway | `contracts/proto/glimmer/surface/v1/` | Desktop/Personal Server 只访问 Kernel Gateway；浏览器认证 WebSocket 是 Product ingress，不是内部器官协议。 |
+| Surface Gateway | `contracts/proto/glimmer/surface/v1/` | Desktop/Personal Server 只访问 Kernel Gateway；Query、Command、Event 使用有限 typed DTO，不接受 `string kind + Struct {frame}`；浏览器认证 WebSocket 是 Product ingress，不是内部器官协议。 |
 | Avatar Host | `contracts/proto/glimmer/avatar/v1/` | `AvatarHostService.Connect` 是唯一 control consumer；二进制 DTO 直接映射，不经 JSON round-trip。 |
 | Audio Engine | `contracts/proto/glimmer/engine/audio/v1/` | unary control 与媒体 data plane 分离；普通 RPC 不携带音频字节。 |
 | Extension Host | `contracts/proto/glimmer/extension/v1/` 与 Extension SDK edge | Kernel 监督独立 Host；第三方 handler 不进入 Kernel。 |

@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events';
 import * as grpc from '@grpc/grpc-js';
-import { create, fromBinary, toBinary, toJson, type DescMessage, type JsonObject, type MessageShape } from '@bufbuild/protobuf';
-import { StructSchema } from '@bufbuild/protobuf/wkt';
+import { create, fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
 import { CallMetadataSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
   SurfaceGatewayServiceCommandRequestSchema,
@@ -19,7 +18,15 @@ import {
   type SurfaceGatewayServiceQueryRequest,
   type SurfaceGatewayServiceQueryResponse,
   type SurfaceGatewayServiceStreamResponse,
+  type SurfaceEvent,
 } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
+import {
+  commandFromSurfaceRequest,
+  queryFromSurfaceRequest,
+  surfaceEventToProjection,
+  type ProductSurfaceProjection,
+  type ProductSurfaceRequest,
+} from './surface-grpc-mapper';
 
 export const SURFACE_GATEWAY_OPEN = 1;
 export const SURFACE_GATEWAY_CONNECTING = 0;
@@ -29,7 +36,7 @@ export interface SurfaceGatewayClientLike {
   readonly readyState: number;
   on(event: string, listener: (...args: any[]) => void): this;
   once(event: string, listener: (...args: any[]) => void): this;
-  send(serialized: string): void;
+  submit(frame: ProductSurfaceRequest): void;
   connect(endpoint: string, generation: string, productId: string): Promise<void>;
   close(): void;
 }
@@ -97,12 +104,11 @@ export class SurfaceGatewayClient extends EventEmitter {
     this.sessionId = response.sessionId;
     const stream = client.Stream(create(SurfaceGatewayServiceStreamRequestSchema, {
       sessionId: this.sessionId,
-      topics: ['presentation'],
       call: create(CallMetadataSchema, { traceId: `${productId}-surface-stream-${Date.now()}` }),
     }));
     this.stream = stream;
     stream.on('data', (event) => {
-      if (event.projection) this.emit('message', Buffer.from(JSON.stringify(structToJson(event.projection)), 'utf8'));
+      this.emitProjection(event.event);
     });
     stream.once('end', () => this.disconnect());
     stream.once('error', (error) => this.fail(error));
@@ -110,25 +116,27 @@ export class SurfaceGatewayClient extends EventEmitter {
     this.emit('open');
   }
 
-  public send(serialized: string): void {
+  public submit(frame: ProductSurfaceRequest): void {
     if (this._readyState !== SURFACE_GATEWAY_OPEN || !this.client || !this.sessionId) return;
-    let frame: Record<string, unknown>;
-    try { frame = JSON.parse(serialized) as Record<string, unknown>; } catch { return; }
-    const kind = typeof frame.kind === 'string' ? frame.kind : '';
-    const request = {
-      sessionId: this.sessionId,
-      call: create(CallMetadataSchema, {
-        traceId: typeof frame.trace_id === 'string' ? frame.trace_id : `${kind}-${Date.now()}`,
-        idempotencyKey: typeof frame.request_id === 'string' ? frame.request_id : '',
-      }),
-      arguments: JSON.parse(JSON.stringify({ frame })) as JsonObject,
-    };
-    const queries = new Set(['config_snapshot_request', 'conversation_history_request', 'skill_catalog_request', 'extension_runtime_projection_request']);
-    if (queries.has(kind)) {
-      this.client.Query(create(SurfaceGatewayServiceQueryRequestSchema, { ...request, query: kind }), (error, response) => this.handleResponse(error, response?.projection));
-    } else {
-      this.client.Command(create(SurfaceGatewayServiceCommandRequestSchema, { ...request, command: kind }), (error, response) => this.handleResponse(error, response?.result));
+    const call = create(CallMetadataSchema, {
+      traceId: frame.trace_id ?? `${frame.kind}-${Date.now()}`,
+      idempotencyKey: 'request_id' in frame ? frame.request_id : '',
+    });
+    const query = queryFromSurfaceRequest(frame);
+    if (query) {
+      this.client.Query(create(SurfaceGatewayServiceQueryRequestSchema, {
+        sessionId: this.sessionId, call, query,
+      }), (error, response) => this.handleResponse(error, response?.event));
+      return;
     }
+    const command = commandFromSurfaceRequest(frame);
+    if (!command) {
+      this.emit('error', new Error(`Surface 请求类型不受支持：${frame.kind}`));
+      return;
+    }
+    this.client.Command(create(SurfaceGatewayServiceCommandRequestSchema, {
+      sessionId: this.sessionId, call, command,
+    }), (error, response) => this.handleResponse(error, response?.event));
   }
 
   public close(): void {
@@ -136,9 +144,14 @@ export class SurfaceGatewayClient extends EventEmitter {
     this.disconnect();
   }
 
-  private handleResponse(error: grpc.ServiceError | null, projection: unknown): void {
+  private handleResponse(error: grpc.ServiceError | null, event: SurfaceEvent | undefined): void {
     if (error) { this.fail(error); return; }
-    if (projection && typeof projection === 'object') this.emit('message', Buffer.from(JSON.stringify(structToJson(projection)), 'utf8'));
+    this.emitProjection(event);
+  }
+
+  private emitProjection(event: SurfaceEvent | undefined): void {
+    const projection = surfaceEventToProjection(event);
+    if (projection) this.emit('message', projection satisfies ProductSurfaceProjection);
   }
 
   private fail(error: Error): void {
@@ -157,8 +170,4 @@ export class SurfaceGatewayClient extends EventEmitter {
     this.sessionId = '';
     if (emitClose) this.emit('close');
   }
-}
-
-function structToJson(value: unknown): unknown {
-  try { return toJson(StructSchema, value as never); } catch { return value; }
 }

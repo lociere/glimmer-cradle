@@ -17,8 +17,7 @@ test('cancels previewed extension transactions when the browser websocket discon
         },
         surfaceGatewayClientFactory: () => {
           upstream = new SurfaceGatewayTestDouble();
-          upstream.onSend = (serialized) => {
-            const frame = JSON.parse(serialized) as Record<string, unknown>;
+          upstream.onSend = (frame) => {
             if (frame.kind === 'extension_install_prepare') {
               upstream?.emitFrame({
                 kind: 'extension_install_preview',
@@ -80,8 +79,7 @@ test('rejects commit requests for transactions owned by another session or unkno
         extensionUploadAuthorization: { principalId: 'token-a', sessionBinding },
         surfaceGatewayClientFactory: () => {
           const upstream = new SurfaceGatewayTestDouble();
-          upstream.onSend = (serialized) => {
-            const frame = JSON.parse(serialized) as Record<string, unknown>;
+          upstream.onSend = (frame) => {
             if (frame.kind === 'extension_install_commit') upstreamCommitSeen = true;
           };
           return upstream;

@@ -58,6 +58,7 @@ import {
   SURFACE_GATEWAY_CONNECTING,
   SURFACE_GATEWAY_OPEN,
 } from './surface-gateway-client';
+import type { ProductSurfaceProjection } from './surface-grpc-mapper';
 
 const RECONNECT_INTERVAL_MS = 3000;
 const PROJECT_ROOTS = resolveDesktopProjectRoots({
@@ -853,7 +854,7 @@ function sendAvatarPresentation(appearance: AvatarAppearanceSettings, resetPlace
     return;
   }
 
-  kernelSocket.send(JSON.stringify({
+  kernelSocket.submit({
     kind: 'avatar_presentation',
     timestamp: Date.now(),
     avatar_presentation: {
@@ -861,7 +862,7 @@ function sendAvatarPresentation(appearance: AvatarAppearanceSettings, resetPlace
       display_scale: appearance.displayScale,
       reset_placement: resetPlacement || undefined,
     },
-  }));
+  });
 }
 
 /** 模型动作始终从本机 catalog 投影读取，renderer 只获得已净化的可操作清单。 */
@@ -926,7 +927,7 @@ async function sendAvatarActionIntent(raw: unknown): Promise<void> {
     actions,
   );
 
-  kernelSocket.send(JSON.stringify({
+  kernelSocket.submit({
     kind: 'avatar_intent',
     timestamp: Date.now(),
     avatar_intent: {
@@ -934,7 +935,7 @@ async function sendAvatarActionIntent(raw: unknown): Promise<void> {
       operation,
       priority: 8,
     },
-  }));
+  });
 
   if (operation !== 'trigger') {
     await saveAvatarActionState(nextActionState);
@@ -1399,7 +1400,7 @@ function sendExtensionInstallRequest<T>(
       reject(new Error('扩展包管理请求超时'));
     }, 120000);
     waiters.set(requestId, { resolve, timer });
-    kernelSocket?.send(JSON.stringify(frame));
+    kernelSocket?.submit(frame);
   });
 }
 
@@ -1480,7 +1481,7 @@ function requestExtensionLifecycle(raw: ExtensionLifecycleRequest): Promise<Exte
         }
       },
     });
-    kernelSocket?.send(JSON.stringify({
+    kernelSocket?.submit({
       kind: 'extension_lifecycle_request',
       timestamp: Date.now(),
       extension_lifecycle_request: {
@@ -1489,7 +1490,7 @@ function requestExtensionLifecycle(raw: ExtensionLifecycleRequest): Promise<Exte
         version: operation === 'start' && version ? version : undefined,
         operation,
       },
-    }));
+    });
   });
 }
 
@@ -1548,7 +1549,7 @@ function executeExtensionCommand(raw: ExtensionCommandRequest): Promise<Extensio
         }
       },
     });
-    kernelSocket?.send(JSON.stringify({
+    kernelSocket?.submit({
       kind: 'extension_command_request',
       timestamp: Date.now(),
       extension_command_request: {
@@ -1556,7 +1557,7 @@ function executeExtensionCommand(raw: ExtensionCommandRequest): Promise<Extensio
         command_id: commandId,
         args,
       },
-    }));
+    });
   });
 }
 
@@ -1592,11 +1593,11 @@ function requestExtensionRuntimeProjections(): Promise<ExtensionRuntimeProjectio
         resolve(result);
       },
     });
-    kernelSocket?.send(JSON.stringify({
+    kernelSocket?.submit({
       kind: 'extension_runtime_projection_request',
       timestamp: Date.now(),
       extension_runtime_projection_request: { request_id: requestId },
-    }));
+    });
   });
 }
 
@@ -1659,11 +1660,11 @@ function requestSkillCatalog(): Promise<SkillCatalogResponse> {
       },
     });
     const request: SkillCatalogRequest = { request_id: requestId };
-    kernelSocket?.send(JSON.stringify({
+    kernelSocket?.submit({
       kind: 'skill_catalog_request',
       timestamp: Date.now(),
       skill_catalog_request: request,
-    } satisfies PresentationUpstreamFrame));
+    } satisfies PresentationUpstreamFrame);
   });
 }
 
@@ -2598,9 +2599,8 @@ async function connectToKernel(): Promise<void> {
     void readAvatarAppearance().then((appearance) => sendAvatarPresentation(appearance));
   });
 
-  kernelSocket.on('message', (raw: Buffer) => {
-    try {
-      const frame = JSON.parse(raw.toString());
+  kernelSocket.on('message', (projection: ProductSurfaceProjection) => {
+      const frame = projection as ProductSurfaceProjection & Record<string, any>;
       const kindValue: string = (typeof frame.kind === 'string' && frame.kind) || '';
       const traceId: string = (typeof frame.trace_id === 'string' && frame.trace_id) || '';
 
@@ -2840,9 +2840,6 @@ async function connectToKernel(): Promise<void> {
           });
         }
       }
-    } catch {
-      console.warn('[ipc-bridge] Failed to parse kernel message');
-    }
   });
 
   kernelSocket.on('close', () => {
@@ -3119,14 +3116,14 @@ function sendCoreSkillResponse(
   failure?: CoreSkillFailureProjection,
 ): void {
   if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN || !requestId) return;
-  kernelSocket.send(JSON.stringify(buildCoreSkillResponseFrame(
+  kernelSocket.submit(buildCoreSkillResponseFrame(
     kind,
     requestId,
     status,
     result,
     message,
     failure,
-  )));
+  ));
 }
 
 function buildObservabilityQueryContext(): {
@@ -3325,11 +3322,11 @@ export function registerIPCHandlers(
     const content = (payload as { content?: string })?.content ?? '';
 
     if (kernelSocket?.readyState === SURFACE_GATEWAY_OPEN) {
-      kernelSocket.send(JSON.stringify({
+      kernelSocket.submit({
         kind: 'chat_input',
         timestamp: Date.now(),
         chat_input: { text: content },
-      }));
+      });
     } else {
       sendToRenderer('ui:reply', {
         trace_id: '',
@@ -3347,7 +3344,7 @@ export function registerIPCHandlers(
 
   desktopIpcRouter.handle('ui:send-audio-input', async (_event, payload: AudioInputPayload) => {
     if (kernelSocket?.readyState === SURFACE_GATEWAY_OPEN) {
-      kernelSocket.send(JSON.stringify({
+      kernelSocket.submit({
         kind: 'audio_input',
         trace_id: payload.trace_id || `ui_audio_${Date.now()}`,
         timestamp: Date.now(),
@@ -3358,7 +3355,7 @@ export function registerIPCHandlers(
           duration_ms: payload.duration_ms,
           sample_rate: payload.sample_rate,
         },
-      }));
+      });
       return;
     }
 
@@ -3415,7 +3412,7 @@ export async function requestKernelShutdown(timeoutMs = 10000): Promise<boolean>
     kernelDisconnectWaiters.add(onDisconnected);
 
     try {
-      kernelSocket?.send(JSON.stringify(frame));
+      kernelSocket?.submit(frame);
     } catch {
       finish(false);
     }

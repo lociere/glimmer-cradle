@@ -4,6 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { Value } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
 import type { CallMetadata, ServiceErrorDetail } from "../../common/v1/service_contract_pb";
 import { file_glimmer_common_v1_service_contract } from "../../common/v1/service_contract_pb";
@@ -13,11 +14,11 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/surface/v1/surface_gateway.proto.
  */
 export const file_glimmer_surface_v1_surface_gateway: GenFile = /*@__PURE__*/
-  fileDesc("CihnbGltbWVyL3N1cmZhY2UvdjEvc3VyZmFjZV9nYXRld2F5LnByb3RvEhJnbGltbWVyLnN1cmZhY2UudjEijAEKI1N1cmZhY2VHYXRld2F5U2VydmljZUNvbm5lY3RSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEgoKcHJvZHVjdF9pZBgCIAEoCRISCgpnZW5lcmF0aW9uGAMgASgJEg4KBnNjb3BlcxgEIAMoCSKBAQokU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29ubmVjdFJlc3BvbnNlEhAKCGFjY2VwdGVkGAEgASgIEhIKCnNlc3Npb25faWQYAiABKAkSEgoKZ2VuZXJhdGlvbhgDIAEoCRIPCgdtZXNzYWdlGAQgASgJEg4KBnNjb3BlcxgFIAMoCSKhAQohU3VyZmFjZUdhdGV3YXlTZXJ2aWNlUXVlcnlSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEgoKc2Vzc2lvbl9pZBgCIAEoCRINCgVxdWVyeRgDIAEoCRIqCglhcmd1bWVudHMYBCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IqsBCiJTdXJmYWNlR2F0ZXdheVNlcnZpY2VRdWVyeVJlc3BvbnNlEhIKCnJlcXVlc3RfaWQYASABKAkSDgoGc3RhdHVzGAIgASgJEisKCnByb2plY3Rpb24YAyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EjQKBWVycm9yGAQgASgLMiUuZ2xpbW1lci5jb21tb24udjEuU2VydmljZUVycm9yRGV0YWlsIqUBCiNTdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5kUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEhIKCnNlc3Npb25faWQYAiABKAkSDwoHY29tbWFuZBgDIAEoCRIqCglhcmd1bWVudHMYBCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IqkBCiRTdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5kUmVzcG9uc2USEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSJwoGcmVzdWx0GAMgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBI0CgVlcnJvchgEIAEoCzIlLmdsaW1tZXIuY29tbW9uLnYxLlNlcnZpY2VFcnJvckRldGFpbCJ3CiJTdXJmYWNlR2F0ZXdheVNlcnZpY2VTdHJlYW1SZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEgoKc2Vzc2lvbl9pZBgCIAEoCRIOCgZ0b3BpY3MYAyADKAkimgEKI1N1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlc3BvbnNlEhAKCGV2ZW50X2lkGAEgASgJEgwKBGtpbmQYAiABKAkSEAoIdHJhY2VfaWQYAyABKAkSFAoMdGltZXN0YW1wX21zGAQgASgDEisKCnByb2plY3Rpb24YBSABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0MogEChVTdXJmYWNlR2F0ZXdheVNlcnZpY2USfAoHQ29ubmVjdBI3LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb25uZWN0UmVxdWVzdBo4LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb25uZWN0UmVzcG9uc2USdgoFUXVlcnkSNS5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlUXVlcnlSZXF1ZXN0GjYuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2VydmljZVF1ZXJ5UmVzcG9uc2USfAoHQ29tbWFuZBI3LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5kUmVxdWVzdBo4LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5kUmVzcG9uc2USewoGU3RyZWFtEjYuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlcXVlc3QaNy5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlU3RyZWFtUmVzcG9uc2UwAUItqgIqR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5TdXJmYWNlLlYxYgZwcm90bzM", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
+  fileDesc("CihnbGltbWVyL3N1cmZhY2UvdjEvc3VyZmFjZV9nYXRld2F5LnByb3RvEhJnbGltbWVyLnN1cmZhY2UudjEijAEKI1N1cmZhY2VHYXRld2F5U2VydmljZUNvbm5lY3RSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEgoKcHJvZHVjdF9pZBgCIAEoCRISCgpnZW5lcmF0aW9uGAMgASgJEg4KBnNjb3BlcxgEIAMoCSKBAQokU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29ubmVjdFJlc3BvbnNlEhAKCGFjY2VwdGVkGAEgASgIEhIKCnNlc3Npb25faWQYAiABKAkSEgoKZ2VuZXJhdGlvbhgDIAEoCRIPCgdtZXNzYWdlGAQgASgJEg4KBnNjb3BlcxgFIAMoCSIwChpDb25maWd1cmF0aW9uU25hcHNob3RRdWVyeRISCgpyZXF1ZXN0X2lkGAEgASgJIrkBChhDb252ZXJzYXRpb25IaXN0b3J5UXVlcnkSEgoKcmVxdWVzdF9pZBgBIAEoCRIXCg9jb252ZXJzYXRpb25faWQYAiABKAkSEAoIc2NlbmVfaWQYAyABKAkSEQoJdGhyZWFkX2lkGAQgASgJEhAKCGFjdG9yX2lkGAUgASgJEhoKEnNvdXJjZV9wcm92aWRlcl9pZBgGIAEoCRIOCgZjdXJzb3IYByABKAkSDQoFbGltaXQYCCABKA0iJwoRU2tpbGxDYXRhbG9nUXVlcnkSEgoKcmVxdWVzdF9pZBgBIAEoCSJLCh9FeHRlbnNpb25SdW50aW1lUHJvamVjdGlvblF1ZXJ5EhIKCnJlcXVlc3RfaWQYASABKAkSFAoMZXh0ZW5zaW9uX2lkGAIgASgJIqwDCiFTdXJmYWNlR2F0ZXdheVNlcnZpY2VRdWVyeVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRISCgpzZXNzaW9uX2lkGAIgASgJElAKFmNvbmZpZ3VyYXRpb25fc25hcHNob3QYCiABKAsyLi5nbGltbWVyLnN1cmZhY2UudjEuQ29uZmlndXJhdGlvblNuYXBzaG90UXVlcnlIABJMChRjb252ZXJzYXRpb25faGlzdG9yeRgLIAEoCzIsLmdsaW1tZXIuc3VyZmFjZS52MS5Db252ZXJzYXRpb25IaXN0b3J5UXVlcnlIABI+Cg1za2lsbF9jYXRhbG9nGAwgASgLMiUuZ2xpbW1lci5zdXJmYWNlLnYxLlNraWxsQ2F0YWxvZ1F1ZXJ5SAASWwocZXh0ZW5zaW9uX3J1bnRpbWVfcHJvamVjdGlvbhgNIAEoCzIzLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25SdW50aW1lUHJvamVjdGlvblF1ZXJ5SABCBwoFcXVlcnkiEgoQSGVhcnRiZWF0Q29tbWFuZCI3ChBDaGF0SW5wdXRDb21tYW5kEgwKBHRleHQYASABKAkSFQoNc291cmNlX3N1ZmZpeBgCIAEoCSJxChFBdWRpb0lucHV0Q29tbWFuZBIQCghhdWRpb19pZBgBIAEoCRINCgVhdWRpbxgCIAEoDBIRCgltaW1lX3R5cGUYAyABKAkSEwoLZHVyYXRpb25fbXMYBCABKA0SEwoLc2FtcGxlX3JhdGUYBSABKA0iYQoZQXZhdGFyUHJlc2VudGF0aW9uQ29tbWFuZBIUCgxwbGFjZW1lbnRfaWQYASABKAkSFQoNZGlzcGxheV9zY2FsZRgCIAEoARIXCg9yZXNldF9wbGFjZW1lbnQYAyABKAgiTQoTQXZhdGFySW50ZW50Q29tbWFuZBIRCglhY3Rpb25faWQYASABKAkSEQoJb3BlcmF0aW9uGAIgASgJEhAKCHByaW9yaXR5GAMgASgNIsEBCh5Db3JlU2tpbGxBY3Rpb25SZXNwb25zZUNvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSJgoGcmVzdWx0GAMgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEg8KB21lc3NhZ2UYBCABKAkSEgoKZXJyb3JfY29kZRgFIAEoCRIUCgxvcGVyYXRpb25faWQYBiABKAkSGAoQcmVjb3ZlcnlfYWN0aW9ucxgHIAMoCSJtCiRDb3JlU2tpbGxDb25maXJtYXRpb25SZXNwb25zZUNvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSEAoIYXBwcm92ZWQYAyABKAgSDwoHbWVzc2FnZRgEIAEoCSKfAgoaQ29uZmlndXJhdGlvblVwZGF0ZUNvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCRIPCgdkcnlfcnVuGAMgASgIEiQKA2xsbRgEIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSJgoFYXVkaW8YBSABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EioKCWVtYmVkZGluZxgGIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSJwoGbWVtb3J5GAcgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBInCgZza2lsbHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0IlkKGENvbmZpZ3VyYXRpb25UZXN0Q29tbWFuZBISCgpyZXF1ZXN0X2lkGAEgASgJEikKCHByb3ZpZGVyGAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdCKeAQoWRXh0ZW5zaW9uSW5zdGFsbFNvdXJjZRIMCgRraW5kGAEgASgJEgwKBHBhdGgYAiABKAkSCwoDdXJsGAMgASgJEhMKC2NhdGFsb2dfdXJsGAQgASgJEhQKDGV4dGVuc2lvbl9pZBgFIAEoCRIPCgdjaGFubmVsGAYgASgJEhIKCnJlcG9zaXRvcnkYByABKAkSCwoDdGFnGAggASgJInAKHkV4dGVuc2lvbkluc3RhbGxQcmVwYXJlQ29tbWFuZBISCgpyZXF1ZXN0X2lkGAEgASgJEjoKBnNvdXJjZRgCIAEoCzIqLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25JbnN0YWxsU291cmNlImkKHUV4dGVuc2lvbkluc3RhbGxDb21taXRDb21tYW5kEhIKCnJlcXVlc3RfaWQYASABKAkSFgoOdHJhbnNhY3Rpb25faWQYAiABKAkSHAoUYXBwcm92ZWRfcGVybWlzc2lvbnMYAyADKAkiSwodRXh0ZW5zaW9uSW5zdGFsbENhbmNlbENvbW1hbmQSEgoKcmVxdWVzdF9pZBgBIAEoCRIWCg50cmFuc2FjdGlvbl9pZBgCIAEoCSJWChlFeHRlbnNpb25Vbmluc3RhbGxDb21tYW5kEhIKCnJlcXVlc3RfaWQYASABKAkSFAoMZXh0ZW5zaW9uX2lkGAIgASgJEg8KB3ZlcnNpb24YAyABKAkiaQoZRXh0ZW5zaW9uTGlmZWN5Y2xlQ29tbWFuZBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGV4dGVuc2lvbl9pZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKCW9wZXJhdGlvbhgEIAEoCSJgChBFeHRlbnNpb25Db21tYW5kEhIKCnJlcXVlc3RfaWQYASABKAkSEgoKY29tbWFuZF9pZBgCIAEoCRIkCgRhcmdzGAMgAygLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlIiEKD1NodXRkb3duQ29tbWFuZBIOCgZyZWFzb24YASABKAkiswoKI1N1cmZhY2VHYXRld2F5U2VydmljZUNvbW1hbmRSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEgoKc2Vzc2lvbl9pZBgCIAEoCRI5CgloZWFydGJlYXQYCiABKAsyJC5nbGltbWVyLnN1cmZhY2UudjEuSGVhcnRiZWF0Q29tbWFuZEgAEjoKCmNoYXRfaW5wdXQYCyABKAsyJC5nbGltbWVyLnN1cmZhY2UudjEuQ2hhdElucHV0Q29tbWFuZEgAEjwKC2F1ZGlvX2lucHV0GAwgASgLMiUuZ2xpbW1lci5zdXJmYWNlLnYxLkF1ZGlvSW5wdXRDb21tYW5kSAASTAoTYXZhdGFyX3ByZXNlbnRhdGlvbhgNIAEoCzItLmdsaW1tZXIuc3VyZmFjZS52MS5BdmF0YXJQcmVzZW50YXRpb25Db21tYW5kSAASQAoNYXZhdGFyX2ludGVudBgOIAEoCzInLmdsaW1tZXIuc3VyZmFjZS52MS5BdmF0YXJJbnRlbnRDb21tYW5kSAASWAoaY29yZV9za2lsbF9hY3Rpb25fcmVzcG9uc2UYDyABKAsyMi5nbGltbWVyLnN1cmZhY2UudjEuQ29yZVNraWxsQWN0aW9uUmVzcG9uc2VDb21tYW5kSAASZAogY29yZV9za2lsbF9jb25maXJtYXRpb25fcmVzcG9uc2UYECABKAsyOC5nbGltbWVyLnN1cmZhY2UudjEuQ29yZVNraWxsQ29uZmlybWF0aW9uUmVzcG9uc2VDb21tYW5kSAASTgoUY29uZmlndXJhdGlvbl91cGRhdGUYESABKAsyLi5nbGltbWVyLnN1cmZhY2UudjEuQ29uZmlndXJhdGlvblVwZGF0ZUNvbW1hbmRIABJKChJjb25maWd1cmF0aW9uX3Rlc3QYEiABKAsyLC5nbGltbWVyLnN1cmZhY2UudjEuQ29uZmlndXJhdGlvblRlc3RDb21tYW5kSAASVwoZZXh0ZW5zaW9uX2luc3RhbGxfcHJlcGFyZRgTIAEoCzIyLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25JbnN0YWxsUHJlcGFyZUNvbW1hbmRIABJVChhleHRlbnNpb25faW5zdGFsbF9jb21taXQYFCABKAsyMS5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uSW5zdGFsbENvbW1pdENvbW1hbmRIABJVChhleHRlbnNpb25faW5zdGFsbF9jYW5jZWwYFSABKAsyMS5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uSW5zdGFsbENhbmNlbENvbW1hbmRIABJMChNleHRlbnNpb25fdW5pbnN0YWxsGBYgASgLMi0uZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvblVuaW5zdGFsbENvbW1hbmRIABJMChNleHRlbnNpb25fbGlmZWN5Y2xlGBcgASgLMi0uZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvbkxpZmVjeWNsZUNvbW1hbmRIABJBChFleHRlbnNpb25fY29tbWFuZBgYIAEoCzIkLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25Db21tYW5kSAASNwoIc2h1dGRvd24YGSABKAsyIy5nbGltbWVyLnN1cmZhY2UudjEuU2h1dGRvd25Db21tYW5kSABCCQoHY29tbWFuZCJWCgxSZXBseU1lc3NhZ2USEAoIc2VxdWVuY2UYASABKA0SFAoMY29udGVudF90eXBlGAIgASgJEgwKBHRleHQYAyABKAkSEAoIbGFuZ3VhZ2UYBCABKAkiZAoRRW1vdGlvblByb2plY3Rpb24SFAoMZW1vdGlvbl90eXBlGAEgASgJEhEKCWludGVuc2l0eRgCIAEoARIPCgd0cmlnZ2VyGAMgASgJEhUKDWJsZW5kX3RpbWVfbXMYBCABKA0ijwEKClJlcGx5RXZlbnQSDAoEdGV4dBgBIAEoCRIyCghtZXNzYWdlcxgCIAMoCzIgLmdsaW1tZXIuc3VyZmFjZS52MS5SZXBseU1lc3NhZ2USPwoQZW1vdGlvbl9zbmFwc2hvdBgDIAEoCzIlLmdsaW1tZXIuc3VyZmFjZS52MS5FbW90aW9uUHJvamVjdGlvbiJGCgxFbW90aW9uRXZlbnQSNgoHZW1vdGlvbhgBIAEoCzIlLmdsaW1tZXIuc3VyZmFjZS52MS5FbW90aW9uUHJvamVjdGlvbiIsCgxUaG91Z2h0RXZlbnQSDgoGYWN0aXZlGAEgASgIEgwKBGhpbnQYAiABKAkiXQoOQXVkaW9QbGF5RXZlbnQSEAoIYXVkaW9faWQYASABKAkSEQoJYXVkaW9fdXJpGAIgASgJEhEKCW1pbWVfdHlwZRgDIAEoCRITCgtkdXJhdGlvbl9tcxgEIAEoDSJXChRBdWRpb1RyYW5zY3JpcHRFdmVudBIQCghhdWRpb19pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSDAoEdGV4dBgDIAEoCRIPCgdtZXNzYWdlGAQgASgJIu4CChpDaGFyYWN0ZXJQcmVzZW50YXRpb25FdmVudBIZChFhdmF0YXJfcGFja2FnZV9pZBgBIAEoCRIQCghtb2RlbF9pZBgCIAEoCRIUCgxkaXNwbGF5X25hbWUYAyABKAkSDAoEa2luZBgEIAEoCRIPCgdiYWNrZW5kGAUgASgJEhEKCWhvc3Rfa2luZBgGIAEoCRIUCgxhdmF0YXJfc3RhdGUYByABKAkSFAoMcGxhY2VtZW50X2lkGAggASgJEhUKDWRpc3BsYXlfc2NhbGUYCSABKAESGwoTd29ya2VyX3dpbmRvd19zdGF0ZRgKIAEoCRIhChljb21wb3NpdGlvbl9zdXJmYWNlX3N0YXRlGAsgASgJEh0KFWZpcnN0X2ZyYW1lX3ByZXNlbnRlZBgMIAEoCBIZChFpbnRlcmFjdGlvbl9yZWFkeRgNIAEoCBINCgVyZWFkeRgOIAEoCBIPCgdzdW1tYXJ5GA8gASgJIjcKEUF2YXRhclN0YXR1c0V2ZW50EhEKCWhvc3Rfa2luZBgBIAEoCRIPCgdob3N0X2lkGAIgASgJImYKFkF2YXRhckFjdGlvblN0YXRlRXZlbnQSEQoJYWN0aW9uX2lkGAEgASgJEg0KBXN0YXRlGAIgASgJEhkKEWFjdGl2ZV9hY3Rpb25faWRzGAMgAygJEg8KB21lc3NhZ2UYBCABKAkisgEKGVJ1bnRpbWVSZXNvdXJjZVByb2plY3Rpb24SEwoLcmVzb3VyY2VfaWQYASABKAkSFQoNcmVzb3VyY2Vfa2luZBgCIAEoCRIVCg1kZXNpcmVkX3N0YXRlGAMgASgJEhQKDGFjdHVhbF9zdGF0ZRgEIAEoCRIRCglyZWFkaW5lc3MYBSABKAkSDwoHc3VtbWFyeRgGIAEoCRIYChByZWNvdmVyeV9hY3Rpb25zGAcgAygJIpMBChtSdW50aW1lUmVjb25jaWxlclByb2plY3Rpb24SDwoHZGVzaXJlZBgBIAEoCRIOCgZhY3R1YWwYAiABKAkSEQoJcmVhZGluZXNzGAMgASgJEkAKCXJlc291cmNlcxgEIAMoCzItLmdsaW1tZXIuc3VyZmFjZS52MS5SdW50aW1lUmVzb3VyY2VQcm9qZWN0aW9uIukBChRSdW50aW1lUmVhZGluZXNzSXRlbRISCgpydW50aW1lX2lkGAEgASgJEg0KBW93bmVyGAIgASgJEg0KBXBoYXNlGAMgASgJEg0KBXN0YXRlGAQgASgJEhAKCGJsb2NraW5nGAUgASgIEg8KB3N1bW1hcnkYBiABKAkSEwoLZGV0YWlsc19yZWYYByABKAkSEwoLZHVyYXRpb25fbXMYCCABKAQSQwoKcmVjb25jaWxlchgJIAEoCzIvLmdsaW1tZXIuc3VyZmFjZS52MS5SdW50aW1lUmVjb25jaWxlclByb2plY3Rpb24iagoVUnVudGltZVJlYWRpbmVzc0V2ZW50EhUKDXVwZGF0ZWRfYXRfbXMYASABKAMSOgoIcnVudGltZXMYAiADKAsyKC5nbGltbWVyLnN1cmZhY2UudjEuUnVudGltZVJlYWRpbmVzc0l0ZW0icAoXQXVkaW9Qcm92aWRlclByb2plY3Rpb24SEwoLcHJvdmlkZXJfaWQYASABKAkSDAoEcm9sZRgCIAEoCRIRCglleGVjdXRpb24YAyABKAkSDgoGc3RhdHVzGAQgASgJEg8KB21lc3NhZ2UYBSABKAkiswEKGUF1ZGlvQ2FwYWJpbGl0eVByb2plY3Rpb24SDwoHZW5hYmxlZBgBIAEoCBIXCg9kaXNhYmxlZF9yZWFzb24YAiABKAkSFwoPYWN0aXZlX3Byb3ZpZGVyGAMgASgJEhMKC3JvdXRlX3N0YXRlGAQgASgJEj4KCXByb3ZpZGVycxgFIAMoCzIrLmdsaW1tZXIuc3VyZmFjZS52MS5BdWRpb1Byb3ZpZGVyUHJvamVjdGlvbiKhAQoQQXVkaW9TdGF0dXNFdmVudBIVCg11cGRhdGVkX2F0X21zGAEgASgDEjoKA3R0cxgCIAEoCzItLmdsaW1tZXIuc3VyZmFjZS52MS5BdWRpb0NhcGFiaWxpdHlQcm9qZWN0aW9uEjoKA2FzchgDIAEoCzItLmdsaW1tZXIuc3VyZmFjZS52MS5BdWRpb0NhcGFiaWxpdHlQcm9qZWN0aW9uIoIBChdDb252ZXJzYXRpb25Ob3RpY2VFdmVudBIMCgRjb2RlGAEgASgJEg0KBWxldmVsGAIgASgJEg0KBXRpdGxlGAMgASgJEg8KB21lc3NhZ2UYBCABKAkSFAoMYWN0aW9uX3JvdXRlGAUgASgJEhQKDGFjdGlvbl9sYWJlbBgGIAEoCSKpAQodQ29udmVyc2F0aW9uQWRkcmVzc1Byb2plY3Rpb24SGgoSc291cmNlX3Byb3ZpZGVyX2lkGAEgASgJEhAKCHNjZW5lX2lkGAIgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgDIAEoCRIRCgl0aHJlYWRfaWQYBCABKAkSFAoMcmVjYWxsX3Njb3BlGAUgASgJEhgKEGRpc2Nsb3N1cmVfc2NvcGUYBiABKAki+gEKIkNvbnZlcnNhdGlvbkhpc3RvcnlFbnRyeVByb2plY3Rpb24SEAoIZW50cnlfaWQYASABKAkSEwoLc291cmNlX2tpbmQYAiABKAkSDAoEcm9sZRgDIAEoCRIOCgZzdGF0dXMYBCABKAkSDAoEdGV4dBgFIAEoCRITCgtvY2N1cnJlZF9hdBgGIAEoCRIXCg9jb252ZXJzYXRpb25faWQYByABKAkSEAoIc2NlbmVfaWQYCCABKAkSEQoJdGhyZWFkX2lkGAkgASgJEhQKDHJlY2FsbF9zY29wZRgKIAEoCRIYChBkaXNjbG9zdXJlX3Njb3BlGAsgASgJIowCCh5Db252ZXJzYXRpb25IaXN0b3J5UmVzdWx0RXZlbnQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSRwoMY29udmVyc2F0aW9uGAMgASgLMjEuZ2xpbW1lci5zdXJmYWNlLnYxLkNvbnZlcnNhdGlvbkFkZHJlc3NQcm9qZWN0aW9uEkUKBWl0ZW1zGAQgAygLMjYuZ2xpbW1lci5zdXJmYWNlLnYxLkNvbnZlcnNhdGlvbkhpc3RvcnlFbnRyeVByb2plY3Rpb24SEwoLbmV4dF9jdXJzb3IYBSABKAkSEAoIaGFzX21vcmUYBiABKAgSDwoHbWVzc2FnZRgHIAEoCSJ8ChpDb25maWd1cmF0aW9uU25hcHNob3RFdmVudBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBnN0YXR1cxgCIAEoCRIpCghzbmFwc2hvdBgDIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSDwoHbWVzc2FnZRgEIAEoCSKnAQoYQ29uZmlndXJhdGlvblVwZGF0ZUV2ZW50EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGc3RhdHVzGAIgASgJEhMKC2FwcGx5X3N0YXRlGAMgASgJEhYKDmNoYW5nZV9zdW1tYXJ5GAQgAygJEikKCHNuYXBzaG90GAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIPCgdtZXNzYWdlGAYgASgJInwKFkNvbmZpZ3VyYXRpb25UZXN0RXZlbnQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSDwoHbWVzc2FnZRgDIAEoCRIZChFkaXNjb3ZlcmVkX21vZGVscxgEIAMoCRISCgpsYXRlbmN5X21zGAUgASgEInMKEVNraWxsQ2F0YWxvZ0V2ZW50EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGc3RhdHVzGAIgASgJEikKCHNuYXBzaG90GAMgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIPCgdtZXNzYWdlGAQgASgJIuoBChxFeHRlbnNpb25JbnN0YWxsUHJldmlld0V2ZW50EhIKCnJlcXVlc3RfaWQYASABKAkSDgoGc3RhdHVzGAIgASgJEhYKDnRyYW5zYWN0aW9uX2lkGAMgASgJEioKCWV4dGVuc2lvbhgEIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSKQoIYXJ0aWZhY3QYBSABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EiYKBXRydXN0GAYgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIPCgdtZXNzYWdlGAcgASgJIpQBChtFeHRlbnNpb25JbnN0YWxsUmVzdWx0RXZlbnQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSFAoMZXh0ZW5zaW9uX2lkGAMgASgJEg8KB3ZlcnNpb24YBCABKAkSGQoRYWxyZWFkeV9pbnN0YWxsZWQYBSABKAgSDwoHbWVzc2FnZRgGIAEoCSJ7Ch1FeHRlbnNpb25Vbmluc3RhbGxSZXN1bHRFdmVudBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGV4dGVuc2lvbl9pZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEg4KBnN0YXR1cxgEIAEoCRIPCgdtZXNzYWdlGAUgASgJIo4BCh1FeHRlbnNpb25MaWZlY3ljbGVSZXN1bHRFdmVudBISCgpyZXF1ZXN0X2lkGAEgASgJEhQKDGV4dGVuc2lvbl9pZBgCIAEoCRIPCgd2ZXJzaW9uGAMgASgJEhEKCW9wZXJhdGlvbhgEIAEoCRIOCgZzdGF0dXMYBSABKAkSDwoHbWVzc2FnZRgGIAEoCSKOAQobRXh0ZW5zaW9uQ29tbWFuZFJlc3VsdEV2ZW50EhIKCnJlcXVlc3RfaWQYASABKAkSEgoKY29tbWFuZF9pZBgCIAEoCRIOCgZzdGF0dXMYAyABKAkSJgoGcmVzdWx0GAQgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEg8KB21lc3NhZ2UYBSABKAkiugEKJUV4dGVuc2lvblJ1bnRpbWVQcm9qZWN0aW9uUmVzdWx0RXZlbnQSEgoKcmVxdWVzdF9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSLAoLcHJvamVjdGlvbnMYAyADKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ei4KDWluc3RhbGxhdGlvbnMYBCADKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Eg8KB21lc3NhZ2UYBSABKAkiVQomRXh0ZW5zaW9uUnVudGltZVByb2plY3Rpb25DaGFuZ2VkRXZlbnQSKwoKcHJvamVjdGlvbhgBIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QiUwobRXh0ZW5zaW9uU3RhdHVzQ2hhbmdlZEV2ZW50EhQKDGV4dGVuc2lvbl9pZBgBIAEoCRINCgVldmVudBgCIAEoCRIPCgdtZXNzYWdlGAMgASgJImsKG0NvcmVTa2lsbEFjdGlvblJlcXVlc3RFdmVudBISCgpyZXF1ZXN0X2lkGAEgASgJEg4KBmFjdGlvbhgCIAEoCRIoCgdwYXlsb2FkGAMgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdCKvAQohQ29yZVNraWxsQ29uZmlybWF0aW9uUmVxdWVzdEV2ZW50EhIKCnJlcXVlc3RfaWQYASABKAkSEAoIdHJhY2VfaWQYAiABKAkSEAoIc2tpbGxfaWQYAyABKAkSEwoLdGFyZ2V0X2tpbmQYBCABKAkSEwoLdGFyZ2V0X25hbWUYBSABKAkSEgoKcmlza19sZXZlbBgGIAEoCRIUCgxzaWRlX2VmZmVjdHMYByADKAkiDwoNU2h1dGRvd25FdmVudCLtEAoMU3VyZmFjZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEhAKCHRyYWNlX2lkGAIgASgJEhQKDHRpbWVzdGFtcF9tcxgDIAEoAxIvCgVyZXBseRgKIAEoCzIeLmdsaW1tZXIuc3VyZmFjZS52MS5SZXBseUV2ZW50SAASMwoHZW1vdGlvbhgLIAEoCzIgLmdsaW1tZXIuc3VyZmFjZS52MS5FbW90aW9uRXZlbnRIABIzCgd0aG91Z2h0GAwgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlRob3VnaHRFdmVudEgAEjgKCmF1ZGlvX3BsYXkYDSABKAsyIi5nbGltbWVyLnN1cmZhY2UudjEuQXVkaW9QbGF5RXZlbnRIABJEChBhdWRpb190cmFuc2NyaXB0GA4gASgLMiguZ2xpbW1lci5zdXJmYWNlLnYxLkF1ZGlvVHJhbnNjcmlwdEV2ZW50SAASUAoWY2hhcmFjdGVyX3ByZXNlbnRhdGlvbhgPIAEoCzIuLmdsaW1tZXIuc3VyZmFjZS52MS5DaGFyYWN0ZXJQcmVzZW50YXRpb25FdmVudEgAEj4KDWF2YXRhcl9zdGF0dXMYECABKAsyJS5nbGltbWVyLnN1cmZhY2UudjEuQXZhdGFyU3RhdHVzRXZlbnRIABJJChNhdmF0YXJfYWN0aW9uX3N0YXRlGBEgASgLMiouZ2xpbW1lci5zdXJmYWNlLnYxLkF2YXRhckFjdGlvblN0YXRlRXZlbnRIABJGChFydW50aW1lX3JlYWRpbmVzcxgSIAEoCzIpLmdsaW1tZXIuc3VyZmFjZS52MS5SdW50aW1lUmVhZGluZXNzRXZlbnRIABI8CgxhdWRpb19zdGF0dXMYEyABKAsyJC5nbGltbWVyLnN1cmZhY2UudjEuQXVkaW9TdGF0dXNFdmVudEgAEkoKE2NvbnZlcnNhdGlvbl9ub3RpY2UYFCABKAsyKy5nbGltbWVyLnN1cmZhY2UudjEuQ29udmVyc2F0aW9uTm90aWNlRXZlbnRIABJZChtjb252ZXJzYXRpb25faGlzdG9yeV9yZXN1bHQYFSABKAsyMi5nbGltbWVyLnN1cmZhY2UudjEuQ29udmVyc2F0aW9uSGlzdG9yeVJlc3VsdEV2ZW50SAASUAoWY29uZmlndXJhdGlvbl9zbmFwc2hvdBgWIAEoCzIuLmdsaW1tZXIuc3VyZmFjZS52MS5Db25maWd1cmF0aW9uU25hcHNob3RFdmVudEgAEkwKFGNvbmZpZ3VyYXRpb25fdXBkYXRlGBcgASgLMiwuZ2xpbW1lci5zdXJmYWNlLnYxLkNvbmZpZ3VyYXRpb25VcGRhdGVFdmVudEgAEkgKEmNvbmZpZ3VyYXRpb25fdGVzdBgYIAEoCzIqLmdsaW1tZXIuc3VyZmFjZS52MS5Db25maWd1cmF0aW9uVGVzdEV2ZW50SAASPgoNc2tpbGxfY2F0YWxvZxgZIAEoCzIlLmdsaW1tZXIuc3VyZmFjZS52MS5Ta2lsbENhdGFsb2dFdmVudEgAElUKGWV4dGVuc2lvbl9pbnN0YWxsX3ByZXZpZXcYGiABKAsyMC5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uSW5zdGFsbFByZXZpZXdFdmVudEgAElMKGGV4dGVuc2lvbl9pbnN0YWxsX3Jlc3VsdBgbIAEoCzIvLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25JbnN0YWxsUmVzdWx0RXZlbnRIABJXChpleHRlbnNpb25fdW5pbnN0YWxsX3Jlc3VsdBgcIAEoCzIxLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25Vbmluc3RhbGxSZXN1bHRFdmVudEgAElcKGmV4dGVuc2lvbl9saWZlY3ljbGVfcmVzdWx0GB0gASgLMjEuZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvbkxpZmVjeWNsZVJlc3VsdEV2ZW50SAASUwoYZXh0ZW5zaW9uX2NvbW1hbmRfcmVzdWx0GB4gASgLMi8uZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvbkNvbW1hbmRSZXN1bHRFdmVudEgAEmgKI2V4dGVuc2lvbl9ydW50aW1lX3Byb2plY3Rpb25fcmVzdWx0GB8gASgLMjkuZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvblJ1bnRpbWVQcm9qZWN0aW9uUmVzdWx0RXZlbnRIABJqCiRleHRlbnNpb25fcnVudGltZV9wcm9qZWN0aW9uX2NoYW5nZWQYICABKAsyOi5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uUnVudGltZVByb2plY3Rpb25DaGFuZ2VkRXZlbnRIABJTChhleHRlbnNpb25fc3RhdHVzX2NoYW5nZWQYISABKAsyLy5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uU3RhdHVzQ2hhbmdlZEV2ZW50SAASVAoZY29yZV9za2lsbF9hY3Rpb25fcmVxdWVzdBgiIAEoCzIvLmdsaW1tZXIuc3VyZmFjZS52MS5Db3JlU2tpbGxBY3Rpb25SZXF1ZXN0RXZlbnRIABJgCh9jb3JlX3NraWxsX2NvbmZpcm1hdGlvbl9yZXF1ZXN0GCMgASgLMjUuZ2xpbW1lci5zdXJmYWNlLnYxLkNvcmVTa2lsbENvbmZpcm1hdGlvblJlcXVlc3RFdmVudEgAEjUKCHNodXRkb3duGCQgASgLMiEuZ2xpbW1lci5zdXJmYWNlLnYxLlNodXRkb3duRXZlbnRIAEIHCgVldmVudCKxAQoiU3VyZmFjZUdhdGV3YXlTZXJ2aWNlUXVlcnlSZXNwb25zZRIUCgxvcGVyYXRpb25faWQYASABKAkSDgoGc3RhdHVzGAIgASgJEi8KBWV2ZW50GAMgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VFdmVudBI0CgVlcnJvchgEIAEoCzIlLmdsaW1tZXIuY29tbW9uLnYxLlNlcnZpY2VFcnJvckRldGFpbCKzAQokU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29tbWFuZFJlc3BvbnNlEhQKDG9wZXJhdGlvbl9pZBgBIAEoCRIOCgZzdGF0dXMYAiABKAkSLwoFZXZlbnQYAyABKAsyIC5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUV2ZW50EjQKBWVycm9yGAQgASgLMiUuZ2xpbW1lci5jb21tb24udjEuU2VydmljZUVycm9yRGV0YWlsImcKIlN1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRISCgpzZXNzaW9uX2lkGAIgASgJIlYKI1N1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlc3BvbnNlEi8KBWV2ZW50GAEgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VFdmVudDKIBAoVU3VyZmFjZUdhdGV3YXlTZXJ2aWNlEnwKB0Nvbm5lY3QSNy5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29ubmVjdFJlcXVlc3QaOC5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29ubmVjdFJlc3BvbnNlEnYKBVF1ZXJ5EjUuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2VydmljZVF1ZXJ5UmVxdWVzdBo2LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VRdWVyeVJlc3BvbnNlEnwKB0NvbW1hbmQSNy5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29tbWFuZFJlcXVlc3QaOC5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlQ29tbWFuZFJlc3BvbnNlEnsKBlN0cmVhbRI2LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VTdHJlYW1SZXF1ZXN0GjcuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlc3BvbnNlMAFCLaoCKkdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuU3VyZmFjZS5WMWIGcHJvdG8z", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
 
 /**
- * Product-to-Kernel session handshake. The generation is bound to the
- * EndpointRegistry record and is never accepted from a public browser client.
+ * Product-to-Kernel session handshake. generation is resolved from the
+ * supervised EndpointRegistry record and never accepted from a browser edge.
  *
  * @generated from message glimmer.surface.v1.SurfaceGatewayServiceConnectRequest
  */
@@ -88,6 +89,114 @@ export const SurfaceGatewayServiceConnectResponseSchema: GenMessage<SurfaceGatew
   messageDesc(file_glimmer_surface_v1_surface_gateway, 1);
 
 /**
+ * @generated from message glimmer.surface.v1.ConfigurationSnapshotQuery
+ */
+export type ConfigurationSnapshotQuery = Message<"glimmer.surface.v1.ConfigurationSnapshotQuery"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationSnapshotQuery.
+ * Use `create(ConfigurationSnapshotQuerySchema)` to create a new message.
+ */
+export const ConfigurationSnapshotQuerySchema: GenMessage<ConfigurationSnapshotQuery> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 2);
+
+/**
+ * @generated from message glimmer.surface.v1.ConversationHistoryQuery
+ */
+export type ConversationHistoryQuery = Message<"glimmer.surface.v1.ConversationHistoryQuery"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string conversation_id = 2;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string scene_id = 3;
+   */
+  sceneId: string;
+
+  /**
+   * @generated from field: string thread_id = 4;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string actor_id = 5;
+   */
+  actorId: string;
+
+  /**
+   * @generated from field: string source_provider_id = 6;
+   */
+  sourceProviderId: string;
+
+  /**
+   * @generated from field: string cursor = 7;
+   */
+  cursor: string;
+
+  /**
+   * @generated from field: uint32 limit = 8;
+   */
+  limit: number;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConversationHistoryQuery.
+ * Use `create(ConversationHistoryQuerySchema)` to create a new message.
+ */
+export const ConversationHistoryQuerySchema: GenMessage<ConversationHistoryQuery> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 3);
+
+/**
+ * @generated from message glimmer.surface.v1.SkillCatalogQuery
+ */
+export type SkillCatalogQuery = Message<"glimmer.surface.v1.SkillCatalogQuery"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.SkillCatalogQuery.
+ * Use `create(SkillCatalogQuerySchema)` to create a new message.
+ */
+export const SkillCatalogQuerySchema: GenMessage<SkillCatalogQuery> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 4);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionRuntimeProjectionQuery
+ */
+export type ExtensionRuntimeProjectionQuery = Message<"glimmer.surface.v1.ExtensionRuntimeProjectionQuery"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string extension_id = 2;
+   */
+  extensionId: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionRuntimeProjectionQuery.
+ * Use `create(ExtensionRuntimeProjectionQuerySchema)` to create a new message.
+ */
+export const ExtensionRuntimeProjectionQuerySchema: GenMessage<ExtensionRuntimeProjectionQuery> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 5);
+
+/**
  * @generated from message glimmer.surface.v1.SurfaceGatewayServiceQueryRequest
  */
 export type SurfaceGatewayServiceQueryRequest = Message<"glimmer.surface.v1.SurfaceGatewayServiceQueryRequest"> & {
@@ -102,14 +211,33 @@ export type SurfaceGatewayServiceQueryRequest = Message<"glimmer.surface.v1.Surf
   sessionId: string;
 
   /**
-   * @generated from field: string query = 3;
+   * @generated from oneof glimmer.surface.v1.SurfaceGatewayServiceQueryRequest.query
    */
-  query: string;
-
-  /**
-   * @generated from field: google.protobuf.Struct arguments = 4;
-   */
-  arguments?: JsonObject | undefined;
+  query: {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationSnapshotQuery configuration_snapshot = 10;
+     */
+    value: ConfigurationSnapshotQuery;
+    case: "configurationSnapshot";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConversationHistoryQuery conversation_history = 11;
+     */
+    value: ConversationHistoryQuery;
+    case: "conversationHistory";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.SkillCatalogQuery skill_catalog = 12;
+     */
+    value: SkillCatalogQuery;
+    case: "skillCatalog";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionRuntimeProjectionQuery extension_runtime_projection = 13;
+     */
+    value: ExtensionRuntimeProjectionQuery;
+    case: "extensionRuntimeProjection";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -117,12 +245,138 @@ export type SurfaceGatewayServiceQueryRequest = Message<"glimmer.surface.v1.Surf
  * Use `create(SurfaceGatewayServiceQueryRequestSchema)` to create a new message.
  */
 export const SurfaceGatewayServiceQueryRequestSchema: GenMessage<SurfaceGatewayServiceQueryRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 2);
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 6);
 
 /**
- * @generated from message glimmer.surface.v1.SurfaceGatewayServiceQueryResponse
+ * @generated from message glimmer.surface.v1.HeartbeatCommand
  */
-export type SurfaceGatewayServiceQueryResponse = Message<"glimmer.surface.v1.SurfaceGatewayServiceQueryResponse"> & {
+export type HeartbeatCommand = Message<"glimmer.surface.v1.HeartbeatCommand"> & {
+};
+
+/**
+ * Describes the message glimmer.surface.v1.HeartbeatCommand.
+ * Use `create(HeartbeatCommandSchema)` to create a new message.
+ */
+export const HeartbeatCommandSchema: GenMessage<HeartbeatCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 7);
+
+/**
+ * @generated from message glimmer.surface.v1.ChatInputCommand
+ */
+export type ChatInputCommand = Message<"glimmer.surface.v1.ChatInputCommand"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+
+  /**
+   * @generated from field: string source_suffix = 2;
+   */
+  sourceSuffix: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ChatInputCommand.
+ * Use `create(ChatInputCommandSchema)` to create a new message.
+ */
+export const ChatInputCommandSchema: GenMessage<ChatInputCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 8);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioInputCommand
+ */
+export type AudioInputCommand = Message<"glimmer.surface.v1.AudioInputCommand"> & {
+  /**
+   * @generated from field: string audio_id = 1;
+   */
+  audioId: string;
+
+  /**
+   * @generated from field: bytes audio = 2;
+   */
+  audio: Uint8Array;
+
+  /**
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: uint32 duration_ms = 4;
+   */
+  durationMs: number;
+
+  /**
+   * @generated from field: uint32 sample_rate = 5;
+   */
+  sampleRate: number;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioInputCommand.
+ * Use `create(AudioInputCommandSchema)` to create a new message.
+ */
+export const AudioInputCommandSchema: GenMessage<AudioInputCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 9);
+
+/**
+ * @generated from message glimmer.surface.v1.AvatarPresentationCommand
+ */
+export type AvatarPresentationCommand = Message<"glimmer.surface.v1.AvatarPresentationCommand"> & {
+  /**
+   * @generated from field: string placement_id = 1;
+   */
+  placementId: string;
+
+  /**
+   * @generated from field: double display_scale = 2;
+   */
+  displayScale: number;
+
+  /**
+   * @generated from field: bool reset_placement = 3;
+   */
+  resetPlacement: boolean;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AvatarPresentationCommand.
+ * Use `create(AvatarPresentationCommandSchema)` to create a new message.
+ */
+export const AvatarPresentationCommandSchema: GenMessage<AvatarPresentationCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 10);
+
+/**
+ * @generated from message glimmer.surface.v1.AvatarIntentCommand
+ */
+export type AvatarIntentCommand = Message<"glimmer.surface.v1.AvatarIntentCommand"> & {
+  /**
+   * @generated from field: string action_id = 1;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: string operation = 2;
+   */
+  operation: string;
+
+  /**
+   * @generated from field: uint32 priority = 3;
+   */
+  priority: number;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AvatarIntentCommand.
+ * Use `create(AvatarIntentCommandSchema)` to create a new message.
+ */
+export const AvatarIntentCommandSchema: GenMessage<AvatarIntentCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 11);
+
+/**
+ * @generated from message glimmer.surface.v1.CoreSkillActionResponseCommand
+ */
+export type CoreSkillActionResponseCommand = Message<"glimmer.surface.v1.CoreSkillActionResponseCommand"> & {
   /**
    * @generated from field: string request_id = 1;
    */
@@ -134,22 +388,369 @@ export type SurfaceGatewayServiceQueryResponse = Message<"glimmer.surface.v1.Sur
   status: string;
 
   /**
-   * @generated from field: google.protobuf.Struct projection = 3;
+   * @generated from field: google.protobuf.Value result = 3;
    */
-  projection?: JsonObject | undefined;
+  result?: Value | undefined;
 
   /**
-   * @generated from field: glimmer.common.v1.ServiceErrorDetail error = 4;
+   * @generated from field: string message = 4;
    */
-  error?: ServiceErrorDetail | undefined;
+  message: string;
+
+  /**
+   * @generated from field: string error_code = 5;
+   */
+  errorCode: string;
+
+  /**
+   * @generated from field: string operation_id = 6;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: repeated string recovery_actions = 7;
+   */
+  recoveryActions: string[];
 };
 
 /**
- * Describes the message glimmer.surface.v1.SurfaceGatewayServiceQueryResponse.
- * Use `create(SurfaceGatewayServiceQueryResponseSchema)` to create a new message.
+ * Describes the message glimmer.surface.v1.CoreSkillActionResponseCommand.
+ * Use `create(CoreSkillActionResponseCommandSchema)` to create a new message.
  */
-export const SurfaceGatewayServiceQueryResponseSchema: GenMessage<SurfaceGatewayServiceQueryResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 3);
+export const CoreSkillActionResponseCommandSchema: GenMessage<CoreSkillActionResponseCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 12);
+
+/**
+ * @generated from message glimmer.surface.v1.CoreSkillConfirmationResponseCommand
+ */
+export type CoreSkillConfirmationResponseCommand = Message<"glimmer.surface.v1.CoreSkillConfirmationResponseCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: bool approved = 3;
+   */
+  approved: boolean;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.CoreSkillConfirmationResponseCommand.
+ * Use `create(CoreSkillConfirmationResponseCommandSchema)` to create a new message.
+ */
+export const CoreSkillConfirmationResponseCommandSchema: GenMessage<CoreSkillConfirmationResponseCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 13);
+
+/**
+ * @generated from message glimmer.surface.v1.ConfigurationUpdateCommand
+ */
+export type ConfigurationUpdateCommand = Message<"glimmer.surface.v1.ConfigurationUpdateCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+
+  /**
+   * @generated from field: bool dry_run = 3;
+   */
+  dryRun: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Struct llm = 4;
+   */
+  llm?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct audio = 5;
+   */
+  audio?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct embedding = 6;
+   */
+  embedding?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct memory = 7;
+   */
+  memory?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct skills = 8;
+   */
+  skills?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationUpdateCommand.
+ * Use `create(ConfigurationUpdateCommandSchema)` to create a new message.
+ */
+export const ConfigurationUpdateCommandSchema: GenMessage<ConfigurationUpdateCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 14);
+
+/**
+ * @generated from message glimmer.surface.v1.ConfigurationTestCommand
+ */
+export type ConfigurationTestCommand = Message<"glimmer.surface.v1.ConfigurationTestCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct provider = 2;
+   */
+  provider?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationTestCommand.
+ * Use `create(ConfigurationTestCommandSchema)` to create a new message.
+ */
+export const ConfigurationTestCommandSchema: GenMessage<ConfigurationTestCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 15);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallSource
+ */
+export type ExtensionInstallSource = Message<"glimmer.surface.v1.ExtensionInstallSource"> & {
+  /**
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * @generated from field: string url = 3;
+   */
+  url: string;
+
+  /**
+   * @generated from field: string catalog_url = 4;
+   */
+  catalogUrl: string;
+
+  /**
+   * @generated from field: string extension_id = 5;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string channel = 6;
+   */
+  channel: string;
+
+  /**
+   * @generated from field: string repository = 7;
+   */
+  repository: string;
+
+  /**
+   * @generated from field: string tag = 8;
+   */
+  tag: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallSource.
+ * Use `create(ExtensionInstallSourceSchema)` to create a new message.
+ */
+export const ExtensionInstallSourceSchema: GenMessage<ExtensionInstallSource> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 16);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallPrepareCommand
+ */
+export type ExtensionInstallPrepareCommand = Message<"glimmer.surface.v1.ExtensionInstallPrepareCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: glimmer.surface.v1.ExtensionInstallSource source = 2;
+   */
+  source?: ExtensionInstallSource | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallPrepareCommand.
+ * Use `create(ExtensionInstallPrepareCommandSchema)` to create a new message.
+ */
+export const ExtensionInstallPrepareCommandSchema: GenMessage<ExtensionInstallPrepareCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 17);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallCommitCommand
+ */
+export type ExtensionInstallCommitCommand = Message<"glimmer.surface.v1.ExtensionInstallCommitCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string transaction_id = 2;
+   */
+  transactionId: string;
+
+  /**
+   * @generated from field: repeated string approved_permissions = 3;
+   */
+  approvedPermissions: string[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallCommitCommand.
+ * Use `create(ExtensionInstallCommitCommandSchema)` to create a new message.
+ */
+export const ExtensionInstallCommitCommandSchema: GenMessage<ExtensionInstallCommitCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 18);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallCancelCommand
+ */
+export type ExtensionInstallCancelCommand = Message<"glimmer.surface.v1.ExtensionInstallCancelCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string transaction_id = 2;
+   */
+  transactionId: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallCancelCommand.
+ * Use `create(ExtensionInstallCancelCommandSchema)` to create a new message.
+ */
+export const ExtensionInstallCancelCommandSchema: GenMessage<ExtensionInstallCancelCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 19);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionUninstallCommand
+ */
+export type ExtensionUninstallCommand = Message<"glimmer.surface.v1.ExtensionUninstallCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string extension_id = 2;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionUninstallCommand.
+ * Use `create(ExtensionUninstallCommandSchema)` to create a new message.
+ */
+export const ExtensionUninstallCommandSchema: GenMessage<ExtensionUninstallCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 20);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionLifecycleCommand
+ */
+export type ExtensionLifecycleCommand = Message<"glimmer.surface.v1.ExtensionLifecycleCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string extension_id = 2;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string operation = 4;
+   */
+  operation: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionLifecycleCommand.
+ * Use `create(ExtensionLifecycleCommandSchema)` to create a new message.
+ */
+export const ExtensionLifecycleCommandSchema: GenMessage<ExtensionLifecycleCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 21);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionCommand
+ */
+export type ExtensionCommand = Message<"glimmer.surface.v1.ExtensionCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string command_id = 2;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: repeated google.protobuf.Value args = 3;
+   */
+  args: Value[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionCommand.
+ * Use `create(ExtensionCommandSchema)` to create a new message.
+ */
+export const ExtensionCommandSchema: GenMessage<ExtensionCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 22);
+
+/**
+ * @generated from message glimmer.surface.v1.ShutdownCommand
+ */
+export type ShutdownCommand = Message<"glimmer.surface.v1.ShutdownCommand"> & {
+  /**
+   * @generated from field: string reason = 1;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ShutdownCommand.
+ * Use `create(ShutdownCommandSchema)` to create a new message.
+ */
+export const ShutdownCommandSchema: GenMessage<ShutdownCommand> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 23);
 
 /**
  * @generated from message glimmer.surface.v1.SurfaceGatewayServiceCommandRequest
@@ -166,14 +767,105 @@ export type SurfaceGatewayServiceCommandRequest = Message<"glimmer.surface.v1.Su
   sessionId: string;
 
   /**
-   * @generated from field: string command = 3;
+   * @generated from oneof glimmer.surface.v1.SurfaceGatewayServiceCommandRequest.command
    */
-  command: string;
-
-  /**
-   * @generated from field: google.protobuf.Struct arguments = 4;
-   */
-  arguments?: JsonObject | undefined;
+  command: {
+    /**
+     * @generated from field: glimmer.surface.v1.HeartbeatCommand heartbeat = 10;
+     */
+    value: HeartbeatCommand;
+    case: "heartbeat";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ChatInputCommand chat_input = 11;
+     */
+    value: ChatInputCommand;
+    case: "chatInput";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AudioInputCommand audio_input = 12;
+     */
+    value: AudioInputCommand;
+    case: "audioInput";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AvatarPresentationCommand avatar_presentation = 13;
+     */
+    value: AvatarPresentationCommand;
+    case: "avatarPresentation";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AvatarIntentCommand avatar_intent = 14;
+     */
+    value: AvatarIntentCommand;
+    case: "avatarIntent";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.CoreSkillActionResponseCommand core_skill_action_response = 15;
+     */
+    value: CoreSkillActionResponseCommand;
+    case: "coreSkillActionResponse";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.CoreSkillConfirmationResponseCommand core_skill_confirmation_response = 16;
+     */
+    value: CoreSkillConfirmationResponseCommand;
+    case: "coreSkillConfirmationResponse";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationUpdateCommand configuration_update = 17;
+     */
+    value: ConfigurationUpdateCommand;
+    case: "configurationUpdate";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationTestCommand configuration_test = 18;
+     */
+    value: ConfigurationTestCommand;
+    case: "configurationTest";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionInstallPrepareCommand extension_install_prepare = 19;
+     */
+    value: ExtensionInstallPrepareCommand;
+    case: "extensionInstallPrepare";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionInstallCommitCommand extension_install_commit = 20;
+     */
+    value: ExtensionInstallCommitCommand;
+    case: "extensionInstallCommit";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionInstallCancelCommand extension_install_cancel = 21;
+     */
+    value: ExtensionInstallCancelCommand;
+    case: "extensionInstallCancel";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionUninstallCommand extension_uninstall = 22;
+     */
+    value: ExtensionUninstallCommand;
+    case: "extensionUninstall";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionLifecycleCommand extension_lifecycle = 23;
+     */
+    value: ExtensionLifecycleCommand;
+    case: "extensionLifecycle";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionCommand extension_command = 24;
+     */
+    value: ExtensionCommand;
+    case: "extensionCommand";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ShutdownCommand shutdown = 25;
+     */
+    value: ShutdownCommand;
+    case: "shutdown";
+  } | { case: undefined; value?: undefined };
 };
 
 /**
@@ -181,12 +873,757 @@ export type SurfaceGatewayServiceCommandRequest = Message<"glimmer.surface.v1.Su
  * Use `create(SurfaceGatewayServiceCommandRequestSchema)` to create a new message.
  */
 export const SurfaceGatewayServiceCommandRequestSchema: GenMessage<SurfaceGatewayServiceCommandRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 4);
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 24);
 
 /**
- * @generated from message glimmer.surface.v1.SurfaceGatewayServiceCommandResponse
+ * @generated from message glimmer.surface.v1.ReplyMessage
  */
-export type SurfaceGatewayServiceCommandResponse = Message<"glimmer.surface.v1.SurfaceGatewayServiceCommandResponse"> & {
+export type ReplyMessage = Message<"glimmer.surface.v1.ReplyMessage"> & {
+  /**
+   * @generated from field: uint32 sequence = 1;
+   */
+  sequence: number;
+
+  /**
+   * @generated from field: string content_type = 2;
+   */
+  contentType: string;
+
+  /**
+   * @generated from field: string text = 3;
+   */
+  text: string;
+
+  /**
+   * @generated from field: string language = 4;
+   */
+  language: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ReplyMessage.
+ * Use `create(ReplyMessageSchema)` to create a new message.
+ */
+export const ReplyMessageSchema: GenMessage<ReplyMessage> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 25);
+
+/**
+ * @generated from message glimmer.surface.v1.EmotionProjection
+ */
+export type EmotionProjection = Message<"glimmer.surface.v1.EmotionProjection"> & {
+  /**
+   * @generated from field: string emotion_type = 1;
+   */
+  emotionType: string;
+
+  /**
+   * @generated from field: double intensity = 2;
+   */
+  intensity: number;
+
+  /**
+   * @generated from field: string trigger = 3;
+   */
+  trigger: string;
+
+  /**
+   * @generated from field: uint32 blend_time_ms = 4;
+   */
+  blendTimeMs: number;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.EmotionProjection.
+ * Use `create(EmotionProjectionSchema)` to create a new message.
+ */
+export const EmotionProjectionSchema: GenMessage<EmotionProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 26);
+
+/**
+ * @generated from message glimmer.surface.v1.ReplyEvent
+ */
+export type ReplyEvent = Message<"glimmer.surface.v1.ReplyEvent"> & {
+  /**
+   * @generated from field: string text = 1;
+   */
+  text: string;
+
+  /**
+   * @generated from field: repeated glimmer.surface.v1.ReplyMessage messages = 2;
+   */
+  messages: ReplyMessage[];
+
+  /**
+   * @generated from field: glimmer.surface.v1.EmotionProjection emotion_snapshot = 3;
+   */
+  emotionSnapshot?: EmotionProjection | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ReplyEvent.
+ * Use `create(ReplyEventSchema)` to create a new message.
+ */
+export const ReplyEventSchema: GenMessage<ReplyEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 27);
+
+/**
+ * @generated from message glimmer.surface.v1.EmotionEvent
+ */
+export type EmotionEvent = Message<"glimmer.surface.v1.EmotionEvent"> & {
+  /**
+   * @generated from field: glimmer.surface.v1.EmotionProjection emotion = 1;
+   */
+  emotion?: EmotionProjection | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.EmotionEvent.
+ * Use `create(EmotionEventSchema)` to create a new message.
+ */
+export const EmotionEventSchema: GenMessage<EmotionEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 28);
+
+/**
+ * @generated from message glimmer.surface.v1.ThoughtEvent
+ */
+export type ThoughtEvent = Message<"glimmer.surface.v1.ThoughtEvent"> & {
+  /**
+   * @generated from field: bool active = 1;
+   */
+  active: boolean;
+
+  /**
+   * @generated from field: string hint = 2;
+   */
+  hint: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ThoughtEvent.
+ * Use `create(ThoughtEventSchema)` to create a new message.
+ */
+export const ThoughtEventSchema: GenMessage<ThoughtEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 29);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioPlayEvent
+ */
+export type AudioPlayEvent = Message<"glimmer.surface.v1.AudioPlayEvent"> & {
+  /**
+   * @generated from field: string audio_id = 1;
+   */
+  audioId: string;
+
+  /**
+   * @generated from field: string audio_uri = 2;
+   */
+  audioUri: string;
+
+  /**
+   * @generated from field: string mime_type = 3;
+   */
+  mimeType: string;
+
+  /**
+   * @generated from field: uint32 duration_ms = 4;
+   */
+  durationMs: number;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioPlayEvent.
+ * Use `create(AudioPlayEventSchema)` to create a new message.
+ */
+export const AudioPlayEventSchema: GenMessage<AudioPlayEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 30);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioTranscriptEvent
+ */
+export type AudioTranscriptEvent = Message<"glimmer.surface.v1.AudioTranscriptEvent"> & {
+  /**
+   * @generated from field: string audio_id = 1;
+   */
+  audioId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string text = 3;
+   */
+  text: string;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioTranscriptEvent.
+ * Use `create(AudioTranscriptEventSchema)` to create a new message.
+ */
+export const AudioTranscriptEventSchema: GenMessage<AudioTranscriptEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 31);
+
+/**
+ * @generated from message glimmer.surface.v1.CharacterPresentationEvent
+ */
+export type CharacterPresentationEvent = Message<"glimmer.surface.v1.CharacterPresentationEvent"> & {
+  /**
+   * @generated from field: string avatar_package_id = 1;
+   */
+  avatarPackageId: string;
+
+  /**
+   * @generated from field: string model_id = 2;
+   */
+  modelId: string;
+
+  /**
+   * @generated from field: string display_name = 3;
+   */
+  displayName: string;
+
+  /**
+   * @generated from field: string kind = 4;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string backend = 5;
+   */
+  backend: string;
+
+  /**
+   * @generated from field: string host_kind = 6;
+   */
+  hostKind: string;
+
+  /**
+   * @generated from field: string avatar_state = 7;
+   */
+  avatarState: string;
+
+  /**
+   * @generated from field: string placement_id = 8;
+   */
+  placementId: string;
+
+  /**
+   * @generated from field: double display_scale = 9;
+   */
+  displayScale: number;
+
+  /**
+   * @generated from field: string worker_window_state = 10;
+   */
+  workerWindowState: string;
+
+  /**
+   * @generated from field: string composition_surface_state = 11;
+   */
+  compositionSurfaceState: string;
+
+  /**
+   * @generated from field: bool first_frame_presented = 12;
+   */
+  firstFramePresented: boolean;
+
+  /**
+   * @generated from field: bool interaction_ready = 13;
+   */
+  interactionReady: boolean;
+
+  /**
+   * @generated from field: bool ready = 14;
+   */
+  ready: boolean;
+
+  /**
+   * @generated from field: string summary = 15;
+   */
+  summary: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.CharacterPresentationEvent.
+ * Use `create(CharacterPresentationEventSchema)` to create a new message.
+ */
+export const CharacterPresentationEventSchema: GenMessage<CharacterPresentationEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 32);
+
+/**
+ * @generated from message glimmer.surface.v1.AvatarStatusEvent
+ */
+export type AvatarStatusEvent = Message<"glimmer.surface.v1.AvatarStatusEvent"> & {
+  /**
+   * @generated from field: string host_kind = 1;
+   */
+  hostKind: string;
+
+  /**
+   * @generated from field: string host_id = 2;
+   */
+  hostId: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AvatarStatusEvent.
+ * Use `create(AvatarStatusEventSchema)` to create a new message.
+ */
+export const AvatarStatusEventSchema: GenMessage<AvatarStatusEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 33);
+
+/**
+ * @generated from message glimmer.surface.v1.AvatarActionStateEvent
+ */
+export type AvatarActionStateEvent = Message<"glimmer.surface.v1.AvatarActionStateEvent"> & {
+  /**
+   * @generated from field: string action_id = 1;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: string state = 2;
+   */
+  state: string;
+
+  /**
+   * @generated from field: repeated string active_action_ids = 3;
+   */
+  activeActionIds: string[];
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AvatarActionStateEvent.
+ * Use `create(AvatarActionStateEventSchema)` to create a new message.
+ */
+export const AvatarActionStateEventSchema: GenMessage<AvatarActionStateEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 34);
+
+/**
+ * @generated from message glimmer.surface.v1.RuntimeResourceProjection
+ */
+export type RuntimeResourceProjection = Message<"glimmer.surface.v1.RuntimeResourceProjection"> & {
+  /**
+   * @generated from field: string resource_id = 1;
+   */
+  resourceId: string;
+
+  /**
+   * @generated from field: string resource_kind = 2;
+   */
+  resourceKind: string;
+
+  /**
+   * @generated from field: string desired_state = 3;
+   */
+  desiredState: string;
+
+  /**
+   * @generated from field: string actual_state = 4;
+   */
+  actualState: string;
+
+  /**
+   * @generated from field: string readiness = 5;
+   */
+  readiness: string;
+
+  /**
+   * @generated from field: string summary = 6;
+   */
+  summary: string;
+
+  /**
+   * @generated from field: repeated string recovery_actions = 7;
+   */
+  recoveryActions: string[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.RuntimeResourceProjection.
+ * Use `create(RuntimeResourceProjectionSchema)` to create a new message.
+ */
+export const RuntimeResourceProjectionSchema: GenMessage<RuntimeResourceProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 35);
+
+/**
+ * @generated from message glimmer.surface.v1.RuntimeReconcilerProjection
+ */
+export type RuntimeReconcilerProjection = Message<"glimmer.surface.v1.RuntimeReconcilerProjection"> & {
+  /**
+   * @generated from field: string desired = 1;
+   */
+  desired: string;
+
+  /**
+   * @generated from field: string actual = 2;
+   */
+  actual: string;
+
+  /**
+   * @generated from field: string readiness = 3;
+   */
+  readiness: string;
+
+  /**
+   * @generated from field: repeated glimmer.surface.v1.RuntimeResourceProjection resources = 4;
+   */
+  resources: RuntimeResourceProjection[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.RuntimeReconcilerProjection.
+ * Use `create(RuntimeReconcilerProjectionSchema)` to create a new message.
+ */
+export const RuntimeReconcilerProjectionSchema: GenMessage<RuntimeReconcilerProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 36);
+
+/**
+ * @generated from message glimmer.surface.v1.RuntimeReadinessItem
+ */
+export type RuntimeReadinessItem = Message<"glimmer.surface.v1.RuntimeReadinessItem"> & {
+  /**
+   * @generated from field: string runtime_id = 1;
+   */
+  runtimeId: string;
+
+  /**
+   * @generated from field: string owner = 2;
+   */
+  owner: string;
+
+  /**
+   * @generated from field: string phase = 3;
+   */
+  phase: string;
+
+  /**
+   * @generated from field: string state = 4;
+   */
+  state: string;
+
+  /**
+   * @generated from field: bool blocking = 5;
+   */
+  blocking: boolean;
+
+  /**
+   * @generated from field: string summary = 6;
+   */
+  summary: string;
+
+  /**
+   * @generated from field: string details_ref = 7;
+   */
+  detailsRef: string;
+
+  /**
+   * @generated from field: uint64 duration_ms = 8;
+   */
+  durationMs: bigint;
+
+  /**
+   * @generated from field: glimmer.surface.v1.RuntimeReconcilerProjection reconciler = 9;
+   */
+  reconciler?: RuntimeReconcilerProjection | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.RuntimeReadinessItem.
+ * Use `create(RuntimeReadinessItemSchema)` to create a new message.
+ */
+export const RuntimeReadinessItemSchema: GenMessage<RuntimeReadinessItem> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 37);
+
+/**
+ * @generated from message glimmer.surface.v1.RuntimeReadinessEvent
+ */
+export type RuntimeReadinessEvent = Message<"glimmer.surface.v1.RuntimeReadinessEvent"> & {
+  /**
+   * @generated from field: int64 updated_at_ms = 1;
+   */
+  updatedAtMs: bigint;
+
+  /**
+   * @generated from field: repeated glimmer.surface.v1.RuntimeReadinessItem runtimes = 2;
+   */
+  runtimes: RuntimeReadinessItem[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.RuntimeReadinessEvent.
+ * Use `create(RuntimeReadinessEventSchema)` to create a new message.
+ */
+export const RuntimeReadinessEventSchema: GenMessage<RuntimeReadinessEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 38);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioProviderProjection
+ */
+export type AudioProviderProjection = Message<"glimmer.surface.v1.AudioProviderProjection"> & {
+  /**
+   * @generated from field: string provider_id = 1;
+   */
+  providerId: string;
+
+  /**
+   * @generated from field: string role = 2;
+   */
+  role: string;
+
+  /**
+   * @generated from field: string execution = 3;
+   */
+  execution: string;
+
+  /**
+   * @generated from field: string status = 4;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioProviderProjection.
+ * Use `create(AudioProviderProjectionSchema)` to create a new message.
+ */
+export const AudioProviderProjectionSchema: GenMessage<AudioProviderProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 39);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioCapabilityProjection
+ */
+export type AudioCapabilityProjection = Message<"glimmer.surface.v1.AudioCapabilityProjection"> & {
+  /**
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: string disabled_reason = 2;
+   */
+  disabledReason: string;
+
+  /**
+   * @generated from field: string active_provider = 3;
+   */
+  activeProvider: string;
+
+  /**
+   * @generated from field: string route_state = 4;
+   */
+  routeState: string;
+
+  /**
+   * @generated from field: repeated glimmer.surface.v1.AudioProviderProjection providers = 5;
+   */
+  providers: AudioProviderProjection[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioCapabilityProjection.
+ * Use `create(AudioCapabilityProjectionSchema)` to create a new message.
+ */
+export const AudioCapabilityProjectionSchema: GenMessage<AudioCapabilityProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 40);
+
+/**
+ * @generated from message glimmer.surface.v1.AudioStatusEvent
+ */
+export type AudioStatusEvent = Message<"glimmer.surface.v1.AudioStatusEvent"> & {
+  /**
+   * @generated from field: int64 updated_at_ms = 1;
+   */
+  updatedAtMs: bigint;
+
+  /**
+   * @generated from field: glimmer.surface.v1.AudioCapabilityProjection tts = 2;
+   */
+  tts?: AudioCapabilityProjection | undefined;
+
+  /**
+   * @generated from field: glimmer.surface.v1.AudioCapabilityProjection asr = 3;
+   */
+  asr?: AudioCapabilityProjection | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.AudioStatusEvent.
+ * Use `create(AudioStatusEventSchema)` to create a new message.
+ */
+export const AudioStatusEventSchema: GenMessage<AudioStatusEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 41);
+
+/**
+ * @generated from message glimmer.surface.v1.ConversationNoticeEvent
+ */
+export type ConversationNoticeEvent = Message<"glimmer.surface.v1.ConversationNoticeEvent"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+
+  /**
+   * @generated from field: string level = 2;
+   */
+  level: string;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string action_route = 5;
+   */
+  actionRoute: string;
+
+  /**
+   * @generated from field: string action_label = 6;
+   */
+  actionLabel: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConversationNoticeEvent.
+ * Use `create(ConversationNoticeEventSchema)` to create a new message.
+ */
+export const ConversationNoticeEventSchema: GenMessage<ConversationNoticeEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 42);
+
+/**
+ * @generated from message glimmer.surface.v1.ConversationAddressProjection
+ */
+export type ConversationAddressProjection = Message<"glimmer.surface.v1.ConversationAddressProjection"> & {
+  /**
+   * @generated from field: string source_provider_id = 1;
+   */
+  sourceProviderId: string;
+
+  /**
+   * @generated from field: string scene_id = 2;
+   */
+  sceneId: string;
+
+  /**
+   * @generated from field: string conversation_id = 3;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string thread_id = 4;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string recall_scope = 5;
+   */
+  recallScope: string;
+
+  /**
+   * @generated from field: string disclosure_scope = 6;
+   */
+  disclosureScope: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConversationAddressProjection.
+ * Use `create(ConversationAddressProjectionSchema)` to create a new message.
+ */
+export const ConversationAddressProjectionSchema: GenMessage<ConversationAddressProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 43);
+
+/**
+ * @generated from message glimmer.surface.v1.ConversationHistoryEntryProjection
+ */
+export type ConversationHistoryEntryProjection = Message<"glimmer.surface.v1.ConversationHistoryEntryProjection"> & {
+  /**
+   * @generated from field: string entry_id = 1;
+   */
+  entryId: string;
+
+  /**
+   * @generated from field: string source_kind = 2;
+   */
+  sourceKind: string;
+
+  /**
+   * @generated from field: string role = 3;
+   */
+  role: string;
+
+  /**
+   * @generated from field: string status = 4;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string text = 5;
+   */
+  text: string;
+
+  /**
+   * @generated from field: string occurred_at = 6;
+   */
+  occurredAt: string;
+
+  /**
+   * @generated from field: string conversation_id = 7;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: string scene_id = 8;
+   */
+  sceneId: string;
+
+  /**
+   * @generated from field: string thread_id = 9;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string recall_scope = 10;
+   */
+  recallScope: string;
+
+  /**
+   * @generated from field: string disclosure_scope = 11;
+   */
+  disclosureScope: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConversationHistoryEntryProjection.
+ * Use `create(ConversationHistoryEntryProjectionSchema)` to create a new message.
+ */
+export const ConversationHistoryEntryProjectionSchema: GenMessage<ConversationHistoryEntryProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 44);
+
+/**
+ * @generated from message glimmer.surface.v1.ConversationHistoryResultEvent
+ */
+export type ConversationHistoryResultEvent = Message<"glimmer.surface.v1.ConversationHistoryResultEvent"> & {
   /**
    * @generated from field: string request_id = 1;
    */
@@ -198,9 +1635,798 @@ export type SurfaceGatewayServiceCommandResponse = Message<"glimmer.surface.v1.S
   status: string;
 
   /**
-   * @generated from field: google.protobuf.Struct result = 3;
+   * @generated from field: glimmer.surface.v1.ConversationAddressProjection conversation = 3;
    */
-  result?: JsonObject | undefined;
+  conversation?: ConversationAddressProjection | undefined;
+
+  /**
+   * @generated from field: repeated glimmer.surface.v1.ConversationHistoryEntryProjection items = 4;
+   */
+  items: ConversationHistoryEntryProjection[];
+
+  /**
+   * @generated from field: string next_cursor = 5;
+   */
+  nextCursor: string;
+
+  /**
+   * @generated from field: bool has_more = 6;
+   */
+  hasMore: boolean;
+
+  /**
+   * @generated from field: string message = 7;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConversationHistoryResultEvent.
+ * Use `create(ConversationHistoryResultEventSchema)` to create a new message.
+ */
+export const ConversationHistoryResultEventSchema: GenMessage<ConversationHistoryResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 45);
+
+/**
+ * @generated from message glimmer.surface.v1.ConfigurationSnapshotEvent
+ */
+export type ConfigurationSnapshotEvent = Message<"glimmer.surface.v1.ConfigurationSnapshotEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct snapshot = 3;
+   */
+  snapshot?: JsonObject | undefined;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationSnapshotEvent.
+ * Use `create(ConfigurationSnapshotEventSchema)` to create a new message.
+ */
+export const ConfigurationSnapshotEventSchema: GenMessage<ConfigurationSnapshotEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 46);
+
+/**
+ * @generated from message glimmer.surface.v1.ConfigurationUpdateEvent
+ */
+export type ConfigurationUpdateEvent = Message<"glimmer.surface.v1.ConfigurationUpdateEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string apply_state = 3;
+   */
+  applyState: string;
+
+  /**
+   * @generated from field: repeated string change_summary = 4;
+   */
+  changeSummary: string[];
+
+  /**
+   * @generated from field: google.protobuf.Struct snapshot = 5;
+   */
+  snapshot?: JsonObject | undefined;
+
+  /**
+   * @generated from field: string message = 6;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationUpdateEvent.
+ * Use `create(ConfigurationUpdateEventSchema)` to create a new message.
+ */
+export const ConfigurationUpdateEventSchema: GenMessage<ConfigurationUpdateEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 47);
+
+/**
+ * @generated from message glimmer.surface.v1.ConfigurationTestEvent
+ */
+export type ConfigurationTestEvent = Message<"glimmer.surface.v1.ConfigurationTestEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string message = 3;
+   */
+  message: string;
+
+  /**
+   * @generated from field: repeated string discovered_models = 4;
+   */
+  discoveredModels: string[];
+
+  /**
+   * @generated from field: uint64 latency_ms = 5;
+   */
+  latencyMs: bigint;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ConfigurationTestEvent.
+ * Use `create(ConfigurationTestEventSchema)` to create a new message.
+ */
+export const ConfigurationTestEventSchema: GenMessage<ConfigurationTestEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 48);
+
+/**
+ * @generated from message glimmer.surface.v1.SkillCatalogEvent
+ */
+export type SkillCatalogEvent = Message<"glimmer.surface.v1.SkillCatalogEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct snapshot = 3;
+   */
+  snapshot?: JsonObject | undefined;
+
+  /**
+   * @generated from field: string message = 4;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.SkillCatalogEvent.
+ * Use `create(SkillCatalogEventSchema)` to create a new message.
+ */
+export const SkillCatalogEventSchema: GenMessage<SkillCatalogEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 49);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallPreviewEvent
+ */
+export type ExtensionInstallPreviewEvent = Message<"glimmer.surface.v1.ExtensionInstallPreviewEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string transaction_id = 3;
+   */
+  transactionId: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct extension = 4;
+   */
+  extension?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct artifact = 5;
+   */
+  artifact?: JsonObject | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct trust = 6;
+   */
+  trust?: JsonObject | undefined;
+
+  /**
+   * @generated from field: string message = 7;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallPreviewEvent.
+ * Use `create(ExtensionInstallPreviewEventSchema)` to create a new message.
+ */
+export const ExtensionInstallPreviewEventSchema: GenMessage<ExtensionInstallPreviewEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 50);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionInstallResultEvent
+ */
+export type ExtensionInstallResultEvent = Message<"glimmer.surface.v1.ExtensionInstallResultEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string extension_id = 3;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string version = 4;
+   */
+  version: string;
+
+  /**
+   * @generated from field: bool already_installed = 5;
+   */
+  alreadyInstalled: boolean;
+
+  /**
+   * @generated from field: string message = 6;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionInstallResultEvent.
+ * Use `create(ExtensionInstallResultEventSchema)` to create a new message.
+ */
+export const ExtensionInstallResultEventSchema: GenMessage<ExtensionInstallResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 51);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionUninstallResultEvent
+ */
+export type ExtensionUninstallResultEvent = Message<"glimmer.surface.v1.ExtensionUninstallResultEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string extension_id = 2;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string status = 4;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionUninstallResultEvent.
+ * Use `create(ExtensionUninstallResultEventSchema)` to create a new message.
+ */
+export const ExtensionUninstallResultEventSchema: GenMessage<ExtensionUninstallResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 52);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionLifecycleResultEvent
+ */
+export type ExtensionLifecycleResultEvent = Message<"glimmer.surface.v1.ExtensionLifecycleResultEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string extension_id = 2;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string version = 3;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string operation = 4;
+   */
+  operation: string;
+
+  /**
+   * @generated from field: string status = 5;
+   */
+  status: string;
+
+  /**
+   * @generated from field: string message = 6;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionLifecycleResultEvent.
+ * Use `create(ExtensionLifecycleResultEventSchema)` to create a new message.
+ */
+export const ExtensionLifecycleResultEventSchema: GenMessage<ExtensionLifecycleResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 53);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionCommandResultEvent
+ */
+export type ExtensionCommandResultEvent = Message<"glimmer.surface.v1.ExtensionCommandResultEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string command_id = 2;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: string status = 3;
+   */
+  status: string;
+
+  /**
+   * @generated from field: google.protobuf.Value result = 4;
+   */
+  result?: Value | undefined;
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionCommandResultEvent.
+ * Use `create(ExtensionCommandResultEventSchema)` to create a new message.
+ */
+export const ExtensionCommandResultEventSchema: GenMessage<ExtensionCommandResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 54);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionRuntimeProjectionResultEvent
+ */
+export type ExtensionRuntimeProjectionResultEvent = Message<"glimmer.surface.v1.ExtensionRuntimeProjectionResultEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: repeated google.protobuf.Struct projections = 3;
+   */
+  projections: JsonObject[];
+
+  /**
+   * @generated from field: repeated google.protobuf.Struct installations = 4;
+   */
+  installations: JsonObject[];
+
+  /**
+   * @generated from field: string message = 5;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionRuntimeProjectionResultEvent.
+ * Use `create(ExtensionRuntimeProjectionResultEventSchema)` to create a new message.
+ */
+export const ExtensionRuntimeProjectionResultEventSchema: GenMessage<ExtensionRuntimeProjectionResultEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 55);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionRuntimeProjectionChangedEvent
+ */
+export type ExtensionRuntimeProjectionChangedEvent = Message<"glimmer.surface.v1.ExtensionRuntimeProjectionChangedEvent"> & {
+  /**
+   * @generated from field: google.protobuf.Struct projection = 1;
+   */
+  projection?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionRuntimeProjectionChangedEvent.
+ * Use `create(ExtensionRuntimeProjectionChangedEventSchema)` to create a new message.
+ */
+export const ExtensionRuntimeProjectionChangedEventSchema: GenMessage<ExtensionRuntimeProjectionChangedEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 56);
+
+/**
+ * @generated from message glimmer.surface.v1.ExtensionStatusChangedEvent
+ */
+export type ExtensionStatusChangedEvent = Message<"glimmer.surface.v1.ExtensionStatusChangedEvent"> & {
+  /**
+   * @generated from field: string extension_id = 1;
+   */
+  extensionId: string;
+
+  /**
+   * @generated from field: string event = 2;
+   */
+  event: string;
+
+  /**
+   * @generated from field: string message = 3;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ExtensionStatusChangedEvent.
+ * Use `create(ExtensionStatusChangedEventSchema)` to create a new message.
+ */
+export const ExtensionStatusChangedEventSchema: GenMessage<ExtensionStatusChangedEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 57);
+
+/**
+ * @generated from message glimmer.surface.v1.CoreSkillActionRequestEvent
+ */
+export type CoreSkillActionRequestEvent = Message<"glimmer.surface.v1.CoreSkillActionRequestEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string action = 2;
+   */
+  action: string;
+
+  /**
+   * @generated from field: google.protobuf.Struct payload = 3;
+   */
+  payload?: JsonObject | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.CoreSkillActionRequestEvent.
+ * Use `create(CoreSkillActionRequestEventSchema)` to create a new message.
+ */
+export const CoreSkillActionRequestEventSchema: GenMessage<CoreSkillActionRequestEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 58);
+
+/**
+ * @generated from message glimmer.surface.v1.CoreSkillConfirmationRequestEvent
+ */
+export type CoreSkillConfirmationRequestEvent = Message<"glimmer.surface.v1.CoreSkillConfirmationRequestEvent"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string trace_id = 2;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: string skill_id = 3;
+   */
+  skillId: string;
+
+  /**
+   * @generated from field: string target_kind = 4;
+   */
+  targetKind: string;
+
+  /**
+   * @generated from field: string target_name = 5;
+   */
+  targetName: string;
+
+  /**
+   * @generated from field: string risk_level = 6;
+   */
+  riskLevel: string;
+
+  /**
+   * @generated from field: repeated string side_effects = 7;
+   */
+  sideEffects: string[];
+};
+
+/**
+ * Describes the message glimmer.surface.v1.CoreSkillConfirmationRequestEvent.
+ * Use `create(CoreSkillConfirmationRequestEventSchema)` to create a new message.
+ */
+export const CoreSkillConfirmationRequestEventSchema: GenMessage<CoreSkillConfirmationRequestEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 59);
+
+/**
+ * @generated from message glimmer.surface.v1.ShutdownEvent
+ */
+export type ShutdownEvent = Message<"glimmer.surface.v1.ShutdownEvent"> & {
+};
+
+/**
+ * Describes the message glimmer.surface.v1.ShutdownEvent.
+ * Use `create(ShutdownEventSchema)` to create a new message.
+ */
+export const ShutdownEventSchema: GenMessage<ShutdownEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 60);
+
+/**
+ * @generated from message glimmer.surface.v1.SurfaceEvent
+ */
+export type SurfaceEvent = Message<"glimmer.surface.v1.SurfaceEvent"> & {
+  /**
+   * @generated from field: string event_id = 1;
+   */
+  eventId: string;
+
+  /**
+   * @generated from field: string trace_id = 2;
+   */
+  traceId: string;
+
+  /**
+   * @generated from field: int64 timestamp_ms = 3;
+   */
+  timestampMs: bigint;
+
+  /**
+   * @generated from oneof glimmer.surface.v1.SurfaceEvent.event
+   */
+  event: {
+    /**
+     * @generated from field: glimmer.surface.v1.ReplyEvent reply = 10;
+     */
+    value: ReplyEvent;
+    case: "reply";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.EmotionEvent emotion = 11;
+     */
+    value: EmotionEvent;
+    case: "emotion";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ThoughtEvent thought = 12;
+     */
+    value: ThoughtEvent;
+    case: "thought";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AudioPlayEvent audio_play = 13;
+     */
+    value: AudioPlayEvent;
+    case: "audioPlay";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AudioTranscriptEvent audio_transcript = 14;
+     */
+    value: AudioTranscriptEvent;
+    case: "audioTranscript";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.CharacterPresentationEvent character_presentation = 15;
+     */
+    value: CharacterPresentationEvent;
+    case: "characterPresentation";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AvatarStatusEvent avatar_status = 16;
+     */
+    value: AvatarStatusEvent;
+    case: "avatarStatus";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AvatarActionStateEvent avatar_action_state = 17;
+     */
+    value: AvatarActionStateEvent;
+    case: "avatarActionState";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.RuntimeReadinessEvent runtime_readiness = 18;
+     */
+    value: RuntimeReadinessEvent;
+    case: "runtimeReadiness";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.AudioStatusEvent audio_status = 19;
+     */
+    value: AudioStatusEvent;
+    case: "audioStatus";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConversationNoticeEvent conversation_notice = 20;
+     */
+    value: ConversationNoticeEvent;
+    case: "conversationNotice";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConversationHistoryResultEvent conversation_history_result = 21;
+     */
+    value: ConversationHistoryResultEvent;
+    case: "conversationHistoryResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationSnapshotEvent configuration_snapshot = 22;
+     */
+    value: ConfigurationSnapshotEvent;
+    case: "configurationSnapshot";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationUpdateEvent configuration_update = 23;
+     */
+    value: ConfigurationUpdateEvent;
+    case: "configurationUpdate";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ConfigurationTestEvent configuration_test = 24;
+     */
+    value: ConfigurationTestEvent;
+    case: "configurationTest";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.SkillCatalogEvent skill_catalog = 25;
+     */
+    value: SkillCatalogEvent;
+    case: "skillCatalog";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionInstallPreviewEvent extension_install_preview = 26;
+     */
+    value: ExtensionInstallPreviewEvent;
+    case: "extensionInstallPreview";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionInstallResultEvent extension_install_result = 27;
+     */
+    value: ExtensionInstallResultEvent;
+    case: "extensionInstallResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionUninstallResultEvent extension_uninstall_result = 28;
+     */
+    value: ExtensionUninstallResultEvent;
+    case: "extensionUninstallResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionLifecycleResultEvent extension_lifecycle_result = 29;
+     */
+    value: ExtensionLifecycleResultEvent;
+    case: "extensionLifecycleResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionCommandResultEvent extension_command_result = 30;
+     */
+    value: ExtensionCommandResultEvent;
+    case: "extensionCommandResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionRuntimeProjectionResultEvent extension_runtime_projection_result = 31;
+     */
+    value: ExtensionRuntimeProjectionResultEvent;
+    case: "extensionRuntimeProjectionResult";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionRuntimeProjectionChangedEvent extension_runtime_projection_changed = 32;
+     */
+    value: ExtensionRuntimeProjectionChangedEvent;
+    case: "extensionRuntimeProjectionChanged";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ExtensionStatusChangedEvent extension_status_changed = 33;
+     */
+    value: ExtensionStatusChangedEvent;
+    case: "extensionStatusChanged";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.CoreSkillActionRequestEvent core_skill_action_request = 34;
+     */
+    value: CoreSkillActionRequestEvent;
+    case: "coreSkillActionRequest";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.CoreSkillConfirmationRequestEvent core_skill_confirmation_request = 35;
+     */
+    value: CoreSkillConfirmationRequestEvent;
+    case: "coreSkillConfirmationRequest";
+  } | {
+    /**
+     * @generated from field: glimmer.surface.v1.ShutdownEvent shutdown = 36;
+     */
+    value: ShutdownEvent;
+    case: "shutdown";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message glimmer.surface.v1.SurfaceEvent.
+ * Use `create(SurfaceEventSchema)` to create a new message.
+ */
+export const SurfaceEventSchema: GenMessage<SurfaceEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 61);
+
+/**
+ * @generated from message glimmer.surface.v1.SurfaceGatewayServiceQueryResponse
+ */
+export type SurfaceGatewayServiceQueryResponse = Message<"glimmer.surface.v1.SurfaceGatewayServiceQueryResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: glimmer.surface.v1.SurfaceEvent event = 3;
+   */
+  event?: SurfaceEvent | undefined;
+
+  /**
+   * @generated from field: glimmer.common.v1.ServiceErrorDetail error = 4;
+   */
+  error?: ServiceErrorDetail | undefined;
+};
+
+/**
+ * Describes the message glimmer.surface.v1.SurfaceGatewayServiceQueryResponse.
+ * Use `create(SurfaceGatewayServiceQueryResponseSchema)` to create a new message.
+ */
+export const SurfaceGatewayServiceQueryResponseSchema: GenMessage<SurfaceGatewayServiceQueryResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 62);
+
+/**
+ * @generated from message glimmer.surface.v1.SurfaceGatewayServiceCommandResponse
+ */
+export type SurfaceGatewayServiceCommandResponse = Message<"glimmer.surface.v1.SurfaceGatewayServiceCommandResponse"> & {
+  /**
+   * @generated from field: string operation_id = 1;
+   */
+  operationId: string;
+
+  /**
+   * @generated from field: string status = 2;
+   */
+  status: string;
+
+  /**
+   * @generated from field: glimmer.surface.v1.SurfaceEvent event = 3;
+   */
+  event?: SurfaceEvent | undefined;
 
   /**
    * @generated from field: glimmer.common.v1.ServiceErrorDetail error = 4;
@@ -213,7 +2439,7 @@ export type SurfaceGatewayServiceCommandResponse = Message<"glimmer.surface.v1.S
  * Use `create(SurfaceGatewayServiceCommandResponseSchema)` to create a new message.
  */
 export const SurfaceGatewayServiceCommandResponseSchema: GenMessage<SurfaceGatewayServiceCommandResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 5);
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 63);
 
 /**
  * @generated from message glimmer.surface.v1.SurfaceGatewayServiceStreamRequest
@@ -228,11 +2454,6 @@ export type SurfaceGatewayServiceStreamRequest = Message<"glimmer.surface.v1.Sur
    * @generated from field: string session_id = 2;
    */
   sessionId: string;
-
-  /**
-   * @generated from field: repeated string topics = 3;
-   */
-  topics: string[];
 };
 
 /**
@@ -240,36 +2461,16 @@ export type SurfaceGatewayServiceStreamRequest = Message<"glimmer.surface.v1.Sur
  * Use `create(SurfaceGatewayServiceStreamRequestSchema)` to create a new message.
  */
 export const SurfaceGatewayServiceStreamRequestSchema: GenMessage<SurfaceGatewayServiceStreamRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 6);
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 64);
 
 /**
  * @generated from message glimmer.surface.v1.SurfaceGatewayServiceStreamResponse
  */
 export type SurfaceGatewayServiceStreamResponse = Message<"glimmer.surface.v1.SurfaceGatewayServiceStreamResponse"> & {
   /**
-   * @generated from field: string event_id = 1;
+   * @generated from field: glimmer.surface.v1.SurfaceEvent event = 1;
    */
-  eventId: string;
-
-  /**
-   * @generated from field: string kind = 2;
-   */
-  kind: string;
-
-  /**
-   * @generated from field: string trace_id = 3;
-   */
-  traceId: string;
-
-  /**
-   * @generated from field: int64 timestamp_ms = 4;
-   */
-  timestampMs: bigint;
-
-  /**
-   * @generated from field: google.protobuf.Struct projection = 5;
-   */
-  projection?: JsonObject | undefined;
+  event?: SurfaceEvent | undefined;
 };
 
 /**
@@ -277,7 +2478,7 @@ export type SurfaceGatewayServiceStreamResponse = Message<"glimmer.surface.v1.Su
  * Use `create(SurfaceGatewayServiceStreamResponseSchema)` to create a new message.
  */
 export const SurfaceGatewayServiceStreamResponseSchema: GenMessage<SurfaceGatewayServiceStreamResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_surface_v1_surface_gateway, 7);
+  messageDesc(file_glimmer_surface_v1_surface_gateway, 65);
 
 /**
  * @generated from service glimmer.surface.v1.SurfaceGatewayService

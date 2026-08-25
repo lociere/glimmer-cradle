@@ -4,11 +4,12 @@ import {
   SURFACE_GATEWAY_OPEN,
   type SurfaceGatewayClientLike,
 } from './surface-gateway-client';
+import type { ProductSurfaceProjection, ProductSurfaceRequest } from './surface-grpc-mapper';
 
 export class SurfaceGatewayTestDouble extends EventEmitter implements SurfaceGatewayClientLike {
   public readyState = SURFACE_GATEWAY_CLOSED;
-  public readonly sent: string[] = [];
-  public onSend: ((serialized: string) => void) | undefined;
+  public readonly sent: ProductSurfaceRequest[] = [];
+  public onSend: ((frame: ProductSurfaceRequest) => void) | undefined;
 
   public connect(_endpoint: string, _generation: string, _productId: string): Promise<void> {
     this.readyState = SURFACE_GATEWAY_OPEN;
@@ -16,13 +17,13 @@ export class SurfaceGatewayTestDouble extends EventEmitter implements SurfaceGat
     return Promise.resolve();
   }
 
-  public send(serialized: string): void {
-    this.sent.push(serialized);
-    this.onSend?.(serialized);
+  public submit(frame: ProductSurfaceRequest): void {
+    this.sent.push(frame);
+    this.onSend?.(frame);
   }
 
-  public emitFrame(frame: unknown): void {
-    this.emit('message', Buffer.from(JSON.stringify(frame), 'utf8'));
+  public emitFrame(frame: ProductSurfaceProjection): void {
+    this.emit('message', frame);
   }
 
   public close(): void {

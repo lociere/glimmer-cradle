@@ -4,7 +4,7 @@
 > 事实依据：本目录下的 `proto/`、`json-schema/`、`compatibility/`、`generated/`、`scripts/` 与 `tests/`。
 > 维护触发：新增或修改 Contract Spine IDL、JSON Schema Document、生成工具链、兼容基线或跨语言验证门。
 
-`contracts/` 是唯一 Contract Spine。Kernel↔Cognition、Surface Gateway、Kernel↔UnityAvatarHost、Kernel↔Audio Engine 与 Extension Host 的跨进程 Service 使用版本化 Protobuf；配置、Extension package、产品组合、Presentation 与 Skill 参数等可独立编辑 Document 使用 JSON Schema。旧 `protocol/`、stdio RPC、ZMQ envelope 和被替代的手写 WebSocket 主线均已退出运行事实。
+`contracts/` 是唯一 Contract Spine。Kernel↔Cognition、Surface Gateway、Kernel↔UnityAvatarHost、Kernel↔Audio Engine 与 Extension Host 的跨进程 Service 使用版本化 Protobuf；配置、Extension package、产品组合与 Skill 参数等可独立编辑 Document 使用 JSON Schema。Surface presentation 主线由 typed Service DTO 拥有，不再保留无 runtime validator 的 JSON Schema 第二事实源。旧 `protocol/`、stdio RPC、ZMQ envelope 和被替代的手写 WebSocket 主线均已退出运行事实。
 
 ## 目录
 

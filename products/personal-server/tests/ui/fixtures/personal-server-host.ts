@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, fromJson, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
 import { StructSchema } from '@bufbuild/protobuf/wkt';
+import * as surfaceV1 from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import {
   SurfaceGatewayServiceCommandRequestSchema,
   SurfaceGatewayServiceCommandResponseSchema,
@@ -142,24 +143,24 @@ export async function startPersonalServerUiFixture(options?: {
       call: grpc.ServerUnaryCall<SurfaceGatewayServiceQueryRequest, SurfaceGatewayServiceQueryResponse>,
       callback: grpc.sendUnaryData<SurfaceGatewayServiceQueryResponse>,
     ) => {
-      const frame = fixtureRequestFrame(call.request.arguments);
+      const frame = fixtureQueryFrame(call.request);
       const response = fixtureResponseFrame(frame, state);
       callback(null, create(SurfaceGatewayServiceQueryResponseSchema, {
-        requestId: `fixture-query-${Date.now()}`,
+        operationId: `fixture-query-${Date.now()}`,
         status: response ? 'success' : 'accepted',
-        projection: response ? fromJson(StructSchema, response as never) as never : undefined,
+        event: response ? fixtureSurfaceEvent(response) : undefined,
       }));
     },
     Command: (
       call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
       callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
     ) => {
-      const frame = fixtureRequestFrame(call.request.arguments);
+      const frame = fixtureCommandFrame(call.request);
       const response = fixtureResponseFrame(frame, state);
       callback(null, create(SurfaceGatewayServiceCommandResponseSchema, {
-        requestId: `fixture-command-${Date.now()}`,
+        operationId: `fixture-command-${Date.now()}`,
         status: response ? 'success' : 'accepted',
-        result: response ? fromJson(StructSchema, response as never) as never : undefined,
+        event: response ? fixtureSurfaceEvent(response) : undefined,
       }));
     },
     Stream: (
@@ -572,12 +573,55 @@ function createFixtureState(zeroProvider: boolean): FixtureState {
   };
 }
 
-function fixtureRequestFrame(argumentsValue: unknown): Record<string, unknown> {
-  if (!argumentsValue || typeof argumentsValue !== 'object') return {};
-  const json = argumentsValue as Record<string, unknown>;
-  return json.frame && typeof json.frame === 'object'
-    ? json.frame as Record<string, unknown>
-    : {};
+function fixtureQueryFrame(request: SurfaceGatewayServiceQueryRequest): Record<string, unknown> {
+  const query = request.query;
+  switch (query.case) {
+    case 'configurationSnapshot': return { kind: 'config_snapshot_request', config_snapshot_request: { request_id: query.value.requestId } };
+    case 'conversationHistory': return { kind: 'conversation_history_request', conversation_history_request: {
+      request_id: query.value.requestId, conversation_id: query.value.conversationId || undefined,
+      scene_id: query.value.sceneId || undefined, thread_id: query.value.threadId || undefined,
+      actor_id: query.value.actorId || undefined, source_provider_id: query.value.sourceProviderId || undefined,
+      cursor: query.value.cursor || undefined, limit: query.value.limit,
+    } };
+    case 'skillCatalog': return { kind: 'skill_catalog_request', skill_catalog_request: { request_id: query.value.requestId } };
+    case 'extensionRuntimeProjection': return { kind: 'extension_runtime_projection_request', extension_runtime_projection_request: {
+      request_id: query.value.requestId, extension_id: query.value.extensionId || undefined,
+    } };
+    default: return {};
+  }
+}
+
+function fixtureCommandFrame(request: SurfaceGatewayServiceCommandRequest): Record<string, unknown> {
+  const command = request.command;
+  switch (command.case) {
+    case 'chatInput': return { kind: 'chat_input', chat_input: { text: command.value.text, source_suffix: command.value.sourceSuffix || undefined } };
+    case 'configurationTest': return { kind: 'config_test_request', config_test_request: {
+      request_id: command.value.requestId, provider: command.value.provider,
+    } };
+    case 'configurationUpdate': return { kind: 'config_update_request', config_update_request: {
+      request_id: command.value.requestId, revision: command.value.revision, dry_run: command.value.dryRun,
+      llm: command.value.llm, audio: command.value.audio, embedding: command.value.embedding,
+      memory: command.value.memory, skills: command.value.skills,
+    } };
+    case 'extensionInstallPrepare': return { kind: 'extension_install_prepare', extension_install_prepare: {
+      request_id: command.value.requestId, source: command.value.source,
+    } };
+    case 'extensionInstallCommit': return { kind: 'extension_install_commit', extension_install_commit: {
+      request_id: command.value.requestId, transaction_id: command.value.transactionId,
+      approved_permissions: command.value.approvedPermissions,
+    } };
+    case 'extensionInstallCancel': return { kind: 'extension_install_cancel', extension_install_cancel: {
+      request_id: command.value.requestId, transaction_id: command.value.transactionId,
+    } };
+    case 'extensionLifecycle': return { kind: 'extension_lifecycle_request', extension_lifecycle_request: {
+      request_id: command.value.requestId, extension_id: command.value.extensionId,
+      version: command.value.version || undefined, operation: command.value.operation,
+    } };
+    case 'extensionUninstall': return { kind: 'extension_uninstall_request', extension_uninstall_request: {
+      request_id: command.value.requestId, extension_id: command.value.extensionId, version: command.value.version,
+    } };
+    default: return {};
+  }
 }
 
 function fixtureResponseFrame(frame: Record<string, unknown>, state: FixtureState): Record<string, unknown> | undefined {
@@ -590,13 +634,147 @@ function fixtureResponseFrame(frame: Record<string, unknown>, state: FixtureStat
   return response;
 }
 
+function fixtureSurfaceEvent(frame: Record<string, unknown>): surfaceV1.SurfaceEvent {
+  const payload = frame as Record<string, any>;
+  const base = {
+    eventId: `fixture-event-${Date.now()}`,
+    traceId: typeof payload.trace_id === 'string' ? payload.trace_id : '',
+    timestampMs: BigInt(typeof payload.timestamp === 'number' ? payload.timestamp : Date.now()),
+  };
+  let event: surfaceV1.SurfaceEvent['event'];
+  switch (payload.kind) {
+    case 'runtime_readiness':
+      event = { case: 'runtimeReadiness', value: create(surfaceV1.RuntimeReadinessEventSchema, {
+        updatedAtMs: BigInt(payload.runtime_readiness.updated_at),
+        runtimes: payload.runtime_readiness.runtimes.map((item: any) => create(surfaceV1.RuntimeReadinessItemSchema, {
+          runtimeId: item.runtime_id, owner: item.owner, phase: item.phase, state: item.state,
+          blocking: item.blocking, summary: item.summary, detailsRef: item.details_ref ?? '',
+          durationMs: BigInt(item.duration_ms ?? 0),
+        })),
+      }) };
+      break;
+    case 'conversation_history_result': {
+      const value = payload.conversation_history_result;
+      event = { case: 'conversationHistoryResult', value: create(surfaceV1.ConversationHistoryResultEventSchema, {
+        requestId: value.request_id, status: value.status,
+        conversation: value.conversation ? create(surfaceV1.ConversationAddressProjectionSchema, {
+          sourceProviderId: value.conversation.source_provider_id, sceneId: value.conversation.scene_id,
+          conversationId: value.conversation.conversation_id, threadId: value.conversation.thread_id,
+          recallScope: value.conversation.recall_scope, disclosureScope: value.conversation.disclosure_scope,
+        }) : undefined,
+        items: value.items.map((item: any) => create(surfaceV1.ConversationHistoryEntryProjectionSchema, {
+          entryId: item.entry_id, sourceKind: item.source_kind, role: item.role, status: item.status,
+          text: item.text, occurredAt: item.occurred_at, conversationId: item.conversation_id,
+          sceneId: item.scene_id, threadId: item.thread_id, recallScope: item.recall_scope,
+          disclosureScope: item.disclosure_scope,
+        })),
+        nextCursor: value.next_cursor ?? '', hasMore: value.has_more, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'configuration_snapshot_result': {
+      const value = payload.configuration_snapshot_result;
+      event = { case: 'configurationSnapshot', value: create(surfaceV1.ConfigurationSnapshotEventSchema, {
+        requestId: value.request_id, status: value.status, snapshot: value.snapshot, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'configuration_update_result': {
+      const value = payload.configuration_update_result;
+      event = { case: 'configurationUpdate', value: create(surfaceV1.ConfigurationUpdateEventSchema, {
+        requestId: value.request_id, status: value.status, applyState: value.apply_state,
+        changeSummary: value.change_summary, snapshot: value.snapshot, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'configuration_test_result': {
+      const value = payload.configuration_test_result;
+      event = { case: 'configurationTest', value: create(surfaceV1.ConfigurationTestEventSchema, {
+        requestId: value.request_id, status: value.status, message: value.message ?? '',
+        discoveredModels: value.discovered_models, latencyMs: BigInt(value.latency_ms ?? 0),
+      }) };
+      break;
+    }
+    case 'skill_catalog_response': {
+      const value = payload.skill_catalog_response;
+      event = { case: 'skillCatalog', value: create(surfaceV1.SkillCatalogEventSchema, {
+        requestId: value.request_id, status: value.status, snapshot: value.snapshot, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'extension_runtime_projection_result': {
+      const value = payload.extension_runtime_projection_result;
+      event = { case: 'extensionRuntimeProjectionResult', value: create(surfaceV1.ExtensionRuntimeProjectionResultEventSchema, {
+        requestId: value.request_id, status: value.status, projections: value.projections,
+        installations: value.installations, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'extension_runtime_projection_changed':
+      event = { case: 'extensionRuntimeProjectionChanged', value: create(surfaceV1.ExtensionRuntimeProjectionChangedEventSchema, {
+        projection: payload.extension_runtime_projection_changed,
+      }) };
+      break;
+    case 'extension_install_preview': {
+      const value = payload.extension_install_preview;
+      event = { case: 'extensionInstallPreview', value: create(surfaceV1.ExtensionInstallPreviewEventSchema, {
+        requestId: value.request_id, status: value.status, transactionId: value.transaction_id ?? '',
+        extension: value.extension, artifact: value.artifact, trust: value.trust, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'extension_install_result': {
+      const value = payload.extension_install_result;
+      event = { case: 'extensionInstallResult', value: create(surfaceV1.ExtensionInstallResultEventSchema, {
+        requestId: value.request_id, status: value.status, extensionId: value.extension_id ?? '',
+        version: value.version ?? '', alreadyInstalled: value.already_installed ?? false, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'extension_lifecycle_result': {
+      const value = payload.extension_lifecycle_result;
+      event = { case: 'extensionLifecycleResult', value: create(surfaceV1.ExtensionLifecycleResultEventSchema, {
+        requestId: value.request_id, extensionId: value.extension_id, version: value.version ?? '',
+        operation: value.operation, status: value.status, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'extension_uninstall_result': {
+      const value = payload.extension_uninstall_result;
+      event = { case: 'extensionUninstallResult', value: create(surfaceV1.ExtensionUninstallResultEventSchema, {
+        requestId: value.request_id, extensionId: value.extension_id, version: value.version,
+        status: value.status, message: value.message ?? '',
+      }) };
+      break;
+    }
+    case 'conversation_notice': {
+      const value = payload.conversation_notice;
+      event = { case: 'conversationNotice', value: create(surfaceV1.ConversationNoticeEventSchema, {
+        code: value.code, level: value.level, title: value.title, message: value.message,
+        actionRoute: value.action_route ?? '', actionLabel: value.action_label ?? '',
+      }) };
+      break;
+    }
+    case 'thought':
+      event = { case: 'thought', value: create(surfaceV1.ThoughtEventSchema, payload.thought) };
+      break;
+    case 'reply':
+      event = { case: 'reply', value: create(surfaceV1.ReplyEventSchema, {
+        text: payload.reply.text,
+        messages: (payload.reply.messages ?? []).map((item: any) => create(surfaceV1.ReplyMessageSchema, {
+          sequence: item.sequence, contentType: item.content_type, text: item.text, language: item.language ?? '',
+        })),
+      }) };
+      break;
+    default:
+      throw new Error(`UI fixture 未实现 typed Surface event：${String(payload.kind)}`);
+  }
+  return create(surfaceV1.SurfaceEventSchema, { ...base, event });
+}
+
 function fixtureStreamFrame(frame: PresentationDownstreamFrame): SurfaceGatewayServiceStreamResponse {
   return create(SurfaceGatewayServiceStreamResponseSchema, {
-    eventId: `fixture-event-${Date.now()}`,
-    kind: frame.kind,
-    traceId: frame.trace_id ?? '',
-    timestampMs: BigInt(Math.max(0, Math.trunc(frame.timestamp))),
-    projection: fromJson(StructSchema, JSON.parse(JSON.stringify(frame)) as never) as never,
+    event: fixtureSurfaceEvent(frame as unknown as Record<string, unknown>),
   });
 }
 

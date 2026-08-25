@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { create, fromJson, type JsonObject } from '@bufbuild/protobuf';
-import { StructSchema } from '@bufbuild/protobuf/wkt';
+import { create } from '@bufbuild/protobuf';
 import {
   SurfaceGatewayServiceCommandRequestSchema,
   SurfaceGatewayServiceCommandResponseSchema,
@@ -14,6 +13,7 @@ import {
   SurfaceGatewayServiceQueryResponseSchema,
   SurfaceGatewayServiceStreamResponseSchema,
   SurfaceGatewayServiceStreamRequestSchema,
+  type SurfaceEvent,
 } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import {
   ServiceErrorCode,
@@ -87,35 +87,20 @@ import {
   RecoveryRequiredError,
 } from '../../domain/errors';
 import { serverStreamingMethod, unaryMethod } from '../cognition/grpc-contract';
+import {
+  commandRequestToSurfaceFrame,
+  queryRequestToSurfaceFrame,
+  surfaceEventFromFrame,
+  type SurfaceProjectionFrame,
+  type SurfaceRequestFrame,
+} from './surface-grpc-mapper';
+
+type CoreSkillResponseFrame = Extract<SurfaceRequestFrame, {
+  kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
+}>;
 
 const logger = getLogger('control-surface-gateway');
 const SURFACE_OPEN = 1;
-const SURFACE_QUERY_KINDS = new Set([
-  'config_snapshot_request',
-  'conversation_history_request',
-  'skill_catalog_request',
-  'extension_runtime_projection_request',
-]);
-const SURFACE_COMMAND_KINDS = new Set([
-  'heartbeat',
-  'ping',
-  'host_hello',
-  'chat_input',
-  'audio_input',
-  'avatar_presentation',
-  'avatar_intent',
-  'core_skill_action_response',
-  'core_skill_confirmation_response',
-  'config_update_request',
-  'config_test_request',
-  'extension_lifecycle_request',
-  'extension_install_prepare',
-  'extension_install_commit',
-  'extension_install_cancel',
-  'extension_uninstall_request',
-  'extension_command_request',
-  'shutdown_request',
-]);
 const surfaceGatewayDefinition = {
   Connect: unaryMethod(
     '/glimmer.surface.v1.SurfaceGatewayService/Connect',
@@ -140,7 +125,7 @@ const surfaceGatewayDefinition = {
 };
 type SurfaceClient = {
   readonly readyState: number;
-  send(data: string): void;
+  send(event: SurfaceEvent): void;
   close?: () => void;
 };
 type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
@@ -369,7 +354,7 @@ export class ControlSurfaceGateway {
       const extensionId = typeof value.extensionId === 'string' ? value.extensionId : '';
       if (!extensionId) return;
 
-      this.broadcast(JSON.stringify({
+      this.broadcastFrame({
         kind: 'extension_status_changed',
         timestamp: Date.now(),
         extension_status_changed: {
@@ -377,7 +362,7 @@ export class ControlSurfaceGateway {
           event: eventName,
           message: typeof value.error === 'string' ? value.error : undefined,
         },
-      }));
+      });
       const projection = this._extensionLifecycleController?.getRuntimeProjection(extensionId);
       if (projection) {
         this.broadcastFrame({
@@ -456,11 +441,15 @@ export class ControlSurfaceGateway {
     call: grpc.ServerUnaryCall<SurfaceGatewayServiceQueryRequest, SurfaceGatewayServiceQueryResponse>,
     callback: grpc.sendUnaryData<SurfaceGatewayServiceQueryResponse>,
   ): void {
+    const frame = queryRequestToSurfaceFrame(call.request);
+    if (!frame) {
+      callback(null, this._surfaceRpcError('query', randomUUID(), ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway query 未指定') as SurfaceGatewayServiceQueryResponse);
+      return;
+    }
     void this._dispatchSurfaceRpc(
       call.request.sessionId,
       'surface:read',
-      call.request.query,
-      call.request.arguments,
+      frame,
       (error, response) => callback(error, response as SurfaceGatewayServiceQueryResponse),
       'query',
     );
@@ -470,11 +459,15 @@ export class ControlSurfaceGateway {
     call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
     callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
   ): void {
+    const frame = commandRequestToSurfaceFrame(call.request);
+    if (!frame) {
+      callback(null, this._surfaceRpcError('command', randomUUID(), ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway command 未指定') as SurfaceGatewayServiceCommandResponse);
+      return;
+    }
     void this._dispatchSurfaceRpc(
       call.request.sessionId,
       'surface:write',
-      call.request.command,
-      call.request.arguments,
+      frame,
       (error, response) => callback(error, response as SurfaceGatewayServiceCommandResponse),
       'command',
     );
@@ -488,43 +481,36 @@ export class ControlSurfaceGateway {
       call.destroy(new Error('Surface Gateway stream permission denied'));
       return;
     }
-    const pendingFrames: string[] = [];
+    const pendingEvents: SurfaceEvent[] = [];
     let streamClosed = false;
     let waitingForDrain = false;
     const flush = (): void => {
       if (streamClosed || call.destroyed) return;
       waitingForDrain = false;
-      while (pendingFrames.length > 0) {
-        const serialized = pendingFrames.shift();
-        if (!serialized) continue;
-        try {
-          const frame = JSON.parse(serialized) as PresentationDownstreamFrame;
-          if (!call.write(this._frameToStreamEvent(frame))) {
-            waitingForDrain = true;
-            call.once('drain', flush);
-            return;
-          }
-        } catch (error) {
-          logger.warn('Surface Gateway stream projection encoding failed', {
-            error: error instanceof Error ? error.message : String(error),
-          });
+      while (pendingEvents.length > 0) {
+        const event = pendingEvents.shift();
+        if (!event) continue;
+        if (!call.write(create(SurfaceGatewayServiceStreamResponseSchema, { event }))) {
+          waitingForDrain = true;
+          call.once('drain', flush);
+          return;
         }
       }
     };
     const client: SurfaceClient = {
       readyState: SURFACE_OPEN,
-      send: (serialized) => {
+      send: (event) => {
         if (streamClosed || call.destroyed) return;
-        if (pendingFrames.length >= 128) {
+        if (pendingEvents.length >= 128) {
           call.destroy(new Error('Surface Gateway stream backpressure limit exceeded'));
           return;
         }
-        pendingFrames.push(serialized);
+        pendingEvents.push(event);
         if (!waitingForDrain) flush();
       },
       close: () => {
         streamClosed = true;
-        pendingFrames.length = 0;
+        pendingEvents.length = 0;
         call.end();
       },
     };
@@ -532,7 +518,7 @@ export class ControlSurfaceGateway {
     this._sendInitialSurfaceFrames(client);
     const cleanup = (): void => {
       streamClosed = true;
-      pendingFrames.length = 0;
+      pendingEvents.length = 0;
       this._clients.delete(client);
       this._surfaceSessions.delete(call.request.sessionId);
     };
@@ -544,8 +530,7 @@ export class ControlSurfaceGateway {
   private async _dispatchSurfaceRpc(
     sessionId: string,
     requiredScope: 'surface:read' | 'surface:write',
-    declaredOperation: string,
-    rawArguments: JsonObject | undefined,
+    frame: SurfaceRequestFrame,
     callback: (error: Error | null, response: SurfaceGatewayServiceQueryResponse | SurfaceGatewayServiceCommandResponse) => void,
     operation: 'query' | 'command',
   ): Promise<void> {
@@ -555,42 +540,23 @@ export class ControlSurfaceGateway {
       callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway 权限不足'));
       return;
     }
-    const frame = extractSurfaceFrame(rawArguments);
-    if (!frame || typeof frame.kind !== 'string') {
-      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway frame 无效'));
-      return;
-    }
-    const declaredKind = declaredOperation.trim();
-    if (declaredKind !== frame.kind) {
-      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, 'Surface Gateway operation 与 frame.kind 不一致'));
-      return;
-    }
-    const allowedKind = operation === 'query'
-      ? SURFACE_QUERY_KINDS.has(frame.kind)
-      : SURFACE_COMMAND_KINDS.has(frame.kind);
-    if (!allowedKind) {
-      callback(null, this._surfaceRpcError(operation, requestId, ServiceErrorCode.INVALID_REQUEST, `Surface Gateway ${operation} 不支持 ${frame.kind}`));
-      return;
-    }
-    const output: unknown[] = [];
+    const output: SurfaceEvent[] = [];
     const client: SurfaceClient = {
       readyState: SURFACE_OPEN,
-      send: (serialized) => {
-        try { output.push(JSON.parse(serialized)); } catch { /* fail closed below */ }
-      },
+      send: (event) => output.push(event),
     };
-    await this._handleMessage(frame, client);
-    const projection = output.find((value) => value && typeof value === 'object') as JsonObject | undefined;
+    await this._dispatchSurfaceRequest(frame, client);
+    const event = output[0];
     callback(null, operation === 'query'
       ? create(SurfaceGatewayServiceQueryResponseSchema, {
-        requestId: surfaceRequestId(projection) || requestId,
-        status: projection ? 'success' : 'accepted',
-        projection: projection ? fromJson(StructSchema, projection) as unknown as JsonObject : undefined,
+        operationId: requestId,
+        status: event ? 'success' : 'accepted',
+        event,
       })
       : create(SurfaceGatewayServiceCommandResponseSchema, {
-        requestId: surfaceRequestId(projection) || requestId,
-        status: projection ? 'success' : 'accepted',
-        result: projection ? fromJson(StructSchema, projection) as unknown as JsonObject : undefined,
+        operationId: requestId,
+        status: event ? 'success' : 'accepted',
+        event,
       }));
   }
 
@@ -608,18 +574,8 @@ export class ControlSurfaceGateway {
       operationId: requestId,
     });
     return operation === 'query'
-      ? create(SurfaceGatewayServiceQueryResponseSchema, { requestId, status: 'error', error })
-      : create(SurfaceGatewayServiceCommandResponseSchema, { requestId, status: 'error', error });
-  }
-
-  private _frameToStreamEvent(frame: PresentationDownstreamFrame): SurfaceGatewayServiceStreamResponse {
-    return create(SurfaceGatewayServiceStreamResponseSchema, {
-      eventId: randomUUID(),
-      kind: frame.kind,
-      traceId: frame.trace_id ?? '',
-      timestampMs: BigInt(Math.max(0, Math.trunc(frame.timestamp))),
-      projection: fromJson(StructSchema, JSON.parse(JSON.stringify(frame)) as JsonObject) as unknown as JsonObject,
-    });
+      ? create(SurfaceGatewayServiceQueryResponseSchema, { operationId: requestId, status: 'error', error })
+      : create(SurfaceGatewayServiceCommandResponseSchema, { operationId: requestId, status: 'error', error });
   }
 
   private _sendInitialSurfaceFrames(client: SurfaceClient): void {
@@ -666,15 +622,15 @@ export class ControlSurfaceGateway {
     return isLocalAvatarSurfaceScene(sceneId);
   }
 
-  private broadcast(data: string) {
+  private broadcast(event: SurfaceEvent): void {
     for (const client of this._clients) {
       if (client.readyState === SURFACE_OPEN) {
-        client.send(data);
+        client.send(event);
       }
     }
   }
 
-  /** 阶段 8.3:统一 PresentationDownstreamFrame 序列化广播。 */
+  /** 将 Kernel owner-local projection 映射为 typed Surface Service event。 */
   public broadcastFrame(frame: PresentationDownstreamFrame): void {
     logger.debug('Broadcast PresentationFrame', {
       frame_class: getPresentationFrameClass(frame.kind),
@@ -682,7 +638,8 @@ export class ControlSurfaceGateway {
       trace_id: frame.trace_id,
     });
 
-    this.broadcast(JSON.stringify(frame));
+    const event = surfaceEventFromFrame(frame);
+    if (event) this.broadcast(event);
   }
 
   public async requestCoreSkillAction(
@@ -740,12 +697,19 @@ export class ControlSurfaceGateway {
         reject(new Error('产品控制表面本地 Skill 请求超时'));
       }, 30000);
       this._pendingSurfaceRequests.set(requestId, { resolve, reject, timer });
-      client.send(JSON.stringify({
+      const event = surfaceEventFromFrame({
         kind,
         request_id: requestId,
         timestamp: Date.now(),
         ...payload,
-      }));
+      } as SurfaceProjectionFrame);
+      if (!event) {
+        this._pendingSurfaceRequests.delete(requestId);
+        clearTimeout(timer);
+        reject(new Error(`Surface event ${kind} 无 typed Service 映射`));
+        return;
+      }
+      client.send(event);
     });
   }
 
@@ -839,7 +803,8 @@ export class ControlSurfaceGateway {
         kind: frame.kind,
         trace_id: frame.trace_id,
       });
-      ws.send(JSON.stringify(frame));
+      const event = surfaceEventFromFrame(frame);
+      if (event) ws.send(event);
     }
   }
 
@@ -868,24 +833,14 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private async _handleMessage(data: any, ws: SurfaceClient): Promise<void> {
-    // 阶段 8.4：上行帧只接受 PresentationUpstreamFrame.kind。
-    const kind: string = (typeof data.kind === 'string' && data.kind) || '';
+  private async _dispatchSurfaceRequest(data: SurfaceRequestFrame, ws: SurfaceClient): Promise<void> {
+    const kind = data.kind;
     if (kind !== 'avatar_presentation') {
       logger.debug('Received UI request', { kind });
     }
 
-    if (kind === 'heartbeat' || kind === 'ping') {
-      // 心跳无副作用,无需回 pong(8.3 简化;Electron 端不依赖 pong)。
-      return;
-    } else if (kind === 'host_hello') {
-      // 阶段 8.3:握手帧。当前仅日志记录;8.7+ AvatarHostRegistry 用 capabilities 路由。
-      const sh = data.host_hello ?? {};
-      logger.info('Avatar hello', {
-        host_kind: sh.host_kind,
-        host_id: sh.host_id,
-        host_version: sh.host_version,
-      });
+    if (kind === 'heartbeat') {
+      // 心跳无副作用，产品不依赖 echo。
       return;
     } else if (kind === 'chat_input') {
       const text: string = (data.chat_input?.text as string) ?? '';
@@ -1302,12 +1257,11 @@ export class ControlSurfaceGateway {
     installations: ExtensionInstallationProjection[] = [],
     message?: string,
   ): void {
-    if (ws.readyState !== SURFACE_OPEN) return;
-    ws.send(JSON.stringify({
+    this._sendFrame(ws, {
       kind: 'extension_runtime_projection_result',
       timestamp: Date.now(),
       extension_runtime_projection_result: { request_id: requestId, status, projections, installations, message },
-    }));
+    });
   }
 
   private _handleSkillCatalogRequest(data: any, ws: SurfaceClient): void {
@@ -1336,8 +1290,7 @@ export class ControlSurfaceGateway {
     snapshot?: SkillCatalogResponsePayload['snapshot'],
     message?: string,
   ): void {
-    if (ws.readyState !== SURFACE_OPEN) return;
-    ws.send(JSON.stringify({
+    this._sendFrame(ws, {
       kind: 'skill_catalog_response',
       timestamp: Date.now(),
       skill_catalog_response: {
@@ -1346,10 +1299,10 @@ export class ControlSurfaceGateway {
         snapshot,
         message,
       } satisfies SkillCatalogResponsePayload,
-    }));
+    });
   }
 
-  private _handleCoreSkillResponse(data: any): void {
+  private _handleCoreSkillResponse(data: CoreSkillResponseFrame): void {
     const requestId = typeof data.request_id === 'string' ? data.request_id : '';
     const pending = this._pendingSurfaceRequests.get(requestId);
     if (!pending) return;
@@ -1418,8 +1371,7 @@ export class ControlSurfaceGateway {
     result?: unknown,
     message?: string,
   ): void {
-    if (ws.readyState !== SURFACE_OPEN) return;
-    ws.send(JSON.stringify({
+    this._sendFrame(ws, {
       kind: 'extension_command_result',
       timestamp: Date.now(),
       extension_command_result: {
@@ -1429,7 +1381,7 @@ export class ControlSurfaceGateway {
         result,
         message,
       },
-    }));
+    });
   }
 
   private async _handleExtensionLifecycleRequest(data: any, ws: SurfaceClient): Promise<void> {
@@ -1483,19 +1435,18 @@ export class ControlSurfaceGateway {
     status: 'success' | 'error',
     message?: string,
   ): void {
-    if (ws.readyState !== SURFACE_OPEN) return;
-    ws.send(JSON.stringify({
+    this._sendFrame(ws, {
       kind: 'extension_lifecycle_result',
       timestamp: Date.now(),
       extension_lifecycle_result: {
         request_id: requestId,
         extension_id: extensionId,
         version: version || undefined,
-        operation,
+        operation: operation as 'start' | 'stop',
         status,
         message,
       },
-    }));
+    });
   }
 
   /** 过滤桌面端请求，避免把 UI 临时字段直接泄漏给 Avatar。 */
@@ -1737,25 +1688,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function extractSurfaceFrame(argumentsValue: JsonObject | undefined): Record<string, unknown> | null {
-  if (!argumentsValue || typeof argumentsValue !== 'object') return null;
-  const frame = argumentsValue.frame;
-  if (frame && typeof frame === 'object' && !Array.isArray(frame)) {
-    return frame as Record<string, unknown>;
-  }
-  return argumentsValue as Record<string, unknown>;
-}
-
-function surfaceRequestId(frame: JsonObject | undefined): string | undefined {
-  if (!frame) return undefined;
-  const payload = Object.values(frame).find((value) => value && typeof value === 'object') as JsonObject | undefined;
-  const requestId = payload?.request_id;
-  return typeof requestId === 'string' && requestId ? requestId : undefined;
-}
-
 function closeSurfaceClient(client: SurfaceClient, frame: PresentationDownstreamFrame): Promise<void> {
   if (client.readyState !== SURFACE_OPEN) return Promise.resolve();
-  client.send(JSON.stringify(frame));
+  const event = surfaceEventFromFrame(frame);
+  if (event) client.send(event);
   client.close?.();
   return Promise.resolve();
 }
