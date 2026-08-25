@@ -1,5 +1,5 @@
 /**
- * YAML → JSON 归一化，由 protocol 包统一拥有并供各消费者复用。
+ * Kernel Config Adapter owner-local 的 YAML → JSON 边缘归一化。
  *
  * 在交 ajv 校验前，对 YAML parse 结果做必要的归一化 —— 仅处理 schema 难以
  * 1:1 表达的 YAML → JSON 边界问题。
