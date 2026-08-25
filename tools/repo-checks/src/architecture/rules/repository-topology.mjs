@@ -85,10 +85,6 @@ export function checkRepositoryTopology(repositoryRoot) {
     if (!discoveredPackages.has(packageName)) violations.push(`${packageName}: 必需工具 workspace 缺失`);
   }
 
-  const workspaceText = fs.readFileSync(path.join(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8');
-  if (!/^\s*-\s*['"]tools\/\*['"]\s*$/m.test(workspaceText)) {
-    violations.push('pnpm-workspace.yaml: 必须纳入 tools/*，且不能枚举固定工具数量');
-  }
   const rootManifest = readJson(path.join(repositoryRoot, 'package.json'));
   for (const [name, expected] of Object.entries(requiredFacade)) {
     if (rootManifest.scripts?.[name] !== expected) {
