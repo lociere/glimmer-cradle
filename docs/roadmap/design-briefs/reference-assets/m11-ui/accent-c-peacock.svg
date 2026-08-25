@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">孔雀青参考色卡</title>
+  <desc id="desc">仅供未来视觉探索使用，不属于 M11 当前 token 的偏绿沉静五级色阶。</desc>
+  <rect width="1200" height="420" rx="28" fill="#F4F4F1"/>
+  <text x="56" y="72" fill="#171919" font-family="Segoe UI, sans-serif" font-size="34" font-weight="700">C · 孔雀青 / Peacock Jade</text>
+  <text x="56" y="108" fill="#666B6B" font-family="Segoe UI, sans-serif" font-size="18">Reference asset only · green-leading, deep and quiet</text>
+  <g transform="translate(56 142)">
+    <rect width="208" height="210" rx="18" fill="#004135"/><rect x="216" width="208" height="210" rx="18" fill="#006A55"/>
+    <rect x="432" width="208" height="210" rx="18" fill="#00AA7E"/><rect x="648" width="208" height="210" rx="18" fill="#37BF8F"/>
+    <rect x="864" width="208" height="210" rx="18" fill="#95DEAE"/>
+    <g fill="#FFFFFF" font-family="Segoe UI, sans-serif"><text x="18" y="38" font-size="16" font-weight="700">DEEP</text><text x="234" y="38" font-size="16" font-weight="700">PRESSED</text><text x="450" y="38" font-size="16" font-weight="700">CORE</text><text x="666" y="38" font-size="16" font-weight="700">HOVER</text></g>
+    <text x="882" y="38" fill="#124329" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">GLINT</text>
+    <g fill="#FFFFFF" font-family="Consolas, monospace" font-size="17"><text x="18" y="178">#004135</text><text x="234" y="178">#006A55</text><text x="450" y="178">#00AA7E</text><text x="666" y="178">#37BF8F</text></g>
+    <text x="882" y="178" fill="#124329" font-family="Consolas, monospace" font-size="17">#95DEAE</text>
+  </g>
+</svg>

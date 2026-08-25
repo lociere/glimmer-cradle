@@ -37,6 +37,7 @@ description: Develop, review, debug, document, or coordinate Glimmer Cradle（�
 | 人格、情绪、记忆、LLM、认知循环 | `subsystems/Cognition.md` |
 | Control Center、Presence、Electron、Unity、Live2D | `subsystems/Desktop与Avatar.md` |
 | Web、Renderer、Control Center、页面布局、视觉设计、设计系统、响应式、可访问性、前端测试 | `subsystems/Frontend与UI.md` |
+| AI 辅助 UI、参考图落地、浏览器截图迭代、组件工作台、前端 Skill/MCP/组件库评估 | `subsystems/Frontend与UI.md` + `subsystems/AI前端开发.md` |
 | Extension、Skill Plane、MCP、公开 SDK | `subsystems/Extensions与SkillPlane.md` |
 
 ## 硬约束

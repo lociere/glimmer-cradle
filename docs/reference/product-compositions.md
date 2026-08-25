@@ -37,6 +37,8 @@ products/personal-server/
   public/
 ```
 
+当前 `src/web/` 仍是原生 TypeScript/Vite 命令式 DOM 实现；[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 已接受第一方产品 UI 统一使用 React，并在 M11 将 Personal Server 浏览器侧迁为 React + Vite、React Router、React Aria Components、CSS Modules，增加产品内 Storybook 工作台。本段区分 Current 与 Accepted Target：精确目标文件和删除门见 [M11 目标物理清单](../roadmap/manifests/M11-目标物理清单.md)，不得把已接受但尚未实施的目标目录写成当前事实。
+
 约束如下：
 
 - `src/server/` 只承载 Node Product Host：认证、HTTP ingress、浏览器 WebSocket ingress、到 Kernel `SurfaceGatewayService` 的 gRPC 代理、静态资源装配与 Product 生命周期对接；不得 import 浏览器业务模块。

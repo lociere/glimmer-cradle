@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">M11 青曜强调色色卡</title>
+  <desc id="desc">深处偏蓝、亮处转青绿的五级强调色色阶，并展示在中性深色和浅色表面上的小面积使用。</desc>
+  <rect width="1200" height="520" rx="28" fill="#F4F4F1"/>
+  <text x="56" y="72" fill="#171919" font-family="Segoe UI, sans-serif" font-size="34" font-weight="700">A · 青曜 / Qingyao</text>
+  <text x="56" y="108" fill="#666B6B" font-family="Segoe UI, sans-serif" font-size="18">M11 selected accent · blue depth → cyan-green inner light</text>
+  <g transform="translate(56 142)">
+    <rect width="208" height="180" rx="18" fill="#004052"/><rect x="216" width="208" height="180" rx="18" fill="#00687F"/>
+    <rect x="432" width="208" height="180" rx="18" fill="#00AABC"/><rect x="648" width="208" height="180" rx="18" fill="#00BFC5"/>
+    <rect x="864" width="208" height="180" rx="18" fill="#6AE2D4"/>
+    <g fill="#FFFFFF" font-family="Segoe UI, sans-serif"><text x="18" y="34" font-size="16" font-weight="700">DEEP</text><text x="234" y="34" font-size="16" font-weight="700">PRESSED</text><text x="450" y="34" font-size="16" font-weight="700">CORE</text><text x="666" y="34" font-size="16" font-weight="700">HOVER</text></g>
+    <text x="882" y="34" fill="#073C3A" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700">GLINT</text>
+    <g fill="#FFFFFF" font-family="Consolas, monospace" font-size="17"><text x="18" y="152">#004052</text><text x="234" y="152">#00687F</text><text x="450" y="152">#00AABC</text><text x="666" y="152">#00BFC5</text></g>
+    <text x="882" y="152" fill="#073C3A" font-family="Consolas, monospace" font-size="17">#6AE2D4</text>
+  </g>
+  <g transform="translate(56 350)">
+    <rect width="528" height="116" rx="18" fill="#121313"/>
+    <rect x="24" y="24" width="184" height="68" rx="13" fill="#252828"/>
+    <rect x="38" y="40" width="9" height="36" rx="5" fill="#00AABC"/><text x="64" y="64" fill="#F2F3F3" font-family="Segoe UI, sans-serif" font-size="18" font-weight="600">Selected item</text>
+    <circle cx="470" cy="58" r="15" fill="#121313" stroke="#6AE2D4" stroke-width="5"/>
+    <rect x="560" width="528" height="116" rx="18" fill="#FBFBFA"/>
+    <rect x="584" y="24" width="184" height="68" rx="13" fill="#FFFFFF"/>
+    <rect x="598" y="40" width="9" height="36" rx="5" fill="#00687F"/><text x="624" y="64" fill="#171919" font-family="Segoe UI, sans-serif" font-size="18" font-weight="600">Selected item</text>
+    <circle cx="1030" cy="58" r="15" fill="#FBFBFA" stroke="#00687F" stroke-width="5"/>
+  </g>
+</svg>

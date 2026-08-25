@@ -124,7 +124,7 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 8：桌面身体、Skill Plane 与 Extension 收口 | `recent-done` | Renderer / Shell / Extension / Skill Plane 形成开发期闭环。 | `architecture/current/`、`implementation/`、`reference/extension-sdk.md` | [M08](./milestones/M08-SkillPlane、Extension与桌面体验收口.md)、[阶段8 ADR](../history/architecture-decisions/阶段8-渲染层架构分析与重构.md)。 |
 | Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../architecture/current/07-子系统当前视图/Cognition.md)、[Extension 与 Skill Plane 当前视图](../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)、[extension-sdk](../reference/extension-sdk.md) | [M09](./milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
 | Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../reference/packaging-layout.md)、[Personal Server 部署](../guides/release/Personal%20Server部署.md) | [M10](./milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
-| Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `at-risk` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环；当前暂停/延期，未完成。 | [Product Compositions](../reference/product-compositions.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)。 |
+| Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `in-progress` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环；前端架构与视觉前置已完成，准备进入实现，整体里程碑仍未完成。 | [Product Compositions](../reference/product-compositions.md)、[UI Design Tokens](../reference/ui-design-tokens.md)、未来配置与 Extension Reference | [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 manifest](./manifests/M11-目标物理清单.md)、[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)。 |
 | Phase 12：契约脊柱与跨进程服务架构重建 | `done` | Slice 1～9 已完成 Contract Spine、typed Surface、owner-local projection 与 legacy `protocol/` 物理删除。 | Blueprint、Current/Implementation/Reference | [M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md)、[M12 manifest](./manifests/M12-目标物理清单.md)、[ADR-0013](../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
 | Phase 13：工程自动化脊柱与交付生命周期闭环 | `done` | A～F 与 ADR-0016 最终仓库工具收口已完成；真实 Docker/Ubuntu/Windows installer/签名/发布仍为环境风险。 | Current/Implementation/Reference/Guide | [M13](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[M13 manifest](./manifests/M13-目标物理清单.md)、[ADR-0015](../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)、[ADR-0016](../architecture/decisions/ADR-0016-仓库工具工作区与产品监督边界.md)。 |
 | Phase 14：低延迟多模态交互 | `candidate` | 文本、语音、视觉和实时感知进入统一交互节奏。 | 未来 Contracts、Provider、Renderer 与 Cognition 文档 | [Backlog](./backlog.md)。 |
@@ -303,7 +303,7 @@ Phase 8 之后，Glimmer Cradle 具备开发期意义上的完整交互闭环。
 
 ## 7. 当前与未来阶段
 
-Phase 9、Phase 10、Phase 12 与 Phase 13 已完成并迁入当前事实源。Phase 11 当前暂停/延期并标记为 `at-risk`，未完成、未关闭。Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
+Phase 9、Phase 10、Phase 12 与 Phase 13 已完成并迁入当前事实源。Phase 11 于 2026-08-25 恢复为 `in-progress`，前端架构、AI 辅助工作流和视觉方向前置已完成，下一步进入 Personal Server 前端实现；整体仍未完成。Phase 14 之后仍是蓝图级候选路线，它们与 Glimmer Cradle 长期方向一致，但除非进入 [now.md](./now.md) 或 [milestones/](./milestones/)，否则不是当前承诺。
 
 ### 7.1 Phase 9：主体可用性、跨场景记忆与体验收口
 
@@ -335,14 +335,14 @@ Phase 10 优先解决“从仓库运行”到“用户正式安装并持续更�
 
 | 项 | 内容 |
 | --- | --- |
-| 状态 | `at-risk`（暂停/延期，未完成） |
+| 状态 | `in-progress`（前端实现准备完成，整体未完成） |
 | 主问题 | Personal Server 已能安装和对话，但仍缺少可用的远程配置、日志与 Extension 管理；场景 Adapter 仍可能被平台启动实现错误限制。 |
-| 计划成果 | Kernel Config Application Port、脱敏配置投影、服务器设置与日志页面、统一 Extension Package Manager、产品/平台兼容校验、区域端点目录，以及 NapCat 外部 OneBot 的 QQ 场景、私有 Skill、回复、Experience 与 Memory 闭环。 |
+| 计划成果 | Kernel Config Application Port、脱敏配置投影、React 组件驱动控制面与 AI 可验证 UI 工作流、统一 Extension Package Manager、产品/平台兼容校验，以及 NapCat 外部 OneBot 的 QQ 场景、私有 Skill、回复、Experience 与 Memory 闭环；区域传输副本保留为长期候选。 |
 | 关键依赖 | Phase 10 的可靠安装、更新、回滚和区域传输基线；Protocol 配置与 Extension Schema；Kernel Policy、Skill Plane、Ingress 和 Observability。 |
 | 非范围 | 不让浏览器直接编辑 YAML 或读取 secret；不把 Docker Socket 交给 Extension；不把 Windows OneKey 可执行文件伪装为 Linux 兼容；不提前实现托管云。 |
 | 验收门 | 用户可在已部署服务器的认证网页完成首次 Provider 配置和真实对话；可从精确 Release 安装、升级、禁用和移除兼容 `.gcex`；NapCat 通过外部 OneBot 在私聊/群聊完成场景和私有 Skill 链路；失败与停机无残留。 |
 
-Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、统一扩展管理和可跨产品复用的场景 Adapter。当前暂停关系与剩余验收门见 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 和 [now.md](./now.md)，长期平台资源分层见 [ADR-0012](../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)。
+Phase 11 的架构重点不是增加页面，而是建立唯一配置 owner、可维护且可验证的控制面、统一扩展管理和可跨产品复用的场景 Adapter。当前活跃前置与剩余验收门见 [M11](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 manifest](./manifests/M11-目标物理清单.md) 和 [now.md](./now.md)，前端决策见 [ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)，长期平台资源分层见 [ADR-0012](../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)。
 
 ### 7.4 Phase 12：契约脊柱与跨进程服务架构重建
 

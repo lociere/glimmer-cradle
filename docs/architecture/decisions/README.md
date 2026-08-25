@@ -24,3 +24,4 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 - [ADR-0014 仓库物理分层与器官模块边界](./ADR-0014-仓库物理分层与器官模块边界.md)（`accepted`；部分替代 ADR-0005 第 7 条与 ADR-0007 第 4–5 条的物理/编译落点）
 - [ADR-0015 工程自动化平面与交付生命周期分层](./ADR-0015-工程自动化平面与交付生命周期分层.md)（`accepted`；固定 owner-local 原子任务、薄编排、同构 CI、fixed artifact 与宿主级事务 owner）
 - [ADR-0016 仓库工具工作区与产品监督边界](./ADR-0016-仓库工具工作区与产品监督边界.md)（`accepted`；以 `tools/*` 私有叶子 workspace 承载长期跨仓工具，root `package.json` 只保留稳定 façade）
+- [ADR-0017 产品前端统一采用 React 组件驱动架构](./ADR-0017-产品前端统一采用React组件驱动架构.md)（`accepted`；第一方产品 UI 统一 React 组件模型，M11 将 Personal Server 迁入该基线；尚未开始运行时迁移）

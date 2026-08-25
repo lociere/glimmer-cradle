@@ -2,8 +2,24 @@
 
 - 状态：in-progress
 - 关联架构：[Product Compositions](../../reference/product-compositions.md)、[Extension 与 Skill Plane 当前视图](../../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)
-- 关联决策：[ADR-0011 Extension 发布与开放生态边界](../../architecture/decisions/ADR-0011-Extension发布与开放生态边界.md)、[ADR-0012 场景 Adapter 与平台受管资源分层](../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)
+- 关联决策：[ADR-0011 Extension 发布与开放生态边界](../../architecture/decisions/ADR-0011-Extension发布与开放生态边界.md)、[ADR-0012 场景 Adapter 与平台受管资源分层](../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)、[ADR-0017 产品前端统一采用 React 组件驱动架构](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)（`accepted`）
 - 前置里程碑：[M10：发布形态、安装投影与数据迁移闭环](./M10-发布形态、安装投影与数据迁移闭环.md)
+- 目标物理清单：[M11 目标物理清单](../manifests/M11-目标物理清单.md)
+- UI 设计简报：[M11 Personal Server UI 设计简报](../design-briefs/M11-Personal%20Server%20UI设计简报.md)
+
+## 目录
+
+- [目标成果](#目标成果)
+- [架构不变量](#架构不变量)
+- [范围](#范围)
+- [非范围](#非范围)
+- [依赖](#依赖)
+- [实施顺序](#实施顺序)
+- [实施追踪清单](#实施追踪清单)
+- [风险](#风险)
+- [第一验收门](#第一验收门)
+- [最终验收门](#最终验收门)
+- [完成后归档](#完成后归档)
 
 ## 目标成果
 
@@ -84,15 +100,17 @@
 - Kernel Config owner、Extension Package Manager、Capability Graph、Skill Policy/Gateway 与审计链路保持单一事实源。
 - `@glimmer-cradle/extension-sdk` 及其所需 Contract Spine public edge 有可公开取得的精确版本和跨仓库 CI。
 - NapCat 上游提供可部署的 OneBot 11 服务，且其许可、账号数据和网络要求得到明确处理。
+- Personal Server UI 实现 slice 以前，ADR-0017 保持 `accepted`，已确认的视觉方向由 M11 UI 设计简报拥有；架构与视觉确认不能单独替代具体实现 slice 授权。
 
 ## 实施顺序
 
 1. **事实与契约**：修正 Current/Reference，新增配置、兼容性、资源 profile 和安装状态 Schema；生成并同步三端契约。
 2. **Kernel 配置主线**：实现脱敏 snapshot、Secret command、校验、revision、原子提交、生效计划、审计和失败恢复；删除产品层第二写入入口。
-3. **Personal Server 页面**：先完成首次配置和 Provider，再完成状态、日志、音频、记忆、Skill、安全、存储与更新页面。
-4. **Extension 发布主线**：发布 SDK/Protocol、仓库模板、Release CI、兼容性预览、安装进度、配置与回滚。
-5. **NapCat 跨产品化**：抽离 Adapter Core，落实外部 OneBot Linux profile、私有网络与 QQ 场景 E2E，再发布 Linux `.gcex`。
-6. **生产验收**：在全新服务器执行安装、网页配置、真实对话、扩展安装、QQ 场景、升级回滚、长运行与停机矩阵。
+3. **Personal Server 前端前置**：ADR-0017、信息架构与 M11 最终视觉方向已确认；首个实现 slice 固化 token、组件语言和代表状态矩阵。
+4. **Personal Server 前端迁移与页面**：按目标物理清单迁 Shell/Router、shared UI 和垂直页面 slice；建立 Storybook stories/组件测试与 Playwright 状态/视觉/a11y 双层闭环，并随 slice 删除旧 DOM owner；MCP 只在试点获准且收益可验证时接入。
+5. **Extension 发布主线**：发布 SDK/Protocol、仓库模板、Release CI、兼容性预览、安装进度、配置与回滚。
+6. **NapCat 跨产品化**：抽离 Adapter Core，落实外部 OneBot Linux profile、私有网络与 QQ 场景 E2E，再发布 Linux `.gcex`。
+7. **生产验收**：在全新服务器执行安装、网页配置、真实对话、扩展安装、QQ 场景、升级回滚、长运行与停机矩阵。
 
 每一步完成时必须删除被替代的直写、平台耦合和旧文档入口；不得在最后统一清理。
 
@@ -109,7 +127,15 @@
 
 ### Personal Server UI 优化门（待实现）
 
-本节记录已确认问题与后续目标，不表示 UI 已修复。实施必须遵循 [前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md) 和 [UI Design Tokens Reference](../../reference/ui-design-tokens.md)。
+本节记录已确认问题与后续目标，不表示 UI 已修复。视觉输入、代表页面、三个候选方向和用户确认门由 [M11 UI 设计简报](../design-briefs/M11-Personal%20Server%20UI设计简报.md) 唯一拥有；实施另遵循 [前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md)、[AI 辅助前端开发](../../guides/development/AI辅助前端开发.md)、[UI Design Tokens Reference](../../reference/ui-design-tokens.md) 和 [M11 目标物理清单](../manifests/M11-目标物理清单.md)。
+
+#### 2026-08-25 前端架构与 AI 工作流前置
+
+- M11 已从暂停状态恢复为 `in-progress`，当前已完成文档、架构、AI 工作流和视觉方向前置；未改运行时代码、依赖或截图基线。
+- 当前原生 TypeScript/Vite + 命令式 DOM 不是永久约束。[ADR-0017](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 已接受第一方产品 UI 统一使用 React 组件模型，并将 Personal Server 迁为 React + Vite、React Router、React Aria Components、语义 CSS variables + CSS Modules，以 Storybook stories/组件测试 + Playwright 建立组件级和产品级双层反馈。
+- ADR-0017 与 M11 最终视觉方向已于 2026-08-25 接受；文档、Skill 与设计前置已完成，实施 slice 获得授权前不修改运行时代码或依赖。
+- AI 的完成定义是“读取真实组件/状态 → 实现内聚片段 → 实际渲染并查看截图 → 运行交互/a11y/响应式检查 → 修正”，不是生成代码或单张截图。
+- Storybook MCP、shadcn Skill/MCP、Vercel/社区前端 Skill 和其他热门工具只提供方法候选。Storybook MCP 仍是 React preview 试点；引入前核对版本、许可证、框架、权限、维护状态、fallback、删除条件和摇篮代表任务效果，不复制其他 agent 配置或建立第二项目 Skill。
 
 #### 当前已确认问题
 
@@ -135,6 +161,7 @@
 - 12/13px 辅助文字与默认正文之间缺少稳定层级；页面既空又挤，信息密度和留白没有统一节奏。
 - 圆角、间距和控件高度存在大量任意值；主工作区在 1440px 仅约占六成，外围 UI 占比过高。
 - 761–1080px 同时保留两层左栏，约 808px 时明显挤压和异常换行；固定断点没有根据主工作区最低容量决定布局。
+- 当前视觉输入与禁止偏移见 M11 UI 设计简报；本节不复制颜色、材质或候选方向。
 
 #### 目标信息架构
 
@@ -150,18 +177,7 @@
 
 #### 视觉探索门
 
-重大 UI 实现前必须：
-
-1. 固定相同的信息架构、页面内容和功能边界。
-2. 产出至少三个真正不同的视觉方向，差异不能只是换颜色。
-3. 每个方向至少展示对话、系统概览、设置三个代表页面，并同时展示宽屏和窄屏。
-4. 比较字体、比例、色彩、表面、品牌、导航、信息密度、动效、可访问性和长期维护成本。
-5. 可以学习优秀产品、官方设计系统和先进 frontend Skill 的方法，但外部参考只作为 inspiration，不成为项目事实源，不复制品牌、布局、颜色、图标、模板、代码或 token。
-6. 由用户选择一个方向，或明确混合哪些元素；用户确认后才把具体 token 与组件语言写为当前实现目标。
-
-评价方向时检查：是否真正好看且完整、适合个人长期使用、与 Glimmer Cradle 身份协调、层级与比例清晰、避免通用 AI 模板感、兼顾可用性/响应式/可访问性，并能形成可维护系统。
-
-不得预设必须深色、Bubble、无边界、克制极简、系统字体，或必须使用渐变、阴影、透明、纹理中的任何一种。当前“无边界 + Bubble”只是比较基线，不是永久不变量。
+重大 UI 实现前必须完成 M11 UI 设计简报第 9 节的设计产物与确认门：同内容的多方向宽/窄屏比较、用户选择或明确混合元素、最终 token/组件合同，以及 Storybook/MCP 试点和项目 Skill 的代表任务证据。外部参考只提供方法，不成为项目事实源。
 
 #### 非范围与验收矩阵
 
