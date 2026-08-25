@@ -1,45 +1,9 @@
 import { create, fromJson, toJson, type JsonObject } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import * as surfaceV1 from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
-import type {
-  PresentationDownstreamFrame,
-  PresentationUpstreamFrame,
-} from '@glimmer-cradle/extension-sdk';
-
-export type SurfaceRequestFrame = PresentationUpstreamFrame | {
-  kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  status: 'success' | 'error';
-  result?: unknown;
-  message?: string;
-  error_code?: string;
-  operation_id?: string;
-  recovery_actions?: string[];
-};
-
-export type SurfaceProjectionFrame = PresentationDownstreamFrame | {
-  kind: 'core_skill_action_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  action: string;
-  payload: Record<string, unknown>;
-} | {
-  kind: 'core_skill_confirmation_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  confirmation: {
-    trace_id: string;
-    skill_id: string;
-    target_kind: string;
-    target_name: string;
-    risk_level: string;
-    side_effects: string[];
-  };
-};
+import type { AudioCapabilityStatus } from '../audio/audio-status-projection';
+export type { SurfaceProjectionFrame, SurfaceRequestFrame } from './surface-models';
+import type { SurfaceProjectionFrame, SurfaceRequestFrame } from './surface-models';
 
 function jsonObject(value: unknown): JsonObject {
   return JSON.parse(JSON.stringify(value ?? {})) as JsonObject;
@@ -418,17 +382,20 @@ function eventValueFromFrame(frame: SurfaceProjectionFrame): surfaceV1.SurfaceEv
     case 'core_skill_action_request': return { case: 'coreSkillActionRequest', value: create(surfaceV1.CoreSkillActionRequestEventSchema, {
       requestId: frame.request_id, action: frame.action, payload: jsonObject(frame.payload),
     }) };
-    case 'core_skill_confirmation_request': return { case: 'coreSkillConfirmationRequest', value: create(surfaceV1.CoreSkillConfirmationRequestEventSchema, {
-      requestId: frame.request_id, traceId: frame.confirmation.trace_id, skillId: frame.confirmation.skill_id,
-      targetKind: frame.confirmation.target_kind, targetName: frame.confirmation.target_name,
-      riskLevel: frame.confirmation.risk_level, sideEffects: frame.confirmation.side_effects,
-    }) };
+    case 'core_skill_confirmation_request': {
+      const confirmation = frame.confirmation;
+      return confirmation ? { case: 'coreSkillConfirmationRequest', value: create(surfaceV1.CoreSkillConfirmationRequestEventSchema, {
+        requestId: frame.request_id, traceId: confirmation.trace_id, skillId: confirmation.skill_id,
+        targetKind: confirmation.target_kind, targetName: confirmation.target_name,
+        riskLevel: confirmation.risk_level, sideEffects: confirmation.side_effects,
+      }) } : null;
+    }
     case 'shutdown': return { case: 'shutdown', value: create(surfaceV1.ShutdownEventSchema) };
     default: return null;
   }
 }
 
-function audioCapability(value: NonNullable<PresentationDownstreamFrame['audio_status']>['tts']) {
+function audioCapability(value: AudioCapabilityStatus) {
   return create(surfaceV1.AudioCapabilityProjectionSchema, {
     enabled: value.enabled, disabledReason: value.disabled_reason ?? '',
     activeProvider: value.active_provider ?? '', routeState: value.route_state,

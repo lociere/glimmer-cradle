@@ -18,10 +18,10 @@ import type {
   ExtensionRuntimeProjectionResult,
   ExtensionUninstallRequest,
   ExtensionUninstallResult,
-  PresentationDownstreamFrame,
-  PresentationUpstreamFrame,
-  PresentationRuntimeReadinessSnapshot,
-} from '@glimmer-cradle/extension-sdk';
+  ProductSurfaceProjection,
+  ProductSurfaceRequest,
+  RuntimeProjection,
+} from '../../../shared/control-center-models';
 
 export interface ProductProjection {
   readonly display_name: string;
@@ -31,7 +31,6 @@ export interface ProductProjection {
   };
 }
 
-export interface RuntimeProjection extends PresentationRuntimeReadinessSnapshot {}
 export type ExtensionRuntimeState = ExtensionRuntimeProjection;
 
 export interface ReadinessStatus {
@@ -44,7 +43,7 @@ export interface ReadinessStatus {
   readonly blocking_runtimes: ReadonlyArray<{ runtime_id: string; state: string; summary: string }>;
 }
 
-export type SurfaceFrame = PresentationDownstreamFrame;
+export type SurfaceFrame = ProductSurfaceProjection;
 
 export interface ObservabilityLogQuery {
   readonly level?: string;
@@ -146,8 +145,8 @@ export interface DeploymentOperationResult {
   readonly updated_at?: string;
 }
 
-type SkillCatalogRequest = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
-export type SkillCatalogLoadResult = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+type SkillCatalogRequest = NonNullable<ProductSurfaceRequest['skill_catalog_request']>;
+export type SkillCatalogLoadResult = NonNullable<ProductSurfaceProjection['skill_catalog_response']>;
 export interface LocalExtensionUploadResult {
   readonly upload_id: string;
   readonly file_name: string;

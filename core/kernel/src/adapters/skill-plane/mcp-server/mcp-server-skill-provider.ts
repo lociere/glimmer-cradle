@@ -6,7 +6,7 @@ import type {
   SkillProviderRuntimeSnapshot,
   SkillRegistrationTarget,
 } from '../../../ports/skill-plane.port';
-import type { McpServerConfig } from '@glimmer-cradle/extension-sdk';
+import type { McpServerConfig } from '../../config/documents';
 import { ConfigManager } from '../../config/config-manager';
 import { getLogger } from '../../observability/logger';
 import type { RuntimeProjectionInputPort } from '../../../ports/kernel-lifecycle.port';

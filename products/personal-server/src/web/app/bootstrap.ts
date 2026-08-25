@@ -1,13 +1,13 @@
 import type {
   ConfigurationSnapshot,
-  PresentationRuntimeReadinessCatalogPayload,
-} from '@glimmer-cradle/extension-sdk';
+  RuntimeReadinessCatalog,
+  RuntimeProjection,
+} from '../../shared/control-center-models';
 import {
   PersonalServerClient,
   type PersonalServerSurface,
   type ProductProjection,
   type ReadinessStatus,
-  type RuntimeProjection,
   type SurfaceFrame,
 } from '../shared/api/personal-server-client';
 import { ConfigurationView } from '../features/configuration/configuration-view';
@@ -223,7 +223,7 @@ function handleSurfaceFrame(shell: ReturnType<typeof renderShell>, frame: Surfac
   state.conversationView?.handleFrame(frame);
   state.extensionView?.handleFrame(frame);
   if (frame.kind === 'runtime_readiness' && frame.runtime_readiness) {
-    updateRuntimeCatalog(frame.runtime_readiness as PresentationRuntimeReadinessCatalogPayload);
+    updateRuntimeCatalog(frame.runtime_readiness as RuntimeReadinessCatalog);
     return;
   }
   if (frame.kind === 'configuration_snapshot_result' && frame.configuration_snapshot_result?.snapshot) {
@@ -232,7 +232,7 @@ function handleSurfaceFrame(shell: ReturnType<typeof renderShell>, frame: Surfac
   }
 }
 
-function updateRuntimeCatalog(catalog: PresentationRuntimeReadinessCatalogPayload): void {
+function updateRuntimeCatalog(catalog: RuntimeReadinessCatalog): void {
   state.runtimeCatalog = catalog.runtimes as RuntimeProjection[];
   renderStatusView();
 }

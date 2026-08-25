@@ -11,7 +11,7 @@ import type {
   ConfigurationTestResult,
   ConfigurationUpdateRequest,
   ConfigurationUpdateResult,
-} from '@glimmer-cradle/extension-sdk';
+} from '../../../shared/control-center-models';
 import {
   createProviderDraft,
   mergeDiscoveredModels,

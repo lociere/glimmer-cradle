@@ -1,4 +1,4 @@
-import type { ConfigurationRouteSnapshot } from '@glimmer-cradle/extension-sdk';
+import type { ConfigurationRouteSnapshot } from '../../../../shared/control-center-models';
 import type { ConfigurationDraftState } from '../configuration-state';
 import { escapeAttribute, escapeHtml } from '../configuration-support';
 

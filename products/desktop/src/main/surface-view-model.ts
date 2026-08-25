@@ -1,4 +1,4 @@
-import type { PresentationDownstreamFrame } from '@glimmer-cradle/extension-sdk';
+import type { ProductSurfaceProjection } from './control-center-models';
 
 export interface AvatarActionStateDocument { active_action_ids: string[] }
 
@@ -20,13 +20,11 @@ export interface RuntimeReadinessSnapshot {
 }
 export interface RuntimeReadinessCatalog { updated_at: number; runtimes: RuntimeReadinessSnapshot[] }
 
-export type PresentationFrameKind = PresentationDownstreamFrame['kind'];
+export type PresentationFrameKind = ProductSurfaceProjection['kind'];
 export type PresentationFrameClass = 'expression_flow' | 'avatar_control' | 'presentation_state';
 const FRAME_CLASS_BY_KIND: Record<PresentationFrameKind, PresentationFrameClass> = {
   thought: 'expression_flow', reply: 'expression_flow', emotion: 'expression_flow',
-  audio_play: 'avatar_control', expression: 'avatar_control', motion: 'avatar_control',
-  lip_sync: 'avatar_control', parameter: 'avatar_control', avatar_intent: 'avatar_control',
-  avatar_action_state: 'avatar_control', presentation: 'avatar_control', idle: 'avatar_control',
+  audio_play: 'avatar_control', avatar_action_state: 'avatar_control',
   character_presentation_projection: 'presentation_state', avatar_status: 'presentation_state',
   runtime_readiness: 'presentation_state', audio_status: 'presentation_state',
   audio_transcript: 'presentation_state', conversation_notice: 'presentation_state',
@@ -37,7 +35,7 @@ const FRAME_CLASS_BY_KIND: Record<PresentationFrameKind, PresentationFrameClass>
   extension_lifecycle_result: 'presentation_state', extension_command_result: 'presentation_state',
   extension_runtime_projection_result: 'presentation_state', extension_runtime_projection_changed: 'presentation_state',
   extension_status_changed: 'presentation_state', shutdown: 'presentation_state',
-  load_scene: 'presentation_state', unload_scene: 'presentation_state', ping: 'presentation_state',
+  core_skill_action_request: 'presentation_state', core_skill_confirmation_request: 'presentation_state',
 };
 export function isPresentationFrameKind(value: string): value is PresentationFrameKind {
   return Object.prototype.hasOwnProperty.call(FRAME_CLASS_BY_KIND, value);

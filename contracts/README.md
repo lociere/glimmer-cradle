@@ -49,4 +49,4 @@ pnpm --filter @glimmer-cradle/contracts baseline:refresh:json-schema
 - Protobuf 只拥有跨进程可调用能力；JSON Schema 只拥有 Document。
 - 同一结构不得同时在 Protobuf 和 JSON Schema 中拥有权威定义。当前 proto 只引用 Document 的 id、version 和 digest，不复制 Document 字段。
 - `generated/` 只属于 Adapter/Transport 边缘；Kernel/Cognition/UnityAvatarHost Adapter 是当前运行 consumer。
-- Extension SDK 只公开稳定 public API 与 schema-derived edge mapping；Kernel/Product 使用 owner-local model/view mapping，不能把 `contracts` 变成万能业务 helper。
+- Extension SDK 只公开 Extension Document 的 authoring/validation edge 与扩展作者/Host Port API；系统配置和 Surface/Product projection 使用 Kernel/Product owner-local model/view mapping，不能把 `contracts` 或 SDK 变成万能业务 helper。

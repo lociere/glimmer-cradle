@@ -1,7 +1,7 @@
 /**
- * AJV 配置校验器，由 protocol 包统一拥有并供各消费者复用。
+ * AJV 配置校验器。Contract Spine 拥有 Document Schema，Kernel 拥有配置注册与业务校验入口。
  *
- * 设计：所有 14 份 schemas/config/*.schema.json 通过 ConfigSchemas 静态导出注入
+ * 设计：Contract Spine 当前 22 份 JSON Schema 由 ConfigSchemas 按 Kernel 所需集合注入
  * ajv 实例；ajv 以 ``useDefaults`` 模式自动填默认值；``additionalProperties``
  * 由各 schema 自身的 ``additionalProperties:false`` 控制。
  *

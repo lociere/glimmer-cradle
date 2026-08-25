@@ -1,4 +1,4 @@
-import type { McpServerConfig } from '@glimmer-cradle/extension-sdk';
+import type { McpServerConfig } from '../../../../shared/control-center-models';
 import type { ConfigurationDraftState } from '../configuration-state';
 import { escapeAttribute, escapeHtml } from '../configuration-support';
 import type { SkillCatalogLoadResult } from '../../../shared/api/personal-server-client';

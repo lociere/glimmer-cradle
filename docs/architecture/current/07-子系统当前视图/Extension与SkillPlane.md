@@ -6,7 +6,7 @@
 
 Extension 是生态边界，Skill Plane 是能力运行平面。当前角色可以通过它接入平台、工具、MCP 和用户能力，但这些能力不成为本体器官，也不能绕过 Kernel 的授权和审计。
 
-跨仓库且可序列化、可版本化的 Extension Manifest、包、Release 与 Registry 契约仍归 Protocol；Slice 6 新增的 Extension Host process Service/Document 归 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。Kernel 拥有安装安全、权限、生命周期、进程监督和内部 Port；`hosts/extension-host` 拥有第三方入口加载、handler registry 与 disposable lifecycle；Extension SDK 只提供扩展作者 API 与公开 Host process protocol。Products 不接触 Extension Host 内部对象，只携带运行所需 SDK module root。
+跨仓库且可序列化、可版本化的 Extension Manifest、包、Release 与 Registry Document 归 Contract Spine；Extension Host process Service/Document 位于 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`。Kernel 拥有安装安全、权限、生命周期、进程监督和内部 Port；`hosts/extension-host` 拥有第三方入口加载、handler registry 与 disposable lifecycle；Extension SDK 只提供扩展作者 API、权限/贡献声明、事件与公开 Host Port。系统配置、Control Center、安装态和完整 runtime projection 不从 SDK public barrel 暴露，Kernel 与产品各自映射 owner-local model/view。Products 不接触 Extension Host 内部对象，只携带运行所需 SDK module root。
 
 ## 当前能力来源
 

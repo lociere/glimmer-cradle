@@ -1,10 +1,8 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type {
-  AudioConfig,
-  AudioStatusPayload,
-} from '@glimmer-cradle/extension-sdk';
+import type { AudioConfig } from '../config/documents/AudioConfig';
+import type { AudioStatusPayload } from './audio-status-projection';
 import type { VoiceConfig } from '../config/documents/VoiceConfig';
 import type { ASRRecognizeRequest } from './contracts/ASRRecognizeRequest';
 import type { ASRRecognizeResponse } from './contracts/ASRRecognizeResponse';

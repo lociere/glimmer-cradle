@@ -1,18 +1,20 @@
 import type {
-  ActionIntentSnapshot,
   CapabilityAudience,
-  CapabilityGraphEdge,
-  CapabilityGraphNode,
   CapabilityScope,
   ContributionRequirements,
   ConversationAddress,
-  DiagnosticsSnapshot,
   ExtensionCommandContribution,
   ExtensionManifest,
-  ExtensionRuntimeProjection,
   ExtensionSkillContribution,
   PerceptionEvent,
 } from '@glimmer-cradle/extension-sdk';
+import type {
+  ActionIntentSnapshot,
+  CapabilityGraphEdge,
+  CapabilityGraphNode,
+  DiagnosticsSnapshot,
+  ExtensionRuntimeProjection,
+} from '../adapters/extension-host/extension-runtime-projection';
 import { DomainEvent } from '../domain/events/domain-events';
 
 export interface Disposable {

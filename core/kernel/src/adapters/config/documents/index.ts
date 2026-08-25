@@ -16,3 +16,7 @@ export type * from './ObservabilityConfig';
 export type * from './SafetyConfig';
 export type * from './SurfaceConfig';
 export type * from './VoiceConfig';
+export type * from './AudioConfig';
+export type * from './EmbeddingConfig';
+export type * from './MemoryConfig';
+export type * from './SkillPlaneConfig';

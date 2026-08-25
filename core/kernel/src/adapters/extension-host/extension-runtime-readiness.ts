@@ -1,4 +1,4 @@
-import type { ExtensionRuntimeProjection } from '@glimmer-cradle/extension-sdk';
+import type { ExtensionRuntimeProjection } from './extension-runtime-projection';
 import {
   strongestRuntimeReadinessState,
   type RuntimeReadinessSnapshot,

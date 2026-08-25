@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ControlSurfaceGateway } from '../../../adapters/surface/control-surface-gateway';
-import type { ConfigurationSnapshot, PresentationDownstreamFrame } from '@glimmer-cradle/extension-sdk';
+import type { ConfigurationSnapshot } from '../../../adapters/config/configuration-models';
+import type { SkillCatalogSnapshot } from '../../../ports/skill-plane.port';
 import type { ConversationHistoryService } from '../../../adapters/surface/conversation-history-service';
 import { RecoveryRequiredError } from '../../../domain/errors';
 import { RuntimeReadinessProjectionMapper } from '../../projection/runtime-readiness-projection';
@@ -13,7 +14,6 @@ import {
   type SurfaceRequestFrame,
 } from '../../../adapters/surface/surface-grpc-mapper';
 
-type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
 const readinessProjection = new RuntimeReadinessProjectionMapper();
 const gateway = new ControlSurfaceGateway(
   readinessProjection,

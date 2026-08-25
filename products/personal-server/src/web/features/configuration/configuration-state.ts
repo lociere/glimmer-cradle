@@ -5,7 +5,7 @@ import type {
   EmbeddingConfig,
   MemoryConfig,
   SkillPlaneConfig,
-} from '@glimmer-cradle/extension-sdk';
+} from '../../../shared/control-center-models';
 
 export interface ProviderDraftState {
   key: string;

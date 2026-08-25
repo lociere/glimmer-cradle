@@ -7,7 +7,7 @@ import type {
   ExtensionRuntimeProjection,
   ExtensionRuntimeProjectionResult,
   ExtensionUninstallRequest,
-} from '@glimmer-cradle/extension-sdk';
+} from '../../../shared/control-center-models';
 import type {
   LocalExtensionUploadResult,
   PersonalServerSurface,

@@ -34,14 +34,14 @@ import type {
   ExtensionLifecycleRequest,
   ExtensionRuntimeProjection,
   ExtensionUninstallRequest,
-  PresentationDownstreamFrame,
-} from '@glimmer-cradle/extension-sdk';
+  ProductSurfaceProjection,
+} from '../../../src/shared/control-center-models';
 import type { RuntimeReadinessCatalog } from '../../../src/server/websocket/runtime-readiness-view';
 type RuntimeReadinessSnapshot = RuntimeReadinessCatalog['runtimes'][number];
 type RuntimeReadinessOwner = RuntimeReadinessSnapshot['owner'];
 import { PersonalServerApp } from '../../../src/server/bootstrap/personal-server-app';
 
-type SkillCatalogSnapshot = NonNullable<NonNullable<PresentationDownstreamFrame['skill_catalog_response']>['snapshot']>;
+type SkillCatalogSnapshot = NonNullable<NonNullable<ProductSurfaceProjection['skill_catalog_response']>['snapshot']>;
 
 type FixtureSurfacePeer = { send(data: string): void };
 
@@ -180,7 +180,7 @@ export async function startPersonalServerUiFixture(options?: {
             readyRuntime('extension.host', 'extension', 'capability_plane', 'Extension Host 已连接', false),
           ],
         } satisfies RuntimeReadinessCatalog,
-      } satisfies PresentationDownstreamFrame));
+      } satisfies ProductSurfaceProjection));
     },
   });
   const kernelPort = await new Promise<number>((resolve, reject) => {
@@ -239,9 +239,9 @@ interface FixtureState {
     projections: Map<string, ExtensionRuntimeProjection>;
     installations: Map<string, ExtensionInstallationProjection>;
     prepared: Map<string, {
-      extension: NonNullable<NonNullable<PresentationDownstreamFrame['extension_install_preview']>['extension']>;
-      artifact: NonNullable<NonNullable<PresentationDownstreamFrame['extension_install_preview']>['artifact']>;
-      trust: NonNullable<NonNullable<PresentationDownstreamFrame['extension_install_preview']>['trust']>;
+      extension: NonNullable<NonNullable<ProductSurfaceProjection['extension_install_preview']>['extension']>;
+      artifact: NonNullable<NonNullable<ProductSurfaceProjection['extension_install_preview']>['artifact']>;
+      trust: NonNullable<NonNullable<ProductSurfaceProjection['extension_install_preview']>['trust']>;
     }>;
   };
 }
@@ -772,7 +772,7 @@ function fixtureSurfaceEvent(frame: Record<string, unknown>): surfaceV1.SurfaceE
   return create(surfaceV1.SurfaceEventSchema, { ...base, event });
 }
 
-function fixtureStreamFrame(frame: PresentationDownstreamFrame): SurfaceGatewayServiceStreamResponse {
+function fixtureStreamFrame(frame: ProductSurfaceProjection): SurfaceGatewayServiceStreamResponse {
   return create(SurfaceGatewayServiceStreamResponseSchema, {
     event: fixtureSurfaceEvent(frame as unknown as Record<string, unknown>),
   });
@@ -1308,7 +1308,7 @@ function createExtensionProjection(entry: {
   };
 }
 
-function buildExtensionPreview(request: ExtensionInstallPrepareRequest): NonNullable<PresentationDownstreamFrame['extension_install_preview']> {
+function buildExtensionPreview(request: ExtensionInstallPrepareRequest): NonNullable<ProductSurfaceProjection['extension_install_preview']> {
   const requestId = request.request_id || `extension-preview-${Date.now()}`;
   const sourceLabel = request.source.kind === 'repository'
     ? request.source.repository.split('/').pop() || 'repository-extension'

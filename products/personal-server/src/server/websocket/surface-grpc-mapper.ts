@@ -1,45 +1,8 @@
 import { create, fromJson, toJson, type JsonObject } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import * as surfaceV1 from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
-import type {
-  PresentationDownstreamFrame,
-  PresentationUpstreamFrame,
-} from '@glimmer-cradle/extension-sdk';
-
-export type ProductSurfaceProjection = PresentationDownstreamFrame | {
-  kind: 'core_skill_action_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  action: string;
-  payload: Record<string, unknown>;
-} | {
-  kind: 'core_skill_confirmation_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  confirmation: {
-    trace_id: string;
-    skill_id: string;
-    target_kind: string;
-    target_name: string;
-    risk_level: string;
-    side_effects: string[];
-  };
-};
-
-export type ProductSurfaceRequest = PresentationUpstreamFrame | {
-  kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  status: 'success' | 'error';
-  result?: unknown;
-  message?: string;
-  error_code?: string;
-  operation_id?: string;
-  recovery_actions?: string[];
-};
+export type { ProductSurfaceProjection, ProductSurfaceRequest } from '../../shared/control-center-models';
+import type { ProductSurfaceProjection, ProductSurfaceRequest } from '../../shared/control-center-models';
 
 function object(value: unknown): JsonObject {
   return JSON.parse(JSON.stringify(value ?? {})) as JsonObject;
@@ -355,7 +318,7 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
   }
 }
 
-function audioCapability(value: surfaceV1.AudioCapabilityProjection | undefined): NonNullable<PresentationDownstreamFrame['audio_status']>['tts'] {
+function audioCapability(value: surfaceV1.AudioCapabilityProjection | undefined): NonNullable<ProductSurfaceProjection['audio_status']>['tts'] {
   return {
     enabled: value?.enabled ?? false, disabled_reason: value?.disabledReason || undefined,
     active_provider: value?.activeProvider || undefined, route_state: (value?.routeState || 'unknown') as never,

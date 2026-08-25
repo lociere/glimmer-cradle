@@ -5,7 +5,7 @@ import type {
   CapabilityGraphEdge,
   CapabilityGraphNode,
   DiagnosticsSnapshot,
-} from '../contracts/models/ExtensionRuntimeProjection';
+} from './lifecycle-projection';
 import type {
   CapabilityAudience,
   CapabilityScope,

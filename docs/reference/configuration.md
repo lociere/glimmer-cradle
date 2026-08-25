@@ -18,6 +18,8 @@
 
 普通配置不得包含密钥明文。Renderer 不直接读取 YAML 或 secret 文件；它只能消费受控投影，并通过白名单 API 请求保存允许编辑的配置。
 
+系统配置的 canonical Document 只在 `contracts/json-schema/config/v1/`。Kernel 的 normalizer/应用模型和 Desktop、Personal Server 的脱敏 view model 都是 owner-local edge；`@glimmer-cradle/extension-sdk` 不公开 Audio、Embedding、Memory、SkillPlane 或 Control Center 配置类型。
+
 `configs/system/identity.yaml` 必须显式提供 `character.active_id` 和 `character.profile_root`。Kernel 启动不会创建缺失的系统配置、Character Package 文件或目录，也不会回退到某个内置角色；当前选择的角色包缺少 manifest、persona、dialogue、safety、inference、provider 或知识索引时，启动应明确失败。开发仓库的受版本控制模板以及未来安装器负责初始配置投影。
 
 ## 变更规则

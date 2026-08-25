@@ -1,6 +1,4 @@
-import type { PresentationDownstreamFrame } from '@glimmer-cradle/extension-sdk';
-
-export type PresentationFrameKind = PresentationDownstreamFrame['kind'];
+import type { PresentationFrameKind } from './surface-models';
 
 export type PresentationFrameClass =
   | 'expression_flow'
@@ -15,15 +13,8 @@ export const PRESENTATION_EXPRESSION_FLOW_KINDS = [
 
 export const PRESENTATION_AVATAR_CONTROL_KINDS = [
   'audio_play',
-  'expression',
-  'motion',
-  'lip_sync',
-  'parameter',
-  'avatar_intent',
   'avatar_action_state',
-  'presentation',
   'character_presentation_projection',
-  'idle',
 ] as const satisfies readonly PresentationFrameKind[];
 
 export const PRESENTATION_STATE_KINDS = [
@@ -47,9 +38,8 @@ export const PRESENTATION_STATE_KINDS = [
   'extension_runtime_projection_changed',
   'extension_status_changed',
   'shutdown',
-  'load_scene',
-  'unload_scene',
-  'ping',
+  'core_skill_action_request',
+  'core_skill_confirmation_request',
 ] as const satisfies readonly PresentationFrameKind[];
 
 const FRAME_CLASS_BY_KIND: Record<PresentationFrameKind, PresentationFrameClass> = {
@@ -57,15 +47,8 @@ const FRAME_CLASS_BY_KIND: Record<PresentationFrameKind, PresentationFrameClass>
   reply: 'expression_flow',
   emotion: 'expression_flow',
   audio_play: 'avatar_control',
-  expression: 'avatar_control',
-  motion: 'avatar_control',
-  lip_sync: 'avatar_control',
-  parameter: 'avatar_control',
-  avatar_intent: 'avatar_control',
   avatar_action_state: 'avatar_control',
-  presentation: 'avatar_control',
   character_presentation_projection: 'presentation_state',
-  idle: 'avatar_control',
   avatar_status: 'presentation_state',
   runtime_readiness: 'presentation_state',
   audio_status: 'presentation_state',
@@ -85,9 +68,8 @@ const FRAME_CLASS_BY_KIND: Record<PresentationFrameKind, PresentationFrameClass>
   extension_runtime_projection_changed: 'presentation_state',
   extension_status_changed: 'presentation_state',
   shutdown: 'presentation_state',
-  load_scene: 'presentation_state',
-  unload_scene: 'presentation_state',
-  ping: 'presentation_state',
+  core_skill_action_request: 'presentation_state',
+  core_skill_confirmation_request: 'presentation_state',
 };
 
 export function isPresentationFrameKind(value: string): value is PresentationFrameKind {

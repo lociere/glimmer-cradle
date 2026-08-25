@@ -2,16 +2,6 @@ import {
   BuiltInContributionPoint,
   BuiltInContributionPointDefinitions,
   getExtensionContributions,
-  type ActionIntentSnapshot,
-  type ActionIntentState,
-  type CapabilityGraphEdge,
-  type CapabilityGraphNode,
-  type CapabilityNodeState,
-  type ContributionPointDefinitionSnapshot,
-  type DiagnosticsEntry,
-  type DiagnosticsSnapshot,
-  type ExtensionRuntimeProjection,
-  type ReadinessGateSnapshot,
   type ContributionDeclaration,
   type ContributionPointDefinition,
   type ExtensionCommandContribution,
@@ -19,6 +9,18 @@ import {
   type ExtensionSkillContribution,
   type ManagedResourceContribution,
 } from '@glimmer-cradle/extension-sdk';
+import type {
+  ActionIntentSnapshot,
+  ActionIntentState,
+  CapabilityGraphEdge,
+  CapabilityGraphNode,
+  CapabilityNodeState,
+  ContributionPointDefinitionSnapshot,
+  DiagnosticsEntry,
+  DiagnosticsSnapshot,
+  ExtensionRuntimeProjection,
+  ReadinessGateSnapshot,
+} from './extension-runtime-projection';
 import type { ExtensionCapabilityGraphReport } from '../../ports';
 import type { SkillAvailabilityContext, SkillPlanePolicyPort } from '../../ports/skill-plane.port';
 

@@ -1,9 +1,5 @@
 import type {
   ChannelReplyMessage,
-  ExtensionInstallPreview,
-  ExtensionInstallResult,
-  ExtensionUninstallResult,
-  PresentationDownstreamFrame,
 } from '@glimmer-cradle/extension-sdk';
 
 interface ReplyPayload {
@@ -332,8 +328,21 @@ interface SkillPolicySnapshot {
   audit: boolean;
 }
 
-type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
-type SkillCatalogSnapshot = NonNullable<SkillCatalogResponse['snapshot']>;
+interface ExtensionInstallPreview { request_id: string; status: 'ready' | 'error'; transaction_id?: string; extension?: { id: string; name: string; version: string; publisher: string; description?: string; permissions: string[]; products?: string[]; platforms: string[] }; artifact?: { sha256: string; size: number; platform: string }; trust?: { source_kind: string; listing_reviewed: boolean; publisher_verified: boolean; artifact_signed: boolean; build_attested: boolean; registry_id?: string; repository?: string }; message?: string }
+interface ExtensionInstallResult { request_id: string; status: 'success' | 'cancelled' | 'error'; extension_id?: string; version?: string; already_installed?: boolean; message?: string }
+interface ExtensionUninstallResult { request_id: string; extension_id: string; version: string; status: 'success' | 'error'; message?: string }
+interface SkillCatalogResponse { request_id: string; status: 'success' | 'error'; snapshot?: SkillCatalogSnapshot; message?: string }
+interface SkillCatalogSnapshot {
+  generatedAt: string;
+  totalSkills: number;
+  providerCounts: Record<'core' | 'extension' | 'mcp_server' | 'user', number>;
+  runtimeStatusCounts: { ready: number; contract_only: number };
+  totalTools: number;
+  totalResources: number;
+  totalPrompts: number;
+  providerRuntimes: Array<{ provider: { kind: string; id: string }; display_name?: string; state: string; summary: string; skill_count: number; tool_count: number; resource_count: number; prompt_count: number; error?: string; recovery_actions: string[]; metadata: Record<string, unknown>; updated_at: string }>;
+  entries: Array<{ id: string; name: string; description: string; audience: string; scope: { kind: string; ids?: readonly string[] }; provider: { kind: string; id: string }; tools: unknown[]; resources: unknown[]; prompts: unknown[]; policy: { riskLevel: string; confirmationRequired: boolean; sideEffects: string[]; audit: boolean }; metadata: Record<string, unknown> }>;
+}
 type SkillCatalogEntrySnapshot = SkillCatalogSnapshot['entries'][number];
 type SkillProviderRuntimeSnapshot = SkillCatalogSnapshot['providerRuntimes'][number];
 

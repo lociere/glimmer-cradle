@@ -1,11 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ChannelReplyMessage,
-  CharacterPresentationProjectionPayload,
-  ExtensionInstallPreview,
-  ExtensionInstallResult,
-  ExtensionUninstallResult,
-  PresentationDownstreamFrame,
 } from '@glimmer-cradle/extension-sdk';
 import type { RuntimeReadinessCatalog } from './runtime-readiness-view';
 
@@ -380,7 +375,11 @@ export interface ExtensionCommandResult<T = unknown> {
   message: string;
 }
 
-export type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+export interface ExtensionInstallPreview { request_id: string; status: 'ready' | 'error'; transaction_id?: string; extension?: { id: string; name: string; version: string; publisher: string; description?: string; permissions: string[]; products?: string[]; platforms: string[] }; artifact?: { sha256: string; size: number; platform: string }; trust?: { source_kind: string; listing_reviewed: boolean; publisher_verified: boolean; artifact_signed: boolean; build_attested: boolean; registry_id?: string; repository?: string }; message?: string }
+export interface ExtensionInstallResult { request_id: string; status: 'success' | 'cancelled' | 'error'; extension_id?: string; version?: string; already_installed?: boolean; message?: string }
+export interface ExtensionUninstallResult { request_id: string; extension_id: string; version: string; status: 'success' | 'error'; message?: string }
+export interface CharacterPresentationProjectionPayload { avatar_package_id: string; model_id: string; display_name: string; kind: 'live2d'; backend: 'unity'; host_kind: 'unity' | 'offline'; avatar_state: 'pending' | 'starting' | 'ready' | 'degraded' | 'stopped'; appearance: { placement_id?: string; display_scale: number }; lifecycle: { worker_window_state: 'isolated' | 'visible' | 'unknown'; composition_surface_state: 'attached' | 'failed' | 'unknown'; first_frame_presented: boolean; interaction_ready: boolean; ready: boolean; summary: string } }
+export interface SkillCatalogResponse { request_id: string; status: 'success' | 'error'; snapshot?: unknown; message?: string }
 
 export interface AvatarAppearanceSettings {
   modelId: string;

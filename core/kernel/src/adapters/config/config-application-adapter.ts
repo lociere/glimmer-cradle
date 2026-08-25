@@ -12,8 +12,6 @@ import {
   resolveStateDir,
 } from '../filesystem/path-utils';
 import {
-  type AudioConfig,
-  type EmbeddingConfig,
   type ConfigurationModelAlias,
   type ConfigurationProviderDraft,
   type ConfigurationProviderTestDraft,
@@ -24,9 +22,8 @@ import {
   type ConfigurationTestResult,
   type ConfigurationUpdateRequest,
   type ConfigurationUpdateResult,
-  type MemoryConfig,
-  type SkillPlaneConfig,
-} from '@glimmer-cradle/extension-sdk';
+} from './configuration-models';
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from './documents';
 import type { LLMConfig } from './documents/LLMConfig';
 import { validateConfig } from './document-validator';
 

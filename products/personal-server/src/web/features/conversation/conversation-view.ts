@@ -2,7 +2,7 @@ import type {
   ConversationHistoryEntry,
   ConversationHistoryRequest,
   ConversationHistoryResult,
-} from '@glimmer-cradle/extension-sdk';
+} from '../../../shared/control-center-models';
 import type { PersonalServerSurface, SurfaceFrame } from '../../shared/api/personal-server-client';
 
 interface ConversationItem {

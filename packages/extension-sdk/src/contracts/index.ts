@@ -5,7 +5,3 @@
  * 内部模型不属于该边界。
  */
 export * from './models/public';
-export type { AudioConfig } from './config/AudioConfig';
-export type { EmbeddingConfig } from './config/EmbeddingConfig';
-export type { MemoryConfig } from './config/MemoryConfig';
-export type { McpServerConfig, SkillPlaneConfig } from './config/SkillPlaneConfig';

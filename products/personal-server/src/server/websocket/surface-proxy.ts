@@ -1,4 +1,3 @@
-import type { PresentationDownstreamFrame, PresentationUpstreamFrame } from '@glimmer-cradle/extension-sdk';
 import { WebSocket, type RawData } from 'ws';
 import {
   SurfaceGatewayClient,
@@ -131,7 +130,7 @@ export function proxySurfaceConnection(
       client.close(1003, 'Surface Gateway 仅接受 JSON 文本请求');
       return null;
     }
-    const frame = parseFrame<PresentationUpstreamFrame>(data);
+    const frame = parseFrame<ProductSurfaceRequest>(data);
     if (!frame || typeof frame.kind !== 'string') {
       client.close(1007, 'Surface Gateway 请求不是有效 JSON DTO');
       return null;
@@ -150,7 +149,7 @@ export function proxySurfaceConnection(
   }
 
   async function rewritePrepareRequest(
-    frame: PresentationUpstreamFrame,
+    frame: ProductSurfaceRequest,
   ): Promise<ProductSurfaceRequest | null> {
     const request = frame.extension_install_prepare;
     if (!request) return null;
@@ -195,7 +194,7 @@ export function proxySurfaceConnection(
               path: materialized.path,
             },
           },
-        } satisfies PresentationUpstreamFrame;
+        } satisfies ProductSurfaceRequest;
     } catch (error) {
       pendingPrepareRequests.delete(request.request_id);
       client.send(JSON.stringify(buildPreviewError(
@@ -207,7 +206,7 @@ export function proxySurfaceConnection(
   }
 
   async function authorizeTransactionRequest(
-    frame: PresentationUpstreamFrame,
+    frame: ProductSurfaceRequest,
     kind: 'commit' | 'cancel',
   ): Promise<ProductSurfaceRequest | null> {
     const authorization = options.extensionUploadAuthorization;
@@ -357,7 +356,7 @@ export function proxySurfaceConnection(
   });
 }
 
-function buildPreviewError(requestId: string, message: string): PresentationDownstreamFrame {
+function buildPreviewError(requestId: string, message: string): ProductSurfaceProjection {
   return {
     kind: 'extension_install_preview',
     timestamp: Date.now(),
@@ -369,7 +368,7 @@ function buildPreviewError(requestId: string, message: string): PresentationDown
   };
 }
 
-function buildInstallResultError(requestId: string, message: string): PresentationDownstreamFrame {
+function buildInstallResultError(requestId: string, message: string): ProductSurfaceProjection {
   return {
     kind: 'extension_install_result',
     timestamp: Date.now(),

@@ -1,45 +1,8 @@
 import { create, fromJson, toJson, type JsonObject } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import * as surfaceV1 from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
-import type {
-  PresentationDownstreamFrame,
-  PresentationUpstreamFrame,
-} from '@glimmer-cradle/extension-sdk';
-
-export type ProductSurfaceProjection = PresentationDownstreamFrame | {
-  kind: 'core_skill_action_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  action: string;
-  payload: Record<string, unknown>;
-} | {
-  kind: 'core_skill_confirmation_request';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  confirmation: {
-    trace_id: string;
-    skill_id: string;
-    target_kind: string;
-    target_name: string;
-    risk_level: string;
-    side_effects: string[];
-  };
-};
-
-export type ProductSurfaceRequest = PresentationUpstreamFrame | {
-  kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
-  trace_id?: string;
-  timestamp: number;
-  request_id: string;
-  status: 'success' | 'error';
-  result?: unknown;
-  message?: string;
-  error_code?: string;
-  operation_id?: string;
-  recovery_actions?: string[];
-};
+export type { ProductSurfaceProjection, ProductSurfaceRequest } from './control-center-models';
+import type { ProductSurfaceProjection, ProductSurfaceRequest } from './control-center-models';
 
 function object(value: unknown): JsonObject {
   return JSON.parse(JSON.stringify(value ?? {})) as JsonObject;
@@ -210,13 +173,12 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
           emotion_type: item.value.emotionSnapshot.emotionType,
           intensity: item.value.emotionSnapshot.intensity,
           trigger: item.value.emotionSnapshot.trigger || undefined,
-          blend_time_ms: item.value.emotionSnapshot.blendTimeMs || undefined,
         } : undefined,
       },
     };
     case 'emotion': return item.value.emotion ? { kind: 'emotion', ...base, emotion: {
       emotion_type: item.value.emotion.emotionType, intensity: item.value.emotion.intensity,
-      trigger: item.value.emotion.trigger || undefined, blend_time_ms: item.value.emotion.blendTimeMs || undefined,
+      trigger: item.value.emotion.trigger || undefined,
     } } : null;
     case 'thought': return { kind: 'thought', ...base, thought: { active: item.value.active, hint: item.value.hint || undefined } };
     case 'audioPlay': return { kind: 'audio_play', ...base, audio_play: {
@@ -325,11 +287,11 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
     case 'extensionLifecycleResult': return { kind: 'extension_lifecycle_result', ...base, extension_lifecycle_result: {
       request_id: item.value.requestId, extension_id: item.value.extensionId, version: item.value.version || undefined,
       operation: item.value.operation as never, status: item.value.status as never, message: item.value.message || undefined,
-    } };
+    } as never };
     case 'extensionCommandResult': return { kind: 'extension_command_result', ...base, extension_command_result: {
       request_id: item.value.requestId, command_id: item.value.commandId, status: item.value.status as never,
       result: readValue(item.value.result), message: item.value.message || undefined,
-    } };
+    } as never };
     case 'extensionRuntimeProjectionResult': return { kind: 'extension_runtime_projection_result', ...base, extension_runtime_projection_result: {
       request_id: item.value.requestId, status: item.value.status as never,
       projections: item.value.projections as never, installations: item.value.installations as never,
@@ -355,7 +317,7 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
   }
 }
 
-function audioCapability(value: surfaceV1.AudioCapabilityProjection | undefined): NonNullable<PresentationDownstreamFrame['audio_status']>['tts'] {
+function audioCapability(value: surfaceV1.AudioCapabilityProjection | undefined): NonNullable<ProductSurfaceProjection['audio_status']>['tts'] {
   return {
     enabled: value?.enabled ?? false, disabled_reason: value?.disabledReason || undefined,
     active_provider: value?.activeProvider || undefined, route_state: (value?.routeState || 'unknown') as never,

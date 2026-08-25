@@ -1,9 +1,11 @@
 import {
-  type ConversationHistoryEntry,
-  type ConversationHistoryRequest as ConversationHistoryQuery,
-  type ConversationHistoryResult as ConversationHistoryResponse,
   type ConversationNotice,
 } from '@glimmer-cradle/extension-sdk';
+import type {
+  ConversationHistoryEntry,
+  ConversationHistoryRequest as ConversationHistoryQuery,
+  ConversationHistoryResult as ConversationHistoryResponse,
+} from './conversation-history-models';
 import type { ConversationHistoryRequest, ConversationHistoryResponse as CognitionHistoryResponse } from '../../ports/cognition-service-port';
 import type { ConversationAddress, ConversationContext } from '../../ports/application-models';
 

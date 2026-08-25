@@ -2,44 +2,13 @@
 // DTOs remain in Contract Spine and are mapped at the Host/Surface adapters.
 export * from './ActionCommand';
 export * from './ChannelReplyPayload';
-export * from './ConfigurationModelAlias';
-export * from './ConfigurationProviderDraft';
-export * from './ConfigurationProviderSnapshot';
-export * from './ConfigurationProviderTestDraft';
-export * from './ConfigurationRouteSnapshot';
-export * from './ConfigurationSnapshot';
-export * from './ConfigurationSnapshotRequest';
-export * from './ConfigurationSnapshotResult';
-export * from './ConfigurationTestRequest';
-export * from './ConfigurationTestResult';
-export * from './ConfigurationUpdateRequest';
-export * from './ConfigurationUpdateResult';
 export * from './ConversationAddress';
 export * from './ConversationContext';
-export * from './ConversationHistoryEntry';
-export * from './ConversationHistoryRequest';
-export * from './ConversationHistoryResult';
 export * from './ConversationNotice';
-export * from './ExtensionCommandRequest';
-export * from './ExtensionCommandResult';
-export * from './ExtensionInstallationProjection';
-export * from './ExtensionInstallCommitRequest';
-export * from './ExtensionInstallPrepareRequest';
-export * from './ExtensionInstallPreview';
-export * from './ExtensionInstallResult';
-export * from './ExtensionLifecycleRequest';
-export * from './ExtensionLifecycleResult';
-export * from './ExtensionRuntimeProjection';
-export * from './ExtensionRuntimeProjectionRequest';
-export * from './ExtensionRuntimeProjectionResult';
-export * from './ExtensionStatusChanged';
-export * from './ExtensionUninstallRequest';
-export * from './ExtensionUninstallResult';
 export * from './PerceptionEvent';
-export * from './PresentationDownstreamFrame';
-export * from './PresentationUpstreamFrame';
 export * from './VisualCommand';
-export type { AudioConfig } from '../config/AudioConfig';
-export type { EmbeddingConfig } from '../config/EmbeddingConfig';
-export type { MemoryConfig } from '../config/MemoryConfig';
-export type { McpServerConfig, SkillPlaneConfig } from '../config/SkillPlaneConfig';
+export type {
+  ActionIntentSnapshot, ActionIntentState, CapabilityGraphEdge, CapabilityGraphNode,
+  CapabilityNodeState, ContributionPointDefinitionSnapshot, DiagnosticsEntry,
+  DiagnosticsSnapshot, ReadinessGateSnapshot,
+} from '../../host/lifecycle-projection';

@@ -110,7 +110,7 @@ Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/
 
 成功审计受 `policy.audit` 控制；拒绝和失败不受该开关关闭。
 
-Core Skill Provider 的 Desktop/Notification/Clipboard manifest 通过 `CorePlatformBridge` 注入真实 handler；`desktop.open_url`、`notification.show`、`clipboard.read` 和 `clipboard.write` 标记为 ready。Desktop bridge 由 `ControlSurfaceGateway` 通过 WebSocket 向 Electron main 发送 `core_skill_action_request` 或 `core_skill_confirmation_request`，Electron main 执行 `shell.openExternal`、Notification、clipboard 或确认对话，并用 response frame 返回结果。剪贴板读写和中风险桌面动作需要确认；Desktop 未连接、handler 抛错或用户拒绝都会经 Gateway 形成失败/拒绝审计。
+Core Skill Provider 的 Desktop/Notification/Clipboard manifest 通过 `CorePlatformBridge` 注入真实 handler；`desktop.open_url`、`notification.show`、`clipboard.read` 和 `clipboard.write` 标记为 ready。Desktop bridge 由 `ControlSurfaceGateway` 通过 typed `SurfaceGatewayService` stream 向 Electron main 发送 `core_skill_action_request` 或 `core_skill_confirmation_request`，Electron main 执行 `shell.openExternal`、Notification、clipboard 或确认对话，并用 typed Command response 返回结果。剪贴板读写和中风险桌面动作需要确认；Desktop 未连接、handler 抛错或用户拒绝都会经 Gateway 形成失败/拒绝审计。
 
 `SkillPlanningAppService` 位于 Kernel application 层，负责把 `SkillCatalogSnapshot` 中 `audience=character`、`runtime_status=ready` 且 scope 匹配当前 `ConversationContext` 的工具转成 `AgentPlanRequest.available_tools`，经 `AIProxy.requestAgentPlan()` 请求 Cognition 规划，并在返回后再次过滤目录外建议。`executeSuggestion()` 将同一 ConversationContext 传给 `SkillInvocationGateway`，不直接执行 provider handler。这样 planner 看不到跨来源能力，伪造建议也会在执行层再次被拒绝。
 

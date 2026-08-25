@@ -2,19 +2,18 @@ import { app, BrowserWindow, shell, dialog, clipboard, Notification, type OpenDi
 import fs from 'fs/promises';
 import path from 'path';
 import YAML from 'yaml';
-import {
-  type AudioStatusPayload,
-  type PresentationDownstreamFrame,
-  type PresentationUpstreamFrame,
-  type CharacterPresentationProjectionPayload,
-  type ExtensionInstallCommitRequest,
-  type ExtensionInstallPrepareRequest,
-  type ExtensionInstallPreview,
-  type ExtensionInstallResult,
-  type ExtensionInstallationProjection,
-  type ExtensionRuntimeProjection,
-  type ExtensionUninstallResult,
-} from '@glimmer-cradle/extension-sdk';
+import type {
+  AudioStatusPayload,
+  CharacterPresentationProjectionPayload,
+  ExtensionInstallCommitRequest,
+  ExtensionInstallPrepareRequest,
+  ExtensionInstallPreview,
+  ExtensionInstallResult,
+  ExtensionInstallationProjection,
+  ExtensionRuntimeProjection,
+  ExtensionUninstallResult,
+  ProductSurfaceRequest,
+} from './control-center-models';
 import type { AvatarActionStateDocument, RuntimeReadinessCatalog } from './surface-view-model';
 import { getPresentationFrameClass, isPresentationFrameKind } from './surface-view-model';
 import {
@@ -452,8 +451,8 @@ const CHARACTER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const EXTENSION_ID_PATTERN = /^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/;
 const EXTENSION_VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const PROFILE_ROOT_PATTERN = /^[a-z0-9](?:[a-z0-9_-]|\/[a-z0-9][a-z0-9_-]*)*$/;
-type SkillCatalogRequest = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
-type SkillCatalogResponse = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+type SkillCatalogRequest = NonNullable<ProductSurfaceRequest['skill_catalog_request']>;
+type SkillCatalogResponse = NonNullable<ProductSurfaceProjection['skill_catalog_response']>;
 
 interface ActiveExtensionSelection {
   id: string;
@@ -1389,7 +1388,7 @@ async function uninstallExtension(raw: unknown): Promise<ExtensionUninstallResul
 function sendExtensionInstallRequest<T>(
   requestId: string,
   waiters: Map<string, { resolve: (result: T) => void; timer: ReturnType<typeof setTimeout> }>,
-  frame: PresentationUpstreamFrame,
+  frame: ProductSurfaceRequest,
 ): Promise<T> {
   if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN) {
     return Promise.reject(new Error('Kernel 尚未连接，无法管理扩展包。'));
@@ -1664,7 +1663,7 @@ function requestSkillCatalog(): Promise<SkillCatalogResponse> {
       kind: 'skill_catalog_request',
       timestamp: Date.now(),
       skill_catalog_request: request,
-    } satisfies PresentationUpstreamFrame);
+    } satisfies ProductSurfaceRequest);
   });
 }
 
@@ -2600,7 +2599,7 @@ async function connectToKernel(): Promise<void> {
   });
 
   kernelSocket.on('message', (projection: ProductSurfaceProjection) => {
-      const frame = projection as ProductSurfaceProjection & Record<string, any>;
+      const frame = projection;
       const kindValue: string = (typeof frame.kind === 'string' && frame.kind) || '';
       const traceId: string = (typeof frame.trace_id === 'string' && frame.trace_id) || '';
 
@@ -2641,7 +2640,7 @@ async function connectToKernel(): Promise<void> {
         const response = frame.extension_lifecycle_result;
         const requestId = response?.request_id ?? '';
         const waiter = extensionLifecycleWaiters.get(requestId);
-        if (waiter) {
+        if (response && waiter) {
           extensionLifecycleWaiters.delete(requestId);
           waiter.resolve({
             status: response.status === 'success' ? 'success' : 'error',
@@ -2655,7 +2654,7 @@ async function connectToKernel(): Promise<void> {
         const response = frame.extension_command_result;
         const requestId = response?.request_id ?? '';
         const waiter = extensionCommandWaiters.get(requestId);
-        if (waiter) {
+        if (response && waiter) {
           extensionCommandWaiters.delete(requestId);
           waiter.resolve({
             status: response.status === 'success' ? 'success' : 'error',
@@ -2715,7 +2714,8 @@ async function connectToKernel(): Promise<void> {
       }
 
       if (kindValue === 'extension_status_changed') {
-        const payload = frame.extension_status_changed ?? {};
+        const payload = frame.extension_status_changed;
+        if (!payload) return;
         const extensionId = typeof payload.extension_id === 'string' ? payload.extension_id : '';
         const event = typeof payload.event === 'string' ? payload.event : '';
         if (
@@ -2734,12 +2734,12 @@ async function connectToKernel(): Promise<void> {
       }
 
       if (kindValue === 'core_skill_action_request') {
-        void handleCoreSkillActionRequest(frame);
+        void handleCoreSkillActionRequest(frame as unknown as Record<string, unknown>);
         return;
       }
 
       if (kindValue === 'core_skill_confirmation_request') {
-        void handleCoreSkillConfirmationRequest(frame);
+        void handleCoreSkillConfirmationRequest(frame as unknown as Record<string, unknown>);
         return;
       }
 
@@ -2771,7 +2771,8 @@ async function connectToKernel(): Promise<void> {
             });
           }
         } else if (kind === 'emotion') {
-          const e = frame.emotion ?? {};
+          const e = frame.emotion;
+          if (!e) return;
           sendToRenderer('ui:emotion-update', {
             emotion_type: e.emotion_type ?? 'neutral',
             intensity: typeof e.intensity === 'number' ? e.intensity : 0.5,
@@ -2779,7 +2780,8 @@ async function connectToKernel(): Promise<void> {
             timestamp: new Date().toISOString(),
           });
         } else if (kind === 'thought') {
-          const thought = frame.thought ?? {};
+          const thought = frame.thought;
+          if (!thought) return;
           sendToRenderer('ui:thought-update', {
             trace_id: traceId,
             active: Boolean(thought.active),
@@ -2789,7 +2791,8 @@ async function connectToKernel(): Promise<void> {
         }
       } else if (frameClass === 'avatar_control') {
         if (kind === 'audio_play') {
-          const a = frame.audio_play ?? frame;
+          const a = frame.audio_play;
+          if (!a) return;
           if (typeof a.audio_id !== 'string' || (!a.audio_uri && !a.audio_data)) {
             return;
           }
@@ -2819,7 +2822,7 @@ async function connectToKernel(): Promise<void> {
           lastCharacterPresentationProjection = frame.character_presentation_projection;
           sendToRenderer('ui:character-presentation-projection', lastCharacterPresentationProjection);
         } else if (kind === 'avatar_status') {
-          const hostKind = frame.avatar_status?.host_kind ?? frame.hostKind;
+          const hostKind = frame.avatar_status?.host_kind;
           if (hostKind === 'unity' || hostKind === 'offline') {
             handlerOptions.onAvatarStatusChanged?.(hostKind);
             sendToRenderer('ui:avatar-status', { hostKind });
@@ -2828,7 +2831,7 @@ async function connectToKernel(): Promise<void> {
           lastAudioStatus = frame.audio_status;
           sendToRenderer('ui:audio-status', lastAudioStatus);
         } else if (kind === 'runtime_readiness' && frame.runtime_readiness) {
-          lastRuntimeReadiness = frame.runtime_readiness;
+          lastRuntimeReadiness = frame.runtime_readiness as RuntimeReadinessCatalog;
           sendToRenderer('ui:runtime-readiness', lastRuntimeReadiness);
         } else if (kind === 'audio_transcript' && frame.audio_transcript) {
           sendToRenderer('ui:audio-transcript', {
@@ -3389,7 +3392,7 @@ export async function requestKernelShutdown(timeoutMs = 10000): Promise<boolean>
   }
 
   kernelShutdownRequested = true;
-  const frame: PresentationUpstreamFrame = {
+  const frame: ProductSurfaceRequest = {
     kind: 'shutdown_request',
     timestamp: Date.now(),
     shutdown_request: {

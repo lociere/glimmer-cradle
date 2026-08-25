@@ -4,12 +4,11 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   ExtensionPermission,
-  type DiagnosticsSnapshot,
   type ExtensionCommandContribution,
   type ExtensionManifest,
-  type ExtensionRuntimeProjection,
   type ExtensionSkillContribution,
 } from '@glimmer-cradle/extension-sdk';
+import type { DiagnosticsSnapshot, ExtensionRuntimeProjection } from '../../adapters/extension-host/extension-runtime-projection';
 import { ExtensionProcessHost } from '../../adapters/extension-host/extension-process-host';
 import type {
   ActiveExtensionSelection,

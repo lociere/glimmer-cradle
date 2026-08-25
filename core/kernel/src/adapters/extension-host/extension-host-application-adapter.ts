@@ -1,11 +1,10 @@
 import type {
-  DiagnosticsSnapshot,
   ExtensionCommandContribution,
   ExtensionManifest,
-  ExtensionRuntimeProjection,
   ExtensionSkillContribution,
   PerceptionEvent,
 } from '@glimmer-cradle/extension-sdk';
+import type { DiagnosticsSnapshot, ExtensionRuntimeProjection } from './extension-runtime-projection';
 import { randomUUID } from 'node:crypto';
 import { DomainEvent } from '../../domain/events';
 import {

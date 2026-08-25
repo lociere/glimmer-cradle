@@ -60,23 +60,21 @@ import {
   ExtensionStoppedEvent,
 } from '../../domain/events';
 import type {
-  PresentationUpstreamFrame,
-  PresentationDownstreamFrame,
-  AudioStatusPayload,
   ChannelReplyMessage,
-  ConversationHistoryRequest,
-  ConfigurationSnapshotRequest,
-  ConfigurationTestRequest,
-  ConfigurationUpdateRequest,
+} from '@glimmer-cradle/extension-sdk';
+import type { AudioStatusPayload } from '../audio/audio-status-projection';
+import type { ConfigurationSnapshotRequest, ConfigurationTestRequest, ConfigurationUpdateRequest } from '../config/configuration-models';
+import type { ConversationHistoryRequest } from './conversation-history-models';
+import type { ExtensionInstallationProjection, ExtensionRuntimeProjection } from '../extension-host/extension-runtime-projection';
+import type { ExtensionInstallPreview } from '../extension-installation/extension-package-manager';
+import type {
+  ExtensionCommandRequest,
   ExtensionInstallCommitRequest,
   ExtensionInstallPrepareRequest,
-  ExtensionCommandRequest,
-  ExtensionInstallationProjection,
   ExtensionLifecycleRequest,
-  ExtensionRuntimeProjection,
   ExtensionRuntimeProjectionRequest,
   ExtensionUninstallRequest,
-} from '@glimmer-cradle/extension-sdk';
+} from './surface-models';
 import type { ControlSurfaceGatewayConfig } from '../../ports/application-capabilities.port';
 import type { RuntimeReadinessCatalog as ProtocolRuntimeReadinessCatalog } from './contracts/RuntimeReadinessCatalog';
 import type { RuntimeReadinessCatalog } from '../../ports/runtime-readiness.port';
@@ -95,9 +93,11 @@ import {
   type SurfaceRequestFrame,
 } from './surface-grpc-mapper';
 
-type CoreSkillResponseFrame = Extract<SurfaceRequestFrame, {
+type CoreSkillResponseFrame = SurfaceRequestFrame & {
   kind: 'core_skill_action_response' | 'core_skill_confirmation_response';
-}>;
+  request_id: string;
+  status: 'success' | 'error';
+};
 
 const logger = getLogger('control-surface-gateway');
 const SURFACE_OPEN = 1;
@@ -128,8 +128,8 @@ type SurfaceClient = {
   send(event: SurfaceEvent): void;
   close?: () => void;
 };
-type SkillCatalogRequestPayload = NonNullable<PresentationUpstreamFrame['skill_catalog_request']>;
-type SkillCatalogResponsePayload = NonNullable<PresentationDownstreamFrame['skill_catalog_response']>;
+type SkillCatalogRequestPayload = NonNullable<SurfaceRequestFrame['skill_catalog_request']>;
+type SkillCatalogResponsePayload = NonNullable<SurfaceProjectionFrame['skill_catalog_response']>;
 
 /**
  * Kernel 侧可确认的 Avatar Host 状态。
@@ -146,20 +146,7 @@ interface ExtensionLifecycleController {
   stopExtension(extensionId: string): Promise<void>;
   activateExtension(extensionId: string, version?: string): Promise<void>;
   deactivateExtension(extensionId: string): Promise<void>;
-  prepareInstall(source: ExtensionInstallPrepareRequest['source']): Promise<{
-    transaction_id: string;
-    extension: {
-      id: string;
-      name: string;
-      version: string;
-      publisher: string;
-      description?: string;
-      permissions: string[];
-      platforms: string[];
-    };
-    artifact: { sha256: string; size: number; platform: string };
-    trust: NonNullable<PresentationDownstreamFrame['extension_install_preview']>['trust'];
-  }>;
+  prepareInstall(source: ExtensionInstallPrepareRequest['source']): Promise<ExtensionInstallPreview>;
   commitInstall(transactionId: string, approvedPermissions: string[]): Promise<{
     extension_id: string;
     version: string;
@@ -188,7 +175,7 @@ export class ControlSurfaceGateway {
   private _perceptionAppService: PerceptionApplicationPort | null = null;
   private _skillCatalogAppService: SkillCatalogApplicationPort | null = null;
   private _lastAvatarRenderState: KernelAvatarStatus = 'offline';
-  private _lastAvatarActionState: NonNullable<PresentationDownstreamFrame['avatar_action_state']> | null = null;
+  private _lastAvatarActionState: NonNullable<SurfaceProjectionFrame['avatar_action_state']> | null = null;
   private _requestApplicationShutdown: ((reason: string) => Promise<void>) | null = null;
   private _extensionLifecycleController: ExtensionLifecycleController | null = null;
   private _configApplicationService: ConfigurationApplicationPort | null = null;
@@ -284,7 +271,7 @@ export class ControlSurfaceGateway {
           timestamp: Date.now(),
           thought: { active: false },
         });
-        // 阶段 8.3:发 PresentationDownstreamFrame —— reply 与 emotion 分帧
+        // reply 与 emotion 保持独立 typed Surface 事件，避免 UI 从文本反推情绪。
         // (消 smell H,emotion 不再塞在 reply 里)。trace_id 真实贯通,不在
         // 渲染边界重新捏造(消 smell C)。
         this.broadcastFrame({
@@ -318,7 +305,7 @@ export class ControlSurfaceGateway {
     EventBus.instance.subscribe('AvatarStatusChangedEvent', async (event: any) => {
       const e = event as AvatarStatusChangedEvent;
       const { hostKind } = e.payload;
-      const projectionFrame: PresentationDownstreamFrame = {
+      const projectionFrame: SurfaceProjectionFrame = {
         kind: 'character_presentation_projection',
         timestamp: Date.now(),
         character_presentation_projection: this.avatar.getCharacterPresentationProjection(),
@@ -631,7 +618,7 @@ export class ControlSurfaceGateway {
   }
 
   /** 将 Kernel owner-local projection 映射为 typed Surface Service event。 */
-  public broadcastFrame(frame: PresentationDownstreamFrame): void {
+  public broadcastFrame(frame: SurfaceProjectionFrame): void {
     logger.debug('Broadcast PresentationFrame', {
       frame_class: getPresentationFrameClass(frame.kind),
       kind: frame.kind,
@@ -796,7 +783,7 @@ export class ControlSurfaceGateway {
     return merged.slice(0, 8);
   }
 
-  private _sendFrame(ws: SurfaceClient, frame: PresentationDownstreamFrame): void {
+  private _sendFrame(ws: SurfaceClient, frame: SurfaceProjectionFrame): void {
     if (ws.readyState === SURFACE_OPEN) {
       logger.debug('Send PresentationFrame', {
         frame_class: getPresentationFrameClass(frame.kind),
@@ -878,7 +865,7 @@ export class ControlSurfaceGateway {
         return;
       }
       this.avatar.updatePresentation(presentation);
-      const projectionFrame: PresentationDownstreamFrame = {
+      const projectionFrame: SurfaceProjectionFrame = {
         kind: 'character_presentation_projection',
         trace_id: typeof data.trace_id === 'string' ? data.trace_id : undefined,
         timestamp: Date.now(),
@@ -904,7 +891,7 @@ export class ControlSurfaceGateway {
         },
       });
     } else if (kind === 'core_skill_action_response' || kind === 'core_skill_confirmation_response') {
-      this._handleCoreSkillResponse(data);
+      this._handleCoreSkillResponse(data as CoreSkillResponseFrame);
     } else if (kind === 'config_snapshot_request') {
       await this._handleConfigSnapshotRequest(data.config_snapshot_request, ws);
     } else if (kind === 'conversation_history_request') {
@@ -1330,7 +1317,7 @@ export class ControlSurfaceGateway {
     pending.reject(new Error(typeof data.message === 'string' ? data.message : 'Desktop Skill 执行失败'));
   }
 
-  private async _handleExtensionCommandRequest(data: any, ws: SurfaceClient): Promise<void> {
+  private async _handleExtensionCommandRequest(data: SurfaceRequestFrame, ws: SurfaceClient): Promise<void> {
     const request = data.extension_command_request as ExtensionCommandRequest | undefined;
     const requestId = request?.request_id?.trim()
       ? request.request_id.trim()
@@ -1450,7 +1437,7 @@ export class ControlSurfaceGateway {
   }
 
   /** 过滤桌面端请求，避免把 UI 临时字段直接泄漏给 Avatar。 */
-  private _normalizeAvatarPresentation(raw: unknown): NonNullable<PresentationDownstreamFrame['presentation']> | null {
+  private _normalizeAvatarPresentation(raw: unknown): NonNullable<SurfaceRequestFrame['avatar_presentation']> | null {
     if (!raw || typeof raw !== 'object') {
       return null;
     }
@@ -1555,7 +1542,7 @@ export class ControlSurfaceGateway {
     text?: string,
     message?: string,
   ): void {
-    const transcript: NonNullable<PresentationDownstreamFrame['audio_transcript']> = {
+    const transcript: NonNullable<SurfaceProjectionFrame['audio_transcript']> = {
       audio_id: audioId,
       status,
     };
@@ -1637,7 +1624,7 @@ export class ControlSurfaceGateway {
     // 阶段 8.2:setInterval 已删,无需 clearInterval。
     if (this._server) {
       const server = this._server;
-      const shutdownFrame: PresentationDownstreamFrame = {
+      const shutdownFrame: SurfaceProjectionFrame = {
         kind: 'shutdown',
         timestamp: Date.now(),
       };
@@ -1688,7 +1675,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function closeSurfaceClient(client: SurfaceClient, frame: PresentationDownstreamFrame): Promise<void> {
+function closeSurfaceClient(client: SurfaceClient, frame: SurfaceProjectionFrame): Promise<void> {
   if (client.readyState !== SURFACE_OPEN) return Promise.resolve();
   const event = surfaceEventFromFrame(frame);
   if (event) client.send(event);

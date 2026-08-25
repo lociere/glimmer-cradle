@@ -1,5 +1,5 @@
-import type { ConfigurationSnapshot, PresentationRuntimeReadinessState } from '@glimmer-cradle/extension-sdk';
-import type { ReadinessStatus, RuntimeProjection } from '../../shared/api/personal-server-client';
+import type { ConfigurationSnapshot, RuntimeProjection } from '../../../shared/control-center-models';
+import type { ReadinessStatus } from '../../shared/api/personal-server-client';
 
 export interface StatusViewSnapshot {
   readonly status: ReadinessStatus | null;
@@ -88,7 +88,7 @@ export class StatusView {
   }
 }
 
-function normalizeState(value: PresentationRuntimeReadinessState): string {
+function normalizeState(value: RuntimeProjection['state']): string {
   return value;
 }
 

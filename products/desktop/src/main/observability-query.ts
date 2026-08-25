@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import YAML from 'yaml';
-import type { ExtensionRuntimeProjection } from '@glimmer-cradle/extension-sdk';
+import type { ExtensionRuntimeProjection } from './control-center-models';
 import type { RuntimeReadinessCatalog } from './surface-view-model';
 import type { AuditRecord, ModelInvocationRecord, ObservabilityConfig, ObservabilityEvent } from './observability-view-model';
 import {

@@ -1,0 +1,13 @@
+import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from './documents';
+export interface ConfigurationModelAlias { alias: string; model_id: string; }
+export interface ConfigurationProviderDraft { key: string; api_type: string; base_url?: string; api_key?: string; clear_api_key?: boolean; temperature?: number; request_method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; request_path?: string; request_headers?: Record<string, string>; request_body_template?: string; response_extract?: string; models: [ConfigurationModelAlias, ...ConfigurationModelAlias[]]; }
+export interface ConfigurationProviderTestDraft extends Omit<ConfigurationProviderDraft, 'models'> {}
+export interface ConfigurationProviderSnapshot { key: string; api_type: string; base_url?: string; has_api_key: boolean; temperature?: number; request_method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; request_path?: string; response_extract?: string; models: ConfigurationModelAlias[]; }
+export interface ConfigurationRouteSnapshot { provider_key?: string; model_alias?: string; effective_model_id?: string; ready: boolean; reason?: string; }
+export interface ConfigurationSnapshot { revision: string; llm: { provider_count: number; providers: ConfigurationProviderSnapshot[]; default_route: ConfigurationRouteSnapshot }; audio: AudioConfig; embedding: EmbeddingConfig; memory: MemoryConfig; skills: SkillPlaneConfig; storage: { config_root: string; data_root: string; state_root: string }; service: { cognition_ready: boolean; restart_supported: boolean }; }
+export interface ConfigurationSnapshotRequest { request_id: string; }
+export interface ConfigurationSnapshotResult { request_id: string; status: 'success' | 'error'; snapshot?: ConfigurationSnapshot; message?: string; }
+export interface ConfigurationTestRequest { request_id: string; provider: ConfigurationProviderTestDraft; }
+export interface ConfigurationTestResult { request_id: string; status: 'success' | 'error'; message: string; discovered_models: string[]; latency_ms?: number; }
+export interface ConfigurationUpdateRequest { request_id: string; revision: string; dry_run?: boolean; llm: { default_route_provider_key?: string; default_route_model_alias?: string; providers: ConfigurationProviderDraft[]; removed_provider_keys: string[] }; audio: AudioConfig; embedding: EmbeddingConfig; memory: MemoryConfig; skills: SkillPlaneConfig; }
+export interface ConfigurationUpdateResult { request_id: string; status: 'preview' | 'success' | 'conflict' | 'error'; apply_state: 'unchanged' | 'restart_required' | 'restarting' | 'completed' | 'failed'; new_revision?: string; change_summary: string[]; snapshot?: ConfigurationSnapshot; message?: string; }

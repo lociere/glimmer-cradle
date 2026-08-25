@@ -1,4 +1,4 @@
-import type { ConfigurationSnapshot } from '@glimmer-cradle/extension-sdk';
+import type { ConfigurationSnapshot } from '../../../../shared/control-center-models';
 import type {
   DeploymentOperationResult,
   DeploymentOperationsSnapshot,
