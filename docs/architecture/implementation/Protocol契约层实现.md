@@ -84,4 +84,4 @@ pnpm typecheck
 pnpm build
 ```
 
-按变更补充 Cognition/Audio Python tests、C# Core/Adapter tests、Unity Host/Player、Surface 产品测试、Extension Host lifecycle、安装/打包和旧引用扫描。`scripts/check-architecture.mjs` 与 `contracts/scripts/check-inventory.mjs` 对 `protocol/` 目录和 package dependency fail-close。
+按变更补充 Cognition/Audio Python tests、C# Core/Adapter tests、Unity Host/Player、Surface 产品测试、Extension Host lifecycle、安装/打包和旧引用扫描。`@glimmer-cradle/repo-checks` 的 architecture rules 与 `contracts/scripts/check-inventory.mjs` 对 `protocol/` 目录和 package dependency fail-close。

@@ -75,6 +75,7 @@
     }
   },
   "scripts": {
+    "stage:host-modules": "node scripts/stage-host-modules.mjs",
     "build": "tsc -p tsconfig.json",
     "build:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -18,7 +18,12 @@ async function main() {
   const dataRoot = await prepareSmokeDataRoot();
   const supervisor = spawn(
     process.execPath,
-    [path.join(repoRoot, 'scripts', 'launch-product.mjs'), 'personal-server', '--production'],
+    [
+      path.join(repoRoot, 'tools', 'workspace-supervisor', 'src', 'cli.mjs'),
+      '--mode', 'production',
+      'personal-server',
+      '--repository-root', repoRoot,
+    ],
     {
       cwd: repoRoot,
       env: {

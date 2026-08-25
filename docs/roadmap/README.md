@@ -14,7 +14,7 @@
 | [manifests/](./manifests/) | M12/M13 的完成态目录树、Current → Target 动作与删除门 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
-M13 A～F 已完成，待本次合入 main。[M12](./milestones/M12-契约脊柱与跨进程服务架构重建.md) Slice 1～8 已形成 fixed state，Slice 9 已形成 fixed candidate 并等待最终复审；M11 仍暂停/延期且未完成。
+M12 Contract Spine/runtime 物理重建与 M13 A～F/最终仓库工具收口均已完成；M11 仍暂停/延期且未完成。下一活跃面由总控与用户另行选择，不从已完成里程碑自动扩张。
 
 ## 状态规则
 

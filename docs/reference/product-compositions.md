@@ -63,7 +63,7 @@ Personal Server 并不禁用 Skill Plane。Core、MCP、User 和 Extension Provi
 | `pnpm build && pnpm smoke:personal-server` | 已构建 Personal Server 的 ready、真实文字对话、停机与进程回收验收 |
 | `GLIMMER_CRADLE_SMOKE_REQUIRE_TTS=1 pnpm smoke:personal-server` | 显式启用并配置 TTS 后，额外要求 `audio_play` 并记录语音延迟 |
 
-`scripts/launch-product.mjs` 是开发期 Product Supervisor。它先运行可缓存准备器，再注入 `GLIMMER_CRADLE_PRODUCT_MANIFEST`，共同持有 Kernel 与 Product Host。主进程以 `code=0` 正常退出时，Supervisor 先等待兄弟进程沿协议自然退出，再在短期限后回收剩余进程树；异常退出则立即收口故障域并向部署层返回失败。Windows 通过当前 Node 附带的 Corepack `pnpm.js` 入口执行仓库锁定版本，避免 `.cmd` 外壳和项目内全局 pnpm 假设破坏进程所有权；其他平台通过 `corepack pnpm` 启动。
+`tools/workspace-supervisor/` 是开发期 Product Supervisor。它从 Product package manifest 消费 `product:prepare`、`product:dev`、`product:start`：Desktop preparation 可运行 Desktop `prepare-runtime` 与 `desktop-assets`，Personal Server preparation 只运行共享 Contracts/Extension SDK owner task，不能进入 Desktop assets。随后 Supervisor 注入 `GLIMMER_CRADLE_PRODUCT_MANIFEST`，共同持有 Kernel 与 Product Host。主进程以 `code=0` 正常退出时，Supervisor 先等待兄弟进程沿协议自然退出，再在短期限后回收剩余进程树；异常退出则立即收口故障域并原样返回非零 code。Windows 通过当前 Node 附带的 Corepack `pnpm.js` 入口执行仓库锁定版本；其他平台通过 `corepack pnpm` 启动。CLI 以工具物理位置或显式 `--repository-root` 解析仓库，不依赖调用者 cwd。
 
 `products/personal-server/scripts/smoke.mjs` 是需要真实 LLM 配置的生产组合 smoke。它分配临时回环端口，并把 models/packages 复制到隔离 Local Data Domain；任一 symlink/junction 会失败闭合，不会把可写路径投影回真实数据。随后记录 `/readyz` 状态迁移，经 `/api/v1/surface` 完成一次文本对话并等待 `reply` 与真实 Audio 状态，最后从受信任控制表面发起全局停机并要求 Product Supervisor 以 `0` 退出。默认接受 TTS/ASR 为 `disabled`；只有设置 `GLIMMER_CRADLE_SMOKE_REQUIRE_TTS=1` 时才要求 `audio_play`。它不替代 Linux OCI 分发物验收。
 

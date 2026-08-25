@@ -3,7 +3,20 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { prepareSmokeDataRoot } from '../scripts/smoke.mjs';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+test('Smoke 通过 workspace-supervisor 直接 CLI 启动生产组合', async () => {
+  const source = await readFile(
+    path.join(repoRoot, 'products', 'personal-server', 'scripts', 'smoke.mjs'),
+    'utf8',
+  );
+  assert.match(source, /tools['"],\s*['"]workspace-supervisor['"],\s*['"]src['"],\s*['"]cli\.mjs/);
+  assert.match(source, /'--mode', 'production'/);
+  assert.doesNotMatch(source, /scripts['"],\s*['"]launch-product\.mjs/);
+});
 
 test('Smoke 使用真实隔离副本，修改副本不会回写源数据', async () => {
   const source = await mkdtemp(path.join(os.tmpdir(), 'glimmer-smoke-source-'));

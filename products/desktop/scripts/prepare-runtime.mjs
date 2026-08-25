@@ -58,7 +58,7 @@ await ensureTask({
   outputs: [
     path.join(repoRoot, 'build', 'extension-host', 'modules', '@glimmer-cradle', 'extension-sdk', 'dist', 'index.js'),
   ],
-  run: () => run(process.execPath, [path.join(repoRoot, 'packages', 'extension-sdk', 'scripts', 'stage-host-modules.mjs')]),
+  run: () => run(pnpmCommand, ['--filter', '@glimmer-cradle/extension-sdk', 'run', 'stage:host-modules']),
 });
 
 await ensureTask({

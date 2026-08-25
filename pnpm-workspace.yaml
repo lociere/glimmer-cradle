@@ -7,6 +7,7 @@ packages:
   - 'contracts'
   - 'packages/extension-sdk'
   - 'templates/extension-basic'
+  - 'tools/*'
 
 # 发行投影必须包含 workspace 私有包的实体副本，不能在部署时回查 npm registry。
 injectWorkspacePackages: true

@@ -7,6 +7,9 @@
     "dist"
   ],
   "scripts": {
+    "product:prepare": "pnpm --filter @glimmer-cradle/extension-sdk run build:with-deps && pnpm --filter @glimmer-cradle/extension-sdk run stage:host-modules",
+    "product:dev": "pnpm run build:web && tsx src/index.ts",
+    "product:start": "node dist/index.js",
     "dev": "pnpm run build:web && tsx src/index.ts",
     "build:web": "vite build",
     "preview:web": "vite preview",

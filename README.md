@@ -108,7 +108,7 @@ pnpm dev
 pnpm dev:personal-server
 ```
 
-`scripts/launch-product.mjs` 是开发期 Product Supervisor，负责共同持有 Product Host 与 Kernel，并在退出时回收受管子进程。正式 Personal Server 使用 OCI、Docker Compose 和版本化部署包，不依赖源码目录或开发服务器。
+`tools/workspace-supervisor/` 是开发期 Product Supervisor，root 命令只通过稳定 package façade 路由；它共同持有 Product Host 与 Kernel，并在退出时回收受管子进程。Desktop 与 Personal Server 的 preparation 由各自 Product package manifest 声明。正式 Personal Server 使用 OCI、Docker Compose 和版本化部署包，不依赖源码目录或开发服务器。
 
 ## 验证
 

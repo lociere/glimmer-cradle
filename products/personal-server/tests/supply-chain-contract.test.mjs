@@ -15,6 +15,17 @@ const workflowText = await readFile(
   'utf8',
 );
 const workflow = YAML.parse(workflowText);
+const dockerIgnore = await readFile(path.join(repoRoot, '.dockerignore'), 'utf8');
+
+test('Personal Server build context 排除 secret、私人资产与本机数据', () => {
+  const lines = new Set(dockerIgnore.split(/\r?\n/));
+  for (const required of [
+    'configs/secrets/secrets.yaml',
+    'assets/avatar',
+    'assets/models',
+    'data',
+  ]) assert.ok(lines.has(required), required);
+});
 
 test('Personal Server 基础镜像输入必须使用 digest 且 Dockerfile 无 tag 默认值', () => {
   for (const name of ['NODE_IMAGE', 'PYTHON_IMAGE', 'UV_IMAGE']) {

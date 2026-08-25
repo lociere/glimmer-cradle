@@ -6,20 +6,13 @@
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进面：M12 Slice 9 candidate
+## 当前推进面：M12/M13 完成，等待下一里程碑选择
 
-[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 的 Slice 1～8 已形成固定提交，Slice 9 legacy protocol closure 已形成 findings 修复 candidate：旧 `protocol/` 已物理删除；独立 Document 已迁入 `contracts/json-schema/` compatibility baseline，Service/DTO consumer 已切到 Contract Spine edge。Surface Gateway 使用有限 typed Query/Command/Event DTO，Kernel 与产品 Adapter 映射 owner-local request/projection；公开 Extension SDK 只保留扩展作者与 Host Port 所需 API，系统配置、Control Center、安装和运行投影回归 Kernel/Product owner。该 candidate 的 Personal Server production smoke 已 exit 0，DeepSeek 不再返回 402，startup/readiness、真实 conversation reply 与 clean shutdown 均通过。当前 findings 修复仍待独立复审，不写成 M12 完成；第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。M11 仍暂停/延期且未完成。
+[M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已完成：旧 `protocol/` 物理删除，独立 Document 进入 `contracts/json-schema/` compatibility baseline，Service/DTO consumer 使用 Contract Spine edge；Surface Gateway 使用有限 typed Query/Command/Event DTO，Kernel 与产品 Adapter 映射 owner-local request/projection，公开 Extension SDK 只保留扩展作者与 Host Port API。第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。
 
-[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 的 A～F 已在唯一 writer 分支形成第二轮审查修复后的 fixed-state candidate：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)。候选继续把未绑定固定 candidate 的 update check/apply 设为 unsupported/fail-closed；Kernel DLQ 已有 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍未注册 replay。该状态尚未再次独立复审或集成，不能写成 main 已完成。
+[M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 已完成 A～F 与最终仓库工具收口：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)；长期跨仓工具位于 `tools/repo-checks/` 与 `tools/workspace-supervisor/`，root `package.json` 只保留稳定 façade，root `scripts/` 已删除。未绑定固定版本/制品的 update check/apply 继续 unsupported/fail-closed；Kernel DLQ 使用 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍不支持 replay。
 
-M12/M13 的完成态目录、迁移动作和删除门分别见对应
-[M12 清单](./manifests/M12-目标物理清单.md) 与
-[M13 清单](./manifests/M13-目标物理清单.md)。M12-9 必须在候选状态重新核对全部
-Protocol consumer，不能用冻结 main inventory 冒充完成证据。
-
-旧 Slice A checkpoint 已由原 owner 保全并重放到 canonical
-`deploy/personal-server/lib/host-transaction.sh`；旧临时路径不属于完成态。下一步只做候选
-commit 的独立复审、必要修复与集成，不再恢复 rejected checkpoint。
+M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单](./manifests/M12-目标物理清单.md) 与 [M13 清单](./manifests/M13-目标物理清单.md)。M11 仍暂停/延期且未完成；下一活跃里程碑由总控与用户另行选择，不从已完成工作自动扩张。
 
 [M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 暂停/延期，未完成、未关闭。M12 Slice 1 是用户授权的“不切运行主线”前置基线工作，不表示 M11 前置依赖已经满足，也不得把 M11 写成完成。
 
@@ -39,13 +32,12 @@ M11 暂停前仍未完成的范围：
 
 ## 下一验收门
 
-### M13 fixed-state 独立复审与集成门
+### 下一里程碑选择与环境风险
 
-独立复审以候选 commit/tree 和验证账本为输入，逐项核对 A～F 物理清单、实际 diff、旧入口
-删除门、事务 trusted namespace、外部 handoff、恢复失败终态、DLQ lifecycle、CI/Release
-权限以及 Desktop clean Windows runner 风险。真实 Docker、Ubuntu、Windows installer、
-签名、公证、Registry 与生产未运行，不得从隔离 fixture 外推。复审通过后由总控集成；若
-M12 后续切片修改相同 generate/build/package 入口，必须按固定 commit 串行 handoff。
+M12/M13 当前没有未闭合的代码集成门。真实 Docker/Ubuntu、Windows installer 安装/首启/
+升级/卸载、签名、公证、Registry、GitHub Sigstore attestation/Release 与生产操作仍是环境
+风险，不能从 isolated fixture、dry-run 或 source build 外推为通过；这些门只有在用户选择
+发布/运维目标并授权唯一环境 owner 后才能执行。
 
 ### Personal Server UI 优化门
 

@@ -75,8 +75,8 @@ Contracts TS Service，并验证 Extension Host process 入口位于
 `runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js`。`packaged-paths.ts` 拒绝缺失或
 symlink 运行组件，并把首次配置从只读 defaults 原子投影到 user-data；
 `packaged-supervisor.ts` 使用 bundled Node 启动 Kernel，并注入 bundled Python、Avatar、
-Extension、native 与 product manifest 路径。它不调用仓库 root
-`scripts/launch-product.mjs`。打包后的物理入口为
+Extension、native 与 product manifest 路径。它不调用开发期
+`tools/workspace-supervisor/`。打包后的物理入口为
 `win-unpacked/resources/app.asar.unpacked/dist/main/{packaged-paths,packaged-supervisor}.js`；
 verifier 同时要求真实 PE installer、`win-unpacked/GlimmerCradle.exe`、`app.asar`、上述
 unpacked 入口、native owner 下的 launcher 和完整组件清单存在并与固定制品

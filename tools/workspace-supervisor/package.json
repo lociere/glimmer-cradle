@@ -1,0 +1,11 @@
+{
+  "name": "@glimmer-cradle/workspace-supervisor",
+  "version": "0.1.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/cli.mjs --mode development",
+    "start": "node src/cli.mjs --mode production",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

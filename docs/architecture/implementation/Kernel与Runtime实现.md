@@ -30,7 +30,7 @@
 
 ## 开发启动编排
 
-仓库根 `pnpm dev` 由 `scripts/launch-product.mjs desktop` 启动；`pnpm dev:personal-server` 选择 Server 组合。Product Supervisor 先调用带 input/output digest manifest 的 `products/desktop/scripts/prepare-runtime.mjs`，准备器只处理 Protocol、Extension SDK 与 Desktop 发布资产，不编译或扫描扩展源码。随后它向 Kernel 注入 `products/<id>/product.json` 并共同监督 Kernel 与产品 Host；任一主进程退出或收到终止信号时，Windows 用 `taskkill /T`、POSIX 用独立进程组回收完整子树。
+仓库根 `pnpm dev` 通过完整 package name 路由到 `tools/workspace-supervisor/`；`pnpm dev:personal-server` 选择 Server 组合。Supervisor 从 Product package manifest 消费标准 `product:prepare`、`product:dev`、`product:start` 入口：Desktop preparation 调用带 input/output digest manifest 的 `products/desktop/scripts/prepare-runtime.mjs`，Personal Server preparation 只构建共享 Contracts/Extension SDK owner task，不经过 Desktop assets。随后 Supervisor 向 Kernel 注入 `products/<id>/product.json` 并共同监督 Kernel 与 Product Host；任一主进程退出或收到终止信号时，Windows 用 `taskkill /T`、POSIX 用独立进程组回收完整子树，并原样传播非零 child exit。
 
 构建、准备和运行是三个独立阶段：`pnpm build` 面向发布与完整验收；`pnpm prepare:runtime` 面向首次安装、源码变化或缓存恢复；runtime lifecycle 只监督进程、连接、资源和 readiness，不调用编译器。未来打包版应在安装/更新阶段交付完整产物，用户启动路径只做廉价完整性检查和进程编排。
 

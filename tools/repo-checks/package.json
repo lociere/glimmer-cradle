@@ -1,0 +1,11 @@
+{
+  "name": "@glimmer-cradle/repo-checks",
+  "version": "0.1.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:architecture": "node src/architecture/cli.mjs",
+    "check:encoding": "node src/encoding/cli.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

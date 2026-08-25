@@ -5,6 +5,9 @@
   "main": "dist/main/index.js",
   "scripts": {
     "sync:assets": "node scripts/sync-assets.mjs",
+    "product:prepare": "node scripts/prepare-runtime.mjs",
+    "product:dev": "node scripts/dev-electron.mjs",
+    "product:start": "electron .",
     "dev": "vite",
     "dev:electron": "node scripts/dev-electron.mjs",
     "package": "node scripts/package.mjs",
