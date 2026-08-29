@@ -172,14 +172,14 @@ export class PersonalServerClient {
     await fetch('/api/v1/session', { method: 'DELETE' });
   }
 
-  public async getProduct(): Promise<ProductProjection> {
-    const response = await fetch('/api/v1/product', { cache: 'no-store' });
+  public async getProduct(signal?: AbortSignal): Promise<ProductProjection> {
+    const response = await fetch('/api/v1/product', { cache: 'no-store', signal });
     if (!response.ok) throw new Error(`product_${response.status}`);
     return response.json();
   }
 
-  public async getStatus(): Promise<ReadinessStatus> {
-    const response = await fetch('/api/v1/status', { cache: 'no-store' });
+  public async getStatus(signal?: AbortSignal): Promise<ReadinessStatus> {
+    const response = await fetch('/api/v1/status', { cache: 'no-store', signal });
     if (response.status === 401) throw new Error('unauthorized');
     if (!response.ok) throw new Error(`status_${response.status}`);
     return response.json();

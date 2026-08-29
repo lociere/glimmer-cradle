@@ -12,7 +12,7 @@ test('为 BrowserRouter 导航路径提供 no-store index fallback', async () =>
   await writeFile(path.join(publicRoot, 'index.html'), '<!doctype html><title>shell</title>', 'utf8');
   await writeFile(path.join(publicRoot, 'assets', 'app.js'), 'export {};', 'utf8');
   const server = createServer(async (request, response) => {
-    const handled = await serveBuiltWebAsset(request.url ?? '/', publicRoot, response);
+    const handled = await serveBuiltWebAsset(request.url ?? '/', publicRoot, request, response);
     if (!handled) {
       response.writeHead(404).end('not found');
     }
@@ -25,14 +25,19 @@ test('为 BrowserRouter 导航路径提供 no-store index fallback', async () =>
 
   try {
     for (const route of ['/conversation', '/overview', '/capabilities', '/activity', '/settings', '/unknown']) {
-      const response = await fetch(`${origin}${route}`);
+      const response = await fetch(`${origin}${route}`, { headers: { accept: 'text/html' } });
       assert.equal(response.status, 200, route);
       assert.equal(response.headers.get('cache-control'), 'no-store', route);
       assert.match(await response.text(), /<title>shell<\/title>/, route);
     }
     assert.equal((await fetch(`${origin}/assets/app.js`)).status, 200);
+    const head = await fetch(`${origin}/assets/app.js`, { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
     assert.equal((await fetch(`${origin}/assets/missing.js`)).status, 404);
-    assert.equal((await fetch(`${origin}/api/v1/missing`)).status, 404);
+    assert.equal((await fetch(`${origin}/api/v1/missing`, { headers: { accept: 'text/html' } })).status, 404);
+    assert.equal((await fetch(`${origin}/overview`, { headers: { accept: 'application/json' } })).status, 404);
+    assert.equal((await fetch(`${origin}/overview`, { method: 'HEAD', headers: { accept: 'text/html' } })).status, 404);
     assert.equal((await fetch(`${origin}/readyz`)).status, 404);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

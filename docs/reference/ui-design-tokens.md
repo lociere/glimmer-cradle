@@ -62,13 +62,13 @@ Desktop 的精确 CSS 值仍以当前实现为准。本页不复制完整数值�
 
 Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 
-- `shared/styles/tokens.css` 提供中性 canvas/workspace/surface、文字、边界、focus、状态、spacing、radius、control 与 layout 语义变量，并由 `html[data-theme='light']` 覆盖浅色值；青曜不进入 canvas、workspace、主要 surface 或正文层级。
+- `shared/styles/tokens.css` 提供中性 canvas/workspace/surface、文字、边界、focus、状态、spacing、radius、control 与 layout 语义变量，并由 `html[data-theme='light']` 覆盖浅色值；主要行动的前景与渐变也由用途 token 映射，消费样式不散落原始色值。青曜不进入 canvas、workspace、主要 surface 或正文层级。
 - `global.css`、`layout.css`、`motion.css` 与 `responsive.css` 分别持有基础语义、壳层容量、reduced-motion 和响应式规则；feature 局部样式不成为第二套主题。
 - `PersonalServerShell.tsx` 在宽屏只显示一层侧栏导航，在窄屏使用可关闭并返回焦点的 React Aria Dialog 导航；当前页面由 React Router `Outlet` 唯一挂载。
 - 登录层不会挂载 Product Shell；深链登录后返回原 URL，根路径、unknown route、refresh 与 back/forward 由浏览器路由测试覆盖。
 - 代表性 `HealthBadge` 以真实组件、CSS Module 和 story 进入 Storybook；Storybook 不模拟 Product Host 事实，也未启用 MCP。
 - 概览深色宽屏、浅色宽屏和深色 480×900 已建立固定 Playwright 视觉基线；动态观测时间在截图前归一，结构、内容与状态不被遮罩。
-- 既有 feature 的全局 CSS 暂时通过 semantic alias 消费当前 token；删除触发器是对应 feature 完成 React component/hook 迁移并通过同场景交互、a11y 与视觉验证，届时 route-local adapter 和旧 DOM/CSS owner 一并删除。
+- 既有 feature 的全局 CSS 暂时通过 semantic alias 消费当前 token；删除触发器是对应 feature 完成 React component/hook 迁移并通过同场景交互、a11y 与视觉验证，届时该 feature route 自有 adapter 和旧 DOM/CSS owner 一并删除。
 
 详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
 

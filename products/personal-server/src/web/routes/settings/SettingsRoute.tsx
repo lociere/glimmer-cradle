@@ -1,8 +1,14 @@
-import { useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PersonalServerAppController } from '../../app/PersonalServerAppController';
-import { LegacyRouteMount } from '../LegacyRouteMount';
 
 export function SettingsRoute({ controller }: { readonly controller: PersonalServerAppController }): JSX.Element {
-  const mount = useCallback((root: HTMLElement) => controller.mountSettings(root), [controller]);
-  return <LegacyRouteMount className="settings-view" dataRole="view-settings" mount={mount} />;
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    return controller.mountSettings(root);
+  }, [controller]);
+
+  return <section ref={rootRef} className="route-view settings-view" data-role="view-settings" />;
 }

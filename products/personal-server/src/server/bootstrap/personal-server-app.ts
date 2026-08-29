@@ -192,7 +192,7 @@ export class PersonalServerApp {
       sendJson(response, 200, { authenticated: false });
       return;
     }
-    if (await serveBuiltWebAsset(pathname, this.publicRoot, response)) {
+    if (await serveBuiltWebAsset(pathname, this.publicRoot, request, response)) {
       return;
     }
     if (!await this.sessions.authenticate(request)) {

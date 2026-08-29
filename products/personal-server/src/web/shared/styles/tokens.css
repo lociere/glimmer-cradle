@@ -17,6 +17,9 @@
   --accent-hover: #00bfc5;
   --accent-text: #6ae2d4;
   --focus-ring: #6ae2d4;
+  --action-primary-text: #f7ffff;
+  --action-primary-gradient-start: #00687f;
+  --action-primary-gradient-end: #008f9f;
   --status-success-text: #72d4a0;
   --status-warning-text: #e7b86d;
   --status-danger-text: #ef8b8b;
@@ -79,6 +82,9 @@
   --accent-hover: #00556a;
   --accent-text: #00687f;
   --focus-ring: #00687f;
+  --action-primary-text: #f7ffff;
+  --action-primary-gradient-start: #00687f;
+  --action-primary-gradient-end: #008f9f;
   --status-success-text: #197248;
   --status-warning-text: #8a5a12;
   --status-danger-text: #a6353b;

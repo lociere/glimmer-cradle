@@ -64,6 +64,7 @@ test('Personal Server React Shell 与 Router 保持唯一 owner，旧入口不�
     'src/web/app/bootstrap.ts',
     'src/web/app/router.ts',
     'src/web/shell/layout.ts',
+    'src/web/routes/LegacyRouteMount.tsx',
   ];
   for (const relativePath of removedPaths) {
     assert.equal(fs.existsSync(path.join(productRoot, relativePath)), false, relativePath);

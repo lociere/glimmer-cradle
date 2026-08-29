@@ -1,8 +1,14 @@
-import { useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PersonalServerAppController } from '../app/PersonalServerAppController';
-import { LegacyRouteMount } from './LegacyRouteMount';
 
 export function OverviewRoute({ controller }: { readonly controller: PersonalServerAppController }): JSX.Element {
-  const mount = useCallback((root: HTMLElement) => controller.mountOverview(root), [controller]);
-  return <LegacyRouteMount className="overview-view" dataRole="view-overview" mount={mount} />;
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    return controller.mountOverview(root);
+  }, [controller]);
+
+  return <section ref={rootRef} className="route-view overview-view" data-role="view-overview" />;
 }

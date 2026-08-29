@@ -55,8 +55,12 @@
 .primary-button,
 .primary-link {
   border: 1px solid color-mix(in srgb, var(--accent-core) 70%, transparent);
-  color: #f7ffff;
-  background: linear-gradient(145deg, #00687f, #008f9f);
+  color: var(--action-primary-text);
+  background: linear-gradient(
+    145deg,
+    var(--action-primary-gradient-start),
+    var(--action-primary-gradient-end)
+  );
   box-shadow: inset 0 1px 0 rgba(106, 226, 212, 0.25);
 }
 

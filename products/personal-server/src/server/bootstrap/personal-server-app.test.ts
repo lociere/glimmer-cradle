@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { PersonalServerApp } from './personal-server-app';
 import { DeploymentOperationsService } from '../adapters/deployment-operations-service';
 
@@ -43,6 +44,71 @@ test('/readyz follows required Cognition failure and recovery without stale read
     assert.equal((await request()).status, 503);
     ready = true;
     assert.equal((await request()).status, 200);
+  });
+});
+
+test('Product Host 只为安全的 GET HTML navigation 提供 BrowserRouter fallback', async (t) => {
+  const fixture = createPersonalServerFixture();
+  const publicRoot = path.join(fixture.root, 'dist', 'public');
+  mkdirSync(path.join(publicRoot, 'assets'), { recursive: true });
+  writeFileSync(path.join(publicRoot, 'index.html'), '<!doctype html><title>shell</title>', 'utf8');
+  writeFileSync(path.join(publicRoot, 'assets', 'app.js'), 'export {};', 'utf8');
+
+  await withDataRoot(fixture.dataRoot, async () => {
+    const app = new PersonalServerApp({
+      host: '127.0.0.1', port: 0, token: 'server-secret',
+      productManifestPath: fixture.productManifestPath, cwd: fixture.root,
+    });
+    await app.start();
+    t.after(() => void app.stop());
+    const origin = fixture.baseUrl(app);
+    const authorized = { authorization: 'Bearer server-secret' };
+
+    const navigation = await fetch(`${origin}/overview`, { headers: { accept: 'text/html' } });
+    assert.equal(navigation.status, 200);
+    assert.equal(navigation.headers.get('cache-control'), 'no-store');
+    assert.match(await navigation.text(), /<title>shell<\/title>/);
+
+    const asset = await fetch(`${origin}/assets/app.js`);
+    assert.equal(asset.status, 200);
+    assert.equal(asset.headers.get('cache-control'), 'public, max-age=3600');
+    assert.equal(await asset.text(), 'export {};');
+    const assetHead = await fetch(`${origin}/assets/app.js`, { method: 'HEAD' });
+    assert.equal(assetHead.status, 200);
+    assert.equal(assetHead.headers.get('content-length'), String(Buffer.byteLength('export {};')));
+    assert.equal(await assetHead.text(), '');
+
+    for (const request of [
+      { path: '/overview', method: 'GET', accept: 'application/json' },
+      { path: '/overview', method: 'GET', accept: 'text/html;q=0, */*' },
+      { path: '/overview', method: 'HEAD', accept: 'text/html' },
+      { path: '/overview', method: 'POST', accept: 'text/html' },
+      { path: '/assets/app.js', method: 'POST', accept: '*/*' },
+      { path: '/assets/missing', method: 'GET', accept: 'text/html' },
+      { path: '/api', method: 'GET', accept: 'text/html' },
+      { path: '/api/v1/missing', method: 'GET', accept: 'text/html' },
+    ]) {
+      const response = await fetch(`${origin}${request.path}`, {
+        method: request.method,
+        headers: { ...authorized, accept: request.accept },
+      });
+      assert.equal(response.status, 404, `${request.method} ${request.path} ${request.accept}`);
+      assert.doesNotMatch(await response.text(), /<title>shell<\/title>/);
+    }
+
+    for (const requestPath of [
+      '/bad%ZZ',
+      '/assets/%2e%2e/index.html',
+      '/assets/%2E%2E%2Findex.html',
+      '/assets/%252e%252e%252findex.html',
+    ]) {
+      const response = await rawHttpRequest(origin, requestPath, {
+        ...authorized,
+        accept: 'text/html',
+      });
+      assert.equal(response.statusCode, 404, requestPath);
+      assert.doesNotMatch(response.body, /<title>shell<\/title>/);
+    }
   });
 });
 
@@ -511,4 +577,31 @@ async function readSseEvent(
 
 function waitForTimeout(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(1, timeoutMs)));
+}
+
+function rawHttpRequest(
+  origin: string,
+  requestPath: string,
+  headers: Record<string, string>,
+): Promise<{ statusCode: number; headers: IncomingHttpHeaders; body: string }> {
+  const target = new URL(origin);
+  return new Promise((resolve, reject) => {
+    const request = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: requestPath,
+      method: 'GET',
+      headers,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.once('end', () => resolve({
+        statusCode: response.statusCode ?? 0,
+        headers: response.headers,
+        body: Buffer.concat(chunks).toString('utf8'),
+      }));
+    });
+    request.once('error', reject);
+    request.end();
+  });
 }

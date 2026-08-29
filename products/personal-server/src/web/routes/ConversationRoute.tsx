@@ -1,8 +1,14 @@
-import { useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PersonalServerAppController } from '../app/PersonalServerAppController';
-import { LegacyRouteMount } from './LegacyRouteMount';
 
 export function ConversationRoute({ controller }: { readonly controller: PersonalServerAppController }): JSX.Element {
-  const mount = useCallback((root: HTMLElement) => controller.mountConversation(root), [controller]);
-  return <LegacyRouteMount className="conversation-view" dataRole="view-conversation" mount={mount} />;
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    return controller.mountConversation(root);
+  }, [controller]);
+
+  return <section ref={rootRef} className="route-view conversation-view" data-role="view-conversation" />;
 }

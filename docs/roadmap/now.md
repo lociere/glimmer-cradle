@@ -14,7 +14,7 @@
 
 M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单](./manifests/M12-目标物理清单.md) 与 [M13 清单](./manifests/M13-目标物理清单.md)。2026-08-25 起，当前活跃面切换为 M11 Personal Server 前端；架构、AI 辅助开发闭环和视觉方向已经确认，首个 React Shell/Router slice 已实施并进入验证/审查门。
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 保持 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认；首个 slice 已建立单一 React root、BrowserRouter、Product Shell、五个正式 URL、深浅主题、窄屏壳层、Storybook 组件入口与 Playwright 基线，并删除旧 Shell/Router/启动 owner。既有 feature 当前由 route-local adapter 保留，下一步是在固定 candidate 审查通过后按垂直 slice React 化并逐个删除 adapter。M11 其他未完成范围仍保持原状态。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 保持 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认；首个 slice 已建立单一 React root、BrowserRouter、Product Shell、五个正式 URL、深浅主题、窄屏壳层、Storybook 组件入口与 Playwright 基线，并删除旧 Shell/Router/启动 owner。既有 feature 当前由五个 feature route 各自拥有的 adapter 保留，不存在共享兼容桥；下一步是在 fixed candidate 审查通过后按垂直 slice React 化并逐个删除 adapter。M11 其他未完成范围仍保持原状态。
 
 `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
 

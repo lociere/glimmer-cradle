@@ -47,6 +47,8 @@ export class PersonalServerAppController {
   private running = false;
   private generation = 0;
   private readinessTimer: ReturnType<typeof setTimeout> | null = null;
+  private authenticatedAbort: AbortController | null = null;
+  private logoutRequest: Promise<void> | null = null;
   private surface: PersonalServerSurface | null = null;
   private conversationView: ConversationView | null = null;
   private extensionView: ExtensionView | null = null;
@@ -79,8 +81,13 @@ export class PersonalServerAppController {
   public async login(token: string): Promise<void> {
     if (this.snapshot.loginPending) return;
     this.patch({ loginPending: true, loginMessage: '' });
+    const pendingLogout = this.logoutRequest;
+    if (pendingLogout) await pendingLogout;
+    if (!this.running) return;
+    const generation = ++this.generation;
     try {
       const response = await this.client.login(token);
+      if (!this.isCurrent(generation) || this.snapshot.session !== 'anonymous') return;
       if (!response.ok) {
         this.patch({
           loginPending: false,
@@ -89,19 +96,24 @@ export class PersonalServerAppController {
         return;
       }
       this.patch({ session: 'authenticated', loginPending: false, loginMessage: '' });
-      await this.startAuthenticated(this.generation);
+      await this.startAuthenticated(generation);
     } catch {
-      this.patch({ loginPending: false, loginMessage: '无法连接 Personal Server，请确认服务仍在运行。' });
+      if (this.isCurrent(generation)) {
+        this.patch({ loginPending: false, loginMessage: '无法连接 Personal Server，请确认服务仍在运行。' });
+      }
     }
   }
 
   public async logout(): Promise<void> {
-    try {
-      await this.client.logout();
-    } finally {
-      this.teardownAuthenticated();
-      this.patch({ ...initialSnapshot, session: 'anonymous' });
-    }
+    if (this.logoutRequest) return this.logoutRequest;
+    this.transitionToAnonymous('');
+    const request = this.client.logout()
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.logoutRequest === request) this.logoutRequest = null;
+      });
+    this.logoutRequest = request;
+    await request;
   }
 
   public mountConversation(root: HTMLElement): () => void {
@@ -205,67 +217,93 @@ export class PersonalServerAppController {
   }
 
   private async startAuthenticated(generation: number): Promise<void> {
-    await Promise.all([this.refreshProduct(generation), this.refreshStatus(generation)]);
-    if (this.isCurrent(generation) && this.snapshot.session === 'authenticated') this.connectSurface(generation);
-  }
-
-  private async refreshProduct(generation: number): Promise<void> {
-    try {
-      const product = await this.client.getProduct();
-      if (this.isCurrent(generation)) this.patch({ productName: product.display_name || 'Personal Server' });
-    } catch {
-      if (this.isCurrent(generation)) this.patch({ productName: 'Personal Server' });
+    if (!this.isAuthenticatedGeneration(generation)) return;
+    this.authenticatedAbort?.abort();
+    const abortController = new AbortController();
+    this.authenticatedAbort = abortController;
+    await Promise.all([
+      this.refreshProduct(generation, abortController.signal),
+      this.refreshStatus(generation, abortController.signal),
+    ]);
+    if (this.authenticatedAbort === abortController && this.isAuthenticatedGeneration(generation)) {
+      this.connectSurface(generation);
     }
   }
 
-  private async refreshStatus(generation: number): Promise<void> {
+  private async refreshProduct(generation: number, signal: AbortSignal): Promise<void> {
     try {
-      const status = await this.client.getStatus();
-      if (!this.isCurrent(generation)) return;
+      const product = await this.client.getProduct(signal);
+      if (!signal.aborted && this.isAuthenticatedGeneration(generation)) {
+        this.patch({ productName: product.display_name || 'Personal Server' });
+      }
+    } catch {
+      if (!signal.aborted && this.isAuthenticatedGeneration(generation)) {
+        this.patch({ productName: 'Personal Server' });
+      }
+    }
+  }
+
+  private async refreshStatus(generation: number, signal: AbortSignal): Promise<void> {
+    try {
+      const status = await this.client.getStatus(signal);
+      if (signal.aborted || !this.isAuthenticatedGeneration(generation)) return;
       this.patch({ status });
       this.renderStatus();
       if (status.ready && (!this.surface || this.surface.readyState === WebSocket.CLOSED)) {
         this.connectSurface(generation);
       }
-      this.scheduleStatusRefresh(generation, status.ready ? 5000 : 1500);
+      this.scheduleStatusRefresh(generation, signal, status.ready ? 5000 : 1500);
     } catch (error) {
-      if (!this.isCurrent(generation)) return;
+      if (signal.aborted || !this.isAuthenticatedGeneration(generation)) return;
       if (error instanceof Error && error.message === 'unauthorized') {
-        this.teardownAuthenticated();
-        this.patch({ ...initialSnapshot, session: 'anonymous', loginMessage: '会话已失效，请重新连接。' });
+        this.transitionToAnonymous('会话已失效，请重新连接。');
         return;
       }
-      this.scheduleStatusRefresh(generation, 1500);
+      this.scheduleStatusRefresh(generation, signal, 1500);
     }
   }
 
-  private scheduleStatusRefresh(generation: number, delayMs: number): void {
+  private scheduleStatusRefresh(generation: number, signal: AbortSignal, delayMs: number): void {
+    if (signal.aborted || !this.isAuthenticatedGeneration(generation)) return;
     this.clearReadinessTimer();
-    this.readinessTimer = setTimeout(() => void this.refreshStatus(generation), delayMs);
+    const timer = setTimeout(() => {
+      if (this.readinessTimer === timer) this.readinessTimer = null;
+      if (!signal.aborted && this.isAuthenticatedGeneration(generation)) {
+        void this.refreshStatus(generation, signal);
+      }
+    }, delayMs);
+    this.readinessTimer = timer;
   }
 
   private connectSurface(generation: number): void {
-    if (!this.isCurrent(generation)) return;
+    if (!this.isAuthenticatedGeneration(generation)) return;
     if (this.surface?.readyState === WebSocket.OPEN || this.surface?.readyState === WebSocket.CONNECTING) return;
     this.patch({ connection: 'connecting' });
-    this.surface = this.client.connectSurface({
+    let surface!: PersonalServerSurface;
+    surface = this.client.connectSurface({
       onOpen: async () => {
-        if (!this.isCurrent(generation)) return;
+        if (!this.isActiveSurface(surface, generation)) return;
         this.patch({ connection: 'online' });
         await this.conversationView?.handleSurfaceOpen();
+        if (!this.isActiveSurface(surface, generation)) return;
         await this.extensionView?.handleSurfaceOpen();
+        if (!this.isActiveSurface(surface, generation)) return;
         if (this.configurationView) void this.loadConfiguration(this.configurationView);
       },
-      onFrame: (frame) => this.handleSurfaceFrame(frame),
+      onFrame: (frame) => {
+        if (this.isActiveSurface(surface, generation)) this.handleSurfaceFrame(frame);
+      },
       onClose: () => {
-        if (!this.isCurrent(generation)) return;
+        if (!this.isActiveSurface(surface, generation)) return;
         this.conversationView?.handleSurfaceClose();
         this.extensionView?.handleSurfaceClose();
         this.surface = null;
         this.patch({ connection: 'waiting' });
-        this.scheduleStatusRefresh(generation, 1000);
+        const signal = this.authenticatedAbort?.signal;
+        if (signal) this.scheduleStatusRefresh(generation, signal, 1000);
       },
     });
+    this.surface = surface;
   }
 
   private handleSurfaceFrame(frame: SurfaceFrame): void {
@@ -317,8 +355,11 @@ export class PersonalServerAppController {
 
   private teardownAuthenticated(): void {
     this.clearReadinessTimer();
-    this.surface?.close();
+    this.authenticatedAbort?.abort();
+    this.authenticatedAbort = null;
+    const surface = this.surface;
     this.surface = null;
+    surface?.close();
     this.conversationView?.handleSurfaceClose();
     this.extensionView?.handleSurfaceClose();
     this.observabilityView?.stop();
@@ -332,6 +373,20 @@ export class PersonalServerAppController {
 
   private isCurrent(generation: number): boolean {
     return this.running && this.generation === generation;
+  }
+
+  private isAuthenticatedGeneration(generation: number): boolean {
+    return this.isCurrent(generation) && this.snapshot.session === 'authenticated';
+  }
+
+  private isActiveSurface(surface: PersonalServerSurface, generation: number): boolean {
+    return this.isAuthenticatedGeneration(generation) && this.surface === surface;
+  }
+
+  private transitionToAnonymous(message: string): void {
+    this.generation += 1;
+    this.teardownAuthenticated();
+    this.patch({ ...initialSnapshot, session: 'anonymous', loginMessage: message });
   }
 
   private patch(patch: Partial<PersonalServerAppSnapshot>): void {
