@@ -1,17 +1,88 @@
-:root {
+:root,
+:root[data-theme='dark'] {
   color-scheme: dark;
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-  --base: #1f2022;
-  --base-soft: #232427;
-  --surface: #151617;
-  --surface-raised: #191a1c;
-  --line: rgba(255, 255, 255, 0.075);
-  --text: #f1f1f0;
-  --muted: #95989f;
-  --accent: #83aef2;
-  --accent-soft: rgba(91, 143, 225, 0.18);
-  --ready: #66c990;
-  --warn: #e5aa62;
-  --danger: #df7272;
-  --radius: 16px;
+  font-family: Inter, "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+  --canvas: #151617;
+  --surface-workspace: #1a1b1d;
+  --surface-navigation: #18191b;
+  --surface-raised: #222427;
+  --surface-overlay: #242629;
+  --surface-hover: rgba(255, 255, 255, 0.055);
+  --surface-selected: rgba(0, 170, 188, 0.105);
+  --divider-subtle: rgba(255, 255, 255, 0.075);
+  --text-primary: #f2f2ef;
+  --text-secondary: #c6c8c8;
+  --text-tertiary: #94989a;
+  --accent-core: #00aabc;
+  --accent-hover: #00bfc5;
+  --accent-text: #6ae2d4;
+  --focus-ring: #6ae2d4;
+  --status-success-text: #72d4a0;
+  --status-warning-text: #e7b86d;
+  --status-danger-text: #ef8b8b;
+  --scrim: rgba(5, 6, 7, 0.7);
+  --shadow-inner-glint: inset 0 1px 0 rgba(106, 226, 212, 0.08);
+  --shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.42);
+  --sidebar-width: 15.5rem;
+  --topbar-height: 4.5rem;
+  --page-gutter: clamp(1.25rem, 3vw, 3rem);
+  --reading-width: 72rem;
+  --font-size-caption: 0.75rem;
+  --font-size-label: 0.8125rem;
+  --font-size-body: 0.9375rem;
+  --font-size-title: 1.125rem;
+  --font-size-display: clamp(1.75rem, 3vw, 2.5rem);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-control: 0.625rem;
+  --radius-surface: 0.875rem;
+  --radius-structure: 1.125rem;
+  --control-height-compact: 2.5rem;
+  --control-height-comfortable: 3.5rem;
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+
+  /* Route-local legacy features consume these aliases until their React slice replaces them. */
+  --base: var(--canvas);
+  --base-soft: var(--surface-navigation);
+  --surface: var(--surface-workspace);
+  --line: var(--divider-subtle);
+  --text: var(--text-primary);
+  --muted: var(--text-tertiary);
+  --accent: var(--accent-text);
+  --accent-soft: var(--surface-selected);
+  --ready: var(--status-success-text);
+  --warn: var(--status-warning-text);
+  --danger: var(--status-danger-text);
+  --radius: var(--radius-structure);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --canvas: #f1f2f1;
+  --surface-workspace: #fafaf8;
+  --surface-navigation: #f6f6f3;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-hover: rgba(18, 22, 23, 0.05);
+  --surface-selected: rgba(0, 104, 127, 0.09);
+  --divider-subtle: rgba(18, 22, 23, 0.105);
+  --text-primary: #202325;
+  --text-secondary: #4d5355;
+  --text-tertiary: #5f6668;
+  --accent-core: #00687f;
+  --accent-hover: #00556a;
+  --accent-text: #00687f;
+  --focus-ring: #00687f;
+  --status-success-text: #197248;
+  --status-warning-text: #8a5a12;
+  --status-danger-text: #a6353b;
+  --scrim: rgba(20, 23, 24, 0.4);
+  --shadow-inner-glint: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --shadow-overlay: 0 24px 64px rgba(39, 43, 44, 0.18);
 }

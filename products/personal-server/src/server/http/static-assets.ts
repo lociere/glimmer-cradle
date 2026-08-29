@@ -29,16 +29,40 @@ export async function serveBuiltWebAsset(
   }
   try {
     const body = await readFile(assetPath);
-    applySecurityHeaders(response);
-    response.writeHead(200, {
-      'content-type': CONTENT_TYPES.get(path.extname(assetPath)) || 'application/octet-stream',
-      'cache-control': pathname === '/' || pathname === '/index.html' ? 'no-store' : 'public, max-age=3600',
-    });
-    response.end(body);
+    sendAsset(response, body, assetPath, pathname === '/' || pathname === '/index.html');
     return true;
   } catch {
-    return false;
+    if (!isBrowserNavigationPath(pathname)) return false;
+    try {
+      const indexPath = path.join(publicRoot, 'index.html');
+      const body = await readFile(indexPath);
+      sendAsset(response, body, indexPath, true);
+      return true;
+    } catch {
+      return false;
+    }
   }
+}
+
+function sendAsset(
+  response: ServerResponse,
+  body: Buffer,
+  assetPath: string,
+  noStore: boolean,
+): void {
+  applySecurityHeaders(response);
+  response.writeHead(200, {
+    'content-type': CONTENT_TYPES.get(path.extname(assetPath)) || 'application/octet-stream',
+    'cache-control': noStore ? 'no-store' : 'public, max-age=3600',
+  });
+  response.end(body);
+}
+
+function isBrowserNavigationPath(pathname: string): boolean {
+  if (!pathname.startsWith('/') || path.extname(pathname)) return false;
+  return !pathname.startsWith('/api/')
+    && pathname !== '/healthz'
+    && pathname !== '/readyz';
 }
 
 function resolveSafeAssetPath(pathname: string, publicRoot: string): string | null {

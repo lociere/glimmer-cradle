@@ -1,0 +1,29 @@
+.badge {
+  display: inline-flex;
+  min-height: var(--control-height-compact);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-label);
+  font-weight: 620;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.ready {
+  color: var(--status-success-text);
+}
+
+.connecting {
+  color: var(--accent-text);
+}
+
+.degraded {
+  color: var(--status-warning-text);
+}

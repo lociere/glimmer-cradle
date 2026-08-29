@@ -37,7 +37,7 @@ products/personal-server/
   public/
 ```
 
-当前 `src/web/` 仍是原生 TypeScript/Vite 命令式 DOM 实现；[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 已接受第一方产品 UI 统一使用 React，并在 M11 将 Personal Server 浏览器侧迁为 React + Vite、React Router、React Aria Components、CSS Modules，增加产品内 Storybook 工作台。本段区分 Current 与 Accepted Target：精确目标文件和删除门见 [M11 目标物理清单](../roadmap/manifests/M11-目标物理清单.md)，不得把已接受但尚未实施的目标目录写成当前事实。
+当前 `src/web/main.tsx` 只创建一个 React root，`app/bootstrap.tsx` 隔离认证层与已登录应用，`app/router.tsx` 是唯一 route table；React Router 独占 `/conversation`、`/overview`、`/capabilities`、`/activity`、`/settings`、根路径重定向和 unknown route 的 URL/history/deep-link 语义。`shell/PersonalServerShell.tsx` 只提供一层全局导航和当前 route 的 `Outlet`，旧 `main.ts`、命令式 `bootstrap.ts`、内存 `app/router.ts` 与 `shell/layout.ts` 已删除。Product Host 对非 API 的 extensionless 导航请求回退 no-store `index.html`，静态资源与 API 缺失仍保持 404。精确后续目标和删除门见 [M11 目标物理清单](../roadmap/manifests/M11-目标物理清单.md)。
 
 约束如下：
 
@@ -47,6 +47,7 @@ products/personal-server/
 - `shared/api/` 是唯一 HTTP/WebSocket client 与跨边界 decode 入口；Web 不手写第二套 payload 类型。浏览器 WebSocket 只属于 Personal Server 外部认证 ingress，Kernel consumer 由 `src/server/` 的 Surface Gateway client 持有。
 - `shared/styles/` 只放 token、global、motion、responsive 等共享样式；feature 局部样式与视图同 owner，不回流成单个全局 `app.css`。
 - `public/` 不再承载业务 `app.js`、`app.css` 或单体页面逻辑；新构建接管后，旧三文件入口必须删除，且通过架构门禁阻止回流。
+- 尚未 React 化的既有 feature 只能由当前 route 的 adapter 挂载，并在离开 route 时注销 listener、stream、timer 与 view；当该 feature 的 React component/hook slice 通过同场景 Playwright 后，adapter 与对应命令式 DOM owner 必须在同一 slice 删除，不建立通用兼容桥。
 
 当前 `v0.1.x` 浏览器应用已经由 `src/web/` 构建入口接管，并提供受认证登录、系统状态、真实结构化日志、零 Provider 可登录降级，以及通过 Control Surface 协议读取/分页恢复 Conversation 历史的正式对话页。对话 feature 只把浏览器内存作为瞬时 view model，不再把 `localStorage` 或页面缓存当作历史事实源；真实历史、游标和恢复状态统一由 Kernel -> Cognition Conversation 投影 owner 提供。设置中心只消费脱敏 `ConfigurationSnapshot`，API key 保持 write-only，并把测试连接、revision 冲突检查和 apply 状态交给 Kernel Config Application Port。M11 现已按 `providers/`、`model-routing/`、`audio/`、`memory/`、`storage/`、`updates/`、`security/` 分出 section owner；安全页已接 Product Host owned 的访问令牌 store，支持受管令牌创建、轮换、撤销与一次性明文返回，环境变量 legacy token 和回环免令牌模式会明确标记为 degraded 来源。备份/恢复、更新与服务控制只通过受认证 Ops Bridge 交给宿主 one-shot transaction owner，不回退到 Product Host 或本地 CLI。Web 在提交前生成 operation ID，Product、Bridge、host owner、audit 和重连续查都使用同一 ID；当前未绑定固定候选的 update check/apply 明确 unsupported。源码直跑或未接宿主桥时，设置页展示真实 disabled reason。Extension 页已覆盖仓库 Release、Registry、Release Manifest 与浏览器本地 `.gcex` 四类来源：浏览器上传只会换取同会话、30 分钟时效、单事务消费的 opaque `upload_id`，Host 在 prepare 时解析为受控临时文件并在 preview 失败、取消、断线或超时后清理；commit/cancel 对所有 transaction_id 都要求属于当前 principal/session，Host 断线会先向 Kernel cancel 本连接已预览未提交事务，Kernel Package Manager 启动与定时 sweep 仍会清理 stale transaction 目录。Audio、Memory、Embedding、Skill 的可写 owner 与完整运维桥仍在 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 的后续验收门内继续收口。
 

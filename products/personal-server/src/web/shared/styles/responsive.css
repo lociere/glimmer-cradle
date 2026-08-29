@@ -1,0 +1,43 @@
+@media (max-width: 760px) {
+  .route-view {
+    min-height: calc(100dvh - var(--topbar-height));
+    padding-inline: var(--space-4);
+  }
+
+  .workspace-head {
+    min-height: 5.5rem;
+    align-items: flex-start;
+    padding-block: var(--space-5);
+  }
+
+  .workspace-head h1,
+  .workspace-head h2 {
+    font-size: 1.75rem;
+  }
+
+  .status-card-grid,
+  .status-runtime-row,
+  .providers-layout,
+  .extension-layout,
+  .observability-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .status-runtime-side {
+    text-align: left;
+  }
+}
+
+@media (max-width: 520px) {
+  .workspace-head {
+    flex-direction: column;
+  }
+
+  .workspace-head > :last-child {
+    align-self: stretch;
+  }
+
+  .message article {
+    max-width: 92%;
+  }
+}

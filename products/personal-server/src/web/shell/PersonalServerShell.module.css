@@ -1,0 +1,232 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  background: var(--canvas);
+  color: var(--text-primary);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6) var(--space-4);
+  background: var(--surface-navigation);
+  border-right: 1px solid var(--divider-subtle);
+}
+
+.identity {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-6);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-label);
+}
+
+.wordmark {
+  color: var(--text-primary);
+  font-size: var(--font-size-title);
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+
+.navigation {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.navLink {
+  min-height: var(--control-height-comfortable);
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.navLink span {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.navLink strong {
+  color: inherit;
+  font-size: var(--font-size-body);
+}
+
+.navLink small {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.navLink:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.activeNavLink {
+  background: var(--surface-selected);
+  color: var(--accent-text);
+  box-shadow: inset 2px 0 0 var(--accent-core), var(--shadow-inner-glint);
+}
+
+.sidebarFooter {
+  margin-top: auto;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-2) 0;
+  border-top: 1px solid var(--divider-subtle);
+}
+
+.logoutButton,
+.iconButton,
+.mobileMenuButton {
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.logoutButton {
+  min-height: var(--control-height-compact);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  font: inherit;
+}
+
+.mainColumn {
+  min-width: 0;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: 0 var(--page-gutter);
+  background: color-mix(in srgb, var(--surface-workspace) 90%, transparent);
+  border-bottom: 1px solid var(--divider-subtle);
+  backdrop-filter: blur(18px) saturate(115%);
+}
+
+.location,
+.mobileIdentity div,
+.mobileDialogHead div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.location span,
+.mobileIdentity span,
+.mobileDialogHead span {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-caption);
+}
+
+.location strong,
+.mobileIdentity strong {
+  font-size: var(--font-size-body);
+  font-weight: 620;
+}
+
+.globalActions,
+.mobileIdentity,
+.mobileDialogHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.iconButton,
+.mobileMenuButton {
+  width: var(--control-height-compact);
+  height: var(--control-height-compact);
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-control);
+}
+
+.iconButton:hover,
+.mobileMenuButton:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.workspace {
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-workspace);
+}
+
+.mobileIdentity,
+.mobileMenuButton,
+.modalOverlay {
+  display: none;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  align-items: stretch;
+  background: var(--scrim);
+}
+
+.mobileModal {
+  width: min(22rem, calc(100vw - var(--space-8)));
+  height: 100%;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-overlay);
+}
+
+.mobileDialog {
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+  padding: var(--space-5);
+  outline: none;
+}
+
+.mobileDialogHead {
+  justify-content: space-between;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar,
+  .location {
+    display: none;
+  }
+
+  .mobileIdentity,
+  .mobileMenuButton {
+    display: flex;
+  }
+
+  .modalOverlay[data-entering],
+  .modalOverlay[data-exiting],
+  .modalOverlay {
+    display: flex;
+  }
+
+  .topbar {
+    padding-inline: var(--space-4);
+  }
+}

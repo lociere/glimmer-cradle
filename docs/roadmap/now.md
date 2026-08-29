@@ -1,20 +1,20 @@
 # Now
 
-> 审阅日期：2026-08-25
+> 审阅日期：2026-08-29
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进面：M11 Personal Server 前端实现准备
+## 当前推进面：M11 Personal Server 前端实现与审查
 
 [M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已完成：旧 `protocol/` 物理删除，独立 Document 进入 `contracts/json-schema/` compatibility baseline，Service/DTO consumer 使用 Contract Spine edge；Surface Gateway 使用有限 typed Query/Command/Event DTO，Kernel 与产品 Adapter 映射 owner-local request/projection，公开 Extension SDK 只保留扩展作者与 Host Port API。第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。
 
 [M13：工程自动化脊柱与交付生命周期闭环](./milestones/M13-工程自动化脊柱与交付生命周期闭环.md) 已完成 A～F 与最终仓库工具收口：部署事务、数据恢复、task graph/CI、owner-local tooling、Personal Server 供应链与 Desktop packaging 均已落到 [M13 完成态物理目录](./manifests/M13-目标物理清单.md)；长期跨仓工具位于 `tools/repo-checks/` 与 `tools/workspace-supervisor/`，root `package.json` 只保留稳定 façade，root `scripts/` 已删除。未绑定固定版本/制品的 update check/apply 继续 unsupported/fail-closed；Kernel DLQ 使用 owner-local EventBus replay 与绑定 receipt，legacy Cognition source 仍不支持 replay。
 
-M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单](./manifests/M12-目标物理清单.md) 与 [M13 清单](./manifests/M13-目标物理清单.md)。2026-08-25 起，当前活跃面切换为 M11 Personal Server 前端；架构、AI 辅助开发闭环和视觉方向已经确认，React 迁移与生产 UI 实现尚未开始。
+M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单](./manifests/M12-目标物理清单.md) 与 [M13 清单](./manifests/M13-目标物理清单.md)。2026-08-25 起，当前活跃面切换为 M11 Personal Server 前端；架构、AI 辅助开发闭环和视觉方向已经确认，首个 React Shell/Router slice 已实施并进入验证/审查门。
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 已恢复 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认；Personal Server 运行时尚未迁移，下一步是在独立授权下启动首个 Shell/Router 实现 slice。M11 其他未完成范围仍保持原状态。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 保持 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认；首个 slice 已建立单一 React root、BrowserRouter、Product Shell、五个正式 URL、深浅主题、窄屏壳层、Storybook 组件入口与 Playwright 基线，并删除旧 Shell/Router/启动 owner。既有 feature 当前由 route-local adapter 保留，下一步是在固定 candidate 审查通过后按垂直 slice React 化并逐个删除 adapter。M11 其他未完成范围仍保持原状态。
 
 `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
 
@@ -24,7 +24,7 @@ M11 仍未完成的范围：
 
 - 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
 - 为 Personal Server 提供零 Provider 可登录的正式控制面，以及 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新能力；
-- 收口 Personal Server 当前 UI 的路由正确性、信息架构、视觉系统、响应式、可访问性和截图验收；
+- 完成 Personal Server 既有 feature 的 React component/hook 迁移、状态矩阵与按 slice adapter 删除门；
 - 让 Extension 安装、启停、升级、权限与产品兼容性通过同一 Package Manager 闭环；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
@@ -41,11 +41,11 @@ M12/M13 当前没有未闭合的代码集成门。真实 Docker/Ubuntu、Windows
 
 ### Personal Server UI 优化门
 
-本门当前只完成问题与规范记录，UI 优化尚未实现：
+本门的首个 Shell/Router slice 已实施；以下门中 1～7 的首批范围已有代码与验证证据，完整 M11 仍需继续收口：
 
-1. ADR-0017 已接受 React + Vite + React Router + React Aria + CSS Modules + Storybook/Playwright 分层，框架决策门已关闭；依赖版本只在实施 slice 固定。
-2. M11 最终视觉方向已确认；下一步按 [M11 目标物理清单](./manifests/M11-目标物理清单.md) 迁 Shell/Router、shared UI 与垂直页面 slice，每个 slice 删除对应旧 DOM owner，不保留双 Shell/双 Router。
-3. 修正页面唯一可见、登录层隔离、URL/history/deep-link、back/forward 和复杂页面挂载语义，并补齐“非当前页面隐藏”断言。
+1. ADR-0017 已接受 React + Vite + React Router + React Aria + CSS Modules + Storybook/Playwright 分层；首个 slice 已固定直接依赖版本，后续升级仍按直接 consumer 与验证选择。
+2. M11 最终视觉方向已确认；Shell/Router 与首批 shared UI 已落地，后续按 [M11 目标物理清单](./manifests/M11-目标物理清单.md) 迁垂直 feature slice，每个 slice 删除对应旧 DOM owner，不保留双主线。
+3. 页面唯一挂载、登录层隔离、URL/history/deep-link、back/forward、refresh、unknown route 与 route cleanup 已进入真实 Product Host Playwright；后续 feature slice 必须保持这些门。
 4. 信息架构收敛为单层全局导航；页面内只在真实子域存在时显示二级导航。Context Inspector 改为选中对象后按需出现的 Context Drawer。
 5. 对话、概览、能力、活动、设置形成清晰一级域；设置拆为模型与路由、语音、记忆、安全、存储、更新等真实子页面；runtime、日志、Extension、Provider 使用列表/主体 + 按需详情。
 6. 在首个实现 slice 中把已确认方向固化为语义 token 与组件语言，并为最终方向补齐代表页面、深浅主题和关键状态矩阵。

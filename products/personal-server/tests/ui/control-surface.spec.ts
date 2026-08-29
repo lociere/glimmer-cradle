@@ -7,17 +7,17 @@ test('supports zero-provider login, history restore and degraded conversation no
   try {
     await login(page, fixture.baseUrl);
 
-    await expect(page.locator('.rail [data-route]')).toHaveCount(5);
+    await expect(page.locator('[aria-label="全局导航"] [data-route]')).toHaveCount(5);
     await expect(page.locator('[data-role="message-list"]')).toContainText('这是从服务端恢复的历史。');
 
     await page.locator('[data-role="message-input"]').fill('现在能聊天吗？');
     await page.locator('[data-role="send-button"]').click();
     await expect(page.locator('[data-role="conversation-banner"]')).toContainText('当前历史已完整恢复');
-    await expect(page.locator('[data-role="message-list"]')).toContainText('尚未配置可用模型');
+    await expect(page.locator('[data-role="message-list"]')).toContainText('没有可用模型');
 
-    await page.locator('[data-route="status"]').first().click();
+    await navigate(page, 'overview');
     await expect(page.locator('.status-card').filter({ hasText: '服务状态' })).toContainText('ready');
-    await page.locator('[data-route="logs"]').first().click();
+    await navigate(page, 'activity');
     await expect(page.locator('.observability-toolbar')).toBeVisible();
   } finally {
     await fixture.stop();
@@ -28,7 +28,7 @@ test('saves provider configuration without echoing api key and enables real repl
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="settings"]').first().click();
+    await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
     await page.locator('[data-action="add-provider"]').click();
     await page.locator('[data-field="provider-key"]').fill('primary');
@@ -45,7 +45,7 @@ test('saves provider configuration without echoing api key and enables real repl
     await expect(page.locator('[data-field="provider-api-key"]')).toHaveValue('');
     await expect(page.locator('[data-field="provider-api-key"]')).toHaveAttribute('placeholder', /已写入/);
 
-    await page.locator('[data-route="conversation"]').first().click();
+    await navigate(page, 'conversation');
     await page.locator('[data-role="message-input"]').fill('请回复一条测试消息');
     await page.locator('[data-role="send-button"]').click();
     await expect(page.locator('[data-role="message-list"]')).toContainText('这是测试回复。');
@@ -58,7 +58,7 @@ test('filters structured logs by module', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="logs"]').first().click();
+    await navigate(page, 'activity');
     await page.locator('[data-field="module"]').fill('config-owner');
     await page.locator('[data-action="apply"]').click();
     await expect(page.locator('.observability-log-list')).toContainText('config-owner');
@@ -72,8 +72,8 @@ test('installs a new extension version, upgrades activation, then rolls back', a
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="extensions"]').first().click();
-    const extensionView = page.locator('[data-role="view-extensions"]');
+    await navigate(page, 'capabilities');
+    const extensionView = page.locator('[data-role="view-capabilities"]');
     const card = extensionView.locator('[data-role="extension-card"][data-extension-id="community.echo"]');
 
     await expect(card).toContainText('激活版本：1.0.0');
@@ -107,8 +107,8 @@ test('uploads a local .gcex package and runs it through the same install transac
     writeFileSync(packagePath, new Uint8Array([0x50, 0x4b, 0x03, 0x04]));
 
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="extensions"]').first().click();
-    const extensionView = page.locator('[data-role="view-extensions"]');
+    await navigate(page, 'capabilities');
+    const extensionView = page.locator('[data-role="view-capabilities"]');
     await extensionView.locator('[data-field="source-kind"]').selectOption('file');
     await extensionView.locator('[data-field="local-package"]').setInputFiles(packagePath);
 
@@ -127,7 +127,7 @@ test('creates a managed access token without re-echoing stored secrets', async (
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="settings"]').first().click();
+    await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
     await settingsView.locator('[data-field="access-token-label"]').fill('Ops laptop');
     await settingsView.locator('[data-action="create-token"]').click();
@@ -144,9 +144,9 @@ test('shows real disabled reason for deployment operations when no host bridge i
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="settings"]').first().click();
+    await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
-    await expect(settingsView).toContainText('当前 Product Host 未配置部署级 glimmer-cradle 运维桥');
+    await expect(settingsView).toContainText('当前 Product Host 未连接部署级外部事务 owner');
     await expect(settingsView.locator('[data-action="create-backup"]')).toBeDisabled();
     await expect(settingsView.locator('[data-action="apply-updates"]')).toBeDisabled();
   } finally {
@@ -158,7 +158,7 @@ test('projects skill catalog runtime and refreshes it after skill config save', 
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="settings"]').first().click();
+    await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
     const skillsSection = page.locator('[data-role="skills-section"]');
 
@@ -183,7 +183,7 @@ test('saves audio, embedding and memory settings without falling back to yaml ed
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
     await login(page, fixture.baseUrl);
-    await page.locator('[data-route="settings"]').first().click();
+    await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
     await expect(settingsView).toBeVisible();
     await expect(settingsView.locator('[data-action="save"]')).toBeVisible({ timeout: 15000 });
@@ -232,16 +232,15 @@ test('keeps both shell connection indicators in sync and restores them after rec
     await expect(connectionLabels.nth(0)).toHaveText('在线');
     await expect(connectionLabels.nth(1)).toHaveText('在线');
 
-    await page.locator('[data-route="logs"]').first().click();
-    await expect(page.locator('.rail [data-route="logs"]').first()).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('.section-pane [data-route="logs"]').first()).toHaveAttribute('aria-current', 'page');
+    await navigate(page, 'activity');
+    await expect(page.locator('[aria-label="全局导航"] [data-route="activity"]').first()).toHaveAttribute('aria-current', 'page');
 
     await fixture.disconnectSurfaceClients();
     // Surface Gateway may complete a gRPC reconnect before a browser paint; assert the stable contract.
     await expect(connectionLabels.nth(0)).toHaveText('在线', { timeout: 8000 });
     await expect(connectionLabels.nth(1)).toHaveText('在线', { timeout: 8000 });
-    await page.locator('[data-route="settings"]').first().click();
-    await expect(page.locator('.section-pane [data-route="settings"]').first()).toHaveAttribute('aria-current', 'page');
+    await navigate(page, 'settings');
+    await expect(page.locator('[aria-label="全局导航"] [data-route="settings"]').first()).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('.settings-section').first()).toBeVisible();
   } finally {
     await fixture.stop();
@@ -253,4 +252,15 @@ async function login(page: import('@playwright/test').Page, baseUrl: string): Pr
   await page.locator('#access-token').fill('server-secret');
   await page.locator('[data-role="login-form"] button[type="submit"]').click();
   await expect(page.locator('[data-role="app-shell"]')).toBeVisible();
+}
+
+async function navigate(page: import('@playwright/test').Page, route: string): Promise<void> {
+  const desktopLink = page.locator(`[aria-label="全局导航"] [data-route="${route}"]`).first();
+  if (await desktopLink.isVisible()) {
+    await desktopLink.click();
+  } else {
+    await page.getByRole('button', { name: '打开全局导航' }).click();
+    await page.getByRole('dialog', { name: '全局导航' }).locator(`[data-route="${route}"]`).click();
+  }
+  await expect(page).toHaveURL(new RegExp(`/${route}$`));
 }

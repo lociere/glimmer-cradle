@@ -49,10 +49,41 @@ test('Personal Server 产品组合不投影 Desktop 本机能力', () => {
 
 test('Personal Server web composition 入口不重新膨胀为 owner 混合单体', () => {
   const limits = [
-    ['src/web/app/bootstrap.ts', 12000],
+    ['src/web/app/bootstrap.tsx', 6500],
+    ['src/web/app/PersonalServerAppController.ts', 24000],
     ['src/web/features/configuration/configuration-view.ts', 20000],
   ];
   for (const [relativePath, maxBytes] of limits) {
     assert.ok(fs.statSync(path.join(productRoot, relativePath)).size <= maxBytes, relativePath);
   }
+});
+
+test('Personal Server React Shell 与 Router 保持唯一 owner，旧入口不回流', () => {
+  const removedPaths = [
+    'src/web/main.ts',
+    'src/web/app/bootstrap.ts',
+    'src/web/app/router.ts',
+    'src/web/shell/layout.ts',
+  ];
+  for (const relativePath of removedPaths) {
+    assert.equal(fs.existsSync(path.join(productRoot, relativePath)), false, relativePath);
+  }
+  assert.equal(fs.existsSync(path.join(productRoot, 'src/web/app/router.tsx')), true);
+
+  const webFiles = [...walkFiles(path.join(productRoot, 'src', 'web'))]
+    .filter((filePath) => /\.(?:ts|tsx)$/.test(filePath));
+  const source = webFiles.map((filePath) => fs.readFileSync(filePath, 'utf8')).join('\n');
+  assert.equal((source.match(/createRoot\s*\(/g) ?? []).length, 1);
+  assert.equal((source.match(/<BrowserRouter>/g) ?? []).length, 1);
+  assert.deepEqual(
+    ['/conversation', '/overview', '/capabilities', '/activity', '/settings']
+      .filter((route) => !source.includes(route)),
+    [],
+  );
+
+  const shellAndRoutes = webFiles
+    .filter((filePath) => /[\\/](?:app|shell|routes)[\\/]/.test(filePath))
+    .map((filePath) => fs.readFileSync(filePath, 'utf8'))
+    .join('\n');
+  assert.doesNotMatch(shellAndRoutes, /\.innerHTML\s*=/);
 });

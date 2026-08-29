@@ -26,7 +26,7 @@
 | **目标规范** | 已确认需要建立，但具体值或组件语言仍待视觉探索/实现 | 不能冒充已落地 |
 | **待用户选择的视觉变量** | 重大改造前必须比较并由用户确认的方向 | 用户确认前不得固化 |
 
-2026-08-25，用户已确认 M11 Personal Server 的最终视觉方向：中性深浅主题与“青曜”强调色正交，以连续、安静的工作台结构为主，使用有限晶光层次，并只在运行列表等高扫描场景提高密度。该结论是 M11 的当前设计目标，不表示生产 token 或组件已经落地。
+2026-08-25，用户确认 M11 Personal Server 的最终视觉方向：中性深浅主题与“青曜”强调色正交，以连续、安静的工作台结构为主，使用有限晶光层次，并只在运行列表等高扫描场景提高密度。首个 Shell/Router slice 已将该方向落入当前语义 token、深浅主题、单层壳层和 480×900 响应式基线；后续 feature React 化仍需继续消费同一 token owner，不能把参考图当作像素或生产 token 的第二事实源。
 
 用户确认某一轮方向后，具体 token 才作为“当前目标/当前实现”进入本 Reference；未来仍可通过新的设计决策和完整验收继续演化。
 
@@ -62,14 +62,15 @@ Desktop 的精确 CSS 值仍以当前实现为准。本页不复制完整数值�
 
 Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 
-- `shared/styles/tokens.css` 只有一组深色 canvas/surface/text/accent/semantic color 与单一 radius 变量，尚未形成完整 typography、spacing、layout、control sizing、motion 和 accessibility token 系统。
-- `shell/layout.ts` 当前创建 Titlebar、Activity Rail、Section Pane、Workspace 与常驻 Inspector；Rail 和 Section Pane 重复同一组一级路由。
-- 路由当前是内存状态，没有 URL、history、back/forward 与 deep-link。
-- `.workspace-view` 的通用 `display: grid` 当前会覆盖原生 `hidden`，使非当前页面继续参与布局；登录遮罩下的应用壳也可能被 `.app-shell` 的 `display: grid` 覆盖。
-- 当前固定断点与多列宽度在中间视口压缩主工作区，页面内容宽度、文字层级、圆角、间距和控件高度存在大量局部任意值。
-- 当前测试覆盖多项真实功能交互，但没有断言所有非当前页面隐藏，也没有关键页面截图视觉基线。
+- `shared/styles/tokens.css` 提供中性 canvas/workspace/surface、文字、边界、focus、状态、spacing、radius、control 与 layout 语义变量，并由 `html[data-theme='light']` 覆盖浅色值；青曜不进入 canvas、workspace、主要 surface 或正文层级。
+- `global.css`、`layout.css`、`motion.css` 与 `responsive.css` 分别持有基础语义、壳层容量、reduced-motion 和响应式规则；feature 局部样式不成为第二套主题。
+- `PersonalServerShell.tsx` 在宽屏只显示一层侧栏导航，在窄屏使用可关闭并返回焦点的 React Aria Dialog 导航；当前页面由 React Router `Outlet` 唯一挂载。
+- 登录层不会挂载 Product Shell；深链登录后返回原 URL，根路径、unknown route、refresh 与 back/forward 由浏览器路由测试覆盖。
+- 代表性 `HealthBadge` 以真实组件、CSS Module 和 story 进入 Storybook；Storybook 不模拟 Product Host 事实，也未启用 MCP。
+- 概览深色宽屏、浅色宽屏和深色 480×900 已建立固定 Playwright 视觉基线；动态观测时间在截图前归一，结构、内容与状态不被遮罩。
+- 既有 feature 的全局 CSS 暂时通过 semantic alias 消费当前 token；删除触发器是对应 feature 完成 React component/hook 迁移并通过同场景交互、a11y 与视觉验证，届时 route-local adapter 和旧 DOM/CSS owner 一并删除。
 
-以上是已核对的当前问题，不是目标结构。详细待实现优化与验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
+详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
 
 ### 当前实现的比较方式
 
