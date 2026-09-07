@@ -34,6 +34,8 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。
 
+2026-09-07 后续 Provider 连接测试切片基于已提交的 `75b10f8c` 推进：同一目标可复用已保存密钥，变更目标或清除密钥禁止复用；自定义网关路径、拒绝重定向、超时、响应限额与受控诊断已落实，精确规则见 [Configuration Reference](../reference/configuration.md#provider-连接测试)。12 项配置测试与 9 项 Gateway 测试通过，含真实本地 HTTP 请求及重定向反例；独立审查发现的非法标识审计泄露已修复并复审通过。未使用外部 Provider 或生产凭据验收。Kernel Vitest 配置已转为 `.mts`；全仓三个 Vite/Vitest 配置入口均使用 ESM，Extension SDK/Host 的 14 项测试及两个产品构建未出现 CJS Node API 弃用警告。后续排查规则进入测试与验收指南。
+
 M11 仍未完成的范围：
 
 - 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；

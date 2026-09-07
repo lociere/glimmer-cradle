@@ -116,108 +116,55 @@ export class ConfigApplicationService {
   public async testProvider(request: ConfigurationTestRequest): Promise<ConfigurationTestResult> {
     const startedAt = Date.now();
     const provider = normalizeProviderTestDraft(request.provider);
-    const validationError = validateProviderTestDraft(provider);
-    if (validationError) {
-      return {
-        request_id: request.request_id,
-        status: 'error',
-        message: validationError,
-        discovered_models: [],
-      };
-    }
-    const apiKey = provider.api_key?.trim();
-    if (!apiKey) {
-      return {
-        request_id: request.request_id,
-        status: 'error',
-        message: '尚未填写 API Key，无法测试连接。',
-        discovered_models: [],
-      };
-    }
+    const validKey = /^[a-z0-9][a-z0-9._-]{0,63}$/.test(provider.key);
+    const finish = (status: 'success' | 'error', message: string, models: string[] = []): ConfigurationTestResult => {
+      appendAuditRecord({
+        owner: 'configuration', module: MODULE_NAME, action: 'provider.test',
+        target_kind: 'llm_provider', target_name: validKey ? provider.key : 'invalid-provider',
+        outcome: status === 'success' ? 'succeeded' : 'failed',
+        attributes: { discovered_model_count: models.length },
+      });
+      return { request_id: request.request_id, status, message, discovered_models: models, latency_ms: Date.now() - startedAt };
+    };
+    if (validateProviderTestDraft(provider)) return finish('error', 'Provider 标识或 API 协议不合法。');
+    const apiType = provider.api_type.toLowerCase();
+    if (apiType !== 'openai' && apiType !== 'deepseek') return finish('error', '当前仅支持 OpenAI/DeepSeek 兼容 Provider 的模型发现，请手动填写其他协议的模型。');
+    let endpoint: URL;
+    try { endpoint = providerModelsEndpoint(provider.base_url); }
+    catch { return finish('error', 'Base URL 必须是无账号信息、查询参数和片段的 HTTP(S) 地址。'); }
 
-    const apiType = provider.api_type.trim().toLowerCase();
-    if (apiType !== 'openai' && apiType !== 'deepseek') {
-      return {
-        request_id: request.request_id,
-        status: 'error',
-        message: `当前仅支持 OpenAI/DeepSeek 兼容 Provider 的模型发现，${provider.api_type} 请手动填写模型。`,
-        discovered_models: [],
-      };
+    let apiKey = provider.clear_api_key ? undefined : provider.api_key;
+    if (!apiKey && !provider.clear_api_key) {
+      try {
+        const config = this.options.configManager.getConfig();
+        const documents = await this.loadDocuments(config);
+        const saved = documents.llm.providers?.[provider.key];
+        // 只有同一已保存目标才可复用 Secret，编辑地址不能把旧密钥送到新服务器。
+        if (saved && saved.api_type.toLowerCase() === apiType && providerModelsEndpoint(saved.base_url).href === endpoint.href) {
+          apiKey = documents.secrets.providers?.[provider.key]?.api_key?.trim();
+        }
+      } catch { return finish('error', '无法读取已保存的 Provider 配置，请检查配置后重试。'); }
     }
+    if (!apiKey) return finish('error', '尚未填写 API Key；新 Provider、变更目标或清除密钥后需要重新填写才能测试。');
 
-    const baseUrl = provider.base_url?.trim();
-    if (!baseUrl) {
-      return {
-        request_id: request.request_id,
-        status: 'error',
-        message: '缺少 base_url，无法测试连接。',
-        discovered_models: [],
-      };
-    }
-
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 15000);
     try {
-      const endpoint = new URL('/v1/models', ensureTrailingSlash(baseUrl)).toString();
       const response = await this.fetchFn(endpoint, {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-        },
+        method: 'GET', redirect: 'error', signal: abort.signal,
+        headers: { authorization: 'Bearer ' + apiKey },
       });
       if (!response.ok) {
-        const body = await safeReadResponseText(response);
-        return {
-          request_id: request.request_id,
-          status: 'error',
-          message: `连接失败：${response.status}${body ? ` ${body}` : ''}`,
-          discovered_models: [],
-          latency_ms: Date.now() - startedAt,
-        };
+        await response.body?.cancel();
+        return finish('error', '连接失败：HTTP ' + response.status + '。请检查地址、凭据与服务状态。');
       }
-      const payload = await response.json() as { data?: Array<{ id?: unknown }> };
-      const discoveredModels = Array.isArray(payload?.data)
-        ? payload.data
-          .map((item) => typeof item?.id === 'string' ? item.id.trim() : '')
-          .filter(Boolean)
-        : [];
-      appendAuditRecord({
-        owner: 'configuration',
-        module: MODULE_NAME,
-        action: 'provider.test',
-        target_kind: 'llm_provider',
-        target_name: provider.key,
-        outcome: 'succeeded',
-        attributes: {
-          discovered_model_count: discoveredModels.length,
-          api_type: provider.api_type,
-        },
-      });
-      return {
-        request_id: request.request_id,
-        status: 'success',
-        message: discoveredModels.length > 0
-          ? `连接成功，发现 ${discoveredModels.length} 个模型。`
-          : '连接成功，但 Provider 未返回模型列表，请手动填写模型。',
-        discovered_models: discoveredModels,
-        latency_ms: Date.now() - startedAt,
-      };
-    } catch (error) {
-      appendAuditRecord({
-        owner: 'configuration',
-        module: MODULE_NAME,
-        action: 'provider.test',
-        target_kind: 'llm_provider',
-        target_name: provider.key,
-        outcome: 'failed',
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        request_id: request.request_id,
-        status: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        discovered_models: [],
-        latency_ms: Date.now() - startedAt,
-      };
-    }
+      const payload = await readProviderModels(response);
+      const models = [...new Set(payload.filter((id): id is string => typeof id === 'string' && id.trim().length > 0 && id.length <= 256 && !id.includes(apiKey!)).map(id => id.trim()))].slice(0, 1000);
+      return finish('success', models.length ? '连接成功，发现 ' + models.length + ' 个模型。' : '连接成功，但 Provider 未返回模型列表，请手动填写模型。', models);
+    } catch {
+      // 上游正文、URL 与异常可能携带凭据；页面和审计均只使用受控诊断。
+      return finish('error', abort.signal.aborted ? '连接测试超时，请检查 Provider 后重试。' : '无法完成连接测试，请检查地址、网络和 Provider 响应；不接受重定向。');
+    } finally { clearTimeout(timer); }
   }
 
   public hasUsableModelRoute(): boolean {
@@ -856,16 +803,32 @@ function summarizeChanges(
   return lines;
 }
 
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value : `${value}/`;
+function providerModelsEndpoint(baseUrl: string | undefined): URL {
+  if (!baseUrl) throw new Error('missing base URL');
+  const url = new URL(baseUrl);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('invalid base URL');
+  const basePath = url.pathname.replace(/\/+$/, '') || '/v1';
+  url.pathname = basePath + '/models';
+  return url;
 }
 
-async function safeReadResponseText(response: Response): Promise<string> {
+async function readProviderModels(response: Response): Promise<unknown[]> {
+  const limit = 1024 * 1024;
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('missing body');
+  const chunks: Uint8Array[] = []; let size = 0;
   try {
-    return (await response.text()).trim().slice(0, 240);
-  } catch {
-    return '';
-  }
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new Error('model list too large');
+      chunks.push(value);
+    }
+    const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (!payload || typeof payload !== 'object' || !('data' in payload) || !Array.isArray(payload.data)) throw new Error('invalid model list');
+    return payload.data.map(item => item && typeof item === 'object' && 'id' in item ? item.id : undefined);
+  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
 }
 
 function deepClone<T>(value: T): T {

@@ -2,6 +2,8 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'fs-extra';
 import yaml from 'yaml';
+import { createServer } from 'node:http';
+import * as observabilityPlane from '../../adapters/observability/plane/plane';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GlobalConfig } from '../../adapters/config/config-schema';
 import { ConfigApplicationService } from '../../adapters/config/config-application-adapter';
@@ -22,6 +24,7 @@ describe('ConfigApplicationService', () => {
     restoreEnv('GLIMMER_CRADLE_CONFIG_ROOT', envSnapshot.configRoot);
     restoreEnv('GLIMMER_CRADLE_DATA_ROOT', envSnapshot.dataRoot);
     vi.restoreAllMocks();
+    vi.useRealTimers();
     await Promise.all([...cleanupRoots].map(async (root) => {
       cleanupRoots.delete(root);
       await fs.remove(root);
@@ -186,6 +189,118 @@ describe('ConfigApplicationService', () => {
     expect(result.status).toBe('error');
     expect(result.message).toContain('尚未填写 API Key');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('tests a saved Provider against a real HTTP endpoint without exposing or rewriting its secret', async () => {
+    const requests: string[] = [];
+    const server = createServer((request, response) => {
+      requests.push(request.url!);
+      expect(request.headers.authorization).toBe('Bearer stored-probe-key');
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({ data: [{ id: 'chat' }, { id: 'chat' }, { id: 'echo-stored-probe-key' }] }));
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw Error('missing port');
+      const baseUrl = `http://127.0.0.1:${address.port}/gateway/v1`;
+      const fixture = await createFixture({ api_type: 'openai', providers: { primary: { api_type: 'openai', base_url: baseUrl, models: { chat: 'chat' } } } });
+      await fs.writeFile(fixture.secretsPath, yaml.stringify({ providers: { primary: { api_key: 'stored-probe-key' } } }));
+      const service = createService(fixture, { isReady: false });
+      const before = await fs.readFile(fixture.secretsPath, 'utf8');
+      const result = await service.testProvider({ request_id: 'saved-test', provider: { key: 'primary', api_type: 'openai', base_url: baseUrl + '/' } });
+      expect(result.status).toBe('success');
+      expect(result.discovered_models).toEqual(['chat']);
+      expect(requests).toEqual(['/gateway/v1/models']);
+      expect(JSON.stringify(result)).not.toContain('stored-probe-key');
+      expect(await fs.readFile(fixture.secretsPath, 'utf8')).toBe(before);
+    } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
+
+  it('never reuses a stored credential for a changed host, path, protocol or cleared secret', async () => {
+    const fixture = await createFixture({ api_type: 'openai', providers: { primary: { api_type: 'openai', base_url: 'https://api.example.test/v1', models: { chat: 'chat' } } } });
+    await fs.writeFile(fixture.secretsPath, yaml.stringify({ providers: { primary: { api_key: 'stored-probe-key' } } }));
+    const fetchFn = vi.fn(async () => Response.json({ data: [] }));
+    const service = createService(fixture, { isReady: false, fetchFn });
+    for (const change of [{ base_url: 'https://other.example.test/v1' }, { base_url: 'https://api.example.test/other' }, { api_type: 'deepseek' }, { clear_api_key: true }]) {
+      const result = await service.testProvider({ request_id: 'changed-test', provider: { key: 'primary', api_type: 'openai', base_url: 'https://api.example.test/v1', ...change } });
+      expect(result.status).toBe('error');
+      expect(result.message).toContain('重新填写');
+    }
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('keeps explicit draft credentials local and strips upstream errors from results and audit', async () => {
+    const fixture = await createFixture({ api_type: 'openai' });
+    const fetchFn = vi.fn().mockResolvedValueOnce(new Response('echo draft-probe-key', { status: 401 })).mockRejectedValueOnce(new Error('URL draft-probe-key'));
+    const service = createService(fixture, { isReady: false, fetchFn });
+    const audit = vi.spyOn(observabilityPlane, 'appendAuditRecord');
+    const request = { request_id: 'draft-test', provider: { key: 'draft', api_type: 'openai', base_url: 'https://api.example.test', api_key: 'draft-probe-key' } };
+    const failure = await service.testProvider(request);
+    expect(failure.message).toContain('HTTP 401');
+    expect(JSON.stringify(failure)).not.toContain('draft-probe-key');
+    expect(JSON.stringify(await service.testProvider(request))).not.toContain('draft-probe-key');
+    expect(await fs.readFile(fixture.secretsPath, 'utf8')).not.toContain('draft-probe-key');
+    expect(audit).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('draft-probe-key');
+    expect(fetchFn.mock.calls[0][1]).toMatchObject({ redirect: 'error', headers: { authorization: 'Bearer draft-probe-key' } });
+  });
+
+  it('does not follow a real HTTP redirect carrying the saved credential', async () => {
+    const paths: string[] = [];
+    const server = createServer((request, response) => {
+      paths.push(request.url!);
+      response.writeHead(302, { location: '/destination' }); response.end();
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address(); if (!address || typeof address === 'string') throw Error('missing port');
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+      const fixture = await createFixture({ api_type: 'openai', providers: { primary: { api_type: 'openai', base_url: baseUrl, models: { chat: 'chat' } } } });
+      await fs.writeFile(fixture.secretsPath, yaml.stringify({ providers: { primary: { api_key: 'stored-probe-key' } } }));
+      const result = await createService(fixture, { isReady: false }).testProvider({ request_id: 'redirect-test', provider: { key: 'primary', api_type: 'openai', base_url: baseUrl } });
+      expect(result.status).toBe('error'); expect(result.message).toContain('重定向');
+      expect(paths).toEqual(['/v1/models']);
+    } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
+
+  it('bounds model discovery payloads and rejects credential-bearing or non-HTTP URLs before fetch', async () => {
+    const fixture = await createFixture({ api_type: 'openai' });
+    const fetchFn = vi.fn(async () => new Response('x'.repeat(1024 * 1024 + 1)));
+    const service = createService(fixture, { isReady: false, fetchFn });
+    const provider = { key: 'draft', api_type: 'openai', api_key: 'draft-probe-key', base_url: 'https://api.example.test/v1' };
+    for (const base_url of ['file:///secret', 'https://user:pass@api.example.test', 'https://api.example.test?key=secret', 'https://api.example.test/#secret']) {
+      expect((await service.testProvider({ request_id: 'invalid-url', provider: { ...provider, base_url } })).status).toBe('error');
+    }
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect((await service.testProvider({ request_id: 'large-body', provider })).status).toBe('error');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts a stalled discovery request after 15 seconds and returns a safe timeout', async () => {
+    const fixture = await createFixture({ api_type: 'openai' });
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const fetchFn: typeof fetch = async (_input, init) => new Promise((_resolve, reject) => {
+      signal = init?.signal ?? undefined;
+      signal?.addEventListener('abort', () => reject(new Error('secret in transport error')), { once: true });
+    });
+    const service = createService(fixture, { isReady: false, fetchFn });
+    const result = service.testProvider({ request_id: 'timeout', provider: { key: 'draft', api_type: 'openai', base_url: 'https://api.example.test', api_key: 'draft-probe-key' } });
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(signal?.aborted).toBe(true);
+    expect((await result).message).toContain('超时');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not copy an invalid Provider identifier into audit records', async () => {
+    const fixture = await createFixture({ api_type: 'openai' });
+    const audit = vi.spyOn(observabilityPlane, 'appendAuditRecord');
+    const fetchFn = vi.fn();
+    const result = await createService(fixture, { isReady: false, fetchFn }).testProvider({ request_id: 'invalid-key', provider: { key: 'mistaken-secret\nAuthorization: private', api_type: 'openai' } });
+    expect(result.status).toBe('error'); expect(fetchFn).not.toHaveBeenCalled();
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('mistaken-secret');
+    expect(audit.mock.calls[0][0].target_name).toBe('invalid-provider');
   });
 });
 
