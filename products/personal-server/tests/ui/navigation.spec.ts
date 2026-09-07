@@ -95,6 +95,10 @@ test('keeps the narrow shell single-column and restores focus after the navigati
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+    await menuButton.click();
+    await page.getByRole('dialog', { name: '全局导航' }).getByRole('button', { name: '退出登录' }).click();
+    await expect(page.locator('[data-role="login-layer"]')).toBeVisible();
+    await expect(page.locator('[data-role="app-shell"]')).toHaveCount(0);
   } finally {
     await fixture.stop();
   }

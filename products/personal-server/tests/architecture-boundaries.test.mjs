@@ -51,7 +51,7 @@ test('Personal Server web composition 入口不重新膨胀为 owner 混合单�
   const limits = [
     ['src/web/app/bootstrap.tsx', 6500],
     ['src/web/app/PersonalServerAppController.ts', 24000],
-    ['src/web/features/configuration/configuration-view.ts', 20000],
+    ['src/web/features/configuration/ConfigurationController.ts', 20000],
   ];
   for (const [relativePath, maxBytes] of limits) {
     assert.ok(fs.statSync(path.join(productRoot, relativePath)).size <= maxBytes, relativePath);
@@ -65,6 +65,19 @@ test('Personal Server React Shell 与 Router 保持唯一 owner，旧入口不�
     'src/web/app/router.ts',
     'src/web/shell/layout.ts',
     'src/web/routes/LegacyRouteMount.tsx',
+    'src/web/features/status/status-view.ts',
+    'src/web/features/status/status.css',
+    'src/web/features/conversation/conversation-view.ts',
+    'src/web/features/conversation/conversation.css',
+    'src/web/features/extensions/extension-view.ts',
+    'src/web/features/extensions/extensions.css',
+    'src/web/features/observability/observability-view.ts',
+    'src/web/features/observability/observability.css',
+    'src/web/features/extensions',
+    'src/web/features/configuration/configuration-view.ts',
+    'src/web/features/configuration/configuration.css',
+    'src/web/features/configuration/configuration-system-bindings.ts',
+    'src/web/features/configuration/configuration-supplemental-state.ts',
   ];
   for (const relativePath of removedPaths) {
     assert.equal(fs.existsSync(path.join(productRoot, relativePath)), false, relativePath);
@@ -87,4 +100,9 @@ test('Personal Server React Shell 与 Router 保持唯一 owner，旧入口不�
     .map((filePath) => fs.readFileSync(filePath, 'utf8'))
     .join('\n');
   assert.doesNotMatch(shellAndRoutes, /\.innerHTML\s*=/);
+  assert.doesNotMatch(source, /mountOverview\s*\(|\bStatusView\b/);
+  assert.doesNotMatch(source, /mountConversation\s*\(|\bConversationView\b/);
+  assert.doesNotMatch(source, /mountCapabilities\s*\(|\bExtensionView\b/);
+  assert.doesNotMatch(source, /mountSettings\s*\(|\bConfigurationView\b/);
+  assert.doesNotMatch(source, /mountActivity\s*\(|\bObservabilityView\b/);
 });

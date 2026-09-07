@@ -28,6 +28,8 @@
 | Extension Documents | `contracts/json-schema/extension/v1/` | SDK validator 消费 canonical Schema；模板只依赖 SDK/Contracts 公开边缘。 |
 | Product / Presentation / Skill Documents | `contracts/json-schema/{product,presentation,skill}/v1/` | serialized Document 唯一事实源；产品 view model 与领域模型留在 owner。 |
 
+Surface Gateway 的 `ConversationHistoryEntryProjection` 除历史正文与来源外，还以 optional 字段传递 `trace_id`、`interaction_id`、`position`、`title`、`moment_id`、`actor_id` 和 `actor_name`。Kernel 出站与 Desktop/Personal Server 入站 Adapter 保留这些字段的缺省语义，位置 `0` 不等同于缺省；产品以 interaction/trace 身份合并瞬时与持久记录，不按消息文本猜测去重。
+
 配置、Extension manifest/package、Product composition 与其他 Document 使用 JSON Schema 2020-12，必须声明稳定 `$id`、`x-glimmer-owner`、`x-glimmer-contract-kind=Document` 和兼容策略。Schema 可以跨目录 `$ref`；validator 必须先注册完整 registry，再校验入口 Document。
 
 ## 生成与兼容

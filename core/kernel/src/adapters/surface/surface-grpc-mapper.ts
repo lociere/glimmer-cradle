@@ -307,6 +307,8 @@ function eventValueFromFrame(frame: SurfaceProjectionFrame): surfaceV1.SurfaceEv
       }) : undefined,
       items: frame.conversation_history_result.items.map((item) => create(surfaceV1.ConversationHistoryEntryProjectionSchema, {
         entryId: item.entry_id, sourceKind: item.source_kind, role: item.role, status: item.status,
+        traceId: item.trace_id, interactionId: item.interaction_id, position: item.position == null ? undefined : BigInt(item.position),
+        title: item.title, momentId: item.moment_id, actorId: item.actor_id, actorName: item.actor_name,
         text: item.text, occurredAt: item.occurred_at, conversationId: item.conversation_id,
         sceneId: item.scene_id, threadId: item.thread_id, recallScope: item.recall_scope,
         disclosureScope: item.disclosure_scope,

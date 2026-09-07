@@ -1,0 +1,13 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import { Activity } from './Activity';
+import { ActivityController, type ActivitySnapshot } from './ActivityController';
+const snapshot: ActivitySnapshot = { entries: [{ id: 'story', timestamp: '2026-09-07T08:00:00Z', source: 'event', level: 'info', module: 'config-owner', owner: 'configuration', runtime_id: 'kernel', trace_id: 'trace-story', event_type: 'config.snapshot', message: '配置已读取', raw: '{"message":"配置已读取"}' }], buffered: [], dropped: 0, query: { limit: 200 }, paused: false, loading: false, initialized: true, connection: 'live', error: '' };
+const meta = { title: 'Features/Activity', component: Activity, args: { snapshot, controller: new ActivityController({ read: async () => [], stream: () => ({ close() {} }) }) } } satisfies Meta<typeof Activity>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Live: Story = {};
+export const Empty: Story = { args: { snapshot: { ...snapshot, entries: [] } } };
+export const Loading: Story = { args: { snapshot: { ...snapshot, entries: [], initialized: false, loading: true, connection: 'connecting' } } };
+export const Error: Story = { args: { snapshot: { ...snapshot, connection: 'retrying', error: '读取失败，正在重试。' } } };
+export const Paused: Story = { args: { snapshot: { ...snapshot, paused: true, buffered: snapshot.entries, dropped: 25 } } };
+export const LongText: Story = { args: { snapshot: { ...snapshot, entries: [{ ...snapshot.entries[0], message: '长事件-very-long-identifier-'.repeat(200) }] } } };

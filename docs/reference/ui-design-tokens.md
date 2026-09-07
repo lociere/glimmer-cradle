@@ -67,8 +67,13 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 - `PersonalServerShell.tsx` 在宽屏只显示一层侧栏导航，在窄屏使用可关闭并返回焦点的 React Aria Dialog 导航；当前页面由 React Router `Outlet` 唯一挂载。
 - 登录层不会挂载 Product Shell；深链登录后返回原 URL，根路径、unknown route、refresh 与 back/forward 由浏览器路由测试覆盖。
 - 代表性 `HealthBadge` 以真实组件、CSS Module 和 story 进入 Storybook；Storybook 不模拟 Product Host 事实，也未启用 MCP。
-- 概览深色宽屏、浅色宽屏和深色 480×900 已建立固定 Playwright 视觉基线；动态观测时间在截图前归一，结构、内容与状态不被遮罩。
-- 既有 feature 的全局 CSS 暂时通过 semantic alias 消费当前 token；删除触发器是对应 feature 完成 React component/hook 迁移并通过同场景交互、a11y 与视觉验证，届时该 feature route 自有 adapter 和旧 DOM/CSS owner 一并删除。
+- 概览 feature 已使用 CSS Module 直接消费同一语义 token，以状态摘要、连续运行体列表、模型配置摘要和按需详情抽屉组织页面；旧 status 全局样式及其共享覆盖已删除。`Overview.stories.tsx` 提供等待、空目录、降级、读取失败、断线、等待重连目录、长列表及详情交互场景。
+- 概览深色宽屏、浅色宽屏和深色 480×900 使用固定 Playwright 视觉基线；观测时间在测试网络响应中固定，避免修改 React 所拥有的 DOM，结构、内容与状态不被遮罩。
+- 概览另有空目录、运行体降级、读取失败与运行体详情的宽/窄屏截图；列表和详情使用 320～1440 CSS px 长内容矩阵验证容量，键盘焦点与深浅主题 axe 由真实 Product Host 测试覆盖。
+- 对话 feature 由 CSS Module 消费相同语义 token，消息区独立滚动，输入区保持在页面底部；恢复历史与空态具有深浅宽/窄屏基线，320～1440 CSS px 长内容、输入焦点与深浅主题 axe 已覆盖。`Conversation.stories.tsx` 提供恢复、空态、加载、错误、断线、等待回复、失败与长消息状态。
+- 能力页候选由 `features/capabilities/Extensions.module.css` 消费相同 token：默认扩展列表，按需安装表单与版本/诊断抽屉，取消旧全局 extension 样式。目录、安装表单和详情建立宽/窄屏截图，深浅主题、320～1440 CSS px 和键盘焦点进入/返回进入 Product Host 回归；独立接受状态由 Roadmap 维护。
+- 活动页由 `features/activity/Activity.module.css` 消费相同 token：筛选、暂停缓冲状态、事件列表与详情抽屉归于页面内；深浅主题、宽窄屏列表/详情截图、320～1440 CSS px、键盘焦点与空态语义进入真实 Host 和 Storybook 回归。
+- 设置由 `features/configuration/Configuration.module.css` 消费相同 token，宽屏侧栏与窄屏分类 Drawer 按真实子区切换；字段、保存状态、一次性令牌及危险操作确认由 React 持有。模型、记忆和丢弃确认建立宽窄深浅主题基线，320～1440 CSS px、键盘焦点与七子区 axe 进入 Product Host 回归；旧 feature DOM/CSS 与 route adapter 已全部删除。
 
 详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
 

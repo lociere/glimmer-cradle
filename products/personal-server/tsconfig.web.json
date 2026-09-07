@@ -9,5 +9,5 @@
     "lib": ["DOM", "ES2022"],
     "types": []
   },
-  "include": ["src/web/**/*.ts", "src/web/**/*.tsx", ".storybook/**/*.ts", "vite.config.ts"]
+  "include": ["src/web/**/*.ts", "src/web/**/*.tsx", ".storybook/**/*.ts", "vite.config.mts"]
 }

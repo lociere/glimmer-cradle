@@ -1,14 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { PersonalServerAppController } from '../../app/PersonalServerAppController';
-
-export function SettingsRoute({ controller }: { readonly controller: PersonalServerAppController }): JSX.Element {
-  const rootRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    return controller.mountSettings(root);
-  }, [controller]);
-
-  return <section ref={rootRef} className="route-view settings-view" data-role="view-settings" />;
+import { Configuration, configurationSections, type ConfigurationSection } from '../../features/configuration/Configuration';
+import { useConfiguration } from '../../features/configuration/useConfiguration';
+export function SettingsRoute({ controller }: { readonly controller: PersonalServerAppController }) {
+  const [params, setParams] = useSearchParams();
+  const section = configurationSections.some(([id]) => id === params.get('section')) ? params.get('section') as ConfigurationSection : 'models';
+  return <Configuration {...useConfiguration(controller)} section={section} onSection={next => setParams({ section: next })} />;
 }

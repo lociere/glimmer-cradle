@@ -83,7 +83,7 @@ export function PersonalServerShell(props: {
       <div className={styles.mainColumn}>
         <header className={styles.topbar}>
           <div className={styles.mobileIdentity}>
-            <MobileNavigation />
+            <MobileNavigation onLogout={() => void props.controller.logout()} />
             <div>
               <span>{current?.label ?? '未知路由'}</span>
               <strong>{props.snapshot.productName}</strong>
@@ -136,7 +136,7 @@ function Navigation({ onNavigate }: { readonly onNavigate?: () => void }): JSX.E
   );
 }
 
-function MobileNavigation(): JSX.Element {
+function MobileNavigation({ onLogout }: { readonly onLogout: () => void }): JSX.Element {
   return (
     <DialogTrigger>
       <Button className={styles.mobileMenuButton} aria-label="打开全局导航">
@@ -154,6 +154,9 @@ function MobileNavigation(): JSX.Element {
                   </Button>
                 </div>
                 <Navigation onNavigate={close} />
+                <Button className={styles.logoutButton} onPress={() => { close(); onLogout(); }}>
+                  <LogOut aria-hidden="true" size={17} />退出登录
+                </Button>
               </>
             )}
           </Dialog>

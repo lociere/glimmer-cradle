@@ -1,0 +1,37 @@
+.page { padding: var(--space-6) var(--page-gutter); min-width: 0; display: grid; grid-template-columns: 10rem minmax(0, 1fr); column-gap: var(--space-6); }
+.header { grid-column: 1 / -1; }
+.page > p, .content, .saveBar { grid-column: 2; }
+.header, .sectionHead { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.header h1 { font-size: var(--font-size-title); margin: 0; }
+.page h2 { font-size: var(--font-size-title); margin: 0 0 var(--space-3); }
+.page h3, .page h4 { margin: 0; }
+.page p { color: var(--text-secondary); line-height: 1.6; overflow-wrap: anywhere; }
+.navigation { display: flex; gap: var(--space-2); flex-direction: column; padding: var(--space-5) 0; grid-column: 1; grid-row: 2 / span 4; align-self: start; }
+.navigation button, .drawerNavigation button { text-align: left; padding: var(--space-3); border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); min-height: var(--control-height-compact); }
+.navigation button[aria-current], .drawerNavigation button[aria-current] { background: var(--surface-selected); color: var(--text-primary); border-color: var(--divider-subtle); }
+.mobileNavigation { display: none; }
+.overlay.navigationOverlay { display: flex; justify-content: flex-end; padding: 0; }
+.dialog.navigationDialog { height: 100dvh; max-height: 100dvh; width: min(22rem, 100%); border-radius: 0; }
+.drawerNavigation { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+.content { min-width: 0; margin: 0; padding: var(--space-5) 0; border: 0; display: grid; gap: var(--space-6); }
+.content section { min-width: 0; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); padding: var(--space-4) 0; }
+.field { display: flex; flex-direction: column; min-width: 0; gap: var(--space-2); color: var(--text-secondary); font-size: var(--font-size-body); }
+.field input:not([type=checkbox]), .field select, .field textarea { width: 100%; min-width: 0; min-height: var(--control-height-compact); padding: var(--space-3); background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--divider-subtle); border-radius: var(--radius-control); }
+.field textarea { min-height: 7rem; resize: vertical; }
+.field input[type=checkbox] { width: 1.25rem; height: 1.25rem; }
+.providers { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(0, 3fr); gap: var(--space-5); }
+.providerList { display: flex; flex-direction: column; gap: var(--space-2); }
+.provider { display: grid; text-align: left; gap: var(--space-2); padding: var(--space-3); background: transparent; color: var(--text-primary); border: 1px solid var(--divider-subtle); border-radius: var(--radius-control); overflow-wrap: anywhere; }
+.provider span { color: var(--text-secondary); }
+.provider[aria-pressed=true] { border-color: var(--accent-text); }
+.model { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: var(--space-3); margin: var(--space-3) 0; }
+.summary, .item { padding: var(--space-4) 0; border-bottom: 1px solid var(--divider-subtle); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2); }
+.saveBar { border-top: 1px solid var(--divider-subtle); padding: var(--space-4) 0; display: grid; gap: var(--space-3); }
+.secret { display: block; overflow-wrap: anywhere; margin: var(--space-4) 0; }
+.overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-4); background: var(--scrim); }
+.dialog { width: min(100%, 30rem); max-height: 90dvh; overflow: auto; background: var(--surface-raised); color: var(--text-primary); padding: var(--space-5); border: 1px solid var(--divider-subtle); border-radius: var(--radius-surface); }
+@media (max-width: 900px) { .providers { grid-template-columns: 1fr; } .providerList { flex-direction: row; flex-wrap: wrap; } }
+@media (max-width: 1100px) { .page { display: block; } .navigation { display: none; } .mobileNavigation { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; padding: var(--space-4) 0; border-bottom: 1px solid var(--divider-subtle); } }
+@media (max-width: 600px) { .fields, .model { grid-template-columns: 1fr; } }

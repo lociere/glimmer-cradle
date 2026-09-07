@@ -4,7 +4,7 @@
 > 事实依据：[ADR-0017](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)、[M11](../milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 目标物理清单](../manifests/M11-目标物理清单.md)、[UI Design Tokens Reference](../../reference/ui-design-tokens.md)、用户提供的 Obsidian 深浅/透明主题截图、雾面材质参考图与蓝色/绿色等强调色反馈。
 > 维护触发：用户选择或混合视觉方向、信息架构、代表页面任务、组件语言、主题策略、容量矩阵或首个 UI 实现 slice 变化。
 
-当前状态为 `design/accepted`。2026-08-25，用户确认“静水结构 × 有限晶光 × 夜湖列表密度”作为 M11 最终视觉方向；深色、浅色和窄屏代表方案已通过视觉确认。React 迁移与生产 UI 尚未实施，精确 token 和组件状态在首个获授权实现 slice 固定并验证。
+当前状态为 `design/accepted`。2026-08-25，用户确认“静水结构 × 有限晶光 × 夜湖列表密度”作为 M11 最终视觉方向；深色、浅色和窄屏代表方案已通过视觉确认。后续 React 实现状态见 [now.md](../now.md)，精确 token 与组件状态由 [UI Design Tokens Reference](../../reference/ui-design-tokens.md) 维护。
 
 ## 目录
 

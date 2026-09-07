@@ -1,6 +1,6 @@
 # Now
 
-> 审阅日期：2026-08-29
+> 审阅日期：2026-09-07
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
@@ -14,7 +14,21 @@
 
 M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单](./manifests/M12-目标物理清单.md) 与 [M13 清单](./manifests/M13-目标物理清单.md)。2026-08-25 起，当前活跃面切换为 M11 Personal Server 前端；架构、AI 辅助开发闭环和视觉方向已经确认，首个 React Shell/Router slice 已实施并进入验证/审查门。
 
-[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 保持 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认；首个 slice 已建立单一 React root、BrowserRouter、Product Shell、五个正式 URL、深浅主题、窄屏壳层、Storybook 组件入口与 Playwright 基线，并删除旧 Shell/Router/启动 owner。既有 feature 当前由五个 feature route 各自拥有的 adapter 保留，不存在共享兼容桥；下一步是在 fixed candidate 审查通过后按垂直 slice React 化并逐个删除 adapter。M11 其他未完成范围仍保持原状态。
+[M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](./milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 保持 `in-progress`。[ADR-0017](../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的最终视觉方向已于 2026-08-25 确认。Shell/Router 后，概览已迁入 React，删除旧 StatusView、route adapter 和 status 样式，并补齐窄屏退出登录。当前装配由 [Product Compositions](../reference/product-compositions.md) 唯一维护，删除门与测试位置见 [M11 清单](./manifests/M11-目标物理清单.md)。对话已迁入 React 并删除旧 DOM owner；能力、活动和设置 React slice 已完成本地实现及独立审查；M11 的 Extension/NapCat 与生产范围仍未完成。
+
+2026-09-07 本次实现由当前任务独占写入，授权限于本地 M11 实现；候选基于 `e4c8d7c7` 的概览/Shell、对话、历史契约、测试与文档改动，未提交、推送或发布。独立审查发现的窄屏退出入口、重连目录 freshness、历史元数据跨进程丢失及服务端 transient 未被持久历史替换均已修复并定向复审。
+
+本切片验证：根 `pnpm typecheck`、`pnpm build`、Personal Server 39 项测试、5 项架构测试、1 项真实 Kernel → protobuf → 两产品历史映射测试与 9 项 Kernel Gateway 测试、Storybook build、编码及仓库架构检查通过。启用本地 Storybook 后，完整 Playwright 为 62 passed / 8 skipped；跳过项为已由另一视口项目覆盖的认证、容量、组件或窄屏专属场景。新增目录延迟反例只抑制发往浏览器的消息，保留 Host readiness 观测，验证在线握手不能提前清除旧目录标记。Contract Spine 的 inventory、lint/breaking、Schema、固定工具链及 TS/Python/C# round-trip 通过，连续生成一致；当时 `contracts:verify` 最后的 Git clean-tree gate 因生成物未暂存而失败；本轮固定暂存候选后已重跑通过。
+
+视觉证据包括深浅宽屏、深色 480×900、空目录、降级、读取失败和运行体详情基线；已检查代表截图。长内容、键盘、焦点返回、reduced-motion、深浅主题 axe 与 320～1440 CSS px 容量矩阵通过。720/360 CSS px 用于模拟 1440px 表面的 200%/400% 可用宽度，不宣称原生浏览器缩放或实体触控验收。报告位于 `build/reports/playwright/personal-server/report/`；后续源码、fixture、依赖或截图环境变化时重验受影响证据。对话另有恢复/空态深浅宽窄屏截图，历史分页、实时合并、断线草稿、发送防重与重试、迟到响应和组件状态已纳入同批回归。概览与对话本地切片完成，完整 M11 及生产/跨仓门仍未完成。
+
+2026-09-07 能力页后续候选由同一任务独占写入：`features/capabilities/` 拥有 React 列表、安装表单、版本/诊断抽屉和事务 Controller；旧 `features/extensions/` 与 route mount 入口已删除。四种来源、启停、升级/回滚、离页预览取消、提交防重和连接恢复保留，真实装配见 Product Compositions。新增 6 项 Controller 反例测试，Personal Server 共 45 项测试通过；根 typecheck/build、迁目录后的产品 typecheck、5 项架构测试、Storybook build、编码、仓库架构和 70 个文档本地链接通过。启用 Storybook 的完整浏览器回归为 70 passed / 10 skipped，跳过项为已由另一视口覆盖的专属场景；回滚后卸载非激活版本另补定向断言。深浅宽屏、480×900 目录/表单/详情基线已检查，320～1440 CSS px、reduced-motion、键盘焦点和深浅主题 axe 已验证；不宣称原生缩放或实体触控验收。
+
+能力页独立审查已恢复并完成：终结错误回执后预览锁死、目录读取与操作错误互相覆盖两项 P2 已修复并定向复审通过。新增 2 项 Controller 反例，产品共 47 项测试通过；能力页真实 Host 浏览器验证为 9 passed / 1 skipped，覆盖 commit/cancel 终结失败后重新安装。根 typecheck/build 与 Storybook build 已重跑通过，上一批未受影响的全量回归证据复用。该批历史证据后的设置进展见下段。候选在当时未提交、推送或发布；当时的契约 clean-tree gate 限制已在本轮设置提交检查中解除。
+
+活动页 React slice 已实现并通过独立生命周期审查：`features/activity/` 拥有页面、CSS Module、hook 与读取/订阅 Controller，旧 ObservabilityView、mountActivity 和旧目录已删除。新增 4 项反例验证迟到读取、筛选代际、停止后流回调、200 条暂停缓冲与重连；产品共 51 项测试通过。真实 Host 已验证日志追加、暂停/继续、详情焦点返回、NDJSON 导出、读取失败恢复、空筛选、长内容及 320～1440 CSS px 深浅主题 axe；认证失效、退出与 route cleanup 回归通过。根 typecheck/build、Storybook build、5 项架构测试、编码与仓库架构检查通过；深浅宽屏与 480×900 列表/详情视觉基线已检查，不宣称原生缩放或实体触控验收。启用 Storybook 的完整浏览器批次为 77 passed / 12 skipped / 3 failed；失败来自旧 DOM 选择器（两个视口）与空列表缺少区域语义，均已修复，受影响场景定向复验为 8 passed / 2 skipped，涵盖 Activity 状态、真实日志交互及宽窄屏视觉基线。其余全量证据复用，跳过项为另一视口已覆盖的专属场景。该批历史证据后的设置进展见下段；当时本地改动未提交、推送或发布。
+
+2026-09-07 设置大块由同一任务独占完成，用户追加授权将累计 M11 本地改动提交 Git。七子区 React 迁移及旧 owner 删除完成，沿用已确认设计方向；独立审查三项 P2（运维旧读覆盖、迟到 POST 终态回退、Skill 投影遗漏）修复并复审通过，新增 8 项 Controller 反例。57 项产品测试、5 项架构测试、根 typecheck/build、Storybook build、编码/仓库架构及 70 个文档本地链接通过；完整浏览器回归为 88 passed / 14 skipped，跳过项由另一视口覆盖。七子区深浅主题 axe、320～1440 CSS px、确认焦点及宽窄截图已验证，不宣称原生浏览器缩放或实体触控验收。Contract Spine 全部门通过；生成物暂存固定后，连续生成一致且工作树对暂存区无差异，原 clean-tree gate 限制已解除。另按用户要求将 Personal Server Vite 配置转为 `.mts` ESM，补齐 public 根目录的源码入口映射；CJS 弃用警告已消除。设置分类 Drawer 的深浅主题 axe、Escape 焦点返回及视觉细节另经定向复验；Vite 开发入口浏览器加载与最终生产构建通过。本次提交固定上述累计 M11 本地变更，未推送或发布。
 
 `v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
 
@@ -24,7 +38,6 @@ M11 仍未完成的范围：
 
 - 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
 - 为 Personal Server 提供零 Provider 可登录的正式控制面，以及 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新能力；
-- 完成 Personal Server 既有 feature 的 React component/hook 迁移、状态矩阵与按 slice adapter 删除门；
 - 让 Extension 安装、启停、升级、权限与产品兼容性通过同一 Package Manager 闭环；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
@@ -68,7 +81,7 @@ M12/M13 当前没有未闭合的代码集成门。真实 Docker/Ubuntu、Windows
 - 不让浏览器直接读写服务器 YAML、Secret、任意文件路径或 Docker Socket。
 - 不把 Desktop 的 Avatar、窗口、剪贴板和本机设备页面复制到 Personal Server。
 - 不偏离已确认的中性主题、青曜强调色和有限晶光边界，也不把参考图布局或采样值写入生产 token。
-- 本轮文档与设计前置不实现路由、框架迁移、布局、响应式、品牌资产或测试代码；ADR 与视觉方向已确认，生产实现从后续获授权 slice 开始。
+- 当前按已授权的前端垂直切片推进；品牌资产及生产发布继续使用各自任务与验收门。
 - 不把 NapCat 的 Windows OneKey 启动逻辑伪装成 Linux 兼容。
 - 不让 Extension 私有 Skill 泄露到无关 ConversationContext，也不把管理操作伪装成人物 Skill。
 - 不为特定云厂商、地域或代理域名分叉安装协议。

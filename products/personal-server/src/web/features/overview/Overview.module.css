@@ -1,0 +1,96 @@
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: calc(var(--reading-width) + 2 * var(--page-gutter));
+  margin-inline: auto;
+  padding-top: var(--space-8);
+  overflow-wrap: anywhere;
+}
+
+.summary, .sectionHead, .drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.summary {
+  padding-block: var(--space-4) var(--space-8);
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.summaryText { min-width: 0; flex: 1 1 20rem; }
+.eyebrow, .observed, .runtimeMeta, .sectionHead p, .details dt {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-label);
+}
+.summary h1 { margin: var(--space-2) 0 var(--space-3); font-size: var(--font-size-display); line-height: 1.25; }
+.overview h2, .dialog h2 { margin: 0; font-size: var(--font-size-title); }
+.overview p, .dialog p { margin: var(--space-2) 0; }
+.overview p, .runtimeMain > span, .dialog { color: var(--text-secondary); }
+.overview .ready, .dialog .ready { color: var(--status-success-text); }
+.overview .waiting, .dialog .waiting { color: var(--status-warning-text); }
+.overview .danger, .dialog .danger { color: var(--status-danger-text); }
+.overview .observed { color: var(--text-tertiary); }
+.sectionHead { padding-bottom: var(--space-4); }
+.runtimeList { padding: 0; margin: 0; list-style: none; }
+.runtimeList > li + li { border-top: 1px solid var(--divider-subtle); }
+.runtimeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 10rem) auto auto;
+  gap: var(--space-4);
+  width: 100%;
+  align-items: center;
+  padding: var(--space-5) var(--space-3);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.runtimeRow:hover { background: var(--surface-hover); }
+.runtimeRow[data-pressed], .runtimeRow[aria-expanded='true'] { background: var(--surface-selected); }
+.runtimeMain, .runtimeMeta { display: grid; gap: var(--space-1); min-width: 0; }
+.runtimeMeta small { font-size: inherit; }
+.runtimeMain > strong { color: var(--text-primary); }
+.runtimeMain > span { font-size: var(--font-size-label); }
+.configuration { padding: var(--space-6); border-radius: var(--radius-surface); background: var(--surface-raised); }
+.notice, .empty { padding: var(--space-4); border-left: 2px solid var(--divider-subtle); }
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-compact);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-control);
+  color: var(--accent-text);
+  background: var(--surface-raised);
+  text-decoration: none;
+  cursor: pointer;
+}
+.action:hover { background: var(--surface-hover); }
+.empty a { color: var(--accent-text); }
+.scrim { position: fixed; inset: 0; z-index: 100; display: flex; justify-content: flex-end; background: var(--scrim); }
+.drawer { width: min(30rem, 100%); height: 100dvh; overflow: auto; background: var(--surface-overlay); box-shadow: var(--shadow-overlay); }
+.dialog { min-height: 100%; padding: var(--space-6); outline: none; overflow-wrap: anywhere; }
+.drawerHead { align-items: flex-start; flex-wrap: nowrap; padding-bottom: var(--space-6); }
+.drawerHead > div { min-width: 0; }
+.drawerHead h2 { color: var(--text-primary); margin-top: var(--space-2); }
+.close { flex: 0 0 var(--control-height-compact); height: var(--control-height-compact); display: grid; place-items: center; border: 1px solid var(--divider-subtle); border-radius: var(--radius-control); background: var(--surface-raised); cursor: pointer; }
+.details { display: grid; gap: var(--space-2); margin-block: var(--space-6); }
+.details dd { margin: 0 0 var(--space-3); color: var(--text-primary); }
+
+@media (max-width: 900px) {
+  .runtimeRow { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-3); }
+  .runtimeMain { grid-column: 1; }
+  .runtimeMeta { grid-column: 1; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+  .runtimeRow > :nth-child(3) { grid-column: 2; grid-row: 1; }
+  .runtimeRow > svg { grid-column: 2; grid-row: 2; justify-self: end; }
+}
+@media (max-width: 520px) {
+  .overview { gap: var(--space-5); padding-top: var(--space-5); }
+  .configuration, .dialog { padding: var(--space-4); }
+}

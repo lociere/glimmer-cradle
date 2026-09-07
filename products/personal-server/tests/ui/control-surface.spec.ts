@@ -1,3 +1,4 @@
+import { selectSettingsSection } from './scenarios/settings-navigation';
 import { expect, test } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 import { startPersonalServerUiFixture } from './fixtures/personal-server-host';
@@ -16,9 +17,9 @@ test('supports zero-provider login, history restore and degraded conversation no
     await expect(page.locator('[data-role="message-list"]')).toContainText('没有可用模型');
 
     await navigate(page, 'overview');
-    await expect(page.locator('.status-card').filter({ hasText: '服务状态' })).toContainText('ready');
+    await expect(page.getByRole('heading', { name: '服务已就绪' })).toBeVisible();
     await navigate(page, 'activity');
-    await expect(page.locator('.observability-toolbar')).toBeVisible();
+    await expect(page.getByRole('button', { name: '应用筛选' })).toBeVisible();
   } finally {
     await fixture.stop();
   }
@@ -36,12 +37,12 @@ test('saves provider configuration without echoing api key and enables real repl
     await page.locator('[data-field="provider-api-key"]').fill('secret-key');
     await page.locator('[data-field="provider-temperature"]').fill('0.7');
     await page.locator('[data-action="test-provider"]').click();
-    await expect(settingsView.locator('.save-status')).toContainText('发现模型 gpt-4.1');
+    await expect(settingsView.locator('[data-role="save-status"]')).toContainText('发现模型 gpt-4.1');
     await page.locator('[data-field="default-route-provider"]').selectOption('primary');
     await page.locator('[data-field="default-route-model"]').selectOption('chat');
     await page.locator('[data-action="save"]').click();
 
-    await expect(settingsView.locator('.route-summary')).toContainText('默认对话路由可用');
+    await expect(settingsView.locator('[data-role="route-summary"]')).toContainText('默认对话路由可用');
     await expect(page.locator('[data-field="provider-api-key"]')).toHaveValue('');
     await expect(page.locator('[data-field="provider-api-key"]')).toHaveAttribute('placeholder', /已写入/);
 
@@ -61,8 +62,8 @@ test('filters structured logs by module', async ({ page }) => {
     await navigate(page, 'activity');
     await page.locator('[data-field="module"]').fill('config-owner');
     await page.locator('[data-action="apply"]').click();
-    await expect(page.locator('.observability-log-list')).toContainText('config-owner');
-    await expect(page.locator('.observability-log-list')).not.toContainText('kernel-runtime');
+    await expect(page.locator('[data-role="log-list"]')).toContainText('config-owner');
+    await expect(page.locator('[data-role="log-list"]')).not.toContainText('kernel-runtime');
   } finally {
     await fixture.stop();
   }
@@ -77,7 +78,11 @@ test('installs a new extension version, upgrades activation, then rolls back', a
     const card = extensionView.locator('[data-role="extension-card"][data-extension-id="community.echo"]');
 
     await expect(card).toContainText('激活版本：1.0.0');
-    await expect(card.locator('[data-role="extension-version-row"][data-version="1.0.0"] [data-action="extension-uninstall"]')).toBeDisabled();
+    await card.getByRole('button').click();
+    const details = page.getByRole('dialog');
+    await expect(details.locator('[data-role="extension-version-row"][data-version="1.0.0"] [data-action="extension-uninstall"]')).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await extensionView.getByRole('button', { name: '安装扩展', exact: true }).click();
 
     await extensionView.locator('[data-field="repository"]').fill('community/echo');
     await extensionView.locator('[data-field="tag"]').fill('v1.1.0');
@@ -87,14 +92,19 @@ test('installs a new extension version, upgrades activation, then rolls back', a
     await extensionView.locator('[data-action="extensions-commit"]').click();
     await expect(card).toContainText('已安装：1.1.0, 1.0.0');
 
-    await card.locator('[data-role="extension-version-row"][data-version="1.1.0"] [data-action="extension-activate-version"]').click();
+    await card.getByRole('button').click();
+    await details.locator('[data-role="extension-version-row"][data-version="1.1.0"] [data-action="extension-activate-version"]').click();
     await expect(card).toContainText('激活版本：1.1.0');
     await expect(card).toContainText('running');
 
-    await card.locator('[data-role="extension-version-row"][data-version="1.0.0"] [data-action="extension-activate-version"]').click();
+    await details.locator('[data-role="extension-version-row"][data-version="1.0.0"] [data-action="extension-activate-version"]').click();
     await expect(card).toContainText('激活版本：1.0.0');
     await expect(card).toContainText('running');
-    await expect(card.locator('[data-role="extension-version-row"][data-version="1.1.0"] [data-action="extension-uninstall"]')).toBeEnabled();
+    await expect(details.locator('[data-role="extension-version-row"][data-version="1.1.0"] [data-action="extension-uninstall"]')).toBeEnabled();
+    page.once('dialog', (dialog) => void dialog.accept());
+    await details.locator('[data-role="extension-version-row"][data-version="1.1.0"] [data-action="extension-uninstall"]').click();
+    await expect(details.locator('[data-role="extension-version-row"][data-version="1.1.0"]')).toHaveCount(0);
+    await expect(card).toContainText('已安装：1.0.0');
   } finally {
     await fixture.stop();
   }
@@ -109,6 +119,7 @@ test('uploads a local .gcex package and runs it through the same install transac
     await login(page, fixture.baseUrl);
     await navigate(page, 'capabilities');
     const extensionView = page.locator('[data-role="view-capabilities"]');
+    await extensionView.getByRole('button', { name: '安装扩展', exact: true }).click();
     await extensionView.locator('[data-field="source-kind"]').selectOption('file');
     await extensionView.locator('[data-field="local-package"]').setInputFiles(packagePath);
 
@@ -129,6 +140,7 @@ test('creates a managed access token without re-echoing stored secrets', async (
     await login(page, fixture.baseUrl);
     await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
+    await selectSettingsSection(page, '安全与访问');
     await settingsView.locator('[data-field="access-token-label"]').fill('Ops laptop');
     await settingsView.locator('[data-action="create-token"]').click();
 
@@ -146,9 +158,10 @@ test('shows real disabled reason for deployment operations when no host bridge i
     await login(page, fixture.baseUrl);
     await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
+    await selectSettingsSection(page, '存储与服务');
     await expect(settingsView).toContainText('当前 Product Host 未连接部署级外部事务 owner');
     await expect(settingsView.locator('[data-action="create-backup"]')).toBeDisabled();
-    await expect(settingsView.locator('[data-action="apply-updates"]')).toBeDisabled();
+    await expect(settingsView.getByRole('button', { name: '应用更新', exact: true })).toBeDisabled();
   } finally {
     await fixture.stop();
   }
@@ -160,6 +173,7 @@ test('projects skill catalog runtime and refreshes it after skill config save', 
     await login(page, fixture.baseUrl);
     await navigate(page, 'settings');
     const settingsView = page.locator('[data-role="view-settings"]');
+    await selectSettingsSection(page, 'Skill / MCP');
     const skillsSection = page.locator('[data-role="skills-section"]');
 
     await expect(skillsSection).toContainText('Skill Catalog / Provider Runtime');
@@ -170,7 +184,7 @@ test('projects skill catalog runtime and refreshes it after skill config save', 
     await skillsSection.locator('[data-path="skills.user_skills.enabled"]').check();
     await page.locator('[data-action="save"]').click();
 
-    await expect(settingsView.locator('.save-bar .save-status')).toContainText('配置已保存');
+    await expect(settingsView.locator('[data-role="save-status"]')).toContainText('配置已保存');
     await expect(skillsSection).toContainText('用户技能目录已启用');
     await expect(skillsSection).toContainText('Local Maintenance');
     await expect(skillsSection).toContainText('ready');
@@ -191,16 +205,19 @@ test('saves audio, embedding and memory settings without falling back to yaml ed
     const embeddingSection = settingsView.locator('[data-role="embedding-section"]');
     const memorySection = settingsView.locator('[data-role="memory-section"]');
 
+    await selectSettingsSection(page, '音频');
     await expect(audioSection).toBeVisible();
     await audioSection.locator('[data-path="audio.tts.enabled"]').check();
     await audioSection.locator('[data-path="audio.asr.enabled"]').check();
     await audioSection.locator('[data-path="audio.tts.cache.max_age_days"]').fill('14');
 
+    await selectSettingsSection(page, '语义向量');
     await expect(embeddingSection).toBeVisible();
     await embeddingSection.locator('[data-path="embedding.enabled"]').check();
     await embeddingSection.locator('[data-path="embedding.route.provider"]').selectOption('local-sentence-transformers');
     await embeddingSection.locator('[data-path="embedding.providers.local-sentence-transformers.auto_download"]').check();
 
+    await selectSettingsSection(page, '记忆与经验');
     await expect(memorySection).toBeVisible();
     await memorySection.locator('[data-path="memory.working.context_message_limit"]').fill('12');
     await memorySection.locator('[data-path="memory.experience.enabled"]').uncheck();
@@ -208,13 +225,16 @@ test('saves audio, embedding and memory settings without falling back to yaml ed
     await expect(settingsView.locator('[data-action="save"]')).toBeEnabled();
     await settingsView.locator('[data-action="save"]').click();
 
-    await expect(settingsView.locator('.save-bar .save-status')).toContainText('配置已保存');
+    await expect(settingsView.locator('[data-role="save-status"]')).toContainText('配置已保存');
+    await selectSettingsSection(page, '音频');
     await expect(audioSection.locator('[data-path="audio.tts.enabled"]')).toBeChecked();
     await expect(audioSection.locator('[data-path="audio.asr.enabled"]')).toBeChecked();
     await expect(audioSection.locator('[data-path="audio.tts.cache.max_age_days"]')).toHaveValue('14');
+    await selectSettingsSection(page, '语义向量');
     await expect(embeddingSection.locator('[data-path="embedding.enabled"]')).toBeChecked();
     await expect(embeddingSection.locator('[data-path="embedding.route.provider"]')).toHaveValue('local-sentence-transformers');
     await expect(embeddingSection.locator('[data-path="embedding.providers.local-sentence-transformers.auto_download"]')).toBeChecked();
+    await selectSettingsSection(page, '记忆与经验');
     await expect(memorySection.locator('[data-path="memory.working.context_message_limit"]')).toHaveValue('12');
     await expect(memorySection.locator('[data-path="memory.experience.enabled"]')).not.toBeChecked();
   } finally {
@@ -241,7 +261,7 @@ test('keeps both shell connection indicators in sync and restores them after rec
     await expect(connectionLabels.nth(1)).toHaveText('在线', { timeout: 8000 });
     await navigate(page, 'settings');
     await expect(page.locator('[aria-label="全局导航"] [data-route="settings"]').first()).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('.settings-section').first()).toBeVisible();
+    await expect(page.locator('[data-role="route-summary"]')).toBeVisible();
   } finally {
     await fixture.stop();
   }

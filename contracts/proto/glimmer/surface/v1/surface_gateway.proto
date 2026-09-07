@@ -239,6 +239,13 @@ message ConversationHistoryEntryProjection {
   string thread_id = 9;
   string recall_scope = 10;
   string disclosure_scope = 11;
+  optional string trace_id = 12;
+  optional string interaction_id = 13;
+  optional uint64 position = 14;
+  optional string title = 15;
+  optional string moment_id = 16;
+  optional string actor_id = 17;
+  optional string actor_name = 18;
 }
 message ConversationHistoryResultEvent {
   string request_id = 1;

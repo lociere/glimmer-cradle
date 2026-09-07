@@ -245,6 +245,8 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
       } : undefined,
       items: item.value.items.map((entry) => ({
         entry_id: entry.entryId, source_kind: entry.sourceKind as never, role: entry.role as never,
+        trace_id: entry.traceId, interaction_id: entry.interactionId, position: entry.position == null ? undefined : Number(entry.position),
+        title: entry.title, moment_id: entry.momentId, actor_id: entry.actorId, actor_name: entry.actorName,
         status: entry.status as never, text: entry.text, occurred_at: entry.occurredAt,
         conversation_id: entry.conversationId, scene_id: entry.sceneId, thread_id: entry.threadId,
         recall_scope: entry.recallScope, disclosure_scope: entry.disclosureScope,

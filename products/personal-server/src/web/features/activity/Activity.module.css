@@ -1,0 +1,22 @@
+.activity { display: flex; flex-direction: column; gap: var(--space-4); max-width: calc(var(--reading-width) + 2 * var(--page-gutter)); margin-inline: auto; padding-top: var(--space-8); overflow-wrap: anywhere; }
+.header, .actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); }
+.actions { justify-content: flex-start; }
+.activity h1, .dialog h2 { font-size: var(--font-size-title); margin: 0; }
+.activity p, .dialog p { color: var(--text-secondary); margin: var(--space-2) 0; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap: var(--space-4); align-items: end; }
+.filters label { display: grid; gap: var(--space-2); min-width: 0; }
+.filters input, .filters select, .button { min-height: var(--control-height-compact); border: 1px solid var(--divider-subtle); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-primary); }
+.filters input, .filters select { width: 100%; min-width: 0; }
+.button, .row { cursor: pointer; }
+.list { max-height: 65dvh; overflow: auto; }
+.entry { border-top: 1px solid var(--divider-subtle); }
+.row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2); width: 100%; text-align: left; border: 0; border-radius: var(--radius-control); padding: var(--space-4); background: transparent; overflow-wrap: anywhere; }
+.row:hover { background: var(--surface-hover); }
+.row > span:not(.message), .row small { color: var(--text-secondary); font-size: var(--font-size-label); }
+.message, .row small { grid-column: 1 / -1; }
+.activity pre, .dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: var(--space-4); background: var(--surface-raised); }
+.scrim { position: fixed; inset: 0; z-index: 100; display: flex; justify-content: flex-end; background: var(--scrim); }
+.drawer { width: min(34rem,100%); height: 100dvh; overflow: auto; background: var(--surface-overlay); box-shadow: var(--shadow-overlay); }
+.dialog { padding: var(--space-6); min-height: 100%; outline: none; overflow-wrap: anywhere; }
+.dialog dd { margin: var(--space-1) 0 var(--space-4); }.dialog dt { color: var(--text-secondary); }
+@media (max-width: 520px) { .row { grid-template-columns: minmax(0,1fr); } .activity { padding-top: var(--space-5); } .dialog { padding: var(--space-4); } }

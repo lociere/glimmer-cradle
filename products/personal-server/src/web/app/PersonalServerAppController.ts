@@ -2,12 +2,12 @@ import type {
   ConfigurationSnapshot,
   RuntimeReadinessCatalog,
   RuntimeProjection,
+  ConversationHistoryRequest,
+  ConversationHistoryResult,
 } from '../../shared/control-center-models';
-import { ConfigurationView } from '../features/configuration/configuration-view';
-import { ConversationView } from '../features/conversation/conversation-view';
-import { ExtensionView } from '../features/extensions/extension-view';
-import { ObservabilityView } from '../features/observability/observability-view';
-import { StatusView } from '../features/status/status-view';
+import type { ConfigurationPort } from '../features/configuration/ConfigurationController';
+import type { ExtensionsPort } from '../features/capabilities/ExtensionsController';
+import type { ActivityPort } from '../features/activity/ActivityController';
 import {
   PersonalServerClient,
   type PersonalServerSurface,
@@ -23,7 +23,10 @@ export interface PersonalServerAppSnapshot {
   readonly connection: ConnectionState;
   readonly productName: string;
   readonly status: ReadinessStatus | null;
+  readonly statusError: string | null;
   readonly runtimes: readonly RuntimeProjection[];
+  readonly runtimeCatalogUpdatedAt: number | null;
+  readonly runtimeCatalogCurrent: boolean;
   readonly configuration: ConfigurationSnapshot | null;
   readonly loginPending: boolean;
   readonly loginMessage: string;
@@ -34,7 +37,10 @@ const initialSnapshot: PersonalServerAppSnapshot = {
   connection: 'waiting',
   productName: 'Personal Server',
   status: null,
+  statusError: null,
   runtimes: [],
+  runtimeCatalogUpdatedAt: null,
+  runtimeCatalogCurrent: false,
   configuration: null,
   loginPending: false,
   loginMessage: '',
@@ -43,6 +49,7 @@ const initialSnapshot: PersonalServerAppSnapshot = {
 export class PersonalServerAppController {
   private readonly client = new PersonalServerClient();
   private readonly listeners = new Set<() => void>();
+  private readonly conversationListeners = new Set<(frame: SurfaceFrame) => void>();
   private snapshot: PersonalServerAppSnapshot = initialSnapshot;
   private running = false;
   private generation = 0;
@@ -50,11 +57,8 @@ export class PersonalServerAppController {
   private authenticatedAbort: AbortController | null = null;
   private logoutRequest: Promise<void> | null = null;
   private surface: PersonalServerSurface | null = null;
-  private conversationView: ConversationView | null = null;
-  private extensionView: ExtensionView | null = null;
-  private statusView: StatusView | null = null;
-  private observabilityView: ObservabilityView | null = null;
-  private configurationView: ConfigurationView | null = null;
+  private readonly extensionListeners = new Set<(frame: SurfaceFrame) => void>();
+
 
   public readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -116,86 +120,116 @@ export class PersonalServerAppController {
     await request;
   }
 
-  public mountConversation(root: HTMLElement): () => void {
-    const view = new ConversationView(root, { getSurface: () => this.surface });
-    this.conversationView = view;
-    if (this.surface?.readyState === WebSocket.OPEN) void view.handleSurfaceOpen();
-    return () => {
-      view.reset();
-      if (this.conversationView === view) this.conversationView = null;
-    };
+  public subscribeConversation(listener: (frame: SurfaceFrame) => void): () => void {
+    this.conversationListeners.add(listener);
+    return () => { this.conversationListeners.delete(listener); };
   }
 
-  public mountOverview(root: HTMLElement): () => void {
-    const view = new StatusView(root);
-    this.statusView = view;
-    this.renderStatus();
-    return () => {
-      if (this.statusView === view) this.statusView = null;
-    };
+  public async readConversationHistory(request: ConversationHistoryRequest, signal: AbortSignal): Promise<ConversationHistoryResult> {
+    const surface = this.surface;
+    const generation = this.generation;
+    if (signal.aborted || !surface || surface.readyState !== WebSocket.OPEN) throw new Error('对话连接尚未就绪。');
+    const result = await surface.requestConversationHistory(request);
+    if (signal.aborted || !this.isActiveSurface(surface, generation)) throw new Error('对话读取已取消。');
+    if (result.status !== 'success') throw new Error(result.message || '历史读取失败。');
+    return result;
   }
 
-  public mountCapabilities(root: HTMLElement): () => void {
-    const view = new ExtensionView(root, {
-      getSurface: () => this.surface,
-      uploadLocalPackage: (file) => this.client.uploadLocalExtensionPackage(file),
-    });
-    this.extensionView = view;
-    view.renderLoading();
-    if (this.surface?.readyState === WebSocket.OPEN) void view.handleSurfaceOpen();
-    return () => {
-      view.reset();
-      if (this.extensionView === view) this.extensionView = null;
-    };
+  public sendConversation(text: string, traceId: string): void {
+    if (this.snapshot.session !== 'authenticated' || this.surface?.readyState !== WebSocket.OPEN) throw new Error('对话连接已断开。');
+    this.surface.sendChatInput(text, traceId);
   }
 
-  public mountActivity(root: HTMLElement): () => void {
-    const view = new ObservabilityView(root, {
-      listRecent: (query) => this.client.getRecentLogs(query),
-      connectStream: (query, handlers) => this.client.connectLogStream(query, handlers),
-    });
-    this.observabilityView = view;
-    view.start();
-    return () => {
-      view.stop();
-      if (this.observabilityView === view) this.observabilityView = null;
-    };
+  public async readConfiguration(signal: AbortSignal): Promise<ConfigurationSnapshot> {
+    const surface = this.surface;
+    const generation = this.generation;
+    if (signal.aborted || !surface || surface.readyState !== WebSocket.OPEN) throw new Error('控制面尚未连接。');
+    const configuration = await surface.requestConfigurationSnapshot();
+    if (signal.aborted || !this.isActiveSurface(surface, generation)) throw new Error('读取已取消或连接已改变。');
+    this.patch({ configuration });
+    return configuration;
   }
 
-  public mountSettings(root: HTMLElement): () => void {
-    const view = new ConfigurationView(root, {
-      onPreview: async (request) => {
-        if (!this.surface) throw new Error('surface_unavailable');
-        return this.surface.previewConfigurationUpdate(request);
+  public subscribeExtensions(listener: (frame: SurfaceFrame) => void): () => void {
+    this.extensionListeners.add(listener);
+    return () => { this.extensionListeners.delete(listener); };
+  }
+
+  public createExtensionsPort(): ExtensionsPort | null {
+    const surface = this.surface;
+    const generation = this.generation;
+    if (!surface || surface.readyState !== WebSocket.OPEN) return null;
+    const guard = () => {
+      if (!this.isActiveSurface(surface, generation) || surface.readyState !== WebSocket.OPEN) throw new Error('扩展连接已断开。');
+    };
+    const requestId = () => crypto.randomUUID();
+    return {
+      read: () => { guard(); return surface.requestExtensionRuntimeProjection({ request_id: requestId() }); },
+      prepare: (request) => { guard(); return surface.prepareExtensionInstall(request); },
+      commit: (preview) => { guard(); return surface.commitExtensionInstall({ request_id: requestId(), transaction_id: preview.transaction_id!, approved_permissions: preview.extension?.permissions ?? [] }); },
+      cancel: (transactionId) => { guard(); return surface.cancelExtensionInstall(requestId(), transactionId); },
+      lifecycle: (id, operation, version) => { guard(); return surface.requestExtensionLifecycle({ request_id: requestId(), extension_id: id, operation, version }); },
+      uninstall: (id, version) => { guard(); return surface.uninstallExtension({ request_id: requestId(), extension_id: id, version }); },
+      upload: (file) => { guard(); return this.client.uploadLocalExtensionPackage(file); },
+    };
+  }
+  public createActivityPort(): ActivityPort {
+    const generation = this.generation;
+    const guard = () => {
+      if (!this.isAuthenticatedGeneration(generation)) throw new Error('会话已失效。');
+    };
+    return {
+      read: async (query, signal) => {
+        guard();
+        const sessionSignal = this.authenticatedAbort?.signal;
+        try {
+          const entries = await this.client.getRecentLogs(query, sessionSignal ? AbortSignal.any([signal, sessionSignal]) : signal);
+          guard();
+          return entries;
+        } catch (error) {
+          if (!signal.aborted && this.isAuthenticatedGeneration(generation) && error instanceof Error && error.message === 'unauthorized') this.transitionToAnonymous('会话已失效，请重新连接。');
+          throw error;
+        }
       },
-      onSave: async (request) => {
-        if (!this.surface) throw new Error('surface_unavailable');
-        return this.surface.applyConfigurationUpdate(request);
+      stream: (query, handlers) => {
+        guard();
+        const signal = this.authenticatedAbort?.signal;
+        const stream = this.client.connectLogStream(query, {
+          onOpen: () => { if (this.isAuthenticatedGeneration(generation)) handlers.onOpen(); },
+          onEntry: (entry) => { if (this.isAuthenticatedGeneration(generation)) handlers.onEntry(entry); },
+          onError: () => { if (this.isAuthenticatedGeneration(generation)) handlers.onError(); },
+        });
+        const close = () => { stream.close(); signal?.removeEventListener('abort', close); };
+        signal?.addEventListener('abort', close, { once: true });
+        if (signal?.aborted) close();
+        return { close };
       },
-      onTestProvider: async (request) => {
-        if (!this.surface) throw new Error('surface_unavailable');
-        return this.surface.testProvider(request);
-      },
-      loadAccessTokens: () => this.client.getAccessTokenSnapshot(),
-      createAccessToken: (label) => this.client.createAccessToken(label),
-      rotateAccessToken: (tokenId) => this.client.rotateAccessToken(tokenId),
-      revokeAccessToken: (tokenId) => this.client.revokeAccessToken(tokenId),
-      loadOperations: () => this.client.getOperationsSnapshot(),
-      runOperation: (operation, options) => this.client.runOperation(operation, options),
-      loadOperationResult: (operationId) => this.client.getOperationResult(operationId),
-      loadSkillCatalog: async () => {
-        if (!this.surface) throw new Error('surface_unavailable');
-        return this.surface.requestSkillCatalog({ request_id: `skill-catalog-${Date.now()}` });
-      },
-    });
-    const reload = () => void this.loadConfiguration(view);
-    root.addEventListener('configuration:reload', reload);
-    this.configurationView = view;
-    view.renderLoading();
-    if (this.surface?.readyState === WebSocket.OPEN) void this.loadConfiguration(view);
-    return () => {
-      root.removeEventListener('configuration:reload', reload);
-      if (this.configurationView === view) this.configurationView = null;
+    };
+  }
+  public createConfigurationPort(): ConfigurationPort | null {
+    const surface = this.surface; const generation = this.generation;
+    if (!surface || surface.readyState !== WebSocket.OPEN) return null;
+    const abort = new AbortController();
+    const sessionSignal = this.authenticatedAbort?.signal;
+    const signal = sessionSignal ? AbortSignal.any([abort.signal, sessionSignal]) : abort.signal;
+    const guard = () => { if (signal.aborted || !this.isActiveSurface(surface, generation) || surface.readyState !== WebSocket.OPEN) throw new Error('配置连接已断开。'); };
+    const request = async <T,>(action: () => Promise<T>): Promise<T> => {
+      guard();
+      try { const result = await action(); guard(); return result; }
+      catch (error) { if (!signal.aborted && this.isAuthenticatedGeneration(generation) && error instanceof Error && error.message === 'unauthorized') this.transitionToAnonymous('会话已失效，请重新连接。'); throw error; }
+    };
+    return {
+      read: () => request(async () => { const configuration = await surface.requestConfigurationSnapshot(); guard(); this.patch({ configuration }); return configuration; }),
+      preview: value => request(() => surface.previewConfigurationUpdate(value)),
+      save: value => request(async () => { const result = await surface.applyConfigurationUpdate(value); guard(); if (result.snapshot && result.status === 'success') this.patch({ configuration: result.snapshot }); return result; }),
+      testProvider: value => request(() => surface.testProvider(value)),
+      tokens: () => request(() => this.client.getAccessTokenSnapshot(signal)),
+      mutateToken: (action, value) => request(() => action === 'create' ? this.client.createAccessToken(value, signal) : action === 'rotate' ? this.client.rotateAccessToken(value, signal) : this.client.revokeAccessToken(value, signal)),
+      operations: () => request(() => this.client.getOperationsSnapshot(signal)),
+      runOperation: (operation, options) => request(() => this.client.runOperation(operation, options, signal)),
+      operationResult: id => request(() => this.client.getOperationResult(id, signal)),
+      skills: () => request(() => surface.requestSkillCatalog({ request_id: crypto.randomUUID() })),
+      close: () => abort.abort(),
     };
   }
 
@@ -247,8 +281,7 @@ export class PersonalServerAppController {
     try {
       const status = await this.client.getStatus(signal);
       if (signal.aborted || !this.isAuthenticatedGeneration(generation)) return;
-      this.patch({ status });
-      this.renderStatus();
+      this.patch({ status, statusError: null });
       if (status.ready && (!this.surface || this.surface.readyState === WebSocket.CLOSED)) {
         this.connectSurface(generation);
       }
@@ -259,6 +292,7 @@ export class PersonalServerAppController {
         this.transitionToAnonymous('会话已失效，请重新连接。');
         return;
       }
+      this.patch({ statusError: '无法读取服务状态，正在自动重试。' });
       this.scheduleStatusRefresh(generation, signal, 1500);
     }
   }
@@ -284,21 +318,17 @@ export class PersonalServerAppController {
       onOpen: async () => {
         if (!this.isActiveSurface(surface, generation)) return;
         this.patch({ connection: 'online' });
-        await this.conversationView?.handleSurfaceOpen();
+
         if (!this.isActiveSurface(surface, generation)) return;
-        await this.extensionView?.handleSurfaceOpen();
-        if (!this.isActiveSurface(surface, generation)) return;
-        if (this.configurationView) void this.loadConfiguration(this.configurationView);
       },
       onFrame: (frame) => {
         if (this.isActiveSurface(surface, generation)) this.handleSurfaceFrame(frame);
       },
       onClose: () => {
         if (!this.isActiveSurface(surface, generation)) return;
-        this.conversationView?.handleSurfaceClose();
-        this.extensionView?.handleSurfaceClose();
+
         this.surface = null;
-        this.patch({ connection: 'waiting' });
+        this.patch({ connection: 'waiting', runtimeCatalogCurrent: false });
         const signal = this.authenticatedAbort?.signal;
         if (signal) this.scheduleStatusRefresh(generation, signal, 1000);
       },
@@ -307,50 +337,13 @@ export class PersonalServerAppController {
   }
 
   private handleSurfaceFrame(frame: SurfaceFrame): void {
-    this.conversationView?.handleFrame(frame);
-    this.extensionView?.handleFrame(frame);
-    if (frame.kind === 'extension_runtime_projection_changed') {
-      // Runtime projection events do not carry the installation catalog; reload both views together.
-      void this.extensionView?.handleSurfaceOpen();
-    }
+    for (const listener of this.conversationListeners) listener(frame);
+    for (const listener of this.extensionListeners) listener(frame);
     if (frame.kind === 'runtime_readiness' && frame.runtime_readiness) {
       const catalog = frame.runtime_readiness as RuntimeReadinessCatalog;
-      this.patch({ runtimes: catalog.runtimes as RuntimeProjection[] });
-      this.renderStatus();
+      this.patch({ runtimes: catalog.runtimes, runtimeCatalogUpdatedAt: catalog.updated_at, runtimeCatalogCurrent: true });
       return;
     }
-    if (frame.kind === 'configuration_snapshot_result' && frame.configuration_snapshot_result?.snapshot) {
-      this.patch({ configuration: frame.configuration_snapshot_result.snapshot });
-      this.renderStatus();
-    }
-  }
-
-  private async loadConfiguration(view: ConfigurationView): Promise<void> {
-    if (this.configurationView !== view) return;
-    if (!this.surface || this.surface.readyState !== WebSocket.OPEN) {
-      view.renderLoading('控制面尚未连接到 Kernel，暂时无法读取配置。');
-      return;
-    }
-    view.renderLoading();
-    try {
-      const configuration = await this.surface.requestConfigurationSnapshot();
-      if (this.configurationView !== view) return;
-      this.patch({ configuration });
-      view.renderSnapshot(configuration);
-      this.renderStatus();
-    } catch (error) {
-      if (this.configurationView === view) {
-        view.renderLoading(error instanceof Error ? error.message : String(error));
-      }
-    }
-  }
-
-  private renderStatus(): void {
-    this.statusView?.render({
-      status: this.snapshot.status,
-      runtimes: this.snapshot.runtimes,
-      configuration: this.snapshot.configuration,
-    });
   }
 
   private teardownAuthenticated(): void {
@@ -360,9 +353,8 @@ export class PersonalServerAppController {
     const surface = this.surface;
     this.surface = null;
     surface?.close();
-    this.conversationView?.handleSurfaceClose();
-    this.extensionView?.handleSurfaceClose();
-    this.observabilityView?.stop();
+
+
   }
 
   private clearReadinessTimer(): void {

@@ -1,4 +1,5 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { configurationScenario } from '../scenarios/configuration';
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as grpc from '@grpc/grpc-js';
@@ -72,14 +73,25 @@ const surfaceGatewayDefinition: grpc.ServiceDefinition = {
 };
 
 export interface PersonalServerUiFixture {
+  appendLog(message: string): void;
   readonly baseUrl: string;
+  publishRuntimeCatalog(catalog: RuntimeReadinessCatalog): void;
   disconnectSurfaceClients(): Promise<void>;
   stop(): Promise<void>;
 }
 
 export async function startPersonalServerUiFixture(options?: {
   readonly zeroProvider?: boolean;
+  readonly runtimeCatalog?: RuntimeReadinessCatalog | null;
+  readonly configurationReadFailures?: number;
+  readonly configurationReadDelayMs?: number;
+  readonly conversationHistory?: ConversationHistoryEntry[];
+  readonly historyReadFailures?: number;
+  readonly historyReadDelayMs?: number;
+  readonly historyPageSize?: number;
+  readonly failFirstExtensionTransaction?: 'commit' | 'cancel';
 }): Promise<PersonalServerUiFixture> {
+  let transactionFailurePending = Boolean(options?.failFirstExtensionTransaction);
   const root = mkdtempSync(path.join(tmpdir(), 'personal-server-ui-'));
   const dataRoot = path.join(root, 'data');
   const configRoot = path.join(root, 'configs');
@@ -125,6 +137,18 @@ export async function startPersonalServerUiFixture(options?: {
   })}\n`, 'utf8');
 
   const state = createFixtureState(Boolean(options?.zeroProvider));
+  if (options?.conversationHistory) state.history = options.conversationHistory;
+  state.historyPageSize = options?.historyPageSize;
+  let historyReadFailures = options?.historyReadFailures ?? 0;
+  let configurationReadFailures = options?.configurationReadFailures ?? 0;
+  let runtimeCatalog = options?.runtimeCatalog === undefined ? {
+    updated_at: Date.now(),
+    runtimes: [
+      readyRuntime('kernel.ingress', 'kernel', 'ingress', 'HTTP ingress 已就绪', true),
+      readyRuntime('cognition', 'cognition', 'core_ready', 'Cognition 已连接', true),
+      readyRuntime('extension.host', 'extension', 'capability_plane', 'Extension Host 已连接', false),
+    ],
+  } satisfies RuntimeReadinessCatalog : options.runtimeCatalog;
   const kernelSurface = new grpc.Server();
   const surfaceStreams = new Set<grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>>();
   kernelSurface.addService(surfaceGatewayDefinition, {
@@ -144,19 +168,49 @@ export async function startPersonalServerUiFixture(options?: {
       callback: grpc.sendUnaryData<SurfaceGatewayServiceQueryResponse>,
     ) => {
       const frame = fixtureQueryFrame(call.request);
-      const response = fixtureResponseFrame(frame, state);
-      callback(null, create(SurfaceGatewayServiceQueryResponseSchema, {
+      const configurationRead = frame.kind === 'config_snapshot_request';
+      const failConfiguration = configurationRead && configurationReadFailures-- > 0;
+      const historyRead = frame.kind === 'conversation_history_request';
+      const failHistory = historyRead && historyReadFailures-- > 0;
+      const response = failHistory ? {
+        kind: 'conversation_history_result', timestamp: Date.now(),
+        conversation_history_result: {
+          request_id: (frame.conversation_history_request as { request_id: string }).request_id,
+          status: 'error', items: [], has_more: false, message: '对话历史暂时不可读。',
+        },
+      } : failConfiguration ? {
+        kind: 'configuration_snapshot_result', timestamp: Date.now(),
+        configuration_snapshot_result: {
+          request_id: (frame.config_snapshot_request as { request_id: string }).request_id, status: 'error', message: '模型配置暂时不可读。',
+        },
+      } satisfies ProductSurfaceProjection : fixtureResponseFrame(frame, state);
+      const reply = () => callback(null, create(SurfaceGatewayServiceQueryResponseSchema, {
         operationId: `fixture-query-${Date.now()}`,
         status: response ? 'success' : 'accepted',
         event: response ? fixtureSurfaceEvent(response) : undefined,
       }));
+      if (historyRead && options?.historyReadDelayMs) setTimeout(reply, options.historyReadDelayMs);
+      else if (configurationRead && options?.configurationReadDelayMs) setTimeout(reply, options.configurationReadDelayMs);
+      else reply();
     },
     Command: (
       call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
       callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
     ) => {
       const frame = fixtureCommandFrame(call.request);
-      const response = fixtureResponseFrame(frame, state);
+      const failedRequest = frame[`extension_install_${options?.failFirstExtensionTransaction}`] as { request_id: string; transaction_id: string } | undefined;
+      if (transactionFailurePending && failedRequest) {
+        transactionFailurePending = false;
+        state.extensions.prepared.delete(failedRequest.transaction_id);
+        callback(null, create(SurfaceGatewayServiceCommandResponseSchema, {
+          operationId: 'fixture-failed-transaction', status: 'success',
+          event: fixtureSurfaceEvent({ kind: 'extension_install_result', timestamp: Date.now(), extension_install_result: { request_id: failedRequest.request_id, status: 'error', message: '安装事务已终结，请重新生成预览。' } }),
+        }));
+        return;
+      }
+      const response = fixtureResponseFrame(frame, state, (event) => {
+        for (const stream of surfaceStreams) stream.write(fixtureStreamFrame(event));
+      });
       callback(null, create(SurfaceGatewayServiceCommandResponseSchema, {
         operationId: `fixture-command-${Date.now()}`,
         status: response ? 'success' : 'accepted',
@@ -169,17 +223,10 @@ export async function startPersonalServerUiFixture(options?: {
       surfaceStreams.add(call);
       call.once('cancelled', () => surfaceStreams.delete(call));
       call.once('close', () => surfaceStreams.delete(call));
-      call.write(fixtureStreamFrame({
+      if (runtimeCatalog) call.write(fixtureStreamFrame({
         kind: 'runtime_readiness',
         timestamp: Date.now(),
-        runtime_readiness: {
-          updated_at: Date.now(),
-          runtimes: [
-            readyRuntime('kernel.ingress', 'kernel', 'ingress', 'HTTP ingress 已就绪', true),
-            readyRuntime('cognition', 'cognition', 'core_ready', 'Cognition 已连接', true),
-            readyRuntime('extension.host', 'extension', 'capability_plane', 'Extension Host 已连接', false),
-          ],
-        } satisfies RuntimeReadinessCatalog,
+        runtime_readiness: runtimeCatalog,
       } satisfies ProductSurfaceProjection));
     },
   });
@@ -217,6 +264,13 @@ export async function startPersonalServerUiFixture(options?: {
 
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
+    appendLog(message) { appendFileSync(eventLogPath, `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'info', event_type: 'fixture.append', event_action: message, owner: 'fixture', module: 'fixture-live', runtime_id: 'kernel', trace_id: 'trace-live' })}\n`, 'utf8'); },
+    publishRuntimeCatalog(catalog) {
+      runtimeCatalog = catalog;
+      for (const stream of surfaceStreams) stream.write(fixtureStreamFrame({
+        kind: 'runtime_readiness', timestamp: Date.now(), runtime_readiness: catalog,
+      }));
+    },
     async disconnectSurfaceClients() {
       for (const stream of surfaceStreams) stream.end();
     },
@@ -235,6 +289,7 @@ interface FixtureState {
   snapshot: ConfigurationSnapshot;
   skillCatalog: SkillCatalogSnapshot;
   history: ConversationHistoryEntry[];
+  historyPageSize?: number;
   extensions: {
     projections: Map<string, ExtensionRuntimeProjection>;
     installations: Map<string, ExtensionInstallationProjection>;
@@ -247,145 +302,9 @@ interface FixtureState {
 }
 
 function createFixtureState(zeroProvider: boolean): FixtureState {
-  const providers: ConfigurationProviderSnapshot[] = zeroProvider
-    ? []
-    : [{
-      key: 'primary',
-      api_type: 'openai',
-      base_url: 'https://api.example.com',
-      has_api_key: true,
-      models: [{ alias: 'chat', model_id: 'gpt-4.1' }],
-    }];
+
   return {
-    snapshot: {
-      revision: 'fixture-rev-1',
-      llm: {
-        provider_count: providers.length,
-        providers,
-        default_route: zeroProvider
-          ? { ready: false, reason: '尚未配置默认对话模型。' }
-          : {
-            provider_key: 'primary',
-            model_alias: 'chat',
-            effective_model_id: 'gpt-4.1',
-            ready: true,
-          },
-      },
-      audio: {
-        tts: {
-          enabled: false,
-          route: {
-            primary: 'dashscope-cosyvoice',
-            fallbacks: [],
-            circuit_breaker: {
-              failure_threshold: 3,
-              recovery_timeout_ms: 30000,
-            },
-          },
-          cache: {
-            enabled: true,
-            max_age_days: 30,
-          },
-          providers: {
-            'dashscope-cosyvoice': {
-              enabled: true,
-              endpoint: 'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
-              model: 'cosyvoice-v3.5-flash',
-              format: 'wav',
-              sample_rate: 24000,
-              connect_timeout_ms: 5000,
-              receive_timeout_ms: 20000,
-              max_retries: 1,
-            },
-          },
-        },
-        asr: {
-          enabled: false,
-          provider: 'funasr',
-          resource_id: 'funasr.sensevoice-small',
-        },
-      },
-      embedding: {
-        enabled: false,
-        route: {
-          provider: 'dashscope-text-embedding',
-        },
-        providers: {
-          'dashscope-text-embedding': {
-            endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/embeddings/text-embedding/text-embedding',
-            model: 'text-embedding-v4',
-            dimensions: 1024,
-            request_timeout_ms: 15000,
-            max_retries: 1,
-          },
-          'local-sentence-transformers': {
-            model_path: 'embedding/m3e-small',
-            model_id: 'moka-ai/m3e-small',
-            auto_download: false,
-            device: 'cpu',
-            batch_size: 64,
-          },
-        },
-      },
-      memory: {
-        working: {
-          max_messages_per_conversation: 32,
-          hydrate_recent_messages: 32,
-          context_message_limit: 8,
-        },
-        conversation: {
-          segment_target_messages: 20,
-          chapter_idle_minutes: 360,
-          chapter_segment_limit: 8,
-          state_update_messages: 6,
-          history_candidate_limit: 12,
-          history_result_limit: 4,
-          summary_max_chars: 2400,
-        },
-        experience: {
-          enabled: true,
-          pack_max_size_mb: 256,
-          flush_interval_ms: 500,
-          flush_max_buffer: 64,
-          episode_idle_seconds: 300,
-          seal_integrity_check: true,
-        },
-        consolidation: {
-          enabled: true,
-          batch_size: 8,
-          max_batch_moments: 64,
-          debounce_seconds: 120,
-          max_wait_seconds: 900,
-          lease_seconds: 180,
-          retry_base_seconds: 30,
-          minimum_salience: 0.45,
-          autobiographical_evidence_threshold: 3,
-          schedule_interval_seconds: 300,
-        },
-        retrieval: {
-          token_budget: 800,
-          candidate_limit: 24,
-          result_limit: 6,
-          semantic_weight: 0.35,
-        },
-      },
-      skills: {
-        mcp_servers: [],
-        user_skills: {
-          enabled: false,
-          root_dir: 'skills',
-        },
-      },
-      storage: {
-        config_root: '/fixture/configs',
-        data_root: '/fixture/data',
-        state_root: '/fixture/data/state',
-      },
-      service: {
-        cognition_ready: true,
-        restart_supported: true,
-      },
-    },
+    snapshot: configurationScenario(zeroProvider),
     skillCatalog: {
       generatedAt: '2026-07-18T18:06:00.000Z',
       totalSkills: 3,
@@ -594,7 +513,7 @@ function fixtureQueryFrame(request: SurfaceGatewayServiceQueryRequest): Record<s
 function fixtureCommandFrame(request: SurfaceGatewayServiceCommandRequest): Record<string, unknown> {
   const command = request.command;
   switch (command.case) {
-    case 'chatInput': return { kind: 'chat_input', chat_input: { text: command.value.text, source_suffix: command.value.sourceSuffix || undefined } };
+    case 'chatInput': return { kind: 'chat_input', trace_id: request.call?.traceId, chat_input: { text: command.value.text, source_suffix: command.value.sourceSuffix || undefined } };
     case 'configurationTest': return { kind: 'config_test_request', config_test_request: {
       request_id: command.value.requestId, provider: command.value.provider,
     } };
@@ -624,11 +543,13 @@ function fixtureCommandFrame(request: SurfaceGatewayServiceCommandRequest): Reco
   }
 }
 
-function fixtureResponseFrame(frame: Record<string, unknown>, state: FixtureState): Record<string, unknown> | undefined {
+function fixtureResponseFrame(frame: Record<string, unknown>, state: FixtureState, publish?: (event: ProductSurfaceProjection) => void): Record<string, unknown> | undefined {
   let response: Record<string, unknown> | undefined;
   handleFixtureFrame({
     send: (serialized) => {
-      response = JSON.parse(serialized) as Record<string, unknown>;
+      const event = JSON.parse(serialized) as Record<string, unknown>;
+      if (event.kind === 'extension_runtime_projection_changed') publish?.(event as unknown as ProductSurfaceProjection);
+      else response = event;
     },
   }, frame, state);
   return response;
@@ -665,6 +586,9 @@ function fixtureSurfaceEvent(frame: Record<string, unknown>): surfaceV1.SurfaceE
         items: value.items.map((item: any) => create(surfaceV1.ConversationHistoryEntryProjectionSchema, {
           entryId: item.entry_id, sourceKind: item.source_kind, role: item.role, status: item.status,
           text: item.text, occurredAt: item.occurred_at, conversationId: item.conversation_id,
+          traceId: item.trace_id, interactionId: item.interaction_id, title: item.title,
+          position: item.position == null ? undefined : BigInt(item.position),
+          momentId: item.moment_id, actorId: item.actor_id, actorName: item.actor_name,
           sceneId: item.scene_id, threadId: item.thread_id, recallScope: item.recall_scope,
           disclosureScope: item.disclosure_scope,
         })),
@@ -782,6 +706,8 @@ function handleFixtureFrame(socket: FixtureSurfacePeer, frame: Record<string, un
   switch (frame.kind) {
     case 'conversation_history_request': {
       const request = frame.conversation_history_request as { request_id?: string; cursor?: string } | undefined;
+      const end = request?.cursor ? Number(request.cursor) : state.history.length;
+      const start = Math.max(0, end - (state.historyPageSize ?? 50));
       socket.send(JSON.stringify({
         kind: 'conversation_history_result',
         timestamp: Date.now(),
@@ -796,8 +722,9 @@ function handleFixtureFrame(socket: FixtureSurfacePeer, frame: Record<string, un
             recall_scope: 'conversation_private',
             disclosure_scope: 'conversation_private',
           },
-          items: request?.cursor ? [] : state.history,
-          has_more: false,
+          items: state.history.slice(start, end),
+          has_more: start > 0,
+          next_cursor: start > 0 ? String(start) : undefined,
         },
       }));
       return;
@@ -832,8 +759,10 @@ function handleFixtureFrame(socket: FixtureSurfacePeer, frame: Record<string, un
     }
     case 'config_update_request': {
       const request = frame.config_update_request as ConfigurationUpdateRequest;
-      state.snapshot = applyUpdate(state.snapshot, request);
-      state.skillCatalog = applySkillCatalogUpdate(state.skillCatalog, request);
+      if (!request.dry_run) {
+        state.snapshot = applyUpdate(state.snapshot, request);
+        state.skillCatalog = applySkillCatalogUpdate(state.skillCatalog, request);
+      }
       socket.send(JSON.stringify({
         kind: 'configuration_update_result',
         timestamp: Date.now(),

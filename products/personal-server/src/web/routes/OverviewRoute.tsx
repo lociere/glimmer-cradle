@@ -1,14 +1,7 @@
-import { useEffect, useRef } from 'react';
 import type { PersonalServerAppController } from '../app/PersonalServerAppController';
+import { Overview } from '../features/overview/Overview';
+import { useOverview } from '../features/overview/useOverview';
 
 export function OverviewRoute({ controller }: { readonly controller: PersonalServerAppController }): JSX.Element {
-  const rootRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    return controller.mountOverview(root);
-  }, [controller]);
-
-  return <section ref={rootRef} className="route-view overview-view" data-role="view-overview" />;
+  return <Overview {...useOverview(controller)} />;
 }

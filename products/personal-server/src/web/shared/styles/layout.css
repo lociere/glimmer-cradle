@@ -155,29 +155,3 @@
 .unknown-route code {
   color: var(--accent-text);
 }
-
-.status-card p,
-.status-empty p,
-.status-runtime-main p,
-.observability-row p,
-.configuration-note,
-.operation-card p {
-  color: var(--text-secondary);
-}
-
-.status-runtime-row,
-.status-empty,
-.observability-row,
-.operation-card {
-  background: var(--surface-workspace);
-}
-
-.field input,
-.field select,
-.field textarea,
-.settings-view input,
-.settings-view select,
-.settings-view textarea {
-  color: var(--text-primary);
-  background: var(--surface-workspace);
-}

@@ -15,17 +15,6 @@
     font-size: 1.75rem;
   }
 
-  .status-card-grid,
-  .status-runtime-row,
-  .providers-layout,
-  .extension-layout,
-  .observability-toolbar {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-  .status-runtime-side {
-    text-align: left;
-  }
 }
 
 @media (max-width: 520px) {
@@ -37,7 +26,4 @@
     align-self: stretch;
   }
 
-  .message article {
-    max-width: 92%;
-  }
 }

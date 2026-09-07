@@ -185,8 +185,8 @@ export class PersonalServerClient {
     return response.json();
   }
 
-  public async getRecentLogs(query: ObservabilityLogQuery = {}): Promise<ReadonlyArray<ObservabilityLogEntry>> {
-    const response = await fetch(`/api/v1/logs/recent${toQueryString(query)}`, { cache: 'no-store' });
+  public async getRecentLogs(query: ObservabilityLogQuery = {}, signal?: AbortSignal): Promise<ReadonlyArray<ObservabilityLogEntry>> {
+    const response = await fetch(`/api/v1/logs/recent${toQueryString(query)}`, { cache: 'no-store', signal });
     if (response.status === 401) throw new Error('unauthorized');
     if (!response.ok) throw new Error(`logs_${response.status}`);
     const payload = await response.json() as { entries?: ObservabilityLogEntry[] };
@@ -196,6 +196,7 @@ export class PersonalServerClient {
   public connectLogStream(
     query: ObservabilityLogQuery,
     handlers: {
+      readonly onOpen?: () => void;
       readonly onEntry: (entry: ObservabilityLogEntry) => void;
       readonly onError: () => void;
     },
@@ -213,28 +214,28 @@ export class PersonalServerClient {
     return new PersonalServerSurface(socket, handlers);
   }
 
-  public async getAccessTokenSnapshot(): Promise<AccessTokenSnapshot> {
-    const response = await fetch('/api/v1/security/access-tokens', { cache: 'no-store' });
+  public async getAccessTokenSnapshot(signal?: AbortSignal): Promise<AccessTokenSnapshot> {
+    const response = await fetch('/api/v1/security/access-tokens', { cache: 'no-store', signal });
     if (response.status === 401) throw new Error('unauthorized');
     if (response.status === 403) throw new Error('forbidden');
     if (!response.ok) throw new Error(`access_tokens_${response.status}`);
     return response.json();
   }
 
-  public async createAccessToken(label: string): Promise<AccessTokenMutationResult> {
-    return this.mutateAccessToken({ operation: 'create', label });
+  public async createAccessToken(label: string, signal?: AbortSignal): Promise<AccessTokenMutationResult> {
+    return this.mutateAccessToken({ operation: 'create', label }, signal);
   }
 
-  public async rotateAccessToken(tokenId: string): Promise<AccessTokenMutationResult> {
-    return this.mutateAccessToken({ operation: 'rotate', token_id: tokenId });
+  public async rotateAccessToken(tokenId: string, signal?: AbortSignal): Promise<AccessTokenMutationResult> {
+    return this.mutateAccessToken({ operation: 'rotate', token_id: tokenId }, signal);
   }
 
-  public async revokeAccessToken(tokenId: string): Promise<AccessTokenMutationResult> {
-    return this.mutateAccessToken({ operation: 'revoke', token_id: tokenId });
+  public async revokeAccessToken(tokenId: string, signal?: AbortSignal): Promise<AccessTokenMutationResult> {
+    return this.mutateAccessToken({ operation: 'revoke', token_id: tokenId }, signal);
   }
 
-  public async getOperationsSnapshot(): Promise<DeploymentOperationsSnapshot> {
-    const response = await fetch('/api/v1/operations', { cache: 'no-store' });
+  public async getOperationsSnapshot(signal?: AbortSignal): Promise<DeploymentOperationsSnapshot> {
+    const response = await fetch('/api/v1/operations', { cache: 'no-store', signal });
     if (response.status === 401) throw new Error('unauthorized');
     if (response.status === 403) throw new Error('forbidden');
     if (!response.ok) throw new Error(`operations_${response.status}`);
@@ -248,9 +249,11 @@ export class PersonalServerClient {
       readonly confirm?: boolean;
       readonly operationId?: string;
     } = {},
+    signal?: AbortSignal,
   ): Promise<DeploymentOperationResult> {
     const operationId = options.operationId || createDeploymentOperationId();
     const response = await fetch('/api/v1/operations', {
+      signal,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -271,8 +274,9 @@ export class PersonalServerClient {
     return payload as DeploymentOperationResult;
   }
 
-  public async getOperationResult(operationId: string): Promise<DeploymentOperationResult | null> {
+  public async getOperationResult(operationId: string, signal?: AbortSignal): Promise<DeploymentOperationResult | null> {
     const response = await fetch(`/api/v1/operations/${encodeURIComponent(operationId)}`, {
+      signal,
       cache: 'no-store',
     });
     if (response.status === 401) throw new Error('unauthorized');
@@ -305,8 +309,9 @@ export class PersonalServerClient {
     return payload as LocalExtensionUploadResult;
   }
 
-  private async mutateAccessToken(body: Record<string, unknown>): Promise<AccessTokenMutationResult> {
+  private async mutateAccessToken(body: Record<string, unknown>, signal?: AbortSignal): Promise<AccessTokenMutationResult> {
     const response = await fetch('/api/v1/security/access-tokens', {
+      signal,
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -335,11 +340,13 @@ export class PersonalServerLogStream {
   public constructor(
     url: string,
     handlers: {
+      readonly onOpen?: () => void;
       readonly onEntry: (entry: ObservabilityLogEntry) => void;
       readonly onError: () => void;
     },
   ) {
     this.source = new EventSource(url);
+    this.source.onopen = () => handlers.onOpen?.();
     this.source.addEventListener('log-entry', (event) => {
       try {
         handlers.onEntry(JSON.parse((event as MessageEvent).data) as ObservabilityLogEntry);
