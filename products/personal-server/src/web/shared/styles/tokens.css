@@ -20,6 +20,7 @@
   --action-primary-text: #f7ffff;
   --action-primary-gradient-start: #00687f;
   --action-primary-gradient-end: #008f9f;
+  --action-primary-inner-glint: rgba(106, 226, 212, 0.25);
   --status-success-text: #72d4a0;
   --status-warning-text: #e7b86d;
   --status-danger-text: #ef8b8b;
@@ -85,6 +86,7 @@
   --action-primary-text: #f7ffff;
   --action-primary-gradient-start: #00687f;
   --action-primary-gradient-end: #008f9f;
+  --action-primary-inner-glint: rgba(106, 226, 212, 0.25);
   --status-success-text: #197248;
   --status-warning-text: #8a5a12;
   --status-danger-text: #a6353b;

@@ -61,7 +61,7 @@
     var(--action-primary-gradient-start),
     var(--action-primary-gradient-end)
   );
-  box-shadow: inset 0 1px 0 rgba(106, 226, 212, 0.25);
+  box-shadow: inset 0 1px 0 var(--action-primary-inner-glint);
 }
 
 .session-loading,
