@@ -4,11 +4,12 @@
 > 事实依据：[开发手册](./开发手册.md)、Architecture、Reference、当前脚本和测试。
 > 维护触发：流程、命令、验证方式、失败恢复、子系统入口或文档结构变化。
 
-先读 [开发手册](./开发手册.md)。它给出所有改动的通用入口、阅读路径和完成定义。然后按任务进入专项指南：
+不熟悉开发入口时读 [开发手册](./开发手册.md)；已明确 owner 的任务直接进入对应专项页，不递归加载所有指南：
 
 | 任务 | 指南 |
 |---|---|
 | 首次配置开发环境 | [onboarding/本地开发环境.md](./onboarding/本地开发环境.md) |
+| 设计与评估开发智能体工作流 | [development/智能体工作流设计.md](./development/智能体工作流设计.md) |
 | 普通功能或缺陷修复 | [development/功能开发与缺陷修复.md](./development/功能开发与缺陷修复.md) |
 | Schema、IPC、跨进程契约 | [development/Schema与跨进程契约变更.md](./development/Schema与跨进程契约变更.md) |
 | 架构边界、进程、分层重构 | [development/架构性改动.md](./development/架构性改动.md) |

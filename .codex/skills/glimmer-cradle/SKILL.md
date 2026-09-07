@@ -1,52 +1,43 @@
 ---
 name: glimmer-cradle
-description: Develop, review, debug, document, or coordinate Glimmer Cradle（微光摇篮）work, including session-role orchestration, task handoffs, validation, and delivery, while preserving architecture, protocol, lifecycle, character-profile, and documentation boundaries.
+description: Develop, debug, review, document, or coordinate Glimmer Cradle（微光摇篮）work. Use project facts, outcome-driven execution, risk-based verification, and explicit ownership while preserving architecture, protocol, lifecycle, and character-profile boundaries.
 ---
 
-# Glimmer Cradle 开发 Skill
+# Glimmer Cradle 项目 Skill
 
-本 Skill 是项目操作手册，不是当前实现的副本。当前目录、端口、阶段、默认 provider、配置值和已落地状态必须从代码、Schema、配置与 `docs/` 读取。
+本 Skill 提供项目操作方法与资料路由。目标、授权以用户请求为准，共同约束见根 `AGENTS.md`，当前实现与运行状态依据项目事实源核验。项目采用单一 canonical Skill。
 
-## 配置定位
+## 开始与路由
 
-本仓库只维护 Codex agent 配置：根目录 `AGENTS.md` 与 `.codex/skills/glimmer-cradle/`。本目录是唯一 canonical agent Skill（目录名暂保留，后续单独迁移）；不得新增 Claude、Copilot、Cursor 或其他 agent 薄适配层，也不得复制 `.codex/skills/glimmer-cradle/references/` 或维护第二套项目事实。
+先识别用户要的是解释、诊断、修改、审查还是运维，以及完成后应观察到什么。修改前检查工作树和已有写入 owner；明确且局部的任务由当前执行者直接推进。
 
-## 每项任务的工作流
+按下表读取与任务有关的卡片，完整阅读选中的卡片。已在当前上下文完整读取且未变化的文件无需重读。卡片引用用于按需查证；不熟悉 owner 时从 `docs/README.md` 或 [开发手册](../../../docs/guides/开发手册.md) 定位，再查实际代码、Schema、测试与配置。
 
-1. 读取根目录 `AGENTS.md`、`docs/README.md`、[开发手册](../../../docs/guides/开发手册.md)，并检查 `git status --short`。
-2. 按任务选择必要的 Blueprint、Current、Implementation、Reference 或 Guide，并核对实际代码、Schema、测试和配置。
-3. 任意实现、调试、文档或交付按 `common/开发工作流.md` 的自适应任务流完成；验证选择和交付证据按 `common/测试与交付.md`。用户只要求分析时不修改。
-4. 当前任务改变代码、Schema、配置或脚本时，同步更新唯一受影响的事实源；不得保留无退出条件的旧入口或兼容壳。
-
-协调任务另读 `common/会话与任务编排.md`。跨会话、跨 owner、高风险或固定 candidate 需要交接时，从控制卡生成该页定义的状态/证据交接包和读取契约；低风险单执行者任务不机械套用。Codex 创建执行或审查会话时，默认用 `fork_turns=none` 或有界 recent turns，并随提示提供足够恢复任务的包；只有包和事实源无法恢复关键对话决策时才传递完整历史，并说明不可替代内容与原因。此策略服务于首次正确率和可追溯性，不以压缩上下文本身为目标。
-
-## Reference 路由
-
-| 任务 | 必读 reference |
+| 当前需要 | Reference |
 |---|---|
-| 任意任务的角色确认、会话创建/换届、下发、等待、验收或交接 | `common/会话与任务编排.md` |
-| 任意实现、调试、文档或交付 | `common/开发工作流.md` |
-| 测试、构建、启动、验收 | `common/测试与交付.md` |
-| 文档、注释、术语、编码 | `common/文档、注释与编码.md` |
-| Code review 或设计自查 | `common/审查与反模式.md` |
-| 模块归属、依赖、进程边界、重构 | `architecture/架构边界与决策.md` |
-| Schema、事件、IPC、WebSocket、SDK | `architecture/协议与跨边界契约.md` |
-| Kernel、Engine、子进程、readiness | `architecture/Runtime与生命周期.md` |
-| `configs/`、`data/`、资产、路径、打包 | `architecture/数据、配置与路径.md` |
-| 日志、trace、metrics、DLQ、性能 | `architecture/可观测性与诊断.md` |
-| 人格、情绪、记忆、LLM、认知循环 | `subsystems/Cognition.md` |
-| Control Center、Presence、Electron、Unity、Live2D | `subsystems/Desktop与Avatar.md` |
-| Web、Renderer、Control Center、页面布局、视觉设计、设计系统、响应式、可访问性、前端测试 | `subsystems/Frontend与UI.md` |
-| AI 辅助 UI、参考图落地、浏览器截图迭代、组件工作台、前端 Skill/MCP/组件库评估 | `subsystems/Frontend与UI.md` + `subsystems/AI前端开发.md` |
-| Extension、Skill Plane、MCP、公开 SDK | `subsystems/Extensions与SkillPlane.md` |
+| 实现、调试、文档修改的任务闭环 | [开发工作流](references/workflow/开发工作流.md) |
+| 分工、交接、跨会话恢复、等待或整合 | [会话与任务编排](references/workflow/会话与任务编排.md) |
+| 选择验证、消费证据、验收与交付 | [测试与交付](references/workflow/测试与交付.md) |
+| 长任务上下文设计、重复读取、工具集成或反馈失真 | [上下文与工具](references/workflow/上下文与工具.md) |
+| 文档、注释、术语或编码 | [文档、注释与编码](references/common/文档、注释与编码.md) |
+| 独立审查或设计风险自查 | [审查与风险评估](references/workflow/审查与风险评估.md) |
+| 模块归属、依赖、进程边界、重构 | [架构边界与决策](references/architecture/架构边界与决策.md) |
+| Schema、事件、IPC、WebSocket、SDK | [协议与跨边界契约](references/architecture/协议与跨边界契约.md) |
+| Kernel、Engine、子进程、readiness | [Runtime与生命周期](references/architecture/Runtime与生命周期.md) |
+| 配置、数据、资产、路径、打包 | [数据、配置与路径](references/architecture/数据、配置与路径.md) |
+| 日志、trace、metrics、DLQ、性能 | [可观测性与诊断](references/architecture/可观测性与诊断.md) |
+| 人格、情绪、记忆、LLM、认知循环 | [Cognition](references/subsystems/Cognition.md) |
+| Control Center、Presence、Electron、Unity、Live2D | [Desktop与Avatar](references/subsystems/Desktop与Avatar.md) |
+| Web、Renderer、布局、视觉、响应式、可访问性 | [Frontend与UI](references/subsystems/Frontend与UI.md) |
+| AI 辅助 UI、参考图落地、截图迭代、组件工作台 | 上一项及 [AI前端开发](references/subsystems/AI前端开发.md) |
+| Extension、Skill Plane、MCP、公开 SDK | [Extensions与SkillPlane](references/subsystems/Extensions与SkillPlane.md) |
 
-## 硬约束
+## 工作中的判断
 
-- 每个会话只担任一个 `session_role`；创建执行、审查或发布/运维会话不等于更换总控。新会话先按 `common/会话与任务编排.md` 声明 parent controller、独占资源 owner、授权与回报契约。
-- 跨边界数据由 Schema/公开契约定义；投影、缓存和生成物不是第二事实源。
-- Kernel 不承载人格判断，Cognition 不访问平台 IO，Renderer 不推断系统事实，Extension 不获取内部对象。
-- 进程存活不等于能力 ready；可降级能力不能伪装为可用。
-- 不保留无退出条件的兼容壳、旧协议、旧桥接或双重主线；Git 保留历史。
-- 架构优化不留下旧架构外壳；如果目标架构要求新目录或新文件布局，代码、配置和文档必须采用该布局，旧布局不得继续作为运行时入口。
-- 文档按 `docs/文档维护规范.md` 选择唯一归属；蓝图表达 Glimmer Cradle 的长期设计语言，Implementation 解释代码，不在 Skill 复制项目事实。
-- 新增或重命名标识符、目录、包、命令、配置键、事件或文档术语前，先按 `docs/guides/development/命名规范.md` 判断 owner；中文正文可用“微光摇篮/摇篮”，机器接口保持英文稳定命名。
+- 将用户目标落实到唯一 owner 与可验证结果；完成结论应包含用户行为或工程成果的直接证据。
+- 先解决关键未知项，再扩大实施范围。紧密耦合工作由同一执行者持有；分工依据任务依赖、资源边界和独立判断价值确定。
+- 新增命名前按命名规范确定职责；结构迁移同时收束旧入口、consumer、测试与权威文档，具体里程碑的物理删除门仍然有效。
+- 实际状态来自代码与环境，长期事实进入 `docs/`；临时任务状态由任务记录或对应 Roadmap 保存。
+- 交付说明成果、验证及未覆盖风险。完成本次范围后结束执行；下一 milestone/slice、推送或发布依据相应授权开展。
+
+整体设计与官方参考见 [智能体工作流设计](../../../docs/guides/development/智能体工作流设计.md)；仅在设计、评估或修改工作流时读取。
