@@ -4,6 +4,7 @@ import { ChevronRight, X } from 'lucide-react';
 import { buildExtensionVersionRows } from './extension-version-support';
 import type { ExtensionsController, ExtensionsSnapshot } from './ExtensionsController';
 import { ExtensionInstall } from './ExtensionInstall';
+import { ExtensionDiagnostics } from './ExtensionDiagnostics';
 import styles from './Extensions.module.css';
 
 export function Extensions({ snapshot, controller }: { snapshot: ExtensionsSnapshot; controller: ExtensionsController }): JSX.Element {
@@ -39,6 +40,7 @@ export function Extensions({ snapshot, controller }: { snapshot: ExtensionsSnaps
               {snapshot.readError && <p role="alert" className={styles.error}>{snapshot.readError}</p>}
               <div className={styles.actions}><button className={styles.button} data-action="extension-start" disabled={disabled || !startVersion || running} onClick={() => void controller.lifecycle(id, 'start', startVersion)}>启用</button><button className={styles.button} data-action="extension-stop" disabled={disabled || !running} onClick={() => void controller.lifecycle(id, 'stop', installation?.active_version)}>停用</button></div>
               <h3>版本</h3>{versions.map((row) => <div className={styles.version} data-role="extension-version-row" data-version={row.version} key={row.version}><strong>{row.version}</strong><p>{row.stateLabel}</p><div className={styles.actions}><button className={styles.button} data-action="extension-activate-version" disabled={disabled || !row.canActivate} onClick={() => void controller.lifecycle(id, 'start', row.version)}>{row.actionLabel}</button><button className={styles.danger} data-action="extension-uninstall" disabled={disabled || !row.canUninstall} onClick={() => { if (window.confirm(`确认卸载 ${id}@${row.version}？`)) void controller.uninstall(id, row.version); }}>卸载此版本</button></div></div>)}
+              <ExtensionDiagnostics projection={projection} />
             </>}</Dialog></Modal></ModalOverlay>
           </DialogTrigger>
         </article>;

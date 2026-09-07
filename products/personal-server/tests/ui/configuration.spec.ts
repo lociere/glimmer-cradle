@@ -32,6 +32,37 @@ test('late token reads cannot erase user input and leaving clears the one-time t
     await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
   } finally { release(); await fixture.stop(); }
 });
+test('history navigation clears issued tokens and late creation never restores their plaintext', async ({ page }) => {
+  let release!: () => void;
+  let entered!: () => void;
+  const wait = new Promise<void>(resolve => { release = resolve; });
+  const posted = new Promise<void>(resolve => { entered = resolve; });
+  let delay = false;
+  await page.route('**/api/v1/security/access-tokens', async route => {
+    if (delay && route.request().method() === 'POST') { entered(); await wait; }
+    await route.continue();
+  });
+  const fixture = await startPersonalServerUiFixture();
+  try {
+    await login(page, fixture.baseUrl);
+    await selectSettingsSection(page, '安全与访问');
+    await page.getByLabel('新令牌标签').fill('history-token');
+    await page.getByRole('button', { name: '创建访问令牌' }).click();
+    await expect(page.locator('[data-role="issued-access-token"]')).toBeVisible();
+    await page.goBack(); await expect(page).toHaveURL(/section=models/);
+    await page.goForward(); await expect(page).toHaveURL(/section=security/);
+    await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
+    delay = true;
+    await page.getByLabel('新令牌标签').fill('late-token');
+    await page.getByRole('button', { name: '创建访问令牌' }).click(); await posted;
+    await page.goBack(); await expect(page).toHaveURL(/section=models/);
+    release(); await page.goForward();
+    await expect(page.getByRole('button', { name: '创建访问令牌' })).toBeEnabled();
+    await expect(page.locator('[data-role="security-access-section"]')).toContainText('late-token');
+    await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
+  } finally { release(); await fixture.stop(); }
+});
+
 test('settings controls and confirmations reflow accessibly in both themes', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'personal-server-desktop', '单项目执行七子区和容量矩阵');
   const fixture = await startPersonalServerUiFixture();

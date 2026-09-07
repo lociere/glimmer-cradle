@@ -8,6 +8,19 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; };
 const operations = { backup: { supported: false, entries: [] }, service: { restart_supported: false, stop_supported: false }, update: { check_supported: false, apply_supported: false, current_version: 'test', source: 'test' } };
 const tokens: AccessTokenSnapshot = { mode: 'open_local', degraded: true, message: 'test', tokens: [] };
+
+test('隐藏令牌撤销迟到响应的明文展示资格，但保留脱敏快照并解除 pending', async () => {
+  const result = deferred<Awaited<ReturnType<ConfigurationPort['mutateToken']>>>();
+  const controller = new ConfigurationController(); controller.connect(port({ mutateToken: () => result.promise })); await flush();
+  const pending = controller.mutateToken('create', 'laptop'); controller.hideToken();
+  result.resolve({ status: 'success', message: 'created', snapshot: { ...tokens, message: 'updated' }, issued_token: 'late-secret' }); await pending;
+  assert.equal(controller.getSnapshot().tokenResult, null);
+  assert.equal(controller.getSnapshot().tokens?.message, 'updated');
+  assert.equal(controller.getSnapshot().tokenPending, false);
+  await controller.mutateToken('create', 'second');
+  assert.equal(controller.getSnapshot().tokenResult?.issued_token, 'late-secret');
+  controller.stop();
+});
 function port(overrides: Partial<ConfigurationPort> = {}): ConfigurationPort {
   return { read: async () => configurationScenario(), preview: async () => { throw Error('unused'); }, save: async () => { throw Error('unused'); }, testProvider: async () => { throw Error('unused'); }, tokens: async () => tokens, mutateToken: async () => ({ status: 'success', message: 'created', snapshot: tokens, issued_token: 'one-time' }), operations: async () => operations, runOperation: async () => { throw Error('unused'); }, operationResult: async () => null, skills: async () => ({ status: 'error', request_id: 'test', message: 'unavailable' }), close: () => {}, ...overrides };
 }

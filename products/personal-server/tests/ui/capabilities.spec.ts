@@ -8,6 +8,49 @@ async function login(page: Page, baseUrl: string) {
   await page.getByRole('button', { name: '连接 Personal Server' }).click();
   await expect(page.getByRole('button', { name: '查看 community.echo 详情' })).toBeVisible();
 }
+
+test('capability diagnostics preserve projected readiness, dependencies and recovery in both themes', async ({ page }, testInfo) => {
+  await page.routeWebSocket('**/api/v1/surface', socket => {
+    const server = socket.connectToServer();
+    server.onMessage(message => {
+      const frame = JSON.parse(String(message));
+      for (const projection of frame.extension_runtime_projection_result?.projections ?? []) {
+        projection.capability_graph = { nodes: [{ id: 'reply', title: '消息回复', contribution_point: 'glimmer.protocolBridge', kind: 'protocol_bridge', state: 'degraded', owner: 'extension', audience: 'adapter', required: true, summary: '服务运行中，但回复连接不可用。', permissions: ['NETWORK'], readiness_gates: [{ id: 'connection', kind: 'connection', state: 'failed', summary: '外部服务未连接。', error_message: '连接超时，请检查外部服务。', error_code: 'CONNECT_TIMEOUT', checked_at: '2026-09-07T08:00:00Z', latency_ms: 0 }], diagnostic_refs: [], metadata: { private_field: 'not-for-display' }, updated_at: '2026-09-07T08:00:00Z' }, { id: 'future', title: '未来能力', contribution_point: 'community.future', kind: 'custom', state: 'future_state', owner: 'extension', audience: 'user', required: false, summary: '尚不支持的状态', permissions: [], readiness_gates: [], diagnostic_refs: [], metadata: {}, updated_at: '2026-09-07T08:00:00Z' }], edges: [{ from: 'reply', to: 'future', relation: 'depends_on', required_state: 'ready' }] };
+        projection.contribution_points = [{ id: 'community.future', title: '未来贡献点', state: 'unsupported', owner: 'third_party', required_permissions: [], metadata: {} }];
+        projection.diagnostics.recovery_actions = ['确认外部服务已启动，然后刷新状态。'];
+        projection.diagnostics.trace_id = 'trace-diagnostics';
+      }
+      socket.send(JSON.stringify(frame));
+    });
+  });
+  const fixture = await startPersonalServerUiFixture();
+  try {
+    await login(page, fixture.baseUrl);
+    const trigger = page.getByRole('button', { name: '查看 community.echo 详情' });
+    await trigger.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('已降级');
+    await expect(dialog).toContainText('未知状态（future_state）');
+    await dialog.locator('summary').filter({ hasText: '消息回复' }).click();
+    await expect(dialog).toContainText('CONNECT_TIMEOUT');
+    await expect(dialog).toContainText('耗时 0 ms');
+    await expect(dialog).toContainText('未来能力 · depends_on · 要求：已就绪');
+    await expect(dialog).toContainText('确认外部服务已启动');
+    await expect(dialog).toContainText('未来贡献点');
+    await expect(dialog).not.toContainText('not-for-display');
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+      await dialog.getByRole('region', { name: '能力与诊断' }).evaluate(element => element.scrollIntoView({ block: 'start' }));
+      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
+      await expect(page).toHaveScreenshot(`extension-diagnostics-${theme}.png`, { animations: 'disabled' });
+    }
+    for (const width of [1440, 1024, 760, 480, 360, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await dialog.evaluate(el => el.scrollWidth - el.clientWidth)).toBe(0);
+    }
+    await page.keyboard.press('Escape'); await expect(trigger).toBeFocused();
+  } finally { await fixture.stop(); }
+});
 for (const operation of ['commit', 'cancel'] as const) {
   test(`terminal ${operation} failure unlocks the form and a fresh Host transaction succeeds`, async ({ page }) => {
     const fixture = await startPersonalServerUiFixture({ failFirstExtensionTransaction: operation });

@@ -116,7 +116,7 @@
 
 ## 实施追踪清单
 
-### 当前检查点（2026-07-24）
+### 历史检查点（2026-07-24）
 
 - 已完成：控制面物理结构从 `public/app.js`/`app.css` 单体迁移到 `products/personal-server/src/server/*` 与 `src/web/*`，并有架构门禁阻止旧入口回流。
 - 已完成：Protocol、Kernel Config Application Port 和 Personal Server 设置页已形成 LLM Provider/默认路由的真实闭环；零 Provider 可登录控制面，依赖 LLM 的对话会返回明确 `conversation_notice`。
@@ -125,19 +125,19 @@
 - 已完成到当前阶段：Extension 页已接真实运行投影、仓库/Registry/Release Manifest 安装预览、安装提交、启停与卸载事务；浏览器本地 `.gcex` 已改为认证上传到 Product Host 受控临时目录并换取 opaque `upload_id`，随后由 Host 在同一安装事务内解析为 Kernel file source，具备会话绑定、30 分钟时效、单事务消费与成功/失败/取消/超时清理；安全页已接受管访问令牌 store，支持创建/轮换/撤销、legacy env degraded 标记与一次性明文返回；运维页已接正式 backup/update/service snapshot，并在缺少宿主运维桥时显示真实 disabled reason；Playwright 已固化零 Provider、Provider 保存、日志筛选、扩展安装/启用、版本切换回退、本地 `.gcex` 上传、访问令牌与运维 disabled reason 在桌面与窄窗双视口。
 - 未开始或未过门：QQ 场景外部验收、Extension 跨仓真实发布物升级/失败恢复、完整宿主运维恢复与长运行矩阵。
 
-### Personal Server UI 优化门（待实现）
+### Personal Server UI 优化门（页面已实现）
 
-本节记录已确认问题与后续目标，不表示 UI 已修复。视觉输入、代表页面、三个候选方向和用户确认门由 [M11 UI 设计简报](../design-briefs/M11-Personal%20Server%20UI设计简报.md) 唯一拥有；实施另遵循 [前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md)、[AI 辅助前端开发](../../guides/development/AI辅助前端开发.md)、[UI Design Tokens Reference](../../reference/ui-design-tokens.md) 和 [M11 目标物理清单](../manifests/M11-目标物理清单.md)。
+五个一级页面、七个设置子区及旧 DOM owner 删除已完成；当前实现、验证范围和证据见 [now.md](../now.md) 与目标物理清单。本节保留原问题和接受标准，历史问题不再作为当前未完成项。视觉输入、代表页面、三个候选方向和用户确认门由 [M11 UI 设计简报](../design-briefs/M11-Personal%20Server%20UI设计简报.md) 唯一拥有；实施另遵循 [前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md)、[AI 辅助前端开发](../../guides/development/AI辅助前端开发.md)、[UI Design Tokens Reference](../../reference/ui-design-tokens.md) 和 [M11 目标物理清单](../manifests/M11-目标物理清单.md)。
 
 #### 2026-08-25 前端架构与 AI 工作流前置
 
-- M11 已从暂停状态恢复为 `in-progress`，当前已完成文档、架构、AI 工作流和视觉方向前置；未改运行时代码、依赖或截图基线。
+- 2026-08-25 时 M11 从暂停状态恢复为 `in-progress`，当时仅完成文档、架构、AI 工作流和视觉方向前置；后续页面实现与验收记录见 now.md。
 - 当前原生 TypeScript/Vite + 命令式 DOM 不是永久约束。[ADR-0017](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md) 已接受第一方产品 UI 统一使用 React 组件模型，并将 Personal Server 迁为 React + Vite、React Router、React Aria Components、语义 CSS variables + CSS Modules，以 Storybook stories/组件测试 + Playwright 建立组件级和产品级双层反馈。
 - ADR-0017 与 M11 最终视觉方向已于 2026-08-25 接受；文档、Skill 与设计前置已完成，实施 slice 获得授权前不修改运行时代码或依赖。
 - AI 的完成定义是“读取真实组件/状态 → 实现内聚片段 → 实际渲染并查看截图 → 运行交互/a11y/响应式检查 → 修正”，不是生成代码或单张截图。
 - Storybook MCP、shadcn Skill/MCP、Vercel/社区前端 Skill 和其他热门工具只提供方法候选。Storybook MCP 仍是 React preview 试点；引入前核对版本、许可证、框架、权限、维护状态、fallback、删除条件和摇篮代表任务效果，不复制其他 agent 配置或建立第二项目 Skill。
 
-#### 当前已确认问题
+#### 迁移前已确认问题（历史输入，现已修复）
 
 **正确性**
 
@@ -206,7 +206,7 @@
 
 - `[x]` 事实与契约：配置 Snapshot/Command、Secret write-only、默认路由与 `conversation_notice` 契约已合入并完成生成同步。
 - `[x]` Kernel 配置主线：LLM Provider 与默认路由的脱敏读取、revision、预览、原子写入、审计和 apply 状态已落地；Audio/Embedding/Memory/Skill 也已接入同一 Config Application Port，并经本地单测验证落盘与 snapshot 回读。
-- `[~]` Personal Server 页面：登录、零 Provider 降级、系统 ready 轮询、状态页、日志页、服务端对话历史恢复、Provider 设置页、Audio/Embedding/Memory/Skill 设置页、访问令牌安全页、运维状态页与扩展运行/安装事务页已落地；但当前页面切换、URL/history、信息架构、视觉 token、内容容量响应式、可访问性和截图基线存在已确认缺口，必须通过本里程碑 UI 优化门后才能视为正式控制面体验完成。
+- `[x]` Personal Server 页面：五个一级页面与七个设置子区的 React 实现完成，URL/history、唯一页面挂载、受控投影、能力诊断、配置与一次性令牌生命周期、主题/容量/a11y 与截图基线已落实。页面本地验收与实机限制见 [now.md](../now.md)；真实外部服务和生产门单独追踪。
 - `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI、本地 `.gcex` 上传主线，以及模板仓库 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档已落地；真实发布物升级/失败恢复与跨仓库 Linux `.gcex` 门禁仍未完成。
 - `[ ]` NapCat 跨产品化：外部 OneBot Linux profile、Adapter Core 收口、QQ 场景 E2E 与 Linux `.gcex` 发布未完成。
 - `[~]` 生产验收：`v0.1.8` fixed commit 已正式发布；全新 Ubuntu 24.04 remote/full、双重摘要、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已通过。真实失败回滚仍因缺少获授权 distinct candidate/fault injection 入口未完成。
@@ -216,13 +216,13 @@
 - `[x]` Protocol 合入 Config Snapshot/Command、Secret write-only、Extension 兼容性与受管资源 profile 契约，并通过生成一致性检查。
 - `[x]` Kernel 能读取脱敏配置、预览一次变更、拒绝 revision 冲突并原子提交；Secret 从读取响应中消失。
 - `[x]` Personal Server 首次配置页面可新建 Provider、测试连接、保存模型路由；真实角色回复链路、正式历史读取、分页恢复与 `conversation_notice` 已接入控制面输入。
-- `[~]` 功能 Playwright 已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用/版本回退与窄窗；页面唯一可见、URL/history/deep-link、信息架构、内容容量、完整状态矩阵、可访问性和关键页面截图基线尚未完成，不能把现有“目标元素可见”测试写成 UI 质量门已通过。
+- `[x]` 页面 Playwright 覆盖零 Provider、五域功能、配置与安装事务、URL/history/deep-link、唯一页面、错误恢复、宽窄窗、深浅主题、键盘/a11y 和截图基线；组件工作台进入同批验证。原生缩放和实体触控不由 CSS 容量模拟代替，具体证据范围见 now.md。
 - `[x]` 区域传输副本已从近期实施范围移出，保留为长期候选，不再驱动当前代码。
 
 ### 最终验收门追踪
 
 - `[x]` `v0.1.8` 在全新 Ubuntu 24.04 无需源码树完成 remote/full 安装；五项 Release 资产与摘要、双重校验、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已验证。
-- `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已打通；生产已运行包含这些能力的 `v0.1.8`，但 UI 优化门、宿主运维完整恢复、真实更新失败恢复与长期运行矩阵仍未完成。
+- `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已打通；生产已运行包含这些能力的 `v0.1.8`，页面实现已完成；宿主运维完整恢复、真实更新失败恢复与长期运行矩阵仍未完成。
 - `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 生产闭环仍未完成。
 - `[ ]` NapCat Linux 外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。
 - `[ ]` 更新失败自动恢复、备份/恢复连续性、完整停机和长运行矩阵未完成；失败回滚缺少获授权 distinct candidate/fault injection 入口。

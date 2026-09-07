@@ -1,6 +1,18 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+test('Extension diagnostics stories distinguish missing, empty, degraded and unknown states', async ({ page }, testInfo) => {
+  const url = process.env.GLIMMER_CRADLE_STORYBOOK_URL;
+  test.skip(!url || testInfo.project.name !== 'personal-server-desktop', '组件工作台单项目检查');
+  for (const story of ['degraded', 'missing', 'empty', 'unknown']) {
+    await page.goto(`${url}/iframe.html?id=features-extensiondiagnostics--${story}&viewMode=story`);
+    await expect(page.getByRole('region', { name: '能力与诊断' })).toBeVisible();
+    if (story === 'unknown') await expect(page.getByRole('region', { name: '能力与诊断' })).toContainText('未知状态（__proto__）');
+    if (await page.locator('summary').count()) await page.locator('summary').first().click();
+    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
+  }
+});
+
 test('Configuration stories expose configuration states accessibly', async ({ page }, testInfo) => {
   const url = process.env.GLIMMER_CRADLE_STORYBOOK_URL;
   test.skip(!url || testInfo.project.name !== 'personal-server-desktop', '组件工作台单项目检查');

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Dialog, DialogTrigger, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { createProviderDraft, type ProviderDraftState } from './configuration-state';
 import { isDraftDirty, routeModelOptions, validateDraft } from './configuration-draft-helpers';
@@ -17,6 +17,10 @@ function Confirm({ label, disabled, onConfirm, children }: { label: string; disa
   return <DialogTrigger><Button className="quiet-button" isDisabled={disabled}>{label}</Button><ModalOverlay className={styles.overlay} isDismissable><Modal className={styles.dialog}><Dialog>{({ close }) => <><Heading slot="title">{label}</Heading><p>{children}</p><div className={styles.actions}><Button className="quiet-button" onPress={close}>取消</Button><Button className="primary-button" onPress={() => { onConfirm(); close(); }}>确认{label}</Button></div></>}</Dialog></Modal></ModalOverlay></DialogTrigger>;
 }
 export function Configuration({ snapshot: state, controller, section, onSection }: Props) {
+  useEffect(() => {
+    // 子区由 URL/history 驱动，离开安全页也必须撤销迟到响应的明文展示资格。
+    if (section === 'security') return () => controller.hideToken();
+  }, [controller, section]);
   const [selected, select] = useState(0);
   const [tokenLabel, setTokenLabel] = useState('');
   const draft = state.draft; const configuration = state.configuration;
@@ -31,7 +35,7 @@ export function Configuration({ snapshot: state, controller, section, onSection 
   return <section className={styles.page} data-role="view-settings">
     <header className={styles.header}><div><h1>服务配置</h1><p>按需调整模型、增强能力和服务管理。</p></div><Button className="quiet-button" isDisabled={!state.connected || locked} onPress={() => { void controller.reload(); void controller.refreshSupplemental(); }}>刷新</Button></header>
     {!state.connected && <p role="status">控制面连接已断开，草稿保留；重连后可继续编辑。</p>}
-    <ConfigurationNavigation section={section} onSection={next => { if (section === 'security') controller.hideToken(); onSection(next); }} />
+    <ConfigurationNavigation section={section} onSection={onSection} />
     {state.loading && <p role="status">正在读取配置快照…</p>}
     {draft && configuration ? <>
       <fieldset className={styles.content} disabled={locked} aria-busy={locked}>

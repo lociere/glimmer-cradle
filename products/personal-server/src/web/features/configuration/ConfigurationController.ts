@@ -42,6 +42,7 @@ export class ConfigurationController {
   private state: ConfigurationState = { configuration: null, draft: null, connected: false, loading: false, pending: false, status: { kind: 'idle' }, tokens: null, tokenResult: null, tokenPending: false, tokenError: null, operations: null, operationResult: null, operationPending: false, operationsError: null, skills: null, skillsPending: false };
   private port: ConfigurationPort | null = null;
   private epoch = 0;
+  private tokenRevealId = 0;
   private readId = 0;
   private supplementalId = 0;
   private tokenId = 0;
@@ -122,13 +123,14 @@ export class ConfigurationController {
   }
   public async mutateToken(action: 'create' | 'rotate' | 'revoke', value: string) {
     const port = this.port; if (!port || this.state.tokenPending) return; const epoch = this.epoch;
+    const revealId = this.tokenRevealId;
     this.tokenId++;
     this.patch({ tokenPending: true, tokenResult: null, tokenError: null });
-    try { const result = await port.mutateToken(action, value); if (this.current(epoch)) this.patch({ tokens: result.snapshot, tokenResult: result }); }
+    try { const result = await port.mutateToken(action, value); if (this.current(epoch)) this.patch({ tokens: result.snapshot, tokenResult: revealId === this.tokenRevealId ? result : null }); }
     catch (error) { if (this.current(epoch)) this.patch({ tokenError: message(error) }); }
     finally { if (this.current(epoch)) this.patch({ tokenPending: false }); }
   }
-  public hideToken() { this.patch({ tokenResult: null }); }
+  public hideToken() { this.tokenRevealId++; this.patch({ tokenResult: null }); }
   public async runOperation(operation: string, backupId?: string) {
     const port = this.port; if (!port || this.state.operationPending) return; const epoch = this.epoch;
     const id = `deployment_op_${crypto.randomUUID()}`;

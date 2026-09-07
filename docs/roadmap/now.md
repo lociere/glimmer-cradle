@@ -1,12 +1,16 @@
 # Now
 
-> 审阅日期：2026-09-07
+> 审阅日期：2026-09-08
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
 [M10：发布形态、安装投影与数据迁移闭环](./milestones/M10-发布形态、安装投影与数据迁移闭环.md) 已完成。Personal Server 已具备公开 Release、digest 固定 OCI、轻量/完整安装包、可信来源校验、不可变版本目录、事务更新回滚、备份恢复和停机回收主链；Ubuntu 24.04 LTS、linux/amd64 是当前实测支持基线。
 
-## 当前推进面：M11 Personal Server 前端实现与审查
+## 当前推进面：M11 Personal Server 页面收束与后续外部验收
+
+2026-09-08 页面部分本地实现与验收完成：对话、概览、能力、活动、设置五域及七个设置子区均使用唯一 React owner。当前任务获用户授权提交并推送累计页面成果，未授权部署生产。后续 M11 剩余三条主线为 Extension 跨仓发布与恢复、NapCat 外部 OneBot/QQ 场景、生产运维恢复与长运行；区域副本和品牌资产继续不在近期范围。
+
+本轮基于 `b0159830` 补齐通用扩展能力诊断（逐项就绪条件、依赖、未知/空状态、恢复建议），修复安全子区经浏览器历史离开或请求迟到时一次性令牌重新显示的问题。独立审查唯一 P2 已修复并复审通过。58 项产品测试、5 项架构测试、根 typecheck/build、Storybook build、编码/架构及文档链接检查通过；启用 Storybook 的完整 Playwright 为 93 passed / 15 skipped，跳过项为另一视口覆盖的组件、容量或生命周期专属场景。最终未知状态防御和诊断内容截图另经 3 passed / 1 skipped 定向复验，未受影响的全量证据复用。新增与受影响的宽窄、深浅截图已经人工查看；浏览器验证覆盖真实 Product Host 与受控 gRPC fixture，不等同外部 Provider、QQ 或生产操作。容量检查覆盖 320～1440 CSS px，未宣称原生浏览器缩放或实体触控验收。完整报告保留在 `build/reports/playwright/personal-server/report/`。
 
 [M12：契约脊柱与跨进程服务架构重建](./milestones/M12-契约脊柱与跨进程服务架构重建.md) 已完成：旧 `protocol/` 物理删除，独立 Document 进入 `contracts/json-schema/` compatibility baseline，Service/DTO consumer 使用 Contract Spine edge；Surface Gateway 使用有限 typed Query/Command/Event DTO，Kernel 与产品 Adapter 映射 owner-local request/projection，公开 Extension SDK 只保留扩展作者与 Host Port API。第三方 Cubism SDK 仍只存在于 ignored 本机供应目录，不进入 Git。
 
@@ -38,11 +42,10 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 M11 仍未完成的范围：
 
-- 由 Kernel Config Application Port 统一提供可校验、可脱敏、可审计的配置投影与更新命令；
-- 为 Personal Server 提供零 Provider 可登录的正式控制面，以及 Provider、真实对话、状态、日志、Audio、Memory、Skill、安全、存储和更新能力；
-- 让 Extension 安装、启停、升级、权限与产品兼容性通过同一 Package Manager 闭环；
+- Extension：独立仓库使用正式 SDK/Contract public edge 与精确发布物，完成跨产品安装、升级失败恢复、回滚及扩展配置/Secret 的完整验收；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
+- 生产运维：真实更新失败自动恢复、备份/恢复连续性、长运行及完整停机矩阵；
 - 把区域 HTTP(S)/OCI 传输副本保留为长期演化候选，只有真实需求出现后再实施。
 
 ## 下一验收门
@@ -54,12 +57,12 @@ M12/M13 当前没有未闭合的代码集成门。真实 Docker/Ubuntu、Windows
 风险，不能从 isolated fixture、dry-run 或 source build 外推为通过；这些门只有在用户选择
 发布/运维目标并授权唯一环境 owner 后才能执行。
 
-### Personal Server UI 优化门
+### Personal Server 页面本地交付门
 
-本门的首个 Shell/Router slice 已实施；以下门中 1～7 的首批范围已有代码与验证证据，完整 M11 仍需继续收口：
+五个一级页面与七个设置子区已全部实现，以下接受标准由现有代码、组件工作台及产品浏览器回归覆盖；具体证据与未覆盖的原生设备行为见上文。完整 M11 的跨仓、NapCat 和生产门仍需继续收口：
 
 1. ADR-0017 已接受 React + Vite + React Router + React Aria + CSS Modules + Storybook/Playwright 分层；首个 slice 已固定直接依赖版本，后续升级仍按直接 consumer 与验证选择。
-2. M11 最终视觉方向已确认；Shell/Router 与首批 shared UI 已落地，后续按 [M11 目标物理清单](./manifests/M11-目标物理清单.md) 迁垂直 feature slice，每个 slice 删除对应旧 DOM owner，不保留双主线。
+2. M11 最终视觉方向已确认；Shell/Router、shared UI 和五域 feature 已落地，并按 [M11 目标物理清单](./manifests/M11-目标物理清单.md) 删除对应旧 DOM owner，不保留双主线。
 3. 页面唯一挂载、登录层隔离、URL/history/deep-link、back/forward、refresh、unknown route 与 route cleanup 已进入真实 Product Host Playwright；后续 feature slice 必须保持这些门。
 4. 信息架构收敛为单层全局导航；页面内只在真实子域存在时显示二级导航。Context Inspector 改为选中对象后按需出现的 Context Drawer。
 5. 对话、概览、能力、活动、设置形成清晰一级域；设置拆为模型与路由、语音、记忆、安全、存储、更新等真实子页面；runtime、日志、Extension、Provider 使用列表/主体 + 按需详情。
