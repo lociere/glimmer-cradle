@@ -40,12 +40,18 @@ describe('Avatar resource catalog canonical host paths', () => {
 
     const snapshots = buildAvatarResourceSnapshots({ repoRoot });
     const registry = snapshots.find((item) => item.resource_id === 'avatar.package-registry');
+    const catalog = snapshots.find((item) => item.resource_id === 'avatar.sdk.catalog');
     const cubism = snapshots.find((item) => item.resource_id === 'avatar.sdk.cubism-unity');
 
     expect(registry?.readiness).toBe('ready');
-    expect(['missing', 'ready']).toContain(cubism?.readiness);
-    if (cubism?.readiness === 'missing') {
-      expect(cubism.recovery_actions?.some((action) => action.includes('data/packages/avatar-sdks'))).toBe(true);
+    if (cubism) {
+      expect(['missing', 'ready']).toContain(cubism.readiness);
+      if (cubism.readiness === 'missing') {
+        expect(cubism.recovery_actions?.some((action) => action.includes('data/packages/avatar-sdks'))).toBe(true);
+      }
+    } else {
+      expect(catalog?.readiness).toBe('ready');
+      expect(catalog?.summary).toContain('当前没有需要 Unity SDK');
     }
   });
 });

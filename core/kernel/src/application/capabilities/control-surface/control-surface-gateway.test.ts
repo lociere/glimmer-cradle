@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ControlSurfaceGateway } from '../../../adapters/surface/control-surface-gateway';
 import type { ConfigurationSnapshot } from '../../../ports/configuration-models';
 import type { SkillCatalogSnapshot } from '../../../ports/skill-plane.port';
@@ -417,11 +419,12 @@ describe('ControlSurfaceGateway', () => {
       _synthesizeAndBroadcastAudio(traceId: string, text: string, sequence?: number): Promise<void>;
     };
     const frames: unknown[] = [];
+    const outputPath = path.resolve('tmp/glimmer-cradle/audio/tts/reply.wav');
     subject._clients.add(createSocket(frames));
     const synthesizeSpeech = subject.audio.synthesizeSpeech;
     subject.audio.synthesizeSpeech = async () => ({
       status: 'success',
-      output_path: 'D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+      output_path: outputPath,
     });
     try {
       await subject._synthesizeAndBroadcastAudio('trace-audio-ref', '你好', 0);
@@ -435,7 +438,7 @@ describe('ControlSurfaceGateway', () => {
       trace_id: 'trace-audio-ref',
       audio_play: {
         audio_id: 'reply-trace-audio-ref-0',
-        audio_uri: 'file:///D:/tmp/glimmer-cradle/audio/tts/reply.wav',
+        audio_uri: pathToFileURL(outputPath).toString(),
         mime_type: 'audio/wav',
       },
     });
