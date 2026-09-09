@@ -1,6 +1,6 @@
 # Now
 
-> 审阅日期：2026-09-09
+> 审阅日期：2026-09-10
 > 范围：当前里程碑切换状态、下一验收门和近期不做事项；不记录已完成架构事实正文。
 > 维护触发：当前里程碑、验收门、风险、范围或审阅日期变化。
 
@@ -10,9 +10,9 @@
 
 2026-09-08 页面部分本地实现与验收完成：对话、概览、能力、活动、设置五域及七个设置子区均使用唯一 React owner。当前任务获用户授权提交并推送累计页面成果，未授权部署生产。后续 M11 剩余三条主线为 Extension 跨仓发布与恢复、NapCat 外部 OneBot/QQ 场景、生产运维恢复与长运行；区域副本和品牌资产继续不在近期范围。
 
-2026-09-09 Extension 发布前置候选已在主仓与 `glimmer-cradle-extensions` 独立仓形成：主仓 Contract/SDK 包使用发布 allowlist，SDK 构建排除测试输出，`pnpm verify:extension-sdk-release` 会从两个 tarball 建立干净 consumer 并实际加载公开 validator；`extension-sdk-v<semver>` 固定 tag workflow 会用绝对工作区路径固定摘要并按 Contract → SDK 顺序发布。第一方扩展仓已迁除 `@glimmer-cradle/protocol`，Registry/模板改从 SDK public edge 校验并统一为首版 `0.1.0`，通用模板的 `any` 平台声明与默认发布目标一致；模板 Release 已收紧为固定 Actions/Ubuntu、公开 SDK 前置、干净且真实指向 HEAD 的 tag、清理旧构建、包完整性/外层摘要复核与 GitHub provenance。本地完整校验、模板 `.gcex` 构建及脏树失败保留通过。三仓候选已进入远端 `main`，主仓 `npm` Environment 与 `NPM_TOKEN` 已配置；正式 npm 包、SDK tag、真实安装/升级失败恢复仍未完成。本地 link 与 tarball consumer 证据不外推为公开发布完成。
+2026-09-09 至 2026-09-10 Extension SDK public edge 已按首版 `0.1.0` 正式发布：`extension-sdk-v0.1.0` 固定主仓候选，`@glimmer-cradle/contracts@0.1.0` 与 `@glimmer-cradle/extension-sdk@0.1.0` 已公开进入 npm，registry shasum 分别为 `5e2179476ba2623240fea8d0b7b4d9f867f548c1`、`259fcbdc2a4bb11dac326e8f147e7e966671417d`，下载的 Actions 固定制品与 registry tarball 逐包一致并带 provenance。第一方扩展仓已迁除 `@glimmer-cradle/protocol`，Registry/模板只从 SDK public edge 校验并统一为 `0.1.0`；模板 `.gcex` 的本地构建、包完整性、脏树拒绝和重复摘要验证通过，但模板公开 Release 与真实安装/升级失败恢复仍未完成。当前 npm 发布仍使用 `npm` Environment 中的 `NPM_TOKEN`；后续应迁移到 npm Trusted Publisher 后撤销长期 token。
 
-同日 NapCat 独立仓已形成真实扩展发布候选：源码只从 SDK public edge 使用 Contract 类型，manifest/peer dependency 精确对齐首版 SDK `0.1.0`，本地 link 会连接主仓 Contract/SDK 发布投影并清理旧 Protocol 链接；发布脚本要求干净工作树与真实指向当前 commit 的精确 `v<semver>` tag，生成 Windows x64、Linux x64 `.gcex`、Release Manifest 和统一摘要，并在上传前重新验证包完整性。manifest、类型检查与 14 项测试通过；脏树默认拒绝且不删除既有候选，显式本地候选连续两次构建摘要一致。Windows 主机上的主仓 Package Manager 还以 `personal-server` 产品约束从真实 NapCat `.gcex` 完成兼容预览、权限拒绝无半安装、原子安装、同摘要幂等重装和卸载，并通过受控 HTTPS fixture 走通真实 Release Manifest 的平台制品选择、外层摘要和安装；Release Manifest 摘要漂移会拒绝且清理事务目录。三条探针已固化为按环境变量接收固定候选的 Kernel 集成测试，并接入 NapCat Linux 发布 workflow。该 workflow 在构建 Adapter 前会从 `extension-sdk-v0.1.0` 重新 pack Contract/SDK，并逐包比较 npm `dist.shasum`，从而阻断未公开或与 tag 漂移的 SDK。安装事务同时收紧为权限确认后的 commit 成败均清理缓存与 staging，制品在确认后变化的反例已覆盖。该临时数据根与受控网络探针不等同 Linux Product Host 或真实远端 Release。三仓 workflow 已进入远端默认分支，但 SDK npm 包/tag、NapCat tag/Release、真实远端安装与升级失败恢复及 external OneBot/QQ E2E 均未完成。
+同日 NapCat 独立仓已从固定 commit `e0f4062fd062acb5b7c2483281e3b279bdc107ca` 正式发布 `v0.1.0`。发布 workflow 从 SDK tag 重建 Contract/SDK tarball 并逐包绑定 npm `dist.shasum`，Adapter 校验、14 项测试、Kernel 固定候选安装事务、provenance 与 GitHub Release 均通过；Windows x64 与 Linux x64 `.gcex` 内容摘要同为 `7d1e0a924a7564fd20392c5388e14e06f039cdd22f84116a66146c65fc57f655`，Release Manifest 摘要为 `f8b3e5caea5692af744617ae6099ab08151a657333f34bd9010a37d71d231082`。Windows 主机上的 Package Manager 已覆盖兼容预览、权限拒绝无半安装、原子安装、同摘要幂等重装、卸载、平台制品选择、外层摘要及漂移拒绝；真实远端安装、升级失败恢复和 external OneBot/QQ E2E 仍未完成。
 
 本轮基于 `b0159830` 补齐通用扩展能力诊断（逐项就绪条件、依赖、未知/空状态、恢复建议），修复安全子区经浏览器历史离开或请求迟到时一次性令牌重新显示的问题。独立审查唯一 P2 已修复并复审通过。58 项产品测试、5 项架构测试、根 typecheck/build、Storybook build、编码/架构及文档链接检查通过；启用 Storybook 的完整 Playwright 为 93 passed / 15 skipped，跳过项为另一视口覆盖的组件、容量或生命周期专属场景。最终未知状态防御和诊断内容截图另经 3 passed / 1 skipped 定向复验，未受影响的全量证据复用。新增与受影响的宽窄、深浅截图已经人工查看；浏览器验证覆盖真实 Product Host 与受控 gRPC fixture，不等同外部 Provider、QQ 或生产操作。容量检查覆盖 320～1440 CSS px，未宣称原生浏览器缩放或实体触控验收。完整报告保留在 `build/reports/playwright/personal-server/report/`。
 
@@ -38,7 +38,7 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 2026-09-07 设置大块由同一任务独占完成，用户追加授权将累计 M11 本地改动提交 Git。七子区 React 迁移及旧 owner 删除完成，沿用已确认设计方向；独立审查三项 P2（运维旧读覆盖、迟到 POST 终态回退、Skill 投影遗漏）修复并复审通过，新增 8 项 Controller 反例。57 项产品测试、5 项架构测试、根 typecheck/build、Storybook build、编码/仓库架构及 70 个文档本地链接通过；完整浏览器回归为 88 passed / 14 skipped，跳过项由另一视口覆盖。七子区深浅主题 axe、320～1440 CSS px、确认焦点及宽窄截图已验证，不宣称原生浏览器缩放或实体触控验收。Contract Spine 全部门通过；生成物暂存固定后，连续生成一致且工作树对暂存区无差异，原 clean-tree gate 限制已解除。另按用户要求将 Personal Server Vite 配置转为 `.mts` ESM，补齐 public 根目录的源码入口映射；CJS 弃用警告已消除。设置分类 Drawer 的深浅主题 axe、Escape 焦点返回及视觉细节另经定向复验；Vite 开发入口浏览器加载与最终生产构建通过。本次提交固定上述累计 M11 本地变更，未推送或发布。
 
-`v0.1.8` 已从 fixed commit `8d8bdabb7047a63cc03fe2e28f67f41ce5c2a17a` 正式发布。GitHub Release、五项公开资产和统一摘要链已验证；全新 Ubuntu 24.04 remote/full 安装完成，控制机与服务器双重摘要通过，应用与默认 Caddy 均从本地已校验镜像归档加载。`/readyz`、容器、ops bridge 与端口通过，同版本幂等重装通过，安装期间未观察到 Registry 回源；当前服务器健康运行 `v0.1.8`。
+2026-09-10 Personal Server 已从 fixed commit `7c5646ef55c15751694147116f5138a0320abad5` 重新作为首版 `v0.1.0` 正式发布；旧 `v0.1.1` 至 `v0.1.8` GitHub Release 与标签已按授权退役删除。发布门禁在干净 Linux runner 上通过完整 build/test/typecheck，OCI 固定为 `ghcr.io/lociere/glimmer-cradle-personal-server:v0.1.0@sha256:2327efb2fba9409da3700053f779961717193ecb699f0bd405c1f60e371d4040`，公开轻量包、完整包和安装脚本均已下载并按 `SHA256SUMS` 实算一致，固定制品与 OCI provenance 已复验。此前全新 Ubuntu 24.04 remote/full 安装及运行验证属于已退役 `v0.1.8` 的历史证据；本轮未获授权部署生产，因此不把当前服务器版本或新 `v0.1.0` 生产健康状态写成已验证。
 
 真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。
 
@@ -46,7 +46,7 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 M11 仍未完成的范围：
 
-- Extension：正式发布 SDK/Contract public edge 与精确扩展发布物，固定跨仓 revision，完成跨产品安装、升级失败恢复、回滚及扩展配置/Secret 的完整验收；
+- Extension：SDK/Contract public edge 与 NapCat 精确扩展发布物已完成；继续发布模板精确制品，并完成跨产品真实远端安装、升级失败恢复、回滚及扩展配置/Secret 的完整验收；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
 - 生产运维：真实更新失败自动恢复、备份/恢复连续性、长运行及完整停机矩阵；
