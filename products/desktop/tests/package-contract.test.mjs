@@ -72,7 +72,9 @@ test('Desktop package dry-run 是独立 Windows fixed-artifact 任务且不发�
   assert.equal(contract.product, 'desktop');
   assert.equal(contract.platform, 'windows-x64');
   assert.equal(contract.publish, false);
-  assert.match(contract.output.replaceAll('\\', '/'), /dist\/desktop\/0\.1\.8\/windows-x64$/);
+  assert.ok(
+    contract.output.replaceAll('\\', '/').endsWith(`/dist/desktop/${rootManifest.version}/windows-x64`),
+  );
   assert.ok(!JSON.stringify(contract).includes('personal-server'));
 });
 
@@ -271,7 +273,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       runtime_files: runtimeFiles,
       components,
     }));
-    await execNode('release-manifest.mjs', [output, '0.1.8'], {
+    await execNode('release-manifest.mjs', [output, '0.1.0'], {
       GLIMMER_CRADLE_SOURCE_COMMIT: 'a'.repeat(40),
     });
     const digest = createHash('sha256')
@@ -291,7 +293,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       ...verifyArgs.slice(3),
     ]));
     await writeFile(path.join(output, 'GlimmerCradle-Setup.exe'), 'fabricated installer');
-    await execNode('release-manifest.mjs', [output, '0.1.8'], {
+    await execNode('release-manifest.mjs', [output, '0.1.0'], {
       GLIMMER_CRADLE_SOURCE_COMMIT: 'a'.repeat(40),
     });
     const fabricatedDigest = createHash('sha256')
@@ -314,7 +316,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
       runtime_files: runtimeFiles,
       components: components.filter((component) => component.id !== 'native'),
     }));
-    await execNode('release-manifest.mjs', [output, '0.1.8'], {
+    await execNode('release-manifest.mjs', [output, '0.1.0'], {
       GLIMMER_CRADLE_SOURCE_COMMIT: 'a'.repeat(40),
     });
     const forgedDigest = createHash('sha256')

@@ -77,7 +77,7 @@ describe('DeploymentOperationsService', () => {
       update: {
         check_supported: false,
         apply_supported: false,
-        current_version: '0.1.8',
+        current_version: '0.1.0',
         source: 'fixture',
       },
     };
@@ -196,7 +196,7 @@ function createFixture() {
   const envFile = path.join(root, 'deployment.env');
   mkdirSync(applicationRoot, { recursive: true });
   mkdirSync(stateRoot, { recursive: true });
-  writeFileSync(path.join(applicationRoot, 'package.json'), JSON.stringify({ version: '0.1.8' }));
+  writeFileSync(path.join(applicationRoot, 'package.json'), JSON.stringify({ version: '0.1.0' }));
   writeFileSync(envFile, `GLIMMER_CRADLE_STATE_ROOT=${stateRoot}\n`);
   return { root, applicationRoot, stateRoot, envFile };
 }

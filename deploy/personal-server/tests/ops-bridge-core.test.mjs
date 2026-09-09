@@ -18,7 +18,7 @@ const snapshot = {
   update: {
     check_supported: false,
     apply_supported: false,
-    current_version: '0.1.8',
+    current_version: '0.1.0',
     source: 'test',
   },
 };

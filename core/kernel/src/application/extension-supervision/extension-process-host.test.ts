@@ -138,7 +138,7 @@ class FakeExtensionHostService implements IExtensionHostService {
   public attentionLeaseDispose: () => void | Promise<void> = () => undefined;
 
   public getConfig(): IExtensionSystemConfig {
-    return { identity: { app_version: '0.1.8' }, extensions: { extension_root_dir: 'data/packages/extensions', sandbox: { timeout_ms: 5000 } } };
+    return { identity: { app_version: '0.1.0' }, extensions: { extension_root_dir: 'data/packages/extensions', sandbox: { timeout_ms: 5000 } } };
   }
   public getRepoRoot(): string { return repoRoot; }
   public async loadActiveExtensions(): Promise<ActiveExtensionSelection[]> { return []; }

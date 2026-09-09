@@ -299,7 +299,7 @@ test('operations HTTP 使用同一 operation_id 投影终态并如实记录失�
     update: {
       check_supported: false,
       apply_supported: false,
-      current_version: '0.1.8',
+      current_version: '0.1.0',
       source: 'fixture',
     },
   };

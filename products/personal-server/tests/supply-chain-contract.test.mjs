@@ -56,7 +56,7 @@ test('Personal Server fixed artifact verifier 要求独立 expected identity，u
   try {
     const artifact = path.join(output, 'glimmer-cradle-personal-server.tar.gz');
     await writeFile(artifact, Buffer.from('fixture release'));
-    await execNode('release-manifest.mjs', [output, '0.1.8'], {
+    await execNode('release-manifest.mjs', [output, '0.1.0'], {
       GLIMMER_CRADLE_SOURCE_COMMIT: 'b'.repeat(40),
       GLIMMER_CRADLE_OCI_IMAGE: `ghcr.io/example/personal-server@sha256:${'d'.repeat(64)}`,
     });

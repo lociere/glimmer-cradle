@@ -1,6 +1,6 @@
 [project]
 name = "glimmer-cradle-contracts"
-version = "0.1.8"
+version = "0.1.0"
 description = "Generated Python runtime for Glimmer Cradle contracts"
 requires-python = ">=3.12,<3.13"
 dependencies = [
