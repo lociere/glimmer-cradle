@@ -15,7 +15,7 @@
 | [manifests/](./manifests/) | M11/M12/M13 的目标或完成态目录树、Current → Target 动作与删除门 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
-M12 Contract Spine/runtime 物理重建与 M13 A～F/最终仓库工具收口均已完成。M11 的页面实现、Extension SDK public edge、NapCat `v0.1.0` 与 Personal Server 首版重发已经落地；模板公开制品、真实远端 Extension 恢复、external OneBot/QQ 和生产验收仍未完成。当前切片与验收状态由 [now.md](./now.md) 维护。
+M12 Contract Spine/runtime 物理重建与 M13 A～F/最终仓库工具收口均已完成。M11 的页面实现、Extension SDK public edge、NapCat `v0.1.0`、默认 Registry stable 指针与 Personal Server 首版重发已经落地；真实远端 Extension 恢复、external OneBot/QQ 和生产验收仍未完成。当前切片与验收状态由 [now.md](./now.md) 维护。
 
 ## 状态规则
 
