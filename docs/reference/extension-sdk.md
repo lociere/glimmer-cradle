@@ -25,6 +25,10 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 
 独立扩展发布物把 `@glimmer-cradle/extension-sdk` 声明为语义化版本 peer dependency；Extension Host 产品组装会在发行物内提供与当前主程序匹配的 SDK module root，这属于产品携带的扩展执行环境，不是扩展安装包对 Kernel 源码的依赖。扩展安装包不得复制 Kernel/Contracts 源码或依赖主仓库相对路径。
 
+公开工具链由同版本的 `@glimmer-cradle/contracts` 与 `@glimmer-cradle/extension-sdk` 两个 npm 包组成。Contract 包只发布生成后的 TypeScript Service/DTO 与 canonical JSON Schema；SDK 把它作为精确运行依赖并提供作者可用的 schema-derived validator、类型与 Host Port。扩展作者只声明 SDK peer，不直接声明 Contract 包，也不得恢复已删除的 `@glimmer-cradle/protocol`。`pnpm verify:extension-sdk-release` 会构建两个包、检查 allowlist、排除测试/compatibility 内容，并从生成的 tarball 在干净 consumer 中安装和加载公开 validator。
+
+主仓使用 `extension-sdk-v<semver>` 精确 tag 触发 `.github/workflows/release-extension-sdk.yml`。workflow 固定两个 npm tarball 与 `SHA256SUMS`，重验后按 Contract → SDK 顺序发布；发布 job 绑定 `npm` Environment，并要求已拥有 `@glimmer-cradle` scope 的 `NPM_TOKEN`。依赖该版本的扩展 Release workflow 必须从同一 SDK tag 重新 pack Contract/SDK，并把本地 tarball SHA-1 与 npm `dist.shasum` 逐包比较后才允许构建扩展制品，由此同时证明公开可取得性和 tag/npm 内容一致。发布与 Git tag 都是显式外部操作，不由本地构建或产品 `v<semver>` Release 自动触发。
+
 ## 包导出
 
 `@glimmer-cradle/extension-sdk` 通过 `exports` 暴露稳定入口。每个入口都同时声明 `types`、`require`、`import` 和 `default`，确保 Kernel 构建、Vitest、扩展模板和第三方扩展在 CJS/ESM 工具链下解析一致。
@@ -119,7 +123,7 @@ publisher.extension-1.0.0-any.gcex
 | Repository Release | GitHub/GitLab/Gitea 精确 tag | 优先解析 Release Manifest；缺失时按 `<id>-<version>-<platform>.gcex` 选择当前平台唯一制品；禁止跟随浮动分支 |
 | Local `.gcex` | 离线、开发和企业分发 | Desktop 通过系统文件选择器交给 main；Personal Server 只接受认证后的受限字节上传，浏览器换取 opaque `upload_id` 后再进入同一安装事务，不接受浏览器指定服务器路径 |
 
-安装分为 `prepare -> preview -> commit`：Kernel 下载到事务目录，逐跳拒绝非 HTTPS 或超过上限的重定向；SDK 在解压过程中限制文件数和膨胀体积，再验证路径、manifest、平台、摘要和 SBOM。用户确认的权限集合必须与包声明完全一致，Kernel 才重新验证并原子安装到 `data/packages/extensions/<id>/<version>/`。扩展目录落位和安装元数据写入属于同一提交结果，任一步失败都回滚新版本；正在运行或被 active config 选中的版本不能卸载。
+安装分为 `prepare -> preview -> commit`：Kernel 下载到事务目录，逐跳拒绝非 HTTPS 或超过上限的重定向；SDK 在解压过程中限制文件数和膨胀体积，再验证路径、manifest、平台、摘要和 SBOM。用户确认的权限集合必须与包声明完全一致，Kernel 才重新验证并原子安装到 `data/packages/extensions/<id>/<version>/`。权限集合不一致时仍可取消或重新确认；权限确认通过后的 commit 无论成功或失败都是终结操作，会清理事务缓存与 staging。扩展目录落位和安装元数据写入属于同一提交结果，任一步失败都回滚新版本；正在运行或被 active config 选中的版本不能卸载。
 
 Personal Server 的浏览器本地包是这条事务的受控前置步骤，而不是第二条安装主线：`POST /api/v1/extensions/local-package` 只接受同源、已认证请求，限制 `.gcex` 扩展名与 256 MiB 大小上限，把字节流写入 Product Host owned 临时目录，并返回绑定当前 principal/session、30 分钟时效、单次消费的 opaque `upload_id`。后续 `extension_install_prepare` 只能提交 `uploaded_package.upload_id`；Host 在当前会话内把它解析为受控 file source 后再转给 Kernel Package Manager。prepare 完成、失败、取消、断线或超时都会清理上传文件与索引；commit/cancel 对所有 transaction_id 都要求属于当前登录会话，Host 断线会主动取消已预览未提交事务，Kernel Package Manager 启动和定时 sweep 仍会清理 stale transaction 目录。
 

@@ -29,7 +29,7 @@ const MAX_PACKAGE_BYTES = 256 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 const TRANSACTION_TTL_MS = 30 * 60 * 1000;
 const TRANSACTION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
-const outboundUrlPolicy = new OutboundUrlPolicy();
+const defaultOutboundUrlPolicy = new OutboundUrlPolicy();
 
 export type ExtensionInstallSource =
   | { kind: 'file'; path: string }
@@ -97,13 +97,16 @@ export class ExtensionPackageManager {
   private cleanupTimer: NodeJS.Timeout | null = null;
   private readonly extensionRoot: string;
   private readonly productId: Exclude<ExtensionProductTarget, 'any'>;
+  private readonly outboundUrlPolicy: OutboundUrlPolicy;
 
   public constructor(
     extensionRoot: string,
     productId: Exclude<ExtensionProductTarget, 'any'> = 'desktop',
+    outboundUrlPolicy: OutboundUrlPolicy = defaultOutboundUrlPolicy,
   ) {
     this.extensionRoot = extensionRoot;
     this.productId = productId;
+    this.outboundUrlPolicy = outboundUrlPolicy;
     this.transactionRoot = path.join(this.cacheRoot, 'transactions');
     this.stagingRoot = path.join(this.extensionRoot, '.staging');
   }
@@ -182,33 +185,32 @@ export class ExtensionPackageManager {
 
     const targetDir = path.join(this.extensionRoot, pending.verified.manifest.id, pending.verified.manifest.version);
     const existingManifestPath = path.join(targetDir, 'extension-manifest.yaml');
-    if (!(await fs.pathExists(existingManifestPath)) && await fs.pathExists(targetDir)) {
-      throw new Error(`扩展安装目标已存在: ${targetDir}`);
-    }
-
-    const verified = await verifyExtensionPackage(pending.packagePath, { maxArchiveBytes: MAX_PACKAGE_BYTES });
-    if (verified.archiveSha256 !== pending.preview.artifact.sha256) {
-      throw new Error('扩展包在用户确认后发生变化，安装已取消');
-    }
-
-    if (await fs.pathExists(existingManifestPath)) {
-      const metadata = await this.readInstallationMetadata(verified.manifest.id, verified.manifest.version);
-      if (metadata?.artifact_sha256 !== verified.archiveSha256) {
-        throw new Error(`不可变扩展版本已经存在且摘要不同: ${verified.manifest.id}@${verified.manifest.version}`);
-      }
-      await this.finishTransaction(transactionId);
-      return {
-        extension_id: verified.manifest.id,
-        version: verified.manifest.version,
-        installed_path: targetDir,
-        already_installed: true,
-      };
-    }
-
     const stagingDir = path.join(this.stagingRoot, transactionId);
     let movedToTarget = false;
     await fs.remove(stagingDir);
     try {
+      if (!(await fs.pathExists(existingManifestPath)) && await fs.pathExists(targetDir)) {
+        throw new Error(`扩展安装目标已存在: ${targetDir}`);
+      }
+
+      const verified = await verifyExtensionPackage(pending.packagePath, { maxArchiveBytes: MAX_PACKAGE_BYTES });
+      if (verified.archiveSha256 !== pending.preview.artifact.sha256) {
+        throw new Error('扩展包在用户确认后发生变化，安装已取消');
+      }
+
+      if (await fs.pathExists(existingManifestPath)) {
+        const metadata = await this.readInstallationMetadata(verified.manifest.id, verified.manifest.version);
+        if (metadata?.artifact_sha256 !== verified.archiveSha256) {
+          throw new Error(`不可变扩展版本已经存在且摘要不同: ${verified.manifest.id}@${verified.manifest.version}`);
+        }
+        return {
+          extension_id: verified.manifest.id,
+          version: verified.manifest.version,
+          installed_path: targetDir,
+          already_installed: true,
+        };
+      }
+
       await extractVerifiedExtensionPackage(verified, stagingDir);
       await fs.ensureDir(path.dirname(targetDir));
       await fs.move(stagingDir, targetDir, { overwrite: false });
@@ -268,7 +270,7 @@ export class ExtensionPackageManager {
     if (source.kind === 'registry') {
       const catalog = requireValid(
         'Extension Registry Catalog',
-        validateExtensionRegistryCatalog(await fetchJson(source.catalog_url)),
+        validateExtensionRegistryCatalog(await fetchJson(source.catalog_url, this.outboundUrlPolicy)),
       );
       const record = catalog.extensions.find((item) => item.id === source.extension_id);
       if (!record) throw new Error(`Registry 中不存在扩展: ${source.extension_id}`);
@@ -288,7 +290,7 @@ export class ExtensionPackageManager {
         repository: record.repository,
       }, record.id);
     }
-    const assets = await resolveRepositoryReleaseAssets(source.repository, source.tag);
+    const assets = await resolveRepositoryReleaseAssets(source.repository, source.tag, this.outboundUrlPolicy);
     const trust = {
       ...emptyTrust('repository'),
       repository: source.repository,
@@ -299,7 +301,7 @@ export class ExtensionPackageManager {
     const platform = currentExtensionPlatform();
     const packageAsset = chooseRepositoryPackageAsset(assets, platform);
     const packagePath = path.join(transactionRoot, packageAsset.name);
-    await downloadFile(packageAsset.url, packagePath, MAX_PACKAGE_BYTES);
+    await downloadFile(packageAsset.url, packagePath, MAX_PACKAGE_BYTES, this.outboundUrlPolicy);
     return {
       packagePath,
       platform: packageAsset.platform,
@@ -315,7 +317,7 @@ export class ExtensionPackageManager {
   ): Promise<ResolvedInstallSource> {
     const release = requireValid(
       'Extension Release Manifest',
-      validateExtensionReleaseManifest(await fetchJson(manifestUrl)),
+      validateExtensionReleaseManifest(await fetchJson(manifestUrl, this.outboundUrlPolicy)),
     );
     if (expectedExtensionId && release.extension.id !== expectedExtensionId) {
       throw new Error(`Registry 与 Release Manifest 的扩展 ID 不一致: ${expectedExtensionId}`);
@@ -324,7 +326,7 @@ export class ExtensionPackageManager {
     const artifact = chooseArtifact(release.artifacts, platform);
     const artifactUrl = new URL(artifact.file, manifestUrl).toString();
     const packagePath = path.join(transactionRoot, path.basename(artifact.file));
-    const downloaded = await downloadFile(artifactUrl, packagePath, MAX_PACKAGE_BYTES);
+    const downloaded = await downloadFile(artifactUrl, packagePath, MAX_PACKAGE_BYTES, this.outboundUrlPolicy);
     if (downloaded.size !== artifact.size || downloaded.sha256 !== artifact.sha256) {
       throw new Error(`Release 制品摘要或大小不匹配: ${artifact.file}`);
     }
@@ -443,7 +445,7 @@ function emptyTrust(sourceKind: ExtensionInstallSource['kind']): ExtensionInstal
   };
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+async function fetchJson(url: string, outboundUrlPolicy: OutboundUrlPolicy): Promise<unknown> {
   const response = await outboundUrlPolicy.fetchJson(url, {
     headers: { Accept: 'application/json' },
     maxBytes: MAX_MANIFEST_BYTES,
@@ -455,7 +457,12 @@ async function fetchJson(url: string): Promise<unknown> {
   return response.payload;
 }
 
-async function downloadFile(url: string, destination: string, maxBytes: number): Promise<{ size: number; sha256: string }> {
+async function downloadFile(
+  url: string,
+  destination: string,
+  maxBytes: number,
+  outboundUrlPolicy: OutboundUrlPolicy,
+): Promise<{ size: number; sha256: string }> {
   const response = await outboundUrlPolicy.downloadFile(url, destination, {
     maxBytes,
     maxRedirects: MAX_REDIRECTS,
@@ -471,23 +478,27 @@ interface RepositoryReleaseAsset {
   url: string;
 }
 
-async function resolveRepositoryReleaseAssets(repository: string, tag: string): Promise<RepositoryReleaseAsset[]> {
+async function resolveRepositoryReleaseAssets(
+  repository: string,
+  tag: string,
+  outboundUrlPolicy: OutboundUrlPolicy,
+): Promise<RepositoryReleaseAsset[]> {
   const url = new URL(repository);
   if (url.protocol !== 'https:') throw new Error('扩展仓库必须使用 HTTPS');
   const [owner, repositoryName] = url.pathname.replace(/^\//, '').replace(/\.git$/, '').split('/');
   if (!owner || !repositoryName || !tag) throw new Error('仓库安装必须提供仓库地址和不可变 tag');
 
   if (url.hostname === 'github.com') {
-    const release = await fetchJson(`https://api.github.com/repos/${owner}/${repositoryName}/releases/tags/${encodeURIComponent(tag)}`) as Record<string, unknown>;
+    const release = await fetchJson(`https://api.github.com/repos/${owner}/${repositoryName}/releases/tags/${encodeURIComponent(tag)}`, outboundUrlPolicy) as Record<string, unknown>;
     return parseReleaseAssets(release.assets);
   }
   if (url.hostname === 'gitlab.com') {
     const project = encodeURIComponent(`${owner}/${repositoryName}`);
-    const release = await fetchJson(`https://gitlab.com/api/v4/projects/${project}/releases/${encodeURIComponent(tag)}`) as Record<string, unknown>;
+    const release = await fetchJson(`https://gitlab.com/api/v4/projects/${project}/releases/${encodeURIComponent(tag)}`, outboundUrlPolicy) as Record<string, unknown>;
     const assets = release.assets as { links?: unknown } | undefined;
     return parseReleaseAssets(assets?.links);
   }
-  const release = await fetchJson(`${url.origin}/api/v1/repos/${owner}/${repositoryName}/releases/tags/${encodeURIComponent(tag)}`) as Record<string, unknown>;
+  const release = await fetchJson(`${url.origin}/api/v1/repos/${owner}/${repositoryName}/releases/tags/${encodeURIComponent(tag)}`, outboundUrlPolicy) as Record<string, unknown>;
   return parseReleaseAssets(release.assets);
 }
 

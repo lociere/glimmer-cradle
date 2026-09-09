@@ -85,6 +85,35 @@ describe('ExtensionPackageManager', () => {
     manager.dispose();
   });
 
+  it('invalidates the transaction when the package changes after approval', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'extension-package-manager-'));
+    process.env.GLIMMER_CRADLE_APP_ROOT = root;
+    process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(root, 'data');
+    const extensionRoot = path.join(root, 'data', 'packages', 'extensions');
+    const manager = new ExtensionPackageManager(extensionRoot, 'personal-server');
+    await manager.initialize();
+
+    const transactionId = 'tx-package-changed';
+    const archivePath = path.join(root, 'archive.gcex');
+    writeFileSync(archivePath, 'fixture', 'utf8');
+    seedPendingTransaction(manager, transactionId, archivePath);
+    const transactionRoot = path.join(root, 'data', 'cache', 'extensions', 'package-manager', 'transactions', transactionId);
+    mkdirSync(transactionRoot, { recursive: true });
+    writeFileSync(path.join(transactionRoot, 'archive.gcex'), 'fixture', 'utf8');
+    mockedVerifier.verifyExtensionPackageMock.mockResolvedValueOnce({
+      ...createVerifiedPackage(),
+      archiveSha256: 'changed-sha256',
+    });
+
+    await expect(manager.commitInstall(transactionId, [])).rejects.toThrow('用户确认后发生变化');
+    expect(existsSync(transactionRoot)).toBe(false);
+    expect(existsSync(path.join(extensionRoot, '.staging', transactionId))).toBe(false);
+    expect(existsSync(path.join(extensionRoot, 'community.test', '1.0.0'))).toBe(false);
+    await expect(manager.commitInstall(transactionId, [])).rejects.toThrow('不存在或已经过期');
+
+    manager.dispose();
+  });
+
   it('removes staging and target directories when metadata persistence fails after move', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'extension-package-manager-'));
     process.env.GLIMMER_CRADLE_APP_ROOT = root;
@@ -187,8 +216,8 @@ function createVerifiedPackage(): {
     readonly products: ['personal-server'];
     readonly platforms: ['any'];
   };
-  readonly archiveSha256: 'fixture-sha256';
-  readonly archiveSize: 7;
+  readonly archiveSha256: string;
+  readonly archiveSize: number;
 } {
   return {
     manifest: {

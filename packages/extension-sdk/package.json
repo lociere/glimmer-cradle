@@ -2,6 +2,13 @@
   "name": "@glimmer-cradle/extension-sdk",
   "version": "0.1.8",
   "private": false,
+  "description": "Public extension authoring SDK for Glimmer Cradle.",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lociere/glimmer-cradle.git",
+    "directory": "packages/extension-sdk"
+  },
   "files": ["dist"],
   "publishConfig": { "access": "public" },
   "main": "dist/index.js",
@@ -76,20 +83,21 @@
   },
   "scripts": {
     "stage:host-modules": "node scripts/stage-host-modules.mjs",
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
     "build:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run typecheck",
     "test": "vitest run src --threads false",
+    "verify:release": "node scripts/verify-public-packages.mjs",
     "test:with-deps": "pnpm --filter @glimmer-cradle/contracts run build && pnpm run test"
   },
   "dependencies": {
     "@glimmer-cradle/contracts": "workspace:*",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "fflate": "^0.8.2",
-    "yaml": "^2.8.2",
-    "ws": "^8.18.3"
+    "fflate": "0.8.2",
+    "yaml": "2.8.2",
+    "ws": "8.18.3"
   },
   "peerDependencies": {
     "zod": "^3.23.0"

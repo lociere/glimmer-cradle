@@ -1,0 +1,103 @@
+name: 发布 Extension SDK
+
+concurrency:
+  group: release-extension-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    tags:
+      - 'extension-sdk-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build-fixed-packages:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 验证版本与发布边界
+        run: |
+          VERSION="${GITHUB_REF_NAME#extension-sdk-v}"
+          test "$(node -p 'require("./contracts/package.json").version')" = "$VERSION"
+          test "$(node -p 'require("./packages/extension-sdk/package.json").version')" = "$VERSION"
+          pnpm install --frozen-lockfile
+          pnpm check:encoding
+          pnpm check:architecture
+          pnpm --filter @glimmer-cradle/contracts run test:gates
+          pnpm --filter @glimmer-cradle/extension-sdk run test:with-deps
+          pnpm verify:extension-sdk-release
+
+      - name: 固定 npm 发布包
+        run: |
+          PACKAGE_DIR="$GITHUB_WORKSPACE/dist/extension-sdk"
+          mkdir -p "$PACKAGE_DIR"
+          pnpm --filter @glimmer-cradle/contracts pack --pack-destination "$PACKAGE_DIR"
+          pnpm --filter @glimmer-cradle/extension-sdk pack --pack-destination "$PACKAGE_DIR"
+          cd "$PACKAGE_DIR"
+          sha256sum ./*.tgz > SHA256SUMS
+          sha256sum --check SHA256SUMS
+
+      - name: 上传固定发布包
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: extension-sdk-${{ github.ref_name }}
+          path: dist/extension-sdk/
+          if-no-files-found: error
+
+  publish:
+    needs: build-fixed-packages
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: 配置 Node.js 与 npm registry
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: 下载固定发布包
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: extension-sdk-${{ github.ref_name }}
+          path: dist/extension-sdk/
+
+      - name: 重新验证并发布固定包
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd dist/extension-sdk
+          sha256sum --check SHA256SUMS
+
+          publish_package() {
+            PACKAGE_NAME="$1"
+            PACKAGE_FILE="$2"
+            VERSION="${GITHUB_REF_NAME#extension-sdk-v}"
+            REMOTE_SHA1="$(npm view "${PACKAGE_NAME}@${VERSION}" dist.shasum 2>/dev/null || true)"
+            if [ -n "$REMOTE_SHA1" ]; then
+              LOCAL_SHA1="$(sha1sum "$PACKAGE_FILE" | cut -d' ' -f1)"
+              test "$REMOTE_SHA1" = "$LOCAL_SHA1"
+              echo "${PACKAGE_NAME}@${VERSION} 已存在且发布包一致，跳过。"
+              return
+            fi
+            npm publish "$PACKAGE_FILE" --access public --provenance
+          }
+
+          publish_package '@glimmer-cradle/contracts' "glimmer-cradle-contracts-${GITHUB_REF_NAME#extension-sdk-v}.tgz"
+          publish_package '@glimmer-cradle/extension-sdk' "glimmer-cradle-extension-sdk-${GITHUB_REF_NAME#extension-sdk-v}.tgz"
