@@ -68,9 +68,11 @@ test('组合任务只有 root 拓扑构建依赖，package atomic task 不含重
   }
   const rootManifest = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
   assert.match(rootManifest.scripts['build:all'], /build:extension-tooling/);
+  assert.match(rootManifest.scripts['build:all'], /@glimmer-cradle\/kernel run build/);
+  assert.match(rootManifest.scripts['build:all'], /@glimmer-cradle\/desktop run build/);
+  assert.match(rootManifest.scripts['build:all'], /@glimmer-cradle\/personal-server run build/);
   assert.match(rootManifest.scripts['build:extension-tooling'], /contracts/);
-  assert.match(rootManifest.scripts['test:all'], /build:extension-tooling/);
-  assert.match(rootManifest.scripts['test:all'], /@glimmer-cradle\/kernel run build/);
-  assert.match(rootManifest.scripts['test:all'], /@glimmer-cradle\/personal-server run build/);
+  assert.match(rootManifest.scripts['test:all'], /build:all/);
+  assert.match(rootManifest.scripts['test:cognition'], /--extra dev/);
   assert.match(rootManifest.scripts.typecheck, /contracts/);
 });
