@@ -12,7 +12,9 @@
 
 2026-09-09 至 2026-09-10 Extension SDK public edge 已按首版 `0.1.0` 正式发布：`extension-sdk-v0.1.0` 固定主仓候选，`@glimmer-cradle/contracts@0.1.0` 与 `@glimmer-cradle/extension-sdk@0.1.0` 已公开进入 npm，registry shasum 分别为 `5e2179476ba2623240fea8d0b7b4d9f867f548c1`、`259fcbdc2a4bb11dac326e8f147e7e966671417d`，下载的 Actions 固定制品与 registry tarball 逐包一致并带 provenance。第一方扩展仓已迁除 `@glimmer-cradle/protocol`，Registry/模板只从 SDK public edge 校验并统一为 `0.1.0`；模板 `.gcex` 的本地构建、包完整性、脏树拒绝和重复摘要验证通过。模板明确仅供复制演示，不发布 `glimmer-cradle.template-basic`；当前仓库尚无第一方扩展。当前 npm 发布仍使用 `npm` Environment 中的 `NPM_TOKEN`；后续应迁移到 npm Trusted Publisher 后撤销长期 token。
 
-同日 NapCat 独立仓已从固定 commit `e0f4062fd062acb5b7c2483281e3b279bdc107ca` 正式发布 `v0.1.0`。发布 workflow 从 SDK tag 重建 Contract/SDK tarball 并逐包绑定 npm `dist.shasum`，Adapter 校验、14 项测试、Kernel 固定候选安装事务、provenance 与 GitHub Release 均通过；Windows x64 与 Linux x64 `.gcex` 内容摘要同为 `7d1e0a924a7564fd20392c5388e14e06f039cdd22f84116a66146c65fc57f655`，Release Manifest 摘要为 `f8b3e5caea5692af744617ae6099ab08151a657333f34bd9010a37d71d231082`。默认 Registry 已将该不可变 manifest 晋级为 `approved/verified` 的 `stable` 指针，并按公开下载重验同一摘要。Windows 主机上的 Package Manager 已覆盖兼容预览、权限拒绝无半安装、原子安装、同摘要幂等重装、卸载、平台制品选择、外层摘要及漂移拒绝；真实远端安装、升级失败恢复和 external OneBot/QQ E2E 仍未完成。
+同日 NapCat 独立仓已从固定 commit `e0f4062fd062acb5b7c2483281e3b279bdc107ca` 正式发布 `v0.1.0`。发布 workflow 从 SDK tag 重建 Contract/SDK tarball 并逐包绑定 npm `dist.shasum`，Adapter 校验、14 项测试、Kernel 固定候选安装事务、provenance 与 GitHub Release 均通过；Windows x64 与 Linux x64 `.gcex` 内容摘要同为 `7d1e0a924a7564fd20392c5388e14e06f039cdd22f84116a66146c65fc57f655`，Release Manifest 摘要为 `f8b3e5caea5692af744617ae6099ab08151a657333f34bd9010a37d71d231082`。默认 Registry 已将该不可变 manifest 晋级为 `approved/verified` 的 `stable` 指针，并按公开下载重验同一摘要。Windows 主机上的 Package Manager 已覆盖兼容预览、权限拒绝无半安装、原子安装、同摘要幂等重装、卸载、平台制品选择、外层摘要及漂移拒绝。
+
+2026-09-10 Extension 发布主线完成公开分发复验。SDK 与 NapCat workflow 均支持对精确既有 tag 做幂等重建：SDK 在 Ubuntu 24.04 上通过 Node 24 Artifact Actions 传递固定 tarball，并确认 npm 上两个 `0.1.0` 包与 tag 重建结果逐包一致；NapCat 对 `v0.1.0` 重建双平台 `.gcex`、Release Manifest、摘要和 provenance，经同一 Artifact Actions 下载后再次校验，手动复验不会覆盖已有 GitHub Release。主仓另从公开默认 Registry 解析 stable 指针和 GitHub Release，在 Ubuntu 24.04 上选择 Linux `.gcex`，完成信任预览、权限确认、原子安装、拒权后保留既有安装、同摘要幂等重装与卸载。由此，SDK → npm → Adapter tag → GitHub Release → Registry → Linux Package Manager 的公开发布与安装链已经闭合。跨版本升级/回滚仍需未来获准的第二个完整版本候选；在首版统一保持 `0.1.0` 时不伪造版本递增。external OneBot/QQ E2E、扩展运行激活与配置/Secret 的真实外部场景继续属于 NapCat/运行验收，而非发布物可取得性。
 
 本轮基于 `b0159830` 补齐通用扩展能力诊断（逐项就绪条件、依赖、未知/空状态、恢复建议），修复安全子区经浏览器历史离开或请求迟到时一次性令牌重新显示的问题。独立审查唯一 P2 已修复并复审通过。58 项产品测试、5 项架构测试、根 typecheck/build、Storybook build、编码/架构及文档链接检查通过；启用 Storybook 的完整 Playwright 为 93 passed / 15 skipped，跳过项为另一视口覆盖的组件、容量或生命周期专属场景。最终未知状态防御和诊断内容截图另经 3 passed / 1 skipped 定向复验，未受影响的全量证据复用。新增与受影响的宽窄、深浅截图已经人工查看；浏览器验证覆盖真实 Product Host 与受控 gRPC fixture，不等同外部 Provider、QQ 或生产操作。容量检查覆盖 320～1440 CSS px，未宣称原生浏览器缩放或实体触控验收。完整报告保留在 `build/reports/playwright/personal-server/report/`。
 
@@ -46,7 +48,7 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 M11 仍未完成的范围：
 
-- Extension：SDK/Contract public edge、NapCat 精确扩展发布物与默认 Registry stable 指针已完成；继续完成跨产品真实远端安装、升级失败恢复、回滚及扩展配置/Secret 的完整验收；
+- Extension：公开 SDK/npm、NapCat 精确发布物、默认 Registry stable 指针和 Ubuntu 公开安装事务已完成；未来产生获准的第二个完整版本候选时再完成跨版本升级失败恢复与回滚，并继续扩展激活及配置/Secret 的真实外部场景验收；
 - 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
 - 生产运维：真实更新失败自动恢复、备份/恢复连续性、长运行及完整停机矩阵；

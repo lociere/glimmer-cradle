@@ -207,8 +207,8 @@
 - `[x]` 事实与契约：配置 Snapshot/Command、Secret write-only、默认路由与 `conversation_notice` 契约已合入并完成生成同步。
 - `[x]` Kernel 配置主线：LLM Provider 与默认路由的脱敏读取、revision、预览、原子写入、审计和 apply 状态已落地；Audio/Embedding/Memory/Skill 也已接入同一 Config Application Port，并经本地单测验证落盘与 snapshot 回读。
 - `[x]` Personal Server 页面：五个一级页面与七个设置子区的 React 实现完成，URL/history、唯一页面挂载、受控投影、能力诊断、配置与一次性令牌生命周期、主题/容量/a11y 与截图基线已落实。页面本地验收与实机限制见 [now.md](../now.md)；真实外部服务和生产门单独追踪。
-- `[~]` Extension 发布主线：统一安装事务、兼容性/信任元数据预览、启停、版本切换回退 UI、本地 `.gcex` 上传主线，以及模板仓库 `release:prepare`、`.gcex` 构建、GitHub Release workflow、`SHA256SUMS` 与文档已落地；Contract/SDK 公共包 allowlist、干净 consumer tarball 安装门和固定 tag npm workflow 已形成候选，第一方扩展仓与 NapCat 独立仓均已迁除旧 Protocol 并统一为首版 SDK `0.1.0`。NapCat 发布候选还具备真实 tag/干净工作树门、双平台 Release Manifest、失败保留和可复现摘要验证；主仓 Package Manager 的本地 file source 与受控 HTTPS Release Manifest 两条真实候选安装探针已固化并进入 NapCat workflow，权限确认后制品变化的失败清理也已覆盖。三仓候选已推送，主仓 `npm` Environment 与发布凭据已配置；SDK/tag 与正式包发布、真实远端发布物升级/失败恢复仍未完成。
-- `[~]` NapCat 跨产品化：Adapter Core 已使用 SDK public edge，manifest/peer dependency 已对齐首版 SDK `0.1.0`，Windows x64 与 Linux x64 `.gcex` 本地候选、Release Manifest、摘要和固定 SDK tag workflow 已通过本地验证；真实 Windows `.gcex` 在临时数据根中通过 `personal-server` 产品兼容预览、权限拒绝无半安装、原子安装、幂等重装与卸载，受控 HTTPS fixture 还验证了 Release Manifest 下载入口。尚未创建正式 tag/Release，Linux Product Host 安装、external OneBot 的真实 QQ 场景 E2E 与升级失败恢复门仍未完成。
+- `[x]` Extension 发布主线：`@glimmer-cradle/contracts@0.1.0` 与 `@glimmer-cradle/extension-sdk@0.1.0` 已由精确 SDK tag 带 provenance 发布到 npm；NapCat `v0.1.0` 已发布双平台 `.gcex`、Release Manifest、`SHA256SUMS` 与 provenance，默认 Registry 的 `approved/verified` stable 指针绑定该不可变 Release。SDK 与 Adapter workflow 均可对精确既有 tag 做不覆盖发行记录的幂等重建，Node 24 Artifact Actions 的上传/下载和摘要复验已在 Ubuntu 24.04 真实运行通过；主仓从公开 Registry 解析 GitHub Release 并选择 Linux `.gcex`，完成信任预览、权限确认、原子安装、拒权不破坏既有安装、同摘要幂等重装与卸载。SDK → npm → Adapter tag → Release → Registry → Linux Package Manager 的发布链已闭合。
+- `[~]` NapCat 跨产品化：Adapter Core 已使用 SDK public edge，manifest/peer dependency 已对齐首版 SDK `0.1.0`；Windows x64 与 Linux x64 `.gcex` 已正式发布且可复现。Windows 临时数据根与 Ubuntu 24.04 公开 Registry 安装探针均通过 `personal-server` 产品兼容预览、权限拒绝、原子安装、幂等重装与卸载。Extension Host 激活、external OneBot 的真实 QQ 场景 E2E、配置/Secret 和重启连续性仍未完成；跨版本升级失败恢复等待未来获准的第二个完整版本候选，不在 `0.1.0` 内伪造递增。
 - `[~]` 生产验收：`v0.1.8` fixed commit 已正式发布；全新 Ubuntu 24.04 remote/full、双重摘要、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已通过。真实失败回滚仍因缺少获授权 distinct candidate/fault injection 入口未完成。
 
 ### 第一验收门追踪
@@ -223,8 +223,8 @@
 
 - `[x]` `v0.1.8` 在全新 Ubuntu 24.04 无需源码树完成 remote/full 安装；五项 Release 资产与摘要、双重校验、本地应用/Caddy 镜像加载、`/readyz`、容器、ops bridge、端口、幂等重装和无 Registry 回源均已验证。
 - `[~]` 浏览器内 Provider、Audio、Embedding、Memory、Skill 配置以及 Security/Storage/Update 正式能力查看已打通；生产已运行包含这些能力的 `v0.1.8`，页面实现已完成；宿主运维完整恢复、真实更新失败恢复与长期运行矩阵仍未完成。
-- `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；真实发布物升级、失败自动恢复和跨仓库 Linux `.gcex` 生产闭环仍未完成。
-- `[~]` NapCat Linux `.gcex` 已形成可复现的本地发布候选，Windows 主机上的 Package Manager 已按 `personal-server` 产品约束完成真实包本地安装/幂等/卸载探针；Linux Product Host、外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。
+- `[~]` Extension 统一事务 UI/投影已覆盖仓库/Registry/Release Manifest 预览、安装、激活、卸载、版本切换回退与浏览器本地 `.gcex` 上传；公开 Registry 到 Ubuntu 24.04 Linux Package Manager 的真实发布物安装/拒权恢复/幂等/卸载已通过。跨版本升级与回滚等待第二个获准候选；真实 Product Host 激活和配置场景仍未完成。
+- `[~]` NapCat Linux `.gcex` 已正式发布并通过公开 Registry 安装；Windows 主机与 Ubuntu runner 均按 `personal-server` 产品约束完成包事务探针。Linux Extension Host、外部 OneBot 私聊/群聊/记忆链路和重启连续性验收未完成。
 - `[ ]` 更新失败自动恢复、备份/恢复连续性、完整停机和长运行矩阵未完成；失败回滚缺少获授权 distinct candidate/fault injection 入口。
 - `[~]` Personal Server Playwright 已覆盖零 Provider、Provider 保存、Audio/Embedding/Memory 保存、Skill Catalog 刷新、安全令牌、运维 disabled reason、扩展安装/启用与桌面/窄窗；安装矩阵和真实外部场景 smoke 尚未全部完成。
 
