@@ -13,7 +13,7 @@ on:
       tag:
         description: 要复验的精确 Extension SDK tag
         required: true
-        default: extension-sdk-v0.1.0
+        default: extension-sdk-v0.2.0
         type: string
 
 env:

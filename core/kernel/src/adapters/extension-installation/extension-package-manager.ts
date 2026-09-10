@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   EXTENSION_ID_PATTERN,
   EXTENSION_VERSION_PATTERN,
+  listExtensionActivationProfiles,
   validateExtensionRegistryCatalog,
   validateExtensionReleaseManifest,
   type ExtensionContractValidation,
@@ -153,7 +154,11 @@ export class ExtensionPackageManager {
           version: verified.manifest.version,
           publisher: verified.manifest.publisher,
           ...(verified.manifest.description ? { description: verified.manifest.description } : {}),
-          permissions: [...verified.manifest.permissions],
+          permissions: collectInstallApprovalPermissions(
+            verified.manifest,
+            this.productId,
+            currentExtensionPlatform(),
+          ),
           products: [...verified.manifest.products],
           platforms: [...verified.manifest.platforms],
         },
@@ -421,6 +426,25 @@ export class ExtensionPackageManager {
   }
 }
 
+function collectInstallApprovalPermissions(
+  manifest: ExtensionManifest,
+  productId: Exclude<ExtensionProductTarget, 'any'>,
+  platform: Exclude<ExtensionPlatform, 'any'>,
+): string[] {
+  const profiles = listExtensionActivationProfiles(manifest, {
+    productId,
+    platform,
+    features: new Set(['extensions']),
+  }).filter((profile) => profile.supported);
+  if (profiles.length === 0) {
+    throw new Error(`扩展 ${manifest.id} 当前没有兼容的 activation profile`);
+  }
+  return [...new Set([
+    ...manifest.permissions,
+    ...profiles.flatMap((profile) => profile.permissions),
+  ])];
+}
+
 function chooseArtifact(artifacts: ExtensionReleaseArtifact[], platform: ExtensionPlatform): ExtensionReleaseArtifact {
   const exact = artifacts.find((artifact) => artifact.platform === platform);
   const universal = artifacts.find((artifact) => artifact.platform === 'any');
@@ -429,10 +453,10 @@ function chooseArtifact(artifacts: ExtensionReleaseArtifact[], platform: Extensi
   return selected;
 }
 
-function currentExtensionPlatform(): ExtensionPlatform {
+function currentExtensionPlatform(): Exclude<ExtensionPlatform, 'any'> {
   const os = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : 'linux';
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  return `${os}-${arch}` as ExtensionPlatform;
+  return `${os}-${arch}` as Exclude<ExtensionPlatform, 'any'>;
 }
 
 function emptyTrust(sourceKind: ExtensionInstallSource['kind']): ExtensionInstallTrust {

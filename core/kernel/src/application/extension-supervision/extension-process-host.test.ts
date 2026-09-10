@@ -47,7 +47,7 @@ describe('ExtensionProcessHost', () => {
     await writeFile(entry, [
       'module.exports = {',
       '  onActivate(ctx) {',
-      "    ctx.ports.commands.registerCommand(`${ctx.extensionId}.ping`, () => ({ pid: process.pid, extensionId: ctx.extensionId }), { title: 'Ping' });",
+      "    ctx.ports.commands.registerCommand(`${ctx.extensionId}.ping`, async () => ({ pid: process.pid, extensionId: ctx.extensionId, activationProfile: ctx.activationProfile, secret: await ctx.ports.secrets.get('probe') }), { title: 'Ping' });",
       '  }',
       '};',
       '',
@@ -55,16 +55,20 @@ describe('ExtensionProcessHost', () => {
     const service = new FakeExtensionHostService();
     const host = new ExtensionProcessHost(
       service,
-      { id: 'demo.extension', permissions: [ExtensionPermission.COMMAND_REGISTER] },
+      { id: 'demo.extension', permissions: [ExtensionPermission.COMMAND_REGISTER, ExtensionPermission.SECRET_READ_SELF] },
       entry,
       {},
+      { probe: 'isolated-secret' },
+      'default',
       5000,
     );
 
     await host.start();
-    const result = await service.executeCommand('demo.extension.ping') as { pid: number; extensionId: string };
+    const result = await service.executeCommand('demo.extension.ping') as { pid: number; extensionId: string; activationProfile: string; secret: string };
 
     expect(result.extensionId).toBe('demo.extension');
+    expect(result.activationProfile).toBe('default');
+    expect(result.secret).toBe('isolated-secret');
     expect(result.pid).not.toBe(process.pid);
     expect(service.commands.size).toBe(1);
     expect(service.lifecycleStages).toContain('Extension demo.extension activated.');
@@ -93,6 +97,8 @@ describe('ExtensionProcessHost', () => {
       { id: 'demo.denied', permissions: [] },
       entry,
       {},
+      {},
+      'default',
       5000,
     );
 
@@ -100,6 +106,35 @@ describe('ExtensionProcessHost', () => {
     await host.stop().catch(() => undefined);
 
     expect(service.commands.size).toBe(0);
+  });
+
+  it('denies extension Secret reads without SECRET_READ_SELF', async () => {
+    process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
+    const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-host-secret-denied-'));
+    temporaryRoots.push(root);
+    const entry = path.join(root, 'extension.js');
+    await writeFile(entry, [
+      'module.exports = {',
+      '  onActivate(ctx) {',
+      "    ctx.ports.commands.registerCommand(`${ctx.extensionId}.secrets`, () => ctx.ports.secrets.get('probe'));",
+      '  }',
+      '};',
+      '',
+    ].join('\n'), 'utf8');
+    const service = new FakeExtensionHostService();
+    const host = new ExtensionProcessHost(
+      service,
+      { id: 'demo.secret-denied', permissions: [ExtensionPermission.COMMAND_REGISTER] },
+      entry,
+      {},
+      { probe: 'must-not-cross-boundary' },
+      'default',
+      5000,
+    );
+
+    await host.start();
+    await expect(service.executeCommand('demo.secret-denied.secrets')).rejects.toThrow(/缺少权限 SECRET_READ_SELF/);
+    await host.stop();
   });
 
   it('stops the isolated host when a registration disposable hangs', async () => {
@@ -122,6 +157,8 @@ describe('ExtensionProcessHost', () => {
       { id: 'demo.hung-registration', permissions: [] },
       entry,
       {},
+      {},
+      'default',
       250,
     );
 

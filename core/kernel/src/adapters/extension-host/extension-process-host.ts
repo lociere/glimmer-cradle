@@ -46,6 +46,8 @@ export class ExtensionProcessHost {
     private readonly manifest: Manifest,
     private readonly entryPath: string,
     private readonly config: Record<string, unknown>,
+    private readonly secrets: Record<string, string>,
+    private readonly activationProfile: string,
     private readonly timeoutMs: number,
   ) {
     this.runtimeId = `extension.${manifest.id}.${randomUUID()}`;
@@ -86,6 +88,7 @@ export class ExtensionProcessHost {
     await withTimeout(this.readyPromise, this.timeoutMs, `扩展 ${this.manifest.id} Host 启动超时`);
     await this.request('activate', {
       extension_id: this.manifest.id,
+      activation_profile: this.activationProfile,
       entry_path: this.entryPath,
       config: hasExtensionPermission(ExtensionPermission.CONFIG_READ_SELF, this.manifest.permissions) ? this.config : {},
     });
@@ -161,6 +164,14 @@ export class ExtensionProcessHost {
       case 'storage.get': return this.service.createStorage(this.manifest.id).get(readString(payload.key));
       case 'storage.set': await this.service.createStorage(this.manifest.id).set(readString(payload.key), payload.value); return null;
       case 'storage.delete': await this.service.createStorage(this.manifest.id).delete(readString(payload.key)); return null;
+      case 'secrets.get': {
+        this.assertPermission(ExtensionPermission.SECRET_READ_SELF, '读取自身 Secret');
+        const key = readString(payload.key);
+        if (!/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(key)) {
+          throw new ExtensionException(`扩展 Secret key 非法: ${key}`, ErrorCode.EXTENSION_VALIDATION_FAILED);
+        }
+        return this.secrets[key];
+      }
       case 'evidence.submit':
         this.assertPermission(ExtensionPermission.EVIDENCE_PROPOSAL_WRITE, '提交认知证据候选');
         await this.service.submitEvidenceProposal(this.manifest.id, payload as never); return null;

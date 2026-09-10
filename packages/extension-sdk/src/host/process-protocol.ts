@@ -23,6 +23,7 @@ export const EXTENSION_KERNEL_METHODS = [
   'storage.get',
   'storage.set',
   'storage.delete',
+  'secrets.get',
   'evidence.submit',
   'perception.inject',
   'attention.acquire',

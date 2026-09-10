@@ -18,7 +18,7 @@
       "owner": "Kernel Config Application owner",
       "kind": "Document",
       "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "96a91e0cdceb661bc3d7ca1609e4140ccb174e60d6c71a784a6600ecbe8b4b02"
+      "sha256": "5b4b63eb6e1fefe569ac6628cf64f8992ab9c54e739a5a8aab05a0ceb08f57fa"
     },
     {
       "path": "json-schema/config/v1/audio-config.schema.json",
@@ -252,7 +252,7 @@
       "owner": "Extension SDK and Package owner",
       "kind": "Document",
       "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "eea8c11be76c7a23332ba577ed9097faf388ee1c3f367aa56a4ad028a19e351a"
+      "sha256": "246ec0d5ef8498229273f31abc20fd9e0f50e98586552ac9a409166d6fb7d7e4"
     },
     {
       "path": "json-schema/extension/v1/extension-registry-catalog.schema.json",

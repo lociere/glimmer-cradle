@@ -75,7 +75,7 @@ describe('extension-host process lifecycle', () => {
       channel: 'extension-host-process-request',
       request_id: 'activate',
       method: 'activate',
-      payload: { extension_id: 'demo.disconnect', entry_path: entry, config: {} },
+      payload: { extension_id: 'demo.disconnect', activation_profile: 'default', entry_path: entry, config: {} },
     });
     await waitForResponse(child, 'activate');
 
@@ -113,7 +113,7 @@ describe('extension-host process lifecycle', () => {
       channel: 'extension-host-process-request',
       request_id: 'activate',
       method: 'activate',
-      payload: { extension_id: 'demo.hung', entry_path: entry, config: {} },
+      payload: { extension_id: 'demo.hung', activation_profile: 'default', entry_path: entry, config: {} },
     });
     await waitForResponse(child, 'activate');
     child.send({

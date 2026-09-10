@@ -11,6 +11,7 @@ export interface ExtensionLogger {
 
 export interface ExtensionHostContext<TConfig = Record<string, unknown>> {
   readonly extensionId: string;
+  readonly activationProfile: string;
   readonly logger: ExtensionLogger;
   readonly config: TConfig;
   readonly subscriptions: Disposable[];

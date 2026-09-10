@@ -39,6 +39,10 @@ export interface ExtensionKeyValueStore {
   delete(key: string): Promise<void>;
 }
 
+export interface ExtensionSecretsPort {
+  get(key: string): Promise<string | undefined>;
+}
+
 export interface PerceptionPort {
   inject(proposal: ExtensionPerceptionProposal): void;
 }
@@ -161,6 +165,7 @@ export interface EvidenceProposalPort {
 
 export interface ExtensionHostPorts {
   readonly storage: ExtensionKeyValueStore;
+  readonly secrets: ExtensionSecretsPort;
   readonly evidenceProposal: EvidenceProposalPort;
   readonly perception: PerceptionPort;
   readonly sceneAttention: SceneAttentionPort;
@@ -172,6 +177,8 @@ export interface ExtensionHostPorts {
 
 export interface ExtensionContext<TConfig = unknown> {
   readonly extensionId: string;
+  /** Host 已完成产品/平台兼容性解析后的 activation profile。 */
+  readonly activationProfile: string;
   readonly logger: ExtensionLogger;
   readonly config: TConfig;
   readonly subscriptions: Disposable[];

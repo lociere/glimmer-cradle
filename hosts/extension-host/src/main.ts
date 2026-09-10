@@ -85,9 +85,12 @@ async function activate(payload: unknown): Promise<{ ready: true; runtime_id: st
   if (extension) return { ready: true, runtime_id: runtimeId };
   const input = asRecord(payload);
   const extensionId = readString(input.extension_id);
+  const activationProfile = readString(input.activation_profile);
   const entryPath = readString(input.entry_path);
   const rawConfig = asRecord(input.config);
-  if (!extensionId || !entryPath) throw new Error('Extension Host 缺少 extension_id 或 entry_path');
+  if (!extensionId || !activationProfile || !entryPath) {
+    throw new Error('Extension Host 缺少 extension_id、activation_profile 或 entry_path');
+  }
 
   reportStage('handshake', `Extension Host handshake accepted for ${extensionId}.`);
   const exported = loadExtensionEntry(entryPath);
@@ -97,7 +100,7 @@ async function activate(payload: unknown): Promise<{ ready: true; runtime_id: st
   }
   extension = candidate;
   const config = validateConfig(extension, rawConfig, extensionId);
-  context = createContext(extensionId, config);
+  context = createContext(extensionId, activationProfile, config);
   reportStage('resource_prepared', `Extension ${extensionId} context prepared.`);
   const registrations: Promise<string>[] = [];
   activationRegistrations = registrations;
@@ -158,7 +161,11 @@ async function runDeactivate(): Promise<{ stopped: true }> {
   return { stopped: true };
 }
 
-function createContext(extensionId: string, config: Record<string, unknown>): ExtensionHostContext {
+function createContext(
+  extensionId: string,
+  activationProfile: string,
+  config: Record<string, unknown>,
+): ExtensionHostContext {
   const subscriptions: Disposable[] = [];
   const track = (disposable: Disposable): Disposable => {
     subscriptions.push(disposable);
@@ -166,6 +173,7 @@ function createContext(extensionId: string, config: Record<string, unknown>): Ex
   };
   return {
     extensionId,
+    activationProfile,
     config: Object.freeze(config),
     subscriptions,
     logger: {
@@ -179,6 +187,12 @@ function createContext(extensionId: string, config: Record<string, unknown>): Ex
         get: (key: string) => request('storage.get', { key }),
         set: async (key: string, value: unknown) => { await request('storage.set', { key, value }); },
         delete: async (key: string) => { await request('storage.delete', { key }); },
+      },
+      secrets: {
+        get: async (key: string) => {
+          const value = await request('secrets.get', { key });
+          return typeof value === 'string' ? value : undefined;
+        },
       },
       evidenceProposal: { submit: async (proposal: unknown) => { await request('evidence.submit', proposal); } },
       perception: { inject: (proposal: unknown) => fire('perception.inject', proposal) },

@@ -13,6 +13,7 @@
 | Extension 配置 | `configs/extensions/*.yaml` | Extension Host | 对应扩展、Kernel Extension runtime |
 | Extension manifest | `data/packages/extensions/<id>/<version>/extension-manifest.yaml` | 已安装扩展包 | Extension Host、Skill Plane、权限检查 |
 | 密钥 | `configs/secrets/` 或环境变量 | 用户/部署环境 | Provider、MCP、扩展、模型服务 |
+| Extension Secret | `configs/secrets/extensions/<id>.yaml` | 用户/部署环境 | 仅在 `SECRET_READ_SELF` 获批后注入对应 Extension Host；只允许字符串键值，不进入普通配置或投影 |
 | 环境变量 | `GLIMMER_CRADLE_*` 等显式覆盖 | 启动环境 | Kernel/Engine/Avatar/Provider |
 | UI 投影 | Electron main/Kernel 提供的受控模型 | 对应 owner | Renderer |
 
@@ -60,7 +61,7 @@ Base URL 只接受不含账号信息、查询参数和片段的 HTTP(S) 地址�
 | `configs/characters/<character-id>/providers.yaml` | 该角色的 LLM provider 路由和可用性 |
 | `configs/characters/<character-id>/voice.yaml` | 该角色的稳定声音身份、表达参数和 provider 声线绑定 |
 | `configs/characters/<character-id>/knowledge/index.yaml` | 该角色的 Knowledge Vault 索引，正文为 `knowledge/*.md` |
-| `configs/extensions/active.yaml` | Extension 激活集合；每项包含精确 `id` 与 `version` |
+| `configs/extensions/active.yaml` | Extension 激活集合；每项包含精确 `id`、`version` 与 Host 解析后的 `profile` |
 | `configs/extensions/*.yaml` | 单个扩展的运行配置 |
 
 ## Character Package 配置

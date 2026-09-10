@@ -1,6 +1,6 @@
 id: your-publisher.my-extension
 name: My Extension
-version: 0.1.0
+version: 0.2.0
 publisher: your-publisher
 license: GPL-3.0-only
 repository: https://github.com/your-publisher/my-extension
@@ -11,10 +11,10 @@ platforms:
   - any
 description: Example extension scaffold for Glimmer Cradle.
 main: dist/index.js
-minAppVersion: 0.1.0
+minAppVersion: 0.2.0
 
 engines:
-  glimmerCradle: 0.1.0
+  glimmerCradle: 0.2.0
 
 tags:
   - example

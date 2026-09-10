@@ -28,6 +28,46 @@ afterEach(() => {
 });
 
 describe('ExtensionPackageManager', () => {
+  it('includes only compatible activation profile permissions in the install approval envelope', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'extension-package-manager-'));
+    process.env.GLIMMER_CRADLE_APP_ROOT = root;
+    process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(root, 'data');
+    const archivePath = path.join(root, 'profiled.gcex');
+    writeFileSync(archivePath, 'fixture', 'utf8');
+    mockedVerifier.verifyExtensionPackageMock.mockResolvedValueOnce({
+      ...createVerifiedPackage(),
+      manifest: {
+        ...createVerifiedPackage().manifest,
+        permissions: ['CHAT_SEND'],
+        activationProfiles: [
+          {
+            id: 'server',
+            title: 'Server',
+            default: true,
+            requirements: { products: ['personal-server'], platforms: ['any'], features: ['extensions'] },
+            permissions: ['EXTERNAL_NETWORK'],
+          },
+          {
+            id: 'desktop-process',
+            title: 'Desktop process',
+            default: false,
+            requirements: { products: ['desktop'], platforms: ['any'], features: ['extensions'] },
+            permissions: ['EXTERNAL_PROCESS'],
+          },
+        ],
+      },
+    } as never);
+    const manager = new ExtensionPackageManager(
+      path.join(root, 'data', 'packages', 'extensions'),
+      'personal-server',
+    );
+
+    const preview = await manager.prepareInstall({ kind: 'file', path: archivePath });
+
+    expect(preview.extension.permissions).toEqual(['CHAT_SEND', 'EXTERNAL_NETWORK']);
+    manager.dispose();
+  });
+
   it('cleans orphaned transaction directories on initialize after a restart', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'extension-package-manager-'));
     process.env.GLIMMER_CRADLE_APP_ROOT = root;
@@ -213,6 +253,7 @@ function createVerifiedPackage(): {
     readonly version: '1.0.0';
     readonly publisher: 'fixture';
     readonly permissions: [];
+    readonly activationProfiles: [];
     readonly products: ['personal-server'];
     readonly platforms: ['any'];
   };
@@ -226,6 +267,7 @@ function createVerifiedPackage(): {
       version: '1.0.0',
       publisher: 'fixture',
       permissions: [],
+      activationProfiles: [],
       products: ['personal-server'],
       platforms: ['any'],
     },

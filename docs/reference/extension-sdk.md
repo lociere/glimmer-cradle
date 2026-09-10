@@ -58,6 +58,7 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 | `activationEvents` | 激活时机 | 不用于权限判断 |
 | `requires` | 需要宿主提供的 Port | 不是授权 |
 | `permissions` | 访问敏感能力或注册能力的授权 | 调用前仍需 Policy |
+| `activationProfiles` | 按产品、平台和 feature 声明可选运行形态及其增量权限 | Host 选择后再裁剪 contribution；不得用第三方配置字段代替 |
 | `contributionPoints` | 扩展自带的 contribution point definition | 只有安装并注册了 definition 的 point 才能解释、授权和执行 |
 | `contributes` | 按 contribution point id 分组的开放贡献表 | `contributes.<pointId>[]` 是唯一贡献声明主线；官方能力也用 `glimmer.*` point 表达 |
 | `configuration` | 扩展配置 schema 或声明 | 普通配置不含密钥 |
@@ -81,7 +82,7 @@ Contribution declaration 可以携带 `audience`，枚举为 `character`、`user
 
 扩展运行事实由 Host 生产 `ExtensionRuntimeProjection`，公开结构由 Extension SDK `contracts` 入口稳定暴露；它是 Service edge projection，不再维护等价 JSON Schema。投影包含 lifecycle、contribution point definitions、Capability Graph、action intents 和 diagnostics。Renderer/Control Center 只消费该投影，不读取扩展 DB、日志、本地端点或 manifest 固定字段来推断 ready。
 
-`@glimmer-cradle/extension-sdk/host` 的 Host process protocol 只描述 Kernel supervision 与 `hosts/extension-host` 的 IPC。阶段必须区分 `process_alive`、`connected`、`handshake`、`resource_prepared`、`ready`、`degraded`、`failed`、`stopping` 和 `stopped`；前一阶段不能冒充后一阶段。第三方 handler、订阅、timer 和配置校验都在 Host process 内，Kernel 只接收受控 Port RPC 并执行权限/Policy/catalog/projection。
+`@glimmer-cradle/extension-sdk/host` 的 Host process protocol 只描述 Kernel supervision 与 `hosts/extension-host` 的 IPC。阶段必须区分 `process_alive`、`connected`、`handshake`、`resource_prepared`、`ready`、`degraded`、`failed`、`stopping` 和 `stopped`；前一阶段不能冒充后一阶段。Kernel 依据产品、平台和 feature 解析 `activationProfiles`，将裁剪后的 manifest 用于权限与 contribution 注册，并只把通用 `activationProfile` 标识传入 `ExtensionContext`；Host/SDK 不解释任何第三方 profile 名称或配置字段。扩展声明并获批 `SECRET_READ_SELF` 后，Kernel 可从 `configs/secrets/extensions/<extension-id>.yaml` 读取当前扩展自己的字符串键值 Secret，并允许该扩展通过 `ctx.ports.secrets.get(key)` 按需读取单个值；缺少权限时请求会被拒绝。第三方 handler、订阅、timer 和配置校验都在 Host process 内，Kernel 只接收受控 Port RPC 并执行权限/Policy/catalog/projection。
 
 路径约定：
 
@@ -90,7 +91,7 @@ Contribution declaration 可以携带 `audience`，枚举为 `character`、`user
 - `data/...` 默认指向 `<app-root>/data`，打包后可通过 `GLIMMER_CRADLE_DATA_ROOT` 切到用户数据目录；
 - 需要固定本机安装位置时可以写绝对路径，但这会降低扩展可迁移性。
 
-Control Center 的扩展页请求 Host runtime projection，提供安装、卸载、激活/停用、热启动/热关闭、配置编辑和本地诊断入口。安装目录允许多个版本并存，`configs/extensions/active.yaml` 必须以 `{ id, version }` 精确选择一个版本，并且只有 Kernel `ExtensionManager` 可以原子改写它；Desktop 和 Personal Server 只提交用户意图。扩展在 `contributes.glimmer.setting` 声明的普通配置会从 Capability Graph 派生为通用表单控件；高级 YAML 只作为结构化声明不足时的兜底入口。
+Control Center 的扩展页请求 Host runtime projection，提供安装、卸载、激活/停用、热启动/热关闭、配置编辑和本地诊断入口。安装目录允许多个版本并存，`configs/extensions/active.yaml` 必须以 `{ id, version, profile }` 精确选择版本与 activation profile，并且只有 Kernel `ExtensionManager` 可以原子改写它；Desktop 和 Personal Server 只提交用户意图。扩展在 `contributes.glimmer.setting` 声明的普通配置会从 Capability Graph 派生为通用表单控件；高级 YAML 只作为结构化声明不足时的兜底入口。
 
 ## 发布包与安装来源
 
@@ -123,7 +124,7 @@ publisher.extension-1.0.0-any.gcex
 | Repository Release | GitHub/GitLab/Gitea 精确 tag | 优先解析 Release Manifest；缺失时按 `<id>-<version>-<platform>.gcex` 选择当前平台唯一制品；禁止跟随浮动分支 |
 | Local `.gcex` | 离线、开发和企业分发 | Desktop 通过系统文件选择器交给 main；Personal Server 只接受认证后的受限字节上传，浏览器换取 opaque `upload_id` 后再进入同一安装事务，不接受浏览器指定服务器路径 |
 
-安装分为 `prepare -> preview -> commit`：Kernel 下载到事务目录，逐跳拒绝非 HTTPS 或超过上限的重定向；SDK 在解压过程中限制文件数和膨胀体积，再验证路径、manifest、平台、摘要和 SBOM。用户确认的权限集合必须与包声明完全一致，Kernel 才重新验证并原子安装到 `data/packages/extensions/<id>/<version>/`。权限集合不一致时仍可取消或重新确认；权限确认通过后的 commit 无论成功或失败都是终结操作，会清理事务缓存与 staging。扩展目录落位和安装元数据写入属于同一提交结果，任一步失败都回滚新版本；正在运行或被 active config 选中的版本不能卸载。
+安装分为 `prepare -> preview -> commit`：Kernel 下载到事务目录，逐跳拒绝非 HTTPS 或超过上限的重定向；SDK 在解压过程中限制文件数和膨胀体积，再验证路径、manifest、平台、摘要和 SBOM。安装预览的权限集合是顶层权限与当前产品/平台所有兼容 activation profile 增量权限的并集，不兼容 profile 的权限不会扩散到当前产品；这保证以后切换兼容 profile 时不会取得未经安装确认的能力。用户确认的权限集合必须与该预览完全一致，Kernel 才重新验证并原子安装到 `data/packages/extensions/<id>/<version>/`。权限集合不一致时仍可取消或重新确认；权限确认通过后的 commit 无论成功或失败都是终结操作，会清理事务缓存与 staging。扩展目录落位和安装元数据写入属于同一提交结果，任一步失败都回滚新版本；正在运行或被 active config 选中的版本不能卸载。
 
 Personal Server 的浏览器本地包是这条事务的受控前置步骤，而不是第二条安装主线：`POST /api/v1/extensions/local-package` 只接受同源、已认证请求，限制 `.gcex` 扩展名与 256 MiB 大小上限，把字节流写入 Product Host owned 临时目录，并返回绑定当前 principal/session、30 分钟时效、单次消费的 opaque `upload_id`。后续 `extension_install_prepare` 只能提交 `uploaded_package.upload_id`；Host 在当前会话内把它解析为受控 file source 后再转给 Kernel Package Manager。prepare 完成、失败、取消、断线或超时都会清理上传文件与索引；commit/cancel 对所有 transaction_id 都要求属于当前登录会话，Host 断线会主动取消已预览未提交事务，Kernel Package Manager 启动和定时 sweep 仍会清理 stale transaction 目录。
 
@@ -152,6 +153,8 @@ release.sigstore.json            # 可选，由作者的 Release 托管
 | `perception` | 提交带 `ConversationAddress` 的清洗后感知 proposal | `PERCEPTION_WRITE` | canonical topology 由 Kernel 生成，进入 Cognition 后才成为经历 |
 | `sceneAttention` | 申请注意力租约或查询当前焦点 | 无单独写权限，受 Host 边界约束 | 不代表控制角色或 Avatar |
 | `runtime` | 上报 Capability Graph 增量和诊断投影 | `RUNTIME_PROJECTION_WRITE` | Host 合并为 `ExtensionRuntimeProjection`；扩展不能直接写 Renderer view model |
+
+`ctx.config` 与 `ctx.ports.secrets` 是两条独立边界：前者要求 `CONFIG_READ_SELF`，允许结构化普通配置；后者要求 `SECRET_READ_SELF`，只接受当前扩展 Secret 文件中的字符串值并按 key 读取。Secret 不进入 manifest、普通配置、运行投影、日志或控制表面读取响应，扩展不得把它复制到 storage 或 diagnostics。
 
 Extension handler 返回值必须可 JSON 序列化；错误抛出清晰 message，由 Host 统一记录 trace、extension id、skill/tool id 和权限决策。
 

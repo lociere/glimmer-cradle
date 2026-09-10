@@ -103,7 +103,7 @@ export class ExtensionManager {
     await Promise.all([...this.extensionDirectoryIndex.entries()].map(async ([extensionId, extensionDir]) => {
       try {
         const manifest = await this.readExtensionManifest(extensionId, extensionDir);
-        const effectiveManifest = this.materializeManifestForRuntime(extensionId, manifest);
+        const { manifest: effectiveManifest } = this.materializeManifestForRuntime(extensionId, manifest);
         this.assertProductCompatibility(extensionId, effectiveManifest);
         this.hostService.registerExtensionRuntimeManifest(effectiveManifest);
         this.hostService.updateExtensionRuntimeLifecycle(extensionId, 'discovered');
@@ -126,7 +126,7 @@ export class ExtensionManager {
     if (this.isShuttingDown || this.extensions.has(extensionId)) return;
     const extensionDir = this.extensionDirectoryIndex.get(extensionId);
     if (!extensionDir) throw this.validationError(`未找到扩展目录: ${extensionId}`);
-    const manifest = this.materializeManifestForRuntime(
+    const { manifest, profile } = this.materializeManifestForRuntime(
       extensionId,
       await this.readExtensionManifest(extensionId, extensionDir),
     );
@@ -143,6 +143,8 @@ export class ExtensionManager {
       if (this.isShuttingDown) return;
       const config = await this.loadExtensionConfig(extensionId);
       if (this.isShuttingDown) return;
+      const secrets = await this.loadExtensionSecrets(extensionId);
+      if (this.isShuttingDown) return;
       const declaredSkillDisposables = this.registerDeclaredSkillEntries(extensionId, manifest);
       this.extensions.set(extensionId, {
         manifest,
@@ -151,6 +153,8 @@ export class ExtensionManager {
           manifest,
           entryPath,
           config,
+          secrets,
+          profile,
           this.extensionTimeoutMs,
         ),
         declaredSkillDisposables,
@@ -327,7 +331,7 @@ export class ExtensionManager {
     for (const extensionId of removedIds) this.hostService.unregisterExtensionRuntime(extensionId);
     this.extensionDirectoryIndex = nextIndex;
     await Promise.all([...nextIndex.entries()].map(async ([extensionId, extensionDir]) => {
-      const manifest = this.materializeManifestForRuntime(
+      const { manifest } = this.materializeManifestForRuntime(
         extensionId,
         await this.readExtensionManifest(extensionId, extensionDir),
       );
@@ -447,9 +451,9 @@ export class ExtensionManager {
   private materializeManifestForRuntime(
     extensionId: string,
     manifest: ExtensionManifestRecord,
-  ): ExtensionManifestRecord {
+  ): { manifest: ExtensionManifestRecord; profile: string } {
     const requestedProfile = this.getSelectionFor(extensionId)?.profile;
-    const { manifest: effectiveManifest } = materializeManifestForActivationProfile(
+    const { manifest: effectiveManifest, profile } = materializeManifestForActivationProfile(
       manifest as ExtensionManifest,
       {
         productId: this.productId,
@@ -458,7 +462,10 @@ export class ExtensionManager {
       },
       requestedProfile,
     );
-    return effectiveManifest as ExtensionManifestRecord;
+    return {
+      manifest: effectiveManifest as ExtensionManifestRecord,
+      profile: profile.id,
+    };
   }
 
   private async resolveSelectionProfile(
@@ -488,6 +495,25 @@ export class ExtensionManager {
     const parsed = yaml.parse(await fs.readFile(configPath, 'utf8'));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw this.validationError(`扩展配置必须是对象: ${extensionId}`);
     return parsed as Record<string, unknown>;
+  }
+
+  private async loadExtensionSecrets(extensionId: string): Promise<Record<string, string>> {
+    const secretsPath = resolveConfigPath(
+      path.join('secrets', 'extensions', `${extensionId}.yaml`),
+      this.hostService.getRepoRoot(),
+    );
+    if (!(await fs.pathExists(secretsPath))) return {};
+    const parsed = yaml.parse(await fs.readFile(secretsPath, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw this.validationError(`扩展 Secret 必须是字符串键值对象: ${extensionId}`);
+    }
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    if (entries.some(([, value]) => typeof value !== 'string')) {
+      throw this.validationError(`扩展 Secret 只允许字符串值: ${extensionId}`);
+    }
+    return Object.fromEntries(
+      entries.filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0),
+    );
   }
 
   private assertEngineCompatibility(extensionId: string, manifest: ExtensionManifestRecord): void {

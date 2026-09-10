@@ -44,12 +44,14 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 真实失败回滚仍未完成：当前缺少获授权的 distinct candidate 或 fault injection 入口，不能用同版本重装、伪造本地回归或未经授权的生产故障替代。NapCat `external_onebot`/QQ E2E、真实发布物 Extension 升级失败恢复与跨仓生产闭环也仍未过门。
 
+2026-09-10 NapCat 跨产品化继续形成 `0.2.0` 固定候选：主仓只增加生态通用的 `ExtensionContext.activationProfile` 与按权限访问的 `ctx.ports.secrets.get(key)`，Kernel 先按产品、平台、feature 与所选 profile 裁剪权限和 contribution，再启动隔离 Host。普通 config 是扩展自有、Schema 校验的非敏感对象；Secret 是独立可选能力，不需要 Secret 的扩展不声明 `SECRET_READ_SELF`，读取请求会被 Host 拒绝。主仓只解释扩展 ID、通用 key 与权限，不包含 NapCat、QQ、OneBot 或第三方配置字段。独立 Adapter 仓删除普通配置中的第二份 profile owner，以 Host 选择为唯一运行依据；`external_onebot` 成为 Personal Server/Linux 默认 profile，且不再取得 `EXTERNAL_PROCESS` 或 Windows 受管资源，`managed_napcat_windows` 的进程权限、命令、资源和设置只在 Desktop Windows profile 生效。Adapter manifest/typecheck、17 项测试与双平台 `release:prepare`，以及根 `check:pr`、Contract gates、SDK 干净消费者发布校验均通过。真实 external OneBot/QQ、生产 Secret 和重启连续性仍需在发布后的 Personal Server 上验证。
+
 2026-09-07 后续 Provider 连接测试切片基于已提交的 `75b10f8c` 推进：同一目标可复用已保存密钥，变更目标或清除密钥禁止复用；自定义网关路径、拒绝重定向、超时、响应限额与受控诊断已落实，精确规则见 [Configuration Reference](../reference/configuration.md#provider-连接测试)。12 项配置测试与 9 项 Gateway 测试通过，含真实本地 HTTP 请求及重定向反例；独立审查发现的非法标识审计泄露已修复并复审通过。未使用外部 Provider 或生产凭据验收。Kernel Vitest 配置已转为 `.mts`；全仓三个 Vite/Vitest 配置入口均使用 ESM，Extension SDK/Host 的 14 项测试及两个产品构建未出现 CJS Node API 弃用警告。后续排查规则进入测试与验收指南。
 
 M11 仍未完成的范围：
 
 - Extension：公开 SDK/npm、NapCat 精确发布物、默认 Registry stable 指针和 Ubuntu 公开安装事务已完成；未来产生获准的第二个完整版本候选时再完成跨版本升级失败恢复与回滚，并继续扩展激活及配置/Secret 的真实外部场景验收；
-- 把 NapCat 拆成跨平台 QQ 场景 Adapter 与平台资源配置，在 Personal Server 上先支持外部 OneBot；
+- 发布 `0.2.0` SDK、Personal Server 与 NapCat Adapter 固定候选，并在 Personal Server 上完成 external OneBot 激活、配置/Secret 与真实 QQ 场景验收；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
 - 生产运维：真实更新失败自动恢复、备份/恢复连续性、长运行及完整停机矩阵；
 - 把区域 HTTP(S)/OCI 传输副本保留为长期演化候选，只有真实需求出现后再实施。

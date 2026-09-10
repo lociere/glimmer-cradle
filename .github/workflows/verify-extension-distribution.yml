@@ -16,7 +16,7 @@ on:
       version:
         description: 预期的精确 Extension 版本
         required: true
-        default: 0.1.0
+        default: 0.2.0
         type: string
 
 permissions:

@@ -138,7 +138,9 @@ error 都是失败/需处理结果，不表示成功。当前 update check/apply
 
 至少配置一个 LLM provider，然后执行 `sudo glimmer-cradle restart`。启用 TTS 或 Embedding 时分别修改 `system/audio.yaml`、`system/embedding.yaml` 并提供对应 secret；保持 `disabled` 不会阻止基础服务就绪。
 
-当前版本的 Extension 页面已接入统一安装事务：仓库 Release、Registry、Release Manifest 和浏览器本地 `.gcex` 都会进入同一 `prepare -> preview -> commit` 主线，并展示兼容性、权限、摘要/信任元数据与失败原因。浏览器本地包不会提交服务器绝对路径；页面只会把 `.gcex` 字节流上传到 Product Host owned 临时目录并换取 opaque `upload_id`，后续 prepare/commit/cancel 必须属于当前登录会话，断线会取消已预览未提交事务。安装前仍必须确认包的 `products`、`platforms` 和所需 `features` 包含当前 Personal Server 组合；只声明 `desktop` 或 `windows-x64` 的包会被正确拒绝。NapCat 的现有 Windows OneKey 包属于这种情况，不能通过改清单伪装成服务器兼容；Personal Server 版本将在 M11 按 [ADR-0012](../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md) 拆分为跨平台 QQ 场景 Adapter 与外部 OneBot 资源配置后发布。
+当前版本的 Extension 页面已接入统一安装事务：仓库 Release、Registry、Release Manifest 和浏览器本地 `.gcex` 都会进入同一 `prepare -> preview -> commit` 主线，并展示兼容性、权限、摘要/信任元数据与失败原因。浏览器本地包不会提交服务器绝对路径；页面只会把 `.gcex` 字节流上传到 Product Host owned 临时目录并换取 opaque `upload_id`，后续 prepare/commit/cancel 必须属于当前登录会话，断线会取消已预览未提交事务。安装前仍必须确认包的 `products`、`platforms` 和所需 `features` 包含当前 Personal Server 组合；只声明 `desktop` 或 `windows-x64` 的包会被正确拒绝。
+
+需要 Secret 的扩展使用 `/var/lib/glimmer-cradle/config/secrets/extensions/<extension-id>.yaml`。文件内容只能是该扩展定义的字符串键值；具体 key 由扩展自己的文档拥有。Kernel 仅在扩展声明且用户确认 `SECRET_READ_SELF` 后，允许对应隔离 Host 通过 `ctx.ports.secrets.get(key)` 按需读取；普通扩展配置、Control Center 读取响应和运行投影都不返回明文。修改后重启或重新激活该扩展。
 
 ## 域名与 HTTPS
 
