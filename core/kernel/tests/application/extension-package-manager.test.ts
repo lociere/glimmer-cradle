@@ -13,6 +13,7 @@ const originalDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
 const suppliedCandidateTest = process.env.GLIMMER_EXTENSION_PACKAGE_CANDIDATE ? it : it.skip;
 const suppliedReleaseCandidateTest = process.env.GLIMMER_EXTENSION_PACKAGE_CANDIDATE
   && process.env.GLIMMER_EXTENSION_RELEASE_MANIFEST ? it : it.skip;
+const publicRegistryCandidateTest = process.env.GLIMMER_EXTENSION_PUBLIC_REGISTRY_URL ? it : it.skip;
 
 afterEach(async () => {
   if (originalDataRoot === undefined) delete process.env.GLIMMER_CRADLE_DATA_ROOT;
@@ -21,6 +22,60 @@ afterEach(async () => {
 });
 
 describe('ExtensionPackageManager', () => {
+  publicRegistryCandidateTest('installs the public Registry release on Linux through the product package transaction', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'extension-public-registry-'));
+    temporaryRoots.push(root);
+    process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(root, 'data');
+    const extensionRoot = path.join(root, 'data', 'packages', 'extensions');
+    const manager = new ExtensionPackageManager(extensionRoot, 'personal-server');
+
+    try {
+      const preview = await manager.prepareInstall({
+        kind: 'registry',
+        catalog_url: process.env.GLIMMER_EXTENSION_PUBLIC_REGISTRY_URL!,
+        extension_id: process.env.GLIMMER_EXTENSION_EXPECTED_ID!,
+        channel: 'stable',
+      });
+      expect(preview.extension.id).toBe(process.env.GLIMMER_EXTENSION_EXPECTED_ID);
+      expect(preview.extension.version).toBe(process.env.GLIMMER_EXTENSION_EXPECTED_VERSION);
+      expect(preview.artifact.platform).toBe('linux-x64');
+      expect(preview.trust.source_kind).toBe('registry');
+      expect(preview.trust.listing_reviewed).toBe(true);
+      expect(preview.trust.publisher_verified).toBe(true);
+
+      const installed = await manager.commitInstall(preview.transaction_id, preview.extension.permissions);
+      expect(installed.already_installed).toBe(false);
+      expect(await fs.pathExists(path.join(installed.installed_path, 'dist', 'index.js'))).toBe(true);
+
+      const denied = await manager.prepareInstall({
+        kind: 'registry',
+        catalog_url: process.env.GLIMMER_EXTENSION_PUBLIC_REGISTRY_URL!,
+        extension_id: process.env.GLIMMER_EXTENSION_EXPECTED_ID!,
+        channel: 'stable',
+      });
+      await expect(manager.commitInstall(denied.transaction_id, [])).rejects.toThrow('权限');
+      await manager.cancelInstall(denied.transaction_id);
+      expect(await fs.pathExists(installed.installed_path)).toBe(true);
+
+      const duplicatePreview = await manager.prepareInstall({
+        kind: 'registry',
+        catalog_url: process.env.GLIMMER_EXTENSION_PUBLIC_REGISTRY_URL!,
+        extension_id: process.env.GLIMMER_EXTENSION_EXPECTED_ID!,
+        channel: 'stable',
+      });
+      const duplicate = await manager.commitInstall(
+        duplicatePreview.transaction_id,
+        duplicatePreview.extension.permissions,
+      );
+      expect(duplicate.already_installed).toBe(true);
+
+      await manager.uninstall(installed.extension_id, installed.version, false);
+      expect(await fs.pathExists(installed.installed_path)).toBe(false);
+    } finally {
+      manager.dispose();
+    }
+  });
+
   suppliedCandidateTest('installs a supplied fixed extension candidate through the product package transaction', async () => {
     const packagePath = path.resolve(process.env.GLIMMER_EXTENSION_PACKAGE_CANDIDATE!);
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'extension-package-candidate-'));

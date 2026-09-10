@@ -1,0 +1,54 @@
+name: 验证 Extension 公开分发
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry_url:
+        description: 要验证的公开 Registry Catalog URL
+        required: true
+        default: https://raw.githubusercontent.com/lociere/glimmer-cradle-extensions/main/registry/catalog.json
+        type: string
+      extension_id:
+        description: 要安装的 Extension ID
+        required: true
+        default: lociere.napcat-adapter
+        type: string
+      version:
+        description: 预期的精确 Extension 版本
+        required: true
+        default: 0.1.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: 配置 pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 安装并构建公开 Extension 边界
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:extension-tooling
+
+      - name: 从公开 Registry 完成 Linux 安装事务
+        env:
+          GLIMMER_EXTENSION_PUBLIC_REGISTRY_URL: ${{ inputs.registry_url }}
+          GLIMMER_EXTENSION_EXPECTED_ID: ${{ inputs.extension_id }}
+          GLIMMER_EXTENSION_EXPECTED_VERSION: ${{ inputs.version }}
+        run: >-
+          pnpm --filter @glimmer-cradle/kernel exec vitest run
+          tests/application/extension-package-manager.test.ts
+          -t "installs the public Registry release on Linux"
