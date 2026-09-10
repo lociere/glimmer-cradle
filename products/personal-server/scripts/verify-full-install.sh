@@ -7,8 +7,9 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 VERIFY_ROOT="$(mktemp -d)"
 RELEASE_ROOT="${VERIFY_ROOT}/release"
 INSTALL_ROOT="${VERIFY_ROOT}/install"
-STATE_ROOT="${VERIFY_ROOT}/state"
 CONFIG_ROOT="${VERIFY_ROOT}/config"
+RUN_ROOT="/run/glimmer-cradle-verify-$$"
+STATE_ROOT="${RUN_ROOT}/state"
 CLI_PATH="${VERIFY_ROOT}/bin/glimmer-cradle"
 HTTP_PORT=8080
 ARCHIVE_IMAGE=""
@@ -28,6 +29,7 @@ cleanup() {
     as_root "$CLI_PATH" stop >/dev/null 2>&1 || true
   fi
   as_root rm -rf -- "$VERIFY_ROOT"
+  as_root rm -rf -- "$RUN_ROOT"
   if [[ -n "$ARCHIVE_IMAGE" ]]; then
     docker image rm "$ARCHIVE_IMAGE" >/dev/null 2>&1 || true
   fi
@@ -57,23 +59,31 @@ install_full() {
     GLIMMER_CRADLE_VERSION="$VERSION" \
     GLIMMER_CRADLE_INSTALL_ROOT="$INSTALL_ROOT" \
     GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
+    GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT" \
     GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT="$CONFIG_ROOT" \
     GLIMMER_CRADLE_CLI_PATH="$CLI_PATH" \
     bash "${RELEASE_ROOT}/glimmer-cradle-installer.sh"
 }
 
 install_full
-as_root sh -c "printf 'preserved\n' > '${STATE_ROOT}/data/m10-install-verification'"
+as_root sh -c "printf 'preserved\n' > '${STATE_ROOT}/data/state/m10-install-verification'"
 install_full
-[[ "$(as_root cat "${STATE_ROOT}/data/m10-install-verification")" == preserved ]]
+[[ "$(as_root cat "${STATE_ROOT}/data/state/m10-install-verification")" == preserved ]]
 [[ ! -e "${INSTALL_ROOT}/releases/${VERSION}/images" ]]
 
 BACKUP_OUTPUT="$(as_root "$CLI_PATH" backup)"
 BACKUP_PATH="${BACKUP_OUTPUT##*备份已创建: }"
 BACKUP_NAME="$(basename -- "$BACKUP_PATH")"
-as_root sh -c "printf 'corrupted\n' > '${STATE_ROOT}/data/m10-install-verification'"
-as_root "$CLI_PATH" restore "$BACKUP_NAME"
-[[ "$(as_root cat "${STATE_ROOT}/data/m10-install-verification")" == preserved ]]
+as_root sh -c "printf 'corrupted\n' > '${STATE_ROOT}/data/state/m10-install-verification'"
+as_root env GLIMMER_CRADLE_TRANSACTION_CONFIRMED=1 "$CLI_PATH" restore "$BACKUP_NAME"
+[[ "$(as_root cat "${STATE_ROOT}/data/state/m10-install-verification")" == preserved ]]
+[[ "$(as_root stat -c '%u:%g:%a' "$RUN_ROOT")" == 0:0:755 ]]
+[[ "$(as_root stat -c '%u:%g:%a' "${RUN_ROOT}/host-owner")" == 0:0:700 ]]
+[[ "$(as_root stat -c '%u:%g:%a' "${RUN_ROOT}/service")" == 10001:10001:700 ]]
+[[ "$(as_root stat -c '%u:%g:%a' "${STATE_ROOT}/data")" == 10001:10001:700 ]]
+PROJECTION_BEFORE="$(as_root sha256sum "${CONFIG_ROOT}/deployment.env" | cut -d' ' -f1)"
+CADDYFILE_BEFORE="$(as_root awk -F= '$1 == "GLIMMER_CRADLE_CADDYFILE" { print substr($0, index($0, "=") + 1) }' "${CONFIG_ROOT}/deployment.env")"
+[[ -f "$CADDYFILE_BEFORE" && ! -L "$CADDYFILE_BEFORE" ]]
 
 BAD_VERSION=0.1.2
 BAD_RELEASE_ROOT="${VERIFY_ROOT}/bad-release"
@@ -95,6 +105,7 @@ if as_root env \
   GLIMMER_CRADLE_VERSION="$BAD_VERSION" \
   GLIMMER_CRADLE_INSTALL_ROOT="$INSTALL_ROOT" \
   GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
+  GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT" \
   GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT="$CONFIG_ROOT" \
   GLIMMER_CRADLE_CLI_PATH="$CLI_PATH" \
   GLIMMER_CRADLE_READY_TIMEOUT_SECONDS=10 \
@@ -104,7 +115,11 @@ if as_root env \
 fi
 [[ "$(<"${INSTALL_ROOT}/current/VERSION")" == "$VERSION" ]]
 [[ ! -e "${INSTALL_ROOT}/releases/${BAD_VERSION}" ]]
-[[ "$(as_root cat "${STATE_ROOT}/data/m10-install-verification")" == preserved ]]
+[[ "$(as_root cat "${STATE_ROOT}/data/state/m10-install-verification")" == preserved ]]
+[[ "$(as_root sha256sum "${CONFIG_ROOT}/deployment.env" | cut -d' ' -f1)" == "$PROJECTION_BEFORE" ]]
+[[ -f "$CADDYFILE_BEFORE" && ! -L "$CADDYFILE_BEFORE" ]]
+CADDY_MOUNT_SOURCE="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' glimmer-cradle-caddy-1)"
+[[ "$CADDY_MOUNT_SOURCE" == "$CADDYFILE_BEFORE" ]]
 as_root "$CLI_PATH" status >/dev/null
 
 as_root "$CLI_PATH" stop

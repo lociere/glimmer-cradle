@@ -9,6 +9,8 @@ ENV_TEMPLATE_FILE="${GLIMMER_CRADLE_ENV_TEMPLATE_FILE:-${SCRIPT_DIR}/.env.exampl
 DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
 RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+HOST_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${RUN_ROOT}/host-owner}"
+SERVICE_RUN_ROOT="${GLIMMER_CRADLE_SERVICE_RUN_ROOT:-${RUN_ROOT}/service}"
 CONTAINER_RUN_ROOT="/run/glimmer-cradle"
 CONTAINER_OPS_BRIDGE_SOCKET="${CONTAINER_RUN_ROOT}/ops-bridge.sock"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-${SCRIPT_DIR}}"
@@ -17,6 +19,7 @@ BACKUP_ROOT="${STATE_ROOT}/data/backups"
 MANUAL_BACKUP_ROOT="${BACKUP_ROOT}/manual"
 TRANSACTION_BACKUP_ROOT="${BACKUP_ROOT}/transaction"
 RESTORE_SAFETY_BACKUP_ROOT="${BACKUP_ROOT}/restore-safety"
+DEPLOY_DIAGNOSTICS_ROOT="${STATE_ROOT}/data/diagnostics/deploy"
 IMAGE_REPOSITORY="glimmer-cradle/personal-server"
 OPS_BRIDGE_CONTAINER="glimmer-cradle-ops-bridge"
 DOCKER_SOCKET_PATH="${GLIMMER_CRADLE_DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
@@ -108,8 +111,7 @@ prepare_environment() {
     bridge_token="$(openssl rand -hex 32)"
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN "$bridge_token"
   fi
-  # deployment.env is consumed by Compose inside the product container. Older releases
-  # incorrectly persisted a host path here; always migrate it to the container projection.
+  # deployment.env 始终保存容器视角的稳定 IPC 路径；宿主路径只用于 Compose bind source。
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "$CONTAINER_OPS_BRIDGE_SOCKET"
   if ! grep -q '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE"; then
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "${IMAGE_REPOSITORY}:${RELEASE_VERSION}"
@@ -119,6 +121,8 @@ prepare_environment() {
   fi
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_HOST_RUN_ROOT "$HOST_RUN_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVICE_RUN_ROOT "$SERVICE_RUN_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
   chmod 600 "$DEPLOYMENT_ENV_FILE"
@@ -128,6 +132,9 @@ prepare_state() {
   mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data/state" "$STATE_ROOT/data/models" \
     "$STATE_ROOT/data/packages" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" \
     "$RESTORE_SAFETY_BACKUP_ROOT"
+  "${PRIVILEGED[@]}" install -d -o 0 -g 0 -m 0700 "$HOST_RUN_ROOT"
+  "${PRIVILEGED[@]}" install -d -o 10001 -g 10001 -m 0700 "$SERVICE_RUN_ROOT"
+  "${PRIVILEGED[@]}" chown 10001:10001 "$STATE_ROOT/data"
   "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data/state" \
     "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages"
   "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT" "$STATE_ROOT/config" "$STATE_ROOT/data" \
@@ -168,34 +175,39 @@ read_env_file() {
   printf '%s' "${value:-$fallback}"
 }
 
-create_compose_env() {
-  local image="$1"
-  local env_file current_image current_caddy_image deployment_mode
+create_previous_compose_env() {
+  local env_file
   env_file="$(mktemp "${STATE_ROOT}/.compose-env.XXXXXX")"
   cp "$DEPLOYMENT_ENV_FILE" "$env_file"
-  current_image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
-  current_caddy_image="$(read_env_file "$env_file" GLIMMER_CRADLE_CADDY_IMAGE '')"
-  deployment_mode="$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
-  set_env_value "$env_file" GLIMMER_CRADLE_IMAGE "$image"
-  if [[ "$deployment_mode" == "source" || "$current_caddy_image" == "$current_image" ]]; then
-    set_env_value "$env_file" GLIMMER_CRADLE_CADDY_IMAGE "$image"
-  fi
   TEMP_ENV_FILES+=("$env_file")
   COMPOSE_ENV_RESULT="$env_file"
 }
 
-persist_selected_image() {
+create_candidate_compose_env() {
   local image="$1"
-  local replacing_image="$2"
-  local current_caddy_image deployment_mode
-  current_caddy_image="$(read_env GLIMMER_CRADLE_CADDY_IMAGE '')"
-  deployment_mode="$(read_env GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
-  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_IMAGE "$image"
-  if [[ "$deployment_mode" == "source" \
-    || -z "$current_caddy_image" \
-    || "$current_caddy_image" == "$replacing_image" ]]; then
-    set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_CADDY_IMAGE "$image"
+  local env_file current_image current_caddy_image deployment_mode candidate_caddy_image candidate_caddyfile
+  create_previous_compose_env
+  env_file="$COMPOSE_ENV_RESULT"
+  current_image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
+  current_caddy_image="$(read_env_file "$env_file" GLIMMER_CRADLE_CADDY_IMAGE '')"
+  deployment_mode="$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)"
+  candidate_caddy_image="${GLIMMER_CRADLE_CANDIDATE_CADDY_IMAGE:-$image}"
+  candidate_caddyfile="${GLIMMER_CRADLE_CANDIDATE_CADDYFILE:-${SCRIPT_DIR}/Caddyfile}"
+  set_env_value "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE "${GLIMMER_CRADLE_CANDIDATE_DEPLOYMENT_MODE:-$deployment_mode}"
+  set_env_value "$env_file" GLIMMER_CRADLE_IMAGE "$image"
+  set_env_value "$env_file" GLIMMER_CRADLE_CADDYFILE "$candidate_caddyfile"
+  if [[ "$deployment_mode" == "source" || -z "$current_caddy_image" || "$current_caddy_image" == "$current_image" ]]; then
+    set_env_value "$env_file" GLIMMER_CRADLE_CADDY_IMAGE "$candidate_caddy_image"
   fi
+  COMPOSE_ENV_RESULT="$env_file"
+}
+
+persist_deployment_projection() {
+  local source_env="$1" temporary
+  temporary="$(mktemp "${DEPLOYMENT_ENV_FILE}.XXXXXX")"
+  cp "$source_env" "$temporary"
+  chmod 0600 "$temporary"
+  mv -f -- "$temporary" "$DEPLOYMENT_ENV_FILE"
 }
 
 write_deploy_result() {
@@ -232,9 +244,10 @@ prepare_candidate() {
   if [[ "$(read_env_file "$env_file" GLIMMER_CRADLE_DEPLOYMENT_MODE source)" == "source" ]]; then
     compose_with_env "$env_file" build --pull
   else
-    if [[ "${GLIMMER_CRADLE_CANDIDATE_PRELOADED:-0}" == 1 ]]; then
-      local image
-      image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
+    local image
+    image="$(read_env_file "$env_file" GLIMMER_CRADLE_IMAGE '')"
+    if [[ "${GLIMMER_CRADLE_CANDIDATE_PRELOADED:-0}" == 1 ]] \
+      || "${DOCKER[@]}" image inspect "$image" >/dev/null 2>&1; then
       "${DOCKER[@]}" image inspect "$image" >/dev/null
     else
       compose_with_env "$env_file" pull
@@ -327,7 +340,7 @@ start_ops_bridge() {
     printf '{"event":"ops_bridge_disabled","error_code":"source_mode_has_no_stable_host_owner","exit_code":66}\n' >&2
     return 0
   fi
-  release_root="${INSTALL_ROOT}/current"
+  release_root="$SCRIPT_DIR"
   [[ -d "$release_root" && -f "$release_root/lib/host-transaction.sh" \
     && ! -L "$release_root/lib/host-transaction.sh" ]] || {
     printf '{"event":"ops_bridge_disabled","error_code":"installed_owner_missing","exit_code":66}\n' >&2
@@ -360,7 +373,7 @@ start_ops_bridge() {
     --entrypoint /usr/local/bin/node \
     --env GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
     --env GLIMMER_CRADLE_RUN_ROOT="$CONTAINER_RUN_ROOT" \
-    --env GLIMMER_CRADLE_HOST_RUN_ROOT="$RUN_ROOT" \
+    --env GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT" \
     --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE" \
     --env GLIMMER_CRADLE_HOST_RELEASE_ROOT="$release_root" \
     --env GLIMMER_CRADLE_HOST_INSTALL_ROOT="$INSTALL_ROOT" \
@@ -377,7 +390,7 @@ start_ops_bridge() {
     --mount type=bind,src="$INSTALL_ROOT",dst="$INSTALL_ROOT" \
     --mount type=bind,src="$CONFIG_ROOT",dst="$CONFIG_ROOT" \
     --mount type=bind,src="$STATE_ROOT",dst="$STATE_ROOT" \
-    --mount type=bind,src="$RUN_ROOT",dst="$CONTAINER_RUN_ROOT" \
+    --mount type=bind,src="$SERVICE_RUN_ROOT",dst="$CONTAINER_RUN_ROOT" \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
     "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
   wait_until_ops_bridge_ready
@@ -600,6 +613,8 @@ rollback_transaction() {
   TRANSACTION_ACTIVE=0
   echo "候选版本未通过就绪门，正在回滚。" >&2
   if [[ -n "$TRANSACTION_CANDIDATE_ENV" ]]; then
+    capture_candidate_diagnostics "$TRANSACTION_CANDIDATE_ENV" \
+      || echo "候选诊断保存失败，继续执行回滚。" >&2
     compose_with_env "$TRANSACTION_CANDIDATE_ENV" down --remove-orphans || rollback_failed=1
   fi
   if [[ -n "$TRANSACTION_BACKUP" ]]; then
@@ -612,17 +627,29 @@ rollback_transaction() {
   if [[ -n "$TRANSACTION_PREVIOUS_IMAGE" && -n "$TRANSACTION_PREVIOUS_ENV" ]]; then
     if compose_with_env "$TRANSACTION_PREVIOUS_ENV" up --detach --remove-orphans \
       && wait_until_ready "$TRANSACTION_PREVIOUS_ENV"; then
-      persist_selected_image "$TRANSACTION_PREVIOUS_IMAGE" "$TRANSACTION_CANDIDATE_IMAGE"
+      persist_deployment_projection "$TRANSACTION_PREVIOUS_ENV"
       echo "已恢复上一版本 ${TRANSACTION_PREVIOUS_IMAGE}。" >&2
     else
       echo "上一版本也未能恢复就绪，请保留 ${TRANSACTION_BACKUP} 并检查日志。" >&2
       rollback_failed=1
     fi
   elif (( TRANSACTION_IMAGE_PERSISTED )) && [[ -n "$TRANSACTION_REPLACING_IMAGE" ]]; then
-    persist_selected_image "$TRANSACTION_REPLACING_IMAGE" "$TRANSACTION_CANDIDATE_IMAGE" \
+    [[ -z "$TRANSACTION_PREVIOUS_ENV" ]] || persist_deployment_projection "$TRANSACTION_PREVIOUS_ENV" \
       || rollback_failed=1
   fi
   (( rollback_failed == 0 ))
+}
+
+capture_candidate_diagnostics() {
+  local env_file="$1" diagnostic_dir transaction_id
+  transaction_id="${GLIMMER_CRADLE_TRANSACTION_ID:-unknown}"
+  diagnostic_dir="${DEPLOY_DIAGNOSTICS_ROOT}/${transaction_id}"
+  mkdir -p "$diagnostic_dir"
+  chmod 0700 "$DEPLOY_DIAGNOSTICS_ROOT" "$diagnostic_dir"
+  compose_with_env "$env_file" ps --all > "${diagnostic_dir}/compose-ps.txt" 2>&1 || true
+  compose_with_env "$env_file" logs --no-color > "${diagnostic_dir}/compose.log" 2>&1 || true
+  chmod 0600 "${diagnostic_dir}/compose-ps.txt" "${diagnostic_dir}/compose.log"
+  echo "候选诊断已保留: ${diagnostic_dir}" >&2
 }
 
 current_container_image() {
@@ -637,18 +664,16 @@ install_release() {
   local existing candidate replacing_image
   existing="$(current_container_image)"
   if [[ -n "$existing" ]]; then
-    echo "检测到现有安装，正在确保当前版本已启动并就绪。"
-    compose_with_env "$DEPLOYMENT_ENV_FILE" up --detach --remove-orphans
-    wait_until_ready "$DEPLOYMENT_ENV_FILE"
-    start_ops_bridge
-    print_access
-    write_deploy_result
-    return 0
+    echo "检测到现有安装，转入统一事务更新以重新核对完整部署 projection。"
+    update_release
+    return
   fi
   replacing_image="$(read_env GLIMMER_CRADLE_IMAGE '')"
   TRANSACTION_REPLACING_IMAGE="$replacing_image"
   candidate="$(next_candidate_image)"
-  create_compose_env "$candidate"
+  create_previous_compose_env
+  TRANSACTION_PREVIOUS_ENV="$COMPOSE_ENV_RESULT"
+  create_candidate_compose_env "$candidate"
   TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
   TRANSACTION_CANDIDATE_IMAGE="$candidate"
   host_transaction_phase prepare
@@ -659,7 +684,7 @@ install_release() {
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
   host_transaction_phase readiness
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
-  persist_selected_image "$candidate" "$replacing_image"
+  persist_deployment_projection "$TRANSACTION_CANDIDATE_ENV"
   TRANSACTION_IMAGE_PERSISTED=1
   cleanup_history "$candidate" ""
   host_transaction_phase bridge_readiness
@@ -679,9 +704,9 @@ update_release() {
     return
   fi
   candidate="$(next_candidate_image)"
-  create_compose_env "$previous"
+  create_previous_compose_env
   TRANSACTION_PREVIOUS_ENV="$COMPOSE_ENV_RESULT"
-  create_compose_env "$candidate"
+  create_candidate_compose_env "$candidate"
   TRANSACTION_CANDIDATE_ENV="$COMPOSE_ENV_RESULT"
   TRANSACTION_PREVIOUS_IMAGE="$previous"
   TRANSACTION_CANDIDATE_IMAGE="$candidate"
@@ -698,7 +723,7 @@ update_release() {
   compose_with_env "$TRANSACTION_CANDIDATE_ENV" up --detach --remove-orphans
   host_transaction_phase readiness
   wait_until_ready "$TRANSACTION_CANDIDATE_ENV"
-  persist_selected_image "$candidate" "$previous"
+  persist_deployment_projection "$TRANSACTION_CANDIDATE_ENV"
   TRANSACTION_IMAGE_PERSISTED=1
   mark_backup "$TRANSACTION_BACKUP" succeeded
   cleanup_history "$candidate" "$previous"
@@ -841,6 +866,7 @@ main() {
   trap 'exit 143' TERM
 
   export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
+  export GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT"
   host_transaction_acquire "deploy.${COMMAND}"
   prepare_environment
   prepare_state

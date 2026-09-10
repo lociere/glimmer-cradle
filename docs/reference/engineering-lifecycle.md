@@ -4,12 +4,19 @@
 
 | 项 | 值 |
 |---|---|
-| lock | `/run/glimmer-cradle/host.lock` |
-| guard | `/run/glimmer-cradle/.host.lock.guard` |
-| handoff | `/run/glimmer-cradle/handoff/<operation-id>.{request.json,result.json,ack,decision}` |
+| host owner root | `/run/glimmer-cradle/host-owner/`，`root:root`、`0700` |
+| service IPC root | `/run/glimmer-cradle/service/`，UID/GID `10001`、`0700`；映射为容器内 `/run/glimmer-cradle/` |
+| lock | `/run/glimmer-cradle/host-owner/host.lock` |
+| guard | `/run/glimmer-cradle/host-owner/.host.lock.guard` |
+| handoff | `/run/glimmer-cradle/host-owner/handoff/<operation-id>.{request.json,result.json,ack,decision}` |
 | journal | `/var/lib/glimmer-cradle/transactions/{current.json,events.jsonl}` |
 | execution phases | `acquire`、`prepare`、`replace`、`restart`、`readiness`、`bridge_readiness`、`commit` |
 | operation states | `unsupported`、`accepted`、`started`、`committed`、`failed`、`recovery_required`、`owner_timeout`、`conflict`、`error` |
+
+宿主事务与服务 IPC 不共享可写根目录。候选镜像、Caddy 镜像和 Caddyfile 只进入临时 Compose projection；readiness 成功后，部署 owner 才以单次 rename 原子替换 canonical `deployment.env`。失败补偿始终从未混入候选字段的 previous projection 重建，不允许形成“旧镜像 + 候选路径”的拼接状态。同镜像重装也走这条事务，以重新核对完整 projection，而不是跳过配置提交门。
+
+`/var/lib/glimmer-cradle/` 是 root-owned 控制面，容器 bind source `config/` 与 `data/` 归 UID/GID `10001`；`data/backups/`、`data/diagnostics/deploy/` 仍是 root-only 子域。失败候选在销毁前把 Compose 状态和日志保存到 `data/diagnostics/deploy/<transaction-id>/`，诊断失败不阻断回滚。
+
 | stable exit | 64 usage；66 missing/unavailable；70 failed；75 locked；77 confirmation denied；78 recovery required；130 INT；143 TERM |
 
 `commit` 只表示最后执行阶段，`committed` 才是成功终态。日志字段默认不包含 token、secret

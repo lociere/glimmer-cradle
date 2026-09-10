@@ -217,6 +217,7 @@ run_light_installer() {
   cat > "${light_config_root}/deployment.env" <<EOF
 GLIMMER_CRADLE_IMAGE=${IMAGE}
 GLIMMER_CRADLE_CADDY_IMAGE=${IMAGE}
+GLIMMER_CRADLE_DEPLOYMENT_MODE=image
 GLIMMER_CRADLE_SERVER_TOKEN=light-install-token
 EOF
 

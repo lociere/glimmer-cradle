@@ -124,7 +124,7 @@ host_transaction_validate_control_file() {
 
 host_transaction_configure_paths() {
   HOST_TRANSACTION_STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-}"
-  HOST_TRANSACTION_RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+  HOST_TRANSACTION_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}/host-owner}"
   [[ -n "$HOST_TRANSACTION_STATE_ROOT" ]] || {
     host_transaction_event transaction_validation_failed state_root_missing "$HOST_TRANSACTION_EXIT_MISSING"
     return "$HOST_TRANSACTION_EXIT_MISSING"

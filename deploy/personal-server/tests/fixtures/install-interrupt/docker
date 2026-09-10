@@ -19,7 +19,7 @@ if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == full-success ]]; then
     *' ps --status running --services'|*' ps --all -q personal-server')
       exit 0
       ;;
-    *' up --detach --remove-orphans'|*' exec -T personal-server node -e '*)
+    *' up --detach --remove-orphans'|*' down --remove-orphans'|*' exec -T personal-server node -e '*)
       exit 0
       ;;
     'image ls glimmer-cradle/personal-server --format {{.Repository}}:{{.Tag}}')
@@ -55,10 +55,16 @@ if [[ "${GLIMMER_CRADLE_TEST_DOCKER_MODE:-}" == light-success ]]; then
       printf '%s\n' "${GLIMMER_CRADLE_TEST_CURRENT_IMAGE:?轻量安装成功测试必须提供当前镜像}"
       exit 0
       ;;
-    *' up --detach --remove-orphans'|*' exec -T personal-server node -e '*)
+    'image inspect '*)
+      exit 0
+      ;;
+    *' up --detach --remove-orphans'|*' down --remove-orphans'|*' exec -T personal-server node -e '*)
       exit 0
       ;;
     'rm -f glimmer-cradle-ops-bridge')
+      exit 0
+      ;;
+    'image ls glimmer-cradle/personal-server --format {{.Repository}}:{{.Tag}}')
       exit 0
       ;;
     'run --detach --name glimmer-cradle-ops-bridge '*)

@@ -11,6 +11,8 @@ VERSION="${GLIMMER_CRADLE_VERSION:-latest}"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-/opt/glimmer-cradle}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-/var/lib/glimmer-cradle}"
 RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+HOST_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${RUN_ROOT}/host-owner}"
+SERVICE_RUN_ROOT="${GLIMMER_CRADLE_SERVICE_RUN_ROOT:-${RUN_ROOT}/service}"
 CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-/etc/glimmer-cradle}"
 DEPLOYMENT_ENV_FILE="${CONFIG_ROOT}/deployment.env"
 CLI_PATH="${GLIMMER_CRADLE_CLI_PATH:-/usr/local/bin/glimmer-cradle}"
@@ -276,6 +278,7 @@ source "${PAYLOAD_ROOT}/lib/host-transaction.sh"
 HOST_TRANSACTION_LIBRARY_LOADED=1
 export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
 export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
+export GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT"
 host_transaction_acquire install.release
 host_transaction_phase prepare
 
@@ -290,6 +293,7 @@ fi
 if [[ -f "$DEPLOYMENT_ENV_FILE" ]]; then
   EXISTING_DEPLOYMENT=1
   cp "$DEPLOYMENT_ENV_FILE" "$DEPLOYMENT_ENV_BACKUP"
+  DEPLOYMENT_ENV_TOUCHED=1
   CURRENT_IMAGE="$(grep '^GLIMMER_CRADLE_IMAGE=' "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
   CURRENT_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "$DEPLOYMENT_ENV_FILE" | tail -n 1 | cut -d= -f2- || true)"
 fi
@@ -341,7 +345,8 @@ validate_oci_archive() {
   local archive="$1"
   local expected_ref_name="$2"
   local expected_config_digest="$3"
-  local oci_root index_file manifest_digest manifest_blob config_digest blob_digest blob_file
+  local oci_root index_file manifest_digest blob_digest
+  local OCI_WORKLOAD_MANIFEST_DIGEST="" OCI_WORKLOAD_CONFIG_DIGEST=""
   oci_root="${TEMP_ROOT}/oci-archive"
   rm -rf -- "$oci_root"
   mkdir -p "$oci_root"
@@ -364,44 +369,74 @@ validate_oci_archive() {
     echo "完整包 OCI index 未声明 manifest digest。" >&2
     exit 1
   }
-  manifest_blob="${oci_root}/blobs/sha256/${manifest_digest#sha256:}"
-  [[ -f "$manifest_blob" ]] || {
-    echo "完整包 OCI manifest blob 缺失。" >&2
-    exit 1
-  }
-  [[ "$(sha256sum "$manifest_blob" | cut -d' ' -f1)" == "${manifest_digest#sha256:}" ]] || {
-    echo "完整包 OCI manifest digest 校验失败。" >&2
-    exit 1
-  }
-  config_digest="$(grep -o '"config"[^{]*{[^}]*"digest"[[:space:]]*:[[:space:]]*"sha256:[0-9a-f]\{64\}"' "$manifest_blob" \
-    | grep -o 'sha256:[0-9a-f]\{64\}' | head -n 1)"
-  [[ "$config_digest" == "$expected_config_digest" ]] || {
-    echo "完整包 OCI config digest 与发布声明不一致。" >&2
-    exit 1
-  }
-  for blob_digest in $(grep -o 'sha256:[0-9a-f]\{64\}' "$manifest_blob"); do
-    blob_file="${oci_root}/blobs/sha256/${blob_digest#sha256:}"
+  validate_oci_blob() {
+    local digest="$1" blob_file
+    blob_file="${oci_root}/blobs/sha256/${digest#sha256:}"
     [[ -f "$blob_file" ]] || {
-      echo "完整包 OCI blob 缺失: ${blob_digest}" >&2
+      echo "完整包 OCI blob 缺失: ${digest}" >&2
       exit 1
     }
-    [[ "$(sha256sum "$blob_file" | cut -d' ' -f1)" == "${blob_digest#sha256:}" ]] || {
-      echo "完整包 OCI blob digest 校验失败: ${blob_digest}" >&2
+    [[ "$(sha256sum "$blob_file" | cut -d' ' -f1)" == "${digest#sha256:}" ]] || {
+      echo "完整包 OCI blob digest 校验失败: ${digest}" >&2
       exit 1
     }
-  done
+  }
+  validate_oci_descriptor_tree() {
+    local digest="$1" descriptor_blob compact child_digest
+    validate_oci_blob "$digest"
+    descriptor_blob="${oci_root}/blobs/sha256/${digest#sha256:}"
+    compact="$(tr -d '\r\n\t ' < "$descriptor_blob")"
+    if [[ "$compact" == *'"config":{'* ]]; then
+      for child_digest in $(grep -o 'sha256:[0-9a-f]\{64\}' "$descriptor_blob"); do
+        validate_oci_blob "$child_digest"
+      done
+    else
+      for child_digest in $(grep -o 'sha256:[0-9a-f]\{64\}' "$descriptor_blob"); do
+        validate_oci_descriptor_tree "$child_digest"
+      done
+    fi
+  }
+  find_oci_linux_amd64_workload() {
+    local digest="$1" descriptor_blob compact config_digest config_blob config_compact child_digest
+    [[ -z "$OCI_WORKLOAD_MANIFEST_DIGEST" ]] || return 0
+    descriptor_blob="${oci_root}/blobs/sha256/${digest#sha256:}"
+    compact="$(tr -d '\r\n\t ' < "$descriptor_blob")"
+    if [[ "$compact" == *'"config":{'* ]]; then
+      config_digest="$(printf '%s' "$compact" \
+        | grep -o '"config":{[^}]*"digest":"sha256:[0-9a-f]\{64\}"' \
+        | grep -o 'sha256:[0-9a-f]\{64\}' | head -n 1 || true)"
+      [[ "$config_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || return 0
+      config_blob="${oci_root}/blobs/sha256/${config_digest#sha256:}"
+      config_compact="$(tr -d '\r\n\t ' < "$config_blob")"
+      if [[ "$config_compact" == *'"architecture":"amd64"'* && "$config_compact" == *'"os":"linux"'* ]]; then
+        OCI_WORKLOAD_MANIFEST_DIGEST="$digest"
+        OCI_WORKLOAD_CONFIG_DIGEST="$config_digest"
+      fi
+      return 0
+    fi
+    for child_digest in $(grep -o 'sha256:[0-9a-f]\{64\}' "$descriptor_blob"); do
+      find_oci_linux_amd64_workload "$child_digest"
+      [[ -z "$OCI_WORKLOAD_MANIFEST_DIGEST" ]] || return 0
+    done
+  }
+
+  validate_oci_descriptor_tree "$manifest_digest"
+  find_oci_linux_amd64_workload "$manifest_digest"
+  [[ -n "$OCI_WORKLOAD_MANIFEST_DIGEST" ]] || {
+    echo "完整包 OCI descriptor 链不包含 linux/amd64 工作负载镜像。" >&2
+    exit 1
+  }
+  [[ "$expected_config_digest" == "$manifest_digest" \
+    || "$expected_config_digest" == "$OCI_WORKLOAD_MANIFEST_DIGEST" \
+    || "$expected_config_digest" == "$OCI_WORKLOAD_CONFIG_DIGEST" ]] || {
+    echo "完整包 OCI 镜像身份与发布声明不一致。" >&2
+    exit 1
+  }
   OCI_ARCHIVE_MANIFEST_DIGEST="$manifest_digest"
 }
 
-set_env_value GLIMMER_CRADLE_DEPLOYMENT_MODE image
-DEPLOYMENT_ENV_TOUCHED=1
-set_env_value GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
-set_env_value GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
-set_env_value GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
-set_env_value GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
-set_env_value GLIMMER_CRADLE_CADDYFILE "${RELEASE_ROOT}/Caddyfile"
 if [[ -n "${GLIMMER_CRADLE_CADDY_IMAGE:-}" ]]; then
-  set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$GLIMMER_CRADLE_CADDY_IMAGE"
+  RELEASE_CADDY_IMAGE="$GLIMMER_CRADLE_CADDY_IMAGE"
 else
   RELEASE_CADDY_IMAGE="$(grep '^GLIMMER_CRADLE_CADDY_IMAGE=' "${RELEASE_ROOT}/.env.example" | tail -n 1 | cut -d= -f2- || true)"
   [[ "$RELEASE_CADDY_IMAGE" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]] || {
@@ -416,7 +451,6 @@ else
     || [[ -z "$PREVIOUS_RELEASE" ]] \
     || [[ "$CURRENT_CADDY_IMAGE" == "$CURRENT_IMAGE" ]] \
     || [[ "$CURRENT_CADDY_IMAGE" == "$PREVIOUS_RELEASE_CADDY_IMAGE" ]]; then
-    set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$RELEASE_CADDY_IMAGE"
     CADDY_TRACKS_RELEASE_IMAGE=1
   fi
 fi
@@ -476,12 +510,16 @@ if [[ "$PACKAGE_VARIANT" == full ]]; then
   }
   CANDIDATE_IMAGE="$LOCAL_ARCHIVE_IMAGE"
   if (( CADDY_TRACKS_RELEASE_IMAGE )); then
-    set_env_value GLIMMER_CRADLE_CADDY_IMAGE "$LOCAL_ARCHIVE_IMAGE"
+    RELEASE_CADDY_IMAGE="$LOCAL_ARCHIVE_IMAGE"
   fi
   export GLIMMER_CRADLE_CANDIDATE_PRELOADED=1
 fi
 
 export GLIMMER_CRADLE_CANDIDATE_IMAGE="$CANDIDATE_IMAGE"
+export GLIMMER_CRADLE_CANDIDATE_DEPLOYMENT_MODE=image
+export GLIMMER_CRADLE_CANDIDATE_CADDY_IMAGE="$RELEASE_CADDY_IMAGE"
+export GLIMMER_CRADLE_CANDIDATE_CADDYFILE="${RELEASE_ROOT}/Caddyfile"
+export GLIMMER_CRADLE_SERVICE_RUN_ROOT="$SERVICE_RUN_ROOT"
 
 if [[ "$CANDIDATE_IMAGE" == ghcr.io/* && -n "$GHCR_TOKEN" ]]; then
   export DOCKER_CONFIG="${TEMP_ROOT}/docker-config"
@@ -491,7 +529,7 @@ if [[ "$CANDIDATE_IMAGE" == ghcr.io/* && -n "$GHCR_TOKEN" ]]; then
 fi
 
 DEPLOY_COMMAND=install
-if (( EXISTING_DEPLOYMENT )) && [[ "$CURRENT_IMAGE" != "$CANDIDATE_IMAGE" ]]; then
+if (( EXISTING_DEPLOYMENT )); then
   DEPLOY_COMMAND=update
 fi
 
@@ -514,6 +552,8 @@ set -Eeuo pipefail
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="${DEPLOYMENT_ENV_FILE}"
 export GLIMMER_CRADLE_STATE_ROOT="${STATE_ROOT}"
 export GLIMMER_CRADLE_RUN_ROOT="${RUN_ROOT}"
+export GLIMMER_CRADLE_HOST_RUN_ROOT="${HOST_RUN_ROOT}"
+export GLIMMER_CRADLE_SERVICE_RUN_ROOT="${SERVICE_RUN_ROOT}"
 export GLIMMER_CRADLE_INSTALL_ROOT="${INSTALL_ROOT}"
 export GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT="${CONFIG_ROOT}"
 if (( \$# == 0 )); then

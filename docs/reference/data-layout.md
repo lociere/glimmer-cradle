@@ -105,7 +105,7 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 
 未列出的无 owner 容器目录不属于当前契约。大对象必须由明确 owner 归入 `state/`、`models/`、`packages/` 或 `work/`；短生命周期协调信息只能进入 `run/`，短生命周期处理材料只能进入 `work/` 或操作系统临时目录。
 
-开发态和便携部署默认使用 `data/run/`。正式 Desktop 可将 RunRoot 映射到应用用户域；Linux Personal Server 应优先映射到 `/run/glimmer-cradle/` 或 `$XDG_RUNTIME_DIR/glimmer-cradle/`。业务代码只依赖 `GLIMMER_CRADLE_RUN_ROOT`/RunRoot resolver，不硬编码具体操作系统路径。
+开发态和便携部署默认使用 `data/run/`。正式 Desktop 可将 RunRoot 映射到应用用户域；Linux Personal Server 使用 `/run/glimmer-cradle/` 作为基目录，并把 root-owned 宿主事务域 `host-owner/` 与 UID 10001-owned 服务 IPC 域 `service/` 物理分离；只有后者映射为容器内规范 `/run/glimmer-cradle/`。Personal Server 的持久状态根由宿主控制，实际 bind source `config/`、`data/` 由 UID/GID 10001 拥有；`data/backups/` 和 `data/diagnostics/deploy/` 是其中独立的 root-only 子域。业务代码仍只依赖容器内 `GLIMMER_CRADLE_RUN_ROOT`/RunRoot resolver，不感知宿主目录布局。
 
 ## 迁移规则
 

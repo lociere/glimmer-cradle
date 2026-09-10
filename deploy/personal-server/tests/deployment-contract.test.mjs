@@ -24,16 +24,19 @@ test('query dispatch 发生在 version、Docker elevation 与事务初始化之�
   assert.doesNotMatch(runQuery, /\bsudo\b|prepare_environment|prepare_state|chmod|chown/);
 });
 
-test('source mode 不伪装 Ops 支持，custom host run root 投影到容器规范路径', () => {
+test('source mode 不伪装 Ops 支持，宿主事务与服务 IPC 使用不同 owner 域', () => {
   assert.match(deploy, /source_mode_has_no_stable_host_owner/);
   for (const rootName of ['INSTALL_ROOT', 'STATE_ROOT']) {
     assert.match(deploy, new RegExp(`src=\\\"\\$${rootName}\\\",dst=\\\"\\$${rootName}\\\"`));
   }
   assert.match(
     deploy,
-    /src="\$RUN_ROOT",dst="\$CONTAINER_RUN_ROOT"/,
+    /src="\$SERVICE_RUN_ROOT",dst="\$CONTAINER_RUN_ROOT"/,
   );
-  assert.match(deploy, /GLIMMER_CRADLE_HOST_RUN_ROOT="\$RUN_ROOT"/);
+  assert.match(deploy, /GLIMMER_CRADLE_HOST_RUN_ROOT="\$HOST_RUN_ROOT"/);
+  assert.match(deploy, /install -d -o 0 -g 0 -m 0700 "\$HOST_RUN_ROOT"/);
+  assert.match(deploy, /install -d -o 10001 -g 10001 -m 0700 "\$SERVICE_RUN_ROOT"/);
+  assert.match(deploy, /chown 10001:10001 "\$STATE_ROOT\/data"/);
 });
 
 test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bind source', () => {
@@ -47,12 +50,27 @@ test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bin
   );
   assert.match(
     compose,
-    /\$\{GLIMMER_CRADLE_RUN_ROOT:-\.\/run\}:\/run\/glimmer-cradle/,
+    /\$\{GLIMMER_CRADLE_SERVICE_RUN_ROOT:-\.\/run\/service\}:\/run\/glimmer-cradle/,
   );
   assert.match(
     deploy,
     /set_env_value "\$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET "\$CONTAINER_OPS_BRIDGE_SOCKET"/,
   );
+});
+
+test('候选装配只写临时 projection，readiness 后才原子替换 canonical env', () => {
+  const install = deploy.slice(deploy.indexOf('install_release()'), deploy.indexOf('\nupdate_release()'));
+  const update = deploy.slice(deploy.indexOf('update_release()'), deploy.indexOf('\ncleanup_history()'));
+  assert.ok(install.indexOf('create_previous_compose_env') < install.indexOf('create_candidate_compose_env'));
+  assert.match(update, /create_previous_compose_env/);
+  assert.match(update, /create_candidate_compose_env/);
+  assert.ok(update.indexOf('wait_until_ready "$TRANSACTION_CANDIDATE_ENV"')
+    < update.indexOf('persist_deployment_projection "$TRANSACTION_CANDIDATE_ENV"'));
+  assert.match(deploy, /mv -f -- "\$temporary" "\$DEPLOYMENT_ENV_FILE"/);
+  assert.doesNotMatch(installer, /set_env_value GLIMMER_CRADLE_CADDYFILE/);
+  assert.match(installer, /GLIMMER_CRADLE_CANDIDATE_CADDYFILE="\$\{RELEASE_ROOT\}\/Caddyfile"/);
+  assert.ok(deploy.indexOf('capture_candidate_diagnostics "$TRANSACTION_CANDIDATE_ENV"')
+    < deploy.indexOf('compose_with_env "$TRANSACTION_CANDIDATE_ENV" down --remove-orphans'));
 });
 
 test('可信锁拒绝 symlink/不安全 owner 并以 guard inode 防替换', () => {

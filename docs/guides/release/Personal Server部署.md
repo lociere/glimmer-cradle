@@ -69,10 +69,12 @@ GitHub 自动附加的 `Source code (zip)` 与 `Source code (tar.gz)` 是 tag �
 | `/var/lib/glimmer-cradle/config/` | 应用配置和 secret |
 | `/var/lib/glimmer-cradle/data/` | 记忆、经历、扩展包与可观测数据 |
 | `/var/lib/glimmer-cradle/data/backups/{manual,transaction,restore-safety}/` | 手工、事务与恢复安全快照的独立保留域 |
-| `/run/glimmer-cradle/host.lock` | 所有宿主写操作共享的 transaction lock |
+| `/var/lib/glimmer-cradle/data/diagnostics/deploy/<transaction-id>/` | 失败候选销毁前保存的 Compose 状态与日志 |
+| `/run/glimmer-cradle/host-owner/` | root-owned 宿主事务锁、handoff 与短生命周期 owner 状态 |
+| `/run/glimmer-cradle/service/` | UID 10001-owned 服务 IPC；只映射为容器内 `/run/glimmer-cradle/` |
 | `/usr/local/bin/glimmer-cradle` | 稳定运维命令 |
 
-重复执行同一命令是幂等的；已停止的同版本会重新启动，发现新镜像时会先备份状态、验收候选版本，并在失败时恢复上一镜像和状态。
+重复执行同一命令是幂等的，但同镜像重装仍会经过统一事务以核对完整部署 projection。候选镜像、Caddy 镜像与 Caddyfile 只写入临时 projection；readiness 成功后 canonical `deployment.env` 才原子切换。失败时先把候选状态和日志写入 root-only 诊断目录，再从未污染的 previous projection 恢复上一镜像、入口配置和状态，不拼接新旧发布路径。宿主持久状态根由 root 控制，容器挂载的 `config/`、`data/` 与服务 IPC 域由 UID/GID 10001 拥有，备份和部署诊断则保持独立的 root-only 子域。
 
 ## 受限网络与区域分发
 
