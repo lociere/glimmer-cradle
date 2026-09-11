@@ -102,9 +102,6 @@ export interface ExtensionCapabilityGraphReport {
 }
 
 export interface IExtensionSystemConfig {
-  identity: {
-    app_version: string;
-  };
   extensions: {
     extension_root_dir: string;
     sandbox: {
@@ -120,6 +117,7 @@ export interface ActiveExtensionSelection {
 }
 
 export interface IExtensionHostService {
+  getApplicationVersion(): string;
   getConfig(): IExtensionSystemConfig;
   getRepoRoot(): string;
   loadActiveExtensions(): Promise<ActiveExtensionSelection[]>;

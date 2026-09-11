@@ -23,6 +23,8 @@
 
 `configs/system/identity.yaml` 必须显式提供 `character.active_id` 和 `character.profile_root`。Kernel 启动不会创建缺失的系统配置、Character Package 文件或目录，也不会回退到某个内置角色；当前选择的角色包缺少 manifest、persona、dialogue、safety、inference、provider 或知识索引时，启动应明确失败。开发仓库的受版本控制模板以及未来安装器负责初始配置投影。
 
+发行版本不是配置。当前产品版本只由不可变的 `products/<id>/product.json` 提供，Kernel 用它校验 Extension 的 `engines.glimmerCradle`；`identity.yaml` 不保存 `app_version`，升级也不需要改写用户配置。
+
 ## 变更规则
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
@@ -52,7 +54,7 @@ Base URL 只接受不含账号信息、查询参数和片段的 HTTP(S) 地址�
 | `configs/system/skills.yaml` | Skill Plane、MCP server、user skill 等能力 provider 配置 |
 | `configs/system/observability.yaml` | 日志、trace、metrics、DLQ、模型调用观测、保留期、index 与 diagnostic bundle 策略 |
 | `configs/system/memory.yaml` | Conversation 工作集/投影、Experience、长期记忆巩固任务与混合召回策略 |
-| `configs/system/identity.yaml` | 系统身份、默认标识和 active character 选择 |
+| `configs/system/identity.yaml` | 系统显示身份和 active character 选择；不拥有发行版本 |
 | `configs/characters/<character-id>/character.manifest.yaml` | 该角色包身份、最小名称锚点、persona mode 与目录声明 |
 | `configs/characters/<character-id>/profile.yaml` | 该角色的作者人格种子：身份事实、性格轴、关系姿态、情绪行为、场景行为、表达倾向 |
 | `configs/characters/<character-id>/dialogue.yaml` | 该角色的对话呈现策略：短句、复杂回复、括号动作、Markdown/代码和分段规则 |

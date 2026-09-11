@@ -232,6 +232,7 @@ function createOperationalRuntimePlan(options: {
   const extensionHost = new ExtensionHostAppService(
     perception, catalog, availability, skillPlanePolicy, attentionLeases, lifeClock,
     new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
+    product.version,
   );
   const application = new ApplicationRuntime({
     setCognitionActionHandler: (handler) => transport.setCognitionActionHandler(handler),

@@ -463,6 +463,7 @@ function createPersonalServerFixture(): {
     schema_version: 1,
     id: 'personal-server',
     display_name: 'Personal Server',
+    version: '0.2.2',
     features: {
       control_surface_gateway: true,
       local_device_actions: false,

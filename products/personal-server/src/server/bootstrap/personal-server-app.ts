@@ -213,6 +213,7 @@ export class PersonalServerApp {
         schema_version: this.productManifest.schema_version,
         id: this.productManifest.id,
         display_name: this.productManifest.display_name,
+        version: this.productManifest.version,
         features: this.productManifest.features,
         surface_websocket: '/api/v1/surface',
       });

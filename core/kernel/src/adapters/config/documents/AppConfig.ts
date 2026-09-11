@@ -8,18 +8,12 @@ export interface AppConfig {
   character: ActiveCharacterConfig;
   backup: SystemBackupConfig;
 }
-/**
- * 系统身份元信息，仅用于展示、日志和扩展宿主握手。
- */
+/** 系统身份元信息；发行版本属于不可变 Product Composition，不进入持久化配置。 */
 export interface SystemIdentityConfig {
   /**
    * 应用显示名称
    */
   app_name: string;
-  /**
-   * 语义化版本号（仅展示）
-   */
-  app_version: string;
 }
 /**
  * 当前激活角色配置。profile_root 相对 configs/，active_id 对应 configs/<profile_root>/<active_id>/。

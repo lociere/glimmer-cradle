@@ -149,7 +149,6 @@ export class ConfigManager {
 
       logger.info('配置管理器初始化完成', {
         app_name: this._config.system.identity.app_name,
-        app_version: this._config.system.identity.app_version,
         active_character: activeCharacter.id,
       });
     } catch (error) {

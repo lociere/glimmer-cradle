@@ -8,6 +8,8 @@ export interface ProductComposition {
   schema_version: 1;
   id: 'desktop' | 'personal-server';
   display_name: string;
+  /** 当前产品制品的语义版本；由发布链写入，不属于用户配置。 */
+  version: string;
   /**
    * Capabilities included in this product artifact. Enablement is owned by system configuration.
    */

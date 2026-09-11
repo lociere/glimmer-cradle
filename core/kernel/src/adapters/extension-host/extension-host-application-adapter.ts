@@ -59,16 +59,18 @@ export class ExtensionHostAppService implements IExtensionHostService {
     private readonly attentionLeases: AttentionLeasePort,
     private readonly lifeClock: LifeClockApplicationPort,
     runtimeRegistry: ExtensionRuntimeRegistry,
+    private readonly applicationVersion: string,
   ) {
     this._runtimeRegistry = runtimeRegistry;
+  }
+
+  public getApplicationVersion(): string {
+    return this.applicationVersion;
   }
 
   public getConfig(): IExtensionSystemConfig {
     const config = ConfigManager.instance.getConfig();
     return {
-      identity: {
-        app_version: config.system.identity.app_version,
-      },
       extensions: {
         extension_root_dir: config.system.extensions.extension_root_dir,
         sandbox: {

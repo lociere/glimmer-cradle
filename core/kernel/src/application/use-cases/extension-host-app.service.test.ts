@@ -27,6 +27,7 @@ function createHostService(perception: unknown, catalog = new SkillCatalogAppSer
       new AttentionLeaseStore(new SystemClockAdapter()),
       {} as never,
       new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
+      '0.2.2',
     ),
   };
 }

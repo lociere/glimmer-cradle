@@ -9,6 +9,7 @@
     "schema_version",
     "id",
     "display_name",
+    "version",
     "features"
   ],
   "properties": {
@@ -27,6 +28,11 @@
     "display_name": {
       "type": "string",
       "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "description": "当前产品制品的语义版本；由发布链写入，不属于用户配置。"
     },
     "features": {
       "type": "object",
@@ -73,5 +79,5 @@
   },
   "x-glimmer-owner": "Product Composition owner",
   "x-glimmer-contract-kind": "Document",
-  "x-glimmer-compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh."
+  "x-glimmer-compatibility": "0.2.3 intentionally requires the immutable product artifact version for runtime compatibility checks."
 }

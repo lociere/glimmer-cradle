@@ -28,4 +28,19 @@ describe('configuration architecture boundaries', () => {
     );
     expect(activeExtensions).not.toMatch(/^enabled\s*:/m);
   });
+
+  it('keeps release version out of persisted configuration and owned by product artifacts', () => {
+    const identity = fs.readFileSync(path.join(repositoryRoot, 'configs/system/identity.yaml'), 'utf8');
+    const repositoryVersion = JSON.parse(
+      fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'),
+    ).version as string;
+    expect(identity).not.toMatch(/^\s*app_version\s*:/m);
+    for (const productId of ['desktop', 'personal-server']) {
+      const product = JSON.parse(fs.readFileSync(
+        path.join(repositoryRoot, 'products', productId, 'product.json'),
+        'utf8',
+      )) as { version?: string };
+      expect(product.version).toBe(repositoryVersion);
+    }
+  });
 });

@@ -25,6 +25,7 @@ import type {
 
 export interface ProductProjection {
   readonly display_name: string;
+  readonly version: string;
   readonly features: {
     readonly extensions?: boolean;
     readonly audio?: { readonly tts?: boolean; readonly asr?: boolean };

@@ -17,8 +17,8 @@
       "dialect": "https://json-schema.org/draft/2020-12/schema",
       "owner": "Kernel Config Application owner",
       "kind": "Document",
-      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "b6dafd7b0d5b26637551e4a40669855c82b29e6baa224b3827c48e27bffde4d9"
+      "compatibility": "0.2.3 intentionally removes release version from persisted configuration; Product Composition owns that fact.",
+      "sha256": "39f18adbc31b9047c4d007594735c181efae64abeea3ff247939cbb5355bf4e6"
     },
     {
       "path": "json-schema/config/v1/audio-config.schema.json",
@@ -278,8 +278,8 @@
       "dialect": "https://json-schema.org/draft/2020-12/schema",
       "owner": "Product Composition owner",
       "kind": "Document",
-      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "af4ea3d354c6617396d8cfe304b1b7234d4cab1ebff49053d2f5f933bade7a6e"
+      "compatibility": "0.2.3 intentionally requires the immutable product artifact version for runtime compatibility checks.",
+      "sha256": "1bfb3279e2f141a179e97831acf2a13607361ca96f71780b051523b4b9f16d02"
     },
     {
       "path": "json-schema/skill/v1/tool-parameters.schema.json",

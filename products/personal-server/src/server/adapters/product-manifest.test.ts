@@ -12,6 +12,7 @@ test('loads a valid personal server product manifest', () => {
     schema_version: 1,
     id: 'personal-server',
     display_name: 'Personal Server',
+    version: '0.2.2',
     features: {
       control_surface_gateway: true,
       local_device_actions: false,
@@ -23,5 +24,6 @@ test('loads a valid personal server product manifest', () => {
 
   const manifest = loadPersonalServerProductManifest(filePath);
   assert.equal(manifest.id, 'personal-server');
+  assert.equal(manifest.version, '0.2.2');
   assert.equal(manifest.features.extensions, true);
 });

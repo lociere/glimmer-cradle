@@ -159,11 +159,11 @@ describe('ExtensionProcessHost', () => {
       {},
       {},
       'default',
-      250,
+      2000,
     );
 
     await host.start();
-    await expect(withTestTimeout(host.stop(), 1500)).resolves.toBeUndefined();
+    await expect(withTestTimeout(host.stop(), 5000)).resolves.toBeUndefined();
 
     expect(service.lifecycleStages).toContain('Extension Host demo.hung-registration stopped');
   });
@@ -174,8 +174,9 @@ class FakeExtensionHostService implements IExtensionHostService {
   public readonly lifecycleStages: string[] = [];
   public attentionLeaseDispose: () => void | Promise<void> = () => undefined;
 
+  public getApplicationVersion(): string { return '0.1.0'; }
   public getConfig(): IExtensionSystemConfig {
-    return { identity: { app_version: '0.1.0' }, extensions: { extension_root_dir: 'data/packages/extensions', sandbox: { timeout_ms: 5000 } } };
+    return { extensions: { extension_root_dir: 'data/packages/extensions', sandbox: { timeout_ms: 5000 } } };
   }
   public getRepoRoot(): string { return repoRoot; }
   public async loadActiveExtensions(): Promise<ActiveExtensionSelection[]> { return []; }

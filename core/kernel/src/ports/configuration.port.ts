@@ -79,7 +79,7 @@ export interface LifeClockConfiguration {
 
 export interface KernelConfiguration {
   readonly system: {
-    readonly identity: { readonly app_name: string; readonly app_version: string };
+    readonly identity: { readonly app_name: string };
     readonly character: { readonly active_id: string; readonly profile_root: string };
     readonly cognition_service: { readonly request_timeout_ms: number; readonly registration_timeout_ms: number };
     readonly ingress: IngressConfiguration;

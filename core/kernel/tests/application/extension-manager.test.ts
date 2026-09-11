@@ -234,6 +234,28 @@ describe('ExtensionManager', () => {
     }
   });
 
+  it('使用不可变产品制品版本校验扩展，而不从持久化配置读取发行版本', async () => {
+    const fixture = await createExtensionFixture('test.product-version', {
+      permissions: [],
+      entrySource: 'module.exports = { onActivate() {} };',
+      version: '1.0.0',
+      appEngine: '>=0.2.2',
+    });
+    const manager = new ExtensionManager(new FakeExtensionHost(
+      fixture.root,
+      new SkillCatalogAppService(new SkillRegistry()),
+      [{ id: fixture.extensionId, version: '1.0.0' }],
+      '0.2.2',
+    ), readinessProjection);
+
+    try {
+      await manager.init();
+      await expect(manager.loadExtension(fixture.extensionId)).resolves.toBeUndefined();
+    } finally {
+      await manager.shutdown();
+    }
+  });
+
   it('激活配置引用未安装版本时拒绝初始化', async () => {
     const fixture = await createExtensionFixture('test.missing-version', {
       permissions: [],
@@ -624,6 +646,7 @@ interface ExtensionFixtureOptions {
   entrySource: string;
   commands?: Array<{ command: string; title: string; category?: string }>;
   version?: string;
+  appEngine?: string;
   nodeEngine?: string;
 }
 
@@ -646,7 +669,7 @@ async function installExtensionVersion(
     'main: index.cjs',
     'minAppVersion: 0.1.0',
     'engines:',
-    '  glimmerCradle: 0.1.0',
+    `  glimmerCradle: ${JSON.stringify(options.appEngine ?? '0.1.0')}`,
     ...(options.nodeEngine ? [`  node: ${JSON.stringify(options.nodeEngine)}`] : []),
     'activationEvents:',
     '  - onStartup',
@@ -688,13 +711,15 @@ class FakeExtensionHost implements IExtensionHostService {
     private readonly _repoRoot: string,
     private readonly _catalog: SkillCatalogAppService,
     private readonly _activeExtensions: ActiveExtensionSelection[] = [],
+    private readonly _applicationVersion = '0.1.0',
   ) {}
+
+  public getApplicationVersion(): string {
+    return this._applicationVersion;
+  }
 
   public getConfig(): IExtensionSystemConfig {
     return {
-      identity: {
-        app_version: '0.1.0',
-      },
       extensions: {
         extension_root_dir: 'data/packages/extensions',
         sandbox: {

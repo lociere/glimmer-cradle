@@ -399,7 +399,6 @@ function createGlobalConfig(initialLlm: LLMConfig): GlobalConfig {
     system: {
       identity: {
         app_name: 'Glimmer Cradle',
-        app_version: '0.1.1',
       },
       character: {
         active_id: 'selrena',

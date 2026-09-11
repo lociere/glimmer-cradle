@@ -517,7 +517,7 @@ export class ExtensionManager {
   }
 
   private assertEngineCompatibility(extensionId: string, manifest: ExtensionManifestRecord): void {
-    const appVersion = this.hostService.getConfig().identity.app_version;
+    const appVersion = this.hostService.getApplicationVersion();
     const requiredAppVersion = manifest.engines.glimmerCradle ?? manifest.minAppVersion;
     if (!isVersionCompatible(appVersion, requiredAppVersion)) throw this.validationError(`扩展 ${extensionId} 要求摇篮版本 ${requiredAppVersion}，当前 ${appVersion}`);
     if (manifest.engines.node && !isVersionCompatible(process.versions.node, manifest.engines.node)) {

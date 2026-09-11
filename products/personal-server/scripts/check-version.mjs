@@ -38,8 +38,8 @@ for (const relativePath of [
 }
 
 const expectedFacts = [
-  ['configs/system/identity.yaml', `app_version: "${rootVersion}"`],
-  ['contracts/json-schema/config/v1/app-config.schema.json', `"default": "${rootVersion}"`],
+  ['products/desktop/product.json', `"version": "${rootVersion}"`],
+  ['products/personal-server/product.json', `"version": "${rootVersion}"`],
   ['engines/audio/src/glimmer_cradle/audio/__init__.py', `__version__ = "${rootVersion}"`],
   ['core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts', `version: '${rootVersion}'`],
   ['hosts/unity-avatar-host/Assets/StreamingAssets/avatar-host.json', `"hostVersion": "${rootVersion}"`],
