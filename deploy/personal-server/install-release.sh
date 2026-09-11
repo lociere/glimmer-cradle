@@ -10,9 +10,11 @@ fi
 VERSION="${GLIMMER_CRADLE_VERSION:-latest}"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-/opt/glimmer-cradle}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-/var/lib/glimmer-cradle}"
+HOST_STATE_ROOT="${STATE_ROOT}/host"
+SERVICE_STATE_ROOT="${STATE_ROOT}/service"
 RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
-HOST_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${RUN_ROOT}/host-owner}"
-SERVICE_RUN_ROOT="${GLIMMER_CRADLE_SERVICE_RUN_ROOT:-${RUN_ROOT}/service}"
+HOST_RUN_ROOT="${RUN_ROOT}/host"
+SERVICE_RUN_ROOT="${RUN_ROOT}/service"
 CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-/etc/glimmer-cradle}"
 DEPLOYMENT_ENV_FILE="${CONFIG_ROOT}/deployment.env"
 CLI_PATH="${GLIMMER_CRADLE_CLI_PATH:-/usr/local/bin/glimmer-cradle}"
@@ -39,6 +41,40 @@ PREVIOUS_RELEASE=""
 DEPLOY_RESULT_FILE=""
 HOST_TRANSACTION_LIBRARY_LOADED=0
 
+validate_managed_root() {
+  local label="$1" target="$2" canonical
+  [[ "$target" == /* ]] || {
+    echo "${label} 必须是绝对路径: ${target}" >&2
+    exit 64
+  }
+  canonical="$(realpath -m -- "$target" 2>/dev/null || true)"
+  [[ "$canonical" == "$target" ]] || {
+    echo "${label} 必须是规范路径且不能包含可消解别名: ${target}" >&2
+    exit 64
+  }
+  case "$target" in
+    /|/etc|/opt|/run|/srv|/tmp|/usr|/var|/var/lib|/var/log|/var/cache)
+      echo "${label} 不能使用系统或共享根目录: ${target}" >&2
+      exit 64
+      ;;
+  esac
+  [[ ! -L "$target" ]] || {
+    echo "${label} 不能是符号链接: ${target}" >&2
+    exit 78
+  }
+}
+
+validate_managed_root GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
+validate_managed_root GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+validate_managed_root GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
+validate_managed_root GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
+[[ "$INSTALL_ROOT" != "$STATE_ROOT" && "$INSTALL_ROOT" != "$RUN_ROOT" \
+  && "$INSTALL_ROOT" != "$CONFIG_ROOT" && "$STATE_ROOT" != "$RUN_ROOT" \
+  && "$STATE_ROOT" != "$CONFIG_ROOT" && "$RUN_ROOT" != "$CONFIG_ROOT" ]] || {
+  echo "install、state、run 与 deployment config 根必须彼此独立。" >&2
+  exit 64
+}
+
 case "$PACKAGE_VARIANT" in
   light|full) ;;
   *) echo "GLIMMER_CRADLE_PACKAGE_VARIANT 只允许 light 或 full。" >&2; exit 1 ;;
@@ -52,7 +88,7 @@ else
   DOWNLOAD_BASE="https://github.com/lociere/glimmer-cradle/releases/download/v${VERSION#v}"
 fi
 
-for command in tar sha256sum install; do
+for command in tar sha256sum install realpath; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "基础系统缺少 ${command}；请使用受支持的 Ubuntu 24.04 LTS 最小镜像。" >&2
     exit 1
@@ -277,8 +313,11 @@ fi
 source "${PAYLOAD_ROOT}/lib/host-transaction.sh"
 HOST_TRANSACTION_LIBRARY_LOADED=1
 export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
+export GLIMMER_CRADLE_HOST_STATE_ROOT="$HOST_STATE_ROOT"
+export GLIMMER_CRADLE_SERVICE_STATE_ROOT="$SERVICE_STATE_ROOT"
 export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
 export GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT"
+install -d -o 0 -g 0 -m 0700 "$STATE_ROOT"
 host_transaction_acquire install.release
 host_transaction_phase prepare
 
@@ -491,6 +530,8 @@ fi
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE"
 export GLIMMER_CRADLE_ENV_TEMPLATE_FILE="${RELEASE_ROOT}/.env.example"
 export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
+export GLIMMER_CRADLE_HOST_STATE_ROOT="$HOST_STATE_ROOT"
+export GLIMMER_CRADLE_SERVICE_STATE_ROOT="$SERVICE_STATE_ROOT"
 if ! "$DOCKER_BIN" info >/dev/null 2>&1 \
   || ! "$DOCKER_BIN" compose version >/dev/null 2>&1 \
   || ! "$DOCKER_BIN" buildx version >/dev/null 2>&1; then
@@ -551,6 +592,8 @@ cat > "$CLI_TEMP" <<EOF
 set -Eeuo pipefail
 export GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="${DEPLOYMENT_ENV_FILE}"
 export GLIMMER_CRADLE_STATE_ROOT="${STATE_ROOT}"
+export GLIMMER_CRADLE_HOST_STATE_ROOT="${HOST_STATE_ROOT}"
+export GLIMMER_CRADLE_SERVICE_STATE_ROOT="${SERVICE_STATE_ROOT}"
 export GLIMMER_CRADLE_RUN_ROOT="${RUN_ROOT}"
 export GLIMMER_CRADLE_HOST_RUN_ROOT="${HOST_RUN_ROOT}"
 export GLIMMER_CRADLE_SERVICE_RUN_ROOT="${SERVICE_RUN_ROOT}"

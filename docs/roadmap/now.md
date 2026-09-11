@@ -46,14 +46,14 @@ M12/M13 的完成态目录、迁移动作和删除门分别见对应 [M12 清单
 
 2026-09-10 NapCat 跨产品化的 `0.2.0` SDK、Personal Server 与 Adapter 已发布：主仓只增加生态通用的 `ExtensionContext.activationProfile` 与按权限访问的 `ctx.ports.secrets.get(key)`，Kernel 先按产品、平台、feature 与所选 profile 裁剪权限和 contribution，再启动隔离 Host。普通 config 是扩展自有、Schema 校验的非敏感对象；Secret 是独立可选能力，不需要 Secret 的扩展不声明 `SECRET_READ_SELF`，读取请求会被 Host 拒绝。主仓只解释扩展 ID、通用 key 与权限，不包含 NapCat、QQ、OneBot 或第三方配置字段。独立 Adapter 仓以 Host 选择为唯一 profile owner；Personal Server/Linux 的 `external_onebot` 不取得 `EXTERNAL_PROCESS` 或 Windows 受管资源，`managed_napcat_windows` 的进程权限、命令、资源和设置只在 Desktop Windows profile 生效。
 
-同日生产升级暴露 Personal Server 部署所有权和候选 projection 架构缺陷，生产已恢复原 `0.1.8` 且 ready。`0.2.1` 候选不保留旧架构兼容壳：宿主事务、服务 IPC、持久数据和 root-only 备份/诊断分属明确 owner 域；镜像、Caddy 镜像与 Caddyfile 只进入候选 projection，readiness 后整体原子提交，失败候选销毁前保留诊断。真实完整包已通过离线首装、同版本事务重装、备份恢复、不健康候选自动回滚、数据连续性、canonical env 哈希、Caddyfile 类型/挂载源及停机回收。根 `check:pr` 已通过；`0.2.1` 发布与生产复验仍待完成。
+同日生产升级暴露 Personal Server 部署所有权和候选 projection 架构缺陷；`0.2.1` 已完成 SDK、Personal Server、Adapter 和 Registry 发布并升级到生产，固定 OCI、完整包、readiness、原子 projection、Caddyfile 挂载和 Ops Bridge 均通过。然而生产 owner 复核继续发现宿主备份仍可能受 service-owned 父目录支配，因此 `0.2.1` 虽健康但不作为最终验收版本。后续 `0.2.2` 不做路径补丁或旧版兼容：ADR-0018 将持久态和运行态统一拆成 `host/`、`service/` 两棵 owner 树，聚合根不再直接承载 owner 数据；旧路径不进入探测、双读或 fallback。当前定向部署/Bridge 契约、宿主事务沙箱、58 项 Personal Server 测试与 Contract Spine 已通过；固定发布物、生产一次性离线迁移及完整验收仍在进行。
 
 2026-09-07 后续 Provider 连接测试切片基于已提交的 `75b10f8c` 推进：同一目标可复用已保存密钥，变更目标或清除密钥禁止复用；自定义网关路径、拒绝重定向、超时、响应限额与受控诊断已落实，精确规则见 [Configuration Reference](../reference/configuration.md#provider-连接测试)。12 项配置测试与 9 项 Gateway 测试通过，含真实本地 HTTP 请求及重定向反例；独立审查发现的非法标识审计泄露已修复并复审通过。未使用外部 Provider 或生产凭据验收。Kernel Vitest 配置已转为 `.mts`；全仓三个 Vite/Vitest 配置入口均使用 ESM，Extension SDK/Host 的 14 项测试及两个产品构建未出现 CJS Node API 弃用警告。后续排查规则进入测试与验收指南。
 
 M11 仍未完成的范围：
 
 - Extension：公开 SDK/npm、NapCat 精确发布物、默认 Registry stable 指针和 Ubuntu 公开安装事务已完成；未来产生获准的第二个完整版本候选时再完成跨版本升级失败恢复与回滚，并继续扩展激活及配置/Secret 的真实外部场景验收；
-- 发布 `0.2.1` SDK、Personal Server 与 NapCat Adapter 架构修订候选，并在 Personal Server 上完成 external OneBot 激活、配置/Secret 与真实 QQ 场景验收；
+- 发布 `0.2.2` SDK、Personal Server 与 NapCat Adapter 架构修订候选，按 ADR-0018 完成生产一次性离线迁移并删除旧 Personal Server 路径；随后完成 external OneBot 激活、配置/可选 Secret 与真实 QQ 场景验收；
 - 验证 Extension 私有 Skill、场景注意力、回复、Experience 与 Memory 的完整链路；
 - 生产运维：真实更新失败自动恢复、备份/恢复连续性、长运行及完整停机矩阵；
 - 把区域 HTTP(S)/OCI 传输副本保留为长期演化候选，只有真实需求出现后再实施。

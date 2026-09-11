@@ -25,3 +25,4 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 - [ADR-0015 工程自动化平面与交付生命周期分层](./ADR-0015-工程自动化平面与交付生命周期分层.md)（`accepted`；固定 owner-local 原子任务、薄编排、同构 CI、fixed artifact 与宿主级事务 owner）
 - [ADR-0016 仓库工具工作区与产品监督边界](./ADR-0016-仓库工具工作区与产品监督边界.md)（`accepted`；以 `tools/*` 私有叶子 workspace 承载长期跨仓工具，root `package.json` 只保留稳定 façade）
 - [ADR-0017 产品前端统一采用 React 组件驱动架构](./ADR-0017-产品前端统一采用React组件驱动架构.md)（`accepted`；第一方产品 UI 统一 React 组件模型，M11 正按垂直切片迁移 Personal Server；当前进度见 [Now](../../roadmap/now.md)）
+- [ADR-0018 Personal Server 宿主与服务状态分域](./ADR-0018-Personal%20Server宿主与服务状态分域.md)（`accepted`；持久态和运行态统一按 `host/`、`service/` owner 树隔离，不保留旧路径兼容主线）

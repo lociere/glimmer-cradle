@@ -105,14 +105,14 @@ export class DeploymentOperationsService {
         },
       };
     }
-    const stateRoot = await this.resolveStateRoot();
+    const hostStateRoot = await this.resolveHostStateRoot();
     const disabledReason = '当前 Product Host 未连接部署级外部事务 owner；宿主写操作不可用。';
-    const entries = await this.listBackups(stateRoot);
+    const entries = await this.listBackups(hostStateRoot);
     return {
       backup: {
         supported: false,
         disabled_reason: disabledReason,
-        backup_root: stateRoot ? path.join(stateRoot, 'data', 'backups') : undefined,
+        backup_root: hostStateRoot ? path.join(hostStateRoot, 'backups') : undefined,
         entries,
       },
       service: {
@@ -220,9 +220,9 @@ export class DeploymentOperationsService {
     }
   }
 
-  private async resolveStateRoot(): Promise<string | null> {
-    if (process.env.GLIMMER_CRADLE_STATE_ROOT?.trim()) {
-      return process.env.GLIMMER_CRADLE_STATE_ROOT.trim();
+  private async resolveHostStateRoot(): Promise<string | null> {
+    if (process.env.GLIMMER_CRADLE_HOST_STATE_ROOT?.trim()) {
+      return process.env.GLIMMER_CRADLE_HOST_STATE_ROOT.trim();
     }
     const envFile = this.options.deploymentEnvFile
       || process.env.GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE
@@ -231,13 +231,13 @@ export class DeploymentOperationsService {
       return null;
     }
     const content = await readFile(envFile, 'utf8');
-    const match = content.match(/^GLIMMER_CRADLE_STATE_ROOT=(.+)$/m);
+    const match = content.match(/^GLIMMER_CRADLE_HOST_STATE_ROOT=(.+)$/m);
     return match?.[1]?.trim() || null;
   }
 
-  private async listBackups(stateRoot: string | null): Promise<DeploymentBackupEntry[]> {
-    if (!stateRoot) return [];
-    const backupRoot = path.join(stateRoot, 'data', 'backups');
+  private async listBackups(hostStateRoot: string | null): Promise<DeploymentBackupEntry[]> {
+    if (!hostStateRoot) return [];
+    const backupRoot = path.join(hostStateRoot, 'backups');
     if (!await fileExists(backupRoot)) return [];
     const backups = [];
     for (const kind of ['manual', 'transaction', 'restore-safety']) {

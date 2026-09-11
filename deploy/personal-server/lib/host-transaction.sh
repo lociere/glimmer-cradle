@@ -123,10 +123,10 @@ host_transaction_validate_control_file() {
 }
 
 host_transaction_configure_paths() {
-  HOST_TRANSACTION_STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-}"
-  HOST_TRANSACTION_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}/host-owner}"
+  HOST_TRANSACTION_STATE_ROOT="${GLIMMER_CRADLE_HOST_STATE_ROOT:-}"
+  HOST_TRANSACTION_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}/host}"
   [[ -n "$HOST_TRANSACTION_STATE_ROOT" ]] || {
-    host_transaction_event transaction_validation_failed state_root_missing "$HOST_TRANSACTION_EXIT_MISSING"
+    host_transaction_event transaction_validation_failed host_state_root_missing "$HOST_TRANSACTION_EXIT_MISSING"
     return "$HOST_TRANSACTION_EXIT_MISSING"
   }
   HOST_TRANSACTION_JOURNAL_ROOT="${HOST_TRANSACTION_STATE_ROOT}/transactions"
@@ -156,7 +156,7 @@ host_transaction_prepare_namespace() {
   if [[ -e "$HOST_TRANSACTION_RUN_ROOT" ]]; then
     host_transaction_validate_trusted_tree "$HOST_TRANSACTION_RUN_ROOT" || return $?
   else
-    install -d -o 0 -g 0 -m 0755 "$HOST_TRANSACTION_RUN_ROOT"
+    install -d -o 0 -g 0 -m 0700 "$HOST_TRANSACTION_RUN_ROOT"
   fi
   host_transaction_validate_trusted_tree "$HOST_TRANSACTION_RUN_ROOT" || return $?
   if [[ -e "$HOST_TRANSACTION_STATE_ROOT" ]]; then

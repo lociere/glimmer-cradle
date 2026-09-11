@@ -9,17 +9,21 @@ ENV_TEMPLATE_FILE="${GLIMMER_CRADLE_ENV_TEMPLATE_FILE:-${SCRIPT_DIR}/.env.exampl
 DEPLOYMENT_ENV_FILE="${GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE:-${SCRIPT_DIR}/.env}"
 STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-${SCRIPT_DIR}/state}"
 RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
-HOST_RUN_ROOT="${GLIMMER_CRADLE_HOST_RUN_ROOT:-${RUN_ROOT}/host-owner}"
-SERVICE_RUN_ROOT="${GLIMMER_CRADLE_SERVICE_RUN_ROOT:-${RUN_ROOT}/service}"
+HOST_STATE_ROOT="${STATE_ROOT}/host"
+SERVICE_STATE_ROOT="${STATE_ROOT}/service"
+SERVICE_CONFIG_ROOT="${SERVICE_STATE_ROOT}/config"
+SERVICE_DATA_ROOT="${SERVICE_STATE_ROOT}/data"
+HOST_RUN_ROOT="${RUN_ROOT}/host"
+SERVICE_RUN_ROOT="${RUN_ROOT}/service"
 CONTAINER_RUN_ROOT="/run/glimmer-cradle"
 CONTAINER_OPS_BRIDGE_SOCKET="${CONTAINER_RUN_ROOT}/ops-bridge.sock"
 INSTALL_ROOT="${GLIMMER_CRADLE_INSTALL_ROOT:-${SCRIPT_DIR}}"
 CONFIG_ROOT="${GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT:-$(dirname -- "$DEPLOYMENT_ENV_FILE")}"
-BACKUP_ROOT="${STATE_ROOT}/data/backups"
+BACKUP_ROOT="${HOST_STATE_ROOT}/backups"
 MANUAL_BACKUP_ROOT="${BACKUP_ROOT}/manual"
 TRANSACTION_BACKUP_ROOT="${BACKUP_ROOT}/transaction"
 RESTORE_SAFETY_BACKUP_ROOT="${BACKUP_ROOT}/restore-safety"
-DEPLOY_DIAGNOSTICS_ROOT="${STATE_ROOT}/data/diagnostics/deploy"
+DEPLOY_DIAGNOSTICS_ROOT="${HOST_STATE_ROOT}/diagnostics/deploy"
 IMAGE_REPOSITORY="glimmer-cradle/personal-server"
 OPS_BRIDGE_CONTAINER="glimmer-cradle-ops-bridge"
 DOCKER_SOCKET_PATH="${GLIMMER_CRADLE_DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
@@ -120,6 +124,8 @@ prepare_environment() {
     set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_DEPLOYMENT_MODE source
   fi
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_HOST_STATE_ROOT "$HOST_STATE_ROOT"
+  set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVICE_STATE_ROOT "$SERVICE_STATE_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_HOST_RUN_ROOT "$HOST_RUN_ROOT"
   set_env_value "$DEPLOYMENT_ENV_FILE" GLIMMER_CRADLE_SERVICE_RUN_ROOT "$SERVICE_RUN_ROOT"
@@ -129,17 +135,14 @@ prepare_environment() {
 }
 
 prepare_state() {
-  mkdir -p "$STATE_ROOT/config" "$STATE_ROOT/data/state" "$STATE_ROOT/data/models" \
-    "$STATE_ROOT/data/packages" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" \
-    "$RESTORE_SAFETY_BACKUP_ROOT"
+  "${PRIVILEGED[@]}" install -d -o 0 -g 0 -m 0700 "$STATE_ROOT" "$HOST_STATE_ROOT" \
+    "$BACKUP_ROOT" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" \
+    "$RESTORE_SAFETY_BACKUP_ROOT" "$(dirname -- "$DEPLOY_DIAGNOSTICS_ROOT")" \
+    "$DEPLOY_DIAGNOSTICS_ROOT"
+  "${PRIVILEGED[@]}" install -d -o 10001 -g 10001 -m 0700 "$SERVICE_STATE_ROOT" \
+    "$SERVICE_CONFIG_ROOT" "$SERVICE_DATA_ROOT"
   "${PRIVILEGED[@]}" install -d -o 0 -g 0 -m 0700 "$HOST_RUN_ROOT"
   "${PRIVILEGED[@]}" install -d -o 10001 -g 10001 -m 0700 "$SERVICE_RUN_ROOT"
-  "${PRIVILEGED[@]}" chown 10001:10001 "$STATE_ROOT/data"
-  "${PRIVILEGED[@]}" chown -R 10001:10001 "$STATE_ROOT/config" "$STATE_ROOT/data/state" \
-    "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages"
-  "${PRIVILEGED[@]}" chmod 700 "$STATE_ROOT" "$STATE_ROOT/config" "$STATE_ROOT/data" \
-    "$STATE_ROOT/data/state" "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages" \
-    "$BACKUP_ROOT" "$MANUAL_BACKUP_ROOT" "$TRANSACTION_BACKUP_ROOT" "$RESTORE_SAFETY_BACKUP_ROOT"
 }
 
 set_env_value() {
@@ -173,6 +176,29 @@ read_env_file() {
   local value
   value="$(grep -E "^${key}=" "$file" | tail -n 1 | cut -d= -f2- || true)"
   printf '%s' "${value:-$fallback}"
+}
+
+validate_managed_root() {
+  local label="$1" target="$2" canonical
+  [[ "$target" == /* ]] || {
+    echo "${label} 必须是绝对路径: ${target}" >&2
+    return "$HOST_TRANSACTION_EXIT_USAGE"
+  }
+  canonical="$(realpath -m -- "$target" 2>/dev/null || true)"
+  [[ "$canonical" == "$target" ]] || {
+    echo "${label} 必须是规范路径且不能包含可消解别名: ${target}" >&2
+    return "$HOST_TRANSACTION_EXIT_USAGE"
+  }
+  case "$target" in
+    /|/etc|/opt|/run|/srv|/tmp|/usr|/var|/var/lib|/var/log|/var/cache)
+      echo "${label} 不能使用系统或共享根目录: ${target}" >&2
+      return "$HOST_TRANSACTION_EXIT_USAGE"
+      ;;
+  esac
+  [[ ! -L "$target" ]] || {
+    echo "${label} 不能是符号链接: ${target}" >&2
+    return "$HOST_TRANSACTION_EXIT_RECOVERY_REQUIRED"
+  }
 }
 
 create_previous_compose_env() {
@@ -372,6 +398,7 @@ start_ops_bridge() {
     --group-add "$docker_gid" \
     --entrypoint /usr/local/bin/node \
     --env GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT" \
+    --env GLIMMER_CRADLE_HOST_STATE_ROOT="$HOST_STATE_ROOT" \
     --env GLIMMER_CRADLE_RUN_ROOT="$CONTAINER_RUN_ROOT" \
     --env GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT" \
     --env GLIMMER_CRADLE_DEPLOYMENT_ENV_FILE="$DEPLOYMENT_ENV_FILE" \
@@ -412,11 +439,12 @@ wait_until_ops_bridge_ready() {
 
 stop_ops_bridge() {
   "${DOCKER[@]}" rm -f "$OPS_BRIDGE_CONTAINER" >/dev/null 2>&1 || true
-  "${PRIVILEGED[@]}" rm -f -- "${RUN_ROOT}/ops-bridge.sock"
+  "${PRIVILEGED[@]}" rm -f -- "${SERVICE_RUN_ROOT}/ops-bridge.sock"
 }
 
 create_backup() {
-  local kind="${1:-transaction}" root timestamp backup_dir counter=0
+  local kind="${1:-transaction}" root timestamp backup_dir counter=0 relative
+  local -a data_entries=()
   case "$kind" in
     manual) root="$MANUAL_BACKUP_ROOT" ;;
     transaction) root="$TRANSACTION_BACKUP_ROOT" ;;
@@ -430,9 +458,42 @@ create_backup() {
     backup_dir="${root}/${timestamp}-$(printf '%02d' "$counter")"
   done
   mkdir -p "$backup_dir"
-  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/config.tar.gz" config
-  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -czf "$backup_dir/data.tar.gz" \
-    data/state data/models data/packages
+  if [[ ! -d "$SERVICE_CONFIG_ROOT" || -L "$SERVICE_CONFIG_ROOT" ]]; then
+    "${PRIVILEGED[@]}" rm -rf -- "$backup_dir"
+    echo "服务配置根不是可信目录，备份已拒绝。" >&2
+    return "$HOST_TRANSACTION_EXIT_FAILED"
+  fi
+  for relative in data/state data/models data/packages; do
+    if [[ -L "${SERVICE_STATE_ROOT}/${relative}" \
+      || ( -e "${SERVICE_STATE_ROOT}/${relative}" && ! -d "${SERVICE_STATE_ROOT}/${relative}" ) ]]; then
+      "${PRIVILEGED[@]}" rm -rf -- "$backup_dir"
+      echo "服务状态包含链接或非目录项，备份已拒绝: ${relative}" >&2
+      return "$HOST_TRANSACTION_EXIT_FAILED"
+    fi
+    [[ ! -d "${SERVICE_STATE_ROOT}/${relative}" ]] || data_entries+=("$relative")
+  done
+  if ! "${PRIVILEGED[@]}" tar -C "$SERVICE_STATE_ROOT" -czf "$backup_dir/config.tar.gz" config; then
+    "${PRIVILEGED[@]}" rm -rf -- "$backup_dir"
+    echo "服务配置归档失败，备份已拒绝。" >&2
+    return "$HOST_TRANSACTION_EXIT_FAILED"
+  fi
+  if (( ${#data_entries[@]} > 0 )); then
+    "${PRIVILEGED[@]}" tar -C "$SERVICE_STATE_ROOT" -czf "$backup_dir/data.tar.gz" \
+      -- "${data_entries[@]}" || {
+        "${PRIVILEGED[@]}" rm -rf -- "$backup_dir"
+        echo "服务数据归档失败，备份已拒绝。" >&2
+        return "$HOST_TRANSACTION_EXIT_FAILED"
+      }
+  else
+    "${PRIVILEGED[@]}" tar -C "$SERVICE_STATE_ROOT" -czf "$backup_dir/data.tar.gz" \
+      --files-from /dev/null
+  fi
+  if ! assert_archive_root "$backup_dir/config.tar.gz" config \
+    || ! assert_archive_root "$backup_dir/data.tar.gz" data; then
+    "${PRIVILEGED[@]}" rm -rf -- "$backup_dir"
+    echo "服务状态包含不可恢复的链接或越界项，备份已拒绝。" >&2
+    return "$HOST_TRANSACTION_EXIT_FAILED"
+  fi
   "${PRIVILEGED[@]}" chown -R "$(id -u):$(id -g)" "$backup_dir"
   (
     cd "$backup_dir"
@@ -480,10 +541,10 @@ restore_backup() {
   )
   assert_archive_root "$backup_dir/config.tar.gz" config
   assert_archive_root "$backup_dir/data.tar.gz" data
-  "${PRIVILEGED[@]}" rm -rf -- "$STATE_ROOT/config" "$STATE_ROOT/data/state" \
-    "$STATE_ROOT/data/models" "$STATE_ROOT/data/packages"
-  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/config.tar.gz"
-  "${PRIVILEGED[@]}" tar -C "$STATE_ROOT" -xzf "$backup_dir/data.tar.gz"
+  "${PRIVILEGED[@]}" rm -rf -- "$SERVICE_CONFIG_ROOT" "$SERVICE_DATA_ROOT/state" \
+    "$SERVICE_DATA_ROOT/models" "$SERVICE_DATA_ROOT/packages"
+  "${PRIVILEGED[@]}" tar -C "$SERVICE_STATE_ROOT" -xzf "$backup_dir/config.tar.gz"
+  "${PRIVILEGED[@]}" tar -C "$SERVICE_STATE_ROOT" -xzf "$backup_dir/data.tar.gz"
   prepare_state
 }
 
@@ -785,14 +846,23 @@ validate_query_environment() {
     return "$HOST_TRANSACTION_EXIT_MISSING"
   }
   STATE_ROOT="$(grep '^GLIMMER_CRADLE_STATE_ROOT=' "$DEPLOYMENT_ENV_FILE" | tail -n1 | cut -d= -f2-)"
-  [[ "$STATE_ROOT" == /* && "$(realpath -m -- "$STATE_ROOT" 2>/dev/null || true)" == "$STATE_ROOT" ]] || {
+  HOST_STATE_ROOT="$(grep '^GLIMMER_CRADLE_HOST_STATE_ROOT=' "$DEPLOYMENT_ENV_FILE" | tail -n1 | cut -d= -f2-)"
+  SERVICE_STATE_ROOT="$(grep '^GLIMMER_CRADLE_SERVICE_STATE_ROOT=' "$DEPLOYMENT_ENV_FILE" | tail -n1 | cut -d= -f2-)"
+  SERVICE_CONFIG_ROOT="${SERVICE_STATE_ROOT}/config"
+  SERVICE_DATA_ROOT="${SERVICE_STATE_ROOT}/data"
+  [[ "$HOST_STATE_ROOT" == "${STATE_ROOT}/host" \
+    && "$SERVICE_STATE_ROOT" == "${STATE_ROOT}/service" ]] || {
+    host_transaction_event deployment_query_failed owner_root_projection_invalid "$HOST_TRANSACTION_EXIT_USAGE"
+    return "$HOST_TRANSACTION_EXIT_USAGE"
+  }
+  validate_managed_root GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT" || {
     host_transaction_event deployment_query_failed state_root_invalid "$HOST_TRANSACTION_EXIT_USAGE"
     return "$HOST_TRANSACTION_EXIT_USAGE"
   }
 }
 
 print_transaction_state() {
-  local transaction_file="${STATE_ROOT}/transactions/current.json"
+  local transaction_file="${HOST_STATE_ROOT}/transactions/current.json"
   if [[ -f "$transaction_file" && ! -L "$transaction_file" && -r "$transaction_file" ]]; then
     printf 'host_transaction='
     cat -- "$transaction_file"
@@ -844,6 +914,11 @@ main() {
     exit "$HOST_TRANSACTION_EXIT_USAGE"
   }
 
+  validate_managed_root GLIMMER_CRADLE_INSTALL_ROOT "$INSTALL_ROOT"
+  validate_managed_root GLIMMER_CRADLE_STATE_ROOT "$STATE_ROOT"
+  validate_managed_root GLIMMER_CRADLE_RUN_ROOT "$RUN_ROOT"
+  validate_managed_root GLIMMER_CRADLE_DEPLOYMENT_CONFIG_ROOT "$CONFIG_ROOT"
+
   if ! docker info >/dev/null 2>&1; then
     if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
       DOCKER=(sudo docker)
@@ -866,7 +941,11 @@ main() {
   trap 'exit 143' TERM
 
   export GLIMMER_CRADLE_RUN_ROOT="$RUN_ROOT"
+  export GLIMMER_CRADLE_STATE_ROOT="$STATE_ROOT"
+  export GLIMMER_CRADLE_HOST_STATE_ROOT="$HOST_STATE_ROOT"
+  export GLIMMER_CRADLE_SERVICE_STATE_ROOT="$SERVICE_STATE_ROOT"
   export GLIMMER_CRADLE_HOST_RUN_ROOT="$HOST_RUN_ROOT"
+  "${PRIVILEGED[@]}" install -d -o 0 -g 0 -m 0700 "$STATE_ROOT"
   host_transaction_acquire "deploy.${COMMAND}"
   prepare_environment
   prepare_state

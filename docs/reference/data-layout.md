@@ -105,7 +105,7 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 
 未列出的无 owner 容器目录不属于当前契约。大对象必须由明确 owner 归入 `state/`、`models/`、`packages/` 或 `work/`；短生命周期协调信息只能进入 `run/`，短生命周期处理材料只能进入 `work/` 或操作系统临时目录。
 
-开发态和便携部署默认使用 `data/run/`。正式 Desktop 可将 RunRoot 映射到应用用户域；Linux Personal Server 使用 `/run/glimmer-cradle/` 作为基目录，并把 root-owned 宿主事务域 `host-owner/` 与 UID 10001-owned 服务 IPC 域 `service/` 物理分离；只有后者映射为容器内规范 `/run/glimmer-cradle/`。Personal Server 的持久状态根由宿主控制，实际 bind source `config/`、`data/` 由 UID/GID 10001 拥有；`data/backups/` 和 `data/diagnostics/deploy/` 是其中独立的 root-only 子域。业务代码仍只依赖容器内 `GLIMMER_CRADLE_RUN_ROOT`/RunRoot resolver，不感知宿主目录布局。
+开发态和便携部署默认使用 `data/run/`。正式 Desktop 可将 RunRoot 映射到应用用户域；Linux Personal Server 的持久态和运行态都按 owner 对称分域：`/var/lib/glimmer-cradle/host/` 与 `/run/glimmer-cradle/host/` 由 root-owned 宿主事务 owner 持有，`/var/lib/glimmer-cradle/service/` 与 `/run/glimmer-cradle/service/` 由 UID 10001 服务持有。只有 service 配置、数据和 IPC 被投影为容器内规范 `/var/lib/glimmer-cradle/{config,data}` 与 `/run/glimmer-cradle/`；业务代码不感知宿主目录布局。宿主事务备份和部署诊断不能进入 service-owned 父目录。
 
 ## 迁移规则
 
@@ -117,4 +117,4 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 
 操作见 [数据迁移与恢复](../guides/operations/数据迁移与恢复.md)，部署映射见 [Packaging Layout Reference](./packaging-layout.md)。
 
-Personal Server 将该备份域投影为宿主 `/var/lib/glimmer-cradle/backups/<UTC timestamp>/`。每个部署备份包含 `config.tar.gz`、`data.tar.gz`、`SHA256SUMS` 与事务元数据；`glimmer-cradle backup` 和 `restore` 是唯一受支持的宿主备份恢复入口，恢复不接受备份域外路径。
+Personal Server 将部署备份域固定为宿主 `/var/lib/glimmer-cradle/host/backups/<kind>/<UTC timestamp>/`。每个部署备份包含 `config.tar.gz`、`data.tar.gz`、`SHA256SUMS` 与事务元数据；`glimmer-cradle backup` 和 `restore` 是唯一受支持的宿主备份恢复入口，恢复不接受备份域外路径。它与应用 owner 可使用的 `data/backups/` 不是同一目录或权限域。

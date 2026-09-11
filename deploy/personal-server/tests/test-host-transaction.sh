@@ -24,7 +24,7 @@ STATE="${ROOT}/state"
 RUN="${ROOT}/run"
 READY="${ROOT}/holder.ready"
 RELEASE="${ROOT}/holder.release"
-env GLIMMER_CRADLE_STATE_ROOT="$STATE" GLIMMER_CRADLE_RUN_ROOT="$RUN" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="$STATE" GLIMMER_CRADLE_RUN_ROOT="$RUN" \
   READY="$READY" RELEASE="$RELEASE" bash -c '
     set -Eeuo pipefail
     source "$1"
@@ -37,7 +37,7 @@ env GLIMMER_CRADLE_STATE_ROOT="$STATE" GLIMMER_CRADLE_RUN_ROOT="$RUN" \
 HOLDER=$!
 wait_file "$READY"
 set +e
-env GLIMMER_CRADLE_STATE_ROOT="$STATE" GLIMMER_CRADLE_RUN_ROOT="$RUN" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="$STATE" GLIMMER_CRADLE_RUN_ROOT="$RUN" \
   bash -c 'source "$1"; host_transaction_acquire test.contender' bash "$LIB" \
   >"${ROOT}/contender.out" 2>"${ROOT}/contender.err"
 CODE=$?
@@ -51,7 +51,7 @@ grep -q '"phase":"committed"' "${STATE}/transactions/current.json"
 SPOOF="${ROOT}/spoof"
 mkdir -p "$SPOOF"
 set +e
-env GLIMMER_CRADLE_STATE_ROOT="${ROOT}/spoof-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/spoof-run" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="${ROOT}/spoof-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/spoof-run" \
   GLIMMER_CRADLE_TRANSACTION_ID=forged GLIMMER_CRADLE_TRANSACTION_OPERATION=test.forged \
   bash -c 'exec 9>"$2"; source "$1"; host_transaction_acquire test.forged' \
   bash "$LIB" "${SPOOF}/unrelated" 2>"${ROOT}/spoof.err"
@@ -64,7 +64,7 @@ SAFE="${ROOT}/safe"
 mkdir -p "$SAFE"
 ln -s "$SAFE" "${ROOT}/symlink-run"
 set +e
-env GLIMMER_CRADLE_STATE_ROOT="${ROOT}/symlink-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/symlink-run" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="${ROOT}/symlink-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/symlink-run" \
   bash -c 'source "$1"; host_transaction_acquire test.symlink' bash "$LIB" 2>"${ROOT}/symlink.err"
 CODE=$?
 set -e
@@ -73,7 +73,7 @@ set -e
 mkdir -p "${ROOT}/user-run"
 chown 65534:65534 "${ROOT}/user-run"
 set +e
-env GLIMMER_CRADLE_STATE_ROOT="${ROOT}/user-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/user-run" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="${ROOT}/user-state" GLIMMER_CRADLE_RUN_ROOT="${ROOT}/user-run" \
   bash -c 'source "$1"; host_transaction_acquire test.user' bash "$LIB" 2>"${ROOT}/user.err"
 CODE=$?
 set -e
@@ -82,7 +82,7 @@ set -e
 REPLACE_STATE="${ROOT}/replace-state"
 REPLACE_RUN="${ROOT}/replace-run"
 set +e
-env GLIMMER_CRADLE_STATE_ROOT="$REPLACE_STATE" GLIMMER_CRADLE_RUN_ROOT="$REPLACE_RUN" \
+env GLIMMER_CRADLE_HOST_STATE_ROOT="$REPLACE_STATE" GLIMMER_CRADLE_RUN_ROOT="$REPLACE_RUN" \
   bash -c '
     source "$1"
     host_transaction_acquire test.replace
@@ -101,6 +101,8 @@ mkdir -p "$QUERY"
 : >"${QUERY}/sudo.log"
 cat >"${QUERY}/deployment.env" <<EOF
 GLIMMER_CRADLE_STATE_ROOT=${QUERY}/state
+GLIMMER_CRADLE_HOST_STATE_ROOT=${QUERY}/state/host
+GLIMMER_CRADLE_SERVICE_STATE_ROOT=${QUERY}/state/service
 GLIMMER_CRADLE_DEPLOYMENT_MODE=image
 EOF
 BEFORE="$(sha256sum "${QUERY}/deployment.env")"
@@ -188,5 +190,23 @@ CODE=$?
 set -e
 [[ "$CODE" == 78 ]]
 grep -q 'safety compensation did not recover' "${RECOVERY}/restore-readiness.action"
+
+UNTRUSTED="${ROOT}/untrusted-service"
+mkdir -p "${UNTRUSTED}/service/config" "${UNTRUSTED}/service/data/models" \
+  "${UNTRUSTED}/service/data/packages" "${UNTRUSTED}/outside" "${UNTRUSTED}/host/backups/manual"
+ln -s "${UNTRUSTED}/outside" "${UNTRUSTED}/service/data/state"
+set +e
+UNTRUSTED="$UNTRUSTED" DEPLOY="$DEPLOY" bash -c '
+  source "$DEPLOY"
+  SERVICE_STATE_ROOT="$UNTRUSTED/service"
+  MANUAL_BACKUP_ROOT="$UNTRUSTED/host/backups/manual"
+  PRIVILEGED=()
+  create_backup manual
+' >"${UNTRUSTED}/backup.out" 2>"${UNTRUSTED}/backup.err"
+CODE=$?
+set -e
+[[ "$CODE" == 70 ]]
+grep -q '备份已拒绝' "${UNTRUSTED}/backup.err"
+[[ -z "$(find "${UNTRUSTED}/host/backups/manual" -mindepth 1 -maxdepth 1 -print -quit)" ]]
 
 printf 'host transaction sandbox tests passed\n'

@@ -121,8 +121,9 @@ in-toto attestation。release job 只下载该 fixed artifact 后发布，不再
 |---|---|
 | `/opt/glimmer-cradle/app` | 只读应用与 Python 环境 |
 | `/opt/glimmer-cradle/default-config` | 只读首次配置模板 |
-| `/var/lib/glimmer-cradle/config` | 用户配置挂载 |
-| `/var/lib/glimmer-cradle/data` | 用户数据挂载 |
+| `/var/lib/glimmer-cradle/service/config` | UID 10001 应用配置 bind source |
+| `/var/lib/glimmer-cradle/service/data` | UID 10001 应用数据 bind source |
+| `/var/lib/glimmer-cradle/host` | root-only 事务 journal、备份与部署诊断 |
 | `/run/glimmer-cradle` | 宿主同路径协调根；包含 transaction lock 与 Ops Bridge socket |
 
 标准镜像包含 Cognition、云端 TTS 所需代码和经完整性验证的 Caddy，不包含 ASR 依赖、FunASR 模型、Embedding 本地模型、私人 Avatar、真实 secret 或本机数据。应用和 Caddy 服务复用同一个 digest 固定的 OCI 传输单元，但仍是两个容器、两个主进程和两套权限边界；应用容器不直接发布 `3210` 到宿主机。目标服务器默认只访问 GitHub Release 与 GHCR，不为宿主就绪检查或入口服务额外拉取 Docker Hub 镜像。

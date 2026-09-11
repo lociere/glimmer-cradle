@@ -36,7 +36,14 @@ test('source mode 不伪装 Ops 支持，宿主事务与服务 IPC 使用不同 
   assert.match(deploy, /GLIMMER_CRADLE_HOST_RUN_ROOT="\$HOST_RUN_ROOT"/);
   assert.match(deploy, /install -d -o 0 -g 0 -m 0700 "\$HOST_RUN_ROOT"/);
   assert.match(deploy, /install -d -o 10001 -g 10001 -m 0700 "\$SERVICE_RUN_ROOT"/);
-  assert.match(deploy, /chown 10001:10001 "\$STATE_ROOT\/data"/);
+  assert.match(deploy, /HOST_STATE_ROOT="\$\{STATE_ROOT\}\/host"/);
+  assert.match(deploy, /SERVICE_STATE_ROOT="\$\{STATE_ROOT\}\/service"/);
+  assert.match(deploy, /install -d -o 10001 -g 10001 -m 0700 "\$SERVICE_STATE_ROOT"/);
+  assert.doesNotMatch(deploy, /chown -R 10001:10001/);
+  assert.match(deploy, /assert_archive_root "\$backup_dir\/config\.tar\.gz" config/);
+  assert.match(deploy, /BACKUP_ROOT="\$\{HOST_STATE_ROOT\}\/backups"/);
+  assert.match(deploy, /DEPLOY_DIAGNOSTICS_ROOT="\$\{HOST_STATE_ROOT\}\/diagnostics\/deploy"/);
+  assert.match(compose, /GLIMMER_CRADLE_SERVICE_STATE_ROOT:-\.\/state\/service/);
 });
 
 test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bind source', () => {

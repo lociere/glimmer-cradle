@@ -18,7 +18,7 @@
       "owner": "Kernel Config Application owner",
       "kind": "Document",
       "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "2597e0da4accba8778550396b2110a43a14828ee30f32b75bbb509fcc744895d"
+      "sha256": "b6dafd7b0d5b26637551e4a40669855c82b29e6baa224b3827c48e27bffde4d9"
     },
     {
       "path": "json-schema/config/v1/audio-config.schema.json",

@@ -9,7 +9,27 @@ fi
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/host-transaction.sh"
 export GLIMMER_CRADLE_STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT:-/var/lib/glimmer-cradle}"
+export GLIMMER_CRADLE_HOST_STATE_ROOT="${GLIMMER_CRADLE_STATE_ROOT}/host"
 export GLIMMER_CRADLE_RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT:-/run/glimmer-cradle}"
+export GLIMMER_CRADLE_HOST_RUN_ROOT="${GLIMMER_CRADLE_RUN_ROOT}/host"
+for managed_root in "$GLIMMER_CRADLE_STATE_ROOT" "$GLIMMER_CRADLE_RUN_ROOT"; do
+  [[ "$managed_root" == /* && "$(realpath -m -- "$managed_root")" == "$managed_root" ]] || {
+    echo "受管根必须是绝对规范路径: ${managed_root}" >&2
+    exit 64
+  }
+  case "$managed_root" in
+    /|/etc|/opt|/run|/srv|/tmp|/usr|/var|/var/lib|/var/log|/var/cache)
+      echo "拒绝把系统或共享根作为受管根: ${managed_root}" >&2
+      exit 64
+      ;;
+  esac
+  [[ ! -L "$managed_root" ]] || {
+    echo "受管根不能是符号链接: ${managed_root}" >&2
+    exit 78
+  }
+done
+install -d -o 0 -g 0 -m 0700 "$GLIMMER_CRADLE_STATE_ROOT"
+install -d -o 0 -g 0 -m 0755 "$GLIMMER_CRADLE_RUN_ROOT"
 finish_bootstrap_transaction() {
   local exit_code=$?
   trap - EXIT INT TERM

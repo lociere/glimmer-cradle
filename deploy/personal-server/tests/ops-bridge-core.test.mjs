@@ -13,7 +13,7 @@ import {
 } from '../container/ops-bridge-handoff.mjs';
 
 const snapshot = {
-  backup: { supported: true, backup_root: '/srv/gc/state/data/backups', entries: [] },
+  backup: { supported: true, backup_root: '/srv/gc/state/backups', entries: [] },
   service: { restart_supported: true, stop_supported: true },
   update: {
     check_supported: false,
@@ -153,6 +153,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
       image: `example.invalid/personal-server@sha256:${'a'.repeat(64)}`,
       installRoot: '/srv/glimmer/install',
       stateRoot: '/srv/glimmer/state',
+      hostStateRoot: '/srv/glimmer/state/host',
       hostRunRoot: '/srv/glimmer/run',
       bridgeRunRoot: '/run/glimmer-cradle',
       deploymentEnvFile: '/srv/glimmer/config/deployment.env',
@@ -171,6 +172,7 @@ describe('Personal Server Ops Bridge external handoff', () => {
       '/run/glimmer-cradle/handoff/deployment_op_contract.result.json',
     );
     assert.ok(built.args.includes('GLIMMER_CRADLE_RUN_ROOT=/srv/glimmer/run'));
+    assert.ok(built.args.includes('GLIMMER_CRADLE_HOST_STATE_ROOT=/srv/glimmer/state/host'));
     assert.ok(built.args.includes('type=bind,src=/srv/glimmer/run,dst=/srv/glimmer/run'));
     assert.ok(built.args.includes(
       'GLIMMER_CRADLE_HANDOFF_RESULT=/srv/glimmer/run/handoff/deployment_op_contract.result.json',
@@ -376,6 +378,7 @@ function fixtureConfig(root, runDocker) {
     image: `example.invalid/personal-server@sha256:${'a'.repeat(64)}`,
     installRoot: root,
     stateRoot: root,
+    hostStateRoot: `${root}/host`,
     hostRunRoot: root,
     bridgeRunRoot: root,
     deploymentEnvFile: `${root}/deployment.env`,

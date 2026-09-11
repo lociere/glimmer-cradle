@@ -2,7 +2,7 @@ name: glimmer-cradle
 
 services:
   personal-server:
-    image: ${GLIMMER_CRADLE_IMAGE:-glimmer-cradle/personal-server:0.2.1}
+    image: ${GLIMMER_CRADLE_IMAGE:-glimmer-cradle/personal-server:0.2.2}
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -10,8 +10,8 @@ services:
       GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET: ${GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET:-/run/glimmer-cradle/ops-bridge.sock}
       GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN: ${GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN:?set GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN in .env}
     volumes:
-      - ${GLIMMER_CRADLE_STATE_ROOT:-./state}/config:/var/lib/glimmer-cradle/config
-      - ${GLIMMER_CRADLE_STATE_ROOT:-./state}/data:/var/lib/glimmer-cradle/data
+      - ${GLIMMER_CRADLE_SERVICE_STATE_ROOT:-./state/service}/config:/var/lib/glimmer-cradle/config
+      - ${GLIMMER_CRADLE_SERVICE_STATE_ROOT:-./state/service}/data:/var/lib/glimmer-cradle/data
       - ${GLIMMER_CRADLE_SERVICE_RUN_ROOT:-./run/service}:/run/glimmer-cradle
     tmpfs:
       - /tmp:uid=10001,gid=10001,mode=1777
@@ -37,7 +37,7 @@ services:
       - internal
 
   caddy:
-    image: ${GLIMMER_CRADLE_CADDY_IMAGE:-glimmer-cradle/personal-server:0.2.1}
+    image: ${GLIMMER_CRADLE_CADDY_IMAGE:-glimmer-cradle/personal-server:0.2.2}
     entrypoint:
       - /usr/local/bin/caddy
     command:

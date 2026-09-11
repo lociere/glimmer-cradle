@@ -13,6 +13,7 @@ import {
 const socketPath = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET || '/run/glimmer-cradle/ops-bridge.sock';
 const token = process.env.GLIMMER_CRADLE_OPERATIONS_BRIDGE_TOKEN || '';
 const stateRoot = process.env.GLIMMER_CRADLE_STATE_ROOT || '/var/lib/glimmer-cradle';
+const hostStateRoot = process.env.GLIMMER_CRADLE_HOST_STATE_ROOT || path.join(stateRoot, 'host');
 const runRoot = process.env.GLIMMER_CRADLE_RUN_ROOT || '/run/glimmer-cradle';
 const hostRunRoot = process.env.GLIMMER_CRADLE_HOST_RUN_ROOT || '';
 const hostReleaseRoot = process.env.GLIMMER_CRADLE_HOST_RELEASE_ROOT || '/opt/glimmer-cradle/current';
@@ -42,6 +43,7 @@ const handoffConfig = {
   image: transactionImage,
   installRoot: hostInstallRoot,
   stateRoot,
+  hostStateRoot,
   hostRunRoot,
   bridgeRunRoot: runRoot,
   deploymentEnvFile,
@@ -127,7 +129,7 @@ async function snapshot(availableVersion) {
     backup: {
       supported: commandAvailable,
       disabled_reason: commandAvailable ? undefined : '外部宿主事务 owner 未完整配置。',
-      backup_root: path.join(stateRoot, 'data', 'backups'),
+      backup_root: path.join(hostStateRoot, 'backups'),
       entries: await listBackups(),
     },
     service: {
@@ -147,7 +149,7 @@ async function snapshot(availableVersion) {
 }
 
 async function listBackups() {
-  const backupRoot = path.join(stateRoot, 'data', 'backups');
+  const backupRoot = path.join(hostStateRoot, 'backups');
   if (!existsSync(backupRoot)) return [];
   const backups = [];
   for (const kind of ['manual', 'transaction', 'restore-safety']) {

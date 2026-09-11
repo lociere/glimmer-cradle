@@ -66,15 +66,15 @@ GitHub 自动附加的 `Source code (zip)` 与 `Source code (tar.gz)` 是 tag �
 | 路径 | 归属 |
 |---|---|
 | `/etc/glimmer-cradle/deployment.env` | 宿主部署配置与访问 token |
-| `/var/lib/glimmer-cradle/config/` | 应用配置和 secret |
-| `/var/lib/glimmer-cradle/data/` | 记忆、经历、扩展包与可观测数据 |
-| `/var/lib/glimmer-cradle/data/backups/{manual,transaction,restore-safety}/` | 手工、事务与恢复安全快照的独立保留域 |
-| `/var/lib/glimmer-cradle/data/diagnostics/deploy/<transaction-id>/` | 失败候选销毁前保存的 Compose 状态与日志 |
-| `/run/glimmer-cradle/host-owner/` | root-owned 宿主事务锁、handoff 与短生命周期 owner 状态 |
+| `/var/lib/glimmer-cradle/service/config/` | UID 10001 应用配置和 secret |
+| `/var/lib/glimmer-cradle/service/data/` | UID 10001 记忆、经历、扩展包与可观测数据 |
+| `/var/lib/glimmer-cradle/host/backups/{manual,transaction,restore-safety}/` | root-only 手工、事务与恢复安全快照 |
+| `/var/lib/glimmer-cradle/host/diagnostics/deploy/<transaction-id>/` | root-only 失败候选 Compose 状态与日志 |
+| `/run/glimmer-cradle/host/` | root-owned 宿主事务锁、handoff 与短生命周期状态 |
 | `/run/glimmer-cradle/service/` | UID 10001-owned 服务 IPC；只映射为容器内 `/run/glimmer-cradle/` |
 | `/usr/local/bin/glimmer-cradle` | 稳定运维命令 |
 
-重复执行同一命令是幂等的，但同镜像重装仍会经过统一事务以核对完整部署 projection。候选镜像、Caddy 镜像与 Caddyfile 只写入临时 projection；readiness 成功后 canonical `deployment.env` 才原子切换。失败时先把候选状态和日志写入 root-only 诊断目录，再从未污染的 previous projection 恢复上一镜像、入口配置和状态，不拼接新旧发布路径。宿主持久状态根由 root 控制，容器挂载的 `config/`、`data/` 与服务 IPC 域由 UID/GID 10001 拥有，备份和部署诊断则保持独立的 root-only 子域。
+重复执行同一命令是幂等的，但同镜像重装仍会经过统一事务以核对完整部署 projection。候选镜像、Caddy 镜像与 Caddyfile 只写入临时 projection；readiness 成功后 canonical `deployment.env` 才原子切换。失败时先把候选状态和日志写入 root-only 诊断目录，再从未污染的 previous projection 恢复上一镜像、入口配置和状态，不拼接新旧发布路径。宿主持久状态根由 root 控制，容器挂载的 `config/`、`data/` 与服务 IPC 域由 UID/GID 10001 拥有；备份与部署诊断位于 service-owned `data/` 的同级 root 控制域，服务身份不能通过父目录重命名或删除它们。
 
 ## 受限网络与区域分发
 
@@ -132,17 +132,17 @@ Web 运维请求使用可恢复的 `operation_id`。accepted/started 后页面�
 error 都是失败/需处理结果，不表示成功。当前 update check/apply 因没有固定 candidate 到
 `install-release.sh` 的不可漂移绑定而明确 unsupported，不执行独立网络检查或假更新。
 
-首次启动会把只读默认模板补充到 `/var/lib/glimmer-cradle/config/`，不会覆盖已有文件。真实 provider key 只写入：
+首次启动会把只读默认模板补充到 `/var/lib/glimmer-cradle/service/config/`，不会覆盖已有文件。真实 provider key 只写入：
 
 ```text
-/var/lib/glimmer-cradle/config/secrets/secrets.yaml
+/var/lib/glimmer-cradle/service/config/secrets/secrets.yaml
 ```
 
 至少配置一个 LLM provider，然后执行 `sudo glimmer-cradle restart`。启用 TTS 或 Embedding 时分别修改 `system/audio.yaml`、`system/embedding.yaml` 并提供对应 secret；保持 `disabled` 不会阻止基础服务就绪。
 
 当前版本的 Extension 页面已接入统一安装事务：仓库 Release、Registry、Release Manifest 和浏览器本地 `.gcex` 都会进入同一 `prepare -> preview -> commit` 主线，并展示兼容性、权限、摘要/信任元数据与失败原因。浏览器本地包不会提交服务器绝对路径；页面只会把 `.gcex` 字节流上传到 Product Host owned 临时目录并换取 opaque `upload_id`，后续 prepare/commit/cancel 必须属于当前登录会话，断线会取消已预览未提交事务。安装前仍必须确认包的 `products`、`platforms` 和所需 `features` 包含当前 Personal Server 组合；只声明 `desktop` 或 `windows-x64` 的包会被正确拒绝。
 
-需要 Secret 的扩展使用 `/var/lib/glimmer-cradle/config/secrets/extensions/<extension-id>.yaml`。文件内容只能是该扩展定义的字符串键值；具体 key 由扩展自己的文档拥有。Kernel 仅在扩展声明且用户确认 `SECRET_READ_SELF` 后，允许对应隔离 Host 通过 `ctx.ports.secrets.get(key)` 按需读取；普通扩展配置、Control Center 读取响应和运行投影都不返回明文。修改后重启或重新激活该扩展。
+需要 Secret 的扩展使用 `/var/lib/glimmer-cradle/service/config/secrets/extensions/<extension-id>.yaml`。不需要 Secret 的扩展不创建该文件，也不申请 `SECRET_READ_SELF`。文件内容只能是该扩展定义的字符串键值；具体 key 由扩展自己的文档拥有。Kernel 仅在扩展声明且用户确认该权限后，允许对应隔离 Host 通过 `ctx.ports.secrets.get(key)` 按需读取；普通扩展配置、Control Center 读取响应和运行投影都不返回明文。修改后重启或重新激活该扩展。
 
 ## 域名与 HTTPS
 
@@ -173,7 +173,7 @@ sudo glimmer-cradle restore <UTC时间戳目录名>
 
 写事务竞争时命令返回 75，并在结构化诊断中给出当前 owner；不要删除 `host.lock` 抢锁。
 若补偿不能恢复操作前服务或数据，终态为 `recovery_required`、退出码 78。此时先读取
-`/var/lib/glimmer-cradle/transactions/current.json` 的 `recovery_action` 与 `events.jsonl`，
+`/var/lib/glimmer-cradle/host/transactions/current.json` 的 `recovery_action` 与 `events.jsonl`，
 完成所列人工恢复并确认服务/数据一致后再重试。`status/logs` 不获取写锁，也不会隐式 sudo
 或初始化 token/env/state。
 

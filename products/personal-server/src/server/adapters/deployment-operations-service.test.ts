@@ -52,7 +52,7 @@ describe('DeploymentOperationsService', () => {
 
   it('只读 fallback 能读取分域备份摘要但不声明写能力', async () => {
     const fixture = createFixture();
-    const backup = path.join(fixture.stateRoot, 'data', 'backups', 'manual', '20260729T010203Z');
+    const backup = path.join(fixture.hostStateRoot, 'backups', 'manual', '20260729T010203Z');
     mkdirSync(backup, { recursive: true });
     writeFileSync(path.join(backup, 'deployment.env'), 'status=manual\n');
     const service = new DeploymentOperationsService({
@@ -193,10 +193,11 @@ function createFixture() {
   roots.push(root);
   const applicationRoot = path.join(root, 'app');
   const stateRoot = path.join(root, 'state');
+  const hostStateRoot = path.join(stateRoot, 'host');
   const envFile = path.join(root, 'deployment.env');
   mkdirSync(applicationRoot, { recursive: true });
-  mkdirSync(stateRoot, { recursive: true });
+  mkdirSync(hostStateRoot, { recursive: true });
   writeFileSync(path.join(applicationRoot, 'package.json'), JSON.stringify({ version: '0.1.0' }));
-  writeFileSync(envFile, `GLIMMER_CRADLE_STATE_ROOT=${stateRoot}\n`);
-  return { root, applicationRoot, stateRoot, envFile };
+  writeFileSync(envFile, `GLIMMER_CRADLE_HOST_STATE_ROOT=${hostStateRoot}\n`);
+  return { root, applicationRoot, stateRoot, hostStateRoot, envFile };
 }
