@@ -1,12 +1,12 @@
 [project]
 name = "glimmer-cradle-desktop-python-runtime"
-version = "0.2.4"
+version = "0.2.5"
 description = "Locked Python dependency set for the installed Desktop runtime."
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "glimmer-cradle-contracts==0.2.4",
-    "glimmer-cradle-cognition==0.2.4",
-    "glimmer-cradle-audio-engine[asr,tts]==0.2.4",
+    "glimmer-cradle-contracts==0.2.5",
+    "glimmer-cradle-cognition==0.2.5",
+    "glimmer-cradle-audio-engine[asr,tts]==0.2.5",
 ]
 
 [tool.uv.sources]

@@ -415,7 +415,7 @@ start_ops_bridge() {
     --mount type=bind,src="$STATE_ROOT",dst="$STATE_ROOT" \
     --mount type=bind,src="$SERVICE_RUN_ROOT",dst="$CONTAINER_RUN_ROOT" \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
-    "$image" /opt/glimmer-cradle/container/ops-bridge.mjs >/dev/null
+    "$image" /usr/local/lib/glimmer-cradle-personal-server/ops-bridge.mjs >/dev/null
   wait_until_ops_bridge_ready
 }
 

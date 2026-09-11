@@ -122,7 +122,7 @@ Glimmer Cradle ${RELEASE_VERSION} 是 Personal Server 的版本化发行。
 curl -fsSL https://github.com/lociere/glimmer-cradle/releases/latest/download/${INSTALLER_NAME} | sudo bash
 \`\`\`
 
-默认只监听服务器 \`127.0.0.1:8080\`。配置、私有发布鉴权、可信 HTTPS 或本地离线来源与更新恢复方式见仓库中的 Personal Server 部署指南。
+首次安装默认只发布一个 HTTP 管理入口，可通过服务器公网 IP 或已解析域名访问；应用、Extension Host 与 Ops Bridge 不发布到宿主机。回环访问、可信 HTTPS、私有发布鉴权、本地离线来源与更新恢复方式见仓库中的 Personal Server 部署指南。
 
 ## 发布物
 

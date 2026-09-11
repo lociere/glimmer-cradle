@@ -275,7 +275,7 @@ wheels = [
 
 [[package]]
 name = "glimmer-cradle-audio-engine"
-version = "0.2.4"
+version = "0.2.5"
 source = { directory = "../../../engines/audio" }
 dependencies = [
     { name = "glimmer-cradle-contracts" },
@@ -313,7 +313,7 @@ provides-extras = ["asr", "tts", "dev"]
 
 [[package]]
 name = "glimmer-cradle-cognition"
-version = "0.2.4"
+version = "0.2.5"
 source = { directory = "../../../core/cognition" }
 dependencies = [
     { name = "aiosqlite" },
@@ -344,7 +344,7 @@ provides-extras = ["local-embedding", "dev"]
 
 [[package]]
 name = "glimmer-cradle-contracts"
-version = "0.2.4"
+version = "0.2.5"
 source = { directory = "../../../contracts" }
 dependencies = [
     { name = "grpcio" },
@@ -359,7 +359,7 @@ requires-dist = [
 
 [[package]]
 name = "glimmer-cradle-desktop-python-runtime"
-version = "0.2.4"
+version = "0.2.5"
 source = { editable = "." }
 dependencies = [
     { name = "glimmer-cradle-audio-engine", extra = ["asr", "tts"] },

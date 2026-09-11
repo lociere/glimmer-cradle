@@ -12,6 +12,7 @@ const handoff = await readFile(path.join(root, 'container', 'ops-bridge-handoff.
 const bridge = await readFile(path.join(root, 'container', 'ops-bridge.mjs'), 'utf8');
 const envTemplate = await readFile(path.join(root, '.env.example'), 'utf8');
 const compose = await readFile(path.join(root, 'compose.yaml'), 'utf8');
+const dockerfile = await readFile(path.join(root, 'Dockerfile'), 'utf8');
 const contract = JSON.parse(await readFile(path.join(root, 'tests', 'transaction-contract.fixture.json'), 'utf8'));
 
 test('query dispatch 发生在 version、Docker elevation 与事务初始化之前', () => {
@@ -44,6 +45,23 @@ test('source mode 不伪装 Ops 支持，宿主事务与服务 IPC 使用不同 
   assert.match(deploy, /BACKUP_ROOT="\$\{HOST_STATE_ROOT\}\/backups"/);
   assert.match(deploy, /DEPLOY_DIAGNOSTICS_ROOT="\$\{HOST_STATE_ROOT\}\/diagnostics\/deploy"/);
   assert.match(compose, /GLIMMER_CRADLE_SERVICE_STATE_ROOT:-\.\/state\/service/);
+});
+
+test('容器运行脚本不位于会被宿主 install root bind mount 遮蔽的路径', () => {
+  assert.match(
+    dockerfile,
+    /deploy\/personal-server\/container \/usr\/local\/lib\/glimmer-cradle-personal-server/,
+  );
+  assert.match(
+    dockerfile,
+    /\/usr\/local\/lib\/glimmer-cradle-personal-server\/entrypoint\.mjs/,
+  );
+  assert.match(
+    deploy,
+    /\/usr\/local\/lib\/glimmer-cradle-personal-server\/ops-bridge\.mjs/,
+  );
+  assert.doesNotMatch(dockerfile, /\/opt\/glimmer-cradle\/container/);
+  assert.doesNotMatch(deploy, /\/opt\/glimmer-cradle\/container\/ops-bridge\.mjs/);
 });
 
 test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bind source', () => {

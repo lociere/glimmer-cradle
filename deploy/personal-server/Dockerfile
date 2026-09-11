@@ -86,7 +86,7 @@ COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/core/
 COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/engines/audio engines/audio
 COPY --chown=glimmer:glimmer products/personal-server/product.json products/personal-server/product.json
 COPY --chown=glimmer:glimmer configs /opt/glimmer-cradle/default-config
-COPY --chown=glimmer:glimmer deploy/personal-server/container /opt/glimmer-cradle/container
+COPY --chown=glimmer:glimmer deploy/personal-server/container /usr/local/lib/glimmer-cradle-personal-server
 
 RUN install -d -o glimmer -g glimmer \
       /var/lib/glimmer-cradle/config \
@@ -111,4 +111,4 @@ ENV NODE_ENV=production \
 USER glimmer:glimmer
 EXPOSE 3210
 STOPSIGNAL SIGTERM
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/node", "/opt/glimmer-cradle/container/entrypoint.mjs"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/node", "/usr/local/lib/glimmer-cradle-personal-server/entrypoint.mjs"]
