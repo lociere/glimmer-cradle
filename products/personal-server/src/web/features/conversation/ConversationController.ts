@@ -1,5 +1,6 @@
 import type { ConversationHistoryEntry, ConversationHistoryRequest, ConversationHistoryResult } from '../../../shared/control-center-models';
 import type { SurfaceFrame } from '../../shared/api/personal-server-client';
+import { createRequestId } from '../../shared/request-id';
 
 export interface ConversationEntry {
   readonly id: string;
@@ -192,5 +193,5 @@ function mergeEntries(current: readonly ConversationEntry[], incoming: readonly 
     return (Date.parse(left.time) || 0) - (Date.parse(right.time) || 0) || left.id.localeCompare(right.id);
   });
 }
-function requestId(prefix: string): string { return `${prefix}-${crypto.randomUUID()}`; }
+function requestId(prefix: string): string { return createRequestId(prefix); }
 function describeError(error: unknown): string { return error instanceof Error ? error.message : '无法完成请求，请重试。'; }

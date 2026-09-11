@@ -14,6 +14,7 @@ import {
   type ReadinessStatus,
   type SurfaceFrame,
 } from '../shared/api/personal-server-client';
+import { createRequestId } from '../shared/request-id';
 
 export type SessionState = 'loading' | 'anonymous' | 'authenticated';
 export type ConnectionState = 'online' | 'connecting' | 'waiting';
@@ -162,7 +163,7 @@ export class PersonalServerAppController {
     const guard = () => {
       if (!this.isActiveSurface(surface, generation) || surface.readyState !== WebSocket.OPEN) throw new Error('扩展连接已断开。');
     };
-    const requestId = () => crypto.randomUUID();
+    const requestId = () => createRequestId('app');
     return {
       read: () => { guard(); return surface.requestExtensionRuntimeProjection({ request_id: requestId() }); },
       prepare: (request) => { guard(); return surface.prepareExtensionInstall(request); },
@@ -228,7 +229,7 @@ export class PersonalServerAppController {
       operations: () => request(() => this.client.getOperationsSnapshot(signal)),
       runOperation: (operation, options) => request(() => this.client.runOperation(operation, options, signal)),
       operationResult: id => request(() => this.client.getOperationResult(id, signal)),
-      skills: () => request(() => surface.requestSkillCatalog({ request_id: crypto.randomUUID() })),
+      skills: () => request(() => surface.requestSkillCatalog({ request_id: createRequestId('skills') })),
       close: () => abort.abort(),
     };
   }

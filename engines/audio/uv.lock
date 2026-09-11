@@ -265,7 +265,7 @@ wheels = [
 
 [[package]]
 name = "glimmer-cradle-audio-engine"
-version = "0.2.5"
+version = "0.2.6"
 source = { editable = "." }
 dependencies = [
     { name = "glimmer-cradle-contracts" },
@@ -307,7 +307,7 @@ provides-extras = ["asr", "tts", "dev"]
 
 [[package]]
 name = "glimmer-cradle-contracts"
-version = "0.2.5"
+version = "0.2.6"
 source = { directory = "../../contracts" }
 dependencies = [
     { name = "grpcio" },

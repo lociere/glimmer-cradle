@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ExtensionInstallPrepareRequest } from '../../../shared/control-center-models';
 import type { ExtensionsController, ExtensionsSnapshot } from './ExtensionsController';
+import { createRequestId } from '../../shared/request-id';
 import styles from './Extensions.module.css';
 
 export function ExtensionInstall({ snapshot, controller }: { snapshot: ExtensionsSnapshot; controller: ExtensionsController }): JSX.Element {
@@ -16,7 +17,7 @@ export function ExtensionInstall({ snapshot, controller }: { snapshot: Extension
     if (source === 'release_manifest' && fields.manifest.trim()) request = { kind: 'release_manifest', url: fields.manifest.trim() };
     if (source === 'file' && snapshot.upload) request = { kind: 'uploaded_package', upload_id: snapshot.upload.upload_id };
     if (!request) { setValidation('请补全安装来源后生成预览。'); return; }
-    setValidation(''); void controller.prepare({ request_id: crypto.randomUUID(), source: request });
+    setValidation(''); void controller.prepare({ request_id: createRequestId('extension-install'), source: request });
   };
   const preview = snapshot.preview;
   return <section className={styles.install} aria-label="安装扩展" data-role="extension-install-section">

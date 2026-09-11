@@ -2,6 +2,7 @@ import type { ConfigurationSnapshot, ConfigurationTestRequest, ConfigurationTest
 import type { AccessTokenSnapshot, AccessTokenMutationResult, DeploymentOperationsSnapshot, DeploymentOperationResult, SkillCatalogLoadResult } from '../../shared/api/personal-server-client';
 import { snapshotToDraft, mergeDiscoveredModels, type ConfigurationDraftState, type ConfigurationStatusState } from './configuration-state';
 import { buildUpdateRequest, isDraftDirty, toProviderTestDraft } from './configuration-draft-helpers';
+import { createRequestId } from '../../shared/request-id';
 
 export interface ConfigurationPort {
   read(): Promise<ConfigurationSnapshot>;
@@ -101,7 +102,7 @@ export class ConfigurationController {
     const provider = toProviderTestDraft(this.state.draft?.providers[index] ?? null); if (!provider) return;
     const epoch = this.epoch; this.patch({ pending: true, status: { kind: 'loading', message: '正在测试连接…' } });
     try {
-      const result = await port.testProvider({ request_id: crypto.randomUUID(), provider });
+      const result = await port.testProvider({ request_id: createRequestId('provider-test'), provider });
       if (!this.current(epoch)) return;
       const draft = structuredClone(this.state.draft!);
       if (result.status === 'success') draft.providers[index].models = mergeDiscoveredModels(draft.providers[index].models, result.discovered_models);
@@ -133,7 +134,7 @@ export class ConfigurationController {
   public hideToken() { this.tokenRevealId++; this.patch({ tokenResult: null }); }
   public async runOperation(operation: string, backupId?: string) {
     const port = this.port; if (!port || this.state.operationPending) return; const epoch = this.epoch;
-    const id = `deployment_op_${crypto.randomUUID()}`;
+    const id = createRequestId('deployment_op');
     this.operationVersion++; this.writeOperation(id); this.patch({ operationPending: true, operationsError: null });
     try { const result = await port.runOperation(operation, { operationId: id, backupId, confirm: true }); if (!this.current(epoch) || this.readOperation() !== id) return; this.projectOperation(result); if (active(result)) void this.poll(id, epoch); }
     catch (error) { if (this.current(epoch) && this.readOperation() === id) { this.patch({ operationsError: `${message(error)}；正在查询原事务结果。` }); void this.poll(id, epoch); } }

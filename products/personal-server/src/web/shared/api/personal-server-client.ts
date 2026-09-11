@@ -22,6 +22,7 @@ import type {
   ProductSurfaceRequest,
   RuntimeProjection,
 } from '../../../shared/control-center-models';
+import { createRequestId } from '../request-id';
 
 export interface ProductProjection {
   readonly display_name: string;
@@ -330,9 +331,7 @@ export class PersonalServerClient {
 }
 
 function createDeploymentOperationId(): string {
-  const uuid = globalThis.crypto?.randomUUID?.()
-    || `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  return `deployment_op_${uuid}`;
+  return createRequestId('deployment_op');
 }
 
 export class PersonalServerLogStream {
@@ -657,10 +656,6 @@ function extractRequestPayload(frame: SurfaceFrame): { requestId: string; body: 
     return { requestId: frame.extension_uninstall_result.request_id, body: frame.extension_uninstall_result };
   }
   return null;
-}
-
-function createRequestId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function toQueryString(query: ObservabilityLogQuery): string {

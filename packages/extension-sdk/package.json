@@ -1,6 +1,6 @@
 {
   "name": "@glimmer-cradle/extension-sdk",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": false,
   "description": "Public extension authoring SDK for Glimmer Cradle.",
   "license": "GPL-3.0-only",
