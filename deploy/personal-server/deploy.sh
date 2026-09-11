@@ -324,10 +324,6 @@ preflight_ports() {
   https_bind="$(read_env GLIMMER_CRADLE_HTTPS_BIND '127.0.0.1')"
   https_port="$(read_env GLIMMER_CRADLE_HTTPS_PORT '8443')"
 
-  if [[ "$site_address" == ':80' && "$http_bind" != '127.0.0.1' && "$http_bind" != '::1' ]]; then
-    echo "拒绝将无 TLS 的控制面板绑定到公网地址 ${http_bind}。请使用默认 SSH 隧道，或配置域名与 HTTPS。" >&2
-    exit 1
-  fi
   if port_in_use tcp "$http_port"; then
     echo "宿主机 TCP 端口 ${http_port} 已被占用；请调整 GLIMMER_CRADLE_HTTP_PORT。" >&2
     exit 1
@@ -824,9 +820,15 @@ print_access() {
   http_bind="$(read_env GLIMMER_CRADLE_HTTP_BIND '127.0.0.1')"
   http_port="$(read_env GLIMMER_CRADLE_HTTP_PORT '8080')"
   if [[ "$address" == ':80' ]]; then
-    echo "控制面板仅监听 ${http_bind}:${http_port}。"
-    echo "从本机建立隧道: ssh -N -L ${http_port}:127.0.0.1:${http_port} <用户>@<服务器>"
-    echo "随后访问: http://127.0.0.1:${http_port}/"
+    if [[ "$http_bind" == '127.0.0.1' || "$http_bind" == '::1' ]]; then
+      echo "控制面板仅监听 ${http_bind}:${http_port}。"
+      echo "从本机建立隧道: ssh -N -L ${http_port}:127.0.0.1:${http_port} <用户>@<服务器>"
+      echo "随后访问: http://127.0.0.1:${http_port}/"
+    elif [[ "$http_port" == '80' ]]; then
+      echo "访问地址: http://<服务器公网 IP 或域名>/"
+    else
+      echo "访问地址: http://<服务器公网 IP 或域名>:${http_port}/"
+    fi
   else
     echo "访问地址: https://${address}/"
   fi

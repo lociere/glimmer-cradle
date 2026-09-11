@@ -88,4 +88,4 @@ Personal Server 构建配置使用 `vite.config.mts` 显式 ESM，目录由 `imp
 
 HTTP 入口为 `/healthz`、`/readyz`、`/api/v1/status`、`/api/v1/product` 和 `/api/v1/session`；控制表面 WebSocket 为 `/api/v1/surface`。`/healthz` 只确认 Product Host 存活，也是容器 healthcheck；`/readyz` 仅在 `kernel.ingress` 与所有 blocking runtime 为 `ready` 时返回 `200`，由部署脚本作为就绪门；已认证的 `/api/v1/status` 始终返回当前 readiness 投影，供页面在启动期间轮询。浏览器通过 `POST /api/v1/session` 登录，服务签发 12 小时、`HttpOnly`、`SameSite=Strict` 的随机会话 Cookie；WebSocket 必须同源且使用该会话，不接受 URL 查询参数中的 token。Kernel 的动态回环端点永不直接暴露到外网。
 
-标准 OCI 部署由 `deploy/personal-server/compose.yaml` 定义。应用内部固定监听 `3210`，只暴露给 Compose 内部网络；Caddy 是唯一宿主机入口。默认绑定 `127.0.0.1:8080` 并通过 SSH 隧道使用，公开部署必须配置域名与 HTTPS。精确操作见 [Personal Server 部署指南](../guides/release/Personal%20Server部署.md)。
+标准 OCI 部署由 `deploy/personal-server/compose.yaml` 定义。应用内部固定监听 `3210`，只暴露给 Compose 内部网络；Caddy 是唯一宿主机入口。首次安装默认只发布 `0.0.0.0:80` 这一个 HTTP 管理入口，可直接使用服务器公网 IP 或已解析域名；应用、扩展 Host 与 Ops Bridge 不发布宿主端口。需要收紧访问时可切换为回环绑定，需要传输加密时配置域名并由同一 Caddy 入口自动启用 HTTPS。精确操作见 [Personal Server 部署指南](../guides/release/Personal%20Server部署.md)。

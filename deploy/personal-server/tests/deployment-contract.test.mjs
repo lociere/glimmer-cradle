@@ -47,6 +47,11 @@ test('source mode 不伪装 Ops 支持，宿主事务与服务 IPC 使用不同 
 });
 
 test('默认 env 与 Compose 固定容器 socket，宿主 run root 只作为 bind source', () => {
+  assert.match(envTemplate, /^GLIMMER_CRADLE_SITE_ADDRESS=:80$/m);
+  assert.match(envTemplate, /^GLIMMER_CRADLE_HTTP_BIND=0\.0\.0\.0$/m);
+  assert.match(envTemplate, /^GLIMMER_CRADLE_HTTP_PORT=80$/m);
+  assert.doesNotMatch(deploy, /拒绝将无 TLS 的控制面板绑定到公网地址/);
+  assert.match(deploy, /访问地址: http:\/\/<服务器公网 IP 或域名>/);
   assert.match(
     envTemplate,
     /^GLIMMER_CRADLE_OPERATIONS_BRIDGE_SOCKET=\/run\/glimmer-cradle\/ops-bridge\.sock$/m,

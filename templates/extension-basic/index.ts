@@ -10,7 +10,7 @@ import { MyExtension } from './src/my-extension';
 export default defineExtension({
   manifest: {
     engines: {
-      glimmerCradle: '0.2.3',
+      glimmerCradle: '0.2.4',
     },
     requires: ['commands'],
     activationEvents: ['onStartup', 'onCommand:your-publisher.my-extension.ping'],

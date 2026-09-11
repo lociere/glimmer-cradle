@@ -113,17 +113,25 @@ sudo env \
 
 当真实用户规模和网络条件需要区域交付时，一个可信 HTTPS 对象端点即可复用现有安装协议：安装器下载完整包、校验 `SHA256SUMS`、导入包内镜像，再进入同一部署事务。是否建设区域 OCI Registry 由更新频率、镜像层复用收益和公开拉取条件决定，不是基础安装前提。对象存储中的版本目录必须不可变；稳定入口只负责解析版本，实际安装继续固定到明确版本和镜像身份。
 
-对象存储、CDN 或自托管静态站点只是同一契约的不同实现，厂商与地域不进入安装器。云安全组默认无需开放 `8080`，推荐保留回环监听并通过 SSH 隧道访问。
+对象存储、CDN 或自托管静态站点只是同一契约的不同实现，厂商与地域不进入安装器。云安全组只按实际访问模式开放唯一管理入口；默认 HTTP 使用 TCP `80`，回环模式无需开放管理端口，HTTPS 模式使用 TCP `80/443` 与 UDP `443`。
 
 ## 访问与配置
 
-默认入口只监听服务器 `127.0.0.1:8080`：
+首次安装默认只发布一个 HTTP 管理入口，可直接打开：
+
+```text
+http://<服务器公网 IP 或已解析域名>/
+```
+
+应用端口 `3210`、Extension Host 和 Ops Bridge 不发布到宿主机；云安全组只需按实际访问模式放行管理入口的 TCP 端口。登录 token 位于 `/etc/glimmer-cradle/deployment.env`。
+
+需要改为仅本机访问时，编辑 `/etc/glimmer-cradle/deployment.env`，设置 `GLIMMER_CRADLE_HTTP_BIND=127.0.0.1` 与 `GLIMMER_CRADLE_HTTP_PORT=8080`，重装同版本或更新后再建立隧道：
 
 ```bash
 ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 ```
 
-随后访问 `http://127.0.0.1:8080/`。访问 token 位于 `/etc/glimmer-cradle/deployment.env`，只用于换取 HttpOnly 会话 Cookie，不进入 URL。
+随后访问 `http://127.0.0.1:8080/`。访问 token 只用于换取 HttpOnly 会话 Cookie，不进入 URL。
 
 当前 `v0.1.x` 网页已提供正式控制面：`对话`、`状态`、`扩展`、`日志`、`设置` 五个一级页面可在零 Provider 状态下登录使用。设置中心当前已接入 Provider/默认路由、Audio、Embedding、Memory/Experience、Skill、安全访问令牌、存储/备份、更新/服务状态等 section owner；Provider secret 仍保持 write-only，浏览器不会回显密钥，也不会直接编辑原始 YAML。若某个运维动作依赖宿主桥但当前源码直跑环境未接入，页面会显示真实 disabled reason，而不是假按钮。
 
