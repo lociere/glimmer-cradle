@@ -42,6 +42,11 @@ const projections = [
     owner: 'native',
     source: path.join(repoRoot, 'build', 'components', 'native', 'composition-host', 'windows-x64'),
     staged: 'components/native/composition-host',
+    files: [
+      'DesktopProcessTreeBridge.exe',
+      'bin/Release/platform_native.dll',
+      'bin/Release/UnityAvatarHostLauncher.exe',
+    ],
   },
 ];
 
@@ -55,11 +60,24 @@ try {
   for (const projection of projections) {
     if (!projection.source) continue;
     await assertDirectory(projection.source, projection.id);
-    await fs.cp(
-      projection.source,
-      path.join(resourcesRoot, projection.staged),
-      { recursive: true, dereference: true },
-    );
+    const projectionTarget = path.join(resourcesRoot, projection.staged);
+    if (projection.files) {
+      for (const relative of projection.files) {
+        const source = path.join(projection.source, ...relative.split('/'));
+        const target = path.join(projectionTarget, ...relative.split('/'));
+        await assertFile(source, `${projection.id}:${relative}`);
+        await fs.mkdir(path.dirname(target), { recursive: true });
+        await fs.copyFile(source, target);
+      }
+    } else {
+      await fs.cp(projection.source, projectionTarget, { recursive: true, dereference: true });
+    }
+    if (projection.id === 'avatar') {
+      await fs.copyFile(
+        path.join(repoRoot, 'hosts', 'unity-avatar-host', 'avatar-sdk-catalog.json'),
+        path.join(projectionTarget, 'avatar-sdk-catalog.json'),
+      );
+    }
     if (projection.id === 'native') {
       await assertFile(path.join(resourcesRoot, projection.staged, 'DesktopProcessTreeBridge.exe'), 'Desktop process-tree authority');
     }
@@ -130,20 +148,31 @@ async function assertFile(target, componentId) {
 }
 
 async function inventoryFiles(root, relativeRoot) {
-  const files = [];
-  for (const entry of await fs.readdir(root, { withFileTypes: true })) {
-    const target = path.join(root, entry.name);
-    if (entry.isSymbolicLink()) throw new Error(`Desktop staging 不接受 symlink: ${target}`);
-    if (entry.isDirectory()) {
-      files.push(...await inventoryFiles(target, relativeRoot));
-    } else if (entry.isFile()) {
+  const targets = await collectInventoryTargets(root);
+  const files = new Array(targets.length);
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(16, targets.length) }, async () => {
+    while (nextIndex < targets.length) {
+      const index = nextIndex++;
+      const target = targets[index];
       const bytes = await fs.readFile(target);
-      files.push({
+      files[index] = {
         path: path.relative(relativeRoot, target).replaceAll('\\', '/'),
         size: bytes.length,
         sha256: createHash('sha256').update(bytes).digest('hex'),
-      });
+      };
     }
-  }
+  }));
   return files.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function collectInventoryTargets(root) {
+  const targets = [];
+  for (const entry of await fs.readdir(root, { withFileTypes: true })) {
+    const target = path.join(root, entry.name);
+    if (entry.isSymbolicLink()) throw new Error(`Desktop staging 不接受 symlink: ${target}`);
+    if (entry.isDirectory()) targets.push(...await collectInventoryTargets(target));
+    else if (entry.isFile()) targets.push(target);
+  }
+  return targets;
 }

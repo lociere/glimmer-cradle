@@ -1,0 +1,4 @@
+.navigation { display: flex; flex-wrap: wrap; gap: .25rem; min-height: var(--control-height-default); align-items: center; }
+.navigation a { min-height: var(--control-height-compact); display: inline-flex; align-items: center; padding-inline: var(--space-3); border-radius: var(--radius-control); color: var(--text-tertiary); text-decoration: none; }
+.navigation a:hover { color: var(--text-primary); background: var(--interactive-neutral); }
+.navigation a[aria-current='page'] { color: var(--accent-text); background: var(--interactive-accent); }

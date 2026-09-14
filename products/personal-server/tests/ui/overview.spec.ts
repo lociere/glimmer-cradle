@@ -34,7 +34,7 @@ test('reads the model on direct entry and preserves keyboard focus across live r
       await trigger.click();
     }
     await dialog.getByRole('link', { name: '查看诊断活动' }).click();
-    await expect(page).toHaveURL(/\/activity$/);
+    await expect(page).toHaveURL(/\/system\/logs$/);
     await expect(dialog).toHaveCount(0);
     await expect(page.locator('[data-role="view-overview"]')).toHaveCount(0);
     await page.goBack();
@@ -72,7 +72,7 @@ test('configuration loading, failure and retry never masquerade as an unconfigur
     await expect(page.getByText('对话模型不可用', { exact: true })).toBeVisible();
     await expect(page.getByText('仍可查看运行状态、诊断活动并调整配置。')).toBeVisible();
     await page.getByRole('link', { name: '配置模型', exact: true }).click();
-    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page).toHaveURL(/\/config$/);
   } finally { await fixture.stop(); }
 });
 
@@ -85,10 +85,10 @@ test('status read failure is explicit and automatically recovers', async ({ page
   const fixture = await startPersonalServerUiFixture();
   try {
     await login(page, fixture.baseUrl);
-    await expect(page.getByRole('heading', { name: '暂时无法确认服务状态' })).toBeVisible();
+    await expect(page.getByText('暂时无法确认服务状态', { exact: true })).toBeVisible();
     await expect(page.getByRole('alert')).toHaveText('无法读取服务状态，正在自动重试。');
     failStatus = false;
-    await expect(page.getByRole('heading', { name: '服务已就绪' })).toBeVisible();
+    await expect(page.getByText('服务已就绪', { exact: true })).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
   } finally { await fixture.stop(); }
 });
@@ -106,8 +106,8 @@ test('late model replies cannot remount a departed route and reconnect refreshes
   try {
     await login(page, fixture.baseUrl);
     await expect(page.getByText('正在读取模型配置…')).toBeVisible();
-    await page.getByRole('link', { name: '查看诊断活动', exact: true }).click();
-    await expect(page).toHaveURL(/\/activity$/);
+    await page.getByRole('link', { name: '查看日志', exact: true }).click();
+    await expect(page).toHaveURL(/\/system\/logs$/);
     await page.waitForTimeout(900);
     await expect(page.locator('[data-role="view-overview"]')).toHaveCount(0);
     await expect(page.locator('main .route-view')).toHaveCount(1);
@@ -161,7 +161,7 @@ test('long catalogs and details reflow across capacity boundaries with accessibl
 });
 
 async function login(page: Page, baseUrl: string): Promise<void> {
-  await page.goto(`${baseUrl}/overview`);
+  await page.goto(`${baseUrl}/system`);
   await page.locator('#access-token').fill('server-secret');
   await page.getByRole('button', { name: '连接 Personal Server' }).click();
   await expect(page.locator('[data-role="view-overview"]')).toBeVisible();

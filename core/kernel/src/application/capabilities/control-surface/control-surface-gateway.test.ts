@@ -50,6 +50,7 @@ describe('ControlSurfaceGateway', () => {
     const sent: SurfaceEvent[] = [];
     subject._clients.add({
       readyState: 1,
+      canHandleActions: true,
       send(event: SurfaceEvent) {
         sent.push(event);
         const requestId = event.event.case === 'coreSkillActionRequest' ? event.event.value.requestId : '';
@@ -82,6 +83,7 @@ describe('ControlSurfaceGateway', () => {
     };
     subject._clients.add({
       readyState: 1,
+      canHandleActions: true,
       send(event: SurfaceEvent) {
         const requestId = event.event.case === 'coreSkillActionRequest' ? event.event.value.requestId : '';
         queueMicrotask(() => subject._handleCoreSkillResponse({
@@ -105,6 +107,45 @@ describe('ControlSurfaceGateway', () => {
       operationId: 'action:unsafe:tool:0',
       recoveryActions: ['confirm_side_effect_state'],
     });
+  });
+
+  it('routes confirmation past observers and accepts only the bound session and response kind', async () => {
+    const subject = gateway as unknown as {
+      _clients: Set<unknown>;
+      _pendingSurfaceRequests: Map<string, unknown>;
+      _handleCoreSkillResponse(data: unknown, sessionId?: string): void;
+    };
+    const observed: SurfaceEvent[] = [];
+    const delivered: SurfaceEvent[] = [];
+    subject._clients.add({ readyState: 1, sessionId: 'monitor', canHandleActions: false, send: (event: SurfaceEvent) => observed.push(event) });
+    subject._clients.add({
+      readyState: 1, sessionId: 'interactive', canHandleActions: true,
+      send(event: SurfaceEvent) {
+        delivered.push(event);
+        if (event.event.case !== 'coreSkillConfirmationRequest') throw new Error('unexpected event');
+        const requestId = event.event.value.requestId;
+        const response = { kind: 'core_skill_confirmation_response', request_id: requestId, status: 'success', result: { approved: true } };
+        subject._handleCoreSkillResponse(response, 'other-session');
+        expect(subject._pendingSurfaceRequests.has(requestId)).toBe(true);
+        subject._handleCoreSkillResponse({ ...response, kind: 'core_skill_action_response' }, 'interactive');
+        expect(subject._pendingSurfaceRequests.has(requestId)).toBe(true);
+        subject._handleCoreSkillResponse({ ...response, result: { approved: false } }, 'interactive');
+      },
+    });
+    await expect(gateway.requestSkillConfirmation({
+      traceId: 'confirmation-trace', skillId: 'test.skill', targetKind: 'tool', targetName: 'test.write', riskLevel: 'high', sideEffects: ['write'],
+    })).resolves.toBe(false);
+    expect(observed).toHaveLength(0);
+    expect(delivered).toHaveLength(1);
+    expect(subject._pendingSurfaceRequests.size).toBe(0);
+  });
+
+  it('fails immediately when only the readiness observer is connected', async () => {
+    const subject = gateway as unknown as { _clients: Set<unknown> };
+    subject._clients.add({ readyState: 1, canHandleActions: false, send: () => { throw new Error('observer must not execute'); } });
+    await expect(gateway.requestSkillConfirmation({
+      traceId: 'observer-only', skillId: 'test.skill', targetKind: 'tool', targetName: 'test.write', riskLevel: 'high', sideEffects: ['write'],
+    })).rejects.toThrow('产品控制表面未连接');
   });
 
   it('returns an explicit conversation notice when no usable LLM route is configured', async () => {

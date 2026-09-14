@@ -15,7 +15,7 @@ test('logout invalidates the session before network completion and cleans active
   await installLifecycleTracking(page);
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
-    await page.goto(`${fixture.baseUrl}/activity`);
+    await page.goto(`${fixture.baseUrl}/system/logs`);
     await login(page);
     await expect.poll(async () => (await lifecycle(page)).webSocketsActive).toBe(1);
     await expect.poll(async () => (await lifecycle(page)).eventSourcesActive).toBe(1);
@@ -39,7 +39,7 @@ test('session expiry tears down the surface, timer and route-local stream withou
   await installLifecycleTracking(page);
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
-    await page.goto(`${fixture.baseUrl}/activity`);
+    await page.goto(`${fixture.baseUrl}/system/logs`);
     await login(page);
     await expect.poll(async () => (await lifecycle(page)).webSocketsActive).toBe(1);
     await expect.poll(async () => (await lifecycle(page)).eventSourcesActive).toBe(1);
@@ -64,7 +64,7 @@ test('quick relogin waits for logout and ignores the delayed close from the old 
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   let releaseLogout = (): void => undefined;
   try {
-    await page.goto(`${fixture.baseUrl}/overview`);
+    await page.goto(`${fixture.baseUrl}/system`);
     await login(page);
     await expect.poll(async () => (await lifecycle(page)).webSocketsActive).toBe(1);
 
@@ -101,10 +101,9 @@ test('quick relogin waits for logout and ignores the delayed close from the old 
     await expect.poll(async () => (await lifecycle(page)).webSocketsClosed).toBeGreaterThanOrEqual(1);
 
     await page.waitForTimeout(600);
-    await expect(page.locator('[data-role="connection-label"]').first()).toContainText('在线');
+    await expect(page.locator('[data-role="connection-label"]')).toHaveCount(0);
     const statusRequests = (await lifecycle(page)).statusRequests;
     await page.waitForTimeout(1_400);
-    await expect(page.locator('[data-role="connection-label"]').first()).toContainText('在线');
     expect((await lifecycle(page)).statusRequests).toBe(statusRequests);
   } finally {
     releaseLogout();

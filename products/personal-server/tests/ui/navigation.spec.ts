@@ -4,8 +4,8 @@ import { startPersonalServerUiFixture } from './fixtures/personal-server-host';
 test('isolates authentication and owns URL, refresh, deep-link, history and unknown routes', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
-    await page.goto(`${fixture.baseUrl}/overview`);
-    await expect(page).toHaveURL(/\/overview$/);
+    await page.goto(`${fixture.baseUrl}/system`);
+    await expect(page).toHaveURL(/\/system$/);
     await expect(page.locator('[data-role="login-layer"]')).toBeVisible();
     await expect(page.locator('[data-role="app-shell"]')).toHaveCount(0);
 
@@ -16,25 +16,25 @@ test('isolates authentication and owns URL, refresh, deep-link, history and unkn
 
     await navigate(page, 'capabilities');
     await expect(page).toHaveURL(/\/capabilities$/);
-    await expect(page.locator('[data-role="view-capabilities"]')).toBeVisible();
+    await expect(page.locator('[data-role="view-capability-catalog"]')).toBeVisible();
     await expect(page.locator('[data-role="view-overview"]')).toHaveCount(0);
 
-    await navigate(page, 'settings');
-    await expect(page).toHaveURL(/\/settings$/);
+    await navigate(page, 'config');
+    await expect(page).toHaveURL(/\/config$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/capabilities$/);
     await page.goForward();
-    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page).toHaveURL(/\/config$/);
     await page.reload();
-    await expect(page.locator('[data-role="view-settings"]')).toBeVisible();
+    await expect(page.locator('[data-role="view-config"]')).toBeVisible();
 
     await page.goto(`${fixture.baseUrl}/missing-route`);
     await expect(page).toHaveURL(/\/missing-route$/);
     await expect(page.locator('[data-role="view-unknown"]')).toContainText('这里没有可打开的页面');
 
     await page.goto(fixture.baseUrl);
-    await expect(page).toHaveURL(/\/conversation$/);
-    await expect(page.locator('[data-role="view-conversation"]')).toBeVisible();
+    await expect(page).toHaveURL(/\/config$/);
+    await expect(page.locator('[data-role="view-config"]')).toBeVisible();
   } finally {
     await fixture.stop();
   }
@@ -68,16 +68,36 @@ test('unmounts route-local streams and keeps exactly one active page under Stric
   try {
     await page.goto(fixture.baseUrl);
     await login(page);
-    await navigate(page, 'activity');
+    await page.goto(`${fixture.baseUrl}/system/logs`);
     await expect(page.locator('main .route-view')).toHaveCount(1);
     await expect.poll(() => eventSourceCount(page)).toBe(1);
 
-    await navigate(page, 'overview');
+    await navigate(page, 'system');
     await expect(page.locator('[data-role="view-activity"]')).toHaveCount(0);
     await expect.poll(() => eventSourceCount(page)).toBe(0);
   } finally {
     await fixture.stop();
   }
+});
+
+test('keeps shell geometry and document scroll stable across route transitions', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'personal-server-desktop', '宽屏固定导航几何检查');
+  const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
+  try {
+    await page.goto(fixture.baseUrl);
+    await login(page);
+    const navigation = page.locator('[aria-label="全局导航"]').first();
+    const workspace = page.locator('#main-content');
+    const initialNavigation = await navigation.boundingBox();
+    const initialWorkspace = await workspace.boundingBox();
+    for (const route of ['extensions', 'capabilities', 'data', 'system', 'config']) {
+      await navigate(page, route);
+      await expect(page.locator('main > section')).toBeVisible();
+      expect(await navigation.boundingBox()).toEqual(initialNavigation);
+      expect(await workspace.boundingBox()).toEqual(initialWorkspace);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBeLessThanOrEqual(1);
+    }
+  } finally { await fixture.stop(); }
 });
 
 test('keeps the narrow shell single-column and restores focus after the navigation dialog closes', async ({ page }, testInfo) => {

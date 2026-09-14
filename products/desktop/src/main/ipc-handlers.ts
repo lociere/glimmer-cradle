@@ -2,6 +2,8 @@ import { app, BrowserWindow, shell, dialog, clipboard, Notification, type OpenDi
 import fs from 'fs/promises';
 import path from 'path';
 import YAML from 'yaml';
+import { openLocalFile } from './local-file-action';
+import { captureScreen, readActiveWindow } from './screen-context-action';
 import type {
   AudioStatusPayload,
   CharacterPresentationProjectionPayload,
@@ -60,15 +62,17 @@ import {
 import type { ProductSurfaceProjection } from './surface-grpc-mapper';
 
 const RECONNECT_INTERVAL_MS = 3000;
+const packagedUserRoot = app.isPackaged ? app.getPath('userData') : '';
 const PROJECT_ROOTS = resolveDesktopProjectRoots({
   cwd: process.cwd(),
   dirName: __dirname,
   resourcesPath: app.isPackaged ? process.resourcesPath : '',
   exeDir: app.isPackaged ? path.dirname(app.getPath('exe')) : '',
-  configuredAppRoot: process.env.GLIMMER_CRADLE_APP_ROOT,
+  configuredAppRoot: process.env.GLIMMER_CRADLE_APP_ROOT || (app.isPackaged ? process.resourcesPath : undefined),
   configuredRepoRoot: process.env.GLIMMER_CRADLE_REPO_ROOT,
-  configuredDataRoot: process.env.GLIMMER_CRADLE_DATA_ROOT,
-  configuredRunRoot: process.env.GLIMMER_CRADLE_RUN_ROOT,
+  configuredDataRoot: process.env.GLIMMER_CRADLE_DATA_ROOT || (packagedUserRoot ? path.join(packagedUserRoot, 'data') : undefined),
+  configuredRunRoot: process.env.GLIMMER_CRADLE_RUN_ROOT || (packagedUserRoot ? path.join(packagedUserRoot, 'run') : undefined),
+  configuredConfigRoot: process.env.GLIMMER_CRADLE_CONFIG_ROOT || (packagedUserRoot ? path.join(packagedUserRoot, 'configs') : undefined),
 });
 const { repoRoot: REPO_ROOT, extensionsRoot: EXTENSION_ROOT } = PROJECT_ROOTS;
 const AVATAR_PATHS = resolveDesktopAvatarPaths(PROJECT_ROOTS);
@@ -3035,6 +3039,12 @@ async function handleCoreSkillActionRequest(frame: Record<string, unknown>): Pro
       const url = typeof payload.url === 'string' ? payload.url.trim() : '';
       const openedUrl = await openHttpExternalUrl(url, 'desktop.open_url');
       result = { ok: true, url: openedUrl };
+    } else if (action === 'desktop.open_file') {
+      result = await openLocalFile(payload.path, (target) => shell.openPath(target));
+    } else if (action === 'screen.capture') {
+      result = await captureScreen(path.join(PROJECT_ROOTS.dataRoot, 'work', 'desktop', 'screenshots'), payload.displayId);
+    } else if (action === 'screen.active_window') {
+      result = await readActiveWindow();
     } else if (action === 'notification.show') {
       const title = typeof payload.title === 'string' ? payload.title.trim() : '';
       const body = typeof payload.body === 'string' ? payload.body.trim() : '';
@@ -3101,8 +3111,8 @@ async function handleCoreSkillConfirmationRequest(frame: Record<string, unknown>
     defaultId: 1,
     cancelId: 1,
     title: '确认执行 Skill',
-    message: `允许执行 ${skillId} / ${targetName}？`,
-    detail: `风险等级：${riskLevel}`,
+    message: typeof confirmation.title === 'string' && confirmation.title ? confirmation.title : `允许执行 ${skillId} / ${targetName}？`,
+    detail: [typeof confirmation.detail === 'string' ? confirmation.detail : '', `风险等级：${riskLevel}`].filter(Boolean).join('\n'),
     noLink: true,
   });
   sendCoreSkillResponse('core_skill_confirmation_response', requestId, 'success', {

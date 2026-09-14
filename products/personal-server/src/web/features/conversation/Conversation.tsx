@@ -11,7 +11,7 @@ export interface ConversationProps {
   readonly onLoadOlder: () => void;
 }
 
-const allowedActions = new Set(['conversation', 'overview', 'settings', 'activity', 'capabilities']);
+const allowedActions = new Set(['data', 'system', 'config', 'system/logs', 'capabilities']);
 const roleLabels = { user: '你', assistant: '回复', system: '提示' };
 const statusLabels = { pending: '已提交，等待处理', thinking: '处理中', failed: '未完成', committed: '', notice: '提示' };
 
@@ -37,7 +37,7 @@ export function Conversation({ snapshot, onSend, onRetry, onRefresh, onLoadOlder
           : snapshot.initialized ? '当前历史已完整恢复。' : '等待读取对话历史。';
 
   return <section className={`route-view ${styles.conversation}`} data-role="view-conversation">
-    <header className={styles.header}><h1>当前对话</h1><Link to="/overview">查看连接与能力</Link></header>
+    <div className={styles.topline}><nav className={styles.localTabs} aria-label="数据分类"><button aria-current="page">对话</button><button disabled title="记忆管理投影尚未开放">记忆</button><button disabled title="经历管理投影尚未开放">经历</button><button disabled title="用量投影尚未开放">用量</button></nav><Link to="/system">系统状态</Link></div>
     <div className={styles.toolbar}>
       <p data-role="conversation-banner" role={snapshot.error ? 'alert' : 'status'} className={snapshot.error || !snapshot.connected ? styles.warning : ''}>{banner}</p>
       <button type="button" onClick={onRefresh} disabled={!snapshot.connected || snapshot.loading || snapshot.loadingOlder}>{snapshot.error ? '重新读取历史' : '刷新历史'}</button>
@@ -46,6 +46,7 @@ export function Conversation({ snapshot, onSend, onRetry, onRefresh, onLoadOlder
       if (listRef.current) olderAnchor.current = { height: listRef.current.scrollHeight, top: listRef.current.scrollTop };
       onLoadOlder();
     }}>{snapshot.loadingOlder ? '正在读取更早消息…' : '加载更早消息'}</button>}
+    <div className={styles.workbench}>
     <ol className={styles.messages} data-role="message-list" aria-label="对话消息" tabIndex={0} ref={listRef} onScroll={() => {
       const list = listRef.current;
       if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
@@ -70,9 +71,10 @@ export function Conversation({ snapshot, onSend, onRetry, onRefresh, onLoadOlder
       if (onSend(draft)) { setDraft(''); followLatest.current = true; inputRef.current?.focus(); }
     }}>
       <label htmlFor="conversation-message">消息</label>
-      <textarea id="conversation-message" ref={inputRef} rows={3} maxLength={8000} placeholder="和当前角色说点什么…" data-role="message-input" value={draft} onChange={(event) => setDraft(event.target.value)} aria-describedby="conversation-send-state" />
+      <textarea id="conversation-message" ref={inputRef} rows={1} maxLength={8000} placeholder="和当前角色说点什么…" data-role="message-input" value={draft} onChange={(event) => setDraft(event.target.value)} aria-describedby="conversation-send-state" />
       <div className={styles.composerFooter}><p id="conversation-send-state" role="status">{snapshot.sendError || (!snapshot.connected ? '连接恢复后可发送；草稿保留在当前页面。' : busy ? '正在等待本次对话完成…' : 'Enter 换行，点击发送。')}</p>
         <button type="submit" className={styles.send} data-role="send-button" disabled={!snapshot.connected || busy || !draft.trim()}>{busy ? '等待回复' : '发送'}</button></div>
     </form>
+    </div>
   </section>;
 }

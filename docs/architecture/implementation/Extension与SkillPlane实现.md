@@ -94,7 +94,7 @@ core/kernel/src/adapters/skill-plane/
 | Core Provider | Kernel 内置基础能力 |
 | Extension Provider | Extension manifest/handler 暴露的能力 |
 | MCP Provider | stdio/http/ws MCP server 的工具、资源和 prompt |
-| User Provider | 用户配置或脚本能力 |
+| User Provider | 用户安装的 SKILL.md 指令技能 |
 
 Catalog 不等于授权，Policy 通过不等于执行，执行必须经过 Gateway。
 
@@ -110,7 +110,15 @@ Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/
 
 成功审计受 `policy.audit` 控制；拒绝和失败不受该开关关闭。
 
-Core Skill Provider 的 Desktop/Notification/Clipboard manifest 通过 `CorePlatformBridge` 注入真实 handler；`desktop.open_url`、`notification.show`、`clipboard.read` 和 `clipboard.write` 标记为 ready。Desktop bridge 由 `ControlSurfaceGateway` 通过 typed `SurfaceGatewayService` stream 向 Electron main 发送 `core_skill_action_request` 或 `core_skill_confirmation_request`，Electron main 执行 `shell.openExternal`、Notification、clipboard 或确认对话，并用 typed Command response 返回结果。剪贴板读写和中风险桌面动作需要确认；Desktop 未连接、handler 抛错或用户拒绝都会经 Gateway 形成失败/拒绝审计。
+Core Skill Provider 通过 `CorePlatformBridge` 注入真实 handler，覆盖桌面 URL/本地文件打开、通知、剪贴板、屏幕截图、前台窗口信息和用户确认。Desktop bridge 由 `ControlSurfaceGateway` 通过 typed `SurfaceGatewayService` stream 向 Electron main 发送 `core_skill_action_request` 或 `core_skill_confirmation_request`，并用 typed Command response 返回结果；实际可调用性仍受 Product Composition、平台、连接和策略约束。截图返回 PNG 文件路径与尺寸，不代表模型已经理解图像；前台窗口读取目前仅支持 Windows。文件打开使用系统默认程序，确认详情显示完整目标路径并提示可能启动程序。
+
+确认请求只路由到具有 `surface:write` 的连接，回执绑定接收请求的 session 和响应类型；只读就绪观察连接不处理动作。Electron 使用原生确认框，Personal Server 使用应用级确认对话框，均显示可选 `title`/`detail`。浏览器默认聚焦拒绝，关闭、超时或断线撤销请求；用户拒绝、缺少控制表面和执行失败均保留 Gateway 审计。
+
+User Provider 由 IO adapter `UserSkillSource` 从包数据目录加载 SKILL.md，元数据遵循 canonical `user-skill-metadata.schema.json`，安装格式见[配置参考](../../reference/configuration.md#用户指令技能)。每个有效技能暴露只读 `instructions.read`。规划器最多通过 Gateway 读取两个被选中的指令技能，再携带指令重新规划；第二轮仍过滤当前目录之外的工具。指令及 `allowed-tools` 不授予权限，引用文件和脚本不会自动执行。禁用时不读取目录，坏文件单独降级，停止时撤销能力。
+
+MCP 连接失败或断开时撤销旧能力目录，以 1 秒起、最多 30 秒的退避重连；成功连接后重置退避。停止 Provider 会取消重试，迟到的旧连接回调不能重建目录。
+
+扩展首次安装成功后自动尝试激活。激活失败保留安装包并呈现降级原因，用户修正配置、凭据或依赖后需在扩展详情重新激活；重启服务不会自动恢复失败的首次激活。已有扩展的升级与重复安装不自动改变既有激活选择。
 
 `SkillPlanningAppService` 位于 Kernel application 层，负责把 `SkillCatalogSnapshot` 中 `audience=character`、`runtime_status=ready` 且 scope 匹配当前 `ConversationContext` 的工具转成 `AgentPlanRequest.available_tools`，经 `AIProxy.requestAgentPlan()` 请求 Cognition 规划，并在返回后再次过滤目录外建议。`executeSuggestion()` 将同一 ConversationContext 传给 `SkillInvocationGateway`，不直接执行 provider handler。这样 planner 看不到跨来源能力，伪造建议也会在执行层再次被拒绝。
 

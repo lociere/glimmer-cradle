@@ -57,7 +57,7 @@ AI 辅助任务在第 2–8 步之间使用短反馈环：先观察当前页面�
 
 ## 3. 信息架构与路由
 
-每个一级入口必须对应一个稳定用户任务域，不以技术模块数量、后端 service 或“有一张卡片可放”为理由增加导航。二级导航只在当前域内存在真实子域时出现；当前位置只由一个主标题和必要 breadcrumb 表达，避免顶栏、侧栏、页面标题重复同一句话。
+每个一级入口必须对应一个稳定用户任务域，不以技术模块数量、后端 service 或“有一张卡片可放”为理由增加导航。二级导航只在当前域内存在真实子域时出现；当前位置由唯一有效的导航状态、轻量标题或必要 breadcrumb 表达，避免全局导航、局部导航和页面巨型标题重复同一句话。
 
 对象详情使用列表/主体 + 按需详情层。Context Drawer 只有在用户选中 runtime、日志、Extension、Provider 等真实对象时才出现；未选中对象时不得常驻空洞 Inspector 挤压工作区。
 
@@ -137,11 +137,23 @@ AI 辅助任务在第 2–8 步之间使用短反馈环：先观察当前页面�
 - 浏览器缩放、文本放大和 320 CSS px 等效宽度下不得丢失信息或要求双向滚动，确需二维布局的内容除外。
 - 不禁止缩放；正文和控件文字响应用户字号偏好，避免只依赖 viewport 单位。
 - 动效服从 `prefers-reduced-motion` 或产品等价偏好；移除非必要运动后仍保留状态变化含义。
+- 全视口工作台应锁定 document 滚动；日志、消息、目录和长详情在明确的内部阅读区滚动，但不得为未溢出的内容永久显示空滚动槽。滚动条使用窄圆角、透明轨道的低干扰样式，页面及内部长内容到底后保留一致的呼吸间距。路由切换只使用不改变几何位置的短过渡，避免新旧页面动画叠加造成抖动。
+- 原生 `select`、浏览器 `confirm` 等不可控系统弹层不得混入已建立的站内材质体系；选择浮层、确认对话框和详情对话框使用共享组件，并验证圆角、遮罩、焦点返回和窄屏位置。
 - 触控目标达到 WCAG 2.2 的最低目标尺寸或满足允许例外，并保持足够间距；拖动必须有非拖动替代。
 - 图标按钮提供可访问名称；陌生图标有文字说明或 tooltip；品牌资产不代替控件标签。
 - 标题层级、landmark、表单 label、错误关联、live region 和语言属性保持正确。
 
 ## 7. 验证矩阵
+
+### Chromeless / Material 专项
+
+- Shell：宽屏导航是否融入 viewport、是否残留实体 Topbar/硬 Sidebar 边界；页面 action 是否回到页面 header。
+- Background：分别验证 Dark/Light × Ambient/Wallpaper；无壁纸时层级仍成立，复杂背景下文字、focus 与 overlay edge 仍可辨认。
+- Material：blur、alpha、border、shadow、saturation 与 brightness 只能来自 semantic token；检查 blur layer 数量，禁止列表行和普通 section 各自产生 backdrop layer。
+- Continuous content：Overview runtime、Activity log、Capabilities object 不得退化成 Card Wall；divider、row rhythm、hover/focus 和长内容扫描顺序清楚。
+- Overlay：分别检查 Dropdown、Popover、Context Drawer、Dialog 的层级、圆角、阴影、scrim、Escape 与焦点返回，不把 Drawer 当 Modal。
+- Interaction：固定 Navigation hover/active、list/log row hover、button hover/pressed、dropdown/popover/drawer/dialog open 与 focus-visible 截图或等价证据；hover action 必须同时能由键盘 focus 与触控显式入口访问。
+- Wallpaper：统一 environmental treatment，背景可辨认但不抢正文；未具备安全 Provider/Proxy 时记录阻断，不能把第三方 API key 放进浏览器。
 
 先根据风险选择矩阵，不用单张“看起来正常”的宽屏截图代替验收。
 

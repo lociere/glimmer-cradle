@@ -11,6 +11,9 @@ packages:
 
 # 发行投影必须包含 workspace 私有包的实体副本，不能在部署时回查 npm registry。
 injectWorkspacePackages: true
+overrides:
+  # Electron 原生模块重编译需要识别 Visual Studio 2026。
+  '@electron/rebuild>node-gyp': 12.4.0
 syncInjectedDepsAfterScripts:
   - build
 

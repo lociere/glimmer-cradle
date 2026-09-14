@@ -12,6 +12,18 @@ export class ControlSurfaceCorePlatformBridge implements CorePlatformBridge {
     return this.surface.requestCoreSkillAction('desktop.open_url', { url }, invocationId);
   }
 
+  public openFile(path: string, invocationId?: string): Promise<unknown> {
+    return this.surface.requestCoreSkillAction('desktop.open_file', { path }, invocationId);
+  }
+
+  public captureScreen(displayId?: string, invocationId?: string): Promise<unknown> {
+    return this.surface.requestCoreSkillAction('screen.capture', { displayId }, invocationId);
+  }
+
+  public readActiveWindow(invocationId?: string): Promise<unknown> {
+    return this.surface.requestCoreSkillAction('screen.active_window', {}, invocationId);
+  }
+
   public showNotification(title: string, body: string, invocationId?: string): Promise<unknown> {
     return this.surface.requestCoreSkillAction('notification.show', { title, body }, invocationId);
   }

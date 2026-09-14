@@ -15,6 +15,7 @@ import {
   type SurfaceFrame,
 } from '../shared/api/personal-server-client';
 import { createRequestId } from '../shared/request-id';
+import { SkillConfirmationController } from '../features/capabilities/SkillConfirmationController';
 
 export type SessionState = 'loading' | 'anonymous' | 'authenticated';
 export type ConnectionState = 'online' | 'connecting' | 'waiting';
@@ -48,6 +49,7 @@ const initialSnapshot: PersonalServerAppSnapshot = {
 };
 
 export class PersonalServerAppController {
+  public readonly skillConfirmation = new SkillConfirmationController();
   private readonly client = new PersonalServerClient();
   private readonly listeners = new Set<() => void>();
   private readonly conversationListeners = new Set<(frame: SurfaceFrame) => void>();
@@ -327,7 +329,7 @@ export class PersonalServerAppController {
       },
       onClose: () => {
         if (!this.isActiveSurface(surface, generation)) return;
-
+        this.skillConfirmation.clear();
         this.surface = null;
         this.patch({ connection: 'waiting', runtimeCatalogCurrent: false });
         const signal = this.authenticatedAbort?.signal;
@@ -338,6 +340,14 @@ export class PersonalServerAppController {
   }
 
   private handleSurfaceFrame(frame: SurfaceFrame): void {
+    if (frame.kind === 'core_skill_confirmation_request') {
+      const surface = this.surface;
+      const generation = this.generation;
+      if (surface) this.skillConfirmation.receive(frame, (approved) => {
+        if (this.isActiveSurface(surface, generation)) surface.respondSkillConfirmation(frame.request_id!, approved);
+      });
+      return;
+    }
     for (const listener of this.conversationListeners) listener(frame);
     for (const listener of this.extensionListeners) listener(frame);
     if (frame.kind === 'runtime_readiness' && frame.runtime_readiness) {
@@ -348,6 +358,7 @@ export class PersonalServerAppController {
   }
 
   private teardownAuthenticated(): void {
+    this.skillConfirmation.clear();
     this.clearReadinessTimer();
     this.authenticatedAbort?.abort();
     this.authenticatedAbort = null;

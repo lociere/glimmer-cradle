@@ -29,7 +29,7 @@ export interface RuntimeProjectionPort extends RuntimeProjectionInputPort {
 }
 
 export interface CognitionIngressRecoveryPort {
-  suspendIngress(summary: string): void;
+  suspendIngress(summary: string, state?: 'starting' | 'failed'): void;
   restoreIngress(): void;
 }
 

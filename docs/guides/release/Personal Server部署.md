@@ -133,7 +133,7 @@ ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 
 随后访问 `http://127.0.0.1:8080/`。访问 token 只用于换取 HttpOnly 会话 Cookie，不进入 URL。
 
-当前 `v0.1.x` 网页已提供正式控制面：`对话`、`状态`、`扩展`、`日志`、`设置` 五个一级页面可在零 Provider 状态下登录使用。设置中心当前已接入 Provider/默认路由、Audio、Embedding、Memory/Experience、Skill、安全访问令牌、存储/备份、更新/服务状态等 section owner；Provider secret 仍保持 write-only，浏览器不会回显密钥，也不会直接编辑原始 YAML。若某个运维动作依赖宿主桥但当前源码直跑环境未接入，页面会显示真实 disabled reason，而不是假按钮。
+当前网页提供 `配置`、`扩展`、`能力`、`数据`、`系统` 五个紧凑一级入口，可在零 Provider 状态下登录使用。配置页接入 Provider/默认路由、Audio、Embedding、Memory/Experience 与外观；Skill 与 Provider Runtime 固定进入能力页，访问令牌、日志、存储/备份和服务状态归入系统页。Provider secret 仍保持 write-only，浏览器不会回显密钥，也不会直接编辑原始 YAML。若某个运维动作依赖宿主桥但当前源码直跑环境未接入，页面会显示真实 disabled reason，而不是假按钮。
 
 Web 运维请求使用可恢复的 `operation_id`。accepted/started 后页面按同一 ID 轮询；重连会继续
 查询 durable 终态。unsupported、failed、recovery_required、owner_timeout、conflict 与

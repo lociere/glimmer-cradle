@@ -54,7 +54,11 @@ if (process.platform === 'win32') {
   await fs.mkdir(nativeStageDirectory, { recursive: true });
   await fs.mkdir(nativePluginDirectory, { recursive: true });
   await fs.copyFile(nativeSource, path.join(nativeStageDirectory, path.basename(nativeSource)));
-  await fs.copyFile(nativeSource, path.join(nativePluginDirectory, path.basename(nativeSource)));
+  // Grpc.Core 在 Unity/Mono 中按 DllImport("grpc_csharp_ext") 解析本机库；
+  // Windows Player 必须收到不带 NuGet 架构后缀的文件名。
+  await fs.rm(path.join(nativePluginDirectory, 'grpc_csharp_ext.x64.dll'), { force: true });
+  await fs.rm(path.join(nativePluginDirectory, 'grpc_csharp_ext.x64.dll.meta'), { force: true });
+  await fs.copyFile(nativeSource, path.join(nativePluginDirectory, 'grpc_csharp_ext.dll'));
 }
 console.log(`[avatar-core] 已生成离线程序集并投影到 Unity Host: ${stageDirectory}`);
 

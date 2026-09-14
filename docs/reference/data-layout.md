@@ -68,6 +68,8 @@ Character Package、Experience Ledger、Knowledge Vault、Memory Substrate 与 V
 | `data/models/voice/` | TTS 模型、用户导入声线、训练整理副本 |
 | `data/cache/audio/tts/` | TTS 合成缓存，可按文本/provider 复用 |
 | `data/work/audio/asr/` | Control Center 上传或录制的 ASR 临时输入 |
+| `data/work/desktop/screenshots/` | Desktop 屏幕技能生成的 PNG；调用返回路径与尺寸，用户按需保留或清理 |
+| `data/packages/skills/<name>/SKILL.md` | 用户安装的指令技能；格式和配置见[配置参考](configuration.md#用户指令技能) |
 | `data/packages/managed-resources/lociere.napcat-adapter/napcat/` | 本机托管 NapCat 程序包；可重装，不保存扩展连续性状态 |
 | `data/packages/extensions/<id>/<version>/` | 已安装扩展发布物；版本可并存，由 active config 精确选择 |
 | `engines/audio/src/glimmer_cradle/audio/resources.json` | 官方音频资源 catalog，不是用户模型目录 |

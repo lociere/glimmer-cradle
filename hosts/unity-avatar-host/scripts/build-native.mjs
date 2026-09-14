@@ -15,7 +15,9 @@ const pluginDirectory = path.join(repoRoot, 'hosts', 'unity-avatar-host', 'Asset
 const binaryName = 'platform_native.dll';
 const cmake = process.env.CMAKE_COMMAND || 'cmake';
 await fs.mkdir(buildDirectory, { recursive: true });
-await run(cmake, ['-S', path.join(repoRoot, 'native'), '-B', buildDirectory, '-A', 'x64']);
+// 固定产物目录可能来自另一台 Windows builder；--fresh 避免失效的 VS instance
+// 留在 CMakeCache 中，使当前已安装生成器能够重新配置。
+await run(cmake, ['--fresh', '-S', path.join(repoRoot, 'native'), '-B', buildDirectory, '-A', 'x64']);
 await run(cmake, ['--build', buildDirectory, '--config', 'Release']);
 
 const candidates = [

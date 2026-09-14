@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from 're
 import { BrowserRouter } from 'react-router-dom';
 import { PersonalServerAppController } from './PersonalServerAppController';
 import { PersonalServerRouter } from './router';
+import { SkillConfirmation } from '../features/capabilities/SkillConfirmation';
 
 const controller = new PersonalServerAppController();
 
@@ -17,7 +18,6 @@ export function PersonalServerApplication(): JSX.Element {
     <BrowserRouter>
       {snapshot.session === 'loading' ? (
         <main className="session-loading" data-role="session-loading" aria-live="polite">
-          <span className="brand-wordmark">微光摇篮</span>
           <p>正在确认 Personal Server 会话…</p>
         </main>
       ) : snapshot.session === 'anonymous' ? (
@@ -27,7 +27,10 @@ export function PersonalServerApplication(): JSX.Element {
           onLogin={(token) => controller.login(token)}
         />
       ) : (
-        <PersonalServerRouter controller={controller} snapshot={snapshot} />
+        <>
+          <PersonalServerRouter controller={controller} snapshot={snapshot} />
+          <SkillConfirmation controller={controller.skillConfirmation} />
+        </>
       )}
     </BrowserRouter>
   );
@@ -53,11 +56,10 @@ function AuthenticationScreen(props: {
   return (
     <main className="login-layer" data-role="login-layer">
       <form className="login-panel" data-role="login-form" onSubmit={(event) => void submit(event)}>
-        <span className="brand-wordmark">微光摇篮</span>
         <div className="login-heading">
           <span>Personal Server</span>
-          <h1>连接你的个人控制面</h1>
-          <p>输入部署时生成的访问令牌。登录后会返回当前 URL 对应的工作区。</p>
+          <h1>连接控制面</h1>
+          <p>使用部署时生成的访问令牌。</p>
         </div>
         <input name="username" value="personal-server" autoComplete="username" hidden readOnly />
         <label htmlFor="access-token">访问令牌</label>

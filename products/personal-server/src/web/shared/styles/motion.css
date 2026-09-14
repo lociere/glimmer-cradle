@@ -8,3 +8,20 @@
     transition-duration: 1ms !important;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none; }
+  ::view-transition-old(workspace) { animation: 90ms ease-in both fade-out; }
+  ::view-transition-new(workspace) { animation: 160ms cubic-bezier(.2, 0, 0, 1) both fade-in; }
+}
+
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(workspace),
+  ::view-transition-new(workspace) { animation: none; }
+}

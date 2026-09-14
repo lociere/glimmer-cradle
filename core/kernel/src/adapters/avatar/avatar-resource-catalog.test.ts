@@ -54,4 +54,34 @@ describe('Avatar resource catalog canonical host paths', () => {
       expect(catalog?.summary).toContain('当前没有需要 Unity SDK');
     }
   });
+
+  it('uses explicit installed Player resources without consulting workspace SDK files', () => {
+    const root = fs.mkdtempSync(path.join(fs.realpathSync.native(process.env.TEMP || process.cwd()), 'avatar-installed-'));
+    try {
+      const registryPath = path.join(root, 'UnityAvatarHost_Data', 'StreamingAssets', 'avatar-package-registry.json');
+      const sdkCatalogPath = path.join(root, 'avatar-sdk-catalog.json');
+      const playerPath = path.join(root, 'UnityAvatarHost.exe');
+      fs.ensureDirSync(path.dirname(registryPath));
+      fs.writeJsonSync(registryPath, { models: [{ modelFormat: 'cubism4' }] });
+      fs.writeJsonSync(sdkCatalogPath, { sdks: [{ id: 'cubism-unity', displayName: 'Cubism', modelFormats: ['cubism4'] }] });
+      fs.writeFileSync(playerPath, 'fixture');
+
+      const snapshots = buildAvatarResourceSnapshots({
+        repoRoot: path.join(root, 'absent-workspace'),
+        commandPath: playerPath,
+        workingDir: root,
+        playerPath,
+        registryPath,
+        sdkCatalogPath,
+      });
+      expect(snapshots.find((item) => item.resource_id === 'avatar.package-registry')?.readiness).toBe('ready');
+      expect(snapshots.find((item) => item.resource_id === 'avatar.host.player')?.readiness).toBe('ready');
+      expect(snapshots.find((item) => item.resource_id === 'avatar.sdk.cubism-unity')).toMatchObject({
+        readiness: 'ready',
+        actual_state: 'ready',
+      });
+    } finally {
+      fs.removeSync(root);
+    }
+  });
 });

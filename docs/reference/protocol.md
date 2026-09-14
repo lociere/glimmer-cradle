@@ -32,6 +32,8 @@ Surface Gateway 的 `ConversationHistoryEntryProjection` 除历史正文与来�
 
 配置、Extension manifest/package、Product composition 与其他 Document 使用 JSON Schema 2020-12，必须声明稳定 `$id`、`x-glimmer-owner`、`x-glimmer-contract-kind=Document` 和兼容策略。Schema 可以跨目录 `$ref`；validator 必须先注册完整 registry，再校验入口 Document。
 
+`CoreSkillConfirmationRequestEvent` 的字段 8 `title`、字段 9 `detail` 为可选展示文本，由双端 Adapter 映射到确认界面；不授予权限，也不替代目标工具策略。确认回执必须来自接收该请求的可写 Surface session，断线使未完成请求失效。用户 SKILL.md 元数据由 `contracts/json-schema/skill/v1/user-skill-metadata.schema.json` 拥有，加载及调用边界见[Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。
+
 ## 生成与兼容
 
 ```powershell

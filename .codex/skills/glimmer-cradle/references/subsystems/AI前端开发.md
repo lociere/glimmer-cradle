@@ -17,7 +17,11 @@
 4. 按 router/Shell → shared UI → feature → route 装配实现；系统事实仍来自受控 Projection，UI 不补猜业务状态。
 5. 在内聚片段完成后立即用真实浏览器渲染目标状态并查看截图，再运行交互、键盘、focus、缩放、reduced-motion 和定向 a11y 检查。
 6. 截图比较只发现变化，不替代视觉判断；只有预期变化才能更新基线，必须说明视觉意图。
-7. 重大 UI 改造仍先产出三个非换色方向并等待用户选择。AI 不因获得高质量模型、UI Skill、MCP、参考图或组件库而绕过该门。
+7. 重大 UI 改造仍先产出三个非换色方向并等待用户选择；但用户已明确确认的方向直接进入实现与验证，不得重复触发选择门。Personal Server 当前已确认 Chromeless Ambient Workspace，依据对应 Design Brief 执行。
+
+## 视觉参考翻译
+
+使用公开参考网站时执行：公开页面与源码检查 → typography/radius/alpha/hover/overlay/material 规律提取 → 区分 reference method 与 foreign framework → 翻译为本项目 primitive/token → 真实浏览器重验。不得复制品牌、源码、class、布局、图标组合、资产或 token 数值，也不得因参考采用 Tailwind、Radix 或其他栈就迁移项目技术边界。
 
 ## 工具与依赖选择
 

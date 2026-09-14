@@ -6,7 +6,7 @@ import { startPersonalServerUiFixture } from './fixtures/personal-server-host';
 test('live events pause, resume, open details and export the displayed results', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture();
   try {
-    await page.goto(`${fixture.baseUrl}/activity`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
+    await page.goto(`${fixture.baseUrl}/system/logs`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
     await expect(page.locator('[data-role="status-line"]')).toContainText('正在观察日志流');
     await page.getByLabel('暂停', { exact: true }).check(); fixture.appendLog('paused-live-message');
     await expect(page.locator('[data-role="status-line"]')).toContainText('缓冲 1 条', { timeout: 8000 });
@@ -26,12 +26,12 @@ test('failed reads retry, empty filters and long content reflow accessibly', asy
   await page.route('**/api/v1/logs/recent**', async (route) => { if (fail) await route.fulfill({ status: 503, body: '{}' }); else await route.continue(); });
   const fixture = await startPersonalServerUiFixture();
   try {
-    await page.goto(`${fixture.baseUrl}/activity`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
+    await page.goto(`${fixture.baseUrl}/system/logs`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
     await expect(page.getByRole('alert')).toContainText('logs_503'); fail = false; await page.getByRole('button', { name: '刷新', exact: true }).click();
     await expect(page.locator('[data-role="status-line"]')).toContainText('正在观察日志流');
-    await page.getByLabel('模块', { exact: true }).fill('nonexistent'); await page.getByRole('button', { name: '应用筛选' }).click();
+    await page.getByLabel('模块', { exact: true }).fill('nonexistent');
     await expect(page.getByText('暂无日志结果，请调整筛选条件。')).toBeVisible();
-    await page.getByLabel('模块', { exact: true }).fill(''); await page.getByRole('button', { name: '应用筛选' }).click();
+    await page.getByLabel('模块', { exact: true }).fill('');
     await expect(page.locator('[data-role="status-line"]')).toContainText('正在观察日志流'); fixture.appendLog('long-identifier-中文'.repeat(200));
     await expect(page.locator('[data-role="log-list"]')).toContainText('long-identifier-', { timeout: 8000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { PersonalServerAppSnapshot } from '../../app/PersonalServerAppController';
 import { RuntimeDetails } from './RuntimeDetails';
+import { SystemNavigation } from '../../shared/ui/SystemNavigation/SystemNavigation';
 import styles from './Overview.module.css';
 
 export interface OverviewProps {
@@ -24,16 +25,16 @@ export function Overview({ snapshot, configurationRead, onRetryConfiguration }: 
 
   return (
     <section className={`route-view ${styles.overview}`} data-role="view-overview">
+      <SystemNavigation />
       <header className={styles.summary}>
         <div className={styles.summaryText}>
-          <span className={styles.eyebrow}>系统概览</span>
-          <h1>{headline}</h1>
+          <strong className={styles[tone]}>{headline}</strong>
           <p className={styles[tone]} role={statusError ? 'alert' : 'status'}>
             {statusError || status?.summary || '等待服务提供就绪状态。'}
           </p>
           {status?.observed_at != null && <p className={styles.observed}>最近观测 <time>{formatTime(status.observed_at)}</time>{statusError && '（上次成功观测）'}</p>}
         </div>
-        <Link className={styles.action} to="/activity">查看诊断活动</Link>
+        <Link className={styles.action} to="/system/logs">查看日志</Link>
       </header>
 
       {stale && <div className={styles.notice} role="status">
@@ -49,7 +50,7 @@ export function Overview({ snapshot, configurationRead, onRetryConfiguration }: 
           {unavailable.length > 0 && <span className={styles.waiting}>{unavailable.length} 项降级或失败</span>}
         </div>
         {runtimeCatalogUpdatedAt === null ? <p role="status" className={styles.empty}>正在等待运行体目录，收到投影后自动显示。</p>
-          : runtimes.length === 0 ? <div className={styles.empty}><strong>运行体目录为空</strong><p>服务返回了空目录，可前往活动检查启动记录。</p><Link to="/activity">查看启动记录</Link></div>
+            : runtimes.length === 0 ? <div className={styles.empty}><strong>运行体目录为空</strong><p>服务返回了空目录，可前往日志检查启动记录。</p><Link to="/system/logs">查看启动记录</Link></div>
             : <ul className={styles.runtimeList}>{runtimes.map((runtime) => <li key={runtime.runtime_id}>
               <RuntimeDetails runtime={runtime} catalogUpdatedAt={runtimeCatalogUpdatedAt} stale={catalogStale} />
             </li>)}</ul>}
@@ -58,7 +59,7 @@ export function Overview({ snapshot, configurationRead, onRetryConfiguration }: 
       <section className={styles.configuration} aria-labelledby="overview-model">
         <div className={styles.sectionHead}>
           <div><h2 id="overview-model">对话模型</h2><p>默认模型路由</p></div>
-          <Link className={styles.action} to="/settings">配置模型</Link>
+          <Link className={styles.action} to="/config">配置模型</Link>
         </div>
         {stale ? <p className={styles.waiting}>连接恢复后重新读取模型配置。{route && `上次投影：${route.ready ? '可用' : '不可用'}。`}</p>
           : configurationRead.state === 'loading' ? <p role="status">正在读取模型配置…</p>

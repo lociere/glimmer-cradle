@@ -189,7 +189,7 @@
       "owner": "Kernel Config Application owner",
       "kind": "Document",
       "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "624ea9eec1887e46f46d604e5f6f2a8dad5c61f828a7e11dc1f988cb53bc72f2"
+      "sha256": "3955c7a0dec0071fd519d715a43b9cc41939aafd4721238e62b7ad38d53ec17a"
     },
     {
       "path": "json-schema/config/v1/surface-config.schema.json",
@@ -289,6 +289,15 @@
       "kind": "Document",
       "compatibility": "additive-v1",
       "sha256": "e4436448c913b34f98972e29645db3ce9a7fe46c75c398a15973583d7fc38008"
+    },
+    {
+      "path": "json-schema/skill/v1/user-skill-metadata.schema.json",
+      "id": "https://glimmer-cradle.dev/schemas/skill/v1/user-skill-metadata.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Kernel Skill Plane",
+      "kind": "Document",
+      "compatibility": "Additive optional metadata only; required fields and validation changes require review.",
+      "sha256": "2e29c18c3965fceac7d0acdc0f41bd7cd39b78c5812661093fc607e368d065f4"
     }
   ]
 }

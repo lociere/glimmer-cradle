@@ -22,7 +22,7 @@ export interface PackagedSupervisorSnapshot {
 
 type ProbeReadiness = 'waiting' | 'ready' | 'degraded' | 'failed';
 interface SurfaceGatewayProbeClient {
-  on(event: 'message', listener: (raw: Buffer) => void): this;
+  on(event: 'message', listener: (frame: { kind?: unknown; runtime_readiness?: unknown }) => void): this;
   once(event: 'error' | 'close', listener: () => void): this;
   removeAllListeners(): this;
   connect(endpoint: string, generation: string): Promise<void>;
@@ -126,6 +126,9 @@ export class PackagedSupervisor {
           GLIMMER_CRADLE_EXTENSION_MODULE_ROOT: this.paths.extensionModuleRoot,
           GLIMMER_CRADLE_PYTHON_RUNTIME: this.paths.pythonExecutable,
           GLIMMER_CRADLE_AVATAR_HOST_COMMAND: this.paths.avatarHostExecutable,
+          GLIMMER_CRADLE_AVATAR_PLAYER_EXECUTABLE: this.paths.avatarPlayerExecutable,
+          GLIMMER_CRADLE_AVATAR_PACKAGE_REGISTRY: this.paths.avatarPackageRegistry,
+          GLIMMER_CRADLE_AVATAR_SDK_CATALOG: this.paths.avatarSdkCatalog,
           GLIMMER_CRADLE_NATIVE_LIB: this.paths.nativeLibrary,
           GLIMMER_CRADLE_SUPERVISOR_PID: String(process.pid),
           GLIMMER_CRADLE_LAUNCH_SESSION: this.launchSession,
@@ -227,6 +230,7 @@ export class PackagedSupervisor {
         const result = await this.processTree.stop();
         if (!result.terminated || result.active_process_count !== 0) return false;
         this.child = null;
+        this.processTree = null;
         return true;
       } catch (error) {
         await this.project('failed', `安装态进程树终止失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -301,9 +305,8 @@ async function probeRuntimeReadinessCatalog(
       resolve(result);
     };
     const timeout = setTimeout(() => finish('waiting'), 1_500);
-    socket.on('message', (raw: Buffer) => {
+    socket.on('message', (frame) => {
       try {
-        const frame = JSON.parse(raw.toString()) as { kind?: unknown; runtime_readiness?: unknown };
         if (frame.kind === 'runtime_readiness') finish(classifyRuntimeReadiness(frame.runtime_readiness));
       } catch {
         finish('waiting');
@@ -317,7 +320,7 @@ async function probeRuntimeReadinessCatalog(
 
 async function createSurfaceGatewayProbeClient(): Promise<SurfaceGatewayProbeClient> {
   const { SurfaceGatewayClient } = await import('./surface-gateway-client.js');
-  return new SurfaceGatewayClient();
+  return new SurfaceGatewayClient(['surface:read']);
 }
 
 function classifyRuntimeReadiness(value: unknown): ProbeReadiness {
@@ -336,7 +339,8 @@ function classifyRuntimeReadiness(value: unknown): ProbeReadiness {
     && typeof (runtime as { state?: unknown }).state === 'string'
   ));
   if (blocking.length === 0) return 'waiting';
-  if (blocking.some((runtime) => runtime.state === 'failed' || runtime.state === 'stopped')) return 'failed';
+  // 初始投影可包含尚未启动的阻塞模块；只有显式 failed 才终止启动。
+  if (blocking.some((runtime) => runtime.state === 'failed')) return 'failed';
   if (!blocking.every((runtime) => runtime.state === 'ready' || runtime.state === 'degraded')) return 'waiting';
   return observed.some((runtime) => runtime.state === 'failed' || runtime.state === 'degraded')
     ? 'degraded'

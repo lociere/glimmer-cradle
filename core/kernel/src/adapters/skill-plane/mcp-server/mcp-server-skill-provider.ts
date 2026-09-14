@@ -53,6 +53,8 @@ export class McpServerSkillProvider implements SkillProvider {
     updatedAt: string;
   }>();
   private readonly _pendingConnections = new Set<Promise<void>>();
+  private readonly _retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly _retryAttempts = new Map<string, number>();
   private _registrationTarget: SkillRegistrationTarget | null = null;
   public readonly provider: SkillProviderRef = MCP_SERVER_SKILL_PROVIDER;
 
@@ -103,6 +105,9 @@ export class McpServerSkillProvider implements SkillProvider {
 
   public async stop(target: SkillRegistrationTarget): Promise<void> {
     this._registrationTarget = null;
+    for (const timer of this._retryTimers.values()) clearTimeout(timer);
+    this._retryTimers.clear();
+    this._retryAttempts.clear();
     await Promise.allSettled(Array.from(this._connections.values()).map((connection) => connection.close()));
     this._connections.clear();
 
@@ -179,8 +184,12 @@ export class McpServerSkillProvider implements SkillProvider {
 
   private async connectTarget(target: McpServerConnectionTarget): Promise<void> {
     const connection = new McpServerConnection(target, {
-      onCapabilitiesChanged: () => this.trackConnection(this.refreshTarget(target.id)),
-      onClosed: () => this.handleConnectionClosed(target.id),
+      onCapabilitiesChanged: () => {
+        if (this._connections.get(target.id) === connection && this._registrationTarget) this.trackConnection(this.refreshTarget(target.id));
+      },
+      onClosed: () => {
+        if (this._connections.get(target.id) === connection && this._registrationTarget) this.handleConnectionClosed(target.id);
+      },
       onError: (error) => logger.warn('MCP server 连接异常', {
         server_id: target.id,
         error: summarizeError(error),
@@ -199,6 +208,7 @@ export class McpServerSkillProvider implements SkillProvider {
         return;
       }
       this.registerSnapshot(target, connection, snapshot);
+      this._retryAttempts.delete(target.id);
       this.setStatus(target, 'ready');
       logger.info('MCP server 已连接并完成能力枚举', {
         server_id: target.id,
@@ -211,6 +221,7 @@ export class McpServerSkillProvider implements SkillProvider {
       if (this._connections.get(target.id) === connection) {
         this._connections.delete(target.id);
         this.setStatus(target, 'unavailable', summarizeError(error));
+        this.scheduleReconnect(target);
       }
       await connection.close().catch(() => undefined);
       logger.warn('MCP server 未就绪，已保持降级', {
@@ -230,6 +241,7 @@ export class McpServerSkillProvider implements SkillProvider {
 
     try {
       const snapshot = await connection.describeCapabilities();
+      if (this._connections.get(id) !== connection || !this._registrationTarget) return;
       this.registerSnapshot(target, connection, snapshot);
       this.setStatus(target, 'ready');
       logger.info('MCP server 能力目录已刷新', {
@@ -239,7 +251,7 @@ export class McpServerSkillProvider implements SkillProvider {
         prompt_count: snapshot.prompts.length,
       });
     } catch (error) {
-      this.handleConnectionFailure(target, summarizeError(error));
+      if (this._connections.get(id) === connection && this._registrationTarget) this.handleConnectionFailure(target, summarizeError(error));
     }
   }
 
@@ -252,12 +264,30 @@ export class McpServerSkillProvider implements SkillProvider {
   }
 
   private handleConnectionFailure(target: McpServerConnectionTarget, error: string): void {
+    const connection = this._connections.get(target.id);
     this._connections.delete(target.id);
+    if (connection) this.trackConnection(connection.close().catch(() => undefined));
     const skillId = this.toSkillId(target);
     this._registrationTarget?.unregisterSkill(skillId);
     this._registeredSkillIds.delete(skillId);
     this._capabilityStats.delete(target.id);
     this.setStatus(target, 'unavailable', error);
+    this.scheduleReconnect(target);
+  }
+
+  private scheduleReconnect(target: McpServerConnectionTarget): void {
+    if (!this._registrationTarget || this._connectionTargets.get(target.id) !== target || this._retryTimers.has(target.id)) return;
+    const attempt = this._retryAttempts.get(target.id) ?? 0;
+    this._retryAttempts.set(target.id, attempt + 1);
+    const delay = Math.min(30_000, 1000 * 2 ** Math.min(attempt, 5));
+    const timer = setTimeout(() => {
+      this._retryTimers.delete(target.id);
+      if (!this._registrationTarget || this._connectionTargets.get(target.id) !== target) return;
+      this.setStatus(target, 'connecting');
+      this.trackConnection(this.connectTarget(target));
+    }, delay);
+    timer.unref?.();
+    this._retryTimers.set(target.id, timer);
   }
 
   private registerSnapshot(

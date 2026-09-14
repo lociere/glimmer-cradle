@@ -7,5 +7,6 @@
 mcp_servers: []
 
 user_skills:
-  enabled: false
+  enabled: true
+  # 相对产品数据根下的 packages；每个子目录包含 SKILL.md。
   root_dir: "skills"

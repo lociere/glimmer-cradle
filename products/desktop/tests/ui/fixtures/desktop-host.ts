@@ -196,6 +196,8 @@ export async function installDesktopHostMock(page: Page): Promise<void> {
           name: 'Workspace Bridge',
           description: '连接外部工作台并提供受控同步能力。',
           version: '0.1.0',
+          installedVersions: ['0.1.0'],
+          activeVersion: '0.1.0',
           enabled: true,
           running: true,
           operationalState: 'ready' as TestExtensionOperationalState,
@@ -410,7 +412,7 @@ export async function installDesktopHostMock(page: Page): Promise<void> {
           provider_id: null,
         },
       ],
-      llm: [
+      modelInvocations: [
         {
           timestamp: '2026-07-07T08:10:02.000Z',
           invocation_id: 'llm-001',

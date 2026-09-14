@@ -15,12 +15,15 @@ export function PersonalServerRouter(props: {
   return (
     <Routes>
       <Route element={<PersonalServerShell controller={props.controller} snapshot={props.snapshot} />}>
-        <Route index element={<Navigate to="/conversation" replace />} />
-        <Route path="conversation" element={<ConversationRoute controller={props.controller} />} />
-        <Route path="overview" element={<OverviewRoute controller={props.controller} />} />
-        <Route path="capabilities" element={<CapabilitiesRoute controller={props.controller} />} />
-        <Route path="activity" element={<ActivityRoute controller={props.controller} />} />
-        <Route path="settings" element={<SettingsRoute controller={props.controller} />} />
+        <Route index element={<Navigate to="/config" replace />} />
+        <Route path="data" element={<ConversationRoute controller={props.controller} />} />
+        <Route path="system" element={<OverviewRoute controller={props.controller} />} />
+        <Route path="extensions" element={<CapabilitiesRoute controller={props.controller} />} />
+        <Route path="capabilities" element={<SettingsRoute controller={props.controller} fixedSection="skills" standalone />} />
+        <Route path="system/logs" element={<ActivityRoute controller={props.controller} />} />
+        <Route path="system/security" element={<SettingsRoute controller={props.controller} fixedSection="security" standalone system />} />
+        <Route path="system/operations" element={<SettingsRoute controller={props.controller} fixedSection="operations" standalone system />} />
+        <Route path="config" element={<SettingsRoute controller={props.controller} />} />
         <Route path="*" element={<UnknownRoute />} />
       </Route>
     </Routes>

@@ -305,6 +305,8 @@ message CoreSkillConfirmationRequestEvent {
   string target_name = 5;
   string risk_level = 6;
   repeated string side_effects = 7;
+  string title = 8;
+  string detail = 9;
 }
 message ShutdownEvent {}
 

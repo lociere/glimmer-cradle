@@ -79,6 +79,9 @@ const ClientConstructor = grpc.makeGenericClientConstructor(definition, 'Surface
 };
 
 export class SurfaceGatewayClient extends EventEmitter {
+  public constructor(private readonly scopes: readonly string[] = ['surface:read', 'surface:write']) {
+    super();
+  }
   private client: SurfaceGrpcClient | null = null;
   private stream: grpc.ClientReadableStream<SurfaceGatewayServiceStreamResponse> | null = null;
   private sessionId = '';
@@ -96,7 +99,7 @@ export class SurfaceGatewayClient extends EventEmitter {
       client.Connect(create(SurfaceGatewayServiceConnectRequestSchema, {
         productId,
         generation,
-        scopes: ['surface:read', 'surface:write'],
+        scopes: [...this.scopes],
         call: create(CallMetadataSchema, { traceId: `${productId}-surface-${Date.now()}` }),
       }), (error, result) => error ? reject(error) : resolve(result));
     });

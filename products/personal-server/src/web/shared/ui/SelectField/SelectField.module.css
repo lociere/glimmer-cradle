@@ -1,0 +1,14 @@
+.select { min-width: 0; display: grid; gap: var(--space-1); color: var(--text-tertiary); font-size: var(--font-size-label); }
+.trigger { width: 100%; min-width: 0; min-height: var(--control-height-compact); display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-1) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-control); color: var(--text-primary); background: var(--interactive-neutral); text-align: left; cursor: pointer; }
+.trigger[data-focus-visible] { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.trigger[data-disabled] { cursor: default; opacity: .68; }
+.popover { min-width: var(--trigger-width); max-width: min(24rem, calc(100vw - 1rem)); padding: .3rem; border: 1px solid var(--material-edge); border-radius: var(--radius-panel); color: var(--text-primary); background: var(--material-frost-elevated); box-shadow: var(--shadow-overlay), var(--shadow-inner-glint); backdrop-filter: var(--material-filter-elevated); overflow: hidden; }
+.popover[data-entering] { animation: select-enter 140ms cubic-bezier(.2, 0, 0, 1); }
+.popover[data-exiting] { animation: select-exit 100ms ease-in; }
+.list { max-height: min(19rem, var(--available-height)); padding: 0; overflow: auto; outline: none; scrollbar-width: thin; }
+.option { min-height: var(--control-height-compact); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: calc(var(--radius-control) - 2px); color: var(--text-secondary); cursor: pointer; outline: none; }
+.option[data-focused] { color: var(--text-primary); background: var(--surface-hover); }
+.option[data-selected] { color: var(--accent-text); background: var(--interactive-accent); }
+@keyframes select-enter { from { opacity: 0; transform: translateY(-.25rem) scale(.985); } }
+@keyframes select-exit { to { opacity: 0; transform: translateY(-.15rem) scale(.99); } }
+@media (prefers-reduced-motion: reduce) { .popover[data-entering], .popover[data-exiting] { animation: none; } }

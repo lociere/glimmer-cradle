@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionManager } from '../../src/adapters/extension-host/extension-manager';
 import type {
   ActiveExtensionSelection,
@@ -39,6 +39,28 @@ afterEach(async () => {
 });
 
 describe('ExtensionManager', () => {
+  it.each([false, true])('首次安装自动启动真实 Host，激活失败保留已安装包与可操作诊断（失败=%s）', async (failActivation) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'extension-first-install-'));
+    tempRoots.push(root);
+    const extensionId = 'test.first-install';
+    const host = new FakeExtensionHost(root, new SkillCatalogAppService(new SkillRegistry()), []);
+    const manager = new ExtensionManager(host, readinessProjection);
+    await manager.init();
+    vi.spyOn(manager as any, 'getPackageManager').mockReturnValue({ commitInstall: async () => {
+      await installExtensionVersion(root, extensionId, { version: '1.0.0', permissions: [], entrySource: failActivation
+        ? 'module.exports = { onActivate() { throw new Error("fixture activation failed"); } };'
+        : 'module.exports = { onActivate() {} };' });
+      return { extension_id: extensionId, version: '1.0.0', installed_path: path.join(root, 'data/packages/extensions', extensionId, '1.0.0'), already_installed: false };
+    } });
+    try {
+      const result = await manager.commitInstall('fixture', []);
+      expect(result.message).toContain(failActivation ? '激活未完成' : '安装并激活');
+      if (failActivation) expect(result.message).toContain('在扩展详情重新激活');
+      expect(manager.listInstallationProjections()[0]?.installed_versions).toContain('1.0.0');
+      expect(manager.getRuntimeProjection(extensionId)?.lifecycle).toBe(failActivation ? 'degraded' : 'running');
+      expect(await host.loadActiveExtensions()).toHaveLength(failActivation ? 0 : 1);
+    } finally { await manager.shutdown(); vi.restoreAllMocks(); }
+  });
   it('发布产品从部署数据根发现扩展，不写入只读应用根', async () => {
     const fixture = await createExtensionFixture('test.deployment-data-root', {
       permissions: [],

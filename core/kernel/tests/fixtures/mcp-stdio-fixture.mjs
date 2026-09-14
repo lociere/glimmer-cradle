@@ -14,6 +14,11 @@ server.registerTool(
   async ({ text }) => ({ content: [{ type: 'text', text }] }),
 );
 
+server.registerTool('disconnect_fixture', { description: '关闭测试服务以验证真实断线恢复。', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => {
+  setTimeout(() => process.exit(0), 30);
+  return { content: [{ type: 'text', text: 'disconnecting' }] };
+});
+
 server.registerResource(
   'profile',
   'selrena-test://profile',

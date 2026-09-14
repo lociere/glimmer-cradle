@@ -307,101 +307,102 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
             "G0NvcmVTa2lsbEFjdGlvblJlcXVlc3RFdmVudBIdCgpyZXF1ZXN0X2lkGAEg",
             "ASgJUglyZXF1ZXN0SWQSFgoGYWN0aW9uGAIgASgJUgZhY3Rpb24SMQoHcGF5",
             "bG9hZBgDIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSB3BheWxvYWQi",
-            "/AEKIUNvcmVTa2lsbENvbmZpcm1hdGlvblJlcXVlc3RFdmVudBIdCgpyZXF1",
+            "qgIKIUNvcmVTa2lsbENvbmZpcm1hdGlvblJlcXVlc3RFdmVudBIdCgpyZXF1",
             "ZXN0X2lkGAEgASgJUglyZXF1ZXN0SWQSGQoIdHJhY2VfaWQYAiABKAlSB3Ry",
             "YWNlSWQSGQoIc2tpbGxfaWQYAyABKAlSB3NraWxsSWQSHwoLdGFyZ2V0X2tp",
             "bmQYBCABKAlSCnRhcmdldEtpbmQSHwoLdGFyZ2V0X25hbWUYBSABKAlSCnRh",
             "cmdldE5hbWUSHQoKcmlza19sZXZlbBgGIAEoCVIJcmlza0xldmVsEiEKDHNp",
-            "ZGVfZWZmZWN0cxgHIAMoCVILc2lkZUVmZmVjdHMiDwoNU2h1dGRvd25FdmVu",
-            "dCKwFQoMU3VyZmFjZUV2ZW50EhkKCGV2ZW50X2lkGAEgASgJUgdldmVudElk",
-            "EhkKCHRyYWNlX2lkGAIgASgJUgd0cmFjZUlkEiEKDHRpbWVzdGFtcF9tcxgD",
-            "IAEoA1ILdGltZXN0YW1wTXMSNgoFcmVwbHkYCiABKAsyHi5nbGltbWVyLnN1",
-            "cmZhY2UudjEuUmVwbHlFdmVudEgAUgVyZXBseRI8CgdlbW90aW9uGAsgASgL",
-            "MiAuZ2xpbW1lci5zdXJmYWNlLnYxLkVtb3Rpb25FdmVudEgAUgdlbW90aW9u",
-            "EjwKB3Rob3VnaHQYDCABKAsyIC5nbGltbWVyLnN1cmZhY2UudjEuVGhvdWdo",
-            "dEV2ZW50SABSB3Rob3VnaHQSQwoKYXVkaW9fcGxheRgNIAEoCzIiLmdsaW1t",
-            "ZXIuc3VyZmFjZS52MS5BdWRpb1BsYXlFdmVudEgAUglhdWRpb1BsYXkSVQoQ",
-            "YXVkaW9fdHJhbnNjcmlwdBgOIAEoCzIoLmdsaW1tZXIuc3VyZmFjZS52MS5B",
-            "dWRpb1RyYW5zY3JpcHRFdmVudEgAUg9hdWRpb1RyYW5zY3JpcHQSZwoWY2hh",
-            "cmFjdGVyX3ByZXNlbnRhdGlvbhgPIAEoCzIuLmdsaW1tZXIuc3VyZmFjZS52",
-            "MS5DaGFyYWN0ZXJQcmVzZW50YXRpb25FdmVudEgAUhVjaGFyYWN0ZXJQcmVz",
-            "ZW50YXRpb24STAoNYXZhdGFyX3N0YXR1cxgQIAEoCzIlLmdsaW1tZXIuc3Vy",
-            "ZmFjZS52MS5BdmF0YXJTdGF0dXNFdmVudEgAUgxhdmF0YXJTdGF0dXMSXAoT",
-            "YXZhdGFyX2FjdGlvbl9zdGF0ZRgRIAEoCzIqLmdsaW1tZXIuc3VyZmFjZS52",
-            "MS5BdmF0YXJBY3Rpb25TdGF0ZUV2ZW50SABSEWF2YXRhckFjdGlvblN0YXRl",
-            "ElgKEXJ1bnRpbWVfcmVhZGluZXNzGBIgASgLMikuZ2xpbW1lci5zdXJmYWNl",
-            "LnYxLlJ1bnRpbWVSZWFkaW5lc3NFdmVudEgAUhBydW50aW1lUmVhZGluZXNz",
-            "EkkKDGF1ZGlvX3N0YXR1cxgTIAEoCzIkLmdsaW1tZXIuc3VyZmFjZS52MS5B",
-            "dWRpb1N0YXR1c0V2ZW50SABSC2F1ZGlvU3RhdHVzEl4KE2NvbnZlcnNhdGlv",
-            "bl9ub3RpY2UYFCABKAsyKy5nbGltbWVyLnN1cmZhY2UudjEuQ29udmVyc2F0",
-            "aW9uTm90aWNlRXZlbnRIAFISY29udmVyc2F0aW9uTm90aWNlEnQKG2NvbnZl",
-            "cnNhdGlvbl9oaXN0b3J5X3Jlc3VsdBgVIAEoCzIyLmdsaW1tZXIuc3VyZmFj",
-            "ZS52MS5Db252ZXJzYXRpb25IaXN0b3J5UmVzdWx0RXZlbnRIAFIZY29udmVy",
-            "c2F0aW9uSGlzdG9yeVJlc3VsdBJnChZjb25maWd1cmF0aW9uX3NuYXBzaG90",
-            "GBYgASgLMi4uZ2xpbW1lci5zdXJmYWNlLnYxLkNvbmZpZ3VyYXRpb25TbmFw",
-            "c2hvdEV2ZW50SABSFWNvbmZpZ3VyYXRpb25TbmFwc2hvdBJhChRjb25maWd1",
-            "cmF0aW9uX3VwZGF0ZRgXIAEoCzIsLmdsaW1tZXIuc3VyZmFjZS52MS5Db25m",
-            "aWd1cmF0aW9uVXBkYXRlRXZlbnRIAFITY29uZmlndXJhdGlvblVwZGF0ZRJb",
-            "ChJjb25maWd1cmF0aW9uX3Rlc3QYGCABKAsyKi5nbGltbWVyLnN1cmZhY2Uu",
-            "djEuQ29uZmlndXJhdGlvblRlc3RFdmVudEgAUhFjb25maWd1cmF0aW9uVGVz",
-            "dBJMCg1za2lsbF9jYXRhbG9nGBkgASgLMiUuZ2xpbW1lci5zdXJmYWNlLnYx",
-            "LlNraWxsQ2F0YWxvZ0V2ZW50SABSDHNraWxsQ2F0YWxvZxJuChlleHRlbnNp",
-            "b25faW5zdGFsbF9wcmV2aWV3GBogASgLMjAuZ2xpbW1lci5zdXJmYWNlLnYx",
-            "LkV4dGVuc2lvbkluc3RhbGxQcmV2aWV3RXZlbnRIAFIXZXh0ZW5zaW9uSW5z",
-            "dGFsbFByZXZpZXcSawoYZXh0ZW5zaW9uX2luc3RhbGxfcmVzdWx0GBsgASgL",
-            "Mi8uZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVuc2lvbkluc3RhbGxSZXN1bHRF",
-            "dmVudEgAUhZleHRlbnNpb25JbnN0YWxsUmVzdWx0EnEKGmV4dGVuc2lvbl91",
-            "bmluc3RhbGxfcmVzdWx0GBwgASgLMjEuZ2xpbW1lci5zdXJmYWNlLnYxLkV4",
-            "dGVuc2lvblVuaW5zdGFsbFJlc3VsdEV2ZW50SABSGGV4dGVuc2lvblVuaW5z",
-            "dGFsbFJlc3VsdBJxChpleHRlbnNpb25fbGlmZWN5Y2xlX3Jlc3VsdBgdIAEo",
-            "CzIxLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25MaWZlY3ljbGVSZXN1",
-            "bHRFdmVudEgAUhhleHRlbnNpb25MaWZlY3ljbGVSZXN1bHQSawoYZXh0ZW5z",
-            "aW9uX2NvbW1hbmRfcmVzdWx0GB4gASgLMi8uZ2xpbW1lci5zdXJmYWNlLnYx",
-            "LkV4dGVuc2lvbkNvbW1hbmRSZXN1bHRFdmVudEgAUhZleHRlbnNpb25Db21t",
-            "YW5kUmVzdWx0EooBCiNleHRlbnNpb25fcnVudGltZV9wcm9qZWN0aW9uX3Jl",
-            "c3VsdBgfIAEoCzI5LmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25SdW50",
-            "aW1lUHJvamVjdGlvblJlc3VsdEV2ZW50SABSIGV4dGVuc2lvblJ1bnRpbWVQ",
-            "cm9qZWN0aW9uUmVzdWx0Eo0BCiRleHRlbnNpb25fcnVudGltZV9wcm9qZWN0",
-            "aW9uX2NoYW5nZWQYICABKAsyOi5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5z",
-            "aW9uUnVudGltZVByb2plY3Rpb25DaGFuZ2VkRXZlbnRIAFIhZXh0ZW5zaW9u",
-            "UnVudGltZVByb2plY3Rpb25DaGFuZ2VkEmsKGGV4dGVuc2lvbl9zdGF0dXNf",
-            "Y2hhbmdlZBghIAEoCzIvLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25T",
-            "dGF0dXNDaGFuZ2VkRXZlbnRIAFIWZXh0ZW5zaW9uU3RhdHVzQ2hhbmdlZBJs",
-            "Chljb3JlX3NraWxsX2FjdGlvbl9yZXF1ZXN0GCIgASgLMi8uZ2xpbW1lci5z",
-            "dXJmYWNlLnYxLkNvcmVTa2lsbEFjdGlvblJlcXVlc3RFdmVudEgAUhZjb3Jl",
-            "U2tpbGxBY3Rpb25SZXF1ZXN0En4KH2NvcmVfc2tpbGxfY29uZmlybWF0aW9u",
-            "X3JlcXVlc3QYIyABKAsyNS5nbGltbWVyLnN1cmZhY2UudjEuQ29yZVNraWxs",
-            "Q29uZmlybWF0aW9uUmVxdWVzdEV2ZW50SABSHGNvcmVTa2lsbENvbmZpcm1h",
-            "dGlvblJlcXVlc3QSPwoIc2h1dGRvd24YJCABKAsyIS5nbGltbWVyLnN1cmZh",
-            "Y2UudjEuU2h1dGRvd25FdmVudEgAUghzaHV0ZG93bkIHCgVldmVudCLUAQoi",
-            "U3VyZmFjZUdhdGV3YXlTZXJ2aWNlUXVlcnlSZXNwb25zZRIhCgxvcGVyYXRp",
-            "b25faWQYASABKAlSC29wZXJhdGlvbklkEhYKBnN0YXR1cxgCIAEoCVIGc3Rh",
-            "dHVzEjYKBWV2ZW50GAMgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZh",
-            "Y2VFdmVudFIFZXZlbnQSOwoFZXJyb3IYBCABKAsyJS5nbGltbWVyLmNvbW1v",
-            "bi52MS5TZXJ2aWNlRXJyb3JEZXRhaWxSBWVycm9yItYBCiRTdXJmYWNlR2F0",
-            "ZXdheVNlcnZpY2VDb21tYW5kUmVzcG9uc2USIQoMb3BlcmF0aW9uX2lkGAEg",
-            "ASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0YXR1cxI2CgVl",
-            "dmVudBgDIAEoCzIgLmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlRXZlbnRS",
-            "BWV2ZW50EjsKBWVycm9yGAQgASgLMiUuZ2xpbW1lci5jb21tb24udjEuU2Vy",
-            "dmljZUVycm9yRGV0YWlsUgVlcnJvciJ4CiJTdXJmYWNlR2F0ZXdheVNlcnZp",
-            "Y2VTdHJlYW1SZXF1ZXN0EjMKBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1v",
-            "bi52MS5DYWxsTWV0YWRhdGFSBGNhbGwSHQoKc2Vzc2lvbl9pZBgCIAEoCVIJ",
-            "c2Vzc2lvbklkIl0KI1N1cmZhY2VHYXRld2F5U2VydmljZVN0cmVhbVJlc3Bv",
-            "bnNlEjYKBWV2ZW50GAEgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZh",
-            "Y2VFdmVudFIFZXZlbnQyiAQKFVN1cmZhY2VHYXRld2F5U2VydmljZRJ8CgdD",
-            "b25uZWN0EjcuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2Vy",
-            "dmljZUNvbm5lY3RSZXF1ZXN0GjguZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZh",
-            "Y2VHYXRld2F5U2VydmljZUNvbm5lY3RSZXNwb25zZRJ2CgVRdWVyeRI1Lmds",
-            "aW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VRdWVyeVJl",
-            "cXVlc3QaNi5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2",
-            "aWNlUXVlcnlSZXNwb25zZRJ8CgdDb21tYW5kEjcuZ2xpbW1lci5zdXJmYWNl",
-            "LnYxLlN1cmZhY2VHYXRld2F5U2VydmljZUNvbW1hbmRSZXF1ZXN0GjguZ2xp",
-            "bW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2VydmljZUNvbW1hbmRS",
-            "ZXNwb25zZRJ7CgZTdHJlYW0SNi5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFj",
-            "ZUdhdGV3YXlTZXJ2aWNlU3RyZWFtUmVxdWVzdBo3LmdsaW1tZXIuc3VyZmFj",
-            "ZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VTdHJlYW1SZXNwb25zZTABQi2q",
-            "AipHbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLlN1cmZhY2UuVjFi",
-            "BnByb3RvMw=="));
+            "ZGVfZWZmZWN0cxgHIAMoCVILc2lkZUVmZmVjdHMSFAoFdGl0bGUYCCABKAlS",
+            "BXRpdGxlEhYKBmRldGFpbBgJIAEoCVIGZGV0YWlsIg8KDVNodXRkb3duRXZl",
+            "bnQisBUKDFN1cmZhY2VFdmVudBIZCghldmVudF9pZBgBIAEoCVIHZXZlbnRJ",
+            "ZBIZCgh0cmFjZV9pZBgCIAEoCVIHdHJhY2VJZBIhCgx0aW1lc3RhbXBfbXMY",
+            "AyABKANSC3RpbWVzdGFtcE1zEjYKBXJlcGx5GAogASgLMh4uZ2xpbW1lci5z",
+            "dXJmYWNlLnYxLlJlcGx5RXZlbnRIAFIFcmVwbHkSPAoHZW1vdGlvbhgLIAEo",
+            "CzIgLmdsaW1tZXIuc3VyZmFjZS52MS5FbW90aW9uRXZlbnRIAFIHZW1vdGlv",
+            "bhI8Cgd0aG91Z2h0GAwgASgLMiAuZ2xpbW1lci5zdXJmYWNlLnYxLlRob3Vn",
+            "aHRFdmVudEgAUgd0aG91Z2h0EkMKCmF1ZGlvX3BsYXkYDSABKAsyIi5nbGlt",
+            "bWVyLnN1cmZhY2UudjEuQXVkaW9QbGF5RXZlbnRIAFIJYXVkaW9QbGF5ElUK",
+            "EGF1ZGlvX3RyYW5zY3JpcHQYDiABKAsyKC5nbGltbWVyLnN1cmZhY2UudjEu",
+            "QXVkaW9UcmFuc2NyaXB0RXZlbnRIAFIPYXVkaW9UcmFuc2NyaXB0EmcKFmNo",
+            "YXJhY3Rlcl9wcmVzZW50YXRpb24YDyABKAsyLi5nbGltbWVyLnN1cmZhY2Uu",
+            "djEuQ2hhcmFjdGVyUHJlc2VudGF0aW9uRXZlbnRIAFIVY2hhcmFjdGVyUHJl",
+            "c2VudGF0aW9uEkwKDWF2YXRhcl9zdGF0dXMYECABKAsyJS5nbGltbWVyLnN1",
+            "cmZhY2UudjEuQXZhdGFyU3RhdHVzRXZlbnRIAFIMYXZhdGFyU3RhdHVzElwK",
+            "E2F2YXRhcl9hY3Rpb25fc3RhdGUYESABKAsyKi5nbGltbWVyLnN1cmZhY2Uu",
+            "djEuQXZhdGFyQWN0aW9uU3RhdGVFdmVudEgAUhFhdmF0YXJBY3Rpb25TdGF0",
+            "ZRJYChFydW50aW1lX3JlYWRpbmVzcxgSIAEoCzIpLmdsaW1tZXIuc3VyZmFj",
+            "ZS52MS5SdW50aW1lUmVhZGluZXNzRXZlbnRIAFIQcnVudGltZVJlYWRpbmVz",
+            "cxJJCgxhdWRpb19zdGF0dXMYEyABKAsyJC5nbGltbWVyLnN1cmZhY2UudjEu",
+            "QXVkaW9TdGF0dXNFdmVudEgAUgthdWRpb1N0YXR1cxJeChNjb252ZXJzYXRp",
+            "b25fbm90aWNlGBQgASgLMisuZ2xpbW1lci5zdXJmYWNlLnYxLkNvbnZlcnNh",
+            "dGlvbk5vdGljZUV2ZW50SABSEmNvbnZlcnNhdGlvbk5vdGljZRJ0Chtjb252",
+            "ZXJzYXRpb25faGlzdG9yeV9yZXN1bHQYFSABKAsyMi5nbGltbWVyLnN1cmZh",
+            "Y2UudjEuQ29udmVyc2F0aW9uSGlzdG9yeVJlc3VsdEV2ZW50SABSGWNvbnZl",
+            "cnNhdGlvbkhpc3RvcnlSZXN1bHQSZwoWY29uZmlndXJhdGlvbl9zbmFwc2hv",
+            "dBgWIAEoCzIuLmdsaW1tZXIuc3VyZmFjZS52MS5Db25maWd1cmF0aW9uU25h",
+            "cHNob3RFdmVudEgAUhVjb25maWd1cmF0aW9uU25hcHNob3QSYQoUY29uZmln",
+            "dXJhdGlvbl91cGRhdGUYFyABKAsyLC5nbGltbWVyLnN1cmZhY2UudjEuQ29u",
+            "ZmlndXJhdGlvblVwZGF0ZUV2ZW50SABSE2NvbmZpZ3VyYXRpb25VcGRhdGUS",
+            "WwoSY29uZmlndXJhdGlvbl90ZXN0GBggASgLMiouZ2xpbW1lci5zdXJmYWNl",
+            "LnYxLkNvbmZpZ3VyYXRpb25UZXN0RXZlbnRIAFIRY29uZmlndXJhdGlvblRl",
+            "c3QSTAoNc2tpbGxfY2F0YWxvZxgZIAEoCzIlLmdsaW1tZXIuc3VyZmFjZS52",
+            "MS5Ta2lsbENhdGFsb2dFdmVudEgAUgxza2lsbENhdGFsb2cSbgoZZXh0ZW5z",
+            "aW9uX2luc3RhbGxfcHJldmlldxgaIAEoCzIwLmdsaW1tZXIuc3VyZmFjZS52",
+            "MS5FeHRlbnNpb25JbnN0YWxsUHJldmlld0V2ZW50SABSF2V4dGVuc2lvbklu",
+            "c3RhbGxQcmV2aWV3EmsKGGV4dGVuc2lvbl9pbnN0YWxsX3Jlc3VsdBgbIAEo",
+            "CzIvLmdsaW1tZXIuc3VyZmFjZS52MS5FeHRlbnNpb25JbnN0YWxsUmVzdWx0",
+            "RXZlbnRIAFIWZXh0ZW5zaW9uSW5zdGFsbFJlc3VsdBJxChpleHRlbnNpb25f",
+            "dW5pbnN0YWxsX3Jlc3VsdBgcIAEoCzIxLmdsaW1tZXIuc3VyZmFjZS52MS5F",
+            "eHRlbnNpb25Vbmluc3RhbGxSZXN1bHRFdmVudEgAUhhleHRlbnNpb25Vbmlu",
+            "c3RhbGxSZXN1bHQScQoaZXh0ZW5zaW9uX2xpZmVjeWNsZV9yZXN1bHQYHSAB",
+            "KAsyMS5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uTGlmZWN5Y2xlUmVz",
+            "dWx0RXZlbnRIAFIYZXh0ZW5zaW9uTGlmZWN5Y2xlUmVzdWx0EmsKGGV4dGVu",
+            "c2lvbl9jb21tYW5kX3Jlc3VsdBgeIAEoCzIvLmdsaW1tZXIuc3VyZmFjZS52",
+            "MS5FeHRlbnNpb25Db21tYW5kUmVzdWx0RXZlbnRIAFIWZXh0ZW5zaW9uQ29t",
+            "bWFuZFJlc3VsdBKKAQojZXh0ZW5zaW9uX3J1bnRpbWVfcHJvamVjdGlvbl9y",
+            "ZXN1bHQYHyABKAsyOS5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9uUnVu",
+            "dGltZVByb2plY3Rpb25SZXN1bHRFdmVudEgAUiBleHRlbnNpb25SdW50aW1l",
+            "UHJvamVjdGlvblJlc3VsdBKNAQokZXh0ZW5zaW9uX3J1bnRpbWVfcHJvamVj",
+            "dGlvbl9jaGFuZ2VkGCAgASgLMjouZ2xpbW1lci5zdXJmYWNlLnYxLkV4dGVu",
+            "c2lvblJ1bnRpbWVQcm9qZWN0aW9uQ2hhbmdlZEV2ZW50SABSIWV4dGVuc2lv",
+            "blJ1bnRpbWVQcm9qZWN0aW9uQ2hhbmdlZBJrChhleHRlbnNpb25fc3RhdHVz",
+            "X2NoYW5nZWQYISABKAsyLy5nbGltbWVyLnN1cmZhY2UudjEuRXh0ZW5zaW9u",
+            "U3RhdHVzQ2hhbmdlZEV2ZW50SABSFmV4dGVuc2lvblN0YXR1c0NoYW5nZWQS",
+            "bAoZY29yZV9za2lsbF9hY3Rpb25fcmVxdWVzdBgiIAEoCzIvLmdsaW1tZXIu",
+            "c3VyZmFjZS52MS5Db3JlU2tpbGxBY3Rpb25SZXF1ZXN0RXZlbnRIAFIWY29y",
+            "ZVNraWxsQWN0aW9uUmVxdWVzdBJ+Ch9jb3JlX3NraWxsX2NvbmZpcm1hdGlv",
+            "bl9yZXF1ZXN0GCMgASgLMjUuZ2xpbW1lci5zdXJmYWNlLnYxLkNvcmVTa2ls",
+            "bENvbmZpcm1hdGlvblJlcXVlc3RFdmVudEgAUhxjb3JlU2tpbGxDb25maXJt",
+            "YXRpb25SZXF1ZXN0Ej8KCHNodXRkb3duGCQgASgLMiEuZ2xpbW1lci5zdXJm",
+            "YWNlLnYxLlNodXRkb3duRXZlbnRIAFIIc2h1dGRvd25CBwoFZXZlbnQi1AEK",
+            "IlN1cmZhY2VHYXRld2F5U2VydmljZVF1ZXJ5UmVzcG9uc2USIQoMb3BlcmF0",
+            "aW9uX2lkGAEgASgJUgtvcGVyYXRpb25JZBIWCgZzdGF0dXMYAiABKAlSBnN0",
+            "YXR1cxI2CgVldmVudBgDIAEoCzIgLmdsaW1tZXIuc3VyZmFjZS52MS5TdXJm",
+            "YWNlRXZlbnRSBWV2ZW50EjsKBWVycm9yGAQgASgLMiUuZ2xpbW1lci5jb21t",
+            "b24udjEuU2VydmljZUVycm9yRGV0YWlsUgVlcnJvciLWAQokU3VyZmFjZUdh",
+            "dGV3YXlTZXJ2aWNlQ29tbWFuZFJlc3BvbnNlEiEKDG9wZXJhdGlvbl9pZBgB",
+            "IAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSNgoF",
+            "ZXZlbnQYAyABKAsyIC5nbGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUV2ZW50",
+            "UgVldmVudBI7CgVlcnJvchgEIAEoCzIlLmdsaW1tZXIuY29tbW9uLnYxLlNl",
+            "cnZpY2VFcnJvckRldGFpbFIFZXJyb3IieAoiU3VyZmFjZUdhdGV3YXlTZXJ2",
+            "aWNlU3RyZWFtUmVxdWVzdBIzCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21t",
+            "b24udjEuQ2FsbE1ldGFkYXRhUgRjYWxsEh0KCnNlc3Npb25faWQYAiABKAlS",
+            "CXNlc3Npb25JZCJdCiNTdXJmYWNlR2F0ZXdheVNlcnZpY2VTdHJlYW1SZXNw",
+            "b25zZRI2CgVldmVudBgBIAEoCzIgLmdsaW1tZXIuc3VyZmFjZS52MS5TdXJm",
+            "YWNlRXZlbnRSBWV2ZW50MogEChVTdXJmYWNlR2F0ZXdheVNlcnZpY2USfAoH",
+            "Q29ubmVjdBI3LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNl",
+            "cnZpY2VDb25uZWN0UmVxdWVzdBo4LmdsaW1tZXIuc3VyZmFjZS52MS5TdXJm",
+            "YWNlR2F0ZXdheVNlcnZpY2VDb25uZWN0UmVzcG9uc2USdgoFUXVlcnkSNS5n",
+            "bGltbWVyLnN1cmZhY2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlUXVlcnlS",
+            "ZXF1ZXN0GjYuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZhY2VHYXRld2F5U2Vy",
+            "dmljZVF1ZXJ5UmVzcG9uc2USfAoHQ29tbWFuZBI3LmdsaW1tZXIuc3VyZmFj",
+            "ZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5kUmVxdWVzdBo4Lmds",
+            "aW1tZXIuc3VyZmFjZS52MS5TdXJmYWNlR2F0ZXdheVNlcnZpY2VDb21tYW5k",
+            "UmVzcG9uc2USewoGU3RyZWFtEjYuZ2xpbW1lci5zdXJmYWNlLnYxLlN1cmZh",
+            "Y2VHYXRld2F5U2VydmljZVN0cmVhbVJlcXVlc3QaNy5nbGltbWVyLnN1cmZh",
+            "Y2UudjEuU3VyZmFjZUdhdGV3YXlTZXJ2aWNlU3RyZWFtUmVzcG9uc2UwAUIt",
+            "qgIqR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5TdXJmYWNlLlYx",
+            "YgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.StructReflection.Descriptor, global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceContractReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -464,7 +465,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ExtensionRuntimeProjectionChangedEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ExtensionRuntimeProjectionChangedEvent.Parser, new[]{ "Projection" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ExtensionStatusChangedEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ExtensionStatusChangedEvent.Parser, new[]{ "ExtensionId", "Event", "Message" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillActionRequestEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillActionRequestEvent.Parser, new[]{ "RequestId", "Action", "Payload" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillConfirmationRequestEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillConfirmationRequestEvent.Parser, new[]{ "RequestId", "TraceId", "SkillId", "TargetKind", "TargetName", "RiskLevel", "SideEffects" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillConfirmationRequestEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.CoreSkillConfirmationRequestEvent.Parser, new[]{ "RequestId", "TraceId", "SkillId", "TargetKind", "TargetName", "RiskLevel", "SideEffects", "Title", "Detail" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ShutdownEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.ShutdownEvent.Parser, null, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.SurfaceEvent), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.SurfaceEvent.Parser, new[]{ "EventId", "TraceId", "TimestampMs", "Reply", "Emotion", "Thought", "AudioPlay", "AudioTranscript", "CharacterPresentation", "AvatarStatus", "AvatarActionState", "RuntimeReadiness", "AudioStatus", "ConversationNotice", "ConversationHistoryResult", "ConfigurationSnapshot", "ConfigurationUpdate", "ConfigurationTest", "SkillCatalog", "ExtensionInstallPreview", "ExtensionInstallResult", "ExtensionUninstallResult", "ExtensionLifecycleResult", "ExtensionCommandResult", "ExtensionRuntimeProjectionResult", "ExtensionRuntimeProjectionChanged", "ExtensionStatusChanged", "CoreSkillActionRequest", "CoreSkillConfirmationRequest", "Shutdown" }, new[]{ "Event" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Surface.V1.SurfaceGatewayServiceQueryResponse), global::GlimmerCradle.Contracts.Glimmer.Surface.V1.SurfaceGatewayServiceQueryResponse.Parser, new[]{ "OperationId", "Status", "Event", "Error" }, null, null, null, null),
@@ -20915,6 +20916,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
       targetName_ = other.targetName_;
       riskLevel_ = other.riskLevel_;
       sideEffects_ = other.sideEffects_.Clone();
+      title_ = other.title_;
+      detail_ = other.detail_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -21007,6 +21010,30 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
       get { return sideEffects_; }
     }
 
+    /// <summary>Field number for the "title" field.</summary>
+    public const int TitleFieldNumber = 8;
+    private string title_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Title {
+      get { return title_; }
+      set {
+        title_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "detail" field.</summary>
+    public const int DetailFieldNumber = 9;
+    private string detail_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Detail {
+      get { return detail_; }
+      set {
+        detail_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -21029,6 +21056,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
       if (TargetName != other.TargetName) return false;
       if (RiskLevel != other.RiskLevel) return false;
       if(!sideEffects_.Equals(other.sideEffects_)) return false;
+      if (Title != other.Title) return false;
+      if (Detail != other.Detail) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -21043,6 +21072,8 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
       if (TargetName.Length != 0) hash ^= TargetName.GetHashCode();
       if (RiskLevel.Length != 0) hash ^= RiskLevel.GetHashCode();
       hash ^= sideEffects_.GetHashCode();
+      if (Title.Length != 0) hash ^= Title.GetHashCode();
+      if (Detail.Length != 0) hash ^= Detail.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -21086,6 +21117,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
         output.WriteString(RiskLevel);
       }
       sideEffects_.WriteTo(output, _repeated_sideEffects_codec);
+      if (Title.Length != 0) {
+        output.WriteRawTag(66);
+        output.WriteString(Title);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(74);
+        output.WriteString(Detail);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -21121,6 +21160,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
         output.WriteString(RiskLevel);
       }
       sideEffects_.WriteTo(ref output, _repeated_sideEffects_codec);
+      if (Title.Length != 0) {
+        output.WriteRawTag(66);
+        output.WriteString(Title);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(74);
+        output.WriteString(Detail);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -21150,6 +21197,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(RiskLevel);
       }
       size += sideEffects_.CalculateSize(_repeated_sideEffects_codec);
+      if (Title.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Title);
+      }
+      if (Detail.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Detail);
+      }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -21181,6 +21234,12 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
         RiskLevel = other.RiskLevel;
       }
       sideEffects_.Add(other.sideEffects_);
+      if (other.Title.Length != 0) {
+        Title = other.Title;
+      }
+      if (other.Detail.Length != 0) {
+        Detail = other.Detail;
+      }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -21228,6 +21287,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
             sideEffects_.AddEntriesFrom(input, _repeated_sideEffects_codec);
             break;
           }
+          case 66: {
+            Title = input.ReadString();
+            break;
+          }
+          case 74: {
+            Detail = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -21273,6 +21340,14 @@ namespace GlimmerCradle.Contracts.Glimmer.Surface.V1 {
           }
           case 58: {
             sideEffects_.AddEntriesFrom(ref input, _repeated_sideEffects_codec);
+            break;
+          }
+          case 66: {
+            Title = input.ReadString();
+            break;
+          }
+          case 74: {
+            Detail = input.ReadString();
             break;
           }
         }

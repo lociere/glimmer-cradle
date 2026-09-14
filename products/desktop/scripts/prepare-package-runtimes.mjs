@@ -15,7 +15,7 @@ const commands = [
     '--config.node-linker=hoisted', '--filter', '@glimmer-cradle/kernel', '--prod', 'deploy',
     path.join(temporaryRoot, 'kernel'),
   ]],
-  ['uv', ['venv', path.join(temporaryRoot, 'python'), '--python', pythonVersion, '--seed']],
+  ['uv', ['python', 'install', pythonVersion]],
 ];
 
 if (process.argv.includes('--dry-run')) {
@@ -38,6 +38,15 @@ try {
   await fs.mkdir(path.join(temporaryRoot, 'node'), { recursive: true });
   await fs.copyFile(process.execPath, path.join(temporaryRoot, 'node', 'node.exe'));
   await run(commands[1][0], commands[1][1]);
+  // venv 的 pyvenv.cfg 绑定构建机；发布完整 managed CPython 才能在新机器独立启动。
+  const managedPython = await capture('uv', ['python', 'find', '--managed-python', pythonVersion]);
+  const pythonRoot = path.join(temporaryRoot, 'python');
+  await fs.cp(path.dirname(managedPython), pythonRoot, {
+    recursive: true,
+    filter: (source) => path.relative(path.dirname(managedPython), source).replaceAll('\\', '/') !== 'Lib/site-packages',
+  });
+  // 仅解除产品私有副本的管理标记，不修改 uv 管理的原始解释器。
+  await fs.rm(path.join(pythonRoot, 'Lib', 'EXTERNALLY-MANAGED'), { force: true });
 
   const pythonRequirements = path.join(temporaryRoot, 'python-requirements.txt');
   await run('uv', [
@@ -45,7 +54,7 @@ try {
     '--frozen', '--no-dev', '--no-emit-project', '--no-emit-local', '--format', 'requirements-txt',
     '--output-file', pythonRequirements,
   ]);
-  const python = path.join(temporaryRoot, 'python', 'Scripts', 'python.exe');
+  const python = path.join(pythonRoot, 'python.exe');
   const bundledNode = path.join(temporaryRoot, 'node', 'node.exe');
   const kernelContracts = path.join(
     temporaryRoot,
@@ -105,7 +114,7 @@ try {
     schema_version: 1,
     platform: 'windows-x64',
     node: { version: process.version, executable: 'node/node.exe' },
-    python: { version: pythonVersion, executable: 'python/Scripts/python.exe' },
+    python: { version: pythonVersion, executable: 'python/python.exe' },
     kernel: { entry: 'kernel/dist/index.js', dependencies: 'kernel/node_modules' },
     extension_host: { entry: 'kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js' },
     cognition: { module: 'glimmer_cradle.cognition.host.process' },
@@ -136,5 +145,15 @@ function run(command, args) {
     child.once('exit', (code) => code === 0
       ? resolve()
       : reject(new Error(`${command} 退出码 ${code ?? 'null'}`)));
+  });
+}
+
+function capture(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd: repoRoot, windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] });
+    let output = '';
+    child.stdout.on('data', (chunk) => { output += chunk; });
+    child.once('error', reject);
+    child.once('exit', (code) => code === 0 ? resolve(output.trim()) : reject(new Error(`${command} 退出码 ${code}`)));
   });
 }

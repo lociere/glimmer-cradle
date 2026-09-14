@@ -42,6 +42,9 @@ test('package→安装投影→正式 resolver/supervisor 首启 ready 并清理
     assert.equal(launch.env?.GLIMMER_CRADLE_RUN_ROOT, paths.runRoot);
     assert.equal(launch.env?.GLIMMER_CRADLE_PYTHON_RUNTIME, paths.pythonExecutable);
     assert.equal(launch.env?.GLIMMER_CRADLE_AVATAR_HOST_COMMAND, paths.avatarHostExecutable);
+    assert.equal(launch.env?.GLIMMER_CRADLE_AVATAR_PLAYER_EXECUTABLE, paths.avatarPlayerExecutable);
+    assert.equal(launch.env?.GLIMMER_CRADLE_AVATAR_PACKAGE_REGISTRY, paths.avatarPackageRegistry);
+    assert.equal(launch.env?.GLIMMER_CRADLE_AVATAR_SDK_CATALOG, paths.avatarSdkCatalog);
     assert.equal(launch.env?.GLIMMER_CRADLE_EXTENSION_MODULE_ROOT, paths.extensionModuleRoot);
     assert.equal(launch.env?.GLIMMER_CRADLE_PRODUCT_MANIFEST, paths.productManifest);
     assert.equal(launch.env?.GLIMMER_CRADLE_NATIVE_LIB, paths.nativeLibrary);
@@ -174,6 +177,28 @@ test('stop 未确认进程树退出时保持 failed，不伪造 stopped', async 
   }
 });
 
+test('启动失败已确认清理后，重复停机不再调用失效的 Job bridge', async () => {
+  const fixture = await createInstallProjection();
+  try {
+    const paths = await resolvePackagedDesktopPaths({ resourcesPath: fixture.resources, userDataPath: fixture.userData });
+    const child = new FakeChild(4302);
+    let stops = 0;
+    const authority = {
+      start: async () => child,
+      stop: async () => {
+        assert.equal(++stops, 1);
+        child.signalCode = 'SIGTERM';
+        return { terminated: true, active_process_count: 0 };
+      },
+    };
+    const supervisor = new PackagedSupervisor(paths, { processTree: authority, probe: async () => 'failed' });
+    await assert.rejects(supervisor.start());
+    await supervisor.stop();
+    assert.equal(stops, 1);
+    assert.equal(supervisor.getSnapshot().state, 'stopped');
+  } finally { await rm(fixture.root, { recursive: true, force: true }); }
+});
+
 test('Desktop native authority protocol 缺省走 Job bridge，并要求 terminated/active=0 才 stopped', async () => {
   const fixture = await createInstallProjection();
   try {
@@ -225,7 +250,7 @@ class FakeSurfaceGatewayClient extends EventEmitter {
       this.emit('close');
       return;
     }
-    queueMicrotask(() => this.emit('message', Buffer.from(JSON.stringify(this.frame), 'utf8')));
+    queueMicrotask(() => this.emit('message', this.frame));
   }
 
   public close(): void {
@@ -243,10 +268,14 @@ async function createInstallProjection(): Promise<{
   const userData = path.join(root, 'user-data');
   const files = new Map([
     ['runtime/node/node.exe', 'node'],
-    ['runtime/python/Scripts/python.exe', 'python'],
+    ['runtime/python/python.exe', 'python'],
     ['runtime/kernel/dist/index.js', 'kernel'],
+    ['runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js', 'extension-host'],
     ['products/desktop/product.json', '{}'],
     ['components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe', 'avatar-launcher'],
+    ['components/avatar/unity-host/UnityAvatarHost.exe', 'avatar-player'],
+    ['components/avatar/unity-host/UnityAvatarHost_Data/StreamingAssets/avatar-package-registry.json', '{"models":[]}'],
+    ['components/avatar/unity-host/avatar-sdk-catalog.json', '{"sdks":[]}'],
     ['components/native/composition-host/bin/Release/platform_native.dll', 'native'],
     ['components/native/composition-host/DesktopProcessTreeBridge.exe', 'native-helper'],
     ['configs/defaults/runtime.yaml', 'mode: packaged\n'],

@@ -46,6 +46,9 @@ const sbomFiles = new Map((sbom.files || []).map((file) => [
 ]));
 const artifactFiles = new Map();
 for (const file of manifest.files) {
+  if (file.path.includes('/node_modules/@glimmer-cradle/contracts/.tools/')) {
+    throw new Error('Desktop 制品不得包含 Contract Spine 开发工具链');
+  }
   if (typeof file.path !== 'string' || path.isAbsolute(file.path)
     || file.path.includes('..') || artifactFiles.has(file.path)
     || sbomFiles.get(file.path) !== file.sha256) {
@@ -97,10 +100,12 @@ for (const requiredPath of [
   'win-unpacked/resources/app.asar.unpacked/dist/main/packaged-supervisor.js',
   'win-unpacked/resources/app.asar.unpacked/dist/main/packaged-paths.js',
   'win-unpacked/resources/runtime/node/node.exe',
-  'win-unpacked/resources/runtime/python/Scripts/python.exe',
+  'win-unpacked/resources/runtime/python/python.exe',
   'win-unpacked/resources/runtime/kernel/dist/index.js',
   'win-unpacked/resources/runtime/runtime-manifest.json',
   'win-unpacked/resources/products/desktop/product.json',
+  'win-unpacked/resources/components/avatar/unity-host/UnityAvatarHost_Data/StreamingAssets/avatar-package-registry.json',
+  'win-unpacked/resources/components/avatar/unity-host/avatar-sdk-catalog.json',
   'win-unpacked/resources/components/native/composition-host/bin/Release/platform_native.dll',
   'win-unpacked/resources/components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe',
   'win-unpacked/resources/components/native/composition-host/DesktopProcessTreeBridge.exe',

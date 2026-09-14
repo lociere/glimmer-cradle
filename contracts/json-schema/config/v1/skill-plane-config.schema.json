@@ -107,7 +107,7 @@
         "root_dir": {
           "type": "string",
           "default": "skills",
-          "description": "用户技能根目录（相对项目根或用户数据目录）。"
+          "description": "用户技能根目录，相对 data/packages；绝对路径也必须位于该包数据目录内。"
         }
       }
     }

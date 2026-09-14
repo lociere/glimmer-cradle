@@ -19,6 +19,7 @@ export interface ResolveDesktopProjectRootsOptions {
   readonly configuredRepoRoot?: string;
   readonly configuredDataRoot?: string;
   readonly configuredRunRoot?: string;
+  readonly configuredConfigRoot?: string;
 }
 
 export function resolveDesktopProjectRoots(
@@ -38,12 +39,16 @@ export function resolveDesktopProjectRoots(
   const runRoot = configuredRunRoot
     ? path.resolve(configuredRunRoot)
     : path.join(dataRoot, 'run');
+  const configuredConfigRoot = options.configuredConfigRoot?.trim() || '';
+  const configRoot = configuredConfigRoot
+    ? path.resolve(configuredConfigRoot)
+    : path.join(repoRoot, 'configs');
 
   return {
     repoRoot,
     dataRoot,
     runRoot,
-    configRoot: path.join(repoRoot, 'configs'),
+    configRoot,
     extensionsRoot: path.join(dataRoot, 'packages', 'extensions'),
   };
 }

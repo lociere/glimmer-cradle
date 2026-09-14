@@ -1,9 +1,9 @@
 import type { CorePlatformBridge, SkillDescriptor, SkillProvider, SkillProviderRef, SkillRegistrationTarget } from '../../../../ports/skill-plane.port';
 import { createReadyClipboardSkill } from './clipboard/manifest';
-import { confirmationSkill } from './confirmation/manifest';
+import { createReadyConfirmationSkill } from './confirmation/manifest';
 import { createReadyDesktopSkill } from './desktop/manifest';
 import { createReadyNotificationSkill } from './notification/manifest';
-import { screenContextSkill } from './screen-context/manifest';
+import { createReadyScreenContextSkill } from './screen-context/manifest';
 import { CORE_SKILL_PROVIDER } from './shared';
 
 export class CoreSkillProvider implements SkillProvider {
@@ -35,9 +35,9 @@ export class CoreSkillProvider implements SkillProvider {
         createReadyDesktopSkill(this._bridge),
         createReadyClipboardSkill(this._bridge),
         createReadyNotificationSkill(this._bridge),
-        screenContextSkill,
+        createReadyScreenContextSkill(this._bridge),
       ]),
-      confirmationSkill,
+      createReadyConfirmationSkill(this._bridge),
     ];
   }
 }

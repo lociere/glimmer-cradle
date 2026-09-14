@@ -138,7 +138,10 @@ export class UnityAvatarHostProcess {
       return;
     }
 
-    const child = spawn(command, config.args, {
+    // 安装树中的原生 launcher 与 Unity Player 分属不同组件目录。
+    const packagedPlayer = process.env.GLIMMER_CRADLE_AVATAR_PLAYER_EXECUTABLE?.trim();
+    const args = packagedPlayer ? [packagedPlayer, ...config.args.slice(1)] : config.args;
+    const child = spawn(command, args, {
       cwd,
       env: {
         ...process.env,

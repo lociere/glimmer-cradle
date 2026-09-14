@@ -146,6 +146,9 @@ test('Desktop package 在 clean Windows owner task 准备六类 runtime projecti
   assert.deepEqual([...supervisorPathFields].sort(), [
     'appRoot',
     'avatarHostExecutable',
+    'avatarPackageRegistry',
+    'avatarPlayerExecutable',
+    'avatarSdkCatalog',
     'configRoot',
     'dataRoot',
     'extensionModuleRoot',
@@ -194,7 +197,11 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
         id: 'avatar',
         owner: 'hosts/unity-avatar-host',
         projection: 'components/avatar/unity-host',
-        paths: ['components/avatar/unity-host/UnityAvatarHost.exe'],
+        paths: [
+          'components/avatar/unity-host/UnityAvatarHost.exe',
+          'components/avatar/unity-host/UnityAvatarHost_Data/StreamingAssets/avatar-package-registry.json',
+          'components/avatar/unity-host/avatar-sdk-catalog.json',
+        ],
       },
       {
         id: 'extension-host',
@@ -245,7 +252,7 @@ test('Desktop fixed artifact 绑定完整 component manifest 与独立 expected 
     assert.ok(!avatarComponent.files.some((file) => file.path.endsWith('UnityAvatarHostLauncher.exe')));
     for (const relative of [
       'runtime/node/node.exe',
-      'runtime/python/Scripts/python.exe',
+      'runtime/python/python.exe',
       'runtime/kernel/node_modules/fixture/index.js',
       'runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js',
       'runtime/runtime-manifest.json',

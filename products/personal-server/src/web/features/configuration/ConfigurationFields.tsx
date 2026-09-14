@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ConfigurationDraftState } from './configuration-state';
 import styles from './Configuration.module.css';
+import { SelectField } from '../../shared/ui/SelectField/SelectField';
 
 type Kind = 'text' | 'number' | 'checkbox' | 'csv' | 'lines' | 'env-lines';
 type Field = readonly [path: string, label: string, kind?: Kind, fallback?: unknown, choices?: readonly (string | number)[]];
@@ -60,9 +61,12 @@ function DraftField({ field: [path, label, kind = 'text', fallback = '', choices
     if (kind === 'env-lines') parsed = Object.fromEntries(text.split(/\r?\n/).filter(line => line.includes('=')).map(line => [line.slice(0, line.indexOf('=')).trim(), line.slice(line.indexOf('=') + 1)]));
     edit(path, parsed);
   };
+  if (choices) return <SelectField label={label} dataPath={path} value={String(value)} options={[
+    ...(!choices.some(choice => String(choice) === String(value)) ? [{ value: String(value), label: String(value) || '未选择' }] : []),
+    ...choices.map(choice => ({ value: String(choice), label: String(choice) })),
+  ]} onChange={update} />;
   return <label className={styles.field}><span>{label}</span>{kind === 'checkbox'
     ? <input type="checkbox" data-path={path} checked={!!value} onChange={event => edit(path, event.target.checked)} />
-    : choices ? <select data-path={path} value={String(value)} onChange={event => update(event.target.value)}>{!choices.some(choice => String(choice) === String(value)) && <option value={String(value)}>{String(value) || '未选择'}</option>}{choices.map(choice => <option key={choice} value={choice}>{choice}</option>)}</select>
     : kind === 'lines' || kind === 'env-lines' ? <textarea data-path={path} value={raw} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => update(event.target.value)} />
     : <input type={kind === 'number' ? 'number' : 'text'} step="any" data-path={path} value={raw} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onChange={event => update(event.target.value)} />}</label>;
 }

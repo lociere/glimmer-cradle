@@ -18,7 +18,7 @@ test('Configuration stories expose configuration states accessibly', async ({ pa
   test.skip(!url || testInfo.project.name !== 'personal-server-desktop', '组件工作台单项目检查');
   for (const story of ['empty', 'loading', 'error', 'pending', 'conflict', 'disconnected', 'audio', 'long-provider']) {
     await page.goto(`${url}/iframe.html?id=features-configuration--${story}&viewMode=story`);
-    await expect(page.locator('[data-role="view-settings"]')).toBeVisible();
+    await expect(page.locator('[data-role="view-config"]')).toBeVisible();
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
   }
 });
@@ -38,7 +38,7 @@ test('Extensions stories expose directory and operation states accessibly', asyn
   test.skip(!storybookUrl || testInfo.project.name !== 'personal-server-desktop', '组件工作台批次的单项目检查');
   for (const story of ['installed', 'empty', 'loading', 'error', 'disconnected', 'pending', 'success', 'long-list']) {
     await page.goto(`${storybookUrl}/iframe.html?id=features-extensions--${story}&viewMode=story`);
-    await expect(page.locator('[data-role="view-capabilities"]')).toBeVisible();
+    await expect(page.locator('[data-role="view-extensions"]')).toBeVisible();
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
   }
 });

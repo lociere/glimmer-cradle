@@ -73,6 +73,8 @@ const surfaceGatewayDefinition: grpc.ServiceDefinition = {
 };
 
 export interface PersonalServerUiFixture {
+  requestSkillConfirmation(requestId: string): void;
+  readonly skillConfirmationReplies: Array<{ requestId: string; approved: boolean }>;
   appendLog(message: string): void;
   readonly baseUrl: string;
   publishRuntimeCatalog(catalog: RuntimeReadinessCatalog): void;
@@ -91,6 +93,7 @@ export async function startPersonalServerUiFixture(options?: {
   readonly historyPageSize?: number;
   readonly failFirstExtensionTransaction?: 'commit' | 'cancel';
 }): Promise<PersonalServerUiFixture> {
+  const skillConfirmationReplies: Array<{ requestId: string; approved: boolean }> = [];
   let transactionFailurePending = Boolean(options?.failFirstExtensionTransaction);
   const root = mkdtempSync(path.join(tmpdir(), 'personal-server-ui-'));
   const dataRoot = path.join(root, 'data');
@@ -197,6 +200,12 @@ export async function startPersonalServerUiFixture(options?: {
       call: grpc.ServerUnaryCall<SurfaceGatewayServiceCommandRequest, SurfaceGatewayServiceCommandResponse>,
       callback: grpc.sendUnaryData<SurfaceGatewayServiceCommandResponse>,
     ) => {
+      if (call.request.command.case === 'coreSkillConfirmationResponse') {
+        const response = call.request.command.value;
+        skillConfirmationReplies.push({ requestId: response.requestId, approved: response.approved });
+        callback(null, create(SurfaceGatewayServiceCommandResponseSchema, { status: 'accepted' }));
+        return;
+      }
       const frame = fixtureCommandFrame(call.request);
       const failedRequest = frame[`extension_install_${options?.failFirstExtensionTransaction}`] as { request_id: string; transaction_id: string } | undefined;
       if (transactionFailurePending && failedRequest) {
@@ -263,6 +272,16 @@ export async function startPersonalServerUiFixture(options?: {
   }
 
   return {
+    skillConfirmationReplies,
+    requestSkillConfirmation(requestId) {
+      const event = create(surfaceV1.SurfaceEventSchema, {
+        event: { case: 'coreSkillConfirmationRequest', value: create(surfaceV1.CoreSkillConfirmationRequestEventSchema, {
+          requestId, traceId: 'confirmation-trace', skillId: 'core.desktop', targetKind: 'tool', targetName: 'desktop.open_file', riskLevel: 'high', sideEffects: ['launch_external_app'],
+          detail: '将使用系统默认程序打开以下路径（可执行文件可能启动程序）：\n"C:\\Tools\\example.exe"',
+        }) },
+      });
+      for (const stream of surfaceStreams) stream.write(create(SurfaceGatewayServiceStreamResponseSchema, { event }));
+    },
     baseUrl: `http://127.0.0.1:${address.port}`,
     appendLog(message) { appendFileSync(eventLogPath, `${JSON.stringify({ timestamp: new Date().toISOString(), level: 'info', event_type: 'fixture.append', event_action: message, owner: 'fixture', module: 'fixture-live', runtime_id: 'kernel', trace_id: 'trace-live' })}\n`, 'utf8'); },
     publishRuntimeCatalog(catalog) {
@@ -1035,7 +1054,7 @@ function handleFixtureFrame(socket: FixtureSurfacePeer, frame: Record<string, un
             level: 'warning',
             title: '尚未配置可用模型',
             message: '控制面可以正常使用，但当前默认对话路由没有可用模型。',
-            action_route: 'settings',
+            action_route: 'config',
             action_label: '打开设置中心',
           },
         }));

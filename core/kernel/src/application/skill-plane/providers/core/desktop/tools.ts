@@ -36,12 +36,17 @@ export function createDesktopTools(bridge: CorePlatformBridge): SkillTool[] {
         return bridge.openUrl(url, context?.invocationId);
       },
     },
-    createContractOnlyTool(
-      'desktop.open_file',
-      '打开本地文件或目录。涉及文件路径暴露与外部应用启动，必须经过策略确认。',
-      'desktop.open_file',
-      openFileParameters,
-    ),
+    {
+      name: 'desktop.open_file',
+      description: '通过系统默认应用打开本地文件或目录。必须经过策略确认。',
+      parameters: openFileParameters,
+      handler: (args: unknown, context) => {
+        const filePath = (args as { path?: unknown })?.path;
+        if (typeof filePath !== 'string' || !filePath.trim()) throw new Error('desktop.open_file 需要 path');
+        return bridge.openFile(filePath, context?.invocationId);
+      },
+      policy: { riskLevel: 'high', confirmationRequired: true, sideEffects: ['open_file', 'launch_external_app'], audit: true },
+    },
   ];
 }
 

@@ -1,8 +1,9 @@
-import { ChevronRight, X } from 'lucide-react';
-import { Button, Dialog, DialogTrigger, Heading, Modal, ModalOverlay } from 'react-aria-components';
+import { ChevronRight } from 'lucide-react';
+import { Button } from 'react-aria-components';
 import { Link } from 'react-router-dom';
 import type { RuntimeProjection } from '../../../shared/control-center-models';
 import styles from './Overview.module.css';
+import { ContextDrawer } from '../../shared/ui/ContextDrawer/ContextDrawer';
 
 export function RuntimeDetails({ runtime, catalogUpdatedAt, stale }: {
   readonly runtime: RuntimeProjection;
@@ -11,20 +12,16 @@ export function RuntimeDetails({ runtime, catalogUpdatedAt, stale }: {
 }): JSX.Element {
   const tone = runtime.state === 'ready' ? 'ready' : runtime.state === 'failed' ? 'danger' : 'waiting';
   return (
-    <DialogTrigger>
-      <Button className={styles.runtimeRow} aria-label={`查看 ${runtime.runtime_id} 详情`}>
+    <ContextDrawer
+      title={runtime.runtime_id}
+      eyebrow="运行体详情"
+      trigger={<Button className={styles.runtimeRow} aria-label={`查看 ${runtime.runtime_id} 详情`}>
         <span className={styles.runtimeMain}><strong>{runtime.runtime_id}</strong><span>{runtime.summary || `${runtime.owner} / ${runtime.phase}`}</span></span>
         <span className={styles.runtimeMeta}>{runtime.owner}<small>{runtime.phase}</small></span>
         <span className={styles[tone]}>{runtime.state}</span><ChevronRight aria-hidden="true" size={16} />
-      </Button>
-      <ModalOverlay className={styles.scrim} isDismissable>
-        <Modal className={styles.drawer}>
-          <Dialog className={styles.dialog}>
-            {({ close }) => <>
-              <div className={styles.drawerHead}>
-                <div><span className={styles.eyebrow}>运行体详情</span><Heading slot="title">{runtime.runtime_id}</Heading></div>
-                <Button className={styles.close} aria-label="关闭运行体详情" onPress={close} autoFocus><X aria-hidden="true" size={18} /></Button>
-              </div>
+      </Button>}
+    >
+      {(close) => <>
               {stale && <p role="status" className={styles.waiting}>尚未收到当前连接的目录，以下为上次投影。</p>}
               <p className={styles[tone]}>{runtime.state}</p><p>{runtime.summary || '暂无状态说明。'}</p>
               <dl className={styles.details}>
@@ -41,11 +38,8 @@ export function RuntimeDetails({ runtime, catalogUpdatedAt, stale }: {
                   <dt>资源数量</dt><dd>{runtime.reconciler.resources.length}</dd>
                 </>}
               </dl>
-              <Link className={styles.action} to="/activity" onClick={close}>查看诊断活动</Link>
+              <Link className={styles.action} to="/system/logs" onClick={close}>查看诊断活动</Link>
             </>}
-          </Dialog>
-        </Modal>
-      </ModalOverlay>
-    </DialogTrigger>
+    </ContextDrawer>
   );
 }

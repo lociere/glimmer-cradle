@@ -417,6 +417,14 @@ export class PersonalServerSurface {
     }));
   }
 
+  public respondSkillConfirmation(requestId: string, approved: boolean): void {
+    if (this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({
+      kind: 'core_skill_confirmation_response', timestamp: Date.now(),
+      request_id: requestId, status: 'success', result: { approved },
+    } satisfies ProductSurfaceRequest));
+  }
+
   public async requestConversationHistory(
     request: ConversationHistoryRequest,
   ): Promise<ConversationHistoryResult> {

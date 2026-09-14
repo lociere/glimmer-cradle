@@ -7,7 +7,9 @@
   "files": [
     "dist/**/*",
     "assets/icons/**/*",
-    "package.json"
+    "package.json",
+    "!**/node_modules/@glimmer-cradle/contracts/.tools/**",
+    "!**/node_modules/@glimmer-cradle/contracts/{tests,fixtures,generated,proto,compatibility,scripts}/**"
   ],
   "asarUnpack": [
     "dist/main/packaged-paths.js",

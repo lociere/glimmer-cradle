@@ -1,8 +1,13 @@
 .route-view {
-  min-height: calc(100dvh - var(--topbar-height));
+  height: calc(100dvh - 3.5rem);
+  min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
-  padding: 0 var(--page-gutter) var(--space-6);
+  width: min(100%, calc(var(--reading-width) + 2 * var(--page-gutter)));
+  margin-inline: auto;
+  padding: 0 var(--page-gutter) max(var(--space-6), env(safe-area-inset-bottom));
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace-head {
@@ -11,7 +16,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-5);
-  border-bottom: 1px solid var(--divider-subtle);
 }
 
 .workspace-head span,
@@ -48,30 +52,32 @@
 }
 
 .quiet-button {
-  border: 1px solid var(--divider-subtle);
-  background: var(--surface-raised);
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  background: var(--interactive-neutral);
 }
 
 .primary-button,
 .primary-link {
-  border: 1px solid color-mix(in srgb, var(--accent-core) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-core) 28%, transparent);
   color: var(--action-primary-text);
-  background: linear-gradient(
-    145deg,
-    var(--action-primary-gradient-start),
-    var(--action-primary-gradient-end)
-  );
-  box-shadow: inset 0 1px 0 var(--action-primary-inner-glint);
+  background: var(--action-primary);
+  box-shadow: none;
 }
+
+.quiet-button:hover { background: var(--interactive-neutral-hover); }
+.quiet-button:active { background: var(--interactive-neutral-pressed); box-shadow: var(--shadow-pressed); }
+.primary-button:hover, .primary-link:hover { background: var(--action-primary-hover); }
+.primary-button:active, .primary-link:active { filter: brightness(.94); box-shadow: var(--shadow-pressed); }
 
 .session-loading,
 .login-layer {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: var(--space-6);
+  padding: var(--space-4);
   background:
-    radial-gradient(circle at 70% 22%, color-mix(in srgb, var(--accent-core) 7%, transparent), transparent 28rem),
+    radial-gradient(circle at 62% 38%, color-mix(in srgb, var(--accent-glint) 6%, transparent), transparent 22rem),
     var(--canvas);
 }
 
@@ -89,20 +95,21 @@
 }
 
 .login-panel {
-  width: min(27rem, 100%);
+  width: min(23rem, 100%);
   display: grid;
-  gap: var(--space-4);
-  padding: clamp(1.5rem, 5vw, 2.5rem);
-  border: 1px solid var(--divider-subtle);
-  border-radius: var(--radius-structure);
-  background: color-mix(in srgb, var(--surface-raised) 94%, transparent);
-  box-shadow: var(--shadow-overlay), var(--shadow-inner-glint);
+  gap: var(--space-3);
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  border: 0;
+  border-radius: var(--radius-dialog);
+  background: var(--material-frost-elevated);
+  backdrop-filter: var(--material-filter-frost);
+  box-shadow: var(--shadow-overlay);
 }
 
 .login-heading {
   display: grid;
   gap: var(--space-2);
-  margin-block: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .login-heading span,
@@ -114,9 +121,9 @@
 
 .login-heading h1 {
   margin: 0;
-  font-size: clamp(1.75rem, 5vw, 2.25rem);
-  line-height: 1.16;
-  letter-spacing: -0.035em;
+  font-size: clamp(1.35rem, 5vw, 1.65rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 .login-heading p,
@@ -127,13 +134,21 @@
 
 .login-panel input {
   width: 100%;
-  min-height: 3rem;
+  min-height: var(--control-height-default);
   padding: 0 var(--space-3);
-  border: 1px solid var(--divider-subtle);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   color: var(--text-primary);
-  background: var(--surface-workspace);
+  background: var(--interactive-neutral);
 }
+
+.login-panel input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-core) 70%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-core) 24%, transparent);
+}
+
+.login-panel .primary-button { width: 100%; margin-top: var(--space-1); }
 
 .login-panel output {
   min-height: 1.5rem;

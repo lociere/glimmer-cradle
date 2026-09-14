@@ -183,6 +183,22 @@ NapCat adapter 的群聊注意力使用 `ingress.group_focus_scope`：
 
 这些配置只影响 Kernel 外部注意力窗口和 Adapter 如何申请焦点；它们不直接改变 Cognition `CognitiveActivityState`，也不授予工具执行权限。Extension 通过 `sceneAttention.requestAttentionLease()` 申请 Attention Lease，`group_focus_scope` 对应 lease 的 `channel_id` 粒度。
 
+## 用户指令技能
+
+`system/skills.yaml` 默认启用 `user_skills`。`root_dir` 默认 `skills`，相对于产品数据根的 `packages/`；自定义绝对路径也必须在该包数据目录内。将每个技能安装为 `data/packages/skills/<name>/SKILL.md`；空目录保持 provider ready 且技能数为零。元数据事实源为 [UserSkillMetadata Schema](../../contracts/json-schema/skill/v1/user-skill-metadata.schema.json)，采用 [Agent Skills](https://agentskills.io/specification) 的指令文件形式：
+
+```markdown
+---
+name: summarize-notes
+description: 帮助整理用户提供的笔记。
+---
+先归纳主题，再列出原文中明确的待办事项；缺失信息应明确标注。
+```
+
+`name` 必须与目录名一致，使用小写字母、数字及中间连字符，最长 64 字符；`description` 为 1–1024 字符非空说明。可选元数据为 `license`、`compatibility`、字符串值 `metadata` 与字符串 `allowed-tools`。`allowed-tools` 仅作为声明，不增加工具权限。
+
+当前支持 SKILL.md 指令正文；不自动读取引用文件或执行附带脚本。最多加载 100 个目录，每个文件最多 32 KiB，正文不能为空；符号链接技能目录及非普通文件不加载。单个无效文件会产生降级诊断，其余有效技能仍可用。安装或修改后重启服务重新加载，可在能力目录检查 `user.<name>` 的状态。
+
 ## 环境变量边界
 
 环境变量用于部署覆盖、密钥注入或本地调试，不应替代普通配置事实源。音频密钥使用 `DASHSCOPE_API_KEY`；进程级超时可用 `GLIMMER_CRADLE_AUDIO_TTS_TIMEOUT_MS`、`GLIMMER_CRADLE_AUDIO_ASR_TIMEOUT_MS` 覆盖；FunASR 的本机缓存调试方式见 [音频引擎开发指南](../guides/subsystems/音频引擎开发.md)。

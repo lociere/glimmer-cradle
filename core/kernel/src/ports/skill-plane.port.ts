@@ -142,6 +142,8 @@ export interface SkillPlanePolicyPort {
 }
 
 export interface SkillConfirmationRequest {
+  readonly title?: string;
+  readonly detail?: string;
   readonly traceId: string;
   readonly skillId: string;
   readonly targetKind: 'tool' | 'resource' | 'prompt';
@@ -155,6 +157,9 @@ export type SkillConfirmationRequester = (request: SkillConfirmationRequest) => 
 
 export interface CorePlatformBridge {
   openUrl(url: string, invocationId?: string): Promise<unknown>;
+  openFile(path: string, invocationId?: string): Promise<unknown>;
+  captureScreen(displayId?: string, invocationId?: string): Promise<unknown>;
+  readActiveWindow(invocationId?: string): Promise<unknown>;
   showNotification(title: string, body: string, invocationId?: string): Promise<unknown>;
   readClipboardText(invocationId?: string): Promise<unknown>;
   writeClipboardText(text: string, invocationId?: string): Promise<unknown>;

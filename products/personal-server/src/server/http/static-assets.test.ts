@@ -24,7 +24,7 @@ test('为 BrowserRouter 导航路径提供 no-store index fallback', async () =>
   const origin = `http://127.0.0.1:${address.port}`;
 
   try {
-    for (const route of ['/conversation', '/overview', '/capabilities', '/activity', '/settings', '/unknown']) {
+    for (const route of ['/config', '/extensions', '/capabilities', '/data', '/system', '/system/logs', '/system/security', '/system/operations', '/unknown']) {
       const response = await fetch(`${origin}${route}`, { headers: { accept: 'text/html' } });
       assert.equal(response.status, 200, route);
       assert.equal(response.headers.get('cache-control'), 'no-store', route);
@@ -36,8 +36,8 @@ test('为 BrowserRouter 导航路径提供 no-store index fallback', async () =>
     assert.equal(await head.text(), '');
     assert.equal((await fetch(`${origin}/assets/missing.js`)).status, 404);
     assert.equal((await fetch(`${origin}/api/v1/missing`, { headers: { accept: 'text/html' } })).status, 404);
-    assert.equal((await fetch(`${origin}/overview`, { headers: { accept: 'application/json' } })).status, 404);
-    assert.equal((await fetch(`${origin}/overview`, { method: 'HEAD', headers: { accept: 'text/html' } })).status, 404);
+    assert.equal((await fetch(`${origin}/system`, { headers: { accept: 'application/json' } })).status, 404);
+    assert.equal((await fetch(`${origin}/system`, { method: 'HEAD', headers: { accept: 'text/html' } })).status, 404);
     assert.equal((await fetch(`${origin}/readyz`)).status, 404);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

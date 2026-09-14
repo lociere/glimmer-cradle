@@ -50,11 +50,11 @@ export class KernelTransportRuntime implements RuntimeModule, CognitionIngressRe
     this.publishIngressSnapshot('stopped');
   }
 
-  public suspendIngress(summary: string): void {
+  public suspendIngress(summary: string, state: 'starting' | 'failed' = 'failed'): void {
     this.ingress.setSystemReady(false);
     this.projection.replaceModuleSnapshots(this.name, [{
       ...this.createIngressSnapshot('stopped'),
-      state: 'failed',
+      state,
       summary,
     }]);
   }

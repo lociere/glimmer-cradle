@@ -90,7 +90,7 @@ test('Personal Server React Shell 与 Router 保持唯一 owner，旧入口不�
   assert.equal((source.match(/createRoot\s*\(/g) ?? []).length, 1);
   assert.equal((source.match(/<BrowserRouter>/g) ?? []).length, 1);
   assert.deepEqual(
-    ['/conversation', '/overview', '/capabilities', '/activity', '/settings']
+    ['/config', '/extensions', '/capabilities', '/data', '/system', '/system/logs']
       .filter((route) => !source.includes(route)),
     [],
   );

@@ -88,7 +88,7 @@ export class SurfaceGatewayClient extends EventEmitter {
   private stopped = false;
   private _readyState = CLOSED;
 
-  public constructor() {
+  public constructor(private readonly scopes: readonly string[] = ['surface:read', 'surface:write']) {
     super();
   }
 
@@ -106,7 +106,7 @@ export class SurfaceGatewayClient extends EventEmitter {
       client.Connect(create(SurfaceGatewayServiceConnectRequestSchema, {
         productId: 'desktop',
         generation,
-        scopes: ['surface:read', 'surface:write'],
+        scopes: [...this.scopes],
         call: create(CallMetadataSchema, { traceId: `desktop-surface-${Date.now()}` }),
       }), (error, result) => error ? reject(error) : resolve(result));
     });

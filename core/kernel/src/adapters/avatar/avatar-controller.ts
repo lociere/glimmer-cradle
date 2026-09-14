@@ -241,6 +241,9 @@ export class AvatarController {
       ...buildAvatarResourceSnapshots({
         commandPath: hostProcess.command,
         workingDir: hostProcess.cwd,
+        playerPath: process.env.GLIMMER_CRADLE_AVATAR_PLAYER_EXECUTABLE,
+        registryPath: process.env.GLIMMER_CRADLE_AVATAR_PACKAGE_REGISTRY,
+        sdkCatalogPath: process.env.GLIMMER_CRADLE_AVATAR_SDK_CATALOG,
       }),
       {
         resource_id: 'avatar.host.process',

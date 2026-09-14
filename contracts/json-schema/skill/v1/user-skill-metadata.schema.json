@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-glimmer-owner": "Kernel Skill Plane",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "Additive optional metadata only; required fields and validation changes require review.",
+  "$id": "https://glimmer-cradle.dev/schemas/skill/v1/user-skill-metadata.schema.json",
+  "title": "UserSkillMetadata",
+  "description": "SKILL.md YAML frontmatter；指令材料不授予工具或脚本执行权限。",
+  "type": "object",
+  "required": ["name", "description"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S" },
+    "license": { "type": "string" },
+    "compatibility": { "type": "string", "maxLength": 500 },
+    "metadata": { "type": "object", "additionalProperties": { "type": "string" } },
+    "allowed-tools": { "type": "string", "description": "仅为作者建议，不成为平台授权。" }
+  },
+  "additionalProperties": false
+}

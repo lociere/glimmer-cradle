@@ -312,6 +312,7 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
       confirmation: {
         trace_id: item.value.traceId, skill_id: item.value.skillId, target_kind: item.value.targetKind,
         target_name: item.value.targetName, risk_level: item.value.riskLevel, side_effects: item.value.sideEffects,
+        title: item.value.title, detail: item.value.detail,
       },
     };
     case 'shutdown': return { kind: 'shutdown', ...base };

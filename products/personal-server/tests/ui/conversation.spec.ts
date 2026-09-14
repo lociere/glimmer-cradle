@@ -7,7 +7,7 @@ function history(count: number): ConversationHistoryEntry[] {
   return Array.from({ length: count }, (_, index) => ({ entry_id: `history-${index}`, source_kind: 'conversation', role: 'assistant', status: 'committed', text: `历史消息 ${index + 1}。`, occurred_at: new Date(Date.UTC(2026, 8, 7, 8, index)).toISOString(), position: index + 1, conversation_id: 'conversation:desktop', scene_id: 'scene:desktop', thread_id: 'main', recall_scope: 'conversation_private', disclosure_scope: 'conversation_private' }));
 }
 async function login(page: Page, baseUrl: string): Promise<void> {
-  await page.goto(`${baseUrl}/conversation`);
+  await page.goto(`${baseUrl}/data`);
   await page.locator('#access-token').fill('server-secret');
   await page.getByRole('button', { name: '连接 Personal Server' }).click();
 }
@@ -74,7 +74,7 @@ test('late history after route leave cannot restore conversation and history rel
   const fixture = await startPersonalServerUiFixture({ historyReadDelayMs: 700 });
   try {
     await login(page, fixture.baseUrl);
-    await page.getByRole('link', { name: '查看连接与能力' }).click();
+    await page.goto(`${fixture.baseUrl}/system`);
     await page.waitForTimeout(900);
     await expect(page.locator('[data-role="view-conversation"]')).toHaveCount(0);
     await page.goBack();

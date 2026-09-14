@@ -26,7 +26,7 @@
 | **目标规范** | 已确认需要建立，但具体值或组件语言仍待视觉探索/实现 | 不能冒充已落地 |
 | **待用户选择的视觉变量** | 重大改造前必须比较并由用户确认的方向 | 用户确认前不得固化 |
 
-2026-08-25，用户确认 M11 Personal Server 的最终视觉方向：中性深浅主题与“青曜”强调色正交，以连续、安静的工作台结构为主，使用有限晶光层次，并只在运行列表等高扫描场景提高密度。首个 Shell/Router slice 已将该方向落入当前语义 token、深浅主题、单层壳层和 480×900 响应式基线；后续 feature React 化仍需继续消费同一 token owner，不能把参考图当作像素或生产 token 的第二事实源。
+2026-09-12，用户在既有“静水结构 × 有限晶光 × 夜湖列表密度”基础上确认 Personal Server 当前视觉方向为 **Chromeless Ambient Workspace（无框环境式工作台）**。它保留中性深浅主题、青曜正交强调、连续内容和诊断列表密度，同时进一步明确 chromeless navigation、full viewport、low-frequency tonal field、selective translucency、统一 Material System、Continuous Log Wall 与禁止 Card Wall。当前实现已建立 Backdrop/Material/Interaction/Radius/Motion token、无宽屏实体 Topbar 的 Shell、统一浮层、Activity Log Wall 和右上角外观浮层；用户只选择主题与背景，材质、密度和动效固定为产品基线。
 
 用户确认某一轮方向后，具体 token 才作为“当前目标/当前实现”进入本 Reference；未来仍可通过新的设计决策和完整验收继续演化。
 
@@ -64,16 +64,16 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 
 - `shared/styles/tokens.css` 提供中性 canvas/workspace/surface、文字、边界、focus、状态、spacing、radius、control 与 layout 语义变量，并由 `html[data-theme='light']` 覆盖浅色值；主要行动的前景与渐变也由用途 token 映射，消费样式不散落原始色值。青曜不进入 canvas、workspace、主要 surface 或正文层级。
 - `global.css`、`layout.css`、`motion.css` 与 `responsive.css` 分别持有基础语义、壳层容量、reduced-motion 和响应式规则；feature 局部样式不成为第二套主题。
-- `PersonalServerShell.tsx` 在宽屏只显示一层侧栏导航，在窄屏使用可关闭并返回焦点的 React Aria Dialog 导航；当前页面由 React Router `Outlet` 唯一挂载。
-- 登录层不会挂载 Product Shell；深链登录后返回原 URL，根路径、unknown route、refresh 与 back/forward 由浏览器路由测试覆盖。
+- `PersonalServerShell.tsx` 在宽屏使用一层以 viewport 为基准居中的 chromeless 顶部导航：紧凑文字按钮直接落在环境背景上，不包裹 Navbar surface；主题与退出独立位于右上角，不参与主导航居中计算。窄屏使用可关闭并返回焦点的 React Aria Dialog 导航。当前页面由 React Router `Outlet` 唯一挂载。
+- 登录层不会挂载 Product Shell；匿名表面使用紧凑、无品牌大字的半透明圆角面板，深链登录后返回原 URL，根路径、unknown route、refresh 与 back/forward 由浏览器路由测试覆盖。
 - 代表性 `HealthBadge` 以真实组件、CSS Module 和 story 进入 Storybook；Storybook 不模拟 Product Host 事实，也未启用 MCP。
 - 概览 feature 已使用 CSS Module 直接消费同一语义 token，以状态摘要、连续运行体列表、模型配置摘要和按需详情抽屉组织页面；旧 status 全局样式及其共享覆盖已删除。`Overview.stories.tsx` 提供等待、空目录、降级、读取失败、断线、等待重连目录、长列表及详情交互场景。
 - 概览深色宽屏、浅色宽屏和深色 480×900 使用固定 Playwright 视觉基线；观测时间在测试网络响应中固定，避免修改 React 所拥有的 DOM，结构、内容与状态不被遮罩。
 - 概览另有空目录、运行体降级、读取失败与运行体详情的宽/窄屏截图；列表和详情使用 320～1440 CSS px 长内容矩阵验证容量，键盘焦点与深浅主题 axe 由真实 Product Host 测试覆盖。
-- 对话 feature 由 CSS Module 消费相同语义 token，消息区独立滚动，输入区保持在页面底部；恢复历史与空态具有深浅宽/窄屏基线，320～1440 CSS px 长内容、输入焦点与深浅主题 axe 已覆盖。`Conversation.stories.tsx` 提供恢复、空态、加载、错误、断线、等待回复、失败与长消息状态。
-- 能力页候选由 `features/capabilities/Extensions.module.css` 消费相同 token：默认扩展列表，按需安装表单与版本/诊断抽屉，取消旧全局 extension 样式。目录、安装表单和详情建立宽/窄屏截图，深浅主题、320～1440 CSS px 和键盘焦点进入/返回进入 Product Host 回归；独立接受状态由 Roadmap 维护。
-- 活动页由 `features/activity/Activity.module.css` 消费相同 token：筛选、暂停缓冲状态、事件列表与详情抽屉归于页面内；深浅主题、宽窄屏列表/详情截图、320～1440 CSS px、键盘焦点与空态语义进入真实 Host 和 Storybook 回归。
-- 设置由 `features/configuration/Configuration.module.css` 消费相同 token，宽屏侧栏与窄屏分类 Drawer 按真实子区切换；字段、保存状态、一次性令牌及危险操作确认由 React 持有。模型、记忆和丢弃确认建立宽窄深浅主题基线，320～1440 CSS px、键盘焦点与七子区 axe 进入 Product Host 回归；旧 feature DOM/CSS 与 route adapter 已全部删除。
+- 对话 feature 由 CSS Module 消费相同语义 token，消息区独立滚动，输入区保持在页面底部；键盘焦点落在 textarea 时由整个圆角输入面承载轻量 focus ring，不在内部生成方形描边。恢复历史与空态具有深浅宽/窄屏基线，320～1440 CSS px 长内容、输入焦点与深浅主题 axe 已覆盖。`Conversation.stories.tsx` 提供恢复、空态、加载、错误、断线、等待回复、失败与长消息状态。
+- 扩展页由 `features/capabilities/Extensions.module.css` 消费相同 token：左侧为轻量文字目录，右侧为内部滚动的版本/诊断详情，按需展开安装表单，不再使用右侧详情抽屉。能力页采用同一 list-detail 语法，MCP 与本地技能作为目录入口进入右侧编辑区。
+- 活动页由 `features/activity/Activity.module.css` 消费相同 token：原有筛选器保留为轻量半透明面板，选项与文本输入变化会自动刷新结果，不保留额外的应用按钮；日志条目进入独立的深色连续阅读窗，行内只保留轻高亮与打开详情，复制和按来源筛选进入详情层。暂停缓冲状态与详情仍归于页面内；深浅主题、宽窄屏列表/详情截图、320～1440 CSS px、键盘焦点与空态语义进入真实 Host 和 Storybook 回归。
+- 配置由 `features/configuration/Configuration.module.css` 消费相同 token，宽屏局部导航与窄屏分类浮层只列模型、语音、检索和记忆；Provider 选择也是轻量文字目录，不显示路由概览卡或大标题。能力目录属于 `/capabilities`，访问安全及存储维护属于 `/system/*`。字段、保存状态、一次性令牌及危险操作确认仍由同一配置 owner 持有。
 
 详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
 
@@ -119,7 +119,7 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 - 不使用全页同一透明度、统一亮边、强 glow、清晰背景干扰或渐变卡片墙；材质手段必须服从信息层级和长期阅读；
 - 深色与浅色是同一中性语义系统的两种映射，accent 再独立映射；不能把 accent 混入主题底色，也不能分别手调成两套无关主题。
 
-“青曜”的已确认视觉色阶如下；[实色色卡](../roadmap/design-briefs/reference-assets/m11-ui/accent-a-qingyao.svg)用于人工比较，表内 OKLCH 值才是后续生成与校准的基准。该色阶是 M11 的目标设计输入，不代表当前代码已经实现，也不表示每一级可以直接作为文字、图标或控件前景色。
+“青曜”的已确认视觉色阶以[实色色卡](../roadmap/design-briefs/reference-assets/m11-ui/accent-a-qingyao.svg)为视觉事实源：`#004052` deep、`#00687F` pressed、`#00AABC` core、`#00BFC5` hover、`#6AE2D4` glint。代码用途 token 必须从这五级映射，再按深浅主题与 WCAG 对比度选择用途；不表示每一级都可直接作为文字、图标或控件前景色。
 
 | 视觉级别 | OKLCH 基准 | sRGB 参考 | 预期角色 |
 |---|---|---|---|
@@ -132,6 +132,8 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 ### 4.2 M11 已确认视觉语言
 
 用户确认的 M11 组合吸收“静水工作台”的连续结构、“晶光器皿”的有限内透光，以及“夜湖控制台”在运行列表中的扫描密度。实现必须保持以下边界：
+
+当前呈现方式收敛为 Chromeless Ambient Workspace：整个 viewport 属于应用空间；全局导航固定为视口顶部居中的“配置 / 扩展 / 能力 / 数据 / 系统”五个紧凑按钮，但不存在 Navbar surface、品牌 Wordmark、在线提示或横向分隔。当前项只使用低比例单色 tint，高亮不使用渐变或装饰色条。右上角外观按钮打开统一圆角浮层，只配置主题与背景；退出是相邻独立 icon action。页面不重复显示巨型一级标题；位置由全局与局部导航表达。Workspace 固定占满 viewport，文档本身不滚动，长日志、消息、目录和详情在各自工作区内部滚动；滚动条只在真实溢出时出现，采用窄、圆、透明轨道的统一样式，每个页面及内部长详情到底后都保留底部呼吸空间。切页只对 workspace 使用短交叉淡化，不使用位移，并遵守 `prefers-reduced-motion`。无意义分割线不参与布局，层级优先由留白、轻面和悬停态表达。
 
 - 深色使用中性炭黑、黑灰和分层灰；浅色使用白、近白和中性灰。两套主题共享语义结构，不分别手调为无关 palette。
 - 主要阅读 surface 以实体或近实体雾面为主；晶莹感来自有限明暗面、局部内高光、柔和阴影和少量青曜晶光，不使用整页玻璃、统一亮边或强 glow。
@@ -166,6 +168,20 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 token 应按语义命名，不用具体颜色或单个页面命名跨产品 token。组件可以拥有受控别名，但不得复制原始值形成第二套主题。
 
 当前实现继续以各 Product 的 `tokens.css` 为代码事实源。DTCG 2025.10 是未来跨工具/跨产品生成链候选；只有 canonical token source、CSS 生成器、校验、consumer 和旧 CSS 删除门同时成立时才能采用，不能并行手写 JSON、CSS 与 Storybook theme。AI 应读取语义 token 与真实组件状态，不能从截图采样后直接在 feature 内散落原始色值。
+
+### 5.1 Personal Server 当前语义
+
+| 系统 | 当前语义 | 使用边界 |
+|---|---|---|
+| Backdrop | `canvas`、`canvas-deep`、`ambient`、`wallpaper`、`custom` | Ambient 是完整默认态；Wallpaper/Custom 没有安全来源时使用 Ambient fallback，不暴露浏览器 API key |
+| Material | `clear`、`content-panel`、`mist`、`frost`、`frost-elevated` | clear=Workspace/导航；content-panel=聚合阅读或编辑内容的无描边低透明面；mist=sticky controls；frost=Popover/Drawer；frost-elevated=Dialog；列表行不单独创建 blur layer |
+| Interaction | `interactive-neutral` default/hover/pressed，`interactive-accent` default/hover | hover 以 alpha/明度为主；pressed 使用轻微 inset；不默认 translate/scale/glow |
+| Radius | `control`、`popover`、`panel`、`dialog`、`pill` | 需要成面的聚合区使用 panel 圆角，连续背景不为制造轮廓而成面；pill 仅用于状态与少量浮动提示 |
+| Control | `compact`、`default`、`comfortable` | 对应紧凑工具、普通控件、导航/触控容量；不得用巨型按钮制造层级 |
+| Motion | `fast`、`standard`、`enter` | hover 最快，overlay enter 较慢；系统 reduced-motion 和用户 Motion 偏好均可降为近零 |
+| Typography | UI sans、display title、mono technical | Mono 只用于时间、ID、trace、日志和结构化字段，数字使用 tabular nums |
+
+Dark/Light × Background × Material 通过 `html[data-*]` 语义映射，feature 只消费用途 token。当前背景没有彩色 grain、RGB noise、紫蓝 blob 或大面积青曜；环境反射保持低对比和低频。
 
 ## 6. 组件与状态契约
 

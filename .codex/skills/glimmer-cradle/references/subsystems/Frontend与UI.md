@@ -27,6 +27,20 @@
 8. 运行定向静态/单元、路由与真实交互、截图矩阵、包级 build/typecheck；Electron 变化补实机。同步唯一事实源并删除被替代旧结构。
 9. AI 辅助实现必须形成“观察当前页面 → 查询真实组件/API → 实现内聚片段 → 浏览器渲染并查看截图 → 交互/a11y/响应式验证 → 纠偏”的闭环；工具或模型不能替代用户视觉确认和真实产品 E2E。
 
+## Personal Server 已确认方向
+
+Personal Server 当前方向是 **Chromeless Ambient Workspace（无框环境式工作台）**。用户已于 2026-09-12 明确确认该方向；后续实现和修正不得重新触发三方向选择。三方向比较仍适用于未来尚未确认的大型 UI 改造。
+
+- Viewport 是连续应用空间；宽屏全局导航以紧凑文字按钮在视口顶部居中，主题与退出独立位于右上角，只在激活/交互态局部使用单色 tint，不出现实体 Sidebar、Navbar surface、硬边界或重复页面巨型标题。页面 action 与局部导航贴近其实际内容区。
+- 默认使用 typography、spacing、section rhythm、subtle divider 与 continuous list 组织内容。禁止 Card Wall、传统 SaaS Dashboard、巨型 Hero、冗余全局导航与常驻空 Inspector。
+- Ambient 背景使用低频、低对比中性色调场；禁止彩噪、RGB noise、紫蓝 gradient blob、霓虹光斑和大面积 accent 污染。
+- Material 只从语义 token 消费：`clear` 用于普通 Workspace，`mist` 用于导航和少量 sticky controls，`frost` 用于 Popover/Dropdown/Context Drawer，`frost-elevated` 用于 Dialog。feature 不散落自己的 `rgba`、blur 或 shadow 形成第二玻璃系统。
+- Hover/pressed 主要改变 luminance、alpha、文字/图标亮度和有限 inset，不以 translate、scale、bounce、强 glow 或大阴影变化表达普通交互。
+- 大结构默认零圆角；control、popover、drawer、dialog 按层级使用有限半径，不使用全站 20–32px 软糖圆角。
+- 一个功能只有一个 Primary Home：健康在 Overview，对话在 Conversation，Extension 生命周期和 MCP 管理在 Capabilities，全局日志在 Activity，Extension 日志复用同一 LogStream，全局配置与系统访问在 Settings。其他位置只提供 contextual deep-link。
+- Activity 使用 Continuous Log Wall；行级 action 在 hover、focus-within 或显式触控菜单中出现，详情进入 Context Drawer。Extension Logs 是同一组件语言的 filtered projection。
+- 宽屏可形成 Navigation / Workspace / Context Drawer；容量不足时导航进入 Overlay，Context Drawer 升级为 full-height sheet，不把 Sidebar 机械缩成不可理解的纯图标列。
+
 ## 视觉探索判断
 
 - 不预设深色/浅色、表面结构、色彩、圆角、阴影、透明、纹理、字体、密度、导航或动效。

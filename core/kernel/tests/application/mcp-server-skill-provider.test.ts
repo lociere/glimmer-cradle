@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
@@ -21,6 +21,29 @@ const observability: KernelObservabilityPort = {
 };
 
 describe('McpServerSkillProvider', () => {
+  it('真实 stdio 断线撤销旧目录并重连，stop 取消后续重试', async () => {
+    const registry = new SkillRegistry();
+    const provider = new McpServerSkillProvider(new RuntimeReadinessProjectionMapper(), () => ({ mcp_servers: [{
+      id: 'reconnect', enabled: true, transport: 'stdio', command: process.execPath,
+      args: [path.resolve(__dirname, '../fixtures/mcp-stdio-fixture.mjs')], env: {}, timeout_ms: 5000,
+    }] }));
+    try {
+      provider.start(registry); await provider.waitForPendingConnections();
+      const oldSkill = registry.findById('mcp.reconnect')!.skill;
+      await oldSkill.tools.find((tool) => tool.name === 'disconnect_fixture')!.handler({});
+      await vi.waitFor(() => expect(registry.findById('mcp.reconnect')).toBeUndefined(), { timeout: 1500, interval: 10 });
+      await vi.waitFor(() => expect(registry.findById('mcp.reconnect')).toBeDefined(), { timeout: 5000, interval: 50 });
+      const newSkill = registry.findById('mcp.reconnect')!.skill;
+      expect(newSkill).not.toBe(oldSkill);
+      expect(await newSkill.tools.find((tool) => tool.name === 'echo')!.handler({ text: 'restored' })).toMatchObject({ content: [{ text: 'restored' }] });
+      await newSkill.tools.find((tool) => tool.name === 'disconnect_fixture')!.handler({});
+      await vi.waitFor(() => expect(registry.findById('mcp.reconnect')).toBeUndefined(), { timeout: 1500, interval: 10 });
+      await provider.stop(registry);
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      expect(registry.findById('mcp.reconnect')).toBeUndefined();
+      expect(provider.listConnectionTargets()).toHaveLength(0);
+    } finally { await provider.stop(registry); }
+  });
   it('把 stdio MCP 的 tool、resource、prompt 投影为可调用 Skill，并在停止时回收', async () => {
     const registry = new SkillRegistry();
     const provider = new McpServerSkillProvider(new RuntimeReadinessProjectionMapper(), () => ({

@@ -89,6 +89,8 @@ Skill 热度只证明被发现/安装，不证明对摇篮有效。每项新增�
 
 ## 4. 设计与实现闭环
 
+视觉参考的标准闭环是：**Reference inspection → Code inspection → Pattern extraction → Project translation → Browser render → Screenshot inspection → Interaction inspection → Correction**。截图只说明感知结果，公开源码用于确认比例、透明、hover、overlay 与 motion 的实现规律；二者都不能覆盖项目 owner、技术栈或用户目标。已经由用户确认的方向直接进入翻译与验证，不重复生成三方向候选。
+
 ### 4.1 先观察
 
 1. 读取目标 route、feature、shared UI、token 和直接相关测试，不扫描无关页面。
@@ -111,6 +113,8 @@ Skill 热度只证明被发现/安装，不证明对摇篮有效。每项新增�
 3. 检查键盘顺序、focus-visible、Overlay 焦点进入/返回、Escape、缩放和 reduced-motion。
 4. 自动 a11y 扫描只覆盖可检测问题；对控件名称、阅读顺序、错误恢复和认知负担保留人工检查。
 5. 只有预期变化才更新截图基线，并在 diff 中说明视觉意图；不能用调大阈值、隐藏动态区域或批量更新掩盖回归。
+
+每轮截图还要执行反模板审查：是否重新出现 Card Wall、巨型圆角、gradient blob、RGB noise、Huge Hero、Dashboard 式空白、重复 Topbar/Sidebar、过度描边玻璃、过量 glow 或无意义动画。任一项出现时先回到信息层级和 token owner 修正，不继续叠加装饰。
 
 ## 5. 失败与恢复
 

@@ -390,6 +390,7 @@ function eventValueFromFrame(frame: SurfaceProjectionFrame): surfaceV1.SurfaceEv
         requestId: frame.request_id, traceId: confirmation.trace_id, skillId: confirmation.skill_id,
         targetKind: confirmation.target_kind, targetName: confirmation.target_name,
         riskLevel: confirmation.risk_level, sideEffects: confirmation.side_effects,
+        title: confirmation.title, detail: confirmation.detail,
       }) } : null;
     }
     case 'shutdown': return { case: 'shutdown', value: create(surfaceV1.ShutdownEventSchema) };

@@ -51,6 +51,7 @@ import { LoggingSkillInvocationAuditSink, SkillInvocationGateway } from '../appl
 import { SkillPlanningAppService } from '../application/use-cases/skill-planning-app.service';
 import { CoreSkillProvider } from '../application/skill-plane/providers/core';
 import { UserSkillProvider } from '../application/skill-plane/providers/user';
+import { UserSkillSource } from '../adapters/skill-plane/user/user-skill-source';
 import { McpServerSkillProvider } from '../adapters/skill-plane/mcp-server';
 import { ControlSurfaceCorePlatformBridge } from '../adapters/surface/control-surface-core-platform-bridge';
 import { currentExtensionPlatform } from '../adapters/platform/skill-availability';
@@ -227,7 +228,7 @@ function createOperationalRuntimePlan(options: {
   );
   const providers = [
     new CoreSkillProvider(bridge, { localDeviceActions: product.features.local_device_actions }),
-    new UserSkillProvider(), mcpProvider,
+    new UserSkillProvider(new UserSkillSource(() => ConfigManager.instance.getConfig().system.skill_plane.user_skills)), mcpProvider,
   ];
   const extensionHost = new ExtensionHostAppService(
     perception, catalog, availability, skillPlanePolicy, attentionLeases, lifeClock,

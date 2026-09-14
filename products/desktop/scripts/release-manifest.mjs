@@ -85,8 +85,27 @@ await fs.writeFile(path.join(root, 'build-claim.json'), `${JSON.stringify({
 }, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify({ event: 'desktop_manifest_created', manifest_digest: digest })}\n`);
 
-async function collectFiles(directory, relative = '') {
-  const files = [];
+async function collectFiles(directory) {
+  const targets = await collectFileTargets(directory);
+  const files = new Array(targets.length);
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(16, targets.length) }, async () => {
+    while (nextIndex < targets.length) {
+      const index = nextIndex++;
+      const { target, artifactPath } = targets[index];
+      const bytes = await fs.readFile(target);
+      files[index] = {
+        path: artifactPath,
+        size: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      };
+    }
+  }));
+  return files.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+async function collectFileTargets(directory, relative = '') {
+  const targets = [];
   const excluded = new Set(['artifact-manifest.json', 'provenance.json', 'sbom.spdx.json', 'build-claim.json']);
   for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
     if (!relative && excluded.has(entry.name)) continue;
@@ -94,17 +113,12 @@ async function collectFiles(directory, relative = '') {
     const artifactPath = path.posix.join(relative.replaceAll('\\', '/'), entry.name);
     if (entry.isSymbolicLink()) throw new Error(`Desktop fixed artifact 不接受 symlink: ${artifactPath}`);
     if (entry.isDirectory()) {
-      files.push(...await collectFiles(target, artifactPath));
+      targets.push(...await collectFileTargets(target, artifactPath));
     } else if (entry.isFile()) {
-      const bytes = await fs.readFile(target);
-      files.push({
-        path: artifactPath,
-        size: bytes.length,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-      });
+      targets.push({ target, artifactPath });
     }
   }
-  return files.sort((left, right) => left.path.localeCompare(right.path));
+  return targets;
 }
 
 async function collectDependencyPackages() {

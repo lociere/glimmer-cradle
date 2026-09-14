@@ -125,6 +125,8 @@ const surfaceGatewayDefinition = {
 };
 type SurfaceClient = {
   readonly readyState: number;
+  readonly sessionId?: string;
+  readonly canHandleActions?: boolean;
   send(event: SurfaceEvent): void;
   close?: () => void;
 };
@@ -161,6 +163,8 @@ interface ExtensionLifecycleController {
 }
 
 interface PendingSurfaceRequest {
+  readonly sessionId?: string;
+  readonly responseKind: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
@@ -486,6 +490,8 @@ export class ControlSurfaceGateway {
     };
     const client: SurfaceClient = {
       readyState: SURFACE_OPEN,
+      sessionId: call.request.sessionId,
+      canHandleActions: session.scopes.has('surface:write'),
       send: (event) => {
         if (streamClosed || call.destroyed) return;
         if (pendingEvents.length >= 128) {
@@ -508,6 +514,12 @@ export class ControlSurfaceGateway {
       pendingEvents.length = 0;
       this._clients.delete(client);
       this._surfaceSessions.delete(call.request.sessionId);
+      for (const [requestId, pending] of this._pendingSurfaceRequests) {
+        if (pending.sessionId !== call.request.sessionId) continue;
+        clearTimeout(pending.timer);
+        this._pendingSurfaceRequests.delete(requestId);
+        pending.reject(new Error('执行 Skill 的产品控制表面已断开'));
+      }
     };
     call.once('cancelled', cleanup);
     call.once('close', cleanup);
@@ -530,6 +542,7 @@ export class ControlSurfaceGateway {
     const output: SurfaceEvent[] = [];
     const client: SurfaceClient = {
       readyState: SURFACE_OPEN,
+      sessionId,
       send: (event) => output.push(event),
     };
     await this._dispatchSurfaceRequest(frame, client);
@@ -658,6 +671,15 @@ export class ControlSurfaceGateway {
   }
 
   public async requestSkillConfirmation(request: SkillConfirmationRequest): Promise<boolean> {
+    let detail = request.detail;
+    if (request.skillId === 'core.desktop' && request.targetName === 'desktop.open_file') {
+      const filePath = (request.args as { path?: unknown } | undefined)?.path;
+      // 不截断待打开目标，避免用户无法辨认实际文件；不暴露其他调用参数。
+      if (typeof filePath !== 'string' || !filePath.trim() || filePath.length > 1800) {
+        throw new Error('文件打开确认需要有效且完整的目标路径');
+      }
+      detail = `将使用系统默认程序打开以下路径（可执行文件可能启动程序）：\n${JSON.stringify(filePath)}`;
+    }
     const result = await this._requestSurfaceRoundTrip('core_skill_confirmation_request', {
       confirmation: {
         trace_id: request.traceId,
@@ -666,13 +688,15 @@ export class ControlSurfaceGateway {
         target_name: request.targetName,
         risk_level: request.riskLevel,
         side_effects: request.sideEffects,
+        title: request.title,
+        detail,
       },
     });
     return Boolean((result as { approved?: unknown })?.approved);
   }
 
   private _requestSurfaceRoundTrip(kind: string, payload: Record<string, unknown>, stableRequestId?: string): Promise<unknown> {
-    const client = Array.from(this._clients).find((item) => item.readyState === SURFACE_OPEN);
+    const client = Array.from(this._clients).find((item) => item.readyState === SURFACE_OPEN && item.canHandleActions === true);
     if (!client) {
       return Promise.reject(new Error('产品控制表面未连接，无法执行本地 Skill'));
     }
@@ -683,7 +707,10 @@ export class ControlSurfaceGateway {
         this._pendingSurfaceRequests.delete(requestId);
         reject(new Error('产品控制表面本地 Skill 请求超时'));
       }, 30000);
-      this._pendingSurfaceRequests.set(requestId, { resolve, reject, timer });
+      this._pendingSurfaceRequests.set(requestId, {
+        resolve, reject, timer, sessionId: client.sessionId,
+        responseKind: kind === 'core_skill_confirmation_request' ? 'core_skill_confirmation_response' : 'core_skill_action_response',
+      });
       const event = surfaceEventFromFrame({
         kind,
         request_id: requestId,
@@ -891,7 +918,7 @@ export class ControlSurfaceGateway {
         },
       });
     } else if (kind === 'core_skill_action_response' || kind === 'core_skill_confirmation_response') {
-      this._handleCoreSkillResponse(data as CoreSkillResponseFrame);
+      this._handleCoreSkillResponse(data as CoreSkillResponseFrame, ws.sessionId);
     } else if (kind === 'config_snapshot_request') {
       await this._handleConfigSnapshotRequest(data.config_snapshot_request, ws);
     } else if (kind === 'conversation_history_request') {
@@ -1289,10 +1316,10 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private _handleCoreSkillResponse(data: CoreSkillResponseFrame): void {
+  private _handleCoreSkillResponse(data: CoreSkillResponseFrame, sessionId?: string): void {
     const requestId = typeof data.request_id === 'string' ? data.request_id : '';
     const pending = this._pendingSurfaceRequests.get(requestId);
-    if (!pending) return;
+    if (!pending || pending.sessionId !== sessionId || pending.responseKind !== data.kind) return;
     this._pendingSurfaceRequests.delete(requestId);
     clearTimeout(pending.timer);
 

@@ -1,5 +1,9 @@
 # M12 Contract Spine Inventory
 
+当前新增用户技能 Document：`json-schema/skill/v1/user-skill-metadata.schema.json`，
+`https://glimmer-cradle.dev/schemas/skill/v1/user-skill-metadata.schema.json`，`UserSkillMetadata`。
+Contract Spine 拥有 frontmatter validator，Kernel UserSkillSource 消费；无旧格式迁移或并行 owner。
+
 > 范围：记录 M12 从 Slice 1 输入到 Slice 9 legacy protocol closure 的迁移账本；本文末尾“Slice 9 当前固定状态”覆盖前文历史输入表。
 > 事实依据：`protocol/`、root/package scripts、`core/`、`products/`、`packages/extension-sdk`、`templates/extension-basic`、`docs/reference/protocol.md` 与 `docs/architecture/implementation/Protocol契约层实现.md`。
 > 维护触发：旧 protocol 目录、生成链、runtime consumer、配置/SDK consumer、contracts baseline 或删除条件变化。

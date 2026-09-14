@@ -46,12 +46,20 @@ Audio engine 以 `engines/audio` 为源码事实源。TTS/ASR 默认关闭且不
 
 ## Desktop 安装投影
 
+Python 携带固定版本 uv managed CPython 的完整分发（含标准库和 DLL），不能复制指向构建机的 venv。运行入口为 `runtime/python/python.exe`。安装树生成后执行隔离模式导入检查，要求 `sys.prefix`、`sys.base_prefix` 与所有模块搜索路径位于捆绑目录，并导入 gRPC、生成契约、Cognition 和 Audio；存在 `pyvenv.cfg` 即拒绝制品。
+
+Electron 原生模块仍执行正式 rebuild；workspace 将 `@electron/rebuild` 的 `node-gyp` 固定为 12.4.0，以支持 Visual Studio 2026。该覆盖仅作用于构建依赖，不跳过 SQLite ABI 重编译。
+
+安装态路径解析器分别校验 Extension Host 入口、原生 Avatar launcher、Unity Player、Player 内 Avatar Package Registry 与随包 SDK catalog。Supervisor 注入这些绝对路径，Kernel 将 Player 作为 launcher 的首参数，并以安装态 registry/catalog 判断已固化 SDK，避免相对路径误落到 native 组件目录或回查源码树。Unity Player 的 Grpc.Core 本机库投影名固定为 `grpc_csharp_ext.dll`，与 Mono 的 `DllImport("grpc_csharp_ext")` 一致。Electron 主包排除 Contracts 开发工具及测试源，只保留运行依赖；native 投影仅包含 `DesktopProcessTreeBridge.exe`、`platform_native.dll` 与 `UnityAvatarHostLauncher.exe`，不携带 CMake/Visual Studio 中间文件。
+
+Supervisor 的只读就绪探针消费对象投影，不抢占交互动作；启动期 `starting`/`stopped` 持续等待，显式阻塞失败才中止。Cognition 启动期间输入入口保持关闭并投影 `starting`，实际失败才投影 `failed`；成功终止进程树后释放 authority 引用，重复停机不再次调用已关闭的桥。
+
 Windows x64 安装树的 `resources/` 包含：
 
 ```text
 runtime/
 ├── node/node.exe
-├── python/Scripts/python.exe
+├── python/python.exe
 ├── python/Lib/site-packages/{glimmer_cradle,...}
 ├── kernel/dist/
 ├── kernel/node_modules/
@@ -59,6 +67,9 @@ runtime/
 └── runtime-manifest.json
 components/
 ├── avatar/unity-host/
+│   ├── UnityAvatarHost.exe
+│   ├── UnityAvatarHost_Data/StreamingAssets/avatar-package-registry.json
+│   └── avatar-sdk-catalog.json
 └── native/composition-host/
     └── bin/Release/{platform_native.dll,UnityAvatarHostLauncher.exe}
 extension-host/modules/
@@ -73,7 +84,7 @@ pnpm production deploy 以 hoisted 实体布局产生 resolved dependency tree�
 junction 绑定随后被重命名的 staging 目录；打包门会在最终安装树用 bundled Node 隔离加载
 Contracts TS Service，并验证 Extension Host process 入口位于
 `runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js`。`packaged-paths.ts` 拒绝缺失或
-symlink 运行组件，并把首次配置从只读 defaults 原子投影到 user-data；
+symlink 运行组件，并把首次配置从只读 defaults 原子投影到 user-data。Desktop 主进程与 bundled Kernel 使用同一 user-data 下的 `configs/`、`data/`、`run/`；应用资源仍以 `resources/` 为只读根；
 `packaged-supervisor.ts` 使用 bundled Node 启动 Kernel，并注入 bundled Python、Avatar、
 Extension、native 与 product manifest 路径。它不调用开发期
 `tools/workspace-supervisor/`。打包后的物理入口为

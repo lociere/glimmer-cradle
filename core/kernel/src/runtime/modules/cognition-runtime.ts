@@ -47,6 +47,6 @@ export class CognitionRuntime implements RuntimeModule {
       details_ref: 'data/observability/logs/application/cognition.console.log',
     }]);
     if (state === 'ready') this.ingressRecovery.restoreIngress();
-    else if (state === 'starting' || state === 'failed') this.ingressRecovery.suspendIngress(summary);
+    else if (state === 'starting' || state === 'failed') this.ingressRecovery.suspendIngress(summary, state);
   }
 }

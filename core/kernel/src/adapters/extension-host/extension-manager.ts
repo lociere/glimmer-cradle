@@ -308,9 +308,21 @@ export class ExtensionManager {
     return this.getPackageManager().prepareInstall(source);
   }
 
-  public async commitInstall(transactionId: string, approvedPermissions: string[]): Promise<ExtensionInstallResult> {
+  public async commitInstall(transactionId: string, approvedPermissions: string[]): Promise<ExtensionInstallResult & { message?: string }> {
+    const previouslyInstalled = new Set(this.listInstallationProjections().map((item) => item.extension_id));
     const result = await this.getPackageManager().commitInstall(transactionId, approvedPermissions);
     await this.refreshInstalledExtensions();
+    if (!result.already_installed && !previouslyInstalled.has(result.extension_id)) {
+      try {
+        await this.activateExtension(result.extension_id, result.version);
+        return { ...result, message: '扩展已安装并激活；具体能力就绪状态见扩展详情。' };
+      } catch {
+        const message = '扩展已安装，但激活未完成。请修正扩展配置、凭据和依赖后，在扩展详情重新激活。';
+        this.hostService.updateExtensionRuntimeLifecycle(result.extension_id, 'degraded', message);
+        this.syncRuntimeReadiness();
+        return { ...result, message };
+      }
+    }
     return result;
   }
 

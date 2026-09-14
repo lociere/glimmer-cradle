@@ -64,7 +64,7 @@ test('Product Host 只为安全的 GET HTML navigation 提供 BrowserRouter fall
     const origin = fixture.baseUrl(app);
     const authorized = { authorization: 'Bearer server-secret' };
 
-    const navigation = await fetch(`${origin}/overview`, { headers: { accept: 'text/html' } });
+    const navigation = await fetch(`${origin}/system`, { headers: { accept: 'text/html' } });
     assert.equal(navigation.status, 200);
     assert.equal(navigation.headers.get('cache-control'), 'no-store');
     assert.match(await navigation.text(), /<title>shell<\/title>/);
@@ -79,10 +79,10 @@ test('Product Host 只为安全的 GET HTML navigation 提供 BrowserRouter fall
     assert.equal(await assetHead.text(), '');
 
     for (const request of [
-      { path: '/overview', method: 'GET', accept: 'application/json' },
-      { path: '/overview', method: 'GET', accept: 'text/html;q=0, */*' },
-      { path: '/overview', method: 'HEAD', accept: 'text/html' },
-      { path: '/overview', method: 'POST', accept: 'text/html' },
+      { path: '/system', method: 'GET', accept: 'application/json' },
+      { path: '/system', method: 'GET', accept: 'text/html;q=0, */*' },
+      { path: '/system', method: 'HEAD', accept: 'text/html' },
+      { path: '/system', method: 'POST', accept: 'text/html' },
       { path: '/assets/app.js', method: 'POST', accept: '*/*' },
       { path: '/assets/missing', method: 'GET', accept: 'text/html' },
       { path: '/api', method: 'GET', accept: 'text/html' },

@@ -15,6 +15,17 @@ import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
 
 const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === '1';
 
+it('Cognition 启动关闭入口但保持 starting；真正失败才发布 failed', () => {
+  const projection = new RuntimeReadinessProjectionMapper();
+  const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined };
+  const transport = new KernelTransportRuntime({} as KernelConfiguration, new KernelCognitionTransport(), new IngressGateManager(logger, new SystemClockAdapter()), projection);
+  const runtime = new CognitionRuntime(transport, { isReady: false, start: async () => {}, stop: async () => {} }, projection);
+  runtime.acceptLifecycleFact('starting', '等待注册');
+  expect(projection.getCatalog().runtimes.find(item => item.runtime_id === 'kernel.ingress')?.state).toBe('starting');
+  runtime.acceptLifecycleFact('failed', '注册失败');
+  expect(projection.getCatalog().runtimes.find(item => item.runtime_id === 'kernel.ingress')?.state).toBe('failed');
+});
+
 describe.skipIf(!runIntegration)('CognitionManager real process integration', () => {
   let transportRuntime: KernelTransportRuntime;
   const transport = new KernelCognitionTransport();

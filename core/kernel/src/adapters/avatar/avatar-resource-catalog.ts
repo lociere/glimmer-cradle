@@ -13,6 +13,10 @@ interface AvatarPackageManifestLike {
   live2dVersion?: string;
 }
 
+interface AvatarPackageRegistryLike {
+  models?: Array<{ modelFormat?: string }>;
+}
+
 interface AvatarSdkDescriptorLike {
   id?: string;
   displayName?: string;
@@ -32,6 +36,9 @@ export interface AvatarResourceOptions {
   readonly repoRoot?: string;
   readonly commandPath?: string;
   readonly workingDir?: string;
+  readonly playerPath?: string;
+  readonly registryPath?: string;
+  readonly sdkCatalogPath?: string;
 }
 
 export function buildAvatarResourceSnapshots(
@@ -40,14 +47,14 @@ export function buildAvatarResourceSnapshots(
   const repoRoot = options.repoRoot ?? resolveRepoRoot();
   const resources: RuntimeResourceSnapshot[] = [];
 
-  const registryPath = path.join(
-    repoRoot,
-    'hosts',
-    'unity-avatar-host',
-    'Assets',
-    'StreamingAssets',
-    'avatar-package-registry.json',
-  );
+  const registryPath = options.registryPath ?? path.join(
+      repoRoot,
+      'hosts',
+      'unity-avatar-host',
+      'Assets',
+      'StreamingAssets',
+      'avatar-package-registry.json',
+    );
   resources.push(inspectRuntimeFileResource({
     resourceId: 'avatar.package-registry',
     resourceKind: 'avatar_package_registry',
@@ -77,18 +84,26 @@ export function buildAvatarResourceSnapshots(
     resources.push(inspectRuntimeFileResource({
       resourceId: 'avatar.host.player',
       resourceKind: 'hostProcess_executable',
-      path: path.join(options.workingDir, 'UnityAvatarHost.exe'),
+      path: options.playerPath?.trim() || path.join(options.workingDir, 'UnityAvatarHost.exe'),
       label: 'Unity Avatar Player',
       recoveryActions: ['运行 pnpm avatar:build 生成 Unity Player。'],
     }));
   }
 
-  resources.push(...buildAvatarSdkResources(repoRoot));
+  resources.push(...buildAvatarSdkResources(repoRoot, {
+    registryPath,
+    sdkCatalogPath: options.sdkCatalogPath,
+    packaged: Boolean(options.registryPath && options.sdkCatalogPath && options.playerPath),
+  }));
   return resources;
 }
 
-function buildAvatarSdkResources(repoRoot: string): RuntimeResourceSnapshot[] {
-  const sdkCatalogPath = path.join(repoRoot, 'hosts', 'unity-avatar-host', 'avatar-sdk-catalog.json');
+function buildAvatarSdkResources(
+  repoRoot: string,
+  options: { registryPath: string; sdkCatalogPath?: string; packaged: boolean },
+): RuntimeResourceSnapshot[] {
+  const sdkCatalogPath = options.sdkCatalogPath
+    ?? path.join(repoRoot, 'hosts', 'unity-avatar-host', 'avatar-sdk-catalog.json');
   const sdkCatalog = readJsonFile<{ sdks?: AvatarSdkDescriptorLike[] }>(sdkCatalogPath);
   if (!sdkCatalog) {
     return [inspectRuntimeFileResource({
@@ -100,7 +115,9 @@ function buildAvatarSdkResources(repoRoot: string): RuntimeResourceSnapshot[] {
     })];
   }
 
-  const requiredModelFormats = collectRequiredUnityModelFormats(repoRoot);
+  const requiredModelFormats = options.packaged
+    ? collectPackagedModelFormats(options.registryPath)
+    : collectRequiredUnityModelFormats(repoRoot);
   if (requiredModelFormats.length === 0) {
     return [{
       resource_id: 'avatar.sdk.catalog',
@@ -135,6 +152,18 @@ function buildAvatarSdkResources(repoRoot: string): RuntimeResourceSnapshot[] {
     const displayName = typeof descriptor.displayName === 'string' && descriptor.displayName.trim()
       ? descriptor.displayName.trim()
       : descriptorId;
+    if (options.packaged) {
+      resources.push({
+        resource_id: `avatar.sdk.${descriptorId}`,
+        resource_kind: 'unity_sdk',
+        desired_state: 'ready',
+        actual_state: 'ready',
+        readiness: 'ready',
+        summary: `${displayName} 已固化到安装态 Unity Player`,
+        recovery_actions: [],
+      });
+      continue;
+    }
     const sourceEnvValue = typeof descriptor.sourceEnv === 'string' && descriptor.sourceEnv.trim()
       ? process.env[descriptor.sourceEnv.trim()]
       : undefined;
@@ -187,6 +216,14 @@ function buildAvatarSdkResources(repoRoot: string): RuntimeResourceSnapshot[] {
     });
   }
   return resources;
+}
+
+function collectPackagedModelFormats(registryPath: string): string[] {
+  const registry = readJsonFile<AvatarPackageRegistryLike>(registryPath);
+  return [...new Set((registry?.models ?? [])
+    .map((model) => model.modelFormat)
+    .filter((format): format is string => typeof format === 'string' && format.trim().length > 0))]
+    .sort();
 }
 
 function collectRequiredUnityModelFormats(repoRoot: string): string[] {

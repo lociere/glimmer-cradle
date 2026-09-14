@@ -39,7 +39,7 @@ export class KernelReadinessMonitor {
     private readonly resolveEndpoint: EndpointResolver,
     private readonly reconnectDelayMs = 500,
     private readonly onKernelShutdown?: () => void,
-    private readonly surfaceGatewayClientFactory: SurfaceGatewayClientFactory = () => new SurfaceGatewayClient(),
+    private readonly surfaceGatewayClientFactory: SurfaceGatewayClientFactory = () => new SurfaceGatewayClient(['surface:read']),
   ) {}
 
   public start(): void {

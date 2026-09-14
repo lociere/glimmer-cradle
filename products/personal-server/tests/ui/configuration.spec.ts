@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { startPersonalServerUiFixture } from './fixtures/personal-server-host';
 async function login(page: Page, baseUrl: string, section = 'models') {
-  await page.goto(`${baseUrl}/settings?section=${section}`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
+  await page.goto(`${baseUrl}/config?section=${section}`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click();
 }
 test('settings failure retries, drafts survive subdomain history and discard restores fields', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true, configurationReadFailures: 1 });
@@ -11,7 +11,7 @@ test('settings failure retries, drafts survive subdomain history and discard res
     await login(page, fixture.baseUrl, 'memory'); await expect(page.getByRole('alert')).toContainText('模型配置暂时不可读');
     await page.getByRole('button', { name: '重试读取' }).click();
     const field = page.getByLabel('上下文注入上限', { exact: true }); await field.fill('12');
-    await selectSettingsSection(page, '音频'); await expect(page).toHaveURL(/section=audio/); await expect(field).toHaveCount(0);
+    await selectSettingsSection(page, '语音与音频'); await expect(page).toHaveURL(/section=audio/); await expect(field).toHaveCount(0);
     await page.goBack(); await expect(field).toHaveValue('12');
     await page.getByRole('button', { name: '刷新', exact: true }).click(); await expect(field).toHaveValue('12');
     await expect(page.locator('[data-role="save-status"]')).toContainText('保留本地修改');
@@ -26,9 +26,9 @@ test('late token reads cannot erase user input and leaving clears the one-time t
   await page.route('**/api/v1/security/access-tokens', async route => { if (route.request().method() === 'GET' && ++reads === 1) await wait; await route.continue(); });
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
-    await login(page, fixture.baseUrl, 'security'); await page.getByLabel('新令牌标签').fill('保留输入'); release(); await expect(page.getByLabel('新令牌标签')).toHaveValue('保留输入');
+    await page.goto(`${fixture.baseUrl}/system/security`); await page.getByLabel('访问令牌').fill('server-secret'); await page.getByRole('button', { name: '连接 Personal Server' }).click(); await page.getByLabel('新令牌标签').fill('保留输入'); release(); await expect(page.getByLabel('新令牌标签')).toHaveValue('保留输入');
     await page.getByRole('button', { name: '创建访问令牌' }).click(); await expect(page.locator('[data-role="issued-access-token"]')).toContainText('gcps_');
-    await selectSettingsSection(page, '模型与路由'); await selectSettingsSection(page, '安全与访问');
+    await page.getByRole('link', { name: '运行', exact: true }).click(); await page.getByRole('link', { name: '访问与安全', exact: true }).click();
     await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
   } finally { release(); await fixture.stop(); }
 });
@@ -45,20 +45,21 @@ test('history navigation clears issued tokens and late creation never restores t
   const fixture = await startPersonalServerUiFixture();
   try {
     await login(page, fixture.baseUrl);
-    await selectSettingsSection(page, '安全与访问');
+    await page.goto(`${fixture.baseUrl}/system/security`);
     await page.getByLabel('新令牌标签').fill('history-token');
     await page.getByRole('button', { name: '创建访问令牌' }).click();
     await expect(page.locator('[data-role="issued-access-token"]')).toBeVisible();
-    await page.goBack(); await expect(page).toHaveURL(/section=models/);
-    await page.goForward(); await expect(page).toHaveURL(/section=security/);
+    await page.goBack(); await expect(page).toHaveURL(/\/config/);
+    await page.goForward(); await expect(page).toHaveURL(/\/system\/security/);
     await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
     delay = true;
     await page.getByLabel('新令牌标签').fill('late-token');
     await page.getByRole('button', { name: '创建访问令牌' }).click(); await posted;
-    await page.goBack(); await expect(page).toHaveURL(/section=models/);
+    await page.goBack(); await expect(page).toHaveURL(/\/config/);
     release(); await page.goForward();
+    await expect(page.locator('[data-role="security-access-section"]')).not.toContainText('late-token');
+    await page.getByLabel('新令牌标签').fill('fresh-token');
     await expect(page.getByRole('button', { name: '创建访问令牌' })).toBeEnabled();
-    await expect(page.locator('[data-role="security-access-section"]')).toContainText('late-token');
     await expect(page.locator('[data-role="issued-access-token"]')).toHaveCount(0);
   } finally { release(); await fixture.stop(); }
 });
@@ -72,12 +73,12 @@ test('settings controls and confirmations reflow accessibly in both themes', asy
     for (const width of [1440, 1024, 901, 899, 761, 759, 601, 599, 480, 360, 320]) { await page.setViewportSize({ width, height: 900 }); expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0); }
     for (const theme of ['dark', 'light']) {
       await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
-      const navigation = page.getByRole('button', { name: '选择设置分类', exact: true });
+      const navigation = page.getByRole('button', { name: '选择配置分类', exact: true });
       await navigation.click();
-      await expect(page.getByRole('dialog', { name: '设置分类' })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: '配置分类' })).toBeVisible();
       expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
       await page.keyboard.press('Escape'); await expect(navigation).toBeFocused();
-      for (const name of ['模型与路由', '音频', '语义向量', '记忆与经验', 'Skill / MCP', '安全与访问', '存储与服务']) {
+      for (const name of ['AI 与路由', '语音与音频', '检索增强', '记忆与检索']) {
         await selectSettingsSection(page, name);
         expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
@@ -86,5 +87,34 @@ test('settings controls and confirmations reflow accessibly in both themes', asy
       expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
       await page.keyboard.press('Escape');
     }
+  } finally { await fixture.stop(); }
+});
+
+test('capability, security and maintenance routes remain accessible and contained', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'personal-server-desktop', '单项目覆盖拆分后的领域入口');
+  const fixture = await startPersonalServerUiFixture();
+  try {
+    await login(page, fixture.baseUrl);
+    for (const path of ['/capabilities', '/system/security', '/system/operations']) {
+      await page.goto(`${fixture.baseUrl}${path}`);
+      await expect(page.locator('main > section')).toBeVisible();
+      expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    }
+  } finally { await fixture.stop(); }
+});
+
+test('appearance popover controls theme and background while presentation settings stay fixed', async ({ page }) => {
+  const fixture = await startPersonalServerUiFixture();
+  try {
+    await login(page, fixture.baseUrl);
+    await page.getByRole('button', { name: '外观设置' }).click();
+    await page.getByRole('group', { name: '主题' }).getByRole('button', { name: '浅色', exact: true }).click();
+    await page.getByRole('group', { name: '背景' }).getByRole('button', { name: '纯色', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(page.locator('html')).toHaveAttribute('data-background', 'ambient');
+    await expect(page.locator('html')).toHaveAttribute('data-material', 'frosted');
+    await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
+    await expect(page.locator('html')).toHaveAttribute('data-motion', 'full');
   } finally { await fixture.stop(); }
 });

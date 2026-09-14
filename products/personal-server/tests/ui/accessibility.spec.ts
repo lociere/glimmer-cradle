@@ -5,7 +5,7 @@ import { startPersonalServerUiFixture } from './fixtures/personal-server-host';
 test('login and authenticated overview have no detectable critical accessibility violations', async ({ page }) => {
   const fixture = await startPersonalServerUiFixture({ zeroProvider: true });
   try {
-    await page.goto(`${fixture.baseUrl}/overview`);
+    await page.goto(`${fixture.baseUrl}/system`);
     await expect(page.locator('[data-role="login-layer"]')).toBeVisible();
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([]);
 

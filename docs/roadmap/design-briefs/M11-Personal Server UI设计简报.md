@@ -4,7 +4,7 @@
 > 事实依据：[ADR-0017](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)、[M11](../milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 目标物理清单](../manifests/M11-目标物理清单.md)、[UI Design Tokens Reference](../../reference/ui-design-tokens.md)、用户提供的 Obsidian 深浅/透明主题截图、雾面材质参考图与蓝色/绿色等强调色反馈。
 > 维护触发：用户选择或混合视觉方向、信息架构、代表页面任务、组件语言、主题策略、容量矩阵或首个 UI 实现 slice 变化。
 
-当前状态为 `design/accepted`。2026-08-25，用户确认“静水结构 × 有限晶光 × 夜湖列表密度”作为 M11 最终视觉方向；深色、浅色和窄屏代表方案已通过视觉确认。后续 React 实现状态见 [now.md](../now.md)，精确 token 与组件状态由 [UI Design Tokens Reference](../../reference/ui-design-tokens.md) 维护。
+当前状态为 `design/accepted`。2026-09-12，用户确认新的最终方向为 **Chromeless Ambient Workspace（无框环境式工作台）**；它吸收并取代此前“静水结构 × 有限晶光 × 夜湖列表密度”的呈现定义，仍保留其中成立的中性主题、青曜正交强调、连续空间、有限晶光和诊断列表密度原则。无需重新触发三方向选择。后续实现状态见 [now.md](../now.md)，精确 token 与组件状态由 [UI Design Tokens Reference](../../reference/ui-design-tokens.md) 维护。
 
 ## 目录
 
@@ -85,6 +85,14 @@ Personal Server 是长期运行的个人控制面，不是营销站、通用 Saa
 
 用户已确认以下组合作为 M11 的最终视觉方向：
 
+- Shell 采用 chromeless centered navigation 与 continuous workspace；导航把五个一级域作为视口顶部居中的紧凑文字按钮组，代码中不保留 Navbar/Sidebar/Rail surface，不显示产品 Wordmark 或常驻在线状态；主题与退出独立置于右上角。宽屏没有实体 Topbar、矩形 Sidebar 或硬分区边界，Wallpaper 模式的内置低对比环境场景贯穿整个 viewport；
+- 采用 full viewport 编排并保留有限 page gutter，不以固定 `max-width` 把 Shell 缩成居中 Dashboard；
+- 背景以 Low-frequency Tonal Field 的 Ambient 模式为完整默认态，并为 Wallpaper/Custom 保留 provider-agnostic 前端模式；
+- 材质层级固定为 clear / mist / frost / frost-elevated，选择性透明只用于导航、sticky controls、floating overlay、Drawer 与 Dialog；
+- 默认用 typography、spacing、section rhythm、subtle divider 和 continuous list 组织信息，禁止 Card Wall；
+- Activity 使用 Continuous Log Wall 与 Follow Tail，Extension 日志复用同一前端语言；Capabilities 作为 Extension/Skill/MCP/Provider-Adapter 的 Primary Home，具体可见对象只来自真实 Projection；
+- Extension 先进入 Context Drawer，再进入对象完整页；Global Settings 只负责摇篮本体配置，Extension 配置归对象详情；
+
 - 采用“静水工作台”的连续、安静结构；
 - 采用 Obsidian 式中性炭黑/暖黑作为 canvas，而不是蓝黑 canvas；
 - 采用“晶光器皿”的清澈层次和有限内透光；磨砂、透明、柔和明暗面按 surface 需要选择，不要求统一玻璃边框；
@@ -103,7 +111,7 @@ Personal Server 是长期运行的个人控制面，不是营销站、通用 Saa
 
 概览代表方案必须同时表现全局结构、信息密度和有限材质：
 
-- 单一左侧全局导航，图标与文字清楚，不再同时出现重复 Rail/Section Pane；
+- 单一顶部居中的全局导航，不再同时出现重复 Rail、侧栏或页面巨型标题；
 - 顶部只放产品身份、当前位置、总体健康和少量全局动作；
 - 主体以总体状态摘要开场，随后是 runtime 列表、Provider/能力摘要和最近异常；
 - canvas 可以是稳定纯色/渐变底色，也可以含低对比、非叙事性的环境轮廓、暗色图形或纹理；背景不是通透感成立的前置条件。采用背景内容时只保留大尺度轮廓和明暗，不让细节、主体或文字穿透到可读程度，也不得伪装状态或退化成壁纸展示；

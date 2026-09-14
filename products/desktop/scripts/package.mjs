@@ -49,6 +49,10 @@ await run(process.execPath, [
 ]);
 await run('pnpm.cmd', packageArgs);
 await run(process.execPath, [
+  path.join(repoRoot, 'products', 'desktop', 'scripts', 'verify-python-bundle.mjs'),
+  path.join(output, 'win-unpacked', 'resources', 'runtime', 'python'),
+]);
+await run(process.execPath, [
   path.join(repoRoot, 'products', 'desktop', 'scripts', 'verify-packaged-runtime.mjs'),
   output,
 ]);

@@ -64,7 +64,7 @@ export interface SurfaceProjectionFrame {
   extension_runtime_projection_changed?: ExtensionRuntimeProjection;
   extension_status_changed?: { extension_id: string; event: 'loaded' | 'started' | 'stopped' | 'error'; message?: string };
   request_id?: string; action?: string; payload?: Record<string, unknown>;
-  confirmation?: { trace_id: string; skill_id: string; target_kind: string; target_name: string; risk_level: string; side_effects: string[] };
+  confirmation?: { trace_id: string; skill_id: string; target_kind: string; target_name: string; risk_level: string; side_effects: string[]; title?: string; detail?: string };
 }
 
 export type PresentationFrameKind = SurfaceProjectionFrame['kind'];

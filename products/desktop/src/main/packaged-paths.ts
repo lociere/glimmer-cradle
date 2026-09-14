@@ -9,9 +9,13 @@ export interface PackagedDesktopPaths {
   readonly nodeExecutable: string;
   readonly pythonExecutable: string;
   readonly kernelEntry: string;
+  readonly extensionHostEntry: string;
   readonly productManifest: string;
   readonly extensionModuleRoot: string;
   readonly avatarHostExecutable: string;
+  readonly avatarPlayerExecutable: string;
+  readonly avatarPackageRegistry: string;
+  readonly avatarSdkCatalog: string;
   readonly nativeLibrary: string;
   readonly processTreeHelper: string;
 }
@@ -28,14 +32,21 @@ export async function resolvePackagedDesktopPaths(options: {
     configRoot: path.join(userRoot, 'configs'),
     runRoot: path.join(userRoot, 'run'),
     nodeExecutable: trustedResource(appRoot, 'runtime/node/node.exe'),
-    pythonExecutable: trustedResource(appRoot, 'runtime/python/Scripts/python.exe'),
+    pythonExecutable: trustedResource(appRoot, 'runtime/python/python.exe'),
     kernelEntry: trustedResource(appRoot, 'runtime/kernel/dist/index.js'),
+    extensionHostEntry: trustedResource(appRoot, 'runtime/kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js'),
     productManifest: trustedResource(appRoot, 'products/desktop/product.json'),
     extensionModuleRoot: trustedResource(appRoot, 'extension-host/modules'),
     avatarHostExecutable: trustedResource(
       appRoot,
       'components/native/composition-host/bin/Release/UnityAvatarHostLauncher.exe',
     ),
+    avatarPlayerExecutable: trustedResource(appRoot, 'components/avatar/unity-host/UnityAvatarHost.exe'),
+    avatarPackageRegistry: trustedResource(
+      appRoot,
+      'components/avatar/unity-host/UnityAvatarHost_Data/StreamingAssets/avatar-package-registry.json',
+    ),
+    avatarSdkCatalog: trustedResource(appRoot, 'components/avatar/unity-host/avatar-sdk-catalog.json'),
     nativeLibrary: trustedResource(
       appRoot,
       'components/native/composition-host/bin/Release/platform_native.dll',
@@ -49,9 +60,13 @@ export async function resolvePackagedDesktopPaths(options: {
     paths.nodeExecutable,
     paths.pythonExecutable,
     paths.kernelEntry,
+    paths.extensionHostEntry,
     paths.productManifest,
     paths.extensionModuleRoot,
     paths.avatarHostExecutable,
+    paths.avatarPlayerExecutable,
+    paths.avatarPackageRegistry,
+    paths.avatarSdkCatalog,
     paths.nativeLibrary,
     paths.processTreeHelper,
   ]) {
