@@ -8,6 +8,7 @@ from glimmer_cradle.cognition.application.cycle import (
 from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
+from glimmer_cradle.cognition.domain.workspace import make_item
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from glimmer_cradle.cognition.domain.configuration import CognitionSettings
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
@@ -99,6 +100,142 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         assert intent.type.value == "reply"
         # 阶段 7.2：回复文本来自 Deliberate 生成（非回显输入）
         assert intent.payload["text"] == "你好呀，我在"
+    finally:
+        await recorder.stop()
+
+
+async def test_ambient_not_selected_is_successful_ingress_without_reply(tmp_path) -> None:
+    """正常的环境观察可以不进入广播，但不能反馈为系统失败并触发 Kernel 熔断。"""
+    queue = PerceptionEventQueue(max_size=10)
+    queue.put(PerceptionEntry(
+        scene_id="napcat:group:1",
+        conversation_id="conversation:napcat:group:1",
+        continuity_id="continuity:napcat:group:1",
+        thread_id="main",
+        recall_scope="space_local",
+        disclosure_scope="space_local",
+        address_mode="ambient",
+        response_policy="observe_only",
+        familiarity=1,
+        text="群聊中的环境消息",
+        trace_id="trace-ambient-not-selected",
+    ))
+    operations = PerceptionOperationRegistry()
+    operation, _ = operations.accept(
+        "perception:ambient-not-selected",
+        "trace-ambient-not-selected",
+    )
+    workspace = GlobalWorkspace(capacity=1)
+    await workspace.propose(make_item(
+        source="drive",
+        content={"drive": "curiosity", "level": 1.0},
+        salience=1.0,
+        clock=CLOCK,
+        ids=IDS,
+    ))
+    recorder = build_experience_recorder(tmp_path)
+    await recorder.start()
+    try:
+        loop = CycleController(
+            workspace=workspace,
+            providers=[PerceptionProvider(queue)],
+            experience_recorder=recorder,
+            perception_operations=operations,
+        )
+
+        await loop.tick_once()
+
+        assert operation.state == "succeeded"
+        assert operation.safe_message == ""
+        assert loop.last_arbitration is not None
+        assert all(intent.type.value != "reply" for intent in loop.last_arbitration.accepted)
+    finally:
+        await recorder.stop()
+
+
+async def test_ambient_accepted_behind_persistent_drive_reaches_terminal_success(tmp_path) -> None:
+    """背景感知写入经历后即完成，不因等待未来广播而永久占住 Kernel 入站。"""
+    queue = PerceptionEventQueue(max_size=10)
+    queue.put(PerceptionEntry(
+        scene_id="napcat:group:1",
+        conversation_id="conversation:napcat:group:1",
+        continuity_id="continuity:napcat:group:1",
+        thread_id="main",
+        recall_scope="space_local",
+        disclosure_scope="space_local",
+        address_mode="ambient",
+        response_policy="observe_only",
+        familiarity=1,
+        text="工作区暂存的环境消息",
+        trace_id="trace-ambient-accepted",
+    ))
+    operations = PerceptionOperationRegistry()
+    operation, _ = operations.accept(
+        "perception:ambient-accepted", "trace-ambient-accepted"
+    )
+    workspace = GlobalWorkspace(capacity=5)
+    await workspace.propose(make_item(
+        source="drive",
+        content={"drive": "curiosity", "level": 1.0},
+        salience=1.0,
+        clock=CLOCK,
+        ids=IDS,
+    ))
+    recorder = build_experience_recorder(tmp_path)
+    await recorder.start()
+    try:
+        loop = CycleController(
+            workspace=workspace,
+            providers=[PerceptionProvider(queue)],
+            experience_recorder=recorder,
+            perception_operations=operations,
+        )
+
+        await loop.tick_once()
+
+        assert operation.state == "succeeded"
+        assert operation.terminal is True
+        assert await workspace.size() == 2
+    finally:
+        await recorder.stop()
+
+
+async def test_direct_perception_rejected_by_workspace_is_a_real_failure(tmp_path) -> None:
+    """direct 是互动义务；若连工作区都无法接纳，必须报告真实失败。"""
+    queue = PerceptionEventQueue(max_size=10)
+    queue.put(PerceptionEntry(
+        scene_id="scene-1", conversation_id="conversation-1",
+        continuity_id="continuity-1", thread_id="main",
+        recall_scope="conversation_private", disclosure_scope="conversation_private",
+        address_mode="direct", response_policy="reply_allowed", familiarity=10,
+        text="直接呼唤", trace_id="trace-direct-rejected",
+    ))
+    operations = PerceptionOperationRegistry()
+    operation, _ = operations.accept(
+        "perception:direct-rejected", "trace-direct-rejected"
+    )
+    workspace = GlobalWorkspace(capacity=1)
+    incumbent = make_item(
+        source="perception",
+        content={"trace_id": "older-direct", "address_mode": "direct"},
+        salience=1.0,
+        clock=CLOCK,
+        ids=IDS,
+    )
+    incumbent.created_at = "9999-12-31T23:59:59+00:00"
+    await workspace.propose(incumbent)
+    recorder = build_experience_recorder(tmp_path)
+    await recorder.start()
+    try:
+        loop = CycleController(
+            workspace=workspace,
+            providers=[PerceptionProvider(queue)],
+            experience_recorder=recorder,
+            perception_operations=operations,
+        )
+        await loop.tick_once()
+        assert operation.state == "failed"
+        assert operation.safe_message == "直接感知未进入工作区广播"
     finally:
         await recorder.stop()
 

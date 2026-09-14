@@ -105,6 +105,7 @@ class CycleController:
         self._turn = CycleTurn()
         self._perception_operations = perception_operations
         self._active_perception_trace = ""
+        self._cycle_perception_traces: set[str] = set()
 
     # ── 启停 ──────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ class CycleController:
         """跑一拍（外部可直调，便于测试与离线重放）。"""
         self._cycle_count += 1
         self._active_perception_trace = ""
+        self._cycle_perception_traces.clear()
         try:
             # 每拍开新 trace + 根 span
             with self._observability.trace_context(self._observability.new_trace_id()):
@@ -198,11 +200,13 @@ class CycleController:
                 self._perception_operations.finish(self._active_perception_trace, "cancelled", "感知操作已取消")
             raise
         except Exception:
-            if self._active_perception_trace and self._perception_operations is not None:
-                self._perception_operations.finish(self._active_perception_trace, "failed", "认知循环处理失败")
+            if self._perception_operations is not None:
+                for trace_id in self._cycle_perception_traces:
+                    self._perception_operations.finish(trace_id, "failed", "认知循环处理失败")
             raise
         finally:
             self._active_perception_trace = ""
+            self._cycle_perception_traces.clear()
 
     async def _do_tick(self) -> WorkspaceItem | None:
         self._turn = CycleTurn()
@@ -217,6 +221,12 @@ class CycleController:
 
         # Appraise 在竞争前更新情绪，让 Deliberate 消费本次感知后的状态。
         with self._observability.span("appraise") as s_appraise:
+            self._cycle_perception_traces.update(
+                trace_id
+                for items in results
+                for item in items
+                if (trace_id := self._perception_trace(item))
+            )
             await self._appraiser.appraise(results, self._turn)
             s_appraise.set_attribute("perceptions", len(self._turn.perception_moment_ids))
 
@@ -230,14 +240,16 @@ class CycleController:
                     accepted, evicted = await self._ws.propose_with_eviction(item)
                     if accepted:
                         accepted_total += 1
-                    elif item.source == "perception" and self._perception_operations is not None:
-                        trace_id = self._perception_trace(item)
-                        if trace_id:
-                            self._perception_operations.finish(trace_id, "failed", "感知未通过工作区竞争")
+                    elif item.source == "perception":
+                        self._finish_unbroadcast_perception(item, "not_selected")
                     if evicted is not None and evicted.source == "perception" and self._perception_operations is not None:
-                        trace_id = self._perception_trace(evicted)
-                        if trace_id:
-                            self._perception_operations.finish(trace_id, "failed", "感知被更高优先级输入淘汰")
+                        self._finish_unbroadcast_perception(evicted, "superseded")
+            # ambient 表示背景观察，不承诺进入意识广播或产生行动。Appraise 已经把它
+            # 写入经历主线，因此无论候选暂存、落选或被替换，入站操作都已经成功。
+            for items in results:
+                for item in items:
+                    if self._is_ambient_perception(item):
+                        self._finish_perception_success(item, "observed")
             s_compete.set_attribute("proposed", proposed_total)
             s_compete.set_attribute("accepted", accepted_total)
             self._observability.counter("cognition.propose", proposed_total, labels={"phase": "compete"})
@@ -325,6 +337,41 @@ class CycleController:
         if item is None or item.source != "perception" or not isinstance(item.content, dict):
             return ""
         return str(item.content.get("trace_id") or "")
+
+    @staticmethod
+    def _is_ambient_perception(item: WorkspaceItem | None) -> bool:
+        return bool(
+            item is not None
+            and item.source == "perception"
+            and isinstance(item.content, dict)
+            and item.content.get("address_mode") != "direct"
+        )
+
+    def _finish_perception_success(self, item: WorkspaceItem, outcome: str) -> None:
+        if self._perception_operations is None:
+            return
+        trace_id = self._perception_trace(item)
+        if trace_id and self._perception_operations.finish(trace_id, "succeeded"):
+            self._observability.counter(
+                "cognition.perception_consumed", 1, labels={"outcome": outcome}
+            )
+
+    def _finish_unbroadcast_perception(self, item: WorkspaceItem, outcome: str) -> None:
+        """关闭无法广播的感知；只有 direct 丢失属于服务失败。"""
+        if self._perception_operations is None:
+            return
+        trace_id = self._perception_trace(item)
+        if not trace_id:
+            return
+        if self._is_ambient_perception(item):
+            self._finish_perception_success(item, outcome)
+            return
+        if self._perception_operations.finish(
+            trace_id, "failed", "直接感知未进入工作区广播"
+        ):
+            self._observability.counter(
+                "cognition.perception_consumed", 1, labels={"outcome": f"direct_{outcome}"}
+            )
 
     async def _safe_propose(
         self, provider: Provider, snapshot: list[WorkspaceItem]

@@ -60,12 +60,14 @@ class PerceptionOperationRegistry:
             operation.state = "running"
             operation.task = task
 
-    def finish(self, trace_id: str, state: str, safe_message: str = "") -> None:
+    def finish(self, trace_id: str, state: str, safe_message: str = "") -> bool:
         operation = self.get_by_trace(trace_id)
         if operation is not None and not operation.terminal:
             operation.state = state
             operation.safe_message = safe_message
             operation.task = None
+            return True
+        return False
 
     async def cancel(self, trace_id: str) -> PerceptionOperation | None:
         operation = self.get_by_trace(trace_id)

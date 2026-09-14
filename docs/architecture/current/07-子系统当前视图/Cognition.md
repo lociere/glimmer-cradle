@@ -35,8 +35,10 @@ core/cognition/src/glimmer_cradle/cognition/
 
 感知入站由 `PerceptionOperationRegistry` 监督：transport 接受后保持
 `accepted/running/succeeded/cancelled/failed`，实际 Cycle tick 与推理 task 绑定到同一 trace。
-取消会移除队列/工作区候选或取消正在运行的推理，不会只取消 RPC 外壳；容量淘汰和竞争拒绝也
-必须进入失败终态；operation id 是幂等主键，trace 绑定冲突会被拒绝。Cognition 反向发布 action
+取消会移除队列/工作区候选或取消正在运行的推理，不会只取消 RPC 外壳。operation 终态表达
+Cognition 是否履行该感知的处理义务：`ambient` 在 Appraise 写入经历后即成功，不等待未来是否广播；
+`direct` 则保持到本拍处理完成，队列淘汰、竞争拒绝或异常导致直接感知丢失时进入失败。工作区的
+注意力选择不再被误报成基础设施失败并推动 Kernel 熔断。operation id 是幂等主键，trace 绑定冲突会被拒绝。Cognition 反向发布 action
 时等待 Kernel 的终态响应，不在固定 5 秒后脱离 Kernel 副作用继续运行；Kernel 的取消还会
 贯穿结果合成，不会被误写成合成失败 fallback。
 
