@@ -19,7 +19,7 @@ import type { AvatarConfiguration } from '../../../ports/configuration.port';
 import type { VisualCommand } from '../../../domain/kernel-contracts';
 import type { ActionStreamStartPayload, ActionStreamCompletePayload, ActionStreamCancelPayload } from '../../../domain/events';
 import type { DomainEventHandler, KernelEventBusPort } from '../../../ports/event-bus.port';
-import type { KernelLoggerPort } from '../../../ports/observability.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 import { isLocalAvatarSurfaceScene } from '../../../domain/surface/local-avatar-scene-policy';
 
 export class VisualCommandDispatcher {

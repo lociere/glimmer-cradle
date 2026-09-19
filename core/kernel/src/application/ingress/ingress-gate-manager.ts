@@ -15,8 +15,8 @@
  *   - 全局配置：参数来自 configs/system/kernel.yaml ingress 节
  */
 import type { IngressConfiguration } from '../../ports/configuration.port';
-import type { KernelLoggerPort } from '../../ports/observability.port';
-import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
+import type { Clock as KernelClockPort, ScheduledTask as ScheduledTaskPort } from '@glimmer-cradle/platform/time';
 
 /** 防护拒绝原因 */
 export type IngressRejectionType =

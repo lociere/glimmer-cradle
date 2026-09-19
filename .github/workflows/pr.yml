@@ -26,4 +26,5 @@ jobs:
           version: '0.11.28'
           python-version: '3.12.13'
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @glimmer-cradle/contracts run verify:architecture
       - run: pnpm check:pr

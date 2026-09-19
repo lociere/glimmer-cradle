@@ -109,12 +109,12 @@ describe('Kernel physical layout', () => {
     expect(readinessStores).toEqual([path.join(sourceRoot, 'application', 'projection', 'runtime-readiness-projection.ts')]);
   });
 
-  it('keeps runtime modules coupled through Ports and the shared RuntimeModule contract only', () => {
+  it('keeps runtime modules independent and coupled through Platform lifecycle contracts', () => {
     const illegalRuntimeConcreteImports = walkTypeScript(path.join(sourceRoot, 'runtime'))
       .flatMap((file) => parseImportEdges(fs.readFileSync(file, 'utf8')).map((edge) => ({ file, edge })))
       .filter(({ file, edge }) => {
         const target = resolveImport(file, edge.source);
-        return layerFor(target) === 'runtime' && path.basename(target ?? '') !== 'runtime-module.ts';
+        return layerFor(target) === 'runtime';
       })
       .map(({ file, edge }) => `${path.relative(sourceRoot, file)} -> ${edge.source}`);
     expect(illegalRuntimeConcreteImports).toEqual([]);

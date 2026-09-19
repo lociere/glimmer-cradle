@@ -8,6 +8,8 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 
 ## 当前 ADR
 
+- [ADR-0019 采用 Architecture Baseline v2.0 冻结基线](./ADR-0019-采用Architecture-Baseline-v2冻结基线.md)（`accepted`；替代旧目标中冲突的目录、模块和状态边界，当前实现按阶段迁移）
+
 - [ADR-0001 企划平台与角色 Profile 分层](./ADR-0001-企划平台与角色Profile分层.md)
 - [ADR-0002 Attention Lease 与 Cognitive Activity 分层](./ADR-0002-AttentionLease与CognitiveActivity分层.md)
 - [ADR-0003 Character Package 与 Memory Substrate 分层](./ADR-0003-CharacterPackage与MemorySubstrate分层.md)

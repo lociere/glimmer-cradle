@@ -1,7 +1,7 @@
 import { ActionStreamCancelledEvent, ActionStreamCompletedEvent, ActionStreamStartedEvent } from '../../../domain/events';
 import type { KernelConfiguration } from '../../../ports/configuration.port';
 import type { KernelEventBusPort } from '../../../ports/event-bus.port';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../../../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
 type StreamState = {
   sceneId: string;

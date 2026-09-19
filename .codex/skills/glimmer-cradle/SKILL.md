@@ -5,6 +5,11 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 
 # Glimmer Cradle 项目 Skill
 
+当前架构重构目标以 [Architecture Baseline v2.0](../../../docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
+和 [ADR-0019](../../../docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 为准。
+卡片中的旧路径是迁移前事实；冲突的目标规则由该 ADR 替代。继续工作前查阅
+[执行记录](../../../docs/roadmap/architecture-v2-refactor.md)，不得直接将旧 Kernel 搬为 Platform 或新增第二契约源。
+
 本 Skill 提供项目操作方法与资料路由。目标、授权以用户请求为准，共同约束见根 `AGENTS.md`，当前实现与运行状态依据项目事实源核验。项目采用单一 canonical Skill。
 
 ## 开始与路由

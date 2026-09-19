@@ -1,6 +1,6 @@
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { DlqReplayRuntimePort } from '../../ports/runtime-capabilities.port';
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 
 export class DlqReplayRuntime implements RuntimeModule {
   public readonly name = 'dlq-replay-ingress';

@@ -1,0 +1,461 @@
+[
+  {
+    "file": "core/avatar/scripts/avatar-package-catalog.mjs",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-8",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/avatar/scripts/avatar-package-catalog.mjs",
+    "rule": "vendor-core",
+    "detail": "live2dVersion",
+    "count": 4,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-8",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/cognition/src/glimmer_cradle/cognition/adapters/inference/gateway.py",
+    "rule": "vendor-core",
+    "detail": "openai",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/cognition/src/glimmer_cradle/cognition/domain/configuration.py",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/kernel/package.json",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "cosyvoice-v3.5-flash",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "dashscope-cosyvoice",
+    "count": 4,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "FunASR 正在预热",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "FunASR unavailable",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "funasr.sensevoice-small",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/audio/audio-service.ts",
+    "rule": "vendor-core",
+    "detail": "funasr",
+    "count": 4,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/avatar/avatar-control-model.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/avatar/avatar-controller.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/avatar/avatar-resource-catalog.ts",
+    "rule": "vendor-core",
+    "detail": "live2dVersion",
+    "count": 3,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/config/config-application-adapter.ts",
+    "rule": "vendor-core",
+    "detail": "当前仅支持 OpenAI/DeepSeek 兼容 Provider 的模型发现，请手动填写其他协议的模型。",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/config/config-application-adapter.ts",
+    "rule": "vendor-core",
+    "detail": "openai",
+    "count": 3,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/config/config-manager.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/config/documents/InferenceConfig.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/config/documents/VoiceConfig.ts",
+    "rule": "vendor-core",
+    "detail": "dashscope-cosyvoice",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-dependency-installer.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-dependency-installer.ts",
+    "rule": "vendor-core",
+    "detail": "githubRelease",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-host-application-adapter.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-manager.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-process-host.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/extension-runtime-registry.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-host/managed-resource-supervisor.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-installation/extension-package-manager.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-installation/extension-package-manager.ts",
+    "rule": "vendor-core",
+    "detail": "github.com",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/extension-installation/extension-package-verifier.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/skill-plane/extension/extension-skill-provider.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts",
+    "rule": "vendor-core",
+    "detail": "@modelcontextprotocol/sdk/client/index.js",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-10",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts",
+    "rule": "vendor-core",
+    "detail": "@modelcontextprotocol/sdk/client/stdio.js",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-10",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts",
+    "rule": "vendor-core",
+    "detail": "@modelcontextprotocol/sdk/client/streamableHttp.js",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-10",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/skill-plane/mcp-server/mcp-server-connection.ts",
+    "rule": "vendor-core",
+    "detail": "@modelcontextprotocol/sdk/client/websocket.js",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-10",
+    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/surface/control-surface-gateway.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 2,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/surface/conversation-history-service.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/surface/surface-models.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/adapters/surface/surface-models.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/application/capabilities/action-stream/action-stream-manager.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 2,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/domain/config/AudioConfig.ts",
+    "rule": "vendor-core",
+    "detail": "dashscope-cosyvoice",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/domain/config/AudioConfig.ts",
+    "rule": "vendor-core",
+    "detail": "DashScopeCosyVoiceConfig",
+    "count": 2,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/domain/config/AudioConfig.ts",
+    "rule": "vendor-core",
+    "detail": "funasr",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/domain/events/action-stream-events.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/ports/application-capabilities.port.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "core/kernel/src/ports/configuration.port.ts",
+    "rule": "vendor-core",
+    "detail": "dashscope-cosyvoice",
+    "count": 2,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/ports/configuration.port.ts",
+    "rule": "vendor-core",
+    "detail": "funasr",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/ports/configuration.port.ts",
+    "rule": "vendor-core",
+    "detail": "live2d",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
+  },
+  {
+    "file": "core/kernel/src/ports/extension-host.port.ts",
+    "rule": "core-sdk",
+    "detail": "@glimmer-cradle/extension-sdk",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-9",
+    "reason": "旧 Host 适配器与 SDK 依赖在公开领域契约和 apps 装配切换后删除。"
+  },
+  {
+    "file": "packages/extension-sdk/src/distribution/index.ts",
+    "rule": "source-cycle",
+    "detail": "packages/extension-sdk/src/distribution/index.ts -> packages/extension-sdk/src/distribution/package.ts -> packages/extension-sdk/src/host/index.ts -> packages/extension-sdk/src/index.ts -> packages/extension-sdk/src/lifecycle/base-extension.ts -> packages/extension-sdk/src/lifecycle/define-extension.ts -> packages/extension-sdk/src/lifecycle/index.ts -> packages/extension-sdk/src/utilities/index.ts -> packages/extension-sdk/src/utilities/websocket/index.ts -> packages/extension-sdk/src/utilities/websocket/web-socket-bridge.ts",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-15",
+    "reason": "现存静态类型/导出环；提取单向公共类型后删除，不据此认定运行期初始化故障。"
+  },
+  {
+    "file": "products/desktop/scripts/sync-assets.mjs",
+    "rule": "deep-import",
+    "detail": "../../../core/avatar/scripts/avatar-package-catalog.mjs",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-8",
+    "reason": "Avatar 资产构建目录在 renderer owner 迁移时改为明确公共入口。"
+  },
+  {
+    "file": "products/desktop/src/main/surface-loader.ts",
+    "rule": "source-cycle",
+    "detail": "products/desktop/src/main/surface-loader.ts -> products/desktop/src/main/surface-registry.ts",
+    "count": 1,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-15",
+    "reason": "现存静态类型/导出环；提取单向公共类型后删除，不据此认定运行期初始化故障。"
+  }
+]

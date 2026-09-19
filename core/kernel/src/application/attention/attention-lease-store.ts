@@ -9,7 +9,7 @@ import type {
   AttentionProjectionMode,
 } from '../../domain/attention/attention-lease';
 import type { AttentionLeasePort } from '../../ports/application-capabilities.port';
-import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
+import type { Clock as KernelClockPort, ScheduledTask as ScheduledTaskPort } from '@glimmer-cradle/platform/time';
 
 export class AttentionLeaseStore implements AttentionLeasePort {
   private readonly leases = new Map<string, AttentionLease>();

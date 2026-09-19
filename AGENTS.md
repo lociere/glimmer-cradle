@@ -1,5 +1,12 @@
 # Glimmer Cradle（微光摇篮）协作约定
 
+## 当前架构迁移目标
+
+- 用户指定的 [Architecture Baseline v2.0](docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
+  为唯一目标基线；[ADR-0019](docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md)
+  替代下文冲突的目标路径与 owner 约束。实际 `contracts/`、`packages/extension-sdk/` 等仍是当前事实，迁移前不得建立第二契约源。
+- 本次按 [执行记录](docs/roadmap/architecture-v2-refactor.md) 分阶段推进；旧目录删除以 consumer-zero、数据迁移与验证为条件。
+
 ## 工作方式
 
 - 从用户要完成的结果出发，确认范围、授权和可观察的完成条件。明确的小任务直接执行；有关键未知项时先调查，有跨层取舍时先形成可验证的计划。计划深度与任务的不确定性和风险相匹配。

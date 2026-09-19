@@ -3,9 +3,10 @@ import { CoreException } from '../domain/errors';
 import { AppLifecycleState } from '../domain/lifecycle/lifecycle-state.enum';
 import type { KernelConfiguration } from '../ports/configuration.port';
 import type { KernelEventBusPort } from '../ports/event-bus.port';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { RuntimeProjectionInputPort } from '../ports/kernel-lifecycle.port';
-import type { RuntimeModule } from '../runtime/modules/runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
+import type { Clock as KernelClockPort } from '@glimmer-cradle/platform/time';
 import { LifecycleOrchestrator } from '../runtime/modules/lifecycle-orchestrator';
 import { KernelBootstrapRuntime } from '../runtime/modules/kernel-bootstrap-runtime';
 import { KernelTransportRuntime } from '../runtime/modules/kernel-transport-runtime';
@@ -96,6 +97,7 @@ export class App {
     private readonly observability: KernelObservabilityPort,
     private readonly eventBus: KernelEventBusPort,
     private readonly projection: RuntimeProjectionInputPort,
+    private readonly clock: KernelClockPort,
     private readonly bootstrap: KernelBootstrapRuntime,
     private readonly createOperationalPlan: OperationalRuntimeFactory,
   ) {}
@@ -104,9 +106,9 @@ export class App {
 
   public async start(): Promise<void> {
     if (this.stateValue !== AppLifecycleState.UNINITIALIZED && this.stateValue !== AppLifecycleState.STOPPED) return;
-    const startedAt = Date.now();
+    const startedAt = this.clock.monotonicNowMs();
     const context = this.observability.createTraceContext();
-    const orchestrator = new LifecycleOrchestrator(this.logger, this.eventBus, this.projection);
+    const orchestrator = new LifecycleOrchestrator(this.logger, this.eventBus, this.projection, this.clock);
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
     try {
@@ -123,7 +125,7 @@ export class App {
       if (plan.extension) await orchestrator.startPhase({ name: 'extensions', modules: [plan.extension] }, context);
       await orchestrator.startPhase({ name: 'organism', modules: [plan.organism] }, context);
       await orchestrator.startPhase({ name: 'recovery-ingress', modules: [plan.recovery] }, context);
-      const startupTimeMs = Date.now() - startedAt;
+      const startupTimeMs = Math.max(0, this.clock.monotonicNowMs() - startedAt);
       this.stateValue = AppLifecycleState.RUNNING;
       this.observability.histogram('app.startup_ms', startupTimeMs);
       await this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context));
@@ -156,12 +158,13 @@ export function createKernelApplication(product: ProductComposition = loadProduc
   const observability = new KernelObservabilityAdapter();
   const eventBus = EventBus.instance;
   const projection = new RuntimeReadinessProjectionMapper();
+  const clock = new SystemClockAdapter();
   const bootstrap = new KernelBootstrapRuntime(new NodeKernelBootstrapAdapter());
   const configuration = new KernelConfigurationAdapter();
   return new App(
-    observability.logger('app-root'), observability, eventBus, projection, bootstrap,
+    observability.logger('app-root'), observability, eventBus, projection, clock, bootstrap,
     (config, requestStop) => createOperationalRuntimePlan({
-      config, product, requestStop, observability, eventBus, projection, configuration,
+      config, product, requestStop, observability, eventBus, projection, configuration, clock,
     }),
   );
 }
@@ -174,9 +177,9 @@ function createOperationalRuntimePlan(options: {
   readonly eventBus: EventBus;
   readonly projection: RuntimeReadinessProjectionMapper;
   readonly configuration: KernelConfigurationAdapter;
+  readonly clock: KernelClockPort;
 }): OperationalRuntimePlan {
-  const { config, product, observability, eventBus, projection, configuration } = options;
-  const clock = new SystemClockAdapter();
+  const { config, product, observability, eventBus, projection, configuration, clock } = options;
   const transportAdapter = new KernelCognitionTransport();
   const ingress = new IngressGateManager(observability.logger('ingress-gate'), clock);
   const transport = new KernelTransportRuntime(config, transportAdapter, ingress, projection);

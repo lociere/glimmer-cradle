@@ -1,5 +1,5 @@
 import type { PerceptionEvent } from '../../ports/application-models';
-import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 
 export interface ChannelStateSnapshot {
   source: string;

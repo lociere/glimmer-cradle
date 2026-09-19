@@ -1,11 +1,16 @@
 # Glimmer Cradle 架构蓝图
 
+当前唯一目标基线为用户提供的 [Architecture Baseline v2.0 (Frozen)](./Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)。
+[执行要求](./Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md) 与 [ADR-0019](../decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md)
+规定替代范围和渐进迁移方式；[执行宪章](./Architecture_Baseline_v2.0_执行宪章.md) 固定权威顺序、迁移纪律与变更控制，
+`architecture-baseline-v2.lock.json` 由架构门禁校验。以下旧蓝图说明中与新基线冲突的目标已被替代；当前实现仍以 Current 和源码为准。
+
 [微光摇篮架构蓝图.md](./微光摇篮架构蓝图.md) 是 Glimmer Cradle 的架构宪法：它保存数字生命体企划与运行平台的产品解释、架构审美、概念完整性、长期不变量和目标形态。当前默认主体是 Selrena（月见），但平台、协议、Kernel、Desktop 与 Extension SDK 不以单个角色命名。
 
 它有意比当前代码更长寿，但不伪造当前实现：
 
-- “理想落地后各命名空间的精确目录和文件是什么”以
-  [目标物理拓扑](./目标物理拓扑.md) 为唯一设计入口；
+- “最终目标目录和模块边界是什么”以 v2 冻结基线为唯一设计入口；
+- [目标物理拓扑](./目标物理拓扑.md) 仅保留旧目标与安装/制品路径的迁移对照，不再拥有目标源码树解释权；
 - “现在已经怎么做”以 [../current/](../current/README.md) 为准；
 - “代码具体怎么实现”以 [../implementation/](../implementation/README.md) 为准；
 - “接下来承诺做什么”以 [../../roadmap/](../../roadmap/README.md) 为准；

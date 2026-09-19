@@ -6,7 +6,7 @@ import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service
 import { SkillInvocationGateway } from './skill-invocation-gateway';
 import { SkillRegistry } from './skill-registry';
 import { SkillPolicyEngine } from './skill-policy-engine';
-import type { KernelObservabilityPort } from '../../ports/observability.port';
+import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
 const registry = new SkillRegistry();
 const skillId = 'extension:test.napcat:private-weather';

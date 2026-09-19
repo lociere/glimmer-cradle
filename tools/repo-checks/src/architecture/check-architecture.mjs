@@ -4,14 +4,18 @@ import { checkPlatformBoundaries } from './rules/platform-boundaries.mjs';
 import { checkRepositoryTopology } from './rules/repository-topology.mjs';
 import { checkWorkspaceArtifactBoundaries } from './rules/workspace-artifact-boundaries.mjs';
 import { checkWorkspaceBoundaries } from './rules/workspace-boundaries.mjs';
+import { checkV2Boundaries } from './v2-boundaries.mjs';
+import { checkArchitectureBaselineLock } from './baseline-lock.mjs';
 
 const rules = [
+  checkArchitectureBaselineLock,
   checkRepositoryTopology,
   checkWorkspaceArtifactBoundaries,
   checkLegacyPaths,
   checkWorkspaceBoundaries,
   checkDerivedBoundaries,
   checkPlatformBoundaries,
+  checkV2Boundaries,
 ];
 
 export function checkArchitecture(repositoryRoot) {

@@ -4,7 +4,7 @@ import type {
   CognitionLifecycleUseCasePort,
   RuntimeProjectionInputPort,
 } from '../../ports/kernel-lifecycle.port';
-import type { RuntimeModule, RuntimeModuleStartDetails } from './runtime-module';
+import type { RuntimeModule, RuntimeModuleStartDetails } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
 
 export class CognitionRuntime implements RuntimeModule {

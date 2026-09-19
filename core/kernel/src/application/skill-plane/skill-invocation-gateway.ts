@@ -15,7 +15,7 @@ import type {
 } from '../../ports/skill-plane.port';
 import type { SkillPolicyDecision } from './skill-policy-engine';
 import type { ConversationContext } from '../../ports/application-models';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
 import { isCapabilityScopeVisible } from './scope';
 import { RecoveryRequiredError } from '../../domain/errors';

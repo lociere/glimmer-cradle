@@ -14,8 +14,8 @@
  */
 import type { PerceptionEvent, PerceptionModalityItem } from '../../ports/application-models';
 import { ConversationDirectory } from '../../application/capabilities/conversation/conversation-directory';
-import type { StableIdentityPort } from '../../ports/identity.port';
-import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { StableIdentity as StableIdentityPort } from '@glimmer-cradle/platform/identity';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 
 // ── CQ 码解析正则 ─────────────────────────────────────────
 const CQ_CODE_RE = /\[CQ:(\w+)(?:,([^\]]*))?\]/g;

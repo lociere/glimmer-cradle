@@ -1,4 +1,4 @@
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { ExtensionLifecycleControllerPort, ExtensionRuntimePort } from '../../ports/runtime-capabilities.port';
 

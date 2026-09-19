@@ -6,7 +6,7 @@ import type {
   RuntimeProjectionInputPort,
 } from '../../ports/kernel-lifecycle.port';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { CognitionActionHandler } from '../../ports/cognition-service-port';
 

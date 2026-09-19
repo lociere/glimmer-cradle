@@ -38,7 +38,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check:generated": "node scripts/check-generated-clean.mjs",
     "check:inventory": "node scripts/check-inventory.mjs",
-    "verify": "pnpm run test:gates && pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run check:toolchain && pnpm run typecheck && pnpm run roundtrip && pnpm run check:generated"
+    "verify": "pnpm run test:gates && pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run check:toolchain && pnpm run typecheck && pnpm run roundtrip && pnpm run check:generated",
+    "verify:architecture": "pnpm run test:gates && pnpm run check:inventory && pnpm run lint:proto && pnpm run breaking:proto && pnpm run check:json-schema && pnpm run check:generated"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.13.0",

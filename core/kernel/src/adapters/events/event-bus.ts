@@ -1,4 +1,5 @@
-import { DomainEvent, EventType } from '../../domain/events';
+import type { LiveEventHandler, LiveEventType } from '@glimmer-cradle/platform/events';
+import { DomainEvent } from '../../domain/events';
 import { getLogger } from '../observability/logger';
 import { DeadLetterQueue } from './dead-letter-queue';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -12,7 +13,7 @@ import type {
 } from '../../ports/event-bus.port';
 
 const logger = getLogger('event-bus');
-type EventHandler<T extends DomainEvent = DomainEvent> = (event: T) => Promise<void>;
+type EventHandler<T extends DomainEvent = DomainEvent> = LiveEventHandler<T>;
 interface RegisteredHandler { readonly fn: EventHandler; readonly replay?: ReplayHandlerRegistration | ReplayUnsupportedRegistration; }
 interface ReplayContext { readonly operation_id: string; readonly source_record_id: number; readonly trace_id: string; readonly payload_digest: string; readonly ack_path: string; }
 
@@ -23,7 +24,7 @@ export class EventBus {
   public static get instance(): EventBus { return EventBus._instance || (EventBus._instance = new EventBus()); }
   private constructor() { logger.info('全局事件总线初始化完成'); }
 
-  public subscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>, replay?: ReplayHandlerRegistration | ReplayUnsupportedRegistration): void {
+  public subscribe<T extends DomainEvent>(eventType: LiveEventType, handler: EventHandler<T>, replay?: ReplayHandlerRegistration | ReplayUnsupportedRegistration): void {
     if (this._isShuttingDown) return;
     if (replay && 'replay' in replay && (!replay.reason || replay.replay !== 'unsupported')) throw new Error('event_bus_replay_registration_invalid');
     if (replay && !('replay' in replay) && (!replay.handler_id || !replay.owner || typeof replay.deliverOrReadAck !== 'function')) throw new Error('event_bus_replay_registration_invalid');
@@ -32,7 +33,7 @@ export class EventBus {
     list.push({ fn: handler as EventHandler, replay: replay || { replay: 'unsupported', reason: 'owner_durable_replay_ack_missing' } });
     this._handlers.set(eventType, list);
   }
-  public unsubscribe<T extends DomainEvent>(eventType: EventType | string, handler: EventHandler<T>): void {
+  public unsubscribe<T extends DomainEvent>(eventType: LiveEventType, handler: EventHandler<T>): void {
     const list = this._handlers.get(eventType); if (!list) return;
     const index = list.findIndex((entry) => entry.fn === handler); if (index >= 0) list.splice(index, 1);
     if (!list.length) this._handlers.delete(eventType);

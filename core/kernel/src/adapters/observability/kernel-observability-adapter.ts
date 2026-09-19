@@ -2,10 +2,7 @@ import { closeLogger, getLogger } from './logger';
 import { counter, histogram, startMetrics, stopMetrics } from './metrics';
 import { createTraceContext, getCurrentTraceId, withTrace } from './trace-context';
 import { span, startTracer, stopTracer } from './tracer';
-import type {
-  KernelObservabilityPort,
-  KernelSpanPort,
-} from '../../ports/observability.port';
+import type { Observability as KernelObservabilityPort, Span as KernelSpanPort } from '@glimmer-cradle/platform/observability';
 
 export class KernelObservabilityAdapter implements KernelObservabilityPort {
   public logger(module: string) {

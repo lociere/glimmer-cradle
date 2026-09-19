@@ -4,7 +4,7 @@ import type { AudioApplicationPort, AudioStatusSnapshot } from '../../ports/runt
 
 import { ChannelStateStore } from "../channel/channel-state-store";
 
-import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 
 import type {
   ASRRecognizeRequest,

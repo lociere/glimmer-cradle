@@ -1,5 +1,5 @@
 import type { ConversationAddress, ConversationContext } from '../../../ports/application-models';
-import type { StableIdentityPort } from '../../../ports/identity.port';
+import type { StableIdentity as StableIdentityPort } from '@glimmer-cradle/platform/identity';
 
 export interface ResolvedConversation {
   context: ConversationContext;

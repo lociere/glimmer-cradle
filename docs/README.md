@@ -1,11 +1,17 @@
 # Glimmer Cradle 文档中心
 
+本次架构重构以 [Architecture Baseline v2.0 (Frozen)](./architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
+为唯一目标基线；[执行要求](./architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md)、
+[执行宪章](./architecture/blueprint/Architecture_Baseline_v2.0_执行宪章.md)、
+[替代决策](./architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 和
+[审计与阶段状态](./roadmap/architecture-v2-refactor.md) 为当前重构入口。Current 继续描述实际源码，不能据目标树宣称已迁移。
+
 Glimmer Cradle 使用“架构、参考、指南、路线、决策、历史”六类文档。Glimmer Cradle 是微光摇篮企划与运行平台；Selrena（月见）是当前默认角色与主线角色。先按你要完成的任务进入，不需要从头通读全部文档。
 
 | 你要做什么 | 从这里开始 |
 |---|---|
 | 理解企划平台、默认角色边界、架构审美或做跨层设计 | [architecture/blueprint/](./architecture/blueprint/README.md) |
-| 审查最终目标目录、制品、安装态与运行数据物理形态 | [architecture/blueprint/目标物理拓扑.md](./architecture/blueprint/目标物理拓扑.md) |
+| 审查最终目标目录与模块边界 | [Architecture Baseline v2.0](./architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md) / [执行宪章](./architecture/blueprint/Architecture_Baseline_v2.0_执行宪章.md) |
 | 认识当前系统结构与边界 | [architecture/current/](./architecture/current/README.md) |
 | 核对当前真实路径或 Current → Target 迁移动作 | [当前物理拓扑](./architecture/current/10-当前物理拓扑.md) / [迁移地图](./architecture/current/11-物理拓扑差距与迁移地图.md) |
 | 理解真实代码如何实现某个子系统 | [architecture/implementation/](./architecture/implementation/README.md) |
@@ -25,8 +31,8 @@ Glimmer Cradle 使用“架构、参考、指南、路线、决策、历史”�
 
 当前事实必须能追溯到代码、Schema、配置或自动生成物。不同文档间应链接而非复制正文。
 
-理想目录、当前真实树与迁移动作分别由
-[目标物理拓扑](./architecture/blueprint/目标物理拓扑.md)、
+目标目录、当前真实树与迁移动作分别由
+[Architecture Baseline v2.0](./architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)、
 [当前物理拓扑](./architecture/current/10-当前物理拓扑.md) 和
 [迁移地图](./architecture/current/11-物理拓扑差距与迁移地图.md) 维护。
 

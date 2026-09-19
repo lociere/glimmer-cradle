@@ -6,9 +6,9 @@ import type { SkillProvider } from '../../ports/skill-plane.port';
 import type { RuntimeReadinessSnapshot } from '../../ports/runtime-readiness.port';
 import type { SkillActionController } from '../../application/skill-plane/skill-action-controller';
 import type { CognitionActionHandler } from '../../ports/cognition-service-port';
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
-import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 
 export class ApplicationRuntime implements RuntimeModule {
   public readonly name = 'application';

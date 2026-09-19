@@ -3,6 +3,9 @@
   "version": "0.2.6",
   "private": true,
   "type": "module",
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  },
   "scripts": {
     "check:architecture": "node src/architecture/cli.mjs",
     "check:encoding": "node src/encoding/cli.mjs",

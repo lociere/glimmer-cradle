@@ -1,4 +1,4 @@
-import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
+import type { Clock as KernelClockPort, ScheduledTask as ScheduledTaskPort } from '@glimmer-cradle/platform/time';
 
 class NodeScheduledTaskAdapter implements ScheduledTaskPort {
   private cancelled = false;

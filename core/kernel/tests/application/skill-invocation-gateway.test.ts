@@ -7,7 +7,7 @@ import {
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
 import type { SkillConfirmationRequester } from '../../src/ports/skill-plane.port';
-import type { KernelObservabilityPort } from '../../src/ports/observability.port';
+import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
 class MemoryAuditSink implements SkillInvocationAuditSink {
   public readonly records: SkillInvocationAuditRecord[] = [];

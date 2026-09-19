@@ -1,8 +1,8 @@
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { AudioConfiguration, KernelConfigurationPort } from '../../ports/configuration.port';
 import type { AudioRuntimePort, ControlSurfaceRuntimePort } from '../../ports/runtime-capabilities.port';
-import type { KernelLoggerPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 import type { RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
 
 export interface ProductAudioComposition { readonly tts: boolean; readonly asr: boolean }

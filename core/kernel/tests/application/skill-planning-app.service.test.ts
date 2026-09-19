@@ -5,7 +5,7 @@ import { SkillPlanningAppService } from '../../src/application/use-cases/skill-p
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
 import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
-import type { KernelObservabilityPort } from '../../src/ports/observability.port';
+import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
 const observability: KernelObservabilityPort = {
   logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),

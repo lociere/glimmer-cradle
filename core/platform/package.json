@@ -1,0 +1,49 @@
+{
+  "name": "@glimmer-cradle/platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./time": {
+      "types": "./dist/time/index.d.ts",
+      "require": "./dist/time/index.js",
+      "default": "./dist/time/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "require": "./dist/identity/index.js",
+      "default": "./dist/identity/index.js"
+    },
+    "./events": {
+      "types": "./dist/events/index.d.ts",
+      "require": "./dist/events/index.js",
+      "default": "./dist/events/index.js"
+    },
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "require": "./dist/observability/index.js",
+      "default": "./dist/observability/index.js"
+    },
+    "./lifecycle": {
+      "types": "./dist/lifecycle/index.d.ts",
+      "require": "./dist/lifecycle/index.js",
+      "default": "./dist/lifecycle/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "pnpm run build && node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

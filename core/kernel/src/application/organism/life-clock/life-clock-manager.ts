@@ -14,9 +14,9 @@ import type { AttentionLeasePort, SourceAttentionPolicy } from '../../../ports/a
 import { IAICapabilityPort } from '../../../ports';
 import type { LifeClockConfiguration } from '../../../ports/configuration.port';
 import type { KernelEventBusPort } from '../../../ports/event-bus.port';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../../../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { AttentionLeaseChange } from '../../../domain/attention/attention-lease';
-import type { KernelClockPort, ScheduledTaskPort } from '../../../ports/clock.port';
+import type { Clock as KernelClockPort, ScheduledTask as ScheduledTaskPort } from '@glimmer-cradle/platform/time';
 import { AttentionTrigger, AttentionTriggerResult } from "./triggers/attention-trigger";
 import { WakeKeywordTrigger } from "./triggers/wake-keyword-trigger";
 

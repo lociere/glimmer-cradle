@@ -9,7 +9,7 @@ import type {
 } from '../../ports/cognition-service-port';
 import { ChannelReplyEvent } from '../../domain/events';
 import type { KernelEventBusPort } from '../../ports/event-bus.port';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { RecoveryRequiredError } from '../../domain/errors';
 

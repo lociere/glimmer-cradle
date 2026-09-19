@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PerceptionEvent } from '../../ports/application-models';
-import type { KernelObservabilityPort } from '../../ports/observability.port';
+import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
 import { AttentionLeaseStore } from './attention-lease-store';
 import { AttentionSessionManager } from './attention-session-manager';

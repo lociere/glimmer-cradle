@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { StableIdentityPort } from '../../ports/identity.port';
+import type { StableIdentity as StableIdentityPort } from '@glimmer-cradle/platform/identity';
 
 export class NodeStableIdentityAdapter implements StableIdentityPort {
   public newId(): string {

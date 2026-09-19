@@ -3,9 +3,9 @@ import type { PerceptionCancelRequest } from '../../ports/cognition-service-port
 import { IAICapabilityPort, IActionStreamPort } from '../../ports';
 import type { AttentionProjectionMode } from '../../domain/attention/attention-lease';
 import type { LifeClockConfiguration } from '../../ports/configuration.port';
-import type { KernelLoggerPort, KernelObservabilityPort } from '../../ports/observability.port';
+import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { AttentionLeasePort } from '../../ports/application-capabilities.port';
-import type { KernelClockPort, ScheduledTaskPort } from '../../ports/clock.port';
+import type { Clock as KernelClockPort, ScheduledTask as ScheduledTaskPort } from '@glimmer-cradle/platform/time';
 
 type PendingIngress = {
   request: PerceptionEvent;

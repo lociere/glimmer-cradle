@@ -1,4 +1,4 @@
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { KernelBootstrapPort } from '../../ports/kernel-lifecycle.port';
 import type { KernelConfiguration } from '../../ports/configuration.port';

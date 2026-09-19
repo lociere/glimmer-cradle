@@ -1,6 +1,6 @@
 import type { TraceContext } from '../../domain/kernel-contracts';
 import type { PresentationLifecyclePort } from '../../ports/runtime-capabilities.port';
-import type { RuntimeModule } from './runtime-module';
+import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 
 /** Runtime executes presentation lifecycle through an injected Application boundary. */
 export class PresentationRuntime implements RuntimeModule {
