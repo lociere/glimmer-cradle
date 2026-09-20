@@ -14,8 +14,10 @@
 
 ## 冻结基线与防漂移门禁
 
+- 规范修订 1：依据用户本轮授权与 ADR-0021，修正 Runtime、Embodiment/Avatar、wire/domain、第三方依赖及改名兼容规则；命名指南和 agent 入口同步，基线锁更新为 v2.0-r1。未进行产品代码或数据迁移。
+
 - [执行宪章](../architecture/blueprint/Architecture_Baseline_v2.0_执行宪章.md) 固定权威顺序、目标边界、迁移纪律和偏离处理。
-- `architecture-baseline-v2.lock.json` 固定用户原始基线与执行要求的 SHA-256，并显式固定五个目标根、七个 Core 模块和迁移政策。
+- `architecture-baseline-v2.lock.json` 固定当前已授权基线修订与执行要求的 SHA-256，并显式固定五个目标根、七个 Core 模块和迁移政策；原始基线保留在 Git `cbb6c853`。
 - `check:architecture` 在其他边界规则前验证基线锁；原文、锁定决策或文件缺失都会失败。
 - 架构目标变更必须同时具备用户明确决策、accepted ADR、新的版本化基线以及 lock/gate 更新；普通实现切片无权改写目标。
 
@@ -90,8 +92,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 15 | legacy consumer-zero 删除、CI 严格门和六条主链验收 | 待执行 |
 
 每阶段先更新本记录中的计划，再实施；完成报告按执行要求 §20 的九项填写。
-阶段 0 完成时 public API、持久数据与运行链路尚未修改；后续切片的当前变化与验证以本页对应记录为准。
-两份原文只作为要求来源，不代表实现完成。
+阶段 0 完成时 public API、持久数据与运行链路尚未修改；阶段 2 已调整 Platform public API 与 Kernel 生命周期接线，阶段 3 已完成 Content/AssetRef 持久边界。后续切片的当前变化与验证以本页对应记录为准；基线及执行要求是目标来源，不代表未列明的迁移已经完成。
 
 ## 兼容窗口与删除门
 
@@ -253,6 +254,13 @@ exit 0。`contracts/generated` 与 compatibility 无 tracked 改动，`pnpm chec
 
 ## 验证证据
 
+- 2026-09-20 文档整理：保留现有分类；旧蓝图、旧目标树、旧母路线与 now 快照归入 History，
+  重建 v2 迁移地图、补齐 Platform 实现和里程碑索引。新增 `check:docs` 并接入 `check:pr`，
+  检查活跃 Markdown 的本地文件链接与入口可达性，不代替源码/设备/生产验收。
+  生命周期审阅发现当前 stop/observer 异常会中断后续停止，详见 Platform 实现；后续阶段 2 需按资源回收风险评估修订，
+  本轮文档工作未改变该行为。
+  验证：repo-checks 16 项通过，106 份活跃 Markdown 本地链接与入口可达性通过，章节锚点另行复核；
+  架构/编码检查、根 `pnpm typecheck` 与 `pnpm build` 通过。未执行全产品测试、Unity/设备矩阵或生产验收。
 - 阶段 0 起始输入：上述 commit；当时新增的只有两份原文副本及本记录，尚无产品源码改动。
 - 起始根 `pnpm check:architecture`、`pnpm typecheck`、`pnpm build`：PASS，exit 0。
 - 阶段 1：repo-checks 11 项（含 6 项 v2 反例）、`pnpm check:encoding`、`pnpm check:architecture` PASS；

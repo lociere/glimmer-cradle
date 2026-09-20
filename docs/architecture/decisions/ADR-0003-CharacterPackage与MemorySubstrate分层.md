@@ -39,6 +39,6 @@ Kernel 只加载和校验配置并注入冻结投影，不解释人格。Cogniti
 
 ## Links
 
-- Architecture：[微光摇篮架构蓝图 §8](../blueprint/微光摇篮架构蓝图.md#8-经历记忆知识与身份)
+- Architecture：[微光摇篮架构蓝图 §8](../../history/architecture-v1/微光摇篮架构蓝图.md#8-经历记忆知识与身份)
 - Reference：[Configuration Reference](../../reference/configuration.md)
 - Reference：[Data Layout Reference](../../reference/data-layout.md)

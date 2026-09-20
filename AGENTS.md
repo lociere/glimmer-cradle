@@ -2,6 +2,8 @@
 
 ## 当前架构迁移目标
 
+- 基线采用 [ADR-0021](docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md) 的规范修订 1；命名实施统一遵循 [命名规范](docs/guides/development/命名规范.md)，旧术语不得覆盖 v2 目标语义。
+
 - 用户指定的 [Architecture Baseline v2.0](docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
   为唯一目标基线；[ADR-0019](docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md)
   替代下文冲突的目标路径与 owner 约束。实际 `contracts/`、`packages/extension-sdk/` 等仍是当前事实，迁移前不得建立第二契约源。
@@ -36,6 +38,7 @@
 
 - 项目任务先读 `.codex/skills/glimmer-cradle/SKILL.md`，再按任务路由读取必要卡片和事实源。当前上下文已完整读取且未变化的内容可直接复用；索引用于定位本次任务所需资料。
 - `docs/README.md` 是项目事实入口：Blueprint 保存长期不变量，Current 保存当前结构，Implementation 保存实现地图，Reference 保存精确契约，Guides 保存操作，Roadmap 保存未完成工作，ADR 保存长期取舍，History 保存历史证据。
+- 文档变更运行 `pnpm check:docs` 与编码检查；旧目标只归 History，v2 状态只归重构执行记录。链接通过不等于源码、设备或生产事实已验证。
 - 代码、Schema、配置或脚本改变事实时，同一工作更新受影响的唯一权威页；链接而不复制正文。未改变事实不做装饰性文档更新，与代码不一致的文档是 bug。
 - `AGENTS.md` 保存共同约束；`.codex/skills/glimmer-cradle/references/` 保存唯一 agent 操作规则；`docs/` 保存项目事实和设计依据。项目采用单一 Codex 配置体系；增加其他厂商适配配置须取得专项授权。
 - `.codex/skills/glimmer-cradle/agents/` 是开发协作元数据，不属于运行时 `configs/`；修改它时同步检查 Skill 与本文件。工作流设计依据见 `docs/guides/development/智能体工作流设计.md`。

@@ -9,7 +9,7 @@
 | `legacy-guides/` | 旧平铺开发与 UI 指南 |
 | `legacy-extensions/` | 旧扩展文档 |
 | `legacy-roadmap/` | 旧推进与增强记录 |
-| `legacy-stage-records/` | 后续迁入的历史阶段材料 |
+| [architecture-v1/](./architecture-v1/README.md) | 被 v2 替代的蓝图、目标树、母路线与推进快照 |
 | [incidents/](./incidents/README.md) | 已解决的开发事故、根因和修复记录 |
 
 当前开发请从 [Architecture](../architecture/README.md)、[Reference](../reference/README.md) 和 [Guides](../guides/README.md) 开始。

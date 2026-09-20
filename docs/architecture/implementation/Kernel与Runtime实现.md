@@ -24,7 +24,7 @@
 | `core/kernel/src/main.ts` | 进程级启动入口，处理启动参数、顶层异常和运行时退出 |
 | `core/kernel/src/composition/kernel-application.ts` | Kernel composition root，组装配置、日志、事件总线、storage、Cognition gRPC transport、runtime 与 application service |
 | `core/kernel/src/index.ts` | 包级导出边界 |
-| `core/kernel/src/runtime/modules/lifecycle-orchestrator.ts` | runtime module 注册、依赖排序、启动/停止、状态聚合 |
+| `core/kernel/src/runtime/modules/lifecycle-orchestrator.ts` | 委托 Platform LifecycleCoordinator，维护 Kernel 日志、领域事件与 readiness projection |
 
 `composition/kernel-application.ts` 是跨层具体实现的唯一组装点。它创建 Application use case、Adapter 与 Runtime module，并通过 capability-specific Port 注入依赖。普通业务对象不应自行 new logger、storage、process supervisor、gRPC client、extension manager 或 provider manager；不得恢复 Proxy/service locator、raw Node API façade、concrete alias 或依赖 Vitest setup 的隐式组装。
 
@@ -39,7 +39,7 @@
 | 目录 | Owner | 关键内容 | 禁止 |
 |---|---|---|---|
 | `domain` | Kernel domain | 本地事件词汇、错误、注意力与 Surface 纯策略 | import Protocol generated、Node 或 Adapter |
-| `ports` | Kernel outbound/input boundaries | config、IO、observability、lifecycle、Application capability、Skill Plane 与 readiness contracts | `any`、raw Node façade、concrete alias、service locator |
+| `ports` | Kernel outbound/input boundaries | config、IO、Application capability、Skill Plane、readiness 和 replay contracts；通用原语来自 Platform | `any`、raw Node façade、concrete alias、service locator |
 | `adapters/config` | Kernel adapter | config defaults、schema、manager 与 Application config adapter | 让 renderer 直接读 YAML |
 | `adapters/events` | Kernel adapter | EventBus、DLQ 与 replay ingress | 用事件绕过 owner 边界 |
 | `adapters/observability` | Kernel adapter | logger、telemetry、trace、metrics 与 diagnostics | 记录密钥或大 payload |
@@ -57,6 +57,9 @@
 | `adapters/cognition` | Kernel adapter | Cognition Service client、Kernel Control Service host、Protobuf DTO 映射 | 把 generated DTO 泄漏进 Application/Domain |
 
 ## Runtime module 实现规则
+
+通用 RuntimeModule 与生命周期协调已由 [Platform](./Platform原语实现.md) 拥有；
+阶段由 composition 显式配置，Coordinator 不自动进行依赖排序。
 
 当前 runtime module 位于 `core/kernel/src/runtime/modules/`，包括 foundation、transport、application、surface、cognition、capability、extension、organism 等。每个 module 应实现同一组语义：
 

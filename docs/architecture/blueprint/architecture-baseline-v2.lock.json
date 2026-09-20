@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "baselineId": "glimmer-cradle-architecture-v2.0",
+  "baselineId": "glimmer-cradle-architecture-v2.0-r1",
   "status": "frozen",
   "immutableSources": [
     {
       "path": "docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md",
-      "sha256": "dc99cd67006a09370fe3efe86b5f0068276b6c65d5a250a4c0081ad0587ed3c1"
+      "sha256": "ae6177596288211cb845569d164699a64865430638b2466b67a0d23c30b09626"
     },
     {
       "path": "docs/architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md",

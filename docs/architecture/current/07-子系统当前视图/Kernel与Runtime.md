@@ -8,6 +8,10 @@ Kernel 是 Glimmer Cradle 的运行秩序中枢。它不拥有当前角色的心
 
 ## 当前职责
 
+通用 Clock/Identity/Observability/Lifecycle/LiveEvent 契约已提取到 Platform；Kernel 保留产品接线和
+readiness/领域投影。现行 Kernel 仍大于 v2 的最小 Kernel，不应整包搬入 Platform。
+具体边界见 [Platform 实现](../../implementation/Platform原语实现.md)。
+
 | 职责 | 当前边界 | 不承担 |
 |---|---|---|
 | 生命周期监督 | 注册 runtime、按依赖启动/停止、收集 readiness、处理 degraded/failed | 让进程存在就算 ready |
@@ -72,7 +76,7 @@ generation、动态 endpoint、Service PID 与受监督子进程；自报 PID �
 
 Kernel 拥有外部注意力事实。外部平台、Desktop 和系统调度只能通过受控入口表达“某个 scene/channel 正被关注”，不能直接驱动 Cognition Activity、Affect、人格判断或 Avatar 外显。
 
-当前公开入口是 Extension SDK 的 `sceneAttention.requestAttentionLease(request)`。Kernel 内部由 `application/attention/attention-lease-store.ts` 持有 `AttentionLease` 并生成只读 `AttentionProjection`，纯数据词汇位于 `domain/attention/attention-lease.ts`；`AttentionSessionManager` 直接消费 projection 来决定入站防抖、批处理和生成中断；`LifeClockManager` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不再维护自己的 attention mode。三者的时间与调度通过 `KernelClockPort` 注入，Node timer 只存在于 `SystemClockAdapter`。按照 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，这条链路的当前模型是：
+当前公开入口是 Extension SDK 的 `sceneAttention.requestAttentionLease(request)`。Kernel 内部由 `application/attention/attention-lease-store.ts` 持有 `AttentionLease` 并生成只读 `AttentionProjection`，纯数据词汇位于 `domain/attention/attention-lease.ts`；`AttentionSessionManager` 直接消费 projection 来决定入站防抖、批处理和生成中断；`LifeClockManager` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不再维护自己的 attention mode。三者的时间与调度通过 Platform `Clock`（局部别名 `KernelClockPort`）注入，Node timer 只存在于 `SystemClockAdapter`。按照 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，这条链路的当前模型是：
 
 | 概念 | Owner | 当前落点 | 目标语义 |
 |---|---|---|---|

@@ -14,6 +14,7 @@
     "zod": "^3.23.0"
   },
   "scripts": {
+    "check:docs": "pnpm --filter @glimmer-cradle/repo-checks --fail-if-no-match run check:docs",
     "bootstrap": "pnpm install",
     "typecheck": "pnpm --filter @glimmer-cradle/platform run build && pnpm --filter @glimmer-cradle/content run build && pnpm --filter @glimmer-cradle/contracts run build && pnpm --filter @glimmer-cradle/extension-sdk run build && pnpm --filter @glimmer-cradle/extension-host run build && pnpm -r --if-present --workspace-concurrency=1 run typecheck",
     "build": "pnpm run build:all",
@@ -55,7 +56,7 @@
     "avatar:composition:build": "node hosts/unity-avatar-host/scripts/build-native.mjs",
     "avatar:build": "node hosts/unity-avatar-host/scripts/build.mjs",
     "prebuild:all": "node products/desktop/scripts/sync-assets.mjs",
-    "check:pr": "pnpm check:encoding && pnpm check:architecture && pnpm test && pnpm typecheck && pnpm build"
+    "check:pr": "pnpm check:encoding && pnpm check:docs && pnpm check:architecture && pnpm test && pnpm typecheck && pnpm build"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

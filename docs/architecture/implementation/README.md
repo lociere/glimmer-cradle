@@ -21,6 +21,7 @@ Implementation 只解释 current 路径如何装配和被消费，不保存 Blue
 
 | 页面 | 代码视角 |
 |---|---|
+| [Platform 原语实现](./Platform原语实现.md) | 公共契约、生命周期协调、Kernel 接线、live event 与 durable replay 边界 |
 | [Protocol 契约层实现](./Protocol契约层实现.md) | Schema、生成链、runtime helper、消费者验证 |
 | [Kernel 与 Runtime 实现](./Kernel与Runtime实现.md) | Kernel root、runtime module、Ingress、capability 和状态投影 |
 | [Cognition 认知核实现](./Cognition认知核实现.md) | Python 进程、Composition、CycleController、context、memory、outbound |

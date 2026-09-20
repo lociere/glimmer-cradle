@@ -1,5 +1,7 @@
 # ADR-0008 Experience Ledger 与版本化 Memory
 
+> 部分替代：交互事实目标 owner 由 ADR-0019 改为 Conversation；现行 Experience 数据在完成迁移前保留。 详见 [ADR-0019](./ADR-0019-采用Architecture-Baseline-v2冻结基线.md)。
+
 - 状态：accepted
 - 日期：2026-07-13
 - 决策者：Glimmer Cradle 架构维护者

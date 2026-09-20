@@ -38,7 +38,7 @@ Personal Server 同时存在两类状态 owner：以 root 身份持有全局锁�
 
 ## Links
 
-- [目标物理拓扑](../blueprint/目标物理拓扑.md)
+- [目标物理拓扑](../../history/architecture-v1/目标物理拓扑.md)
 - [Data Layout Reference](../../reference/data-layout.md)
 - [Engineering Lifecycle Reference](../../reference/engineering-lifecycle.md)
 - [ADR-0015 工程自动化平面与交付生命周期分层](./ADR-0015-工程自动化平面与交付生命周期分层.md)

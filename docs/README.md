@@ -3,7 +3,7 @@
 本次架构重构以 [Architecture Baseline v2.0 (Frozen)](./architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
 为唯一目标基线；[执行要求](./architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md)、
 [执行宪章](./architecture/blueprint/Architecture_Baseline_v2.0_执行宪章.md)、
-[替代决策](./architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 和
+[替代决策](./architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md)、[规范修订决策](./architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md) 和
 [审计与阶段状态](./roadmap/architecture-v2-refactor.md) 为当前重构入口。Current 继续描述实际源码，不能据目标树宣称已迁移。
 
 Glimmer Cradle 使用“架构、参考、指南、路线、决策、历史”六类文档。Glimmer Cradle 是微光摇篮企划与运行平台；Selrena（月见）是当前默认角色与主线角色。先按你要完成的任务进入，不需要从头通读全部文档。
@@ -38,4 +38,7 @@ Glimmer Cradle 使用“架构、参考、指南、路线、决策、历史”�
 
 ## 维护
 
-修改前先阅读 [文档维护规范.md](./文档维护规范.md)。旧的架构、指南、扩展与路线图材料均已归档到 `history/legacy-*`，不再作为活跃入口或事实源。
+文档入口、事实归属与验证边界见 [文档维护规范](./文档维护规范.md)。维护后运行 `pnpm check:docs`；
+该检查覆盖活跃 Markdown 的本地文件链接和入口可达性，语义与代码一致性仍须人工核对。
+
+修改前先阅读 [文档维护规范.md](./文档维护规范.md)。旧的架构、指南、扩展与路线图材料已归档到 `history/`，不再作为活跃入口或事实源。

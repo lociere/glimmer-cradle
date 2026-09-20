@@ -9,10 +9,10 @@
 | 文件 | 用途 |
 |---|---|
 | [now.md](./now.md) | 当前唯一活跃推进面、下一验收门和本次审阅日期 |
-| [blueprint-realization.md](./blueprint-realization.md) | 从项目 0 到架构蓝图完全落地的全阶段母路线；不等同当前承诺 |
+| [architecture-v2-refactor.md](./architecture-v2-refactor.md) | 当前 v2 唯一阶段计划、审计、兼容窗口与验收证据 |
 | [milestones/](./milestones/) | 已承诺或进行中的里程碑，按成果写 |
 | [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) | M11 当前视觉输入、代表页面、候选方向与用户确认门 |
-| [manifests/](./manifests/) | M11/M12/M13 的目标或完成态目录树、Current → Target 动作与删除门 |
+| [manifests/](./manifests/README.md) | M11/M12/M13 的目标或完成态目录树、Current → Target 动作与删除门 |
 | [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
 
 M12 Contract Spine/runtime 物理重建与 M13 A～F/最终仓库工具收口均已完成。M11 的页面实现、Extension SDK public edge、NapCat `v0.1.0`、默认 Registry stable 指针与 Personal Server 首版重发已经落地；真实远端 Extension 恢复、external OneBot/QQ 和生产验收仍未完成。当前切片与验收状态由 [now.md](./now.md) 维护。

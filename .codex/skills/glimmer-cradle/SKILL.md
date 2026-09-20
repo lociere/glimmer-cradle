@@ -5,6 +5,9 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 
 # Glimmer Cradle 项目 Skill
 
+基线规范修订与命名解释以 [ADR-0021](../../../docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md)
+为准；新增名称和迁移旧名先查 [命名规范](../../../docs/guides/development/命名规范.md)。
+
 当前架构重构目标以 [Architecture Baseline v2.0](../../../docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
 和 [ADR-0019](../../../docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 为准。
 卡片中的旧路径是迁移前事实；冲突的目标规则由该 ADR 替代。继续工作前查阅

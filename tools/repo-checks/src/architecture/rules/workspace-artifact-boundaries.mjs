@@ -21,6 +21,7 @@ const allowedDevelopmentToolReferences = new Map([
   ['products/personal-server/scripts/smoke.mjs', new Set(['tools/workspace-supervisor'])],
 ]);
 const allowedRootFacadeReferences = new Map([
+  ['check:docs', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:architecture', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:encoding', new Set(['@glimmer-cradle/repo-checks'])],
   ['dev', new Set(['@glimmer-cradle/workspace-supervisor'])],

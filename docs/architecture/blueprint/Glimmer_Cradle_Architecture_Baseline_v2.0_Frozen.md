@@ -1,7 +1,7 @@
 # Glimmer Cradle（微光摇篮）最终冻结架构规范
 
-版本：Architecture Baseline v2.0 (Frozen)  
-状态：**最终冻结；取代 Architecture Baseline v1.0**  
+版本：Architecture Baseline v2.0 (Frozen)，规范修订 1（2026-09-19）
+状态：**架构边界冻结；取代 Architecture Baseline v1.0**
 用途：作为 Glimmer Cradle 后续代码组织、重构、评审、扩展、协议设计、部署与长期演进的唯一架构基线。
 
 ---
@@ -59,6 +59,8 @@ glimmer-cradle/
 ├── protocol/
 └── docs/
 ```
+
+该树描述五个目标源码与文档边界，不是清理工作目录的命令。Git/CI/工具链配置、依赖缓存、构建输出和用户运行数据须按各自 owner 管理，不因未列入树中而删除。
 
 根级目录只表达五种真正不同的仓库边界：
 
@@ -190,7 +192,7 @@ ExecutionLocation
 
 ### 5.6 Time
 
-Core 只提供 Clock、Timer、Deadline、Monotonic Time 等时间 primitive。长期工作调度不属于 Platform，而属于 Jobs。
+Platform 只提供 Clock、Timer、Deadline、Monotonic Time 等时间 primitive。长期工作调度不属于 Platform，而属于 Jobs。
 
 ### 5.7 Security
 
@@ -801,7 +803,7 @@ package glimmer.cognition.v1;
 
 ### 15.4 禁止重复手写
 
-禁止同时手写 `turn.ts + turn.proto + turn.py` 三份跨语言 schema。Generated code 不允许人工修改，Domain 与 Wire 通过 mapper 隔离。
+禁止同时手写 `turn.ts + turn.proto + turn.py` 三份等价 wire schema。独立领域模型可以按语言定义，并通过 mapper 与 wire 对接；文档配置使用唯一 owner 的 JSON Schema，不因 wire 收敛而删除文档校验。Generated code 不允许人工修改，Domain 与 Wire 通过 mapper 隔离。
 
 ---
 
@@ -838,10 +840,11 @@ capabilities  → cognition/internal ❌
 jobs          → cognition/internal ❌
 embodiment    → cognition/internal ❌
 core          → extension-sdk      ❌
-core          → vendor package     ❌
+core domain/public contract → vendor protocol/model type ❌
 ```
 
 跨模块协作只能使用 public contracts/ports，不允许 import 对方 internal implementation。
+通用数据库、序列化和算法库不因由第三方发布而被一概禁止；具体模型厂商、平台 SDK 和渲染器实现按 §1、§23 的边界隔离。
 
 ---
 
@@ -1015,12 +1018,16 @@ Context budget 同理：所有 Persona/Memory/Resource 都可以存在，但不�
 
 ## 22. 命名规范
 
+本节规定职责语义；语言拼写、迁移步骤和检查清单统一维护于
+[命名规范](../../guides/development/命名规范.md)。修订依据见
+[ADR-0021](../decisions/ADR-0021-架构基线规范修订与命名收束.md)。
+
 推荐术语：
 
 - `Core`：产品核心命名空间；
 - `Platform`：共享运行底座；
 - `Kernel`：最小 service/lifecycle/composition 核；
-- `Runtime`：只用于明确运行态组件，例如 ModelRuntime，不做万能目录；
+- `Runtime`：仅用于生命周期监督、语言/平台固定术语或第三方正式名称，例如 RuntimeModule、RuntimeSession；模型推理契约用 InferenceProvider，独立承载进程用 Worker/Host；
 - `Host`：承载/组合组件的可执行进程；
 - `Provider`：某 contract 的实现来源；
 - `Adapter`：边界转换；
@@ -1030,9 +1037,13 @@ Context budget 同理：所有 Persona/Memory/Resource 都可以存在，但不�
 - `Router`：选择目标；
 - `Assembler`：组装多来源信息；
 - `Projection`：从 canonical log/state 派生的 read model；
-- `Store/Repository`：持久访问；
+- `Store/Repository`：存储访问/领域对象持久访问；必须另行说明是否 durable、是否 canonical 及唯一 owner；
 - `Executor`：执行；
 - `Job`：跨时间持久工作。
+
+Conversation 与 RuntimeSession、Turn 与 Step、Job 与普通异步 Task 必须区分；Character 是产品概念，不形成统管人格、记忆与具身的对象。Embodiment 是目标领域名，Avatar 可以继续作为产品形象、资产和既有协议术语。
+
+命名表达职责和 owner；不按词表机械替换现有标识符。公开接口、事件键、稳定 ID 和持久数据的改名须经过兼容与迁移验证。
 
 谨慎或禁止泛化：`Manager / Utils / Misc / Shared / Common / World / Ecosystem / Runtime(顶级无上下文) / Registry<any>`。
 
@@ -1056,7 +1067,7 @@ OriginRef
 CapabilityId
 ```
 
-只有在多个实现长期共享稳定语义后才提升核心抽象：**Extract abstraction only after semantic convergence.**
+抽象须有真实消费者与稳定语义证据；多个实现的语义收敛是重要依据，不是要求已有明确领域契约必须等待第二个厂商。不得为假想扩展预建抽象。
 
 ---
 

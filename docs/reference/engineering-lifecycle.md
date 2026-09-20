@@ -1,5 +1,20 @@
 # Engineering Lifecycle Reference
 
+> 范围：仓库检查、宿主事务、恢复及 fixed artifact 的精确入口与状态。
+> 事实依据：root/package scripts、repo-checks、部署事务与产品实现。
+> 维护触发：命令、退出码、任务 owner、事务状态或制品边界变化。
+
+## 仓库检查入口
+
+| 命令 | owner 与结果 |
+|---|---|
+| `pnpm check:docs` | repo-checks `src/docs/cli.mjs`；活跃 Markdown 本地文件链接与入口可达性；0 通过、1 违规、2 无法运行 |
+| `pnpm check:architecture` | repo-checks；基线锁、依赖边界和精确 legacy exceptions |
+| `pnpm check:encoding` | repo-checks；tracked 与未忽略 untracked 文本的 UTF-8/BOM |
+| `pnpm check:pr` | 根薄编排；编码、文档、架构、测试、typecheck、build；PR workflow 调用同一入口 |
+
+文档检查不验证远端链接、章节锚点或产品事实；维护方式见 [文档维护](../guides/development/文档维护.md)。
+
 ## 宿主事务
 
 | 项 | 值 |
