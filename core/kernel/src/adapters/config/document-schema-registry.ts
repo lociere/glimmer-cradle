@@ -1,12 +1,14 @@
 /**
- * 配置 JSON Schema 集合导出（阶段 P.4b 起为 TypeScript 端 ajv 校验的事实源）
+ * Kernel 配置 Schema 装配入口；Schema 事实源始终为 Contract Spine。
  *
  * 设计：本模块通过 `resolveJsonModule` 静态 import 所有 schemas/config/*.schema.json，
  * 让 Kernel ConfigManager 从本 owner adapter 取得 canonical Document registry，
  * 拿到全部配置 schema，无需运行时文件 IO。
  *
  * runtime schema 只从 Contract Spine JSON Schema 装配，不建立第二份 schema。
+ * 通用编译、默认值和错误格式由 Platform ConfigurationValidator 拥有。
  */
+import { ConfigurationValidator } from '@glimmer-cradle/platform/configuration';
 import AppConfig from '@glimmer-cradle/contracts/json-schema/config/v1/app-config.schema.json';
 import AudioConfig from '@glimmer-cradle/contracts/json-schema/config/v1/audio-config.schema.json';
 import AvatarConfig from '@glimmer-cradle/contracts/json-schema/config/v1/avatar-config.schema.json';
@@ -56,3 +58,5 @@ export const ConfigSchemas = {
 } as const;
 
 export type ConfigSchemaName = keyof typeof ConfigSchemas;
+
+export const configValidator = new ConfigurationValidator(ConfigSchemas, { formats: true });

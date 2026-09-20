@@ -59,6 +59,9 @@ import { currentExtensionPlatform } from '../adapters/platform/skill-availabilit
 import type { ProductFeatureId, SkillAvailabilityContext } from '../ports/skill-plane.port';
 import { ExtensionRuntimeRegistry } from '../adapters/extension-host/extension-runtime-registry';
 import { ExtensionHostAppService } from '../adapters/extension-host/extension-host-application-adapter';
+import { FileAssetStore } from '../adapters/content/file-asset-store';
+import { StagedAssetUploads } from '../adapters/content/staged-asset-uploads';
+import { resolveWorkPath } from '../adapters/filesystem/path-utils';
 import { ExtensionManager } from '../adapters/extension-host/extension-manager';
 import { KernelExtensionRuntimeAdapter } from '../adapters/extension-host/kernel-extension-runtime-adapter';
 import { ConfigApplicationService } from '../adapters/config/config-application-adapter';
@@ -192,7 +195,7 @@ function createOperationalRuntimePlan(options: {
   const cognition = new AIProxy(cognitionAdapter);
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
-  const surface = new ControlSurfaceGateway(projection, avatar, audio);
+  const surface = new ControlSurfaceGateway(projection, avatar, audio, new FileAssetStore());
   const conversations = new ConversationDirectory(new NodeStableIdentityAdapter());
   const channelState = new ChannelStateStore(observability.logger('channel-state'));
   const attentionLeases = new AttentionLeaseStore(clock);
@@ -237,6 +240,10 @@ function createOperationalRuntimePlan(options: {
     perception, catalog, availability, skillPlanePolicy, attentionLeases, lifeClock,
     new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
     product.version,
+    new StagedAssetUploads(
+      new FileAssetStore(),
+      new FileAssetStore(resolveWorkPath('content/transient/assets'), resolveWorkPath('content/transient/uploads'), true),
+    ),
   );
   const application = new ApplicationRuntime({
     setCognitionActionHandler: (handler) => transport.setCognitionActionHandler(handler),

@@ -4,6 +4,7 @@ import type {
   ContributionRequirements,
   ConversationAddress,
   ExtensionCommandContribution,
+  ExtensionContentPart,
   ExtensionManifest,
   ExtensionSkillContribution,
   PerceptionEvent,
@@ -46,7 +47,7 @@ export interface ExtensionPerceptionProposal {
   source_event_id?: string;
   schema_ref?: string;
   contribution_id?: string;
-  content: Omit<PerceptionEvent['content'], 'actor_id' | 'actor_name'>;
+  content: Omit<PerceptionEvent['content'], 'actor_id' | 'actor_name' | 'parts'> & { parts?: ExtensionContentPart[] };
 }
 
 export interface ExtensionEvidenceProposal {
@@ -140,6 +141,9 @@ export interface IExtensionHostService {
   publishDomainEvent(event: DomainEvent): void;
 
   injectPerception(extensionId: string, proposal: ExtensionPerceptionProposal): Promise<void>;
+  beginAssetUpload(extensionId: string, input: { mediaType: string; sizeBytes: number; sha256: string }): Promise<string>;
+  writeAssetUpload(extensionId: string, token: string, chunk: Uint8Array): Promise<void>;
+  abortAssetUpload(extensionId: string, token: string): Promise<void>;
 
   requestSceneAttentionLease(extensionId: string, request: ExtensionAttentionLeaseRequest): Disposable;
   isSceneFocused(channelId: string): Promise<boolean>;

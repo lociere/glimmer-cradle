@@ -68,7 +68,7 @@ export interface PerceptionContent {
    */
   text?: string | null;
   /**
-   * 模态列表：text / image / video
+   * 模态列表：text / image / audio / video
    */
   modality: string[];
   /**
@@ -85,7 +85,7 @@ export interface PerceptionContent {
   items?: PerceptionModalityItem[];
 }
 export interface PerceptionModalityItem {
-  modality: 'text' | 'image' | 'video';
+  modality: 'text' | 'image' | 'audio' | 'video';
   text?: string | null;
   uri?: string | null;
   mime_type?: string | null;

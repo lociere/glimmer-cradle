@@ -7,6 +7,11 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "exports": {
+    "./configuration": {
+      "types": "./dist/configuration/index.d.ts",
+      "require": "./dist/configuration/index.js",
+      "default": "./dist/configuration/index.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
@@ -42,6 +47,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
     "test": "pnpm run build && node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
   },
   "devDependencies": {
     "typescript": "^6.0.2"

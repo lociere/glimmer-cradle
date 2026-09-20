@@ -12,7 +12,7 @@
  *   import { normalizeSystemYamlNulls } from './yaml-normalizers';
  *   const data = yaml.parse(content);
  *   normalizeSystemYamlNulls(data);                // 原地修改
- *   validateConfig('AppConfig', data);             // 然后交 ajv
+ *   configValidator.validate('AppConfig', data);             // 然后交 ajv
  *
  * 设计纪律：不要把"业务规则归一化"塞进来 —— 那是 config-processor 的职责。
  * 本模块只处理 YAML/JSON 表达层面的失配。

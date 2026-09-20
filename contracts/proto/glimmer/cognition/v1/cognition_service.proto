@@ -3,6 +3,7 @@ syntax = "proto3";
 package glimmer.cognition.v1;
 
 import "glimmer/common/v1/service_contract.proto";
+import "glimmer/content/v1/content.proto";
 import "google/protobuf/struct.proto";
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Cognition.V1";
@@ -66,12 +67,18 @@ message ModalityItem {
   google.protobuf.Struct metadata = 6;
 }
 
+message PerceptionPart {
+  glimmer.content.v1.ContentPart content = 1;
+  ModalitySemantic semantic = 2;
+}
+
 message PerceptionContent {
   string text = 1;
   repeated string modality = 2;
   string actor_id = 3;
   string actor_name = 4;
   repeated ModalityItem items = 5;
+  repeated PerceptionPart parts = 6;
 }
 
 message SubmitPerceptionRequest {

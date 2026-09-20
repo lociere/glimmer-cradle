@@ -9,11 +9,26 @@ import {
 import {
   AvatarDownstreamFrameSchema,
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
+import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
 
 const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
 const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version: string; tool_id: string };
 const digest = createHash('sha256').update(documentBytes).digest();
+
+const asset = { assetId: '00000000-0000-4000-8000-000000000001', mediaType: 'image/png',
+  sizeBytes: 3n, sha256: 'a'.repeat(64) };
+const contentParts = [
+  create(ContentPartSchema, { value: { case: 'text', value: 'hello' } }),
+  create(ContentPartSchema, { value: { case: 'image', value: asset } }),
+  create(ContentPartSchema, { value: { case: 'audio', value: { ...asset, mediaType: 'audio/wav' } } }),
+  create(ContentPartSchema, { value: { case: 'video', value: { ...asset, mediaType: 'video/mp4' } } }),
+  create(ContentPartSchema, { value: { case: 'file', value: { asset, name: 'a.png' } } }),
+];
+if (contentParts.map((part) => fromBinary(ContentPartSchema, toBinary(ContentPartSchema, part)).value.case).join(',')
+  !== 'text,image,audio,video,file') {
+  throw new Error('TypeScript ContentPart round-trip lost a variant');
+}
 
 const request = create(EchoProbeRequestSchema, {
   probeId: 'slice1-contract-probe',

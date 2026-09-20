@@ -72,6 +72,9 @@ class PerceptionAppraiser:
                 MomentKind.PERCEPTION,
                 content={
                     "text": text,
+                    "semantic_text": semantic_text,
+                    "parts": self._moment_parts(content.get("model_input")),
+                    "legacy_media_unrecoverable": self._legacy_media_unrecoverable(content.get("model_input")),
                     "address_mode": content.get("address_mode", "direct"),
                     "response_policy": response_policy,
                     "familiarity": content.get("familiarity", 0),
@@ -118,6 +121,40 @@ class PerceptionAppraiser:
                 ))
 
         self._update_emotion(emotion_inputs, turn)
+
+    @staticmethod
+    def _moment_parts(model_input: object) -> list[dict]:
+        if not isinstance(model_input, dict):
+            return []
+        result: list[dict] = []
+        for part in model_input.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            content = part.get("content")
+            if not isinstance(content, dict):
+                continue
+            kind = next((key for key in ("text", "image", "audio", "video", "file") if key in content), None)
+            if kind is None:
+                continue
+            value = content[kind]
+            if kind == "text":
+                result.append({"kind": "text", "text": value})
+            elif isinstance(value, dict):
+                asset = value.get("asset") if kind == "file" else value
+                if isinstance(asset, dict):
+                    result.append({"kind": kind, "asset": asset,
+                                   "semantic": part.get("semantic"),
+                                   **({"name": value.get("name")} if kind == "file" else {})})
+        return result
+
+    @staticmethod
+    def _legacy_media_unrecoverable(model_input: object) -> bool:
+        if not isinstance(model_input, dict):
+            return False
+        return any(
+            isinstance(item, dict) and item.get("uri") and item.get("modality") in ("image", "audio", "video")
+            for item in model_input.get("items") or []
+        )
 
     async def _route(self, content: dict) -> tuple[str, str, tuple, str | None]:
         text = content.get("text", "")

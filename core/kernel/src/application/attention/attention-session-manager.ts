@@ -14,39 +14,15 @@ type PendingIngress = {
   queued_at_ms: number;
 };
 
-/**
- * 被中断的 in-flight 批次内容快照。
- * 不携带 Promise 回调，仅保留语义内容供下次合并。
- * address_mode / response_policy 也需保存：若被打断批次含可回复 direct 呼唤，
- * 恢复后仍应保持可回复优先级；纯 observe_only 背景不会被合并升级成回复。
- */
-type InterruptedContent = {
-  text?: string;
-  items?: NonNullable<PerceptionEvent['content']['items']>;
-  modality: string[];
-  actor_id?: string;
-  actor_name?: string;
-  address_mode: 'direct' | 'ambient';
-  response_policy: 'reply_allowed' | 'observe_only';
-  conversation: PerceptionEvent['conversation'];
-  origin: PerceptionEvent['origin'];
-  retention_ceiling: PerceptionEvent['retention_ceiling'];
-  trace_id?: string;
-};
-
 type SceneIngressState = {
   pending: PendingIngress[];
+  interruptedPending: PendingIngress[];
   timer: ScheduledTaskPort | null;
   chain: Promise<void>;
   inFlightTraceId: string | null;
+  inFlightHasMedia: boolean;
+  inFlightPending: PendingIngress[];
   cancelRequested: boolean;
-  /**
-   * 被中断的 in-flight 批次的合并内容，供下一次 flush 时前置拼入。
-   * 确保中断后 AI 收到的是「被打断消息 + 新消息」的完整上下文。
-   * 级联中断下会持续累积：A 被中断 → interruptedContent=A；
-   * A+B 被中断 → interruptedContent=merge(A,B)，最终 AI 看到完整链。
-   */
-  interruptedContent: InterruptedContent | null;
 };
 
 export class AttentionSessionManager {
@@ -56,6 +32,7 @@ export class AttentionSessionManager {
   private _focusedDebounceMs: number = 700;
   private _maxBatchMessages: number = 4;
   private _maxBatchItems: number = 24;
+  private _stopping = false;
   private readonly logger: KernelLoggerPort;
   private _aiProxy!: IAICapabilityPort;
   private _actionStream!: IActionStreamPort;
@@ -78,6 +55,7 @@ export class AttentionSessionManager {
     this._maxBatchMessages = lifeClock.ingress_max_batch_messages;
     this._maxBatchItems = lifeClock.ingress_max_batch_items;
     this._initialized = true;
+    this._stopping = false;
 
     this.logger.info('注意力会话管理器初始化完成', {
       ingress_debounce_ms: this._debounceMs,
@@ -91,10 +69,13 @@ export class AttentionSessionManager {
     if (!this._initialized) {
       throw new Error('AttentionSessionManager 未初始化，请先调用 init()');
     }
+    if (this._stopping) {
+      throw new Error('AttentionSessionManager 正在停止');
+    }
 
     const source = request.conversation.conversation_id;
     const state = this.getSceneState(source);
-    this.tryInterruptInFlight(source, state);
+    this.tryInterruptInFlight(source, state, request);
 
     return new Promise<void>((resolve, reject) => {
       state.pending.push({ request, resolve, reject, queued_at_ms: this.clock.monotonicNowMs() });
@@ -103,6 +84,7 @@ export class AttentionSessionManager {
   }
 
   public async stop(): Promise<void> {
+    this._stopping = true;
     // 先取消所有定时器和拒绝所有待处理请求
     const cancellations: Promise<unknown>[] = [];
     for (const [source, state] of this._sceneStates.entries()) {
@@ -112,6 +94,15 @@ export class AttentionSessionManager {
       for (const pending of state.pending) {
         pending.reject(new Error('Attention session manager stopped'));
       }
+      for (const pending of state.interruptedPending) {
+        pending.reject(new Error('Attention session manager stopped'));
+      }
+      for (const pending of state.inFlightPending) {
+        pending.reject(new Error('Attention session manager stopped'));
+      }
+      state.pending = [];
+      state.interruptedPending = [];
+      state.inFlightPending = [];
       if (state.inFlightTraceId) {
         const traceId = state.inFlightTraceId;
         state.cancelRequested = true;
@@ -129,6 +120,7 @@ export class AttentionSessionManager {
     const chains = Array.from(this._sceneStates.values()).map((s) => s.chain);
     await Promise.allSettled(chains);
     this._sceneStates.clear();
+    this._initialized = false;
   }
 
   private getSceneState(source: string): SceneIngressState {
@@ -139,11 +131,13 @@ export class AttentionSessionManager {
 
     const created: SceneIngressState = {
       pending: [],
+      interruptedPending: [],
       timer: null,
       chain: Promise.resolve(),
       inFlightTraceId: null,
+      inFlightHasMedia: false,
+      inFlightPending: [],
       cancelRequested: false,
-      interruptedContent: null,
     };
     this._sceneStates.set(source, created);
     return created;
@@ -169,10 +163,12 @@ export class AttentionSessionManager {
     });
   }
 
-  private tryInterruptInFlight(source: string, state: SceneIngressState): void {
+  private tryInterruptInFlight(source: string, state: SceneIngressState, request: PerceptionEvent): void {
     if (!state.inFlightTraceId || state.cancelRequested) {
       return;
     }
+    // 媒体租约须等真实 Cognition 终态；不把新旧留存级别的媒体合并重放。
+    if (state.inFlightHasMedia || this.hasMedia(request)) return;
 
     state.cancelRequested = true;
     const cancelRequest: PerceptionCancelRequest = {
@@ -208,36 +204,60 @@ export class AttentionSessionManager {
     return this._attentionLeaseStore.getProjection().mode;
   }
 
+  private hasMedia(request: PerceptionEvent): boolean {
+    return Boolean(
+      request.content.parts?.some((part) => part.content.kind !== 'text')
+      || request.content.items?.length,
+    );
+  }
+
   private async flushScene(source: string, state: SceneIngressState): Promise<void> {
-    const queue = state.pending.splice(0, state.pending.length);
-    if (queue.length === 0) {
+    const queue = [...state.interruptedPending.splice(0), ...state.pending.splice(0)];
+    if (queue.length === 0) return;
+    const groups: PendingIngress[][] = [];
+    for (const entry of queue) {
+      const last = groups[groups.length - 1];
+      if (!last || last.length >= this._maxBatchMessages
+        || last[0].request.retention_ceiling !== entry.request.retention_ceiling
+        || this.hasMedia(entry.request) || last.some((candidate) => this.hasMedia(candidate.request))) {
+        groups.push([entry]);
+      } else {
+        last.push(entry);
+      }
+    }
+    for (let index = 0; index < groups.length; index += 1) {
+      const interrupted = await this.flushBatch(source, state, groups[index]);
+      if (!interrupted) continue;
+      state.pending.unshift(...groups.slice(index + 1).flat());
       return;
     }
+  }
 
-    const overflowCount = Math.max(0, queue.length - this._maxBatchMessages);
-    for (const dropped of queue.slice(0, overflowCount)) {
-      dropped.resolve();
+  private async flushBatch(source: string, state: SceneIngressState, batch: PendingIngress[]): Promise<boolean> {
+    if (batch.some((entry) => (
+      (entry.request.content.parts?.length ?? 0) > this._maxBatchItems
+      || (entry.request.content.items?.length ?? 0) > this._maxBatchItems
+    ))) {
+      const error = new Error('感知 Content parts/items 超过批次上限');
+      for (const entry of batch) entry.reject(error);
+      this.logger.warn('感知批次拒绝超限 Content', { scene_id: source, batch_size: batch.length });
+      return false;
     }
-
-    const batch = queue.slice(overflowCount);
     const queueWaitMs = this.clock.monotonicNowMs() - Math.min(...batch.map((entry) => entry.queued_at_ms));
     const attentionProjectionMode = this.resolveAttentionProjectionMode();
-
-    // 提取并清空上次被中断的内容快照，作为本次合并的前缀。
-    // 在构造 mergedRequest 之前置空，避免异常路径重复使用。
-    const prefix = state.interruptedContent;
-    state.interruptedContent = null;
-
-    const mergedRequest = this.mergeRequests(batch.map((entry) => entry.request), prefix);
+    const mergedRequest = this.mergeRequests(batch.map((entry) => entry.request));
     const traceId = mergedRequest.trace_id || mergedRequest.id;
     state.inFlightTraceId = traceId;
+    state.inFlightHasMedia = this.hasMedia(mergedRequest);
+    state.inFlightPending = batch;
     state.cancelRequested = false;
+    let interrupted = false;
 
     await this.observability.withTrace(traceId, async () => {
       await this.observability.span('attention.flush', async (flushSpan) => {
         flushSpan.setAttribute('scene_id', source);
         flushSpan.setAttribute('batch_size', batch.length);
-        flushSpan.setAttribute('dropped_count', overflowCount);
+        flushSpan.setAttribute('dropped_count', 0);
         flushSpan.setAttribute('queue_wait_ms', queueWaitMs);
         flushSpan.setAttribute('attention_projection_mode', attentionProjectionMode);
         flushSpan.setAttribute('address_mode', mergedRequest.address_mode);
@@ -254,13 +274,12 @@ export class AttentionSessionManager {
           response_policy: mergedRequest.response_policy ?? 'reply_allowed',
         });
 
-        await this._actionStream.startThinkingStream(
-          source,
-          traceId,
-          String(mergedRequest.source || 'unknown'),
-        );
-
         try {
+          await this._actionStream.startThinkingStream(
+            source,
+            traceId,
+            String(mergedRequest.source || 'unknown'),
+          );
           await this.observability.span(
             'attention.ipc.perception_message',
             async (ipcSpan) => {
@@ -282,42 +301,24 @@ export class AttentionSessionManager {
               conversation_id: mergedRequest.conversation.conversation_id,
             },
           );
-          for (let index = 0; index < batch.length - 1; index += 1) {
-            batch[index].resolve();
-          }
-          batch[batch.length - 1].resolve();
+          for (const entry of batch) entry.resolve();
           this.logger.debug('注意力批次完成', {
             scene_id: source,
             batch_size: batch.length,
           });
-          await this._actionStream.completeStream(
-            source,
-            traceId,
-            'calm',
-            0,
-          );
+          try {
+            await this._actionStream.completeStream(source, traceId, 'calm', 0);
+          } catch (cleanupError) {
+            this.logger.warn('注意力完成流清理失败', {
+              scene_id: source, trace_id: traceId,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          }
         } catch (error) {
-          if (state.cancelRequested) {
-            // 本次 in-flight 是被后续消息中断的（不是真实错误）。
-            // 保存合并内容（已含 prefix + 本批次）供下次 flush 前置拼入，
-            // 确保 AI 最终收到「所有未回复消息 + 新消息」的完整上下文。
-            state.interruptedContent = {
-              text: mergedRequest.content?.text ?? undefined,
-              items: mergedRequest.content?.items ? [...mergedRequest.content.items] : undefined,
-              modality: mergedRequest.content?.modality ? [...mergedRequest.content.modality] : [],
-              actor_id: mergedRequest.content?.actor_id ?? undefined,
-              actor_name: mergedRequest.content?.actor_name ?? undefined,
-              address_mode: mergedRequest.address_mode,
-              response_policy: mergedRequest.response_policy ?? 'reply_allowed',
-              conversation: mergedRequest.conversation,
-              origin: mergedRequest.origin,
-              retention_ceiling: mergedRequest.retention_ceiling,
-              trace_id: mergedRequest.trace_id,
-            };
-            // 优雅结束，不向上层抛错——这些消息内容已被保存，会在下次 flush 中处理
-            for (const entry of batch) {
-              entry.resolve();
-            }
+          if (state.cancelRequested && !this._stopping) {
+            // 原始请求与完成承诺一同重放，避免语义或媒体引用在截断时丢失。
+            state.interruptedPending.push(...batch);
+            interrupted = true;
             this.logger.info('in-flight 批次被中断，内容已暂存供下次合并', {
               scene_id: source,
               batch_size: batch.length,
@@ -325,9 +326,7 @@ export class AttentionSessionManager {
             });
           } else {
             flushSpan.setStatus('error', error instanceof Error ? error.name : String(error));
-            for (const entry of batch) {
-              entry.reject(error);
-            }
+            if (!this._stopping) for (const entry of batch) entry.reject(error);
             this.logger.error('注意力批次失败', {
               scene_id: source,
               batch_size: batch.length,
@@ -335,48 +334,46 @@ export class AttentionSessionManager {
               error: error instanceof Error ? error.message : String(error),
             });
           }
-          await this._actionStream.cancelStream(source, traceId, state.cancelRequested ? 'interrupted' : 'generation_failed');
+          try {
+            await this._actionStream.cancelStream(source, traceId, state.cancelRequested ? 'interrupted' : 'generation_failed');
+          } catch (cleanupError) {
+            this.logger.warn('注意力取消流清理失败', {
+              scene_id: source, trace_id: traceId,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          }
         } finally {
           if (state.inFlightTraceId === traceId) {
             state.inFlightTraceId = null;
+            state.inFlightHasMedia = false;
+            state.inFlightPending = [];
           }
           state.cancelRequested = false;
         }
       });
     });
+    return interrupted;
   }
 
-  private mergeRequests(
-    requests: PerceptionEvent[],
-    prefix?: InterruptedContent | null,
-  ): PerceptionEvent {
+  private mergeRequests(requests: PerceptionEvent[]): PerceptionEvent {
     const tail = requests[requests.length - 1];
 
-    const modalities = new Set<string>(prefix?.modality ?? []);
-    const allItems: NonNullable<PerceptionEvent['content']['items']> = [
-      ...(prefix?.items ?? []),
-    ];
+    const modalities = new Set<string>();
+    const allItems: NonNullable<PerceptionEvent['content']['items']> = [];
+    const allParts: Array<NonNullable<PerceptionEvent['content']['parts']>[number]> = [];
 
     const textParts: string[] = [];
-    if (prefix?.text) textParts.push(prefix.text);
     const actorIds = new Set<string>();
     const actorNames = new Set<string>();
-    if (prefix?.actor_id) actorIds.add(prefix.actor_id);
-    if (prefix?.actor_name) actorNames.add(prefix.actor_name);
 
     for (const r of requests) {
       if (r.content?.text) textParts.push(r.content.text);
       r.content?.modality?.forEach(m => modalities.add(m));
       if (r.content?.items) allItems.push(...r.content.items);
+      if (r.content?.parts) allParts.push(...r.content.parts);
       if (r.content?.actor_id) actorIds.add(r.content.actor_id);
       if (r.content?.actor_name) actorNames.add(r.content.actor_name);
     }
-
-    // items 总数超出上限时保留最新的
-    const trimmedItems =
-      allItems.length > this._maxBatchItems
-        ? allItems.slice(allItems.length - this._maxBatchItems)
-        : allItems;
 
     return {
       id: tail.id,
@@ -386,12 +383,11 @@ export class AttentionSessionManager {
       timestamp: tail.timestamp,
       familiarity: tail.familiarity,
       // 被中断的前缀或当前批次中任一消息是 direct 呼唤，则合并结果为 direct
-      address_mode: (prefix?.address_mode === 'direct' || requests.some(r => r.address_mode === 'direct'))
+      address_mode: requests.some(r => r.address_mode === 'direct')
         ? 'direct'
         : 'ambient',
       // 只要合并批次中存在可回复消息，就保留回复资格；纯背景观察保持 observe_only。
       response_policy: (
-        prefix?.response_policy === 'reply_allowed' ||
         requests.some(r => (r.response_policy ?? 'reply_allowed') === 'reply_allowed')
       )
         ? 'reply_allowed'
@@ -401,20 +397,20 @@ export class AttentionSessionManager {
         interaction_id: tail.trace_id || tail.id,
       },
       origin: tail.origin,
-      retention_ceiling: this.resolveRetentionCeiling(requests, prefix),
+      retention_ceiling: this.resolveRetentionCeiling(requests),
       content: {
         text: textParts.join('\n') || undefined,
         modality: Array.from(modalities),
         actor_id: actorIds.size === 1 ? Array.from(actorIds)[0] : undefined,
         actor_name: actorNames.size === 1 ? Array.from(actorNames)[0] : undefined,
-        items: trimmedItems.length > 0 ? trimmedItems : undefined,
+        items: allItems.length > 0 ? allItems : undefined,
+        parts: allParts.length > 0 ? allParts : undefined,
       },
     };
   }
 
   private resolveRetentionCeiling(
     requests: PerceptionEvent[],
-    prefix?: InterruptedContent | null,
   ): PerceptionEvent['retention_ceiling'] {
     const rank: Record<PerceptionEvent['retention_ceiling'], number> = {
       transient: 0,
@@ -422,7 +418,6 @@ export class AttentionSessionManager {
       memory_candidate: 2,
     };
     const ceilings = [
-      ...(prefix ? [prefix.retention_ceiling] : []),
       ...requests.map((request) => request.retention_ceiling),
     ];
     return ceilings.reduce((strictest, current) => (

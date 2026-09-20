@@ -8,7 +8,7 @@ import { CoreException } from '../../domain/errors';
 import { getLogger } from '../observability/logger';
 import { resolveConfigDir, resolveConfigPath } from '../filesystem/path-utils';
 import { GlobalConfig } from './config-schema';
-import { validateConfig, type ConfigSchemaName } from './document-validator';
+import { configValidator, type ConfigSchemaName } from './document-schema-registry';
 import { normalizeSystemYamlNulls } from './yaml-normalizers';
 import type { ActiveExtensionSelection } from '../../ports';
 
@@ -217,7 +217,7 @@ export class ConfigManager {
     const characterRoot = path.join(activeCharacter.root, activeCharacter.id);
     const knowledgeRoot = path.resolve(this._configDir, characterRoot, 'knowledge');
     const raw = await this.loadYaml(path.join(characterRoot, 'knowledge', 'index.yaml'));
-    const indexResult = validateConfig<KnowledgeIndexConfig>('KnowledgeIndexConfig', raw);
+    const indexResult = configValidator.validate<KnowledgeIndexConfig>('KnowledgeIndexConfig', raw);
     if (!indexResult.ok) {
       throw new CoreException(
         `知识索引配置校验失败: ${indexResult.errors.join('; ')}`,
@@ -253,7 +253,7 @@ export class ConfigManager {
       retrieval: index.retrieval as KnowledgeBaseConfig['retrieval'],
       entries,
     };
-    const result = validateConfig<KnowledgeBaseConfig>('KnowledgeBaseConfig', knowledgeConfig);
+    const result = configValidator.validate<KnowledgeBaseConfig>('KnowledgeBaseConfig', knowledgeConfig);
     if (!result.ok) {
       throw new CoreException(
         `知识库配置校验失败: ${result.errors.join('; ')}`,
@@ -265,7 +265,7 @@ export class ConfigManager {
 
   /** 单段 ajv 校验帮手 —— 失败抛 CoreException。 */
   private validateSection(name: ConfigSchemaName, data: unknown): void {
-    const result = validateConfig(name, data);
+    const result = configValidator.validate(name, data);
     if (!result.ok) {
       throw new CoreException(
         `配置校验失败 [${name}]: ${result.errors.join('; ')}`,

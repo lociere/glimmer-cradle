@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
+import type { AssetRef, ContentPart } from '@glimmer-cradle/content';
 import {
   AddressMode,
   CancelPerceptionRequestSchema,
@@ -89,6 +90,15 @@ export class CognitionClient {
               confidence: item.semantic.confidence ?? undefined,
             } : undefined,
             metadata: objectToStruct(item.metadata),
+          })) ?? [],
+          parts: request.content.parts?.map((part) => ({
+            content: { value: mapContentPart(part.content) },
+            semantic: part.semantic ? {
+              text: part.semantic.text,
+              source: part.semantic.source ?? '',
+              resolved: part.semantic.resolved ?? undefined,
+              confidence: part.semantic.confidence ?? undefined,
+            } : undefined,
           })) ?? [],
         },
       }),
@@ -291,6 +301,25 @@ export class CognitionClient {
       }),
       { timeoutMs, traceId },
     );
+  }
+}
+
+function mapAssetRef(ref: AssetRef) {
+  return {
+    assetId: ref.assetId,
+    mediaType: ref.mediaType,
+    sizeBytes: BigInt(ref.sizeBytes),
+    sha256: ref.sha256,
+  };
+}
+
+function mapContentPart(part: ContentPart) {
+  switch (part.kind) {
+    case 'text': return { case: 'text' as const, value: part.text };
+    case 'image': return { case: 'image' as const, value: mapAssetRef(part.asset) };
+    case 'audio': return { case: 'audio' as const, value: mapAssetRef(part.asset) };
+    case 'video': return { case: 'video' as const, value: mapAssetRef(part.asset) };
+    case 'file': return { case: 'file' as const, value: { asset: mapAssetRef(part.asset), name: part.name ?? '' } };
   }
 }
 

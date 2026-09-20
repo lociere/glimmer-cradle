@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { create } from '@bufbuild/protobuf';
@@ -43,8 +44,10 @@ import { AvatarController } from '../avatar/avatar-controller';
 import { isLocalAvatarSurfaceScene } from '../../domain/surface/local-avatar-scene-policy';
 import {
   EXTENSION_ID_PATTERN,
-  PerceptionEvent,
 } from '@glimmer-cradle/extension-sdk';
+import type { PerceptionEvent } from '../../ports/application-models';
+import type { AssetRef } from '@glimmer-cradle/content';
+import { FileAssetStore, MAX_ASSET_BYTES } from '../content/file-asset-store';
 import { RECOVERY_REQUIRED_ERROR_CODE } from './recovery-contract';
 import { getPresentationFrameClass } from './presentation-frame-policy';
 import { AudioService } from '../audio/audio-service';
@@ -194,6 +197,7 @@ export class ControlSurfaceGateway {
     private readonly readinessProjection: RuntimeProjectionPort,
     private readonly avatar: AvatarController,
     private readonly audio: AudioService,
+    private readonly assetStore: FileAssetStore = new FileAssetStore(),
   ) {}
 
   public async init(
@@ -880,7 +884,9 @@ export class ControlSurfaceGateway {
         return;
       }
       this._conversationHistoryService?.recordSubmittedUserMessage(text, traceId);
-      this._injectDesktopText(text, traceId);
+      void this._injectDesktopText(text, traceId).catch((error) => {
+        logger.error('桌面文本感知处理失败', { trace_id: traceId, error: errorMessage(error) });
+      });
     } else if (kind === 'audio_input') {
       const traceId = (typeof data.trace_id === 'string' && data.trace_id)
         || `ui_audio_${Date.now()}`;
@@ -1529,12 +1535,17 @@ export class ControlSurfaceGateway {
       return;
     }
 
+    let audioPath: string | undefined;
     try {
+      const audioBytes = Buffer.from(audioData, 'base64');
+      if (!audioBytes.length || audioBytes.length > MAX_ASSET_BYTES || !/^audio\/[\w.+-]+$/.test(mimeType)) {
+        throw new Error('录音类型或大小无效');
+      }
       const asrDir = path.join(resolveWorkDir(), 'audio', 'asr');
       await mkdir(asrDir, { recursive: true });
       const extension = this._audioExtensionFromMime(mimeType);
-      const audioPath = path.join(asrDir, `${this._safeFileToken(audioId)}.${extension}`);
-      await writeFile(audioPath, Buffer.from(audioData, 'base64'));
+      audioPath = path.join(asrDir, `${randomUUID()}.${extension}`);
+      await writeFile(audioPath, audioBytes);
 
       const result = await this.audio.recognizeSpeech({ audio_path: audioPath, trace_id: traceId });
       if (result.status !== 'success' || !result.text?.trim()) {
@@ -1549,8 +1560,17 @@ export class ControlSurfaceGateway {
       }
 
       const text = result.text.trim();
+      const asset = await this.assetStore.put(createReadStream(audioPath), mimeType);
+      try {
+        await this._injectDesktopText(text, traceId, asset);
+      } catch (error) {
+        logger.warn('桌面录音资产已提交但感知未确认，需核查孤儿', {
+          trace_id: traceId, asset_id: asset.assetId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
       this._broadcastAudioTranscript(traceId, audioId, 'success', text);
-      this._injectDesktopText(text, traceId);
     } catch (error) {
       this._broadcastAudioTranscript(
         traceId,
@@ -1559,6 +1579,8 @@ export class ControlSurfaceGateway {
         undefined,
         error instanceof Error ? error.message : String(error),
       );
+    } finally {
+      if (audioPath) await rm(audioPath, { force: true });
     }
   }
 
@@ -1584,7 +1606,7 @@ export class ControlSurfaceGateway {
     });
   }
 
-  private _injectDesktopText(text: string, traceId: string): void {
+  private async _injectDesktopText(text: string, traceId: string, audioAsset?: AssetRef): Promise<void> {
     const normalized = text.trim();
     if (!normalized) return;
     const resolved = this._perceptionAppService?.getConversationDirectory().resolve({
@@ -1597,7 +1619,7 @@ export class ControlSurfaceGateway {
       continuity_key: 'local-user',
       visibility: 'private',
     }, traceId);
-    if (!resolved) return;
+    if (!resolved) throw new Error('桌面会话地址解析失败');
 
     const simEvent: PerceptionEvent = {
       id: traceId,
@@ -1622,18 +1644,17 @@ export class ControlSurfaceGateway {
       content: {
         text: normalized,
         modality: ['text'],
+        parts: audioAsset ? [
+          { content: { kind: 'text', text: normalized } },
+          { content: { kind: 'audio', asset: audioAsset }, semantic: { text: normalized, source: 'asr', resolved: true } },
+        ] : [{ content: { kind: 'text', text: normalized } }],
         actor_id: resolved.actor_id,
         actor_name: resolved.actor_name,
       },
     };
 
-    if (this._perceptionAppService) {
-      this._perceptionAppService.processIngress(simEvent).catch((err: any) => {
-        logger.error('Failed to process UI input', { err });
-      });
-    } else {
-      logger.warn('PerceptionAppService not initialized');
-    }
+    if (!this._perceptionAppService) throw new Error('PerceptionAppService not initialized');
+    await this._perceptionAppService.processIngress(simEvent);
   }
 
   private _audioExtensionFromMime(mimeType: string): string {

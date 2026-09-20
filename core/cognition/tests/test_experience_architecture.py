@@ -1,10 +1,12 @@
 from pathlib import Path
 import sqlite3
+from dataclasses import replace
 
 from glimmer_cradle.cognition.adapters.observability import trace_context
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
 from tests.support import build_experience_recorder
 from glimmer_cradle.cognition.domain.experience import MomentKind
+from glimmer_cradle.cognition.domain.experience.events import Moment, SourceDescriptor
 
 
 async def test_ledger_restart_causation_and_episode_projection(tmp_path: Path) -> None:
@@ -234,3 +236,22 @@ async def test_ledger_rebuilds_catalog_from_packs(tmp_path: Path) -> None:
 
     assert second.seq == 2
     assert build_experience_recorder(base_dir).ledger.query()[0].content["text"] == "保留在 pack"
+
+
+async def test_v4_text_moment_reads_beside_v5_reference_and_transient_is_not_recorded(tmp_path: Path) -> None:
+    recorder = build_experience_recorder(tmp_path / "experience")
+    await recorder.start()
+    old = replace(Moment.create(0, kind=MomentKind.PERCEPTION, content={"text": "历史纯文本"},
+        moment_id="legacy-v4", occurred_at="2025-01-01T00:00:00Z"), schema_version=4,
+        origin=SourceDescriptor(schema_ref="glimmer://cognition/moment/v4"))
+    recorder.ledger.append(old)
+    recorder.record(MomentKind.PERCEPTION, {"text": "临时"}, retention_ceiling="transient")
+    recorder.record(MomentKind.PERCEPTION, {"text": "新媒体", "parts": [{"kind": "image", "asset": {
+        "asset_id": "00000000-0000-4000-8000-000000000001", "media_type": "image/png",
+        "size_bytes": "3", "sha256": "a" * 64}}]})
+    await recorder.stop()
+    moments = build_experience_recorder(tmp_path / "experience").ledger.query()
+    assert len(moments) == 2
+    assert moments[0].schema_version == 4 and moments[0].content["text"] == "历史纯文本"
+    assert moments[1].schema_version == 5
+    assert moments[1].content["parts"][0]["asset"]["asset_id"]

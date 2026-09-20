@@ -20,6 +20,7 @@
 | 契约族 | 路径/公开边缘 | 关键不变量 |
 |---|---|---|
 | Common / Kernel / Cognition | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` | deadline、cancellation、typed error、trace/causation/correlation、generation 与幂等。 |
+| Content | `contracts/proto/glimmer/content/v1/content.proto` | `ContentPart` 的 Text/Image/Audio/Video/File 联合体；媒体为 `AssetRef(asset_id,media_type,size_bytes,sha256)`，不含路径与字节。Cognition `PerceptionContent.parts = 6` 为新入口，`items = 5` 是阶段 9/14 删除门约束的旧 URI 读取入口。 |
 | Surface Gateway | `contracts/proto/glimmer/surface/v1/` | Desktop/Personal Server 只访问 Kernel Gateway；Query、Command、Event 使用有限 typed DTO，不接受 `string kind + Struct {frame}`；浏览器认证 WebSocket 是 Product ingress，不是内部器官协议。 |
 | Avatar Host | `contracts/proto/glimmer/avatar/v1/` | `AvatarHostService.Connect` 是唯一 control consumer；二进制 DTO 直接映射，不经 JSON round-trip。 |
 | Audio Engine | `contracts/proto/glimmer/engine/audio/v1/` | unary control 与媒体 data plane 分离；普通 RPC 不携带音频字节。 |
@@ -31,6 +32,8 @@
 Surface Gateway 的 `ConversationHistoryEntryProjection` 除历史正文与来源外，还以 optional 字段传递 `trace_id`、`interaction_id`、`position`、`title`、`moment_id`、`actor_id` 和 `actor_name`。Kernel 出站与 Desktop/Personal Server 入站 Adapter 保留这些字段的缺省语义，位置 `0` 不等同于缺省；产品以 interaction/trace 身份合并瞬时与持久记录，不按消息文本猜测去重。
 
 配置、Extension manifest/package、Product composition 与其他 Document 使用 JSON Schema 2020-12，必须声明稳定 `$id`、`x-glimmer-owner`、`x-glimmer-contract-kind=Document` 和兼容策略。Schema 可以跨目录 `$ref`；validator 必须先注册完整 registry，再校验入口 Document。
+
+Content 的 TypeScript/Python/C# DTO 只从 canonical proto 生成；`AssetRef` 的 ID 不作为访问凭据。新 Experience v5 Moment 在 `content.parts` 中写引用与语义，不内联媒体字节；旧 v4 文本 Moment 继续读取。旧 URI-only `items` 当拍消费且不可保证恢复，不生成假引用。长期恢复规则见 [ADR-0020](../architecture/decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
 `CoreSkillConfirmationRequestEvent` 的字段 8 `title`、字段 9 `detail` 为可选展示文本，由双端 Adapter 映射到确认界面；不授予权限，也不替代目标工具策略。确认回执必须来自接收该请求的可写 Surface session，断线使未完成请求失效。用户 SKILL.md 元数据由 `contracts/json-schema/skill/v1/user-skill-metadata.schema.json` 拥有，加载及调用边界见[Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。
 

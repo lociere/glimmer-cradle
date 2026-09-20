@@ -24,10 +24,11 @@
 | `host/composition.py` | 唯一组装点，绑定 external Ports、persistence、memory、inference、cycle 与 adapters |
 | `adapters/kernel/inbound_adapter.py` | Cognition Service DTO 到应用端口的入站映射 |
 | `adapters/kernel/outbound_adapter.py` | 行动、状态和日志经 Kernel Control Service 回传 |
-| `adapters/kernel/grpc_transport.py` | 动态回环 gRPC host/client、deadline、取消、typed detail 与 generation 校验 |
+| `adapters/kernel/grpc_transport.py` | 动态回环 gRPC host/client、deadline、取消、typed detail、generation 与 Content `parts` 映射 |
+| `adapters/content/asset_reader.py` | 只读按 ID 校验媒体类型、大小与 SHA-256；图片构造临时 provider 输入 |
 | `ports/kernel/models.py` | 不依赖 generated DTO 的进程内边界模型 |
 
-Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 Electron、平台 payload、Extension handler 或 Kernel 内部对象。
+Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 Electron、平台 payload、Extension handler 或 Kernel 内部对象。v5 Perception Moment 写引用与语义，v4 记录继续读取；`transient` 不写 Moment。旧 URI 媒体只做当拍兼容，不保证恢复；视频和音频不冒充视觉图片输入。参见 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
 ## 代码结构地图
 
@@ -54,7 +55,7 @@ core/cognition/
 │   │   └── clock.py, inference.py, observability.py,
 │   │       persistence.py, trace_context.py
 │   ├── adapters/                       # 外部能力与 contract edge 的具体实现
-│   │   ├── kernel/ inference/ observability/ persistence/
+│   │   ├── kernel/ content/ inference/ observability/ persistence/
 │   │   └── clock.py, configuration.py, paths.py
 │   └── host/
 │       ├── process.py                  # 唯一 Python 进程入口与生命周期接入

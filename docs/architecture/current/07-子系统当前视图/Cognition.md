@@ -6,6 +6,8 @@
 
 Cognition 是当前角色的心智主权边界。用户输入、平台事件、语音转写、工具结果和桌面上下文只有被规范化为当前角色感知后，才能进入 Cognition；Cognition 输出的是行动、回复、情绪、思考和状态事件，而不是直接控制窗口、平台或进程。
 
+新媒体经 `PerceptionContent.parts` 进入；Cognition 只读 `data/state/content/assets/` 或当拍租约并复核摘要，不解释外部路径。Experience v5 Moment 保存引用与语义文本；v4 文本继续读取。旧 URI-only `items` 当拍处理并标记不可保证恢复；图片可临时构造视觉 provider 输入，视频与未转写音频如实降级。取舍见 [ADR-0020](../../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
+
 生命周期结束同样遵守心智主权边界：Kernel 通过 `CognitionService.Shutdown` 请求停机，Cognition 在回复确认后自行停止入站 Service、刷新 Experience、封口开放 Episode、关闭 Memory/telemetry 并退出；停机不运行记忆巩固模型，Kernel 只保留有界 deadline、进程树监督与强制回收兜底。
 
 ## 当前职责

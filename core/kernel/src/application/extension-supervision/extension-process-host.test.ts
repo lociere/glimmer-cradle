@@ -137,6 +137,42 @@ describe('ExtensionProcessHost', () => {
     await host.stop();
   });
 
+  it('enforces PERCEPTION_WRITE for chunk upload and awaits the injected result over IPC', async () => {
+    process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
+    const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-content-'));
+    temporaryRoots.push(root);
+    const entry = path.join(root, 'extension.js');
+    await writeFile(entry, [
+      'module.exports = {',
+      '  onActivate(ctx) {',
+      "    ctx.ports.commands.registerCommand(`${ctx.extensionId}.upload`, async () => {",
+      "      const token = await ctx.ports.assetUpload.begin({ mediaType: 'image/png', sizeBytes: 3, sha256: 'a'.repeat(64) });",
+      "      await ctx.ports.assetUpload.write(token, Uint8Array.from([1, 2, 3]));",
+      "      await ctx.ports.perception.inject({ sensoryType: 'VISUAL', address: { provider_id: ctx.extensionId, provider_account_id: 'a', space_kind: 'personal', external_space_key: 'one', visibility: 'private' }, content: { modality: ['image'], parts: [{ kind: 'image', uploadToken: token }] } });",
+      "      return 'accepted';",
+      '    });',
+      '  }',
+      '};',
+    ].join('\n'), 'utf8');
+    const denied = new FakeExtensionHostService();
+    const deniedHost = new ExtensionProcessHost(denied,
+      { id: 'demo.content-denied', permissions: [ExtensionPermission.COMMAND_REGISTER] },
+      entry, {}, {}, 'default', 5000);
+    await deniedHost.start();
+    await expect(denied.executeCommand('demo.content-denied.upload')).rejects.toThrow(/缺少权限 PERCEPTION_WRITE/);
+    await deniedHost.stop();
+
+    const allowed = new FakeExtensionHostService();
+    const allowedHost = new ExtensionProcessHost(allowed,
+      { id: 'demo.content-allowed', permissions: [ExtensionPermission.COMMAND_REGISTER, ExtensionPermission.PERCEPTION_WRITE] },
+      entry, {}, {}, 'default', 5000);
+    await allowedHost.start();
+    await expect(allowed.executeCommand('demo.content-allowed.upload')).resolves.toBe('accepted');
+    expect(allowed.assetWrites).toEqual([[1, 2, 3]]);
+    expect(allowed.injected).toHaveLength(1);
+    await allowedHost.stop();
+  });
+
   it('stops the isolated host when a registration disposable hangs', async () => {
     process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
     const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-host-hung-registration-'));
@@ -170,6 +206,13 @@ describe('ExtensionProcessHost', () => {
 });
 
 class FakeExtensionHostService implements IExtensionHostService {
+  public readonly assetWrites: number[][] = [];
+  public readonly injected: ExtensionPerceptionProposal[] = [];
+  async beginAssetUpload(): Promise<string> { return 'test-upload'; }
+  async writeAssetUpload(_extensionId: string, _token: string, chunk: Uint8Array): Promise<void> {
+    this.assetWrites.push(Array.from(chunk));
+  }
+  async abortAssetUpload(): Promise<void> {}
   public readonly commands = new Map<string, { extensionId: string; handler: ExtensionCommandHandler; metadata?: ExtensionCommandMetadata }>();
   public readonly lifecycleStages: string[] = [];
   public attentionLeaseDispose: () => void | Promise<void> = () => undefined;
@@ -197,7 +240,10 @@ class FakeExtensionHostService implements IExtensionHostService {
   public subscribeEvent(_eventName: string, _handler: (event: unknown) => Promise<void>): Disposable { return { dispose: () => undefined }; }
   public publishExtensionEvent(_eventType: string, _eventId: string, _payload: unknown): void {}
   public publishDomainEvent(_event: never): void {}
-  public async injectPerception(_extensionId: string, _proposal: ExtensionPerceptionProposal): Promise<void> {}
+  public async injectPerception(_extensionId: string, proposal: ExtensionPerceptionProposal): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    this.injected.push(proposal);
+  }
   public requestSceneAttentionLease(_extensionId: string, _request: ExtensionAttentionLeaseRequest): Disposable {
     return { dispose: () => this.attentionLeaseDispose() };
   }

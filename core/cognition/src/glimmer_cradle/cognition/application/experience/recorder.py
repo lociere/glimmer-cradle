@@ -69,7 +69,7 @@ class ExperienceRecorder:
                disclosure_scope: str = "conversation_private",
                affect: AffectSnapshot | None = None, importance: float = 0.5,
                trace_id: str | None = None) -> Moment | None:
-        if not self._enabled:
+        if not self._enabled or retention_ceiling == "transient":
             return None
         resolved_trace = trace_id or self._observability.current_trace_id() or ""
         moment = self._ledger.append(Moment.create(

@@ -7,6 +7,7 @@ using GlimmerCradle.Contracts.Glimmer.Common.V1;
 using GlimmerCradle.Contracts.Glimmer.Cognition.V1;
 using GlimmerCradle.Contracts.Glimmer.Kernel.V1;
 using AvatarV1 = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
+using ContentV1 = GlimmerCradle.Contracts.Glimmer.Content.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -15,6 +16,29 @@ var fixtureBytes = File.ReadAllBytes(fixturePath);
 using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
+
+var contentAsset = new ContentV1.AssetRef
+{
+    AssetId = "00000000-0000-4000-8000-000000000001", MediaType = "image/png",
+    SizeBytes = 3, Sha256 = new string('a', 64),
+};
+var contentParts = new[]
+{
+    new ContentV1.ContentPart { Text = "hello" },
+    new ContentV1.ContentPart { Image = contentAsset },
+    new ContentV1.ContentPart { Audio = contentAsset },
+    new ContentV1.ContentPart { Video = contentAsset },
+    new ContentV1.ContentPart { File = new ContentV1.FileContent { Asset = contentAsset, Name = "a.png" } },
+};
+var contentCases = new[] { ContentV1.ContentPart.ValueOneofCase.Text, ContentV1.ContentPart.ValueOneofCase.Image,
+    ContentV1.ContentPart.ValueOneofCase.Audio, ContentV1.ContentPart.ValueOneofCase.Video,
+    ContentV1.ContentPart.ValueOneofCase.File };
+for (var index = 0; index < contentParts.Length; index++)
+{
+    var restored = ContentV1.ContentPart.Parser.ParseFrom(contentParts[index].ToByteArray());
+    if (restored.ValueCase != contentCases[index])
+        throw new InvalidOperationException("C# ContentPart round-trip lost a variant");
+}
 
 var request = new EchoProbeRequest
 {

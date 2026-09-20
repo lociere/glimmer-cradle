@@ -81,13 +81,16 @@ describe('AttentionSessionManager 感知契约', () => {
     const subject = manager as unknown as {
       mergeRequests(requests: PerceptionEvent[]): PerceptionEvent;
     };
-    const event = perception();
+    const event = perception({ content: { text: '测试输入', modality: ['text', 'image'], parts: [
+      { content: { kind: 'image', asset: { assetId: '00000000-0000-4000-8000-000000000001', mediaType: 'image/png', sizeBytes: 3, sha256: 'a'.repeat(64) } } },
+    ] } });
 
     const merged = subject.mergeRequests([event]);
 
     expect(merged.trace_id).toBe(event.trace_id);
     expect(merged.origin).toEqual(event.origin);
     expect(merged.retention_ceiling).toBe('memory_candidate');
+    expect(merged.content.parts).toEqual(event.content.parts);
   });
 
   it('合并不同留存上限时采用最严格上限', () => {
@@ -101,6 +104,135 @@ describe('AttentionSessionManager 感知契约', () => {
     ]);
 
     expect(merged.retention_ceiling).toBe('transient');
+  });
+
+  it('媒体不因消息批次上限丢失，且不同留存级别分别送入 Cognition', async () => {
+    const sent: PerceptionEvent[] = [];
+    const subject = manager as unknown as {
+      _initialized: boolean; _stopping: boolean; _debounceMs: number; _focusedDebounceMs: number;
+      _maxBatchMessages: number; _maxBatchItems: number; _aiProxy: unknown; _actionStream: unknown;
+      ingest(request: PerceptionEvent): Promise<void>;
+    };
+    subject._initialized = true;
+    subject._stopping = false;
+    subject._debounceMs = 5;
+    subject._focusedDebounceMs = 5;
+    subject._maxBatchMessages = 2;
+    subject._maxBatchItems = 2;
+    subject._aiProxy = { isReady: true, sendPerceptionMessage: async (request: PerceptionEvent) => {
+      sent.push(request);
+      return { operation_id: request.id, state: 'succeeded', terminal: true,
+        completion: Promise.resolve({ operation_id: request.id, state: 'succeeded', terminal: true }) };
+    }, cancelPerception: async () => undefined };
+    subject._actionStream = { startThinkingStream: async () => undefined,
+      completeStream: async () => undefined, cancelStream: async () => undefined };
+
+    const events = Array.from({ length: 5 }, (_, index) => perception({
+      id: `media-${index}`,
+      retention_ceiling: index === 2 ? 'transient' : 'experience',
+      content: { text: `media ${index}`, modality: ['image'], parts: [{ content: { kind: 'image', asset: {
+        assetId: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+        mediaType: 'image/png', sizeBytes: 3, sha256: 'a'.repeat(64),
+      } } }] },
+    }));
+    await Promise.all(events.map((event) => subject.ingest(event)));
+    expect(sent).toHaveLength(5);
+    expect(sent.map((event) => event.retention_ceiling)).toEqual([
+      'experience', 'experience', 'transient', 'experience', 'experience',
+    ]);
+    expect(sent.map((event) => event.content.parts?.[0].content.kind)).toEqual(Array(5).fill('image'));
+  });
+
+  it('拒绝超出 parts 上限的媒体请求，不把截尾当作成功', async () => {
+    const subject = manager as unknown as {
+      _initialized: boolean; _stopping: boolean; _debounceMs: number; _focusedDebounceMs: number;
+      _maxBatchItems: number; _aiProxy: unknown; _actionStream: unknown;
+      ingest(request: PerceptionEvent): Promise<void>;
+    };
+    subject._initialized = true;
+    subject._stopping = false;
+    subject._debounceMs = 1;
+    subject._focusedDebounceMs = 1;
+    subject._maxBatchItems = 1;
+    const sendPerceptionMessage = vi.fn();
+    subject._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception: async () => undefined };
+    subject._actionStream = { startThinkingStream: async () => undefined,
+      completeStream: async () => undefined, cancelStream: async () => undefined };
+    const image = { content: { kind: 'image' as const, asset: {
+      assetId: '00000000-0000-4000-8000-000000000001', mediaType: 'image/png', sizeBytes: 3, sha256: 'a'.repeat(64),
+    } } };
+    await expect(subject.ingest(perception({ content: { modality: ['image'], parts: [image, image] } })))
+      .rejects.toThrow('Content parts/items 超过批次上限');
+    expect(sendPerceptionMessage).not.toHaveBeenCalled();
+  });
+
+  it('拒绝超出 items 上限的旧 URI 媒体，不静默截尾', async () => {
+    const subject = manager as any;
+    subject._initialized = true;
+    subject._stopping = false;
+    subject._debounceMs = 1;
+    subject._focusedDebounceMs = 1;
+    subject._maxBatchItems = 1;
+    const sendPerceptionMessage = vi.fn();
+    subject._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception: async () => undefined };
+    subject._actionStream = { startThinkingStream: async () => undefined,
+      completeStream: async () => undefined, cancelStream: async () => undefined };
+    const legacy = { modality: 'image' as const, uri: 'https://expired.example/image', mime_type: 'image/png' };
+    await expect(subject.ingest(perception({ content: { modality: ['image'], items: [legacy, legacy] } })))
+      .rejects.toThrow('parts/items 超过批次上限');
+    expect(sendPerceptionMessage).not.toHaveBeenCalled();
+  });
+
+  it('settles ingress when thinking stream startup or cancel cleanup fails', async () => {
+    const subject = manager as any;
+    subject._initialized = true;
+    subject._stopping = false;
+    subject._debounceMs = 1;
+    subject._focusedDebounceMs = 1;
+    subject._maxBatchItems = 24;
+    subject._aiProxy = { isReady: true, sendPerceptionMessage: vi.fn(), cancelPerception: async () => undefined };
+    subject._actionStream = {
+      startThinkingStream: async () => { throw new Error('stream start failed'); },
+      completeStream: async () => undefined,
+      cancelStream: async () => { throw new Error('stream cleanup failed'); },
+    };
+    await expect(subject.ingest(perception())).rejects.toThrow('stream start failed');
+    expect(subject._aiProxy.sendPerceptionMessage).not.toHaveBeenCalled();
+  });
+
+  it('rejects an in-flight ingress when stop cancels it', async () => {
+    let finish!: (value: any) => void;
+    let releaseCancellation!: () => void;
+    const completion = new Promise((resolve) => { finish = resolve; });
+    const cancellationHeld = new Promise<void>((resolve) => { releaseCancellation = resolve; });
+    const subject = manager as any;
+    subject._initialized = true;
+    subject._stopping = false;
+    subject._debounceMs = 1;
+    subject._focusedDebounceMs = 1;
+    subject._maxBatchItems = 24;
+    const sendPerceptionMessage = vi.fn(async () => (
+      { operation_id: 'operation', state: 'running', terminal: false, completion }
+    ));
+    subject._aiProxy = {
+      isReady: true,
+      sendPerceptionMessage,
+      cancelPerception: async () => {
+        finish({ operation_id: 'operation', state: 'cancelled', terminal: true });
+        await cancellationHeld;
+      },
+    };
+    subject._actionStream = { startThinkingStream: async () => undefined,
+      completeStream: async () => undefined, cancelStream: async () => undefined };
+    const ingress = subject.ingest(perception());
+    await vi.waitFor(() => expect(subject._sceneStates.get('conversation:desktop:local')?.inFlightTraceId).toBeTruthy());
+    const stopped = manager.stop();
+    await expect(ingress).rejects.toThrow('stopped');
+    await expect(subject.ingest(perception({ id: 'late-ingress' }))).rejects.toThrow('正在停止');
+    expect(sendPerceptionMessage).toHaveBeenCalledTimes(1);
+    releaseCancellation();
+    await expect(stopped).resolves.toBeUndefined();
+    expect(sendPerceptionMessage).toHaveBeenCalledTimes(1);
   });
 
   it('首个 operation 未终态时第二次 ingress 会取消真实 operation 后再处理合并输入', async () => {
@@ -134,7 +266,7 @@ describe('AttentionSessionManager 感知契约', () => {
       cancelStream: vi.fn(async () => undefined),
     };
     const subject = manager as unknown as {
-      _initialized: boolean;
+      _initialized: boolean; _stopping: boolean;
       _debounceMs: number;
       _focusedDebounceMs: number;
       _aiProxy: unknown;
@@ -142,6 +274,7 @@ describe('AttentionSessionManager 感知契约', () => {
       ingest(request: PerceptionEvent): Promise<void>;
     };
     subject._initialized = true;
+    subject._stopping = false;
     subject._debounceMs = 1;
     subject._focusedDebounceMs = 1;
     subject._aiProxy = { isReady: true, sendPerceptionMessage, cancelPerception, sendLifeHeartbeat: vi.fn() };

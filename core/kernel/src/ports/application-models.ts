@@ -36,7 +36,7 @@ export interface SourceDescriptor {
 }
 
 export interface PerceptionModalityItem {
-  readonly modality: 'text' | 'image' | 'video';
+  readonly modality: 'text' | 'image' | 'audio' | 'video';
   readonly text?: string | null;
   readonly uri?: string | null;
   readonly mime_type?: string | null;
@@ -47,6 +47,11 @@ export interface PerceptionModalityItem {
     readonly confidence?: number | null;
   };
   readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface PerceptionContentPart {
+  readonly content: ContentPart;
+  readonly semantic?: PerceptionModalityItem['semantic'];
 }
 
 export interface PerceptionEvent {
@@ -67,6 +72,7 @@ export interface PerceptionEvent {
     readonly actor_id?: string | null;
     readonly actor_name?: string | null;
     readonly items?: PerceptionModalityItem[];
+    readonly parts?: readonly PerceptionContentPart[];
   };
 }
 
@@ -195,3 +201,4 @@ export interface CognitiveActivitySnapshot {
   readonly state: string;
   readonly policy: { readonly frequency_hint_ms: number };
 }
+import type { ContentPart } from '@glimmer-cradle/content';

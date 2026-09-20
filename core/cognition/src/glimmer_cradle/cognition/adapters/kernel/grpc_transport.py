@@ -261,6 +261,7 @@ class CognitionGrpcHost:
                     "actor_name": content.actor_name or None,
                     "modality": list(content.modality),
                     "items": [MessageToDict(item, preserving_proto_field_name=True) for item in content.items],
+                    "parts": [MessageToDict(part, preserving_proto_field_name=True) for part in content.parts],
                 }
                 conversation = request.conversation
                 address_mode = "direct" if request.address_mode == cognition_pb.ADDRESS_MODE_DIRECT else "ambient"

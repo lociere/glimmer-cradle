@@ -21,3 +21,5 @@ export type {
   RuntimeModuleStartDetails,
 } from './lifecycle/index.js';
 export { LifecycleCoordinator } from './lifecycle/index.js';
+export { ConfigurationValidator } from './configuration/index.js';
+export type { ConfigurationValidation } from './configuration/index.js';

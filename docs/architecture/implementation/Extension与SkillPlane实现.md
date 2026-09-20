@@ -1,5 +1,7 @@
 # Extension 与 Skill Plane 实现
 
+感知媒体的真实入站为 Extension Host IPC `asset.begin/write/abort` 与 `perception.inject`。Kernel 每次检查 `PERCEPTION_WRITE`，暂存 token 绑定扩展且只可消费一次；Host 等待 Cognition 感知操作结果，持久资产由 Kernel 单写者提交。旧 URI-only `items` 仍是阶段 9/14 删除门约束的读取兼容。准确字段见 [SDK Reference](../../reference/extension-sdk.md) 与 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
+
 > 范围：Extension SDK、Extension Host、Skill Registry、Policy、Invocation Gateway、Core/Extension/MCP/User Provider 和 Adapter 如何在代码中接线；不写 SDK 字段全表。
 > 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/adapters/{extension-host,skill-plane}/`、`core/kernel/src/ports/{extension-host,skill-plane,application-capabilities}.port.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
 > 维护触发：SDK API、manifest、permissions/requires、activation、provider 生命周期、MCP、Policy、Gateway、catalog、confirmation 或 audit 变化。

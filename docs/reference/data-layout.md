@@ -29,6 +29,7 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Cognition / Experience | Ledger 全局 position、pack 范围与单写者目录 |
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Cognition / Experience | 月度不可变 Moment、来源、因果与检索索引 |
+| `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory/memory.db` | Cognition | Memory、revision、evidence、relationship、intention、knowledge 与 embedding |
 | `data/state/cognition/conversations/conversations.db` | Cognition / Conversation | 从 Ledger 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint |
 | `data/state/cognition/projections/episodes.db` | Cognition | 可从 Ledger 删除重建的 Episode 投影和巩固 checkpoint |
@@ -68,6 +69,8 @@ Character Package、Experience Ledger、Knowledge Vault、Memory Substrate 与 V
 | `data/models/voice/` | TTS 模型、用户导入声线、训练整理副本 |
 | `data/cache/audio/tts/` | TTS 合成缓存，可按文本/provider 复用 |
 | `data/work/audio/asr/` | Control Center 上传或录制的 ASR 临时输入 |
+| `data/work/content/staged/`、`data/work/content/uploads/` | Kernel 分块上传与落盘暂存；失败清理、30 分钟过期，不作备份 |
+| `data/work/content/transient/assets/` | 当拍媒体租约；感知终态释放，异常残留按 30 分钟清理，不作备份 |
 | `data/work/desktop/screenshots/` | Desktop 屏幕技能生成的 PNG；调用返回路径与尺寸，用户按需保留或清理 |
 | `data/packages/skills/<name>/SKILL.md` | 用户安装的指令技能；格式和配置见[配置参考](configuration.md#用户指令技能) |
 | `data/packages/managed-resources/lociere.napcat-adapter/napcat/` | 本机托管 NapCat 程序包；可重装，不保存扩展连续性状态 |

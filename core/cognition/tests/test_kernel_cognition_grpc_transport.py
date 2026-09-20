@@ -4,6 +4,7 @@ import grpc
 import pytest
 
 from glimmer.common.v1 import service_contract_pb2 as common_pb
+from glimmer.content.v1 import content_pb2 as content_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
@@ -153,7 +154,18 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
             recall_scope="conversation_private",
             disclosure_scope="conversation_private",
         ),
-        content=cognition_pb.PerceptionContent(text="hello"),
+        content=cognition_pb.PerceptionContent(text="hello", parts=[
+            cognition_pb.PerceptionPart(content=content_pb.ContentPart(text="hello")),
+            cognition_pb.PerceptionPart(content=content_pb.ContentPart(image=content_pb.AssetRef(
+                asset_id="00000000-0000-4000-8000-000000000001", media_type="image/png", size_bytes=3, sha256="a" * 64))),
+            cognition_pb.PerceptionPart(content=content_pb.ContentPart(audio=content_pb.AssetRef(
+                asset_id="00000000-0000-4000-8000-000000000002", media_type="audio/wav", size_bytes=3, sha256="b" * 64))),
+            cognition_pb.PerceptionPart(content=content_pb.ContentPart(video=content_pb.AssetRef(
+                asset_id="00000000-0000-4000-8000-000000000003", media_type="video/mp4", size_bytes=3, sha256="c" * 64))),
+            cognition_pb.PerceptionPart(content=content_pb.ContentPart(file=content_pb.FileContent(
+                asset=content_pb.AssetRef(asset_id="00000000-0000-4000-8000-000000000004",
+                    media_type="application/pdf", size_bytes=3, sha256="d" * 64), name="a.pdf"))),
+        ]),
     )
     first = await submit(request, timeout=1)
     second = await submit(request, timeout=1)
@@ -161,6 +173,9 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
     assert second.duplicate is True
     assert len(queue.entries) == 1
     assert queue.entries[0].trace_id == "trace-1"
+    assert [next(iter(part["content"])) for part in queue.entries[0].model_input["parts"]] == [
+        "text", "image", "audio", "video", "file",
+    ]
 
     conflicting_trace = cognition_pb.SubmitPerceptionRequest()
     conflicting_trace.CopyFrom(request)

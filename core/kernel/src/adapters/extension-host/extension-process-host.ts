@@ -178,6 +178,17 @@ export class ExtensionProcessHost {
       case 'perception.inject':
         this.assertPermission(ExtensionPermission.PERCEPTION_WRITE, '注入感知事件');
         await this.service.injectPerception(this.manifest.id, payload as never); return null;
+      case 'asset.begin':
+        this.assertPermission(ExtensionPermission.PERCEPTION_WRITE, '暂存感知资产');
+        return this.service.beginAssetUpload(this.manifest.id, {
+          mediaType: readString(payload.mediaType), sizeBytes: Number(payload.sizeBytes), sha256: readString(payload.sha256),
+        });
+      case 'asset.write':
+        this.assertPermission(ExtensionPermission.PERCEPTION_WRITE, '写入感知资产');
+        await this.service.writeAssetUpload(this.manifest.id, readString(payload.token), payload.chunk as Uint8Array); return null;
+      case 'asset.abort':
+        this.assertPermission(ExtensionPermission.PERCEPTION_WRITE, '取消感知资产');
+        await this.service.abortAssetUpload(this.manifest.id, readString(payload.token)); return null;
       case 'attention.acquire': {
         const disposable = this.service.requestSceneAttentionLease(this.manifest.id, payload as never);
         return { registration_id: this.register(disposable) };

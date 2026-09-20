@@ -1,8 +1,8 @@
 """多模态输入编排与语义描述生成。
 
 两种策略：
-  core_direct        — 主模型支持原生视觉（如 Qwen-VL、GPT-4o）：
-                       把图片 URL 直接拼入 vision 消息发给主模型，
+  core_direct        — 主模型支持原生视觉：
+                       把已验证图片的临时 provider 输入拼入 vision 消息，
                        不经过专家模型中转。返回的 semantic_text 为空，
                        由 DeliberationController 注入回复上下文。
 
@@ -14,8 +14,8 @@
 架构规范：
   - 本模块是推理层，不触碰业务规则/人设
   - 不引入任何第三方平台字段（QQ号、emoji_id 等）
-  - 只使用 PerceptionModalityItem 的通用语义字段：
-            modality / uri / mime_type / semantic / metadata["visual_kind"]
+  - 新媒体只从 ContentPart 的 AssetRef 读取并校验；旧 URI 项限期当拍处理。
+  - 视频与音频不得伪装为 image_url 输入。
   - vision_prompt 根据 visual_kind 动态生成，在文本侧标记图片语义性质
 """
 from dataclasses import dataclass, field
@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from glimmer_cradle.cognition.domain.configuration import InferenceSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
 
 logger = get_logger("multimodal_router")
 
@@ -46,6 +47,7 @@ class PerceptionModalityItem(BaseModel):
 class PerceptionContent(BaseModel):
     text: str = ""
     items: list[PerceptionModalityItem] = Field(default_factory=list)
+    parts: list[dict] = Field(default_factory=list)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -73,6 +75,7 @@ class MultimodalRouteResult:
         vision_messages: core_direct 策略下供主模型直接使用的视觉消息列表；
                          specialist_then_core 策略下为空
         image_items:     原始图片 item（供外部需要时使用）
+        audio_items:     音频 item；只消费可信转写，不送视觉 provider
         video_items:     原始视频 item
     """
     strategy: str
@@ -80,6 +83,7 @@ class MultimodalRouteResult:
     semantic_text: str
     vision_messages: List[VisionMessage] = field(default_factory=list)
     image_items: List[PerceptionModalityItem] = field(default_factory=list)
+    audio_items: List[PerceptionModalityItem] = field(default_factory=list)
     video_items: List[PerceptionModalityItem] = field(default_factory=list)
 
 
@@ -125,9 +129,10 @@ class MultimodalRouter:
     LLMEngine 在 container 中初始化后通过 set_llm_engine() 注入，避免循环依赖。
     """
 
-    def __init__(self, inference_config: InferenceSettings) -> None:
+    def __init__(self, inference_config: InferenceSettings, asset_reader: AssetReader | None = None) -> None:
         self._config = inference_config
         self._llm_engine: LLMPort | None = None   # 由 Composition Root 在组装期注入。
+        self._assets = asset_reader or AssetReader()
 
     def set_llm_engine(self, llm_engine: LLMPort) -> None:
         """注入 LLMEngine 实例（避免构造时循环依赖）。"""
@@ -160,23 +165,65 @@ class MultimodalRouter:
         )
         primary_text = content.text or ""
 
-        # 从 items 中分离媒体项，截取到 max_items
+        # v5 Content 优先；v4 URI-only items 只在迁移窗口内当拍读取。
+        normalized_items = list(content.items or [])
+        file_descriptions: list[str] = []
+        for part in content.parts or []:
+            value = part.get("content") if isinstance(part, dict) else None
+            if not isinstance(value, dict):
+                continue
+            kind = next((key for key in ("text", "image", "audio", "video", "file") if key in value), None)
+            if kind == "text" and not primary_text:
+                primary_text = str(value[kind])
+            elif kind in ("image", "audio", "video", "file"):
+                payload = value[kind]
+                ref = payload.get("asset") if kind == "file" and isinstance(payload, dict) else payload
+                if not isinstance(ref, dict):
+                    continue
+                semantic = part.get("semantic") or {}
+                if not isinstance(semantic, dict):
+                    semantic = {}
+                uri = None
+                try:
+                    if kind == "image":
+                        uri = self._assets.image_data_url(ref)
+                    else:
+                        self._assets.verify(ref)
+                except (OSError, ValueError, TypeError) as exc:
+                    logger.warning("资产读取降级", asset_id=ref.get("asset_id"), error=str(exc))
+                if kind == "file":
+                    file_descriptions.append(
+                        f"[文件] {semantic.get('text') or '用户提供了文件，但当前没有文件理解能力'}"
+                    )
+                    continue
+                normalized_items.append(PerceptionModalityItem(
+                    modality=kind, uri=uri, mime_type=str(ref.get("media_type") or ""),
+                    semantic=PerceptionSemantic.model_validate(semantic),
+                ))
+
+        # 从规范项与旧 items 中分离媒体项，截取到 max_items
         image_items: List[PerceptionModalityItem] = []
+        audio_items: List[PerceptionModalityItem] = []
         video_items: List[PerceptionModalityItem] = []
-        for item in content.items or []:
-            total = len(image_items) + len(video_items)
+        for item in normalized_items:
+            total = len(image_items) + len(audio_items) + len(video_items)
             if total >= mm_config.max_items:
                 break
-            if item.modality == "image" and item.uri:
+            # 历史 CQ:record 事件被编码为 video + audio/*；读取时仍按音频处理。
+            if item.modality == "audio" or (
+                item.modality == "video" and (item.mime_type or "").startswith("audio/")
+            ):
+                audio_items.append(item)
+            elif item.modality == "image":
                 image_items.append(item)
-            elif item.modality == "video" and item.uri:
+            elif item.modality == "video":
                 video_items.append(item)
 
-        if not image_items and not video_items:
+        if not image_items and not audio_items and not video_items:
             return MultimodalRouteResult(
                 strategy=mm_config.strategy,
                 primary_text=primary_text,
-                semantic_text="",
+                semantic_text="\n".join(file_descriptions),
             )
 
         if not mm_config.enabled:
@@ -185,11 +232,15 @@ class MultimodalRouter:
                 parts.append(f"{len(image_items)}张图片")
             if video_items:
                 parts.append(f"{len(video_items)}个视频")
+            unavailable = f"[多模态处理已禁用，包含{'、'.join(parts)}，无法识别内容]" if parts else ""
             return MultimodalRouteResult(
                 strategy=mm_config.strategy,
                 primary_text=primary_text,
-                semantic_text=f"[多模态处理已禁用，包含{'、'.join(parts)}，无法识别内容]",
+                semantic_text="\n".join(part for part in (
+                    unavailable, *self._audio_descriptions(audio_items), *file_descriptions,
+                ) if part),
                 image_items=image_items,
+                audio_items=audio_items,
                 video_items=video_items,
             )
 
@@ -199,25 +250,25 @@ class MultimodalRouter:
         if strategy == "core_direct":
             vision_msgs: List[VisionMessage] = []
             for item in image_items:
+                if not item.uri:
+                    continue
                 vision_msgs.append(VisionMessage(
                     uri=item.uri or "",
                     mime_type=item.mime_type or "image/jpeg",
                     prompt=_build_vision_prompt(item),
                     semantic_text=item.semantic.text if item.semantic else "",
                 ))
-            for item in video_items:
-                vision_msgs.append(VisionMessage(
-                    uri=item.uri or "",
-                    mime_type=item.mime_type or "video/mp4",
-                    prompt=_build_vision_prompt(item),
-                    semantic_text=item.semantic.text if item.semantic else "",
-                ))
             return MultimodalRouteResult(
                 strategy=strategy,
                 primary_text=primary_text,
-                semantic_text="",
+                semantic_text="\n".join((
+                    *self._audio_descriptions(audio_items),
+                    *self._fallback_description([item for item in image_items if not item.uri], video_items).splitlines(),
+                    *file_descriptions,
+                )),
                 vision_messages=vision_msgs,
                 image_items=image_items,
+                audio_items=audio_items,
                 video_items=video_items,
             )
 
@@ -237,10 +288,24 @@ class MultimodalRouter:
         return MultimodalRouteResult(
             strategy=strategy,
             primary_text=primary_text,
-            semantic_text=semantic_text,
+            semantic_text="\n".join(part for part in (
+                semantic_text, *self._audio_descriptions(audio_items), *file_descriptions
+            ) if part),
             image_items=image_items,
+            audio_items=audio_items,
             video_items=video_items,
         )
+
+    @staticmethod
+    def _audio_descriptions(items: List[PerceptionModalityItem]) -> list[str]:
+        descriptions: list[str] = []
+        for index, item in enumerate(items, 1):
+            semantic = item.semantic
+            transcript = semantic.text.strip() if semantic and semantic.resolved else ""
+            descriptions.append(
+                f"[语音{index}] {transcript or '用户发送了语音，但当前没有可用的转写文本'}"
+            )
+        return descriptions
 
     def _run_specialist(
         self,
@@ -269,6 +334,9 @@ class MultimodalRouter:
             if semantic_text and semantic_resolved:
                 desc_parts.append(f"[{label}{idx}] {semantic_text}")
                 logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
+                continue
+            if not img.uri:
+                desc_parts.append(f"[{label}{idx}] {semantic_text or '用户发送了图片，但视觉能力当前不可用'}")
                 continue
             prompt = _build_vision_prompt(img)
             try:
@@ -299,26 +367,8 @@ class MultimodalRouter:
                 desc_parts.append(f"[视频{idx}] {semantic_text}")
                 logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
                 continue
-            prompt = _build_vision_prompt(vid)
-            try:
-                req = LLMRequest(messages=[
-                    LLMMessage(
-                        role="user",
-                        content=prompt,
-                        vision_url=vid.uri,
-                        vision_mime=vid.mime_type or "video/mp4",
-                    )
-                ])
-                description = self._llm_engine.generate(req, provider_key=video_provider)
-                desc_parts.append(f"[视频{idx}] {description.strip()}")
-                logger.debug(
-                    "视觉专家模型描述完成",
-                    index=idx, kind="video", provider=video_provider,
-                )
-            except Exception as e:
-                fallback = semantic_text or "用户发送了视频，但视觉能力当前不可用"
-                desc_parts.append(f"[视频{idx}] {fallback}")
-                logger.warning("专家视频调用失败", index=idx, error=str(e))
+            # 当前 provider 仅有 image_url 输入契约，视频按能力降级。
+            desc_parts.append(f"[视频{idx}] {semantic_text or '用户发送了视频，但视觉能力当前不可用'}")
 
         return "\n".join(desc_parts)
 

@@ -8,6 +8,8 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 
 ## 当前 ADR
 
+- [ADR-0020 Content 资产单写者与恢复边界](./ADR-0020-Content资产单写者与恢复边界.md)（`accepted`；规定新媒体引用、暂存、Experience 恢复与旧 URI 退出门）
+
 - [ADR-0019 采用 Architecture Baseline v2.0 冻结基线](./ADR-0019-采用Architecture-Baseline-v2冻结基线.md)（`accepted`；替代旧目标中冲突的目录、模块和状态边界，当前实现按阶段迁移）
 
 - [ADR-0001 企划平台与角色 Profile 分层](./ADR-0001-企划平台与角色Profile分层.md)

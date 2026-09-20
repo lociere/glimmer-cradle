@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class MomentKind(str, Enum):
@@ -32,7 +32,7 @@ class SourceDescriptor:
     provider_version: str | None = None
     contribution_id: str | None = None
     source_event_id: str = ""
-    schema_ref: str = "glimmer://cognition/moment/v4"
+    schema_ref: str = "glimmer://cognition/moment/v5"
     content_hash: str | None = None
     trust_tier: str = "host_verified"
     privacy_class: str = "private"

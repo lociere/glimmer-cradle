@@ -8,7 +8,7 @@
 
 ```text
 contracts/
-├── proto/glimmer/{common,kernel,cognition,surface,avatar,engine/audio,extension}/v1/
+├── proto/glimmer/{common,kernel,cognition,content,surface,avatar,engine/audio,extension}/v1/
 ├── json-schema/{common,config,extension,presentation,product,skill}/v1/
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
@@ -25,6 +25,7 @@ contracts/
 `contracts/buf.gen.yaml` 从 `contracts/proto/` 生成 TS/Python/C# DTO 与 service stub。生成输出只在边缘消费：
 
 - Kernel Cognition Adapter ↔ Python Cognition `adapters/kernel/grpc_transport.py`；
+- Kernel Content mapper ↔ Python Cognition 只读资产 adapter；`parts = 6` 传引用，`items = 5` 限期读取；
 - Kernel Surface Adapter ↔ Desktop/Personal Server gateway client；
 - Kernel Avatar Adapter ↔ Unity Host `Adapters` assembly；
 - Kernel Audio Adapter ↔ Python Audio `grpc_host.py`；

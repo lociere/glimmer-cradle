@@ -79,12 +79,14 @@
 Desktop/Extension/Platform input
   -> preload/adapter/host port
   -> PerceptionAppService
-  -> IngressGateManager / IdentityRouter
+  -> IngressGateManager / AttentionSessionManager
   -> ManageCognitionLifecycle / CognitionServicePort
   -> CognitionService gRPC adapter
 ```
 
 `PerceptionAppService` 负责把已规范化的输入送入 Kernel 主链；`IngressGateManager` 决定是否允许进入认知链路；Application 的 `ManageCognitionLifecycle` 只依赖 `CognitionServicePort`，`adapters/cognition/cognition-process-adapter.ts` 管理 Python Cognition 进程与 Service 代际、注册、readiness、重启和停机。平台 Adapter 只做协议清洗，不把平台私有 payload 传进 Cognition。
+
+`core/content` 拥有纯类型与 Port；Kernel `adapters/content/file-asset-store.ts` 是 `data/state/content/assets/` 的唯一写入适配器。Extension Host 的分块请求由 `StagedAssetUploads` 校验后变为 `AssetRef`，Attention 合并与中断恢复保留 `content.parts`，`CognitionClient` 只把引用映射到生成的 `PerceptionPart`。旧 `IdentityRouter` 没有生产消费者，已按 consumer-zero 删除。产品录音 ASR 成功后提交音频引用与可信转写；失败时清理工作输入。存储与孤儿取舍见 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
 `CognitionManager` 把 perception operation handle 交给 `AttentionSessionManager` 持有，并轮询
 Service 的真实终态；新输入到达时旧 trace 仍保持 in-flight，等待

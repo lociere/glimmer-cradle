@@ -72,11 +72,20 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  core/content:
+    devDependencies:
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+
   core/kernel:
     dependencies:
       '@bufbuild/protobuf':
         specifier: 2.13.0
         version: 2.13.0
+      '@glimmer-cradle/content':
+        specifier: workspace:*
+        version: link:../content
       '@glimmer-cradle/contracts':
         specifier: workspace:*
         version: link:../../contracts
@@ -98,9 +107,6 @@ importers:
       ajv:
         specifier: 8.20.0
         version: 8.20.0
-      ajv-formats:
-        specifier: 3.0.1
-        version: 3.0.1(ajv@8.20.0)
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
@@ -155,6 +161,13 @@ importers:
         version: 0.34.6(playwright@1.61.0)
 
   core/platform:
+    dependencies:
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
     devDependencies:
       typescript:
         specifier: ^6.0.2

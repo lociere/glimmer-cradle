@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package glimmer.content.v1;
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Content.V1";
+
+message AssetRef {
+  string asset_id = 1;
+  string media_type = 2;
+  uint64 size_bytes = 3;
+  string sha256 = 4;
+}
+
+message FileContent {
+  AssetRef asset = 1;
+  string name = 2;
+}
+
+message ContentPart {
+  oneof value {
+    string text = 1;
+    AssetRef image = 2;
+    AssetRef audio = 3;
+    AssetRef video = 4;
+    FileContent file = 5;
+  }
+}

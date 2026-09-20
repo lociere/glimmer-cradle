@@ -28,6 +28,7 @@ const handlers = new Map<string, Handler>();
 const timers = new Set<NodeJS.Timeout>();
 const disposables = createDisposableRegistry();
 const requestTimeoutMs = readPositiveInteger(process.env.GLIMMER_CRADLE_EXTENSION_HOST_IPC_REQUEST_TIMEOUT_MS, 2000);
+const perceptionResultTimeoutMs = readPositiveInteger(process.env.GLIMMER_CRADLE_EXTENSION_PERCEPTION_RESULT_TIMEOUT_MS, 120_000);
 const deactivationTimeoutMs = readPositiveInteger(process.env.GLIMMER_CRADLE_EXTENSION_HOST_DEACTIVATE_TIMEOUT_MS, 3000);
 
 let extension: LoadedExtensionModule | null = null;
@@ -195,7 +196,12 @@ function createContext(
         },
       },
       evidenceProposal: { submit: async (proposal: unknown) => { await request('evidence.submit', proposal); } },
-      perception: { inject: (proposal: unknown) => fire('perception.inject', proposal) },
+      perception: { inject: async (proposal: unknown) => { await request('perception.inject', proposal, perceptionResultTimeoutMs); } },
+      assetUpload: {
+        begin: async (input: { mediaType: string; sizeBytes: number; sha256: string }) => String(await request('asset.begin', input)),
+        write: async (token: string, chunk: Uint8Array) => { await request('asset.write', { token, chunk }); },
+        abort: async (token: string) => { await request('asset.abort', { token }); },
+      },
       sceneAttention: {
         requestAttentionLease: (lease: unknown) => track(deferredRegistration('attention.acquire', lease)),
         isSceneFocused: async (channelId: string) => Boolean(await request('attention.focused', { channel_id: channelId })),
@@ -271,7 +277,7 @@ async function invokeHandler(payload: unknown): Promise<unknown> {
   return handler(input.args);
 }
 
-function request(method: ExtensionKernelMethod, payload: unknown): Promise<unknown> {
+function request(method: ExtensionKernelMethod, payload: unknown, timeoutMs = requestTimeoutMs): Promise<unknown> {
   const sendToParent = process.send;
   if (ipcClosed || !process.connected || !sendToParent) {
     return Promise.reject(new ExtensionHostIpcError('ipc_disconnected', `Extension Host IPC disconnected before ${method}`));
@@ -282,7 +288,7 @@ function request(method: ExtensionKernelMethod, payload: unknown): Promise<unkno
       pending.delete(requestId);
       timers.delete(timeout);
       reject(new ExtensionHostIpcError('ipc_request_timeout', `Extension Host IPC request timeout: ${method}`));
-    }, requestTimeoutMs);
+    }, timeoutMs);
     timeout.unref?.();
     timers.add(timeout);
     const fail = (error: Error) => {

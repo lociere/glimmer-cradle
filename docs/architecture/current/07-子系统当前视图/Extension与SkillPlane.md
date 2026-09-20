@@ -42,6 +42,8 @@ Host 以 Capability Graph 表达扩展运行事实。扩展一旦被扫描发现
 
 `scope` 与 `requirements` 是另外两道正交边界。`scope.kind` 可以是 `global`、`source_provider`、`scene` 或 `conversation`；扩展声明中的 `$self` 会在注册时解析为自己的 Extension ID。`requirements` 约束 `desktop` / `personal-server`、Windows/Linux/macOS 和 `avatar`、`audio.tts`、`audio.asr`、`local_device_actions`、`extensions` 等产品功能。Catalog 投影、规划和 Invocation Gateway 都按当前 `ConversationContext` 与 Product Composition 过滤，不能用伪造调用跨来源、跨场景或跨会话执行。
 
+感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。
+
 认知接入只有两条公开主线：`perception` 提交带 `ConversationAddress` 的清洗后感知；`evidenceProposal` 由 `EVIDENCE_PROPOSAL_WRITE` 授权，提交同样带地址、`sourceEventId` 与 `schemaRef` 的证据候选。Kernel `ConversationDirectory` 把外部地址解析为 canonical ConversationContext 与不可逆 actor id；Extension 不能提交 canonical id、不能直接读写 Cognition Conversation/Memory，也没有平行会话事实 Host Port。
 
 ## Skill Plane 调用链

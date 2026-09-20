@@ -14,11 +14,24 @@ from glimmer.common.v1.contract_probe_pb2 import (  # noqa: E402
     EchoProbeResponse,
     TraceMetadata,
 )
+from glimmer.content.v1.content_pb2 import AssetRef, ContentPart, FileContent  # noqa: E402
 
 fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
+
+asset = AssetRef(asset_id="00000000-0000-4000-8000-000000000001", media_type="image/png",
+                 size_bytes=3, sha256="a" * 64)
+content_parts = [ContentPart(text="hello"), ContentPart(image=asset),
+                 ContentPart(audio=AssetRef(media_type="audio/wav")),
+                 ContentPart(video=AssetRef(media_type="video/mp4")),
+                 ContentPart(file=FileContent(asset=asset, name="a.png"))]
+for expected, part in zip(("text", "image", "audio", "video", "file"), content_parts):
+    restored = ContentPart()
+    restored.ParseFromString(part.SerializeToString())
+    if restored.WhichOneof("value") != expected:
+        raise RuntimeError("Python ContentPart round-trip lost a variant")
 
 request = EchoProbeRequest(
     probe_id="slice1-contract-probe",

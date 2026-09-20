@@ -23,6 +23,10 @@ Extension 是可安装、可禁用、可授权、可升级和可回收的生态�
 
 需要序列化和版本化的 Extension Manifest、包、Release 与 Registry Document 由 `contracts/json-schema/extension/v1/` 定义，`@glimmer-cradle/extension-sdk` 提供 schema-derived public edge 与 validator。Extension Host process 的 Service/Document 契约位于 `contracts/proto/glimmer/extension/v1/` 与 `contracts/json-schema/extension/v1/`；SDK 的 `host/process-protocol.ts` 是当前 Node IPC transport mapping owner，stage 对齐 Contract Spine generated enum，Host 只 re-export。SDK public API 只包含扩展作者和 Host Port 的 manifest、package、permissions、contribution、events 与有限 lifecycle/readiness 类型；Audio/Embedding/Memory/SkillPlane config、Surface presentation、Control Center、安装态和系统 runtime projection 均不公开。Kernel 拥有安装验证、权限裁决、生命周期、进程监督、catalog/projection 和内部 Port；产品只保留自身 view mapping。`src/contracts/public-boundary.test.ts` 递归检查 barrel/re-export 图和 production named import，禁止这些非 owner 类型回流。
 
+公开 `PerceptionModalityItem.modality` 允许 `text`、`image`、`audio`、`video`。这只是感知媒体类别，
+不授予扩展读取本地媒体、转写音频或持有长期 AssetRef 的权限；对应 wire 字段仍由
+`contracts/proto/glimmer/cognition/v1/cognition_service.proto` 拥有。
+
 独立扩展发布物把 `@glimmer-cradle/extension-sdk` 声明为语义化版本 peer dependency；Extension Host 产品组装会在发行物内提供与当前主程序匹配的 SDK module root，这属于产品携带的扩展执行环境，不是扩展安装包对 Kernel 源码的依赖。扩展安装包不得复制 Kernel/Contracts 源码或依赖主仓库相对路径。
 
 公开工具链由同版本的 `@glimmer-cradle/contracts` 与 `@glimmer-cradle/extension-sdk` 两个 npm 包组成。Contract 包只发布生成后的 TypeScript Service/DTO 与 canonical JSON Schema；SDK 把它作为精确运行依赖并提供作者可用的 schema-derived validator、类型与 Host Port。扩展作者只声明 SDK peer，不直接声明 Contract 包，也不得恢复已删除的 `@glimmer-cradle/protocol`。`pnpm verify:extension-sdk-release` 会构建两个包、检查 allowlist、排除测试/compatibility 内容，并从生成的 tarball 在干净 consumer 中安装和加载公开 validator。
@@ -151,6 +155,7 @@ release.sigstore.json            # 可选，由作者的 Release 托管
 |---|---|---|---|
 | `evidenceProposal` | 提交带来源的证据候选 | `EVIDENCE_PROPOSAL_WRITE` | Kernel 转成 `ambient + observe_only + memory_candidate` 感知，不直写 Memory |
 | `perception` | 提交带 `ConversationAddress` 的清洗后感知 proposal | `PERCEPTION_WRITE` | canonical topology 由 Kernel 生成，进入 Cognition 后才成为经历 |
+| `assetUpload` | `begin({mediaType,sizeBytes,sha256})` → token、`write(token,chunk)`、`abort(token)` | `PERCEPTION_WRITE` | 每块不超过 1 MiB、单资产不超过 256 MiB；token 只属于本扩展且一次注入后失效，不等于长期 `AssetRef` |
 | `sceneAttention` | 申请注意力租约或查询当前焦点 | 无单独写权限，受 Host 边界约束 | 不代表控制角色或 Avatar |
 | `runtime` | 上报 Capability Graph 增量和诊断投影 | `RUNTIME_PROJECTION_WRITE` | Host 合并为 `ExtensionRuntimeProjection`；扩展不能直接写 Renderer view model |
 
@@ -161,6 +166,8 @@ Extension handler 返回值必须可 JSON 序列化；错误抛出清晰 message
 `sceneAttention.requestAttentionLease()` 申请一个注意力租约，请求字段包括 `sceneId`、`channelId`、`actorId`、`strength`、`reason` 和 `durationMs`；返回的 `Disposable` 用于释放该租约。它不等同于扩展控制当前角色或 Avatar。Adapter 可以用它表达“某个外部上下文正在被关注”，例如把群聊注意力细分到发送者；后续是否回复、是否外显表情，仍由 Cognition 和 Kernel Surface 决定。按照 [ADR-0002](../architecture/decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，Kernel 内部由 `AttentionLeaseStore` 持有 Attention Lease 并生成 Attention Projection。
 
 认知相关 SDK 能力只提交 proposal：`perception.inject()` 和 `evidenceProposal.submit()` 都要求 `ConversationAddress`。Extension 只决定外部平台的 account/space/thread/endpoint 与 visibility，Kernel 生成 canonical `ConversationContext`、不可逆 actor id、trust、privacy 和 cognitive effect。`perception.content` 不允许提交 `actor_id` / `actor_name`；`evidenceProposal` 只接受 `address`、`content`、`sourceEventId` 与 `schemaRef`。证据候选先成为 Moment，再经 Conversation/Episode、结构化巩固和证据校验决定是否成为版本化 Memory。公开 SDK 不提供第二套会话连续性入口或 Memory CRUD。
+
+新媒体使用 `perception.content.parts`，文本项形如 `{kind:'text',text}`，媒体项形如 `{kind:'image'|'audio'|'video'|'file',uploadToken,name?}`。上游 Adapter 自己取得远程字节，先分块上传，再 `await perception.inject(proposal)`；Host 检查权限、声明大小、摘要、媒体类型与 token owner，提交后由 Kernel 转成资产引用。`retention_ceiling='transient'` 使用当拍租约；允许进入 Experience 的事件才保存原始字节。旧 `items` URI-only 事件只在阶段 9/14 兼容窗口当拍读取，其媒体不可保证恢复。完整持久边界见 [ADR-0020](../architecture/decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
 ## Skill Plane 映射
 

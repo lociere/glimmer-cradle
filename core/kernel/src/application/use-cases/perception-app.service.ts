@@ -55,8 +55,7 @@ export class PerceptionAppService {
         rejection: gateResult.rejection?.type,
 
       });
-
-      return;
+      throw new Error(`感知输入被入站防护拒绝: ${gateResult.rejection?.type ?? 'unknown'}`);
 
     }
 
@@ -154,6 +153,7 @@ export class PerceptionAppService {
         stack: e instanceof Error ? e.stack : undefined,
 
       });
+      throw e;
 
     }
 
@@ -190,6 +190,5 @@ export class PerceptionAppService {
   }
 
 }
-
 
 

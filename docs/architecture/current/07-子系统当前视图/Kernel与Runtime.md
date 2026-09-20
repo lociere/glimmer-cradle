@@ -50,6 +50,12 @@ core/kernel/src/
 
 Ingress Gate 是 Kernel 对输入的闸门。它必须等 required SDK 完成真实业务 ready 或明确 degraded 后才开放。典型判断：
 
+Extension Host 是实际第三方感知入口；平台 Adapter 负责清洗外部协议并取得媒体字节，Kernel
+不解析 CQ 码或抓取远程 URI。`PerceptionAppService` 经 Ingress Gate 与 Attention 把 Content 引用
+送入 Cognition；Kernel 单写者文件库保存允许进入 Experience 的媒体。无生产消费者的旧
+`IdentityRouter` 已删除。历史 `video + audio/*` 仍按音频降级读取，退出门见
+[v2 执行记录](../../../roadmap/architecture-v2-refactor.md)。
+
 - Cognition：受监督进程以本代 generation 注册动态回环 gRPC 端点，知识初始化、数据库/记忆基础设施和认知循环均可服务；仅进程存在或端口绑定不算 ready。
 - Audio：协议健康、TTS route/ASR warmup 或清晰 degraded；`audio.host` 先汇总语音整体 desired/actual/readiness，再由 `audio.tts`、`audio.asr` 投影 Engine 返回的 cloud/local provider 状态。Kernel 不扫描模型目录或 sidecar，也不复制 Engine 路由。
 - Avatar：`host_hello` 之后完成 catalog、模型 driver、Composition Host 首帧和 `host_ready`；这些阶段变化由 `AvatarController` 实时回写 `RuntimeReadinessCatalog`，Desktop 诊断消费的不是启动时死快照。

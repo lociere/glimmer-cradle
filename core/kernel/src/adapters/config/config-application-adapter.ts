@@ -25,7 +25,7 @@ import {
 } from '../../ports/configuration-models';
 import type { AudioConfig, EmbeddingConfig, MemoryConfig, SkillPlaneConfig } from '../../domain/config';
 import type { LLMConfig } from './documents/LLMConfig';
-import { validateConfig } from './document-validator';
+import { configValidator } from './document-schema-registry';
 
 interface ConfigManagerPort {
   getConfig(): Readonly<GlobalConfig>;
@@ -716,7 +716,7 @@ async function readValidatedYamlFile<T>(schemaName: 'LLMConfig' | 'AudioConfig' 
 }
 
 function validateOrThrow<T>(schemaName: 'LLMConfig' | 'AudioConfig' | 'EmbeddingConfig' | 'MemoryConfig' | 'SkillPlaneConfig', value: unknown): T {
-  const validation = validateConfig<T>(schemaName, deepClone(value));
+  const validation = configValidator.validate<T>(schemaName, deepClone(value));
   if (!validation.ok || !validation.data) {
     throw new Error(validation.errors.join('; '));
   }

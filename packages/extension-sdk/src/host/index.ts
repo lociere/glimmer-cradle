@@ -44,8 +44,18 @@ export interface ExtensionSecretsPort {
 }
 
 export interface PerceptionPort {
-  inject(proposal: ExtensionPerceptionProposal): void;
+  inject(proposal: ExtensionPerceptionProposal): Promise<void>;
 }
+
+export interface AssetUploadPort {
+  begin(input: { mediaType: string; sizeBytes: number; sha256: string }): Promise<string>;
+  write(token: string, chunk: Uint8Array): Promise<void>;
+  abort(token: string): Promise<void>;
+}
+
+export type ExtensionContentPart =
+  | { kind: 'text'; text: string; semantic?: { text: string; source?: string; resolved?: boolean; confidence?: number } }
+  | { kind: 'image' | 'audio' | 'video' | 'file'; uploadToken: string; name?: string; semantic?: { text: string; source?: string; resolved?: boolean; confidence?: number } };
 
 export interface ExtensionPerceptionProposal {
   id?: string;
@@ -59,7 +69,7 @@ export interface ExtensionPerceptionProposal {
   source_event_id?: string;
   schema_ref?: string;
   contribution_id?: string;
-  content: Omit<PerceptionEvent['content'], 'actor_id' | 'actor_name'>;
+  content: Omit<PerceptionEvent['content'], 'actor_id' | 'actor_name' | 'parts'> & { parts?: ExtensionContentPart[] };
 }
 
 export type AttentionLeaseStrength = 'background' | 'watching' | 'focused' | 'pinned';
@@ -168,6 +178,7 @@ export interface ExtensionHostPorts {
   readonly secrets: ExtensionSecretsPort;
   readonly evidenceProposal: EvidenceProposalPort;
   readonly perception: PerceptionPort;
+  readonly assetUpload: AssetUploadPort;
   readonly sceneAttention: SceneAttentionPort;
   readonly events: ExtensionEventBus;
   readonly agents: AgentRegistryPort;
