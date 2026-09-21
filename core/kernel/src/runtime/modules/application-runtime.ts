@@ -17,6 +17,7 @@ export class ApplicationRuntime implements RuntimeModule {
   private _perceptionAppService: PerceptionAppService | null = null;
   private _extensionHostAppService: IExtensionHostService | null = null;
   private readonly _skillProviders: SkillProvider[];
+  private readonly ownedResources: ReadonlyArray<{ close(): void | Promise<void> }>;
 
   public constructor(options: {
     readonly setCognitionActionHandler: (handler: CognitionActionHandler | null) => void;
@@ -28,6 +29,7 @@ export class ApplicationRuntime implements RuntimeModule {
     readonly skillPlanning: SkillPlanningAppService;
     readonly skillAction: SkillActionController;
     readonly perception: PerceptionAppService;
+    readonly ownedResources?: ReadonlyArray<{ close(): void | Promise<void> }>;
   }) {
     this._skillProviders = options.skillProviders;
     this._setCognitionActionHandler = options.setCognitionActionHandler;
@@ -38,6 +40,7 @@ export class ApplicationRuntime implements RuntimeModule {
     this.skillPlanning = options.skillPlanning;
     this.skillAction = options.skillAction;
     this.perception = options.perception;
+    this.ownedResources = options.ownedResources ?? [];
   }
   private readonly logger: KernelLoggerPort;
   private readonly providerReadiness: () => RuntimeReadinessSnapshot[];
@@ -107,8 +110,20 @@ export class ApplicationRuntime implements RuntimeModule {
 
   public async stop(_context: TraceContext): Promise<void> {
     const skillCatalogAppService = this._skillCatalogAppService ?? this.skillCatalog;
+    const failures: unknown[] = [];
     for (const provider of [...this._skillProviders].reverse()) {
-      await Promise.resolve(provider.stop(skillCatalogAppService));
+      try {
+        await Promise.resolve(provider.stop(skillCatalogAppService));
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    for (const resource of [...this.ownedResources].reverse()) {
+      try {
+        await Promise.resolve(resource.close());
+      } catch (error) {
+        failures.push(error);
+      }
     }
 
     this._extensionHostAppService = null;
@@ -117,5 +132,8 @@ export class ApplicationRuntime implements RuntimeModule {
     this._skillCatalogAppService = null;
     this._setCognitionActionHandler(null);
     this.logger.debug('Application Runtime 已停止');
+    if (failures.length > 0) {
+      throw new AggregateError(failures, 'Application Runtime 停止时存在资源释放失败');
+    }
   }
 }

@@ -8,9 +8,10 @@
 
 `core/conversation` 是私有双语言领域 owner：
 
-- TypeScript `src/index.ts` 拥有 `ConversationAddress`、`ConversationContext` 与
-  `ConversationDirectory`。Kernel composition 注入 Platform `StableIdentity`，桌面和 Extension Adapter
-  只提交平台中立地址；解析后不再保留外部 account/space/thread 原值。
+- TypeScript `src/binding/` 拥有 `ConversationAddress`、`ConversationContext`、存储 Port 与
+  `ConversationDirectory`；根入口只负责公开导出。Kernel composition 注入 Platform `StableIdentity` 和
+  `SqliteBindingStore`，桌面和 Extension Adapter 只提交平台中立地址；解析后不再保留外部
+  account/space/thread 原值。
 - Python `python/glimmer_cradle/conversation/` 拥有持久 `ConversationTurn` 状态机、Message/WorkingSet、
   `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port；最终源码根迁移到
   `src/glimmer_cradle/conversation/` 前，现行 `pyproject.toml` 仍以 `python/` 为唯一包入口。
@@ -24,7 +25,11 @@
 
 `ConversationDirectory` 对 provider/account/space/thread/actor endpoint 做不可逆稳定摘要，生成 scene、
 conversation、continuity、thread 与 actor opaque id，并根据 visibility/space kind 固定 recall/disclosure scope。
-相同地址跨进程重启得到相同 Conversation；每次交互的 `interaction_id` 单独变化。
+`migrations/001-binding.sql` 建立 `data/state/conversation/bindings.db` 的持久映射，只保存 opaque identity、
+provider id、权限域和创建时间，不保存外部 account/space/thread/actor 原值。相同地址跨进程重启得到相同
+Conversation；每次交互的 `interaction_id` 单独变化。已绑定地址发生 space kind/visibility 权限漂移时
+fail closed，不能静默改写既有作用域；Kernel Application Runtime 停止时负责关闭 store，即使其他 provider
+释放失败也继续收束该资源。
 
 `ConversationTurn` 保存一次完整交互周期的稳定 identity、权限上下文、状态与修订。`TurnController` 通过
 `SqliteTurnStore` 提供幂等接纳、乐观并发和 `accepted → running → completed/interrupted/failed` 合法转换；

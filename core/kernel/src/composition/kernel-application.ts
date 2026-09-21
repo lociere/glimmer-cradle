@@ -35,7 +35,7 @@ import { AvatarController } from '../adapters/avatar/avatar-controller';
 import { AvatarRuntimeAdapter } from '../adapters/avatar/avatar-runtime-adapter';
 import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gateway';
 import { NodeStableIdentityAdapter } from '../adapters/identity/node-stable-identity-adapter';
-import { ConversationDirectory } from '@glimmer-cradle/conversation';
+import { ConversationDirectory, SqliteBindingStore } from '@glimmer-cradle/conversation';
 import { ChannelStateStore } from '../application/channel/channel-state-store';
 import { AttentionLeaseStore } from '../application/attention/attention-lease-store';
 import { AttentionSessionManager } from '../application/attention/attention-session-manager';
@@ -61,7 +61,7 @@ import { ExtensionRuntimeRegistry } from '../adapters/extension-host/extension-r
 import { ExtensionHostAppService } from '../adapters/extension-host/extension-host-application-adapter';
 import { FileAssetStore } from '../adapters/content/file-asset-store';
 import { StagedAssetUploads } from '../adapters/content/staged-asset-uploads';
-import { resolveWorkPath } from '../adapters/filesystem/path-utils';
+import { resolveStatePath, resolveWorkPath } from '../adapters/filesystem/path-utils';
 import { ExtensionManager } from '../adapters/extension-host/extension-manager';
 import { KernelExtensionRuntimeAdapter } from '../adapters/extension-host/kernel-extension-runtime-adapter';
 import { ConfigApplicationService } from '../adapters/config/config-application-adapter';
@@ -196,7 +196,8 @@ function createOperationalRuntimePlan(options: {
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
   const surface = new ControlSurfaceGateway(projection, avatar, audio, new FileAssetStore());
-  const conversations = new ConversationDirectory(new NodeStableIdentityAdapter());
+  const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));
+  const conversations = new ConversationDirectory(new NodeStableIdentityAdapter(), bindingStore);
   const channelState = new ChannelStateStore(observability.logger('channel-state'));
   const attentionLeases = new AttentionLeaseStore(clock);
   const actionStream = new ActionStreamManager(config.character.inference.action_stream, eventBus, observability);
@@ -250,6 +251,7 @@ function createOperationalRuntimePlan(options: {
     logger: observability.logger('application-runtime'), skillProviders: providers,
     providerReadiness: () => mcpProvider.getReadinessSnapshots(), extensionHostService: extensionHost,
     skillCatalog: catalog, skillPlanning: planning, skillAction: action, perception,
+    ownedResources: [bindingStore],
   });
   const configApplication = new ConfigApplicationService({ configManager: ConfigManager.instance, cognition: cognitionAdapter });
   const presentationAdapter = new KernelPresentationAdapter(

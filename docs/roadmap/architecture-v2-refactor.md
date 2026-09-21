@@ -238,6 +238,13 @@ Contract Spine 完整 verify（21 项 gate、inventory、Buf lint/breaking、JSO
 roundtrip、generated-clean）、docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。
 interaction、delivery、目标物理拆分和阶段 14 数据迁移仍属于阶段 4/后续依赖工作，因此不标记阶段完成。
 
+后续 Binding 物理切片把 `src/index.ts` 的聚合实现拆入 `src/binding/{binding,binding-resolver,
+binding-store-port}.ts`，并以 `migrations/001-binding.sql`、`SqliteBindingStore` 和 Kernel composition 建立
+真实持久消费者。数据库只保存 opaque identity，不保存外部 account/space/thread/actor 键；同一地址的
+权限分类漂移拒绝覆盖。Conversation TS 5 项、Kernel 全量 202 项（另 7 项跳过）及 typecheck PASS；
+Conversation tarball 同时包含编译后的 adapter/API 与唯一 SQL migration。interaction/delivery 尚未实现，
+本切片不扩大阶段完成声明。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

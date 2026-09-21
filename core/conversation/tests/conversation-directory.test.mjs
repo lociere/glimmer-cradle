@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { ConversationDirectory } from '../dist/index.js';
+import { ConversationDirectory, SqliteBindingStore } from '../dist/index.js';
 
-const directory = new ConversationDirectory({
+const identity = {
   newId: () => 'interaction-default',
   digest: (parts) => parts.join('|').split('').reduce(
     (value, character) => `${value}${character.charCodeAt(0).toString(16)}`,
     '',
   ).padEnd(20, '0'),
-});
+};
+const directory = new ConversationDirectory(identity);
 
 test('同一平台地址生成稳定且不暴露外部键的会话拓扑', () => {
   const address = {
@@ -82,4 +86,44 @@ test('空白地址、非法枚举与空 interaction fail closed', () => {
   assert.throws(() => directory.resolve({ ...valid, space_kind: 'session' }), /space_kind/u);
   assert.throws(() => directory.resolve({ ...valid, visibility: 'unknown' }), /visibility/u);
   assert.throws(() => directory.resolve(valid, '  '), /interaction_id/u);
+});
+
+test('SQLite Binding 跨重启复用 opaque identity 且不保存外部原始键', () => {
+  const root = mkdtempSync(join(tmpdir(), 'glimmer-conversation-binding-'));
+  const databasePath = join(root, 'bindings.db');
+  const address = {
+    provider_id: 'provider',
+    provider_account_id: 'secret-account-123',
+    space_kind: 'direct',
+    external_space_key: 'secret-space-456',
+    actor_endpoint_key: 'secret-actor-789',
+    visibility: 'private',
+  };
+  try {
+    const firstStore = new SqliteBindingStore(databasePath);
+    const firstDirectory = new ConversationDirectory(
+      identity, firstStore, { nowIso: () => '2026-01-01T00:00:00Z' },
+    );
+    const first = firstDirectory.resolve(address, 'interaction-first');
+    firstStore.close();
+
+    const secondStore = new SqliteBindingStore(databasePath);
+    const secondDirectory = new ConversationDirectory(
+      identity, secondStore, { nowIso: () => '2026-01-02T00:00:00Z' },
+    );
+    const second = secondDirectory.resolve(address, 'interaction-second');
+    assert.throws(
+      () => secondDirectory.resolve({ ...address, visibility: 'shared' }, 'interaction-drift'),
+      /Binding 冲突/u,
+    );
+    secondStore.close();
+
+    assert.equal(second.context.conversation_id, first.context.conversation_id);
+    assert.equal(second.context.thread_id, first.context.thread_id);
+    assert.equal(second.context.interaction_id, 'interaction-second');
+    const bytes = readFileSync(databasePath).toString('utf8');
+    assert.doesNotMatch(bytes, /secret-account-123|secret-space-456|secret-actor-789/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
