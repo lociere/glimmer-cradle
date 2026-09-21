@@ -1,4 +1,4 @@
-"""Experience Ledger 的不可变 Moment 领域模型。"""
+"""Conversation Log 的不可变 ordered fact；Moment 字段名保持持久兼容。"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -91,7 +91,7 @@ class Moment:
         try:
             kind_value = kind.value if isinstance(kind, MomentKind) else MomentKind(str(kind)).value
         except ValueError as error:
-            raise ValueError(f"不支持的 Experience Moment kind: {kind}") from error
+            raise ValueError(f"不支持的 Conversation Moment kind: {kind}") from error
         return Moment(
             seq=seq,
             moment_id=event_id,

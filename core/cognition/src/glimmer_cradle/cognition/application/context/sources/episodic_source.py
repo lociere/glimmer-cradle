@@ -9,8 +9,7 @@ from glimmer_cradle.cognition.application.context.sources.base import (
     ContextSource,
     estimate_tokens,
 )
-from glimmer_cradle.cognition.domain.experience.events import Moment, MomentKind
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate
 from glimmer_cradle.cognition.ports.clock import ClockPort
 
@@ -58,11 +57,11 @@ class EpisodicMemorySource(ContextSource):
 
 
 class RecentExperienceSource(ContextSource):
-    """近期经历源。只读取已经提交到 Experience Ledger 的 Moment。"""
+    """近期经历源。只读取已经提交到 Conversation Log 的 Moment。"""
 
     name = "experience"
 
-    def __init__(self, recorder: ExperienceRecorder) -> None:
+    def __init__(self, recorder: ConversationRecorder) -> None:
         self._recorder = recorder
 
     async def activate(self, query: ContextQuery, *, max_items: int = 10) -> list[ContextItem]:

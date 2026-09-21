@@ -48,7 +48,7 @@
 | `application/ingress` | Kernel application | 输入闸门和身份路由 | UI ready 即放行 |
 | `runtime/modules` | Kernel runtime | runtime module、readiness、orchestrator | import Adapter concrete；start 返回即 ready |
 | `application/use-cases` | Kernel application | Perception、Cognition lifecycle、Skill Catalog/Planning service | 写人格/记忆语义 |
-| `application/capabilities` | Kernel application | conversation、inference proxy、scene、action-stream 与纯编排 | 泄露 provider 细节给 Cognition |
+| `application/capabilities` | Kernel application | inference proxy、scene、action-stream 与纯编排；Conversation Binding 由 `core/conversation` 提供 | 泄露 provider 细节给 Cognition |
 | `application/skill-plane` | Kernel application | registry、policy、gateway 与 Core/User provider policy | handler 绕过授权；import MCP/Extension concrete |
 | `adapters/{audio,avatar,surface,organism}` | Kernel adapter | 平台 IO、Host/Engine client 与 Application capability adapter | 让 Application import concrete |
 | `adapters/skill-plane` | Skill provider adapter | Extension/MCP provider、connection 与 runtime readiness | 绕过 Skill policy/gateway |
@@ -98,7 +98,7 @@ Service 的真实终态；新输入到达时旧 trace 仍保持 in-flight，等�
 register、knowledge init 与 readiness 后，才通过 `CognitionIngressRecoveryPort` 恢复此前明确开放的
 Ingress。Runtime module 之间不注入或 import concrete；同层只共享 `runtime-module.ts` 生命周期契约。
 
-桌面与 Extension 都不能自行生成 Cognition 使用的会话 ID。桌面入口和 `ExtensionHostAppService` 先构造 `ConversationAddress`，再由 `application/capabilities/conversation/conversation-directory.ts` 解析为 `ConversationContext`。Directory 根据 provider、account、space、thread 和 actor endpoint 生成稳定且不可逆的 scene、conversation、continuity、thread 与 actor 标识，并同时决定 `recall_scope` / `disclosure_scope`。这些 canonical 字段跟随感知、Skill 请求和结果合成穿过 Cognition Service；下游只能消费，不能重新解释平台身份或放宽作用域。
+桌面与 Extension 都不能自行生成 Cognition 使用的会话 ID。桌面入口和 `ExtensionHostAppService` 先构造 `ConversationAddress`，再由 `core/conversation/src/index.ts` 的 `ConversationDirectory` 解析为 `ConversationContext`。Kernel Composition 只注入 Platform `StableIdentity` 并消费结果；Directory 根据 provider、account、space、thread 和 actor endpoint 生成稳定且不可逆的 scene、conversation、continuity、thread 与 actor 标识，并同时决定 `recall_scope` / `disclosure_scope`。这些 canonical 字段跟随感知、Skill 请求和结果合成穿过 Cognition Service；下游只能消费，不能重新解释平台身份或放宽作用域。Extension SDK 当前保留结构相同的公开发布投影，Adapter edge 负责接入，不能反向成为 Core owner。
 
 外部注意力链路当前由 `adapters/extension-host/extension-host-application-adapter.ts` 接收 Extension `sceneAttention.requestAttentionLease()` 请求，再通过强类型 Attention capability Port 交给 `application/attention/attention-lease-store.ts` 持有 Kernel-owned `AttentionLease`；纯数据词汇位于 `domain/attention/attention-lease.ts`。`AttentionLeaseStore.getProjection()` 提供只读 `AttentionProjection`，其中包含当前关注的 scene/channel、owner、reason 和过期时间；Extension 查询 `isSceneFocused(channelId)` 读取同一 store。`application/attention/attention-session-manager.ts` 消费 projection 来决定入站 debounce、批处理、生成中断和 `attention_projection_mode` 观测标签；`application/organism/life-clock/life-clock-manager.ts` 只消费 projection 来发布 `OrganismAttentionChangedEvent`，不维护 attention mode，也不把 attention projection 转成主动思维许可。LifeClock 的心跳只由 `life_clock.heartbeat_enabled` 显式开启，兜底间隔来自 `life_clock.heartbeat_interval_ms`；收到 Cognition `state_sync` 后，实际节奏优先使用 `CognitiveActivityPolicy.frequency_hint_ms`。Attention store/session、LifeClock 与 Ingress Gate 的时间读取和调度都依赖 `ports/clock.port.ts`，唯一 Node timer owner 是 `adapters/time/system-clock-adapter.ts`。该链路不改变 Cognition Activity、Affect 或 Maintenance 的 owner。
 
@@ -192,7 +192,7 @@ Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能
 | Extension 公开 projection | `packages/extension-sdk/src/contracts/`，Kernel Adapter 映射 owner-local model |
 | Kernel 数据 | `data/state/kernel/` |
 | Extension 数据 | `data/state/extensions/` |
-| Conversation 拓扑契约 | `ConversationAddress`（外部地址）与 `ConversationContext`（Kernel canonical 结果） |
+| Conversation 拓扑契约 | `core/conversation` 的 `ConversationAddress`（外部 opaque 地址）与 `ConversationContext`（canonical 结果）；Extension SDK 保留公开投影 |
 | 日志/trace/DLQ | `data/observability/` 与 Kernel logger/tracer/DLQ |
 | 子进程日志 | `data/observability/logs/application/` |
 

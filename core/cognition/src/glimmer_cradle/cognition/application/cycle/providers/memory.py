@@ -2,7 +2,7 @@
 MemoryProvider 是 Context Assembly 进入 Global Workspace 的记忆专家入口。
 
 按当前工作区焦点形成查询，由 ContextAssembly 在 episodic Memory、Knowledge、
-Relationship 与近期 Ledger Moment 中按预算召回候选。
+Relationship 与近期 Conversation Log Moment 中按预算召回候选。
 
 设计要点：
 - **反应型**：工作区空时不投放（无焦点 → 无查询 → 跳过）

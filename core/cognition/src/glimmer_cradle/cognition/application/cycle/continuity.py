@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
-from glimmer_cradle.cognition.domain.experience.events import MomentKind
+from glimmer_cradle.conversation import MomentKind
 
 
 class CycleContinuity:
@@ -33,17 +33,17 @@ class CycleContinuity:
                 moment = self._recorder.record(
                     MomentKind.REPLY,
                     content={"text": clean, "length": len(clean)},
-                    scene_id=(payload.get("scene_id") or turn.scene_id) or None,
-                    conversation_id=turn.conversation_id,
-                    continuity_id=turn.continuity_id,
-                    thread_id=turn.thread_id,
-                    interaction_id=turn.trace_id,
+                    scene_id=(payload.get("scene_id") or turn.turn.scene_id) or None,
+                    conversation_id=turn.turn.conversation_id,
+                    continuity_id=turn.turn.continuity_id,
+                    thread_id=turn.turn.thread_id,
+                    interaction_id=turn.turn.turn_id,
                     actor_id=payload.get("actor_id"),
                     actor_name=payload.get("actor_name"),
-                    trace_id=turn.trace_id or None,
+                    trace_id=turn.turn.turn_id or None,
                     causation_ids=causation,
-                    recall_scope=turn.recall_scope,
-                    disclosure_scope=turn.disclosure_scope,
+                    recall_scope=turn.turn.recall_scope,
+                    disclosure_scope=turn.turn.disclosure_scope,
                     importance=0.6,
                 )
                 return moment.moment_id if moment is not None else None
@@ -53,18 +53,18 @@ class CycleContinuity:
                 MomentKind.ACTION,
                 content={
                     "action_type": payload.get("action_type", ""),
-                    "scene_id": payload.get("scene_id") or turn.scene_id,
+                    "scene_id": payload.get("scene_id") or turn.turn.scene_id,
                     "reason": payload.get("reason"),
                 },
-                scene_id=(payload.get("scene_id") or turn.scene_id) or None,
-                conversation_id=turn.conversation_id,
-                continuity_id=turn.continuity_id,
-                thread_id=turn.thread_id,
-                interaction_id=turn.trace_id,
-                trace_id=turn.trace_id or None,
+                scene_id=(payload.get("scene_id") or turn.turn.scene_id) or None,
+                conversation_id=turn.turn.conversation_id,
+                continuity_id=turn.turn.continuity_id,
+                thread_id=turn.turn.thread_id,
+                interaction_id=turn.turn.turn_id,
+                trace_id=turn.turn.turn_id or None,
                 causation_ids=causation,
-                recall_scope=turn.recall_scope,
-                disclosure_scope=turn.disclosure_scope,
+                recall_scope=turn.turn.recall_scope,
+                disclosure_scope=turn.turn.disclosure_scope,
                 importance=0.55,
             )
             return None
@@ -74,7 +74,7 @@ class CycleContinuity:
             policy == "observe_only" for policy in turn.response_policies
         )
         content: dict[str, object] = {
-            "scene_id": turn.scene_id,
+            "scene_id": turn.turn.scene_id,
             "reason": "observe_only" if observe_only else "no_reply",
             "response_policy": "observe_only" if observe_only else "reply_allowed",
         }
@@ -87,15 +87,15 @@ class CycleContinuity:
         self._recorder.record(
             MomentKind.SILENCE,
             content=content,
-            scene_id=turn.scene_id or None,
-            conversation_id=turn.conversation_id,
-            continuity_id=turn.continuity_id,
-            thread_id=turn.thread_id,
-            interaction_id=turn.trace_id,
-            trace_id=turn.trace_id or None,
+            scene_id=turn.turn.scene_id or None,
+            conversation_id=turn.turn.conversation_id,
+            continuity_id=turn.turn.continuity_id,
+            thread_id=turn.turn.thread_id,
+            interaction_id=turn.turn.turn_id,
+            trace_id=turn.turn.turn_id or None,
             causation_ids=tuple(turn.perception_moment_ids),
-            recall_scope=turn.recall_scope,
-            disclosure_scope=turn.disclosure_scope,
+            recall_scope=turn.turn.recall_scope,
+            disclosure_scope=turn.turn.disclosure_scope,
             importance=0.3,
         )
         return None

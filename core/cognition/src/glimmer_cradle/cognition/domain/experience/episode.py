@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from glimmer_cradle.cognition.domain.experience.events import Moment
+from glimmer_cradle.conversation import Moment
 
 
 @dataclass(frozen=True, slots=True)

@@ -27,12 +27,12 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 | 路径 | owner | 说明 |
 |---|---|---|
-| `data/state/cognition/experience/catalog.db` | Cognition / Experience | Ledger 全局 position、pack 范围与单写者目录 |
-| `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Cognition / Experience | 月度不可变 Moment、来源、因果与检索索引 |
+| `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |
+| `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory/memory.db` | Cognition | Memory、revision、evidence、relationship、intention、knowledge 与 embedding |
-| `data/state/cognition/conversations/conversations.db` | Cognition / Conversation | 从 Ledger 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint |
-| `data/state/cognition/projections/episodes.db` | Cognition | 可从 Ledger 删除重建的 Episode 投影和巩固 checkpoint |
+| `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
+| `data/state/cognition/projections/episodes.db` | Cognition | 可从 Conversation Log 删除重建的 Episode 投影和巩固 checkpoint |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |
 | `data/state/avatar/action-state.json` | Avatar/Desktop main | 手动动作的最后接受状态；唯一磁盘字段为 `active_action_ids: string[]`，Desktop 启动时读取，Avatar Host 上报后校正 |
 | `data/state/desktop/avatar-presentation.json` | Desktop/Electron main | Avatar 模型选择、显示倍率和 Desktop Surface 呈现偏好 |
@@ -40,9 +40,9 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 | `data/state/extensions/` | Extension Host/各扩展 | 扩展自己的状态域，不能写 Cognition 私有库 |
 | `data/state/extensions/lociere.napcat-adapter/napcat/` | NapCat adapter | NapCat 工作目录；保存 NapCat 配置、日志、插件和 cache，程序包升级时不覆盖 |
 
-Cognition 进程内 `ConversationWorkingSet` 是从 `conversations.db` 恢复的有界缓存，不拥有历史事实。长期聊天记录由 Experience Ledger 派生到 Conversation Store，Kernel 和 Renderer 都不维护平行对话事实源。Control Center 分开展示 Conversation 消息、Ledger Moment、Episode、活动 Memory、revision、evidence 和角色知识；Renderer 只消费 Desktop main 生成的只读投影。
+Cognition 进程内使用的 `ConversationWorkingSet` 是从 `conversations.db` 恢复的有界缓存，不拥有历史事实。长期聊天记录由 Conversation Log 派生到 History Store，Kernel 和 Renderer 都不维护平行对话事实源。Control Center 分开展示 Conversation 消息、Log Moment、Episode、活动 Memory、revision、evidence 和角色知识；Renderer 只消费 Desktop main 生成的只读投影。
 
-Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Ledger packs 聚合最近 Moment，从 Episode projection 读取分段状态，从 `memory.db` 读取当前 revision、evidence 与巩固结果统计。Control Center 必须区分待巩固、巩固完成但无长期记忆、巩固失败和活动记忆，也不能把预览结果解释为实际 Prompt 召回。
+Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Conversation Log packs 聚合最近 Moment，从 Episode projection 读取分段状态，从 `memory.db` 读取当前 revision、evidence 与巩固结果统计。Control Center 必须区分待巩固、巩固完成但无长期记忆、巩固失败和活动记忆，也不能把预览结果解释为实际 Prompt 召回。
 
 `data/state/desktop/` 只能保存 Desktop/Electron main 拥有的界面偏好，例如窗口、Avatar 呈现和用户可恢复的 UI 选择。它不得保存对话历史、会话摘要、线程状态、活动上下文、经历记录、长期记忆或 Avatar 动作事实。此类连续性数据必须由 Cognition、Kernel、Avatar 或 Extension owner 写入各自状态域，再通过受控 projection 提供给 Renderer 展示。
 
@@ -59,7 +59,7 @@ Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Ledger 
 | `configs/characters/<character-id>/voice.yaml` | Character voice | 稳定声音身份和 provider 声线绑定；不含密钥与系统路由 |
 | `configs/characters/<character-id>/knowledge/index.yaml` | Cognition knowledge | Knowledge Vault 索引，正文来自同目录 `*.md` |
 
-Character Package、Experience Ledger、Knowledge Vault、Memory Substrate 与 Vector Index 分工不同。Ledger 是经历事实源，`memory.db` 保存版本化认知状态，Episode/embedding 是可重建投影；任何一层都不能反向改写 `profile.yaml` 或 `dialogue.yaml`。
+Character Package、Conversation Log、Knowledge Vault、Memory Substrate 与 Vector Index 分工不同。Log 是持久交互事实源，`memory.db` 保存版本化认知状态，Episode/embedding 是可重建投影；任何一层都不能反向改写 `profile.yaml` 或 `dialogue.yaml`。
 
 ## 模型与官方 Engine
 

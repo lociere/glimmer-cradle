@@ -1,6 +1,6 @@
 """Volition：willingness 公式 + arbiter 仲裁 测试（阶段 5.7）。"""
 import pytest
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.conversation import build_conversation_recorder as build_experience_recorder
 
 from glimmer_cradle.cognition.domain.volition import (
     Intent,

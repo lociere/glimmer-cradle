@@ -1,4 +1,4 @@
-import type { ConversationContext } from './application-models';
+import type { ConversationContext } from '@glimmer-cradle/conversation';
 
 export type ExtensionProductTarget = 'any' | 'desktop' | 'personal-server';
 export type ExtensionPlatform = 'any' | 'windows-x64' | 'windows-arm64' | 'linux-x64' | 'linux-arm64' | 'darwin-x64' | 'darwin-arm64';

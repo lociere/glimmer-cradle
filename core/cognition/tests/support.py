@@ -111,8 +111,8 @@ def recorder_args() -> dict:
 
 
 def build_experience_recorder(base_dir, **kwargs):
-    from glimmer_cradle.cognition.adapters.persistence.experience.factory import (
-        build_experience_recorder as build,
+    from glimmer_cradle.conversation import (
+        build_conversation_recorder as build,
     )
 
     return build(base_dir, **recorder_args(), **kwargs)

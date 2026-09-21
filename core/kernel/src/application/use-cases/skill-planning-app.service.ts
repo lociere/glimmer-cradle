@@ -1,4 +1,4 @@
-import type { ConversationContext } from '../../ports/application-models';
+import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 import { SkillCatalogAppService } from './skill-catalog-app.service';

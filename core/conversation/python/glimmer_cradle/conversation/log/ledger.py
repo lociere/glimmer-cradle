@@ -1,4 +1,4 @@
-"""单写者、分包、可校验的 Experience Ledger。"""
+"""单写者、分包、可校验的 Conversation Log。"""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import BinaryIO
 
-from glimmer_cradle.cognition.domain.experience.events import AffectSnapshot, Moment, SourceDescriptor
+from glimmer_cradle.conversation.log.events import AffectSnapshot, Moment, SourceDescriptor
 
 _PACK_DDL = """
 CREATE TABLE IF NOT EXISTS moments (
@@ -38,8 +38,8 @@ CREATE INDEX IF NOT EXISTS idx_causes_parent ON moment_causes(cause_moment_id);
 """
 
 
-class ExperienceLedger:
-    """Moment 的唯一事实源；catalog 只管理位置与分包元数据。"""
+class ConversationLog:
+    """交互 Moment 的唯一事实源；catalog 只管理位置与分包元数据。"""
 
     def __init__(self, base_dir: Path, *, pack_max_size_mb: int = 256) -> None:
         self.base_dir = base_dir
@@ -47,53 +47,76 @@ class ExperienceLedger:
         self.packs_dir = base_dir / "packs"
         self.pack_max_bytes = max(16, pack_max_size_mb) * 1024 * 1024
         self._pending: list[Moment] = []
+        self._inflight: list[Moment] = []
         self._last_position = 0
         self._lock = threading.RLock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._flush_lock = asyncio.Lock()
         self._writer_guard: BinaryIO | None = None
-        self._started = False
+        self._state = "stopped"
 
     @property
     def last_position(self) -> int:
         return self._last_position
 
     async def start(self) -> None:
-        if self._started:
-            return
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        self.packs_dir.mkdir(parents=True, exist_ok=True)
-        self._acquire_writer_guard()
-        try:
-            await asyncio.to_thread(self._initialize)
-        except Exception:
-            self._release_writer_guard()
-            raise
-        self._started = True
+        async with self._lifecycle_lock:
+            if self._state == "started":
+                return
+            if self._state in {"stopping", "stop_failed"}:
+                raise RuntimeError("Conversation Log 必须先完成停止恢复")
+            self.base_dir.mkdir(parents=True, exist_ok=True)
+            self.packs_dir.mkdir(parents=True, exist_ok=True)
+            self._state = "starting"
+            self._acquire_writer_guard()
+            try:
+                await asyncio.to_thread(self._initialize)
+            except Exception:
+                self._release_writer_guard()
+                self._state = "stopped"
+                raise
+            self._state = "started"
 
     async def stop(self) -> None:
-        if not self._started:
-            return
-        await self.flush()
-        self._release_writer_guard()
-        self._started = False
+        async with self._lifecycle_lock:
+            if self._state == "stopped":
+                return
+            if self._state not in {"started", "stop_failed"}:
+                raise RuntimeError(f"Conversation Log 无法从 {self._state} 停止")
+            self._state = "stopping"
+            try:
+                await self.flush()
+            except Exception:
+                self._state = "stop_failed"
+                raise
+            self._release_writer_guard()
+            self._state = "stopped"
 
     def append(self, moment: Moment) -> Moment:
         with self._lock:
+            if self._state != "started":
+                raise RuntimeError("Conversation Log 未处于可写状态")
             self._last_position += 1
             stored = replace(moment, seq=self._last_position)
             self._pending.append(stored)
             return stored
 
     async def flush(self) -> None:
-        with self._lock:
-            pending, self._pending = self._pending, []
-        if not pending:
-            return
-        try:
-            await asyncio.to_thread(self._write_batch, pending)
-        except Exception:
+        async with self._flush_lock:
             with self._lock:
-                self._pending = pending + self._pending
-            raise
+                pending, self._pending = self._pending, []
+                self._inflight = pending
+            if not pending:
+                return
+            try:
+                await asyncio.to_thread(self._write_batch, pending)
+            except Exception:
+                with self._lock:
+                    self._pending = pending + self._pending
+                    self._inflight = []
+                raise
+            with self._lock:
+                self._inflight = []
 
     def recent(self, *, limit: int, kinds: set[str] | None = None,
                scene_id: str | None = None, exclude_trace_id: str | None = None) -> list[Moment]:
@@ -115,20 +138,21 @@ class ExperienceLedger:
     def query(self, *, after_position: int = 0, limit: int | None = None,
               descending: bool = False) -> list[Moment]:
         results: list[Moment] = []
-        order = "DESC" if descending else "ASC"
-        for pack in self._pack_paths(reverse=descending):
+        for pack in self._pack_paths():
             with closing(sqlite3.connect(pack)) as conn:
-                sql = f"SELECT * FROM moments WHERE position > ? ORDER BY position {order}"
-                params: list[object] = [after_position]
-                if limit is not None:
-                    sql += " LIMIT ?"
-                    params.append(max(0, limit - len(results)))
-                rows = conn.execute(sql, params).fetchall()
+                rows = conn.execute(
+                    "SELECT * FROM moments WHERE position > ?", (after_position,)
+                ).fetchall()
                 causes = self._read_causes(conn, [row[1] for row in rows])
                 results.extend(self._row_to_moment(row, causes.get(row[1], ())) for row in rows)
-                if limit is not None and len(results) >= limit:
-                    break
-        return results[:limit] if limit is not None else results
+        with self._lock:
+            results.extend(
+                item for item in (*self._inflight, *self._pending)
+                if item.seq > after_position
+            )
+        unique = {item.moment_id: item for item in results}
+        ordered = sorted(unique.values(), key=lambda item: item.seq, reverse=descending)
+        return ordered[:limit] if limit is not None else ordered
 
     def verify(self) -> dict[str, object]:
         moments = self.query()
@@ -185,21 +209,53 @@ class ExperienceLedger:
     def _write_batch(self, moments: list[Moment]) -> None:
         groups: dict[Path, list[Moment]] = {}
         for moment in moments:
+            if self._validate_existing_moment(moment):
+                continue
             groups.setdefault(self._pack_path_for(moment), []).append(moment)
         for pack, batch in groups.items():
-            pack.parent.mkdir(parents=True, exist_ok=True)
+            self._write_pack(pack, batch)
+        self._reconcile_catalog()
+
+    def _write_pack(self, pack: Path, batch: list[Moment]) -> None:
+        pack.parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(pack)) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.executescript(_PACK_DDL)
+            conn.execute("BEGIN IMMEDIATE")
+            for moment in batch:
+                conn.execute(
+                    "INSERT INTO moments VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    self._moment_values(moment),
+                )
+                conn.executemany(
+                    "INSERT INTO moment_causes VALUES(?,?,?)",
+                    [
+                        (moment.moment_id, cause, index)
+                        for index, cause in enumerate(moment.causation_ids)
+                    ],
+                )
+            conn.commit()
+
+    def _validate_existing_moment(self, expected: Moment) -> bool:
+        matches: list[Moment] = []
+        for pack in self._pack_paths():
             with closing(sqlite3.connect(pack)) as conn:
-                conn.execute("PRAGMA journal_mode=WAL")
-                conn.executescript(_PACK_DDL)
-                conn.execute("BEGIN IMMEDIATE")
-                for moment in batch:
-                    conn.execute("INSERT INTO moments VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                                 self._moment_values(moment))
-                    conn.executemany("INSERT INTO moment_causes VALUES(?,?,?)",
-                                     [(moment.moment_id, cause, index)
-                                      for index, cause in enumerate(moment.causation_ids)])
-                conn.commit()
-            self._update_catalog(pack, batch)
+                rows = conn.execute(
+                    "SELECT * FROM moments WHERE position=? OR moment_id=?",
+                    (expected.seq, expected.moment_id),
+                ).fetchall()
+                causes = self._read_causes(conn, [row[1] for row in rows])
+                matches.extend(
+                    self._row_to_moment(row, causes.get(row[1], ())) for row in rows
+                )
+        if not matches:
+            return False
+        if len(matches) != 1 or matches[0] != expected:
+            raise RuntimeError(
+                f"Conversation Log position/id 冲突: position={expected.seq} "
+                f"moment_id={expected.moment_id}"
+            )
+        return True
 
     def _pack_path_for(self, moment: Moment) -> Path:
         dt = datetime.fromisoformat(moment.occurred_at.replace("Z", "+00:00"))
@@ -213,27 +269,45 @@ class ExperienceLedger:
                 return candidate
             index += 1
 
-    def _update_catalog(self, pack: Path, batch: list[Moment]) -> None:
-        relative = pack.relative_to(self.base_dir).as_posix()
-        pack_id = relative.replace("/", ":")
+    def _reconcile_catalog(self) -> None:
         with closing(sqlite3.connect(self.catalog_path)) as conn:
             conn.execute("BEGIN IMMEDIATE")
+            known_paths: set[str] = set()
+            last_position = 0
+            for pack in self._pack_paths():
+                with closing(sqlite3.connect(pack)) as pack_conn:
+                    row = pack_conn.execute(
+                        "SELECT MIN(position),MAX(position),MIN(occurred_at) FROM moments"
+                    ).fetchone()
+                if row is None or row[0] is None:
+                    continue
+                relative = pack.relative_to(self.base_dir).as_posix()
+                pack_id = relative.replace("/", ":")
+                known_paths.add(relative)
+                conn.execute(
+                    """
+                    INSERT INTO packs VALUES(?,?,?,?,?,NULL)
+                    ON CONFLICT(pack_id) DO UPDATE SET
+                      relative_path=excluded.relative_path,
+                      first_position=excluded.first_position,
+                      last_position=excluded.last_position
+                    """,
+                    (pack_id, relative, int(row[0]), int(row[1]), row[2]),
+                )
+                last_position = max(last_position, int(row[1]))
+            for relative, in conn.execute("SELECT relative_path FROM packs").fetchall():
+                if relative not in known_paths:
+                    conn.execute("DELETE FROM packs WHERE relative_path=?", (relative,))
             conn.execute(
-                "INSERT INTO packs VALUES(?,?,?,?,?,NULL) ON CONFLICT(pack_id) DO UPDATE SET last_position=excluded.last_position",
-                (pack_id, relative, batch[0].seq, batch[-1].seq, batch[0].occurred_at))
-            conn.execute(
-                "INSERT INTO ledger_meta VALUES('last_position', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (str(batch[-1].seq),))
+                "INSERT INTO ledger_meta VALUES('last_position',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (str(last_position),),
+            )
             conn.commit()
 
     def _pack_paths(self, *, reverse: bool = False) -> list[Path]:
-        if not self.catalog_path.exists():
-            return []
-        with closing(sqlite3.connect(self.catalog_path)) as conn:
-            rows = conn.execute(
-                f"SELECT relative_path FROM packs ORDER BY first_position {'DESC' if reverse else 'ASC'}"
-            ).fetchall()
-        return [self.base_dir / row[0] for row in rows if (self.base_dir / row[0]).exists()]
+        paths = sorted(self.packs_dir.rglob("*.experience.db")) if self.packs_dir.exists() else []
+        return list(reversed(paths)) if reverse else paths
 
     @staticmethod
     def _moment_values(moment: Moment) -> tuple[object, ...]:
@@ -289,7 +363,7 @@ class ExperienceLedger:
                 )
         except OSError as exc:
             handle.close()
-            raise RuntimeError("Experience Ledger 已有写入者") from exc
+            raise RuntimeError("Conversation Log 已有写入者") from exc
         self._writer_guard = handle
 
     def _release_writer_guard(self) -> None:

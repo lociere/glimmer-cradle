@@ -11,7 +11,7 @@ from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projectio
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
-from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
+from glimmer_cradle.conversation.log import Moment, MomentKind
 from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository

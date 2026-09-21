@@ -1,17 +1,19 @@
-"""Cognition 向 Experience Ledger 写入 Moment 的唯一门面。"""
+"""向 Conversation Log 写入 durable interaction Moment 的唯一门面。"""
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
 
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.domain.experience.events import AffectSnapshot, Moment, MomentKind, SourceDescriptor
-from glimmer_cradle.cognition.ports.persistence import ExperienceLedgerPort
-from glimmer_cradle.cognition.ports.clock import ClockPort
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.conversation.log.events import AffectSnapshot, Moment, MomentKind, SourceDescriptor
+from glimmer_cradle.conversation.ports import (
+    ClockPort,
+    ConversationLogPort,
+    IdGeneratorPort,
+    ObservabilityPort,
+)
 
-class ExperienceRecorder:
-    def __init__(self, ledger: ExperienceLedgerPort, *, clock: ClockPort,
+class ConversationRecorder:
+    def __init__(self, log: ConversationLogPort, *, clock: ClockPort,
                  ids: IdGeneratorPort,
                  observability: ObservabilityPort,
                  enabled: bool = True,
@@ -21,11 +23,12 @@ class ExperienceRecorder:
         self._clock = clock
         self._ids = ids
         self._observability = observability
-        self._logger = observability.logger("experience_recorder")
+        self._logger = observability.logger("conversation_recorder")
         self._flush_interval = max(50, flush_interval_ms) / 1000
         self._flush_max_buffer = max(1, flush_max_buffer)
-        self._ledger = ledger
+        self._log = log
         self._flush_task: asyncio.Task | None = None
+        self._threshold_flush_task: asyncio.Task | None = None
         self._running = False
         self._since_flush = 0
         self._recorded_listeners: list[Callable[[Moment], None]] = []
@@ -35,16 +38,18 @@ class ExperienceRecorder:
         return self._enabled
 
     @property
-    def ledger(self) -> ExperienceLedgerPort:
-        return self._ledger
+    def log(self) -> ConversationLogPort:
+        return self._log
 
     async def start(self) -> None:
         if not self._enabled:
             return
-        await self._ledger.start()
+        if self._running:
+            return
+        await self._log.start()
         self._running = True
         self._flush_task = asyncio.create_task(self._flush_loop())
-        self._logger.info("Experience Ledger 已启动", base_dir=str(self._ledger.base_dir))
+        self._logger.info("Conversation Log 已启动", base_dir=str(self._log.base_dir))
 
     async def stop(self) -> None:
         self._running = False
@@ -54,8 +59,12 @@ class ExperienceRecorder:
                 await self._flush_task
             except asyncio.CancelledError:
                 pass
+            self._flush_task = None
+        threshold_task = self._threshold_flush_task
+        if threshold_task is not None and threshold_task is not asyncio.current_task():
+            await threshold_task
         if self._enabled:
-            await self._ledger.stop()
+            await self._log.stop()
 
     def record(self, kind: MomentKind | str, content: dict, *,
                causation_ids: tuple[str, ...] | list[str] = (),
@@ -71,8 +80,10 @@ class ExperienceRecorder:
                trace_id: str | None = None) -> Moment | None:
         if not self._enabled or retention_ceiling == "transient":
             return None
+        if not self._running:
+            raise RuntimeError("ConversationRecorder 未处于可写状态")
         resolved_trace = trace_id or self._observability.current_trace_id() or ""
-        moment = self._ledger.append(Moment.create(
+        moment = self._log.append(Moment.create(
             0, kind=kind, content=content, causation_ids=causation_ids,
             scene_id=scene_id, interaction_id=interaction_id,
             conversation_id=conversation_id, continuity_id=continuity_id,
@@ -89,43 +100,58 @@ class ExperienceRecorder:
             try:
                 listener(moment)
             except Exception as exc:
-                self._logger.warning("Experience Moment 通知失败", error=str(exc), exc_info=True)
+                self._logger.warning("Conversation Moment 通知失败", error=str(exc), exc_info=True)
         return moment
 
     def on_recorded(self, listener: Callable[[Moment], None]) -> None:
-        """订阅进程内提示；Ledger 仍是可恢复事实源，监听器不是可靠队列。"""
+        """订阅进程内提示；Log 仍是可恢复事实源，监听器不是可靠队列。"""
         self._recorded_listeners.append(listener)
 
     async def flush(self) -> None:
         if self._enabled:
-            await self._ledger.flush()
+            await self._log.flush()
             self._since_flush = 0
 
     def iter_moments_since(self, since_iso: str | None = None) -> list[Moment]:
-        moments = self._ledger.query()
+        moments = self._log.query()
         if not since_iso:
             return moments
         return [item for item in moments if item.occurred_at > since_iso]
 
     def moments_after(self, position: int) -> list[Moment]:
-        return self._ledger.query(after_position=position)
+        return self._log.query(after_position=position)
 
     def recent_moments(self, *, limit: int = 20, kinds: set[str] | None = None,
                        scene_id: str | None = None,
                        exclude_trace_id: str | None = None) -> list[Moment]:
         if not self._enabled or limit <= 0:
             return []
-        return self._ledger.recent(limit=limit, kinds=kinds, scene_id=scene_id,
+        return self._log.recent(limit=limit, kinds=kinds, scene_id=scene_id,
                                    exclude_trace_id=exclude_trace_id)
 
     def verify(self) -> dict[str, object]:
-        return self._ledger.verify()
+        return self._log.verify()
 
     def _schedule_flush(self) -> None:
         try:
-            asyncio.get_running_loop().create_task(self.flush())
+            asyncio.get_running_loop()
         except RuntimeError:
-            pass
+            return
+        if self._threshold_flush_task is not None and not self._threshold_flush_task.done():
+            return
+        self._threshold_flush_task = asyncio.create_task(self._threshold_flush())
+
+    async def _threshold_flush(self) -> None:
+        try:
+            await self.flush()
+        except Exception as exc:
+            self._logger.error(
+                "Conversation Log 阈值刷盘失败",
+                error=str(exc),
+                exc_info=True,
+            )
+        finally:
+            self._threshold_flush_task = None
 
     async def _flush_loop(self) -> None:
         while self._running:
@@ -135,4 +161,4 @@ class ExperienceRecorder:
             except asyncio.CancelledError:
                 return
             except Exception as exc:
-                self._logger.error("Experience Ledger 刷盘失败", error=str(exc), exc_info=True)
+                self._logger.error("Conversation Log 刷盘失败", error=str(exc), exc_info=True)

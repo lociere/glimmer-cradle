@@ -1,4 +1,4 @@
-"""从 Experience Ledger 派生、可重建的持久 Episode 投影。"""
+"""从 Conversation Log 派生、可重建的持久 Episode 投影。"""
 from __future__ import annotations
 
 import sqlite3
@@ -7,18 +7,17 @@ from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from glimmer_cradle.cognition.domain.experience.events import Moment, MomentKind
+from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 from glimmer_cradle.cognition.domain.experience.episode import Episode
-from glimmer_cradle.cognition.ports.persistence import ExperienceRecorderPort
 
 
 class EpisodeProjection:
-    """按 interaction/scene/causation 形成 Episode；投影可删除后从账本重建。"""
+    """按 interaction/scene/causation 形成 Episode；投影可从 Conversation Log 重建。"""
 
     def __init__(
         self,
         db_path: Path,
-        recorder: ExperienceRecorderPort,
+        recorder: ConversationLogReaderPort,
         *,
         idle_seconds: int = 300,
         integrity_check: bool = True,
@@ -205,7 +204,7 @@ class EpisodeProjection:
     def _hydrate(self, conn: sqlite3.Connection, row: tuple) -> Episode:
         positions = [item[0] for item in conn.execute(
             "SELECT position FROM episode_moments WHERE episode_id=? ORDER BY position", (row[0],))]
-        by_position = {item.seq: item for item in self._recorder.ledger.query(
+        by_position = {item.seq: item for item in self._recorder.log.query(
             after_position=max(0, row[8] - 1), limit=row[9] - row[8] + 1)}
         moments = tuple(by_position[position] for position in positions if position in by_position)
         return Episode(

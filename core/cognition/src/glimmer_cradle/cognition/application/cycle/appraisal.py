@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from glimmer_cradle.cognition.application.cycle.turn import CycleTurn, UserConversationTurn
+from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem
-from glimmer_cradle.cognition.domain.experience.events import MomentKind, SourceDescriptor
+from glimmer_cradle.conversation import ConversationTurn, MomentKind, SourceDescriptor
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
@@ -37,7 +37,7 @@ class PerceptionAppraiser:
         emotion_inputs: list[str] = []
         for item in perceptions:
             content = item.content
-            trace_id = content.get("trace_id", "")
+            trace_id = str(content.get("trace_id") or item.item_id)
             scene_id = content.get("scene_id", "")
             conversation_id = content.get("conversation_id", "")
             continuity_id = content.get("continuity_id", "")
@@ -57,17 +57,24 @@ class PerceptionAppraiser:
             ).strip()
             if emotion_input:
                 emotion_inputs.append(emotion_input)
-            turn.scene_id = scene_id or turn.scene_id
-            turn.conversation_id = conversation_id or turn.conversation_id
-            turn.continuity_id = continuity_id or turn.continuity_id
-            turn.thread_id = thread_id or turn.thread_id
-            turn.recall_scope = recall_scope or turn.recall_scope
-            turn.disclosure_scope = disclosure_scope or turn.disclosure_scope
-            turn.trace_id = trace_id or turn.trace_id
+            candidate_turn = ConversationTurn(
+                turn_id=str(content.get("interaction_id") or trace_id),
+                scene_id=scene_id,
+                conversation_id=conversation_id,
+                continuity_id=continuity_id,
+                thread_id=thread_id,
+                recall_scope=recall_scope,
+                disclosure_scope=disclosure_scope,
+            )
+            existing_turn = turn.turns_by_trace.get(trace_id)
+            if existing_turn is not None and existing_turn != candidate_turn:
+                raise ValueError("同一 perception trace 不得跨 Conversation 或权限域")
+            turn.turns_by_trace[trace_id] = candidate_turn
             response_policy = content.get("response_policy", "reply_allowed")
             if not isinstance(response_policy, str):
                 response_policy = "reply_allowed"
             turn.response_policies.append(response_policy)
+            turn.response_policy_by_trace.setdefault(trace_id, []).append(response_policy)
             moment = self._recorder.record(
                 MomentKind.PERCEPTION,
                 content={
@@ -102,24 +109,8 @@ class PerceptionAppraiser:
             )
             if moment is not None:
                 turn.perception_moment_ids.append(moment.moment_id)
+                turn.perception_moment_ids_by_trace.setdefault(trace_id, []).append(moment.moment_id)
                 content["experience_moment_id"] = moment.moment_id
-            if text and text.strip():
-                turn.user_turns.append(UserConversationTurn(
-                    scene_id=scene_id,
-                    conversation_id=conversation_id,
-                    continuity_id=continuity_id,
-                    thread_id=thread_id,
-                    recall_scope=recall_scope,
-                    disclosure_scope=disclosure_scope,
-                    text=text,
-                    familiarity=int(content.get("familiarity", 0) or 0),
-                    moment_id=moment.moment_id if moment is not None else None,
-                    interaction_id=str(content.get("interaction_id") or trace_id or "") or None,
-                    actor_id=content.get("actor_id"),
-                    actor_name=content.get("actor_name"),
-                    retention_ceiling=str(content.get("retention_ceiling") or "experience"),
-                ))
-
         self._update_emotion(emotion_inputs, turn)
 
     @staticmethod
@@ -197,16 +188,22 @@ class PerceptionAppraiser:
             float(state.get("intensity", 0.0)),
             labels={"emotion": str(state.get("emotion_type", ""))},
         )
+        turn.pending_emotion_state = state
+
+    def record_active_emotion(self, turn: CycleTurn) -> None:
+        state = turn.pending_emotion_state
+        if not isinstance(state, dict) or not turn.perception_moment_ids:
+            return
         moment = self._recorder.record(
             MomentKind.EMOTION,
             content={"emotion": state},
-            scene_id=turn.scene_id or None,
-            conversation_id=turn.conversation_id,
-            continuity_id=turn.continuity_id,
-            thread_id=turn.thread_id,
-            recall_scope=turn.recall_scope,
-            disclosure_scope=turn.disclosure_scope,
-            trace_id=turn.trace_id or None,
+            scene_id=turn.turn.scene_id or None,
+            conversation_id=turn.turn.conversation_id,
+            continuity_id=turn.turn.continuity_id,
+            thread_id=turn.turn.thread_id,
+            recall_scope=turn.turn.recall_scope,
+            disclosure_scope=turn.turn.disclosure_scope,
+            trace_id=turn.turn.turn_id or None,
             causation_ids=tuple(turn.perception_moment_ids),
             importance=0.4,
         )

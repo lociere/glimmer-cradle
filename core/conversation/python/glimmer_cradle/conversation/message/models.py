@@ -1,4 +1,4 @@
-"""会话查询投影与可重建工作集模型。"""
+"""Conversation 查询投影与可重建工作集模型。"""
 
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ class ConversationWorkingSet:
     """由 Conversation Store 恢复的有界缓存，不拥有历史事实。"""
 
     conversation_id: str
+    thread_id: str = "main"
     messages: list[ConversationMessage] = field(default_factory=list)
     state: dict = field(default_factory=dict)
     hydrated: bool = False

@@ -148,6 +148,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "glimmer-cradle-contracts" },
+    { name = "glimmer-cradle-conversation" },
     { name = "grpcio" },
     { name = "numpy" },
     { name = "protobuf" },
@@ -170,6 +171,7 @@ local-embedding = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20,<1" },
     { name = "glimmer-cradle-contracts", directory = "../../contracts" },
+    { name = "glimmer-cradle-conversation", directory = "../conversation" },
     { name = "grpcio", specifier = ">=1.74,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "numpy", specifier = ">=2.0,<3" },
@@ -197,6 +199,22 @@ requires-dist = [
     { name = "grpcio", specifier = ">=1.74,<2" },
     { name = "protobuf", specifier = "==6.33.0" },
 ]
+
+[[package]]
+name = "glimmer-cradle-conversation"
+version = "0.1.0"
+source = { directory = "../conversation" }
+dependencies = [
+    { name = "aiosqlite" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", specifier = ">=0.20,<1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "grpcio"

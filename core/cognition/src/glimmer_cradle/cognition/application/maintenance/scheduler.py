@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 
-from glimmer_cradle.cognition.domain.experience.events import Moment, MomentKind
+from glimmer_cradle.conversation import Moment, MomentKind
 from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 

@@ -1,11 +1,10 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from glimmer_cradle.cognition.application.conversation import ConversationController
-from glimmer_cradle.cognition.adapters.persistence.conversation import ConversationStore
-from glimmer_cradle.cognition.application.experience import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationController, ConversationStore
+from glimmer_cradle.conversation.log.recorder import ConversationRecorder
 from tests.support import CLOCK, IDS, build_experience_recorder
-from glimmer_cradle.cognition.domain.experience import Moment, MomentKind
+from glimmer_cradle.conversation.log import Moment, MomentKind
 
 
 def projection_config():
@@ -28,7 +27,7 @@ def working_config():
     )
 
 
-async def record_dialogue(recorder: ExperienceRecorder) -> None:
+async def record_dialogue(recorder: ConversationRecorder) -> None:
     common = {
         "scene_id": "scene:desktop:primary",
         "conversation_id": "conversation:desktop:primary",
@@ -69,6 +68,7 @@ async def test_conversation_projection_rebuilds_from_experience(tmp_path: Path) 
     await controller.connect()
     state, recent, history = await controller.prompt_context(
         "conversation:desktop:primary",
+        "main",
         "星潮是什么",
         allowed_scopes={"conversation_private", "global_safe", "public"},
     )
@@ -87,6 +87,7 @@ async def test_conversation_projection_rebuilds_from_experience(tmp_path: Path) 
     await rebuilt.connect()
     _, rebuilt_recent, rebuilt_history = await rebuilt.prompt_context(
         "conversation:desktop:primary",
+        "main",
         "星潮是什么",
         allowed_scopes={"conversation_private", "global_safe", "public"},
     )
@@ -112,6 +113,7 @@ async def test_conversation_projection_filters_before_prompt_assembly(tmp_path: 
     await controller.connect()
     state, recent, history = await controller.prompt_context(
         "conversation:desktop:primary",
+        "main",
         "星潮",
         allowed_scopes={"public"},
     )
@@ -138,6 +140,7 @@ async def test_conversation_history_page_uses_stable_cursor_and_actor_scope(tmp_
 
     thread, first_page, next_cursor, has_more = await controller.history_page(
         "conversation:desktop:primary",
+        "main",
         allowed_scopes={"conversation_private"},
         cursor=None,
         limit=2,
@@ -154,6 +157,7 @@ async def test_conversation_history_page_uses_stable_cursor_and_actor_scope(tmp_
 
     _, second_page, tail_cursor, tail_has_more = await controller.history_page(
         "conversation:desktop:primary",
+        "main",
         allowed_scopes={"conversation_private"},
         cursor=next_cursor,
         limit=3,
@@ -207,13 +211,13 @@ async def test_conversation_projection_rejects_identity_or_scope_drift(tmp_path:
     await recorder.stop()
 
 
-def test_experience_rejects_unknown_moment_kind() -> None:
+def test_conversation_log_rejects_unknown_moment_kind() -> None:
     try:
         Moment.create(
             1, kind="thought", content={"text": "内部草稿"},
             moment_id=IDS.new(), occurred_at=CLOCK.now_iso()
         )
     except ValueError as error:
-        assert "不支持的 Experience Moment kind" in str(error)
+        assert "不支持的 Conversation Moment kind" in str(error)
     else:
-        raise AssertionError("内部推理草稿不得进入 Experience Ledger")
+        raise AssertionError("内部推理草稿不得进入 Conversation Log")

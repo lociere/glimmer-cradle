@@ -1,5 +1,7 @@
 # ADR-0003：Character Package 与 Memory Substrate 分层
 
+> 部分替代：交互事实源现名为 Conversation Log，owner 为 Conversation；本 ADR 的分层原则继续有效。详见 [ADR-0022](./ADR-0022-ConversationLog与Experience投影边界.md)。
+
 - 状态：accepted
 - 日期：2026-06-30
 
@@ -16,7 +18,7 @@
 | 层 | 事实源 | 规则 |
 |---|---|---|
 | Character Package | `character.manifest.yaml`、`profile.yaml`、`dialogue.yaml`、`safety.yaml` | 作者写定的最小身份、安全边界、稳定人格种子和对话呈现策略；不进入 RAG，不写入向量库，不由运行时静默改写 |
-| Experience Ledger | Experience Stream / Moment ledger | 角色经历过什么的生命事实源；append-only，可回放，可追踪因果 |
+| Conversation Log | ordered Moment log | 已发生交互事实的事实源；append-only，可回放，可追踪因果 |
 | Knowledge Vault | `knowledge/index.yaml`、`knowledge/*.md`、用户导入资料、Extension 知识贡献 | 外部资料和世界事实；只允许知识资料，不承载人格 |
 | Memory Substrate | working memory、long-term memory、relationship、preference、reflection | 从经历和反思生成的认知投影；写入必须由 Cognition 判断 |
 | Graph / Vector Index | memory graph、embedding、retrieval index | 检索和关系投影；可重建，不是原始事实源 |
@@ -29,7 +31,7 @@ Kernel 只加载和校验配置并注入冻结投影，不解释人格。Cogniti
 - 历史的 persona 范围知识条目和编译分组字段不属于当前架构契约。
 - 角色聊天呈现问题由 `dialogue.yaml` 和出站归一化共同约束，不能靠把更多 persona 条目塞进 RAG 解决。
 - 记忆巩固使用独立结构化指令，不复用对外聊天格式，也不改写 profile。
-- Graph/Vector 索引可以删除重建；Character Package 和 Experience Ledger 不能被索引反向改写。
+- Graph/Vector 索引可以删除重建；Character Package 和 Conversation Log 不能被索引反向改写。
 
 ## Alternatives considered
 

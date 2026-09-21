@@ -1,10 +1,10 @@
 import type {
   ActionCommand,
-  ConversationContext,
   ConversationHistoryResult,
   KnowledgeBaseConfig,
   PerceptionEvent,
 } from './application-models';
+import type { ConversationContext } from '@glimmer-cradle/conversation';
 
 /** Kernel 应用层使用的 Cognition 用例模型；跨进程 DTO 只存在于 Service Adapter。 */
 export interface PerceptionCancelRequest {

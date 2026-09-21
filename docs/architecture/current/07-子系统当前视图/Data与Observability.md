@@ -10,9 +10,9 @@ Data 是角色连续性的物理投影，Observability 是多进程系统的工�
 
 | 数据域 | 语义 | Owner |
 |---|---|---|
-| `data/state/cognition/experience/` | Experience catalog 与月度 Ledger packs | Cognition / Experience |
+| `data/state/cognition/experience/` | Conversation Log catalog 与月度 packs；旧路径名待阶段 14 迁移 | Conversation |
 | `data/state/cognition/memory/` | 版本化 Memory、Relationship、Intention、Knowledge 与索引事实库 | Cognition |
-| `data/state/cognition/conversations/` | 从 Ledger 可重建的 Conversation、Chapter、Segment 与 State 投影 | Cognition |
+| `data/state/cognition/conversations/` | 从 Log 可重建的 Conversation、Chapter、Segment 与 State 投影；旧路径名待阶段 14 迁移 | Conversation |
 | `data/state/cognition/projections/` | 可从事实源重建的 Episode 等投影 | Cognition |
 | `data/state/kernel/` | Kernel 基础设施状态、扩展宿主数据、TS DLQ | Kernel |
 | `data/state/desktop/` | Desktop 窗口、界面偏好与 Avatar 呈现状态 | Desktop main |
@@ -24,7 +24,7 @@ Data 是角色连续性的物理投影，Observability 是多进程系统的工�
 | `data/work/` | ASR 输入、临时音频、导出中间产物 | 产生方 |
 | `data/backups/` | 迁移与用户主动备份 | 迁移 / 恢复流程 |
 
-Experience Ledger 和 Memory DB 是不可再生 state；Episode、索引、缓存、工作材料和 observability 是可重建或可清理材料。清理 observability 不是清理记忆或 Experience。
+Conversation Log 和 Memory DB 是不可再生 state；History、Episode、索引、缓存、工作材料和 observability 是可重建或可清理材料。清理 observability 不是清理交互事实或记忆。
 
 ## 当前可观测性平面
 
@@ -69,10 +69,10 @@ Renderer 不直接读取 `data/observability/` 原始文件，也不直接读取
 
 SQLite 索引损坏或缺失时，Desktop main 可以直接扫描当前 JSONL 事实文件并只读查询 Kernel DLQ，作为恢复路径重新建立索引；这不是旧目录兼容入口。
 
-## Trace 与 Experience 的关系
+## Trace 与 Conversation fact 的关系
 
 当前有两条不同因果线：
-- **Experience / Moment**：回答“角色经历了什么”，服务连续性与人格状态
+- **Conversation / Moment**：回答“交互中持久发生了什么”，服务连续性与 Cognition Experience 投影
 - **Trace / Span**：回答“系统如何处理这次操作”，服务工程诊断
 
 两者可以关联，但不能互相替代。一条用户输入可能同时产生 Moment 和 trace；一次 provider timeout 可能只有 trace、日志与 DLQ，不一定成为角色经历。
@@ -91,14 +91,14 @@ observability cleanup 只针对可再生观测数据：
 
 不在 cleanup 范围内：
 - Cognition state
-- Experience
+- Conversation Log
 - 用户导入模型与资源
 - 扩展私有状态
 - 托管包
 
 ## 迁移原则
 
-1. 先识别不可再生状态：Experience Ledger、Memory DB、用户导入模型、扩展状态、用户备份。
+1. 先识别不可再生状态：Conversation Log、Memory DB、用户导入模型、扩展状态、用户备份。
 2. 再识别可清理投影：cache、work、observability。
 3. 迁移脚本只读旧 owner 路径，把数据写入当前 owner 状态目录；迁移完成后删除旧入口读取代码。
 4. 新目录、新 Schema、新 IPC、新文档必须一起收口。

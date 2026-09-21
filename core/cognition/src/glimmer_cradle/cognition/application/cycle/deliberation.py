@@ -155,11 +155,12 @@ class DeliberationController:
             persona_prompt=persona_prompt,
             scene_id=content.get("scene_id", ""),
             conversation_id=content.get("conversation_id", ""),
+            thread_id=content.get("thread_id", "main"),
             actor_id=content.get("actor_id"),
             recall_scope=content.get("recall_scope", "conversation_private"),
             user_text=user_text if isinstance(user_text, str) else "",
             emotion_state=emotion_state,
-            trace_id=turn.trace_id,
+            trace_id=turn.turn.turn_id,
             multimodal_text=multimodal_text,
         )
 

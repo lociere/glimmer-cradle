@@ -1,4 +1,5 @@
-import type { ActionCommand, ConversationContext } from '../../ports/application-models';
+import type { ActionCommand } from '../../ports/application-models';
+import type { ConversationContext } from '@glimmer-cradle/conversation';
 import { normalizeReplyMessages } from './reply-messages';
 import type {
   AgentPlanResponse,

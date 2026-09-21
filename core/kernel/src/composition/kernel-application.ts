@@ -35,7 +35,7 @@ import { AvatarController } from '../adapters/avatar/avatar-controller';
 import { AvatarRuntimeAdapter } from '../adapters/avatar/avatar-runtime-adapter';
 import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gateway';
 import { NodeStableIdentityAdapter } from '../adapters/identity/node-stable-identity-adapter';
-import { ConversationDirectory } from '../application/capabilities/conversation/conversation-directory';
+import { ConversationDirectory } from '@glimmer-cradle/conversation';
 import { ChannelStateStore } from '../application/channel/channel-state-store';
 import { AttentionLeaseStore } from '../application/attention/attention-lease-store';
 import { AttentionSessionManager } from '../application/attention/attention-session-manager';

@@ -78,6 +78,16 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
 
+  core/conversation:
+    dependencies:
+      '@glimmer-cradle/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+
   core/kernel:
     dependencies:
       '@bufbuild/protobuf':
@@ -89,6 +99,9 @@ importers:
       '@glimmer-cradle/contracts':
         specifier: workspace:*
         version: link:../../contracts
+      '@glimmer-cradle/conversation':
+        specifier: workspace:*
+        version: link:../conversation
       '@glimmer-cradle/extension-host':
         specifier: workspace:*
         version: link:../../hosts/extension-host

@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.application.cycle import (
 from glimmer_cradle.cognition.application.cycle.providers import Provider, PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item as _make_item
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
-from glimmer_cradle.cognition.adapters.persistence.experience.ledger import ExperienceLedger
+from glimmer_cradle.conversation import ConversationLog
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
 
@@ -44,7 +44,7 @@ def CycleController(*args, **kwargs):
 
 
 def read_ledger_moments(path):
-    return ExperienceLedger(path).query()
+    return ConversationLog(path).query()
 
 
 class _FakeReasoning:
@@ -1082,7 +1082,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
     """perception 入站 → Appraise 调 update_by_input + 写 PERCEPTION/EMOTION Moment。"""
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
-    from glimmer_cradle.cognition.domain.experience.events import MomentKind
+    from glimmer_cradle.conversation.log import MomentKind
 
     class _Fixed(Provider):
         name = "perception"
@@ -1137,7 +1137,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
 async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
     """无 perception 广播 → 情绪不动、不写 PERCEPTION/EMOTION Moment。"""
     from glimmer_cradle.cognition.application.cycle.providers import Provider
-    from glimmer_cradle.cognition.domain.experience.events import MomentKind
+    from glimmer_cradle.conversation.log import MomentKind
 
     class _DriveOnly(Provider):
         name = "drive"
@@ -1205,10 +1205,89 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
     finally:
         await recorder.stop()
 
-    moments = recorder.ledger.query()
+    moments = recorder.log.query()
     dialogue = [item for item in moments if item.kind in {"perception", "reply"}]
     assert [item.content["text"] for item in dialogue] == ["你好月见", "你好呀"]
     assert all(item.conversation_id == "conversation:sc1" for item in dialogue)
+
+
+async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path: Path) -> None:
+    """同拍跨域感知只允许广播项成为回复的 Turn 与因果来源。"""
+    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.domain.volition import WillingnessConfig
+    from glimmer_cradle.conversation import MomentKind
+
+    class _Batch(Provider):
+        name = "perception"
+
+        async def propose(self, snap):
+            return [
+                make_item(
+                    source="perception",
+                    content={
+                        "text": "A 的直接消息",
+                        "scene_id": "scene:a",
+                        "conversation_id": "conversation:a",
+                        "continuity_id": "continuity:a",
+                        "thread_id": "thread:a",
+                        "recall_scope": "conversation_private",
+                        "disclosure_scope": "conversation_private",
+                        "trace_id": "trace-a",
+                        "interaction_id": "turn-a",
+                        "address_mode": "direct",
+                        "familiarity": 9,
+                    },
+                    salience=0.95,
+                ),
+                make_item(
+                    source="perception",
+                    content={
+                        "text": "B 的背景消息",
+                        "scene_id": "scene:b",
+                        "conversation_id": "conversation:b",
+                        "continuity_id": "continuity:b",
+                        "thread_id": "thread:b",
+                        "recall_scope": "space_local",
+                        "disclosure_scope": "space_local",
+                        "trace_id": "trace-b",
+                        "interaction_id": "turn-b",
+                        "address_mode": "ambient",
+                        "response_policy": "observe_only",
+                        "familiarity": 1,
+                    },
+                    salience=0.2,
+                ),
+            ]
+
+    recorder = build_experience_recorder(tmp_path)
+    await recorder.start()
+    try:
+        loop = CycleController(
+            workspace=GlobalWorkspace(capacity=3),
+            providers=[_Batch()],
+            experience_recorder=recorder,
+            willingness_config=WillingnessConfig(
+                threshold_by_activity={"engaged": 0.2}
+            ),
+            reasoning=_FakeReasoning("只回复 A"),
+        )
+        await loop.tick_once()
+    finally:
+        await recorder.stop()
+
+    moments = recorder.log.query()
+    perceptions = {
+        item.trace_id: item
+        for item in moments
+        if item.kind == MomentKind.PERCEPTION.value
+    }
+    reply = next(item for item in moments if item.kind == MomentKind.REPLY.value)
+    assert reply.conversation_id == "conversation:a"
+    assert reply.continuity_id == "continuity:a"
+    assert reply.thread_id == "thread:a"
+    assert reply.recall_scope == "conversation_private"
+    assert reply.causation_ids == (perceptions["trace-a"].moment_id,)
+    assert perceptions["trace-b"].moment_id not in reply.causation_ids
 
 
 async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: Path) -> None:
@@ -1243,7 +1322,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
     finally:
         await recorder.stop()
 
-    moments = recorder.ledger.query()
+    moments = recorder.log.query()
     assert any(item.kind == "perception" and item.content["text"] == "嗯" for item in moments)
     assert not any(item.kind == "reply" for item in moments)
 
@@ -1290,8 +1369,11 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     class _KB:
         async def get_knowledge(self, query): return [_Mem("天空是蓝的")]
     class _Conversation:
-        async def prompt_context(self, conversation_id, query, *, allowed_scopes):
+        async def prompt_context(
+            self, conversation_id, thread_id, query, *, allowed_scopes
+        ):
             assert conversation_id == "conversation:scX"
+            assert thread_id == "main"
             return "当前话题：长期陪伴", "user: 你好啊", "历史片段：很久以前的摘要"
 
     class _Entity:
@@ -1340,7 +1422,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
     """本地私聊不能召回扩展群聊的 space-local 经历。"""
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
-    from glimmer_cradle.cognition.domain.experience.events import MomentKind
+    from glimmer_cradle.conversation.log import MomentKind
 
     class _Fixed(Provider):
         name = "perception"

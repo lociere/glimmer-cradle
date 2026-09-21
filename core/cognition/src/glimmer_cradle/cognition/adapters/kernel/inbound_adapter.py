@@ -2,7 +2,7 @@
 
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanOutput, AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput, AgentSynthesisOutput, AgentSynthesisUseCase
-from glimmer_cradle.cognition.application.conversation.controller import ConversationController
+from glimmer_cradle.conversation import ConversationController
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
@@ -40,8 +40,11 @@ class KernelEventInboundAdapter(KernelRequestPort):
         return await self.agent_synthesis_use_case.execute(input_data, input_data.trace_id)
 
     async def on_conversation_history(self, payload: ConversationHistoryQuery) -> ConversationHistoryResult:
+        if not payload.allowed_scopes:
+            raise ValueError("Conversation History allowed_scopes 不得为空")
         thread, messages, next_cursor, has_more = await self.conversation_controller.history_page(
             payload.conversation_id,
+            payload.thread_id,
             allowed_scopes=set(payload.allowed_scopes),
             cursor=payload.cursor,
             limit=payload.limit,

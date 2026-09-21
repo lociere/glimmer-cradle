@@ -94,12 +94,12 @@ class CognitionHost:
             )
             components = self._require_components()
 
-            # 1.5 启动经历记录器（Glimmer Cradle 架构蓝图 §4.1，脊柱①）
-            #     先确立进程级 boot_id（telemetry 层用，蓝图 §6.2），经历之流本身是连续的，
+            # 1.5 启动 Conversation Log 单写者。
+            #     先确立进程级 boot_id（telemetry 层用），交互事实流本身是连续的，
             #     不写 SESSION_START/EPOCH_START 这类"生命周期事件" —— 那是 telemetry 的事。
             set_boot_id(new_boot_id())
-            experience_recorder = components.experience_recorder
-            await experience_recorder.start()
+            conversation_recorder = components.conversation_recorder
+            await conversation_recorder.start()
 
             # 先启动 metrics 与 tracer，保留启动期诊断。
             #     须在记忆/知识加载之前 —— 启动期的 gauge / span 才不会丢。
@@ -204,24 +204,24 @@ class CognitionHost:
             except Exception as e:
                 logger.error(f"Error stopping cognitive activity controller: {e}")
 
-            # Ledger 仍可读时刷新并封口 Episode；未巩固 Episode 会在下次启动后重试。
+            # Conversation Log 仍可读时刷新并封口 Episode；未巩固 Episode 会在下次启动后重试。
             try:
                 await components.maintenance_scheduler.stop()
             except Exception as e:
                 logger.error(f"Error sealing episode projection: {e}")
 
-            # Ledger 仍可读时先把 Conversation 投影推进到最终 checkpoint。
+            # Conversation Log 仍可读时先把 History 投影推进到最终 checkpoint。
             try:
                 await components.conversation_controller.close()
             except Exception as e:
                 logger.error(f"Error closing conversation store: {e}")
 
-            # 最后停止 Experience 单写者。进程关闭属于 telemetry，不写伪造 Moment。
+            # 最后停止 Conversation Log 单写者。进程关闭属于 telemetry，不写伪造 Moment。
             try:
-                experience_recorder = components.experience_recorder
-                await experience_recorder.stop()
+                conversation_recorder = components.conversation_recorder
+                await conversation_recorder.stop()
             except Exception as e:
-                logger.error(f"Error stopping experience recorder: {e}")
+                logger.error(f"Error stopping conversation recorder: {e}")
 
             try:
                 await components.cognition_database.close()

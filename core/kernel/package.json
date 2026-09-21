@@ -32,6 +32,7 @@
   "dependencies": {
     "@glimmer-cradle/platform": "workspace:*",
     "@glimmer-cradle/content": "workspace:*",
+    "@glimmer-cradle/conversation": "workspace:*",
     "@bufbuild/protobuf": "2.13.0",
     "@glimmer-cradle/contracts": "workspace:*",
     "@glimmer-cradle/extension-host": "workspace:*",

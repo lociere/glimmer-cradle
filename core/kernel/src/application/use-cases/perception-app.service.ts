@@ -1,4 +1,4 @@
-import { ConversationDirectory } from "../capabilities/conversation/conversation-directory";
+import { ConversationDirectory } from '@glimmer-cradle/conversation';
 
 import type { AudioApplicationPort, AudioStatusSnapshot } from '../../ports/runtime-capabilities.port';
 
@@ -190,5 +190,4 @@ export class PerceptionAppService {
   }
 
 }
-
 

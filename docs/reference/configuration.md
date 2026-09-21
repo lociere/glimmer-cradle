@@ -143,7 +143,7 @@ endpoint catalog、日志或持久文件。
 
 ## Cognition 连续性配置
 
-`configs/system/memory.yaml` 由 `MemoryConfig` Schema 约束，分别配置可恢复工作集、Conversation 投影、Experience Ledger、持久巩固任务和混合召回。所有数量都是上限或触发阈值，不会让缓存成为历史事实源。
+`configs/system/memory.yaml` 由 `MemoryConfig` Schema 约束，分别配置可恢复工作集、Conversation History、兼容键 `experience.*` 下的 Conversation Log、持久巩固任务和混合召回。所有数量都是上限或触发阈值，不会让缓存成为历史事实源。
 
 | 键 | Owner | 语义 |
 |---|---|---|
@@ -156,7 +156,7 @@ endpoint catalog、日志或持久文件。
 | `conversation.state_update_messages` | ConversationStore | 更新 Conversation State 的增量消息阈值。 |
 | `conversation.history_candidate_limit` / `history_result_limit` | ConversationStore | 历史 Segment 粗召回与最终返回上限。 |
 | `conversation.summary_max_chars` | ConversationStore | 可重建摘要的最大字符数。 |
-| `experience.*` | ExperienceRecorder / EpisodeProjection | Ledger pack、flush、Episode idle 封口与完整性检查策略。 |
+| `experience.*` | ConversationRecorder / EpisodeProjection | 兼容配置键；Conversation Log pack/flush、Cognition Episode idle 封口与完整性检查策略。键迁移留阶段 14。 |
 | `consolidation.batch_size` / `max_batch_moments` | ConsolidationCoordinator | 单轮领取任务与送入一次权限域内巩固的 Moment 上限。 |
 | `consolidation.debounce_seconds` / `max_wait_seconds` | ConsolidationJobRepository | 正常去抖与最晚可执行期限。 |
 | `consolidation.lease_seconds` / `retry_base_seconds` | ConsolidationJobRepository | durable job 租约和指数退避基数。 |

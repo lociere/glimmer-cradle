@@ -17,7 +17,7 @@ from glimmer_cradle.cognition.application.activity.projection import (
     project_activity_history,
 )
 from glimmer_cradle.cognition.domain.activity.transition import ActivityTransition, evaluate_transition
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationRecorder
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 
@@ -31,7 +31,7 @@ class CognitiveActivityController:
     def __init__(
         self,
         *,
-        experience_recorder: ExperienceRecorder,
+        experience_recorder: ConversationRecorder,
         affect_activation_provider: Callable[[], float],
         clock: ClockPort,
         observability: ObservabilityPort,

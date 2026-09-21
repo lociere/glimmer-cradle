@@ -14,8 +14,7 @@ from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
-from glimmer_cradle.cognition.domain.experience.events import MomentKind, SourceDescriptor
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationRecorder, MomentKind, SourceDescriptor
 
 _SYNTHESIS_RESULT_INSTRUCTION = """\
 [外部能力结果处理]
@@ -50,7 +49,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     self_entity: SelfEntity
     llm_engine: LLMPort
     persona_injector: Any | None = None
-    experience_recorder: ExperienceRecorder | None = None
+    experience_recorder: ConversationRecorder | None = None
     activity_controller: Any | None = None
 
     async def _execute(self, input_data: AgentSynthesisInput, trace_id: str) -> AgentSynthesisOutput:

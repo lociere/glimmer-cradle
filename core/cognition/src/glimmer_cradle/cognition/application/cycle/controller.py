@@ -28,7 +28,7 @@ from glimmer_cradle.cognition.application.cycle.perception_operations import Per
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationRecorder
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 
 class CycleController:
@@ -39,7 +39,7 @@ class CycleController:
         *,
         workspace: GlobalWorkspace,
         providers: Sequence[Provider],
-        experience_recorder: ExperienceRecorder,
+        experience_recorder: ConversationRecorder,
         activity_controller: CognitiveActivityController | None = None,
         emotion_system=None,  # 提供 emotion_intensity 入 willingness
         willingness_config: WillingnessConfig | None = None,
@@ -261,6 +261,21 @@ class CycleController:
             broadcast_item = await self._ws.broadcast()
             s_bc.set_attribute("has_content", broadcast_item is not None)
         trace_id = self._perception_trace(broadcast_item)
+        if trace_id:
+            active_turn = self._turn.turns_by_trace.get(trace_id)
+            if active_turn is None:
+                raise RuntimeError("广播感知缺少对应 ConversationTurn")
+            self._turn.turn = active_turn
+            self._turn.perception_moment_ids = list(
+                self._turn.perception_moment_ids_by_trace.get(trace_id, ())
+            )
+            self._turn.response_policies = list(
+                self._turn.response_policy_by_trace.get(trace_id, ())
+            )
+            self._appraiser.record_active_emotion(self._turn)
+        else:
+            self._turn.perception_moment_ids = []
+            self._turn.response_policies = []
         if trace_id and self._perception_operations is not None:
             self._active_perception_trace = trace_id
             operation = self._perception_operations.get_by_trace(trace_id)

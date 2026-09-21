@@ -9,6 +9,7 @@ authors = [
 
 dependencies = [
     "glimmer-cradle-contracts==0.2.6",
+    "glimmer-cradle-conversation==0.1.0",
     "numpy>=2.0,<3",
     "pydantic>=2.7,<3",
     "structlog>=24.0,<26",
@@ -19,6 +20,7 @@ dependencies = [
 
 [tool.uv.sources]
 glimmer-cradle-contracts = { path = "../../contracts" }
+glimmer-cradle-conversation = { path = "../conversation" }
 
 [project.optional-dependencies]
 local-embedding = [

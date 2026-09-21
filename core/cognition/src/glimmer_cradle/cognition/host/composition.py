@@ -8,8 +8,7 @@ from glimmer_cradle.cognition.application.activity import CognitiveActivityContr
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
 from glimmer_cradle.cognition.application.context import ContextAssembly
-from glimmer_cradle.cognition.application.conversation import ConversationController
-from glimmer_cradle.cognition.adapters.persistence.conversation import ConversationStore
+from glimmer_cradle.conversation import ConversationController, ConversationStore
 from glimmer_cradle.cognition.application.context.sources import (
     EpisodicMemorySource,
     KnowledgeSource,
@@ -27,12 +26,15 @@ from glimmer_cradle.cognition.application.cycle.providers import (
     SocialProvider,
 )
 from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
-from glimmer_cradle.cognition.adapters.persistence.experience.factory import build_experience_recorder
+from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
-from glimmer_cradle.cognition.adapters.paths import resolve_episode_projection_path, resolve_experience_dir
+from glimmer_cradle.cognition.adapters.paths import (
+    resolve_conversation_db_path,
+    resolve_episode_projection_path,
+    resolve_experience_dir,
+)
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
@@ -65,7 +67,7 @@ class CognitionComponents:
     kernel_client: KernelGrpcClient
     cognition_grpc_host: CognitionGrpcHost
     outbound_adapter: KernelEventOutboundAdapter
-    experience_recorder: ExperienceRecorder
+    conversation_recorder: ConversationRecorder
     memory_substrate: MemorySubstrate
     knowledge_base: KnowledgeBase
     activity_controller: CognitiveActivityController
@@ -93,7 +95,7 @@ def compose_cognition(
 
     clock = SystemClock()
     ids = SystemIdGenerator()
-    experience_recorder = build_experience_recorder(
+    conversation_recorder = build_conversation_recorder(
         resolve_experience_dir(),
         enabled=experience_config.enabled,
         pack_max_size_mb=experience_config.pack_max_size_mb,
@@ -109,8 +111,10 @@ def compose_cognition(
     vector_repository = VectorRepository(cognition_database)
     relationship_repository = RelationshipRepository(cognition_database)
     conversation_controller = ConversationController(
-        store=ConversationStore(config=memory_config.conversation),
-        recorder=experience_recorder,
+        store=ConversationStore(
+            resolve_conversation_db_path(), config=memory_config.conversation
+        ),
+        recorder=conversation_recorder,
         working_config=memory_config.working,
     )
 
@@ -144,7 +148,7 @@ def compose_cognition(
     knowledge_base.bind_vector_repository(vector_repository)
 
     activity_controller = CognitiveActivityController(
-        experience_recorder=experience_recorder,
+        experience_recorder=conversation_recorder,
         clock=clock,
         observability=observability,
         affect_activation_provider=lambda: float(
@@ -171,7 +175,7 @@ def compose_cognition(
         self_entity=self_entity,
         llm_engine=llm_engine,
         persona_injector=self_entity.persona_injector,
-        experience_recorder=experience_recorder,
+        experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
         ids=ids,
         observability=observability,
@@ -189,12 +193,12 @@ def compose_cognition(
     perception_operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity, clock=clock)
     relationship_projection = RelationshipProjection(
-        recorder=experience_recorder,
+        recorder=conversation_recorder,
         repository=relationship_repository,
         database=cognition_database,
     )
     context_assembly = ContextAssembly(sources=[
-        RecentExperienceSource(experience_recorder),
+        RecentExperienceSource(conversation_recorder),
         EpisodicMemorySource(memory_substrate, clock=clock),
         KnowledgeSource(knowledge_base),
         RelationshipSource(relationship_repository),
@@ -205,7 +209,7 @@ def compose_cognition(
 
     episode_projection = EpisodeProjection(
         resolve_episode_projection_path(),
-        experience_recorder,
+        conversation_recorder,
         idle_seconds=experience_config.episode_idle_seconds,
         integrity_check=experience_config.seal_integrity_check,
     )
@@ -238,7 +242,7 @@ def compose_cognition(
         observability=observability,
     )
     activity_controller.on_transition(maintenance_scheduler.notify_activity_transition)
-    experience_recorder.on_recorded(maintenance_scheduler.notify_moment)
+    conversation_recorder.on_recorded(maintenance_scheduler.notify_moment)
     cycle_controller = CycleController(
         workspace=workspace,
         providers=[
@@ -249,7 +253,7 @@ def compose_cognition(
             DriveProvider(activity_controller=activity_controller, clock=clock, ids=ids),
             SocialProvider(relationship_repository, clock=clock, ids=ids),
         ],
-        experience_recorder=experience_recorder,
+        experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
         emotion_system=self_entity.emotion_system,
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
@@ -286,7 +290,7 @@ def compose_cognition(
         kernel_client=kernel_client,
         cognition_grpc_host=cognition_grpc_host,
         outbound_adapter=outbound_adapter,
-        experience_recorder=experience_recorder,
+        conversation_recorder=conversation_recorder,
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,
         activity_controller=activity_controller,

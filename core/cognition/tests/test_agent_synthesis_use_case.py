@@ -8,7 +8,7 @@ from glimmer_cradle.cognition.application.agent_synthesis_use_case import (
     AgentSynthesisUseCase,
 )
 from tests.support import IDS, OBSERVABILITY, build_experience_recorder
-from glimmer_cradle.cognition.domain.experience import MomentKind
+from glimmer_cradle.conversation.log import MomentKind
 
 
 class _FakePersonaInjector:
@@ -131,7 +131,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
     await recorder.flush()
 
     action_result = next(
-        moment for moment in recorder.ledger.query()
+        moment for moment in recorder.log.query()
         if moment.kind == MomentKind.ACTION_RESULT.value
     )
     assert action_result.trace_id == "trace-tool"
@@ -139,7 +139,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
     assert action_result.origin.schema_ref == "glimmer://browser/open-result/v1"
     assert action_result.retention_ceiling == "memory_candidate"
     reply = next(
-        moment for moment in recorder.ledger.query()
+        moment for moment in recorder.log.query()
         if moment.kind == MomentKind.REPLY.value
     )
     assert reply.content == {"text": "已经打开。", "length": 5}

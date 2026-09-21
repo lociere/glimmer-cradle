@@ -20,9 +20,9 @@ import type {
   AttentionProjectionMode,
 } from '../domain/attention/attention-lease';
 import type {
-  ConversationAddress,
   PerceptionEvent,
 } from './application-models';
+import type { ConversationAddress, ConversationContext } from '@glimmer-cradle/conversation';
 import type { IAICapabilityPort, IActionStreamPort } from './ai-capability.port';
 import type {
   SkillCatalogEntry,
@@ -38,7 +38,7 @@ export interface ControlSurfaceGatewayConfig {
 
 export interface ConversationDirectoryPort {
   resolve(address: ConversationAddress, interactionId?: string): {
-    readonly context: PerceptionEvent['conversation'];
+    readonly context: ConversationContext;
     readonly actor_id?: string;
     readonly actor_name?: string;
     readonly source_key: string;

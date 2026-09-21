@@ -1,12 +1,11 @@
-"""从 Experience Ledger 重建认知活动所需的最近活动时间线。"""
+"""从 Conversation Log 重建认知活动所需的最近活动时间线。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from glimmer_cradle.cognition.domain.experience.events import MomentKind
-from glimmer_cradle.cognition.application.experience.recorder import ExperienceRecorder
+from glimmer_cradle.conversation import ConversationRecorder, MomentKind
 
 
 @dataclass(frozen=True)
@@ -26,7 +25,7 @@ def parse_iso_ms(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def project_activity_history(recorder: ExperienceRecorder) -> ActivityHistory:
+def project_activity_history(recorder: ConversationRecorder) -> ActivityHistory:
     """从角色实际经历重建三条活动时间线，不读取调度 transition。"""
     direct_at: datetime | None = None
     observed_at: datetime | None = None

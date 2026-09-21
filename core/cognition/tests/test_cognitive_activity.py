@@ -13,7 +13,7 @@ from glimmer_cradle.cognition.application.activity import (
     policy_for,
 )
 from glimmer_cradle.cognition.application.activity.projection import project_activity_history
-from glimmer_cradle.cognition.domain.experience.events import MomentKind
+from glimmer_cradle.conversation.log import MomentKind
 from tests.support import OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 

@@ -1,15 +1,14 @@
-"""从 Experience Ledger 幂等派生关系互动计数。"""
+"""从 Conversation Log 幂等派生关系互动计数。"""
 from __future__ import annotations
 
-from glimmer_cradle.cognition.domain.experience.events import MomentKind
-from glimmer_cradle.cognition.ports.persistence import ExperienceRecorderPort
+from glimmer_cradle.conversation import ConversationLogReaderPort, MomentKind
 from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 
 
 class RelationshipProjection:
-    def __init__(self, *, recorder: ExperienceRecorderPort,
+    def __init__(self, *, recorder: ConversationLogReaderPort,
                  repository: RelationshipRepository,
                  database: CognitionDatabase) -> None:
         self._recorder = recorder

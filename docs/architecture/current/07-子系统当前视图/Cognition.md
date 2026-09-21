@@ -72,16 +72,16 @@ Perception
 
 ## 记忆与连续性
 
-会话不是由用户反复“新建聊天”才能成立的容器。Desktop 使用稳定的长期 `Conversation`，Cognition 按空闲边界和片段数量自动形成 `Chapter`，再把连续原始消息压成多级 `Segment`；原始 Moment 始终留在 Ledger。外部平台由 Adapter 决定地址粒度，例如 QQ 私聊可一人一个 `external_space_key`、群聊可一群一个，特殊线程可提供 `external_thread_key`，但规范 ID 和权限域只能由 Kernel 解析。
+会话不是由用户反复“新建聊天”才能成立的容器。Desktop 使用稳定的长期 `Conversation`，Conversation History 按空闲边界和片段数量自动形成 `Chapter`，再把连续原始消息压成多级 `Segment`；原始 Moment 始终留在 Conversation Log。外部平台由 Adapter 决定地址粒度，例如 QQ 私聊可一人一个 `external_space_key`、群聊可一群一个，特殊线程可提供 `external_thread_key`，但规范 ID 和权限域只能由 `core/conversation` 解析。
 
-拓扑名词固定为：`ActorEndpoint` 是平台侧某个发言端点；`Continuity` 表示跨表面的身份连续性线索；`Scene` 是外部环境；`Conversation` 是长期对话流；`Chapter` 是自动形成的阶段；`Segment` 是可检索摘要；`Thread` 是 Conversation 内的显式支线；`Interaction` 是一次处理闭环；`Moment` 是不可变经历事实。当前跨边界稳定载体是 `ConversationAddress` 和 `ConversationContext`，Chapter/Segment 是 Cognition 内部投影。
+拓扑名词固定为：`ActorEndpoint` 是平台侧某个发言端点；`Continuity` 表示跨表面的身份连续性线索；`Scene` 是外部环境；`Conversation` 是长期对话流；`Chapter` 是自动形成的阶段；`Segment` 是可检索摘要；`Thread` 是 Conversation 内的显式支线；`Turn` 是一次处理闭环；`Moment` 是 Log 的不可变交互事实。当前跨边界稳定载体是 `ConversationAddress` 和 `ConversationContext`，Chapter/Segment 是 Conversation History 投影。
 
 | 域 | Owner | 语义 |
 |---|---|---|
-| Conversation Working Set | `ConversationController` | 从持久 Conversation Store 恢复的有界进程缓存；不是事实源，重启后可恢复 |
-| Conversation Store | `application/conversation/`、`adapters/persistence/conversation/`、`data/state/cognition/conversations/conversations.db` | 从 Ledger 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建 |
-| Experience Ledger | `ExperienceRecorder` / `ExperienceLedger` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
-| Episode Projection | `EpisodeProjection` | 按 interaction + scene 从 Ledger 派生的边界单元；可删除、可重建、可封口 |
+| Conversation Working Set | `core/conversation` `ConversationController` | 从持久 History Store 恢复的有界进程缓存；不是事实源，重启后可恢复 |
+| Conversation History | `core/conversation/python/.../history/`、`data/state/cognition/conversations/conversations.db` | 从 Log 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建，路径待阶段 14 迁移 |
+| Conversation Log | `ConversationRecorder` / `ConversationLog` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
+| Episode Projection | `EpisodeProjection` | Cognition 按 turn + scene 从 Log 派生的经历边界；可删除、可重建、可封口 |
 | Memory Substrate | `MemorySubstrate` / repositories | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其状态 |
 | 记忆修订与证据 | `memory_revisions` / `memory_evidence` | 当前有效修订、历史有效期、来源 Moment 和 consolidation id |
 | 关系投影 | `RelationshipProjection` / `relationship_*` | 按 checkpoint 从 Moment 幂等派生直接互动、环境观察、回复计数和有证据修订 |
@@ -93,7 +93,7 @@ Perception
 ```text
 normalized Perception / Emotion / Reply / Action / ActionResult / Silence
   -> Moment + SourceDescriptor + retention_ceiling
-  -> Experience Ledger
+  -> Conversation Log
   -> Conversation Projection + Episode Projection
   -> durable Consolidation Job + ConsolidationCoordinator
   -> structured memory drafts + evidence validation
@@ -104,7 +104,7 @@ normalized Perception / Emotion / Reply / Action / ActionResult / Silence
 
 `SourceDescriptor` 记录 provider kind/id/version、source event、schema、trust、privacy 和 cognitive effect。`retention_ceiling` 决定一条 Moment 最多能进入哪一层；只有 `memory_candidate` 才可参与记忆巩固。工具成功结果也只是候选证据，不自动成为事实；失败结果保留为 Experience，不能污染 Memory。
 
-Global Workspace 的候选、竞争、广播和 `thought` Intent 属于易失注意力过程，只通过 span、metrics 或 Presentation `thought` frame 观察，不写入 Experience。`MomentKind` 不包含 `thought`；未来反思、自我叙事或计划若需要持久化，必须定义带来源证据的独立认知产物，而不是把内部广播伪装成经历事实。
+Global Workspace 的候选、竞争、广播和 `thought` Intent 属于易失注意力过程，只通过 span、metrics 或 Presentation `thought` frame 观察，不写入 Conversation Log。`MomentKind` 不包含 `thought`；未来反思、自我叙事或计划若需要持久化，必须定义带来源证据的独立认知产物，而不是把内部广播伪装成交互事实。
 
 Episode 是巩固、叙事和回忆的批次，不是第二事实源。`reply` / `silence` 会把当前交互封口为 `interaction_completed` 并立即唤醒 `MaintenanceScheduler`；空闲超时和 `quiescent` 只补充收口无终结事件的批次。sealed Episode 先进入 `consolidation_jobs` 持久队列，再按 debounce、最大等待、lease 和退避重试批量消费。任务在模型推理前按 `recall_scope + disclosure_scope + 域 owner` 分区，同一次模型调用和现有记忆候选不得跨权限域。启动恢复先补投影、回收过期 lease 并收口中断 Episode；停机只封口、入队和 checkpoint，不执行模型推理。
 

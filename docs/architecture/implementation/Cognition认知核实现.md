@@ -124,7 +124,7 @@ Kernel CognitionService request
 
 `application/activity/` 是认知资源调度的唯一 owner；状态模型与纯转换位于 `domain/activity/`。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
 
-`application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。`ExperienceRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`CycleController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
+`application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。Conversation `ConversationRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`CycleController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
 
 ## 上下文与推理
 
@@ -157,23 +157,23 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 
 | 组件 | 实现位置 | 语义 |
 |---|---|---|
-| Experience Ledger | `domain/experience/events.py`、`adapters/persistence/experience/ledger.py`、`application/experience/recorder.py` | 不可变 Moment、月度 SQLite pack、全局 position、来源与因果 |
-| Conversation Projection | `application/conversation/controller.py`、`adapters/persistence/conversation/store.py` | 可重建的消息、Chapter、Segment、Conversation State 与进程 Working Set |
+| Conversation Log | `core/conversation/python/glimmer_cradle/conversation/log/` | 交互事实的不可变 Moment、月度 SQLite pack、全局 position、来源与因果；Cognition 只读消费 |
+| Conversation Projection | `core/conversation/python/glimmer_cradle/conversation/{message,history}/` | Conversation owner 的可重建消息、Chapter、Segment、Conversation State 与进程 Working Set；Cognition Worker 只负责组合与消费 |
 | Episode Projection | `adapters/persistence/experience/episodes.py` | interaction/scene 分段、封口、待巩固队列与可重建投影 |
 | Memory Substrate | `application/memory/substrate.py`、`adapters/persistence/memory/memory_repo.py` | 版本化记忆、证据、时间有效修订与有预算召回 |
 | Consolidation | `application/memory/consolidation.py`、`adapters/persistence/memory/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试 |
-| Relationship | `adapters/persistence/memory/relationship_projection.py`、`relationship_repo.py` | 从 Ledger 幂等派生互动计数、熟悉度与证据修订 |
+| Relationship | `adapters/persistence/memory/relationship_projection.py`、`relationship_repo.py` | 从 Conversation Log 幂等派生互动计数、熟悉度与证据修订 |
 | Knowledge | `application/memory/knowledge_base.py`、`adapters/persistence/memory/knowledge_repo.py` | 知识条目 |
 | Vector | `adapters/persistence/memory/vector_repo.py` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
 | Memory Database | `adapters/persistence/memory/database.py` | `data/state/cognition/memory/memory.db` |
 
-长期连续性由 Cognition 拥有。Kernel 可以收到投影或行动结果，但不直接写 Cognition DB。
+长期交互连续性由 Conversation 拥有；Cognition 拥有 Experience、Memory、Persona 与推理语义。Kernel 可以收到投影或行动结果，但不直接写 Cognition/Conversation DB。
 
 记忆分层规则：
 
-1. Kernel 从 `ConversationAddress` 生成 canonical `ConversationContext`；Cognition 不接受 Extension 自造 canonical ID。
-2. Conversation Store 只从 Ledger 投影，Working Set 只从 Store 恢复；没有第二套短期记忆或 transcript 写回。
-3. Ledger、Conversation Segment、Memory revision 与 RecentExperience 都携带 scope；过滤先于检索与 Prompt 拼装。
+1. `core/conversation` 从 `ConversationAddress` 生成 canonical `ConversationContext`；Kernel 注入 Platform identity，Cognition 不接受 Extension 自造 canonical ID。
+2. Conversation History 只从 Conversation Log 投影，Working Set 只从 History 恢复；没有第二套短期记忆或 transcript 写回。
+3. Conversation Log、Conversation Segment、Memory revision 与 RecentExperience 都携带 scope；过滤先于检索与 Prompt 拼装。
 4. Extension 可提交规范化 perception 或 `evidenceProposal`，但不能读写 Conversation/Memory。
 
 ## 记忆闭环通电状态
@@ -185,7 +185,7 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
   -> Kernel PerceptionAppService / AttentionSessionManager
   -> Cognition PerceptionProvider
   -> CycleController Appraise
-  -> Experience Ledger
+  -> Conversation Log
   -> ConversationProjection + EpisodeProjection
   -> consolidation_jobs -> scope-partitioned ConsolidationCoordinator
   -> versioned Memory / Relationship / Knowledge / RecentExperienceSource
@@ -195,8 +195,8 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 已经通电的链路：
 
 - 本地和外部感知会进入统一 `PerceptionProvider`，由 `CycleController` 写入 PERCEPTION、EMOTION、REPLY 或 SILENCE Moment。
-- `CycleContinuity` 只写本轮真实发生的 user/assistant Moment；`ConversationController` 从 Ledger 增量投影并为下一轮恢复上下文。
-- `ExperienceRecorder` 会把 Moment 写入 `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db`；`catalog.db` 维护全局 position 和 pack 范围。
+- `CycleContinuity` 只写本轮真实发生的 user/assistant Moment；`core/conversation` 的 `ConversationController` 从 canonical Conversation Log 增量投影并为下一轮恢复上下文。Cognition 只通过 Conversation Port 消费，不拥有日志写入与历史投影实现。
+- Conversation `ConversationRecorder` 会把 Moment 写入兼容路径 `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db`；`catalog.db` 维护全局 position 和 pack 范围。路径迁移留阶段 14，不改变当前 owner。
 - `EpisodeProjection` 按 interaction、scene、conversation 与 recall/disclosure 权限域形成可重建 Episode；同一个 Episode 在物理表和查询键上都不能跨域。`reply` / `silence` 立即形成 `interaction_completed` 边界，`episode_idle_seconds`、`quiescent` 与停机只补充收口开放批次。启动时按 `seal_integrity_check` 校验投影数据库，先补投影所有已提交 Moment，再将遗留开放批次标记为 `process_interrupted`；封口后同 interaction 的迟到 Moment 会进入新 Episode，不改写已封口批次。
 - `MaintenanceScheduler` 在正常运行中由终结 Moment 唤醒，并按 `schedule_interval_seconds` 对持久待办补偿扫描；`ConsolidationCoordinator` 只处理 `memory_candidate`，先写 `consolidation_jobs`，再按 scope/owner 分批 claim。停机只投影、封口和入队，不执行模型巩固。输出必须通过结构、evidence id 与目标权限域校验后才可写入 Memory。
 - `KnowledgeBase` 启动时通过 Cognition Service `InitializeKnowledge` 注入角色知识，`knowledge_entry` 可被活动上下文检索。

@@ -1,0 +1,28 @@
+[project]
+name = "glimmer-cradle-conversation"
+version = "0.1.0"
+description = "Conversation domain and history projection for Glimmer Cradle"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "aiosqlite>=0.20,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+where = ["python"]
+include = ["glimmer_cradle.conversation*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+pythonpath = ["python"]
+testpaths = ["tests/python"]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

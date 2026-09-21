@@ -1,17 +1,23 @@
-"""Experience 到 Conversation 投影、恢复与检索的唯一 owner。"""
+"""Conversation ordered fact 到 History 投影、恢复与检索的唯一 owner。"""
 
 from __future__ import annotations
 
-from glimmer_cradle.cognition.domain.conversation.models import ConversationWorkingSet
-from glimmer_cradle.cognition.ports.persistence import ConversationStorePort
+from glimmer_cradle.conversation.message.models import ConversationWorkingSet
+from glimmer_cradle.conversation.ports import ConversationHistoryStorePort, ConversationLogReaderPort
 
 
 class ConversationController:
-    def __init__(self, *, store: ConversationStorePort, recorder, working_config) -> None:
+    def __init__(
+        self,
+        *,
+        store: ConversationHistoryStorePort,
+        recorder: ConversationLogReaderPort,
+        working_config,
+    ) -> None:
         self._store = store
         self._recorder = recorder
         self._working_config = working_config
-        self._working_sets: dict[str, ConversationWorkingSet] = {}
+        self._working_sets: dict[tuple[str, str], ConversationWorkingSet] = {}
         self._connected = False
 
     async def connect(self) -> None:
@@ -43,23 +49,29 @@ class ConversationController:
         await self._recorder.flush()
         checkpoint = await self._store.checkpoint()
         moments = self._recorder.moments_after(checkpoint)
-        affected: set[str] = set()
+        affected: set[tuple[str, str]] = set()
         for moment in moments:
             if await self._store.project(moment) and moment.conversation_id:
-                affected.add(moment.conversation_id)
-        for conversation_id in affected:
-            self._working_sets.pop(conversation_id, None)
+                affected.add((moment.conversation_id, moment.thread_id))
+        for key in affected:
+            self._working_sets.pop(key, None)
         return len(moments)
 
-    async def working_set(self, conversation_id: str) -> ConversationWorkingSet:
+    async def working_set(
+        self, conversation_id: str, thread_id: str
+    ) -> ConversationWorkingSet:
         await self.project_pending()
+        key = (conversation_id, thread_id)
         working_set = self._working_sets.setdefault(
-            conversation_id, ConversationWorkingSet(conversation_id=conversation_id)
+            key,
+            ConversationWorkingSet(
+                conversation_id=conversation_id, thread_id=thread_id
+            ),
         )
         async with working_set.lock:
             if not working_set.hydrated:
                 state, messages = await self._store.load_working_set(
-                    conversation_id,
+                    conversation_id, thread_id,
                     limit=min(
                         self._working_config.hydrate_recent_messages,
                         self._working_config.max_messages_per_conversation,
@@ -71,11 +83,12 @@ class ConversationController:
         return working_set
 
     async def prompt_context(
-        self, conversation_id: str, query: str, *, allowed_scopes: set[str]
+        self, conversation_id: str, thread_id: str, query: str, *,
+        allowed_scopes: set[str]
     ) -> tuple[str, str, str]:
-        if not conversation_id:
+        if not conversation_id or not thread_id or not allowed_scopes:
             return "", "", ""
-        working_set = await self.working_set(conversation_id)
+        working_set = await self.working_set(conversation_id, thread_id)
         async with working_set.lock:
             state = (
                 self._format_state(working_set.state)
@@ -88,7 +101,7 @@ class ConversationController:
                 if item.recall_scope in allowed_scopes
             )
         segments = await self._store.retrieve_segments(
-            conversation_id, query, allowed_scopes=allowed_scopes,
+            conversation_id, thread_id, query, allowed_scopes=allowed_scopes,
             limit=self._store.history_result_limit,
         )
         return state, recent, "\n".join(f"历史片段：{item}" for item in segments)
@@ -96,6 +109,7 @@ class ConversationController:
     async def history_page(
         self,
         conversation_id: str,
+        thread_id: str,
         *,
         allowed_scopes: set[str],
         cursor: str | None,
@@ -103,11 +117,11 @@ class ConversationController:
         scene_id: str | None = None,
         actor_id: str | None = None,
     ) -> tuple[dict, list, str | None, bool]:
-        if not conversation_id:
+        if not conversation_id or not thread_id or not allowed_scopes:
             return {}, [], None, False
         await self.project_pending()
         return await self._store.load_history_page(
-            conversation_id,
+            conversation_id, thread_id,
             allowed_scopes=allowed_scopes,
             cursor=cursor,
             limit=limit,

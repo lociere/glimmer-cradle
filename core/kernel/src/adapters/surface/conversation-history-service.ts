@@ -7,7 +7,7 @@ import type {
   ConversationHistoryResult as ConversationHistoryResponse,
 } from '../../ports/conversation-history.port-models';
 import type { ConversationHistoryRequest, ConversationHistoryResponse as CognitionHistoryResponse } from '../../ports/cognition-service-port';
-import type { ConversationAddress, ConversationContext } from '../../ports/application-models';
+import type { ConversationAddress, ConversationContext } from '@glimmer-cradle/conversation';
 
 interface ConversationDirectoryPort {
   resolve(address: ConversationAddress, interactionId?: string): {
@@ -131,6 +131,7 @@ export class ConversationHistoryService {
 
   public async readHistory(request: ConversationHistoryQuery): Promise<ConversationHistoryResponse> {
     const resolved = this.resolveConversation(request.request_id);
+    this.assertResolvedTopology(request, resolved);
     const allowedScopes = [
       resolved.context.recall_scope,
       ...(resolved.context.disclosure_scope !== resolved.context.recall_scope
@@ -139,12 +140,12 @@ export class ConversationHistoryService {
     ] as [string, ...string[]];
     const payload: ConversationHistoryRequest = {
       request_id: request.request_id,
-      conversation_id: request.conversation_id?.trim() || resolved.context.conversation_id,
-      scene_id: request.scene_id?.trim() || resolved.context.scene_id,
-      thread_id: request.thread_id?.trim() || resolved.context.thread_id,
-      actor_id: request.actor_id?.trim() || resolved.actor_id,
+      conversation_id: resolved.context.conversation_id,
+      scene_id: resolved.context.scene_id,
+      thread_id: resolved.context.thread_id,
+      actor_id: resolved.actor_id,
       actor_name: resolved.actor_name,
-      source_provider_id: request.source_provider_id?.trim() || resolved.context.source_provider_id || 'desktop-ui',
+      source_provider_id: resolved.context.source_provider_id,
       cursor: request.cursor?.trim() || undefined,
       limit: request.limit ?? 50,
       allowed_scopes: allowedScopes,
@@ -157,6 +158,25 @@ export class ConversationHistoryService {
       return persisted;
     }
     return this.mergeTransientEntries(persisted);
+  }
+
+  private assertResolvedTopology(
+    request: ConversationHistoryQuery,
+    resolved: ReturnType<ConversationHistoryService['resolveConversation']>,
+  ): void {
+    const expected = {
+      conversation_id: resolved.context.conversation_id,
+      scene_id: resolved.context.scene_id,
+      thread_id: resolved.context.thread_id,
+      actor_id: resolved.actor_id,
+      source_provider_id: resolved.context.source_provider_id,
+    } as const;
+    for (const [field, value] of Object.entries(expected)) {
+      const supplied = request[field as keyof ConversationHistoryQuery];
+      if (typeof supplied === 'string' && supplied.trim() && supplied.trim() !== value) {
+        throw new Error(`Conversation History ${field} 与已解析拓扑不一致`);
+      }
+    }
   }
 
   private mergeTransientEntries(

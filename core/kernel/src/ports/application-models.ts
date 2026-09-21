@@ -1,26 +1,4 @@
-export interface ConversationAddress {
-  readonly provider_id: string;
-  readonly provider_account_id: string;
-  readonly space_kind: 'personal' | 'direct' | 'group' | 'channel' | 'thread' | 'world' | 'custom';
-  readonly external_space_key: string;
-  readonly external_thread_key?: string | null;
-  readonly parent_space_key?: string | null;
-  readonly actor_endpoint_key?: string | null;
-  readonly actor_display_name?: string | null;
-  readonly continuity_key?: string | null;
-  readonly visibility: 'private' | 'shared' | 'public';
-}
-
-export interface ConversationContext {
-  readonly source_provider_id: string;
-  readonly scene_id: string;
-  readonly conversation_id: string;
-  readonly continuity_id: string;
-  readonly thread_id: string;
-  readonly interaction_id: string;
-  readonly recall_scope: 'conversation_private' | 'actor_private' | 'space_local' | 'character_internal' | 'global_safe' | 'public';
-  readonly disclosure_scope: 'conversation_private' | 'actor_private' | 'space_local' | 'global_safe' | 'public';
-}
+import type { ConversationContext } from '@glimmer-cradle/conversation';
 
 export interface SourceDescriptor {
   readonly provider_kind: 'core' | 'extension' | 'mcp' | 'user';

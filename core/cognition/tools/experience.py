@@ -1,5 +1,5 @@
 """
-经历之流 CLI — 当前角色 Moment 流查询与检视工具（Glimmer Cradle 架构蓝图 §4.1）
+Conversation Log CLI — 当前角色交互 Moment 查询与检视工具
 
 用法:
   python core/cognition/tools/experience.py tail [N] 查看最近 N 条 Moment（默认 20）
@@ -19,12 +19,11 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from glimmer_cradle.cognition.adapters.paths import resolve_experience_dir
-from glimmer_cradle.cognition.adapters.persistence.experience.ledger import ExperienceLedger
-from glimmer_cradle.cognition.domain.experience.events import Moment
+from glimmer_cradle.conversation import ConversationLog, Moment
 
 
 def iter_moments(base_dir: Path) -> list[Moment]:
-    return ExperienceLedger(base_dir).query()
+    return ConversationLog(base_dir).query()
 
 
 def replay_trace(base_dir: Path, trace_id: str) -> list[Moment]:
@@ -36,7 +35,7 @@ def replay_causation(base_dir: Path, moment_id: str) -> list[Moment]:
 
 
 def verify(base_dir: Path) -> dict[str, object]:
-    return ExperienceLedger(base_dir).verify()
+    return ConversationLog(base_dir).verify()
 
 
 def _print_moment(m: Moment) -> None:
@@ -107,14 +106,18 @@ def cmd_kinds(base_dir: Path) -> None:
 
 def cmd_verify(base_dir: Path) -> int:
     result = verify(base_dir)
-    print(f"Moment 总数: {result.total}")
-    print(f"最后 seq: {result.last_seq}")
-    if result.ok:
+    print(f"Moment 总数: {result['moments']}")
+    print(f"最后 position: {result['last_position']}")
+    if result["ok"]:
         print("完整性: OK（seq 单调连续无断号）")
         return 0
-    print(f"完整性: 失败 — 发现 {len(result.gaps)} 处断号:")
-    for expected, actual in result.gaps[:20]:
-        print(f"  期望 seq={expected}，实际 seq={actual}")
+    gaps = result["position_gaps"]
+    duplicates = result["duplicate_ids"]
+    print(f"完整性: 失败 — 断号 {len(gaps)} 处，重复 ID {len(duplicates)} 个")
+    for position in gaps[:20]:
+        print(f"  缺少 position={position}")
+    for moment_id in duplicates[:20]:
+        print(f"  重复 moment_id={moment_id}")
     return 1
 
 

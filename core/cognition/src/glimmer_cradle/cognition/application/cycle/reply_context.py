@@ -33,6 +33,7 @@ class ReplyContextBuilder:
         persona_prompt: str,
         scene_id: str,
         conversation_id: str,
+        thread_id: str,
         actor_id: str | None,
         recall_scope: str,
         user_text: str,
@@ -47,6 +48,7 @@ class ReplyContextBuilder:
         context = await self._gather(
             scene_id=scene_id,
             conversation_id=conversation_id,
+            thread_id=thread_id,
             actor_id=actor_id,
             recall_scope=recall_scope,
             user_text=user_text,
@@ -57,7 +59,8 @@ class ReplyContextBuilder:
         return self._compose(persona_prompt, context)
 
     async def _gather(
-        self, *, scene_id: str, conversation_id: str, actor_id: str | None,
+        self, *, scene_id: str, conversation_id: str, thread_id: str,
+        actor_id: str | None,
         recall_scope: str, user_text: str, emotion_state: dict, trace_id: str
     ) -> dict[str, str]:
         context = {
@@ -120,7 +123,7 @@ class ReplyContextBuilder:
                     context["recent_dialogue"],
                     context["historical_segments"],
                 ) = await self._conversation.prompt_context(
-                    conversation_id, query,
+                    conversation_id, thread_id, query,
                     allowed_scopes=self._allowed_scopes(recall_scope),
                 )
         except Exception as exc:
