@@ -55,6 +55,7 @@ export interface AgentSynthesisRequest {
 }
 
 export interface AgentToolResult {
+  readonly skill_id?: string;
   readonly tool_name: string;
   readonly status: 'success' | 'error' | 'skipped';
   readonly result_json: string;
@@ -64,6 +65,7 @@ export interface AgentToolResult {
   readonly provider_version?: string;
   readonly source_event_id: string;
   readonly schema_ref: string;
+  readonly arguments_json?: string;
 }
 
 export interface AgentSynthesisResponse {

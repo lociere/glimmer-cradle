@@ -28,7 +28,7 @@ from glimmer_cradle.cognition.application.cycle.perception_operations import Per
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
-from glimmer_cradle.conversation import ConversationRecorder
+from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 
 class CycleController:
@@ -52,6 +52,7 @@ class CycleController:
         conversation=None,
         multimodal_router=None,
         perception_operations: PerceptionOperationRegistry | None = None,
+        turn_controller: TurnController | None = None,
         clock: ClockPort,
         ids: IdGeneratorPort,
         observability: ObservabilityPort,
@@ -104,6 +105,7 @@ class CycleController:
         self._last_arbitration: ArbitrationResult | None = None
         self._turn = CycleTurn()
         self._perception_operations = perception_operations
+        self._turn_controller = turn_controller
         self._active_perception_trace = ""
         self._cycle_perception_traces: set[str] = set()
 
@@ -196,10 +198,12 @@ class CycleController:
                         if trace_id and self._perception_operations is not None:
                             self._perception_operations.finish(trace_id, "succeeded")
         except asyncio.CancelledError:
+            await self._finish_active_turn("interrupted", "cycle_cancelled")
             if self._active_perception_trace and self._perception_operations is not None:
                 self._perception_operations.finish(self._active_perception_trace, "cancelled", "感知操作已取消")
             raise
         except Exception:
+            await self._finish_active_turn("failed", "cycle_failed")
             if self._perception_operations is not None:
                 for trace_id in self._cycle_perception_traces:
                     self._perception_operations.finish(trace_id, "failed", "认知循环处理失败")
@@ -264,15 +268,32 @@ class CycleController:
         if trace_id:
             active_turn = self._turn.turns_by_trace.get(trace_id)
             if active_turn is None:
-                raise RuntimeError("广播感知缺少对应 ConversationTurn")
-            self._turn.turn = active_turn
-            self._turn.perception_moment_ids = list(
-                self._turn.perception_moment_ids_by_trace.get(trace_id, ())
-            )
-            self._turn.response_policies = list(
-                self._turn.response_policy_by_trace.get(trace_id, ())
-            )
-            self._appraiser.record_active_emotion(self._turn)
+                # Workspace 可在当前候选被拒时返回上一拍遗留感知；它没有本拍 Turn，
+                # 不能借用其他会话上下文，也不能让已正确失败的当前 ingress 变成 tick 异常。
+                self.logger.warning(
+                    "忽略缺少本拍 ConversationTurn 的陈旧感知广播",
+                    trace_id=trace_id,
+                )
+                self._observability.counter(
+                    "cognition.stale_perception_broadcast", 1
+                )
+                broadcast_item = None
+                trace_id = ""
+            else:
+                if self._turn_controller is not None:
+                    accepted_turn = await self._turn_controller.accept(active_turn)
+                    active_turn = await self._turn_controller.start(
+                        accepted_turn.turn_id,
+                        expected_revision=accepted_turn.revision,
+                    )
+                self._turn.turn = active_turn
+                self._turn.perception_moment_ids = list(
+                    self._turn.perception_moment_ids_by_trace.get(trace_id, ())
+                )
+                self._turn.response_policies = list(
+                    self._turn.response_policy_by_trace.get(trace_id, ())
+                )
+                self._appraiser.record_active_emotion(self._turn)
         else:
             self._turn.perception_moment_ids = []
             self._turn.response_policies = []
@@ -318,6 +339,7 @@ class CycleController:
 
         # Act：只发送通过仲裁的 ActionCommand。
         with self._observability.span("act") as s_act:
+            await self._continuity.record_action(self._turn)
             emitted = await self._action_emitter.emit(self._turn.arbitration)
             s_act.set_attribute("actions_emitted", emitted)
             if emitted:
@@ -330,10 +352,36 @@ class CycleController:
             await self._continuity.commit(self._turn)
             s_cons.set_attribute("experience_committed", True)
 
+        if self._turn.skill_request is None:
+            await self._finish_active_turn("completed", None)
+
         await self._consume_ephemeral_broadcast(broadcast_item)
         self._observability.gauge("cognition.tick_alive", 1.0)
         self._observability.gauge("cognition.workspace_size", float(await self._ws.size()))
         return broadcast_item
+
+    async def _finish_active_turn(self, status: str, reason: str | None) -> None:
+        if self._turn_controller is None:
+            return
+        turn = self._turn.turn
+        if not turn.turn_id or turn.revision <= 0 or turn.is_terminal:
+            return
+        if status == "completed":
+            self._turn.turn = await self._turn_controller.complete(
+                turn.turn_id, expected_revision=turn.revision
+            )
+        elif status == "interrupted":
+            self._turn.turn = await self._turn_controller.interrupt(
+                turn.turn_id,
+                expected_revision=turn.revision,
+                reason=reason or "interrupted",
+            )
+        else:
+            self._turn.turn = await self._turn_controller.fail(
+                turn.turn_id,
+                expected_revision=turn.revision,
+                reason=reason or "failed",
+            )
 
     # ── 内部辅助 ─────────────────────────────────────────────────────────
 

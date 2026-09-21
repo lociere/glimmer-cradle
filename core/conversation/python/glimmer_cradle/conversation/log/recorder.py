@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Callable
 
 from glimmer_cradle.conversation.log.events import AffectSnapshot, Moment, MomentKind, SourceDescriptor
@@ -77,13 +78,19 @@ class ConversationRecorder:
                recall_scope: str = "conversation_private",
                disclosure_scope: str = "conversation_private",
                affect: AffectSnapshot | None = None, importance: float = 0.5,
-               trace_id: str | None = None) -> Moment | None:
+               trace_id: str | None = None,
+               idempotency_key: str | None = None) -> Moment | None:
         if not self._enabled or retention_ceiling == "transient":
             return None
         if not self._running:
             raise RuntimeError("ConversationRecorder 未处于可写状态")
         resolved_trace = trace_id or self._observability.current_trace_id() or ""
-        moment = self._log.append(Moment.create(
+        moment_id = (
+            uuid.uuid5(uuid.NAMESPACE_URL, f"glimmer:conversation-fact:{idempotency_key}").hex
+            if idempotency_key
+            else self._ids.new()
+        )
+        candidate = Moment.create(
             0, kind=kind, content=content, causation_ids=causation_ids,
             scene_id=scene_id, interaction_id=interaction_id,
             conversation_id=conversation_id, continuity_id=continuity_id,
@@ -92,7 +99,12 @@ class ConversationRecorder:
             retention_ceiling=retention_ceiling, affect=affect,
             recall_scope=recall_scope, disclosure_scope=disclosure_scope,
             importance=importance, trace_id=resolved_trace,
-            moment_id=self._ids.new(), occurred_at=self._clock.now_iso()))
+            moment_id=moment_id, occurred_at=self._clock.now_iso())
+        moment = (
+            self._log.append_idempotent(candidate)
+            if idempotency_key
+            else self._log.append(candidate)
+        )
         self._since_flush += 1
         if self._since_flush >= self._flush_max_buffer:
             self._schedule_flush()

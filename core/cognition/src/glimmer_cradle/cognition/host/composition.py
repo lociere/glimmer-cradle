@@ -8,7 +8,12 @@ from glimmer_cradle.cognition.application.activity import CognitiveActivityContr
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
 from glimmer_cradle.cognition.application.context import ContextAssembly
-from glimmer_cradle.conversation import ConversationController, ConversationStore
+from glimmer_cradle.conversation import (
+    ConversationController,
+    ConversationStore,
+    SqliteTurnStore,
+    TurnController,
+)
 from glimmer_cradle.cognition.application.context.sources import (
     EpisodicMemorySource,
     KnowledgeSource,
@@ -73,6 +78,7 @@ class CognitionComponents:
     activity_controller: CognitiveActivityController
     cognition_database: CognitionDatabase
     conversation_controller: ConversationController
+    turn_controller: TurnController
     maintenance_scheduler: MaintenanceScheduler
     cycle_controller: CycleController
 
@@ -116,6 +122,10 @@ def compose_cognition(
         ),
         recorder=conversation_recorder,
         working_config=memory_config.working,
+    )
+    turn_controller = TurnController(
+        SqliteTurnStore(resolve_conversation_db_path()),
+        clock=clock,
     )
 
     memory_substrate = MemorySubstrate(
@@ -177,6 +187,7 @@ def compose_cognition(
         persona_injector=self_entity.persona_injector,
         experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
+        turn_controller=turn_controller,
         ids=ids,
         observability=observability,
     )
@@ -265,6 +276,7 @@ def compose_cognition(
         conversation=conversation_controller,
         multimodal_router=multimodal_router,
         perception_operations=perception_operations,
+        turn_controller=turn_controller,
         clock=clock,
         ids=ids,
         observability=observability,
@@ -296,6 +308,7 @@ def compose_cognition(
         activity_controller=activity_controller,
         cognition_database=cognition_database,
         conversation_controller=conversation_controller,
+        turn_controller=turn_controller,
         maintenance_scheduler=maintenance_scheduler,
         cycle_controller=cycle_controller,
     )

@@ -81,9 +81,11 @@ describe('SkillActionController', () => {
     expect(synthesisRequests[0].tool_results[0].status).toBe('success');
     expect(synthesisRequests[0].tool_results[0].tool_name).toBe('get_weather');
     expect(synthesisRequests[0].tool_results[0]).toMatchObject({
+      skill_id: 'core.weather',
       provider_kind: 'core',
       provider_id: 'core-skills',
       schema_ref: 'glimmer://skill/action-result/v1',
+      arguments_json: JSON.stringify({ city: '上海' }),
     });
     expect(synthesisRequests[0].tool_results[0].source_event_id).toBe(
       synthesisRequests[0].tool_results[0].invocation_id,

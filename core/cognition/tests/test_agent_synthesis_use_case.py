@@ -7,7 +7,12 @@ from glimmer_cradle.cognition.application.agent_synthesis_use_case import (
     AgentSynthesisInput,
     AgentSynthesisUseCase,
 )
-from tests.support import IDS, OBSERVABILITY, build_experience_recorder
+from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from glimmer_cradle.conversation import (
+    ConversationTurn,
+    SqliteTurnStore,
+    TurnController,
+)
 from glimmer_cradle.conversation.log import MomentKind
 
 
@@ -103,6 +108,29 @@ async def test_agent_synthesis_error_result_prompt_does_not_pretend_success() ->
 async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -> None:
     recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
+    turn_controller = TurnController(
+        SqliteTurnStore(tmp_path / "turns.db"), clock=CLOCK
+    )
+    await turn_controller.connect()
+    accepted_turn = await turn_controller.accept(ConversationTurn(
+        turn_id="trace-tool",
+        scene_id="desktop",
+        conversation_id="conversation-1",
+        continuity_id="continuity-1",
+        thread_id="main",
+    ))
+    await turn_controller.start(
+        accepted_turn.turn_id, expected_revision=accepted_turn.revision
+    )
+    request = recorder.record(
+        MomentKind.ACTION,
+        {"action_type": "skill_request", "operation_id": "action:trace-tool"},
+        scene_id="desktop",
+        conversation_id="conversation-1",
+        thread_id="main",
+        interaction_id="trace-tool",
+        trace_id="trace-tool",
+    )
     use_case = AgentSynthesisUseCase(
         self_entity=_self_entity(),
         llm_engine=_FakeLlmEngine("已经打开。"),
@@ -110,16 +138,20 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
         ids=IDS,
         observability=OBSERVABILITY,
         experience_recorder=recorder,
+        turn_controller=turn_controller,
     )
 
-    await use_case.execute(AgentSynthesisInput(
+    synthesis_input = AgentSynthesisInput(
         original_goal="打开 B 站",
         scene_id="desktop",
         trace_id="trace-tool",
+        conversation={"conversation_id": "conversation-1", "thread_id": "main"},
         tool_results=[{
+            "skill_id": "browser",
             "tool_name": "browser.open",
             "status": "success",
             "result_json": '{"url":"https://www.bilibili.com"}',
+            "arguments_json": '{"url":"https://www.bilibili.com"}',
             "invocation_id": "invocation-1",
             "provider_kind": "extension",
             "provider_id": "browser-extension",
@@ -127,9 +159,20 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
             "source_event_id": "event-1",
             "schema_ref": "glimmer://browser/open-result/v1",
         }],
-    ), trace_id="trace-tool")
+    )
+    first_output = await use_case.execute(synthesis_input, trace_id="trace-tool")
     await recorder.flush()
 
+    tool_call = next(
+        moment for moment in recorder.log.query()
+        if moment.kind == MomentKind.ACTION.value
+        and moment.content.get("action_type") == "tool_call"
+    )
+    assert request is not None
+    assert tool_call.causation_ids == (request.moment_id,)
+    assert tool_call.content["skill_id"] == "browser"
+    assert tool_call.content["arguments_json"] == '{"url":"https://www.bilibili.com"}'
+    assert tool_call.origin.schema_ref == "glimmer://capability/tool-call/v1"
     action_result = next(
         moment for moment in recorder.log.query()
         if moment.kind == MomentKind.ACTION_RESULT.value
@@ -138,6 +181,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
     assert action_result.origin.provider_id == "browser-extension"
     assert action_result.origin.schema_ref == "glimmer://browser/open-result/v1"
     assert action_result.retention_ceiling == "memory_candidate"
+    assert action_result.causation_ids == (tool_call.moment_id,)
     reply = next(
         moment for moment in recorder.log.query()
         if moment.kind == MomentKind.REPLY.value
@@ -146,4 +190,14 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
     assert reply.trace_id == "trace-tool"
     assert reply.interaction_id == "trace-tool"
     assert reply.causation_ids == (action_result.moment_id,)
+    positions = [tool_call.seq, action_result.seq, reply.seq]
+    assert positions == sorted(positions)
+    completed_turn = await turn_controller.load("trace-tool")
+    assert completed_turn is not None and completed_turn.status == "completed"
+
+    replay_output = await use_case.execute(synthesis_input, trace_id="trace-tool")
+    await recorder.flush()
+    assert replay_output.reply_content == first_output.reply_content
+    assert len(recorder.log.query()) == 4
+    await turn_controller.close()
     await recorder.stop()

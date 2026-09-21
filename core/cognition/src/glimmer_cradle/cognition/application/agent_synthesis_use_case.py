@@ -14,7 +14,12 @@ from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
-from glimmer_cradle.conversation import ConversationRecorder, MomentKind, SourceDescriptor
+from glimmer_cradle.conversation import (
+    ConversationRecorder,
+    MomentKind,
+    SourceDescriptor,
+    TurnController,
+)
 
 _SYNTHESIS_RESULT_INSTRUCTION = """\
 [外部能力结果处理]
@@ -51,11 +56,21 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     persona_injector: Any | None = None
     experience_recorder: ConversationRecorder | None = None
     activity_controller: Any | None = None
+    turn_controller: TurnController | None = None
 
     async def _execute(self, input_data: AgentSynthesisInput, trace_id: str) -> AgentSynthesisOutput:
         nickname = self.self_entity.manifest_config.base.nickname
 
-        action_result_ids = self._record_action_results(input_data, trace_id)
+        persisted_reply = self._persisted_reply(input_data.trace_id or trace_id)
+        if persisted_reply is not None:
+            await self._complete_turn(input_data.trace_id or trace_id)
+            return AgentSynthesisOutput(
+                reply_content=str(persisted_reply.content.get("text") or ""),
+                emotion_state={"name": "平静", "intensity": 0.5},
+                trace_id=input_data.trace_id or trace_id,
+            )
+
+        action_result_ids = self._record_tool_exchange(input_data, trace_id)
 
         # 格式化工具结果
         results_text = self._format_tool_results(input_data.tool_results)
@@ -96,6 +111,9 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         self._record_reply(
             input_data, trace_id, reply_content, action_result_ids
         )
+        if self.experience_recorder is not None:
+            await self.experience_recorder.flush()
+        await self._complete_turn(input_data.trace_id or trace_id)
         if self.activity_controller is not None:
             self.activity_controller.record_self_activity("skill_reply")
 
@@ -105,7 +123,15 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
             trace_id=trace_id,
         )
 
-    def _record_action_results(
+    async def _complete_turn(self, turn_id: str) -> None:
+        if self.turn_controller is None or not turn_id:
+            return
+        turn = await self.turn_controller.load(turn_id)
+        if turn is None or turn.is_terminal:
+            return
+        await self.turn_controller.complete(turn_id, expected_revision=turn.revision)
+
+    def _record_tool_exchange(
         self,
         input_data: AgentSynthesisInput,
         trace_id: str,
@@ -113,37 +139,77 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         if self.experience_recorder is None:
             return ()
         moment_ids: list[str] = []
+        resolved_trace_id = input_data.trace_id or trace_id
+        request_moment_id = self._action_request_moment_id(resolved_trace_id)
         for result in input_data.tool_results:
             provider_kind = str(result.get("provider_kind") or "core")
             status = str(result.get("status") or "error")
-            moment = self.experience_recorder.record(
-                MomentKind.ACTION_RESULT,
+            invocation_id = str(result.get("invocation_id") or "")
+            result_origin = SourceDescriptor(
+                provider_kind=provider_kind,
+                provider_id=str(result.get("provider_id") or "kernel.skill-plane"),
+                provider_version=result.get("provider_version"),
+                source_event_id=str(result.get("source_event_id") or invocation_id or trace_id),
+                schema_ref=str(result.get("schema_ref") or "glimmer://skill/action-result/v1"),
+                trust_tier="host_verified" if provider_kind == "core" else "untrusted",
+                privacy_class="private",
+                cognitive_effect="action_result",
+            )
+            call_origin = SourceDescriptor(
+                provider_kind=provider_kind,
+                provider_id=result_origin.provider_id,
+                provider_version=result_origin.provider_version,
+                source_event_id=result_origin.source_event_id,
+                schema_ref="glimmer://capability/tool-call/v1",
+                trust_tier=result_origin.trust_tier,
+                privacy_class=result_origin.privacy_class,
+                cognitive_effect="context",
+            )
+            call = self.experience_recorder.record(
+                MomentKind.ACTION,
                 {
+                    "action_type": "tool_call",
+                    "skill_id": str(result.get("skill_id") or ""),
                     "tool_name": str(result.get("tool_name") or "unknown"),
-                    "status": status,
-                    "result_json": str(result.get("result_json") or "{}")[:4000],
-                    "invocation_id": str(result.get("invocation_id") or ""),
+                    "arguments_json": str(result.get("arguments_json") or "{}")[:4000],
+                    "invocation_id": invocation_id,
                 },
+                causation_ids=(request_moment_id,) if request_moment_id else (),
                 scene_id=input_data.scene_id or None,
                 conversation_id=str(input_data.conversation.get("conversation_id") or ""),
                 continuity_id=str(input_data.conversation.get("continuity_id") or ""),
                 thread_id=str(input_data.conversation.get("thread_id") or "main"),
-                interaction_id=input_data.trace_id or trace_id,
-                trace_id=input_data.trace_id or trace_id,
-                origin=SourceDescriptor(
-                    provider_kind=provider_kind,
-                    provider_id=str(result.get("provider_id") or "kernel.skill-plane"),
-                    provider_version=result.get("provider_version"),
-                    source_event_id=str(result.get("source_event_id") or result.get("invocation_id") or trace_id),
-                    schema_ref=str(result.get("schema_ref") or "glimmer://skill/action-result/v1"),
-                    trust_tier="host_verified" if provider_kind == "core" else "untrusted",
-                    privacy_class="private",
-                    cognitive_effect="action_result",
-                ),
+                interaction_id=resolved_trace_id,
+                trace_id=resolved_trace_id,
+                origin=call_origin,
+                retention_ceiling="experience",
+                recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
+                disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
+                importance=0.55,
+                idempotency_key=f"tool-call:{invocation_id}" if invocation_id else None,
+            )
+            moment = self.experience_recorder.record(
+                MomentKind.ACTION_RESULT,
+                {
+                    "skill_id": str(result.get("skill_id") or ""),
+                    "tool_name": str(result.get("tool_name") or "unknown"),
+                    "status": status,
+                    "result_json": str(result.get("result_json") or "{}")[:4000],
+                    "invocation_id": invocation_id,
+                },
+                causation_ids=(call.moment_id,) if call is not None else (),
+                scene_id=input_data.scene_id or None,
+                conversation_id=str(input_data.conversation.get("conversation_id") or ""),
+                continuity_id=str(input_data.conversation.get("continuity_id") or ""),
+                thread_id=str(input_data.conversation.get("thread_id") or "main"),
+                interaction_id=resolved_trace_id,
+                trace_id=resolved_trace_id,
+                origin=result_origin,
                 retention_ceiling="memory_candidate" if status == "success" else "experience",
                 recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
                 disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
                 importance=0.6 if status == "success" else 0.4,
+                idempotency_key=f"tool-result:{invocation_id}" if invocation_id else None,
             )
             if moment is not None:
                 moment_ids.append(moment.moment_id)
@@ -172,8 +238,34 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
             recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
             disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
             importance=0.6,
+            idempotency_key=f"skill-reply:{resolved_trace_id}" if resolved_trace_id else None,
         )
         return moment.moment_id if moment is not None else None
+
+    def _action_request_moment_id(self, interaction_id: str) -> str | None:
+        if self.experience_recorder is None or not interaction_id:
+            return None
+        moments = self.experience_recorder.recent_moments(
+            limit=200, kinds={MomentKind.ACTION.value}
+        )
+        for moment in reversed(moments):
+            if (
+                moment.interaction_id == interaction_id
+                and moment.content.get("action_type") == "skill_request"
+            ):
+                return moment.moment_id
+        return None
+
+    def _persisted_reply(self, interaction_id: str):
+        if self.experience_recorder is None or not interaction_id:
+            return None
+        moments = self.experience_recorder.recent_moments(
+            limit=200, kinds={MomentKind.REPLY.value}
+        )
+        return next(
+            (moment for moment in reversed(moments) if moment.interaction_id == interaction_id),
+            None,
+        )
 
     def _build_system_prompt(self, nickname: str) -> str:
         injector = self.persona_injector or getattr(self.self_entity, "persona_injector", None)

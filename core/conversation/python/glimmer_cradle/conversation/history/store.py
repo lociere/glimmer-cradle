@@ -123,6 +123,13 @@ class ConversationStore:
             )
             for table in tables:
                 await conn.execute(f"ALTER TABLE {table} RENAME TO v3_{table}")
+            # SQLite 重命名表时保留索引名；先释放旧名字，新 DDL 才能建立指向 v4 表的索引。
+            for index in (
+                "idx_conversation_messages_thread",
+                "idx_conversation_chapters_active",
+                "idx_conversation_segments_lookup",
+            ):
+                await conn.execute(f"DROP INDEX IF EXISTS {index}")
             for statement in _DDL.split(";"):
                 if statement.strip():
                     await conn.execute(statement)

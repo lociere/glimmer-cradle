@@ -16,6 +16,47 @@ class CycleContinuity:
     async def commit(self, turn: CycleTurn) -> None:
         self._write_outcome(turn)
 
+    async def record_action(self, turn: CycleTurn) -> str | None:
+        """在外部执行前提交行动请求，使晚到结果可以引用稳定事实。"""
+        accepted = turn.arbitration.accepted if turn.arbitration is not None else ()
+        action = next((intent for intent in accepted if intent.type.value == "action"), None)
+        if action is None:
+            return None
+        payload = action.payload if isinstance(action.payload, dict) else {}
+        causation = tuple(
+            moment_id
+            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id)
+            if moment_id
+        )
+        moment = self._recorder.record(
+            MomentKind.ACTION,
+            content={
+                "action_type": payload.get("action_type", ""),
+                "scene_id": payload.get("scene_id") or turn.turn.scene_id,
+                "original_goal": payload.get("original_goal", ""),
+                "capability_kind": payload.get("capability_kind"),
+                "reason": payload.get("reason"),
+                "planning_hint": payload.get("planning_hint"),
+                "operation_id": f"action:{turn.turn.turn_id}",
+            },
+            scene_id=(payload.get("scene_id") or turn.turn.scene_id) or None,
+            conversation_id=turn.turn.conversation_id,
+            continuity_id=turn.turn.continuity_id,
+            thread_id=turn.turn.thread_id,
+            interaction_id=turn.turn.turn_id,
+            trace_id=turn.turn.turn_id or None,
+            causation_ids=causation,
+            recall_scope=turn.turn.recall_scope,
+            disclosure_scope=turn.turn.disclosure_scope,
+            importance=0.55,
+            idempotency_key=f"action-request:{turn.turn.turn_id}",
+        )
+        turn.action_moment_id = moment.moment_id if moment is not None else None
+        if moment is not None:
+            # 外部副作用只能发生在 ACTION 已越过 durable flush barrier 之后。
+            await self._recorder.flush()
+        return turn.action_moment_id
+
     def _write_outcome(self, turn: CycleTurn) -> str | None:
         causation = tuple(
             moment_id
@@ -24,7 +65,6 @@ class CycleContinuity:
         )
         accepted = turn.arbitration.accepted if turn.arbitration is not None else ()
         reply = next((intent for intent in accepted if intent.type.value == "reply"), None)
-        action = next((intent for intent in accepted if intent.type.value == "action"), None)
         if reply is not None:
             payload = reply.payload if isinstance(reply.payload, dict) else {}
             text = payload.get("text", "")
@@ -47,26 +87,7 @@ class CycleContinuity:
                     importance=0.6,
                 )
                 return moment.moment_id if moment is not None else None
-        if action is not None:
-            payload = action.payload if isinstance(action.payload, dict) else {}
-            self._recorder.record(
-                MomentKind.ACTION,
-                content={
-                    "action_type": payload.get("action_type", ""),
-                    "scene_id": payload.get("scene_id") or turn.turn.scene_id,
-                    "reason": payload.get("reason"),
-                },
-                scene_id=(payload.get("scene_id") or turn.turn.scene_id) or None,
-                conversation_id=turn.turn.conversation_id,
-                continuity_id=turn.turn.continuity_id,
-                thread_id=turn.turn.thread_id,
-                interaction_id=turn.turn.turn_id,
-                trace_id=turn.turn.turn_id or None,
-                causation_ids=causation,
-                recall_scope=turn.turn.recall_scope,
-                disclosure_scope=turn.turn.disclosure_scope,
-                importance=0.55,
-            )
+        if turn.action_moment_id is not None:
             return None
         if not turn.perception_moment_ids:
             return None

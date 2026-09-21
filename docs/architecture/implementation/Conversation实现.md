@@ -11,8 +11,9 @@
 - TypeScript `src/index.ts` 拥有 `ConversationAddress`、`ConversationContext` 与
   `ConversationDirectory`。Kernel composition 注入 Platform `StableIdentity`，桌面和 Extension Adapter
   只提交平台中立地址；解析后不再保留外部 account/space/thread 原值。
-- Python `python/glimmer_cradle/conversation/` 拥有 `ConversationTurn`、Message/WorkingSet、
-  `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port。
+- Python `python/glimmer_cradle/conversation/` 拥有持久 `ConversationTurn` 状态机、Message/WorkingSet、
+  `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port；最终源码根迁移到
+  `src/glimmer_cradle/conversation/` 前，现行 `pyproject.toml` 仍以 `python/` 为唯一包入口。
 - Cognition Worker 是当前进程 composition root，不因此拥有 Conversation 状态；它注入 Clock、ID、
   Observability、兼容路径和配置，再通过 Conversation reader 组装 Context、Episode、Relationship 与 Activity。
 
@@ -25,9 +26,12 @@
 conversation、continuity、thread 与 actor opaque id，并根据 visibility/space kind 固定 recall/disclosure scope。
 相同地址跨进程重启得到相同 Conversation；每次交互的 `interaction_id` 单独变化。
 
-`ConversationTurn` 保存一次完整交互周期的稳定 identity 与权限上下文。Cognition `CycleTurn` 只保存一拍内的
-perception、ActionPlan、intent 和 arbitration，并引用 `ConversationTurn`；模型推理 Step 在阶段 5 留在
-Cognition Loop，不再把 Turn 和 Step 当同一种状态。
+`ConversationTurn` 保存一次完整交互周期的稳定 identity、权限上下文、状态与修订。`TurnController` 通过
+`SqliteTurnStore` 提供幂等接纳、乐观并发和 `accepted → running → completed/interrupted/failed` 合法转换；
+进程重启会把遗留 active Turn 明确收束为 `interrupted/process_restarted`。普通回复或沉默在 Log 提交后完成
+Turn；能力请求保持 running，直到 ToolCall/ToolResult/Reply 持久并 flush 后完成。Cognition `CycleTurn`
+只保存一拍内的 perception、ActionPlan、intent 和 arbitration，并引用持久 Turn；模型推理 Step 在阶段 5
+留在 Cognition Loop，不再把 Turn 和 Step 当同一种状态。
 
 ## Canonical Log 与 Experience
 
@@ -55,11 +59,18 @@ Cognition 的 Episode、Relationship、Activity、Recent Experience 与 Memory c
 `history/controller.py` 在读取前 flush Log 并推进 checkpoint；Working Set 只从 History Store 恢复。
 `conversations.db` 是可删除重建的 projection，不是第二事实源。
 
-当前兼容路径为 `data/state/cognition/conversations/conversations.db`；阶段 14 迁移前保持不变。权限域、
-continuity 或 thread 在同一 canonical Conversation 内漂移时投影 fail closed。分页 cursor 以 Log position
-为锚，actor 过滤仍允许 assistant reply 与对应用户历史成对呈现。
+当前兼容路径为 `data/state/cognition/conversations/conversations.db`；阶段 14 迁移前保持不变。History
+schema v4 以 `(conversation_id, thread_id)` 区分线程；同一线程的 scene 与权限域漂移时投影 fail closed，
+continuity/actor 可随交互变化。分页 cursor 以 Log position 为锚，actor 过滤仍允许 assistant reply 与
+对应用户历史成对呈现。v3→v4 在事务内释放旧表重命名后保留的索引名，再复制 checkpoint、Message、
+Chapter、Segment、成员和 State；迁移失败回滚，不删除旧数据。
 
-模型可见的 tool result 作为 `action_result` 留在 Log，并由 Episode/Recent Experience 重建上下文；
+能力请求在外部副作用前写入 `action` 并越过 flush barrier。实际工具调用以稳定 `invocation_id` 写入
+`action(tool_call)`，结果以该调用为 causation 写入 `action_result`，最终 `reply` 再引用结果；相同
+invocation 的 RPC 重放返回原 position，内容冲突则拒绝覆盖。由此模型可见 ToolCall/ToolResult 可从 Log
+恢复，而 Kernel 当前内存 execution journal 的完整持久化仍由阶段 6 收束。
+
+模型可见的 tool result 由 Episode/Recent Experience 重建上下文；
 Control Center 的普通 History 只投影 user/assistant Message，不把工具 payload 冒充聊天文本。
 
 ## 验证
@@ -74,4 +85,5 @@ pnpm build
 ```
 
 高风险变化还要覆盖单写者冲突、重启 position、旧 v4/v5 pack、catalog 重建、损坏读取、History 重建、
-权限域漂移、分页 cursor、transient 不落盘、工具结果恢复和停机 flush。路径迁移必须额外执行备份恢复。
+权限域漂移、多 thread 隔离、v3→v4 无损迁移、Turn 重启恢复/非法转换/重复接纳、分页 cursor、
+transient 不落盘、工具结果恢复和停机 flush。路径迁移必须额外执行备份恢复。

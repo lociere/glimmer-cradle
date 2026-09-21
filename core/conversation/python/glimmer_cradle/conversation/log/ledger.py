@@ -96,10 +96,44 @@ class ConversationLog:
         with self._lock:
             if self._state != "started":
                 raise RuntimeError("Conversation Log 未处于可写状态")
-            self._last_position += 1
-            stored = replace(moment, seq=self._last_position)
-            self._pending.append(stored)
-            return stored
+            return self._append_locked(moment)
+
+    def append_idempotent(self, moment: Moment) -> Moment:
+        """按稳定 fact id 重放；相同事实返回原位置，冲突事实拒绝覆盖。"""
+        with self._lock:
+            if self._state != "started":
+                raise RuntimeError("Conversation Log 未处于可写状态")
+            existing = self._find_moment_by_id(moment.moment_id)
+            if existing is not None:
+                comparable_existing = replace(existing, seq=0, occurred_at="")
+                comparable_candidate = replace(moment, seq=0, occurred_at="")
+                if comparable_existing != comparable_candidate:
+                    raise RuntimeError(
+                        f"Conversation Log 幂等 fact 冲突: moment_id={moment.moment_id}"
+                    )
+                return existing
+            return self._append_locked(moment)
+
+    def _append_locked(self, moment: Moment) -> Moment:
+        self._last_position += 1
+        stored = replace(moment, seq=self._last_position)
+        self._pending.append(stored)
+        return stored
+
+    def _find_moment_by_id(self, moment_id: str) -> Moment | None:
+        for item in (*self._inflight, *self._pending):
+            if item.moment_id == moment_id:
+                return item
+        for pack in self._pack_paths():
+            with closing(sqlite3.connect(pack)) as conn:
+                row = conn.execute(
+                    "SELECT * FROM moments WHERE moment_id=?", (moment_id,)
+                ).fetchone()
+                if row is None:
+                    continue
+                causes = self._read_causes(conn, [moment_id])
+                return self._row_to_moment(row, causes.get(moment_id, ()))
+        return None
 
     async def flush(self) -> None:
         async with self._flush_lock:

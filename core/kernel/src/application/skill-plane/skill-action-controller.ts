@@ -237,7 +237,7 @@ export class SkillActionController {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           result,
-        }, source, invocationId);
+        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint);
         options.journal.toolResults.set(invocationId, toolResult);
         results.push(toolResult);
       } catch (error) {
@@ -250,7 +250,7 @@ export class SkillActionController {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           error: normalizeError(error),
-        }, source, invocationId);
+        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint);
         options.journal.toolResults.set(invocationId, toolResult);
         results.push(toolResult);
       }
@@ -307,8 +307,11 @@ function makeToolResult(
   payload: Record<string, unknown>,
   source: { providerKind: AgentToolResult['provider_kind']; providerId: string },
   invocationId: string,
+  skillId?: string,
+  argumentsValue?: Record<string, unknown>,
 ): AgentToolResult {
   return {
+    skill_id: skillId,
     tool_name: toolName,
     status,
     result_json: safeJsonStringify(payload),
@@ -317,6 +320,7 @@ function makeToolResult(
     provider_id: source.providerId,
     source_event_id: invocationId,
     schema_ref: 'glimmer://skill/action-result/v1',
+    arguments_json: argumentsValue === undefined ? undefined : safeJsonStringify(argumentsValue),
   };
 }
 

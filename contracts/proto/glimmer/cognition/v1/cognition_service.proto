@@ -204,6 +204,8 @@ message ToolResult {
   string provider_version = 7;
   string source_event_id = 8;
   string schema_ref = 9;
+  string skill_id = 10;
+  string arguments_json = 11;
 }
 
 message SynthesizeRequest {

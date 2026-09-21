@@ -26,3 +26,4 @@ class CycleTurn:
     skill_request: dict | None = None
     action_plan: ActionPlan | None = None
     arbitration: ArbitrationResult | None = None
+    action_moment_id: str | None = None

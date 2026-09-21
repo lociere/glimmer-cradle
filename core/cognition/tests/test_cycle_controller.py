@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.application.cycle import (
 from glimmer_cradle.cognition.application.cycle.providers import Provider, PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item as _make_item
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
-from glimmer_cradle.conversation import ConversationLog
+from glimmer_cradle.conversation import ConversationLog, SqliteTurnStore, TurnController
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
 
@@ -183,6 +183,44 @@ async def test_perception_broadcast_writes_no_thought_moment(tmp_path: Path) -> 
     assert "thought" not in kinds
     assert "perception" in kinds
     assert "silence" in kinds  # 收到输入但没回
+
+
+async def test_perception_cycle_persists_and_completes_conversation_turn(
+    tmp_path: Path,
+) -> None:
+    ws = GlobalWorkspace(capacity=3)
+    p = _FixedProvider("perception", [make_item(
+        source="perception",
+        content={
+            "text": "hi",
+            "scene_id": "scene:test",
+            "conversation_id": "conversation:test",
+            "continuity_id": "continuity:test",
+            "thread_id": "main",
+            "interaction_id": "turn:test",
+            "trace_id": "turn:test",
+        },
+        salience=0.9,
+    )])
+    recorder = build_experience_recorder(tmp_path / "experience")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=CLOCK)
+    await recorder.start()
+    await turns.connect()
+    loop = CycleController(
+        workspace=ws,
+        providers=[p],
+        experience_recorder=recorder,
+        turn_controller=turns,
+    )
+    try:
+        await loop.tick_once()
+        persisted = await turns.load("turn:test")
+        assert persisted is not None
+        assert persisted.status == "completed"
+        assert persisted.revision == 3
+    finally:
+        await turns.close()
+        await recorder.stop()
 
 
 async def test_tick_no_broadcast_writes_no_moment(tmp_path: Path) -> None:
@@ -483,8 +521,10 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
             )]
 
     emitted: list[dict] = []
+    persisted_before_emit = []
 
     async def _sink(cmd):
+        persisted_before_emit.extend(read_ledger_moments(tmp_path))
         emitted.append(cmd)
 
     reasoning = _SequenceReasoning([
@@ -522,6 +562,11 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
     assert len(reasoning.requests) == 1
     assert reasoning.requests[0].metadata["purpose"] == "cognitive_action_plan"
     assert reasoning.requests[0].metadata["trace_id"] == "t-skill"
+    assert any(
+        moment.kind == "action"
+        and moment.content["action_type"] == "skill_request"
+        for moment in persisted_before_emit
+    )
     moments = list(read_ledger_moments(tmp_path))
     assert any(m.kind == "action" and m.content["action_type"] == "skill_request" for m in moments)
     assert not any(m.kind == "reply" for m in moments)

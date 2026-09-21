@@ -80,6 +80,50 @@ def working_config():
     )
 
 
+_V3_HISTORY_DDL = """
+CREATE TABLE schema_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE TABLE projection_meta(name TEXT PRIMARY KEY,position INTEGER NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE conversation_threads(
+  conversation_id TEXT PRIMARY KEY, continuity_id TEXT NOT NULL, scene_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL, recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE conversation_messages(
+  position INTEGER PRIMARY KEY, moment_id TEXT NOT NULL UNIQUE,
+  conversation_id TEXT NOT NULL REFERENCES conversation_threads(conversation_id),
+  chapter_id TEXT, scene_id TEXT NOT NULL, thread_id TEXT NOT NULL,
+  interaction_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('user','assistant')),
+  content TEXT NOT NULL, actor_id TEXT, actor_name TEXT, occurred_at TEXT NOT NULL,
+  importance REAL NOT NULL, recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL
+);
+CREATE INDEX idx_conversation_messages_thread ON conversation_messages(conversation_id,position DESC);
+CREATE TABLE conversation_chapters(
+  chapter_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL,
+  sequence INTEGER NOT NULL, status TEXT NOT NULL,
+  first_position INTEGER NOT NULL, last_position INTEGER NOT NULL,
+  started_at TEXT NOT NULL, ended_at TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '',
+  UNIQUE(conversation_id,sequence)
+);
+CREATE INDEX idx_conversation_chapters_active ON conversation_chapters(conversation_id,status,last_position);
+CREATE TABLE conversation_segments(
+  segment_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, chapter_id TEXT NOT NULL,
+  level INTEGER NOT NULL, parent_segment_id TEXT,
+  first_position INTEGER NOT NULL, last_position INTEGER NOT NULL,
+  summary TEXT NOT NULL, keywords_json TEXT NOT NULL, actor_ids_json TEXT NOT NULL,
+  recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL, created_at TEXT NOT NULL,
+  UNIQUE(conversation_id,level,first_position,last_position)
+);
+CREATE INDEX idx_conversation_segments_lookup ON conversation_segments(conversation_id,level,last_position DESC);
+CREATE TABLE conversation_segment_members(
+  segment_id TEXT NOT NULL,position INTEGER NOT NULL,PRIMARY KEY(segment_id,position)
+);
+CREATE TABLE conversation_state(
+  conversation_id TEXT PRIMARY KEY,version INTEGER NOT NULL,through_position INTEGER NOT NULL,
+  state_json TEXT NOT NULL,updated_at TEXT NOT NULL
+);
+"""
+
+
 async def test_log_is_single_writer_and_resumes_global_position(tmp_path: Path) -> None:
     first = recorder(tmp_path / "log")
     competing = recorder(tmp_path / "log")
@@ -258,3 +302,232 @@ async def test_failed_stop_keeps_single_writer_until_retry_succeeds(tmp_path: Pa
     await competitor.stop()
     assert second is not None and second.seq == 2
     assert [item.seq for item in competitor.log.query()] == [1, 2]
+
+
+async def test_idempotent_fact_replay_keeps_original_position_and_rejects_conflict(
+    tmp_path: Path,
+) -> None:
+    base_dir = tmp_path / "log"
+    subject = recorder(base_dir)
+    await subject.start()
+    first = subject.record(
+        MomentKind.ACTION,
+        {"action_type": "tool_call", "invocation_id": "invoke-1"},
+        idempotency_key="tool-call:invoke-1",
+    )
+    await subject.flush()
+    replay = subject.record(
+        MomentKind.ACTION,
+        {"action_type": "tool_call", "invocation_id": "invoke-1"},
+        idempotency_key="tool-call:invoke-1",
+    )
+    assert replay is not None and first is not None
+    assert replay.moment_id == first.moment_id
+    assert replay.seq == first.seq == 1
+    assert len(subject.log.query()) == 1
+
+    with pytest.raises(RuntimeError, match="幂等 fact 冲突"):
+        subject.record(
+            MomentKind.ACTION,
+            {"action_type": "tool_call", "invocation_id": "changed"},
+            idempotency_key="tool-call:invoke-1",
+        )
+    await subject.stop()
+
+
+async def test_history_v3_migrates_losslessly_to_thread_scoped_v4(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "history.db"
+    timestamp = "2026-01-01T00:00:00Z"
+    with sqlite3.connect(database) as connection:
+        connection.executescript(_V3_HISTORY_DDL)
+        connection.execute("INSERT INTO schema_meta VALUES('schema_version','3')")
+        connection.execute(
+            "INSERT INTO projection_meta VALUES('conversation',2,?)",
+            (timestamp,),
+        )
+        connection.execute(
+            "INSERT INTO conversation_threads VALUES(?,?,?,?,?,?,?,?)",
+            (
+                "conversation:migrate",
+                "continuity:legacy",
+                "scene:legacy",
+                "main",
+                "conversation_private",
+                "conversation_private",
+                timestamp,
+                timestamp,
+            ),
+        )
+        connection.executemany(
+            "INSERT INTO conversation_messages VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                (
+                    1,
+                    "moment:user",
+                    "conversation:migrate",
+                    "chapter:legacy",
+                    "scene:legacy",
+                    "main",
+                    "interaction:legacy",
+                    "user",
+                    "迁移前的问题",
+                    None,
+                    None,
+                    timestamp,
+                    0.6,
+                    "conversation_private",
+                    "conversation_private",
+                ),
+                (
+                    2,
+                    "moment:assistant",
+                    "conversation:migrate",
+                    "chapter:legacy",
+                    "scene:legacy",
+                    "main",
+                    "interaction:legacy",
+                    "assistant",
+                    "迁移前的回答",
+                    "selrena",
+                    "月见",
+                    timestamp,
+                    0.5,
+                    "conversation_private",
+                    "conversation_private",
+                ),
+            ),
+        )
+        connection.execute(
+            "INSERT INTO conversation_chapters VALUES(?,?,?,?,?,?,?,?,?)",
+            (
+                "chapter:legacy",
+                "conversation:migrate",
+                1,
+                "active",
+                1,
+                2,
+                timestamp,
+                timestamp,
+                "迁移前的章节摘要",
+            ),
+        )
+        connection.execute(
+            "INSERT INTO conversation_segments VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "segment:legacy",
+                "conversation:migrate",
+                "chapter:legacy",
+                0,
+                None,
+                1,
+                2,
+                "迁移前的问题与回答",
+                '["迁移", "回答"]',
+                '["selrena"]',
+                "conversation_private",
+                "conversation_private",
+                timestamp,
+            ),
+        )
+        connection.executemany(
+            "INSERT INTO conversation_segment_members VALUES(?,?)",
+            (("segment:legacy", 1), ("segment:legacy", 2)),
+        )
+        connection.execute(
+            "INSERT INTO conversation_state VALUES(?,?,?,?,?)",
+            (
+                "conversation:migrate",
+                2,
+                2,
+                '{"active_topic":"迁移前的问题",'
+                '"_recall_scope":"conversation_private",'
+                '"_disclosure_scope":"conversation_private"}',
+                timestamp,
+            ),
+        )
+        connection.commit()
+
+    store = ConversationStore(database, config=projection_config())
+    await store.connect()
+    assert await store.checkpoint() == 2
+    state, messages = await store.load_working_set(
+        "conversation:migrate", "main", limit=8
+    )
+    segments = await store.retrieve_segments(
+        "conversation:migrate",
+        "main",
+        "迁移回答",
+        allowed_scopes={"conversation_private"},
+        limit=4,
+    )
+    await store.close()
+
+    assert state["active_topic"] == "迁移前的问题"
+    assert [message.content for message in messages] == ["迁移前的问题", "迁移前的回答"]
+    assert segments == ["迁移前的问题与回答"]
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT value FROM schema_meta WHERE key='schema_version'"
+        ).fetchone() == ("4",)
+        assert connection.execute(
+            "SELECT thread_id FROM conversation_chapters"
+        ).fetchone() == ("main",)
+        assert connection.execute(
+            "SELECT thread_id FROM conversation_segments"
+        ).fetchone() == ("main",)
+        assert connection.execute(
+            "SELECT thread_id FROM conversation_state"
+        ).fetchone() == ("main",)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'v3_%'"
+        ).fetchone() == (0,)
+
+
+async def test_history_isolates_multiple_threads_in_one_conversation(
+    tmp_path: Path,
+) -> None:
+    log = recorder(tmp_path / "log")
+    await log.start()
+    for thread_id, continuity_id, user_text, reply_text in (
+        ("main", "continuity:main", "主线程问题", "主线程回答"),
+        ("topic:audio", "continuity:audio", "音频线程问题", "音频线程回答"),
+    ):
+        common = {
+            "scene_id": "scene:shared",
+            "conversation_id": "conversation:shared",
+            "continuity_id": continuity_id,
+            "thread_id": thread_id,
+            "interaction_id": f"interaction:{thread_id}",
+        }
+        log.record(MomentKind.PERCEPTION, {"text": user_text}, **common)
+        log.record(MomentKind.REPLY, {"text": reply_text}, **common)
+
+    controller = ConversationController(
+        store=ConversationStore(tmp_path / "history.db", config=projection_config()),
+        recorder=log,
+        working_config=working_config(),
+    )
+    await controller.connect()
+    _, main_recent, main_history = await controller.prompt_context(
+        "conversation:shared",
+        "main",
+        "主线程",
+        allowed_scopes={"conversation_private"},
+    )
+    _, audio_recent, audio_history = await controller.prompt_context(
+        "conversation:shared",
+        "topic:audio",
+        "音频线程",
+        allowed_scopes={"conversation_private"},
+    )
+    await controller.close()
+    await log.stop()
+
+    assert "主线程问题" in main_recent and "主线程回答" in main_recent
+    assert "音频线程" not in main_recent
+    assert "音频线程问题" in audio_recent and "音频线程回答" in audio_recent
+    assert "主线程" not in audio_recent
+    assert "主线程" in main_history and "音频线程" not in main_history
+    assert "音频线程" in audio_history and "主线程" not in audio_history

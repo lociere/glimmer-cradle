@@ -207,6 +207,7 @@ export class CognitionClient {
         sceneId: request.scene_id ?? 'default',
         conversation: request.conversation ? mapConversation(request.conversation) : undefined,
         toolResults: request.tool_results.map((result) => ({
+          skillId: result.skill_id ?? '',
           toolName: result.tool_name,
           status: result.status,
           resultJson: result.result_json,
@@ -216,6 +217,7 @@ export class CognitionClient {
           providerVersion: result.provider_version ?? '',
           sourceEventId: result.source_event_id,
           schemaRef: result.schema_ref,
+          argumentsJson: result.arguments_json ?? '',
         })),
       }),
       { timeoutMs, traceId, signal },

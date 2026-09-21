@@ -104,7 +104,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 1 | v2 权威入口、ADR、增量边界检查与显式 legacy debt | 已完成：51 条例外、68 处起始命中；CI 接入 contract architecture gate |
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
-| 4 | Conversation log/history/binding/Turn 唯一 owner | 进行中：owner、单写者与完整门禁已收束，固定候选独立审查待执行 |
+| 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 待执行 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
@@ -119,6 +119,24 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 
 每阶段先更新本记录中的计划，再实施；完成报告按执行要求 §20 的九项填写。
 阶段 0 完成时 public API、持久数据与运行链路尚未修改；阶段 2 已调整 Platform public API 与 Kernel 生命周期接线，阶段 3 已完成 Content/AssetRef 持久边界。后续切片的当前变化与验证以本页对应记录为准；基线及执行要求是目标来源，不代表未列明的迁移已经完成。
+
+### v2.1 当前路径到目标文件映射（阶段 4）
+
+本表是阶段 4 的迁移输入，不表示目标文件已经实现；精确目标路径仍以
+[`architecture-target-v2.1.json`](../architecture/blueprint/architecture-target-v2.1.json) 为准。
+每次物理迁移须同时切换消费者、测试、构建入口和旧路径删除门，禁止按表机械复制形成双 owner。
+
+| 当前事实 | v2.1 目标文件 | 本阶段处理与删除门 |
+|---|---|---|
+| `core/conversation/src/index.ts` 中 binding 类型与算法 | `core/conversation/src/binding/{binding.ts,binding-resolver.ts,binding-store-port.ts}`、`src/adapters/storage/sqlite-binding-store.ts` | 先拆纯模型/解析与持久绑定；稳定 ID、旧地址样本和 Kernel consumer 全切换后删除聚合实现 |
+| 尚缺的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 由 Host 通过 `apps/host/src/composition/turn-processor-adapter.ts` 绑定 Cognition；接纳、去重和中断反例通过后替换 Kernel 旧入口 |
+| 尚缺的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出和 unknown 回执通过恢复测试后切换 Surface 投递链 |
+| `python/glimmer_cradle/conversation/log/*` | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/log_store.py` | 保留 v4/v5 ID、position、单写者和 pack 读取；阶段 14 备份/恢复及 consumer-zero 后迁路径和文件名 |
+| `python/glimmer_cradle/conversation/history/{store.py,controller.py}` | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | v3→v4、多 thread、分页、重建和权限反例通过后拆分；`conversations.db` 始终为投影 |
+| `python/glimmer_cradle/conversation/turn/models.py` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | Conversation 持久 Turn 与 Cognition Step 分离；重启恢复、合法转换与重复请求通过后删除瞬态替代语义 |
+| Cognition `CycleContinuity`、`AgentSynthesisUseCase` 的 action/result 记录 | Conversation Log 的 ACTION → ACTION_RESULT → REPLY 因果事实；跨进程映射暂经现行 cognition proto | 本切片先确保副作用前 flush、稳定 invocation 与幂等重放；阶段 6 切换 native ToolCall/ToolResult 后删除 `skill_request` 兼容链 |
+| `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 阶段 12 切 App composition；Conversation writer drain 与 Cognition checkpoint 都通过后删除旧 Worker 入口 |
+| Kernel composition、Surface history 与 skill action 接线 | `apps/host/src/adapters/protocol/conversation-mapper.ts`、`composition/{domain-owners.ts,turn-processor-adapter.ts}`、`gateway/conversation-routes.ts` | 阶段 12/15 消费者切换并通过本地/headless 共用 Host 验收后删除旧 Kernel 业务接线 |
 
 ## 兼容窗口与删除门
 
@@ -196,8 +214,9 @@ Turn 由 Conversation 拥有稳定交互身份、Conversation/continuity/thread 
 只组合该 Turn 和模型循环瞬态，模型 Step 留阶段 5 收束。仓库中的 Surface Gateway、WebSocket、认证和
 provider session 均为连接或授权生命周期，不是持久聊天实体；核心持久连续性只使用 Conversation。
 
-阶段 4 尚未标记完成：当前固定候选的完整门禁已通过；仍须满足高风险持久化 owner 变更的独立只读
-审查要求。未获得独立审查前不进入下一阶段写入。
+阶段 4 尚未标记完成：下述 v2.0 固定候选的完整门禁曾通过，但 v2.1 已扩大 Conversation 的目标范围；
+该证据不能覆盖新增 interaction/delivery、持久 Turn 与物理目录契约。依用户授权，非必要中间审查延后到
+整体重构固定候选集中执行；高风险持久化与跨进程边界仍必须在最终候选接受前完成独立只读审查。
 
 固定候选证据：`@glimmer-cradle/conversation` TypeScript 3 项与 Python 4 项、Cognition 全量 256 项、
 Kernel 全量 201 项（另 7 项跳过；原 2 项 Directory 测试已迁至 Conversation）、Desktop 10 项，
@@ -207,6 +226,17 @@ v4/v5、catalog 重建、scope 漂移、稳定 cursor、Episode 恢复和工具�
 深导入 Conversation 内部 `log/ports`，改为根入口公开契约后重跑通过；Cognition 全量和 Conversation
 双语言测试也在该修复后再次通过。并行早期首跑曾因 Conversation 包尚未构建而使 Kernel typecheck
 报模块缺失，按根构建依赖顺序重跑即通过；两次失败均已修正且不属于当前候选。
+
+v2.1 继续实施后，上述 v2.0 固定候选证据仅作为历史输入，不再代表阶段 4 当前候选已经通过。
+当前切片补 ACTION 副作用前 durable barrier、稳定 invocation 的 ToolCall/ToolResult/Reply 因果链和幂等
+重放，并同步 Contract Spine 的调用元数据。History v3→v4 迁移释放 SQLite 重命名后遗留的旧索引名，新增
+无损迁移与同 conversation 多 thread 隔离反例。Conversation 持久 Turn 已具备幂等接纳、上下文冲突拒绝、
+乐观修订、合法终态和重启中断恢复；Cognition 普通回复/沉默在 Log 提交后完成 Turn，能力请求等待
+ToolCall/ToolResult/Reply flush 后完成。Conversation Python 14 项、相关 Cognition 47 项定向测试与
+Cognition 全量 258 项 PASS。
+Contract Spine 完整 verify（21 项 gate、inventory、Buf lint/breaking、JSON Schema、toolchain、三语言
+roundtrip、generated-clean）、docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。
+interaction、delivery、目标物理拆分和阶段 14 数据迁移仍属于阶段 4/后续依赖工作，因此不标记阶段完成。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

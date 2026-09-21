@@ -114,6 +114,7 @@ class CognitionHost:
             # 1.66 先连接事实库并恢复投影，认知循环不得在 repository ready 前消费输入。
             cognition_database = components.cognition_database
             await cognition_database.connect()
+            await components.turn_controller.connect()
             await components.conversation_controller.connect()
             await components.memory_substrate.load()
             await components.knowledge_base.load_persisted()
@@ -215,6 +216,11 @@ class CognitionHost:
                 await components.conversation_controller.close()
             except Exception as e:
                 logger.error(f"Error closing conversation store: {e}")
+
+            try:
+                await components.turn_controller.close()
+            except Exception as e:
+                logger.error(f"Error closing conversation turn store: {e}")
 
             # 最后停止 Conversation Log 单写者。进程关闭属于 telemetry，不写伪造 Moment。
             try:
