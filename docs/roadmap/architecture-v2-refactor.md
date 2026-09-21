@@ -1,4 +1,4 @@
-# Architecture Baseline v2.0 重构执行记录
+# Architecture Baseline v2.1 重构执行记录
 
 > 范围：本地仓库渐进重构的审计、阶段计划、验收证据和未完成项。
 > 事实依据：起始 commit `0f793adbba586c7a80a841c56ea3fbe40a1183b8`、实际源码及用户提供的两份原文。
@@ -6,8 +6,8 @@
 
 ## 目标与执行边界
 
-用户授权按 [冻结基线](../architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
-和 [执行要求](../architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md) 完成重构。
+用户授权按 [冻结基线](../architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
+和 [执行要求](../architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.1.md) 完成重构。
 冻结基线决定目标边界，执行要求决定阶段与验收。当前执行任务为唯一工作树写入 owner。
 开始时工作树干净；本次包含本地代码、测试、文档与迁移实现，生产迁移、发布和推送不在当前授权内。
 已有运行数据不得删除；历史发布事实不回写。不得把局部检查通过写成整体重构完成。
@@ -16,10 +16,31 @@
 
 - 规范修订 1：依据用户本轮授权与 ADR-0021，修正 Runtime、Embodiment/Avatar、wire/domain、第三方依赖及改名兼容规则；命名指南和 agent 入口同步，基线锁更新为 v2.0-r1。未进行产品代码或数据迁移。
 
-- [执行宪章](../architecture/blueprint/Architecture_Baseline_v2.0_执行宪章.md) 固定权威顺序、目标边界、迁移纪律和偏离处理。
+- [执行宪章](../architecture/blueprint/Architecture_Baseline_v2.1_执行宪章.md) 固定权威顺序、目标边界、迁移纪律和偏离处理。
 - `architecture-baseline-v2.lock.json` 固定当前已授权基线修订与执行要求的 SHA-256，并显式固定五个目标根、七个 Core 模块和迁移政策；原始基线保留在 Git `cbb6c853`。
 - `check:architecture` 在其他边界规则前验证基线锁；原文、锁定决策或文件缺失都会失败。
 - 架构目标变更必须同时具备用户明确决策、accepted ADR、新的版本化基线以及 lock/gate 更新；普通实现切片无权改写目标。
+
+## v2.1 完整目标补齐（2026-09-21）
+
+依据 [ADR-0023](../architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 切换 v2.1。
+本轮仅更新设计、文件清单及其校验机制，未迁移产品代码和数据；下文初始审计与已完成阶段保持历史事实。
+首要原则是核心不为第三方环境特化；可选接入因独立演进与生命周期采用 Extension，基础依赖和 App 技术不机械扩展化。
+
+新增差距：Conversation interaction/delivery 与持久 Turn 分工；Cognition state/knowledge/planning/checkpoint；
+Execution journal/outbox/unknown；Jobs fencing；共用 Host；authority handover；完整 TS/Python/C#/Unity/native 制品与恢复门。
+具体目标路径见 [物理目录](../architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md)，不能继续用初始审计表的概念路径作为最终路径。
+下一实现切片须按该清单补当前 → 目标的文件映射；`check:target-layout:final` 在迁移树上预期失败。
+当前架构旧路径规则仍服务于迁移事实，阶段 15 必须切换为最终依赖/路径规则并清空迁移例外。
+
+本轮验证（2026-09-21；本地 dirty 候选，仅文档、agent 路由、基线锁和 repo-checks 工具/命令变化）：
+
+- PASS：目录规范/生成树同步，1,097 个目标文件与 333 个父目录；六份规范源的摘要锁一致。
+- PASS：repo-checks 全部 21 项测试；含缺项、多项、非法路径、大小写/文件目录冲突、展示树漂移与最终实物模式反例。
+- PASS：`pnpm check:docs`（111 份活跃页）、`pnpm check:encoding`、`pnpm check:architecture`、根 `pnpm typecheck`、根 `pnpm build`。
+- 预期 FAIL：最终源码文件核对缺少 816 个目标文件、存在 1,116 个清单外现行文件，无其他规格错误。完整差距输出在本地 `build/reports/architecture-v2/target-layout-final.json`；这些数量反映迁移差距，不代表可直接删除文件。
+- 未执行：产品数据迁移、真实扩展/设备、C#/Unity/native 新目标构建与最终安装恢复；本轮没有实现这些新目标，不宣称已经通过。
+- 证据失效条件：清单/树/摘要/校验器或被验证构建输入变化；后续切片按相关输入重新验证。
 
 ## 第零阶段：初始审计
 

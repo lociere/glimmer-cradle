@@ -1,5 +1,7 @@
 # ADR-0019：采用 Architecture Baseline v2.0 冻结基线
 
+> 目标版本选择已由 [ADR-0023](./ADR-0023-最终目标蓝图与物理目录契约.md) 替代；本文保留当时决策及仍有效的迁移/命名纪律。
+
 - 状态：accepted
 - 日期：2026-09-15
 
@@ -13,8 +15,8 @@
 
 ## Decision
 
-[Architecture Baseline v2.0 (Frozen)](../blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
-是唯一目标架构基线，[执行要求](../blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md)
+[Architecture Baseline v2.0 (Frozen)](../../history/architecture-v2.0/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
+是唯一目标架构基线，[执行要求](../../history/architecture-v2.0/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md)
 规定阶段和验收方式。两份用户原文保留原内容，不将实施解释写入原文。
 
 本决策替代旧蓝图与 ADR 中冲突的目标边界：

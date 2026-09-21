@@ -27,6 +27,6 @@ Extension 在 `PERCEPTION_WRITE` 下分块暂存到 `data/work/content/`，上�
 
 ## Links
 
-- Architecture：[Architecture Baseline v2.0](../blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
+- Architecture：[Architecture Baseline v2.0](../../history/architecture-v2.0/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
 - Reference：[协议](../../reference/protocol.md)、[数据布局](../../reference/data-layout.md)
 - 执行记录：[阶段三](../../roadmap/architecture-v2-refactor.md)

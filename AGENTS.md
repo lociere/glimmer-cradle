@@ -1,11 +1,14 @@
 # Glimmer Cradle（微光摇篮）协作约定
 
+> 当前目标采用 [ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 的 v2.1 蓝图与完整物理清单；旧 v2.0 版本绑定已替代。第三方来源不是强制扩展化条件，按职责、可替换性和生命周期判断。
+
+
 ## 当前架构迁移目标
 
-- 基线采用 [ADR-0021](docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md) 的规范修订 1；命名实施统一遵循 [命名规范](docs/guides/development/命名规范.md)，旧术语不得覆盖 v2 目标语义。
+- 基线采用 [ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 的 v2.1；ADR-0021 的命名与兼容纪律继续有效。命名实施统一遵循 [命名规范](docs/guides/development/命名规范.md)，旧术语不得覆盖 v2 目标语义。
 
-- 用户指定的 [Architecture Baseline v2.0](docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
-  为唯一目标基线；[ADR-0019](docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md)
+- 用户指定的 [Architecture Baseline v2.1](docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
+  为唯一目标基线；[ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md)
   替代下文冲突的目标路径与 owner 约束。实际 `contracts/`、`packages/extension-sdk/` 等仍是当前事实，迁移前不得建立第二契约源。
 - 本次按 [执行记录](docs/roadmap/architecture-v2-refactor.md) 分阶段推进；旧目录删除以 consumer-zero、数据迁移与验证为条件。
 

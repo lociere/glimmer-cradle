@@ -5,34 +5,64 @@ import path from 'node:path';
 const lockPath = 'docs/architecture/blueprint/architecture-baseline-v2.lock.json';
 
 const expectedLock = {
-  schemaVersion: 1,
-  baselineId: 'glimmer-cradle-architecture-v2.0-r1',
-  status: 'frozen',
-  immutableSources: [
+  "schemaVersion": 1,
+  "baselineId": "glimmer-cradle-architecture-v2.1",
+  "status": "frozen",
+  "immutableSources": [
     {
-      path: 'docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md',
-      sha256: 'ae6177596288211cb845569d164699a64865430638b2466b67a0d23c30b09626',
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md",
+      "sha256": "f7dac802ed791ad51db79e6f40fcd7b2056bde1117c9286b91ff3976d6fcf0dc"
     },
     {
-      path: 'docs/architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md',
-      sha256: '8b1791fb17c8dcb3a8936082e6168526c7cf437cfd30d12878d7ef90b51c01a8',
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.1.md",
+      "sha256": "88526a6e79f4e195324d6d0c74b4f8325d66445444645b732823be634ec8f0fb"
     },
+    {
+      "path": "docs/architecture/blueprint/Architecture_Baseline_v2.1_执行宪章.md",
+      "sha256": "87a73b0656526afbd063689ad1e6c72b2cc39ad4ef2f1b58bd800a906bc0e8f5"
+    },
+    {
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md",
+      "sha256": "851a9b03b0ebc2104b0fb905e37888245d7ac53815ccd510837e2485459cf126"
+    },
+    {
+      "path": "docs/architecture/blueprint/architecture-target-v2.1.json",
+      "sha256": "374a5306b19951cbeace767887c9adcfa9de236df03b51905b199cd608d80118"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",
+      "sha256": "ad9bba8edd68e8978fad227efde9123cbdef98ca7ecb95eb23233d6d18867b70"
+    }
   ],
-  targetRoots: ['core', 'extension-sdk', 'apps', 'protocol', 'docs'],
-  coreModules: ['platform', 'content', 'conversation', 'cognition', 'capabilities', 'jobs', 'embodiment'],
-  migrationPolicy: {
-    singleCanonicalWriter: true,
-    consumerZeroBeforeDelete: true,
-    noEmptyNamespaces: true,
-    noWholeKernelMove: true,
-    atomicProtocolCutover: true,
+  "targetRoots": [
+    "core",
+    "extension-sdk",
+    "apps",
+    "protocol",
+    "docs"
+  ],
+  "coreModules": [
+    "platform",
+    "content",
+    "conversation",
+    "cognition",
+    "capabilities",
+    "jobs",
+    "embodiment"
+  ],
+  "migrationPolicy": {
+    "singleCanonicalWriter": true,
+    "consumerZeroBeforeDelete": true,
+    "noEmptyNamespaces": true,
+    "noWholeKernelMove": true,
+    "atomicProtocolCutover": true
   },
-  changeRequirements: [
-    'explicit-user-decision',
-    'accepted-adr',
-    'versioned-baseline',
-    'lock-and-gate-update',
-  ],
+  "changeRequirements": [
+    "explicit-user-decision",
+    "accepted-adr",
+    "versioned-baseline",
+    "lock-and-gate-update"
+  ]
 };
 
 function stableJson(value) {
@@ -56,7 +86,7 @@ export function checkArchitectureBaselineLock(repositoryRoot) {
   }
 
   if (stableJson(actualLock) !== stableJson(expectedLock)) {
-    violations.push(`${lockPath}: frozen architecture decisions changed; a new user decision, ADR and versioned baseline are required`);
+    violations.push(`${lockPath}: frozen architecture decisions changed; synchronize the governed baseline, manifest and gate; semantic boundary changes require a user decision and ADR`);
     return violations;
   }
 

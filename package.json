@@ -57,7 +57,9 @@
     "avatar:composition:build": "node hosts/unity-avatar-host/scripts/build-native.mjs",
     "avatar:build": "node hosts/unity-avatar-host/scripts/build.mjs",
     "prebuild:all": "node products/desktop/scripts/sync-assets.mjs",
-    "check:pr": "pnpm check:encoding && pnpm check:docs && pnpm check:architecture && pnpm test && pnpm typecheck && pnpm build"
+    "check:pr": "pnpm check:encoding && pnpm check:docs && pnpm check:architecture && pnpm test && pnpm typecheck && pnpm build",
+    "check:target-layout": "pnpm --filter @glimmer-cradle/repo-checks --fail-if-no-match run check:target-layout",
+    "check:target-layout:final": "pnpm --filter @glimmer-cradle/repo-checks --fail-if-no-match run check:target-layout:final"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

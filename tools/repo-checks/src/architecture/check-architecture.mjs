@@ -6,9 +6,11 @@ import { checkWorkspaceArtifactBoundaries } from './rules/workspace-artifact-bou
 import { checkWorkspaceBoundaries } from './rules/workspace-boundaries.mjs';
 import { checkV2Boundaries } from './v2-boundaries.mjs';
 import { checkArchitectureBaselineLock } from './baseline-lock.mjs';
+import { checkTargetLayout } from './target-layout.mjs';
 
 const rules = [
   checkArchitectureBaselineLock,
+  checkTargetLayout,
   checkRepositoryTopology,
   checkWorkspaceArtifactBoundaries,
   checkLegacyPaths,

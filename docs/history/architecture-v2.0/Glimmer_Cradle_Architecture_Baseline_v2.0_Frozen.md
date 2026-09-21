@@ -1020,7 +1020,7 @@ Context budget 同理：所有 Persona/Memory/Resource 都可以存在，但不�
 
 本节规定职责语义；语言拼写、迁移步骤和检查清单统一维护于
 [命名规范](../../guides/development/命名规范.md)。修订依据见
-[ADR-0021](../decisions/ADR-0021-架构基线规范修订与命名收束.md)。
+[ADR-0021](../../architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md)。
 
 推荐术语：
 

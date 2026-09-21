@@ -24,6 +24,8 @@ const allowedRootFacadeReferences = new Map([
   ['check:docs', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:architecture', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:encoding', new Set(['@glimmer-cradle/repo-checks'])],
+  ['check:target-layout', new Set(['@glimmer-cradle/repo-checks'])],
+  ['check:target-layout:final', new Set(['@glimmer-cradle/repo-checks'])],
   ['dev', new Set(['@glimmer-cradle/workspace-supervisor'])],
   ['dev:all', new Set(['@glimmer-cradle/workspace-supervisor'])],
   ['dev:desktop', new Set(['@glimmer-cradle/workspace-supervisor'])],

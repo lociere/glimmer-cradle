@@ -6,7 +6,7 @@
 
 ## 当前主线
 
-按 [Architecture Baseline v2.0 规范修订 1](../architecture/blueprint/README.md) 渐进重构。
+按 [Architecture Baseline v2.1](../architecture/blueprint/README.md) 渐进重构。
 阶段 2 正在进行：Platform 的 Clock、StableIdentity、Observability、Lifecycle 与 LiveEvent contracts
 已落地，Kernel 仍承担产品装配、readiness、领域事件、durable replay 和 DLQ。
 完整阶段状态及验证范围只在 [执行记录](./architecture-v2-refactor.md) 维护。

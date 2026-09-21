@@ -1,0 +1,4653 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "glimmer-cradle-architecture-v2.1",
+  "status": "target-not-implemented",
+  "repositoryFiles": [
+    {
+      "path": ".codex/skills/glimmer-cradle/SKILL.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/agents/openai.yaml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/architecture/Runtime与生命周期.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/architecture/协议与跨边界契约.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/architecture/可观测性与诊断.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/architecture/数据、配置与路径.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/architecture/架构边界与决策.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/common/文档、注释与编码.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/subsystems/AI前端开发.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/subsystems/Cognition.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/subsystems/Desktop与Avatar.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/subsystems/Extensions与SkillPlane.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/subsystems/Frontend与UI.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/workflow/上下文与工具.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/workflow/会话与任务编排.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/workflow/审查与风险评估.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/workflow/开发工作流.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".codex/skills/glimmer-cradle/references/workflow/测试与交付.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".dockerignore",
+      "owner": "engineering"
+    },
+    {
+      "path": ".editorconfig",
+      "owner": "engineering"
+    },
+    {
+      "path": ".gitattributes",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/pr.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/release-desktop.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/release-extension-sdk.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/release-personal-server.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/verify-extension-distribution.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/verify-final-architecture.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".github/workflows/verify-native-renderer.yml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".gitignore",
+      "owner": "engineering"
+    },
+    {
+      "path": ".nvmrc",
+      "owner": "engineering"
+    },
+    {
+      "path": ".python-version",
+      "owner": "engineering"
+    },
+    {
+      "path": "AGENTS.md",
+      "owner": "engineering"
+    },
+    {
+      "path": "LICENSE",
+      "owner": "engineering"
+    },
+    {
+      "path": "README.md",
+      "owner": "engineering"
+    },
+    {
+      "path": "apps/cognition-worker/README.md",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/pyproject.toml",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/schemas/worker-config.schema.json",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/__init__.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/__main__.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/__init__.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/capability_client.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/cognition_mapper.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/content_client.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/conversation_mapper.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/job_client.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/resource_client.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/py.typed",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/readiness.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/service.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/shutdown.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/conftest.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/fixtures/worker-config.json",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/test_process_recovery.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/test_public_api.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/test_rpc_roundtrip.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/cognition-worker/tests/test_shutdown_flush.py",
+      "owner": "cognition-worker"
+    },
+    {
+      "path": "apps/desktop/README.md",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/electron-builder.yaml",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/index.html",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/CMakeLists.txt",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/include/platform_native.h",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/package.manifest.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/src/composition_host_stub.cpp",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/src/composition_host_windows.cpp",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/tests/architecture-boundaries.test.mjs",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/native/tests/composition_contract_test.cpp",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/playwright.config.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/resources/icon.ico",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/resources/icon.png",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/resources/icon.svg",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/schemas/desktop-config.schema.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/schemas/surfaces.schema.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/scripts/build-native.mjs",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/scripts/build.mjs",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/scripts/package-release.mjs",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/scripts/sync-assets.mjs",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/index.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/app-paths.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/composition.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/host-supervisor.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/main.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/native-composition.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/tray-controller.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/update-controller.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/main/window-controller.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/preload/desktop-api.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/App.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/api/desktop-client.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/api/host-client.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/AudioControls.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/Composer.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/ConnectionStatus.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/ContentPart.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/ErrorBoundary.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/components/MessageList.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/main.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/CharacterPage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/ConversationPage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/DiagnosticsPage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/ExtensionsPage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/KnowledgePage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/pages/SettingsPage.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/state/connection-store.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/state/projection-store.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/styles.css",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/surfaces/ControlCenterSurface.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer/surfaces/PresenceSurface.tsx",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/src/shared/ipc-contract.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/fixtures/desktop-config.yaml",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/host-supervision.test.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/preload-permissions.test.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/projection-reconnect.test.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/public-api.test.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/ui/accessibility.spec.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/ui/conversation.spec.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tests/window-lifecycle.test.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tsconfig.build.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/tsconfig.json",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/vite.config.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/desktop/vitest.config.ts",
+      "owner": "desktop"
+    },
+    {
+      "path": "apps/extension-host/README.md",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/package.json",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/broker-client.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/composition.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/contribution-registry.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/index.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/loader.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/main.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/managed-process.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/pending-calls.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/protocol-mapper.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/src/shutdown.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/fixtures/extension/extension-manifest.yaml",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/fixtures/extension/package.json",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/fixtures/extension/src/index.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/load-unload.test.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/process-crash.test.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/public-api.test.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tests/revoke-pending.test.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tsconfig.build.json",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/tsconfig.json",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/extension-host/vitest.config.ts",
+      "owner": "extension-host"
+    },
+    {
+      "path": "apps/host/README.md",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/.env.example",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/Caddyfile",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/Dockerfile",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/bootstrap-host.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/compose.source.yaml",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/compose.yaml",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/container/entrypoint.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/container/ops-bridge-core.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/container/ops-bridge-handoff.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/container/ops-bridge.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/container/supervisor.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/deploy.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/install-release.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/install-remote.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/install.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/lib/host-transaction.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/tests/fixtures/docker",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/tests/fixtures/sudo",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/tests/install-rollback.test.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/deployment/tests/test-host-transaction.sh",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/index.html",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/migrations/001-authority.sql",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/package.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/schemas/extension-catalog.schema.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/schemas/host-config.schema.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/schemas/topology.schema.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/scripts/build.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/scripts/check-version.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/scripts/package-release.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/scripts/smoke.mjs",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/platform/authority-store.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/platform/backup-coordinator.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/platform/data-paths.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/platform/migration-coordinator.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/capability-mapper.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/cognition-client.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/content-mapper.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/conversation-mapper.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/embodiment-mapper.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/extension-client.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/adapters/protocol/job-mapper.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/devices.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/files.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/network.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/permissions.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/process.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/broker/secrets.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/cli.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/composition/cognition-job-adapter.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/composition/domain-owners.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/composition/extension-contributions.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/composition/host.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/composition/turn-processor-adapter.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/extensions/extension-catalog.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/extensions/extension-installer.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/extensions/extension-state.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/authentication.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/content-routes.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/control-routes.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/conversation-routes.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/http-server.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/gateway/websocket-server.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/index.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/main.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/supervision/readiness.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/supervision/shutdown.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/supervision/worker-supervisor.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/App.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/components/ConnectionStatus.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/components/ErrorBoundary.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/host-client.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/main.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/pages/ConversationsPage.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/pages/DiagnosticsPage.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/pages/ExtensionsPage.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/pages/JobsPage.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/pages/OverviewPage.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/src/ui/styles.css",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/authority-handover.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/backup-restore.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/broker-denial.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/extension-install-rollback.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/fixtures/host-config.yaml",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/host-startup.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/public-api.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/turn-processor.test.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tests/ui-navigation.test.tsx",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tsconfig.build.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/tsconfig.json",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/vite.config.ts",
+      "owner": "host"
+    },
+    {
+      "path": "apps/host/vitest.config.ts",
+      "owner": "host"
+    },
+    {
+      "path": "configs/README.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/assets/README.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/character.manifest.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/dialogue.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/inference.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/knowledge/food-daily.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/knowledge/index.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/knowledge/time-awareness.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/knowledge/weather-seasons.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/migrations/README.md",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/profile.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/providers.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/safety.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/characters/selrena/voice.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/extensions/active.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/extensions/catalog.lock.json",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/secrets/secrets.example.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/avatar.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/capabilities.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/cognition.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/host.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/jobs.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/observability.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/platform.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/system/surfaces.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/topology/cloud.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/topology/hybrid.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "configs/topology/local.yaml",
+      "owner": "configuration"
+    },
+    {
+      "path": "core/capabilities/README.md",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/migrations/001-execution-journal.sql",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/package.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/schemas/capabilities-config.schema.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/schemas/skill.schema.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/adapters/storage/sqlite-execution-journal.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/execution-controller.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/execution-journal.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/execution-policy.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/execution-router.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/execution-target.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/executor-port.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/invocation.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/reconciliation.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/execution/result-outbox.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/exposure/exposure-controller.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/exposure/exposure-policy.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/exposure/step-surface.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/index.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/resources/resource-registry.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/resources/resource-revision.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/resources/resource.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/skills/skill-catalog.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/skills/skill.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/speech/audio-stream.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/speech/recognition.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/speech/speech-provider.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/speech/synthesis.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/tools/tool-call.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/tools/tool-registry.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/tools/tool-result.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/src/tools/tool.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/execution-unknown-recovery.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/exposure-permissions.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/fixtures/invocations.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/fixtures/skill.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/public-api.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/registry-unload.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/result-outbox-idempotency.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/revoked-before-dispatch.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tests/speech-cancellation.test.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tsconfig.build.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/tsconfig.json",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/capabilities/vitest.config.ts",
+      "owner": "capabilities"
+    },
+    {
+      "path": "core/cognition/README.md",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/migrations/001-state.sql",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/migrations/002-memory.sql",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/migrations/003-knowledge.sql",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/migrations/004-planning.sql",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/migrations/005-checkpoints.sql",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/pyproject.toml",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/character-manifest.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/cognition-config.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/inference-policy.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/knowledge-source.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/memory-policy.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/schemas/persona.schema.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/checkpoint_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/knowledge_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/memory_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/planning_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/state_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/attention/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/attention/attention.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/attention/attention_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/attention/lease.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/assembler.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/budget.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/compaction.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/source.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/context/trust.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/event.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/inference_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/model.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/model_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/realtime.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/request.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/freshness.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/index.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/ingestion.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/invalidation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/knowledge_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/retrieval.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/revision.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/source.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/knowledge/transformation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/checkpoint.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/loop_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/recovery.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/run.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/step.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/loop/stop_policy.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/consolidation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/correction.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/memory.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/memory_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/memory_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/memory/provenance.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/perception/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/perception/observation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/perception/observation_normalizer.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/perception/observation_queue.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/persona/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/persona/compiler.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/persona/mutation_policy.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/persona/profile.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/persona/revision.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/commitment.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/goal.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/plan.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/planning/planning_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/capability_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/clock_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/content_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/conversation_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/job_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/ports/resource_port.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/py.typed",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/state/__init__.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/state/cognitive_state.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/state/decay.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/state/state_controller.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/src/glimmer_cradle/cognition/state/state_store.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/conftest.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/fixtures/checkpoint.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/fixtures/knowledge-source.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/fixtures/model-events.json",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/fixtures/persona.yaml",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_context_budget.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_context_trust.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_knowledge_authorization.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_knowledge_deletion.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_knowledge_revision.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_loop_checkpoint.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_loop_native_tools.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_memory_correction.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_persona_mutation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_planning_jobs.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_public_api.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_realtime_cancellation.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/cognition/tests/test_state_decay.py",
+      "owner": "cognition"
+    },
+    {
+      "path": "core/content/README.md",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/migrations/001-asset-index.sql",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/package.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/pyproject.toml",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/schemas/asset-manifest.schema.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/adapters/storage/file-asset-store.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/adapters/storage/sqlite-asset-index.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/asset-controller.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/asset-manifest.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/asset-ref.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/asset-store-port.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/garbage-collector.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/retention.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/assets/upload.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/glimmer_cradle/content/__init__.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/glimmer_cradle/content/asset_ref.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/glimmer_cradle/content/parts.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/glimmer_cradle/content/py.typed",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/index.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/audio.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/content-part.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/file.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/image.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/provenance.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/text.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/src/parts/video.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/asset-authorization.test.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/asset-commit-recovery.test.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/asset-reference-gc.test.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/conftest.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/fixtures/asset-manifest.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/fixtures/content-parts.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/public-api.test.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/test_content_parts.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tests/test_public_api.py",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tsconfig.build.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/tsconfig.json",
+      "owner": "content"
+    },
+    {
+      "path": "core/content/vitest.config.ts",
+      "owner": "content"
+    },
+    {
+      "path": "core/conversation/README.md",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/migrations/001-binding.sql",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/migrations/002-delivery.sql",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/migrations/python/001-history.sql",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/migrations/python/002-turns.sql",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/package.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/pyproject.toml",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/schemas/conversation-config.schema.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/adapters/storage/sqlite-binding-store.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/adapters/storage/sqlite-delivery-store.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/binding/binding-resolver.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/binding/binding-store-port.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/binding/binding.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/delivery/delivery-controller.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/delivery/delivery-store-port.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/delivery/output-generation.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/delivery/playout.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/delivery/receipt.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/history_store.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/log_store.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/turn_store.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/writer_guard.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/history/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/history/checkpoint.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/history/history_reader.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/history/projection.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/history/working_set.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/commit_barrier.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/position.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/reader.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/record.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/log/writer.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/messages/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/messages/message.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/messages/participant.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/py.typed",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/turns/__init__.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/turns/turn.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/turns/turn_controller.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/glimmer_cradle/conversation/turns/turn_store.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/index.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/interaction/input-deduplicator.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/interaction/input.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/interaction/interaction-controller.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/interaction/interruption.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/messages/message.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/messages/participant.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/turns/turn-processor-port.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/turns/turn-snapshot.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/src/turns/turn-store-port.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/conftest.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/delivery-unknown.test.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/fixtures/conversation-events.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/fixtures/legacy-log-v4.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/fixtures/legacy-log-v5.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/fixtures/playout-events.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/ingress-deduplication.test.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/interruption-late-output.test.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/public-api.test.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/test_history_rebuild.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/test_log_durability.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/test_public_api.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/test_turn_recovery.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tests/test_writer_fencing.py",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tsconfig.build.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/tsconfig.json",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/conversation/vitest.config.ts",
+      "owner": "conversation"
+    },
+    {
+      "path": "core/embodiment/README.md",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/package.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/schemas/avatar-actions.schema.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/schemas/avatar-behavior.schema.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/schemas/avatar-packages.schema.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/schemas/embodiment-config.schema.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/schemas/emotion-map.schema.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/expression/expression-intent.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/expression/expression-policy.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/gaze/gaze.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/gesture/gesture.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/index.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/lip-sync/lip-sync.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/lip-sync/playout-clock.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/motion/motion-controller.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/motion/motion.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/pose/pose.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/rendering/renderer-capabilities.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/rendering/renderer-feedback.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/rendering/renderer-port.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/state/embodiment-controller.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/src/state/embodiment-state.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/fixtures/legacy-avatar-behavior.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/intent-projection.test.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/legacy-behavior-equivalence.test.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/playout-sync.test.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/public-api.test.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tests/stale-intent.test.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tsconfig.build.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/tsconfig.json",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/embodiment/vitest.config.ts",
+      "owner": "embodiment"
+    },
+    {
+      "path": "core/jobs/README.md",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/migrations/001-jobs.sql",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/package.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/schemas/jobs-config.schema.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/adapters/storage/sqlite-job-store.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/execution/cancellation.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/execution/job-controller.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/execution/job-handler-port.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/execution/job.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/index.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/ports/clock-port.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/ports/job-store-port.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/recovery/recovery-controller.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/recovery/retention.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/recovery/retry-policy.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/scheduling/lease.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/scheduling/schedule.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/scheduling/scheduler.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/triggers/trigger-controller.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/triggers/trigger.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/cancellation-retention.test.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/duplicate-trigger.test.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/fixtures/job.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/lease-fencing.test.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/public-api.test.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/restart-recovery.test.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tsconfig.build.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tsconfig.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/vitest.config.ts",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/platform/README.md",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/package.json",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/schemas/platform-config.schema.json",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/adapters/node/file-config-loader.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/adapters/node/process-supervisor.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/adapters/node/structured-logger.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/backpressure.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/command.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/deadline.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/envelope.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/event.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/communication/stream.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/configuration/config-loader.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/configuration/config-revision.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/configuration/schema.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/identity/identity.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/identity/stable-identity.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/index.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/lifecycle/cancellation.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/lifecycle/disposal.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/lifecycle/readiness.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/lifecycle/runtime-module.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/lifecycle/supervisor.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/observability/health.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/observability/logger.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/observability/metrics.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/observability/redaction.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/observability/trace.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/scope/scope-registry.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/scope/scope.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/security/audit-event.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/security/authorization.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/security/permission.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/security/principal.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/security/secret-reference.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/time/clock.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/time/system-clock.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/authority.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/fencing-token.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/handover.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/lease.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/node.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/offline-proposal.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/authority-fencing.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/config-reload.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/fixtures/platform-config.json",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/lifecycle-drain.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/log-redaction.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/public-api.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/stream-backpressure.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tsconfig.build.json",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tsconfig.json",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/vitest.config.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "data/README.md",
+      "owner": "data"
+    },
+    {
+      "path": "docs/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/Architecture_Baseline_v2.1_执行宪章.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.1.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/architecture-baseline-v2.lock.json",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/blueprint/architecture-target-v2.1.json",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/00-阅读说明.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/01-目标、约束与质量属性.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/02-系统上下文.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/03-运行拓扑与进程边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/04-构件、分层与依赖.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/05-关键运行时链路.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/06-跨切面机制.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Cognition.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Data与Observability.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Desktop与Avatar.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Engines与Native.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Extension与SkillPlane.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/Kernel与Runtime.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/07-子系统当前视图/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/08-部署与交付形态.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/09-术语表.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/10-当前物理拓扑.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/11-物理拓扑差距与迁移地图.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/current/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0000-模板.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0001-企划平台与角色Profile分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0003-CharacterPackage与MemorySubstrate分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0004-Extension开放生态运行边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0005-Character-Avatar-Surface-Host分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0006-Desktop物理归属与Electron进程分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0007-UnityAvatarHost程序集边界与SDK投影.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0008-ExperienceLedger与版本化Memory.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0009-本地监督树与动态端点治理.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0010-产品组合与扩展仓库边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0011-Extension发布与开放生态边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0016-仓库工具工作区与产品监督边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0018-Personal Server宿主与服务状态分域.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0020-Content资产单写者与恢复边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0022-ConversationLog与Experience投影边界.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/decisions/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Cognition认知核实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Conversation实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Desktop与Avatar实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Engines与Native实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Extension与SkillPlane实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Kernel与Runtime实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Platform原语实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/Protocol契约层实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/工程生命周期实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/数据、记忆与可观测性实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/AI辅助前端开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/Schema与跨进程契约变更.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/前端开发与UI验收.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/功能开发与缺陷修复.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/命名规范.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/文档维护.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/智能体工作流设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/架构性改动.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/development/测试与验收.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/onboarding/本地开发环境.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/operations/性能诊断.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/operations/数据迁移与恢复.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/operations/日志、Trace与DLQ排障.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/release/Personal Server部署.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/release/客户端打包.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/subsystems/Cognition开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/subsystems/Kernel开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/subsystems/扩展开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/subsystems/桌面与Avatar开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/subsystems/音频引擎开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/guides/开发手册.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段2-数据持久化设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段3-遥测设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段4-觉醒态设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段5-认知循环设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段6-反思与记忆图谱设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段7-自主输出通路设计.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段8-渲染层架构分析与重构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段P-Protocol契约层重构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-decisions/阶段P9-契约层与包管理自洽化重构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v1/2026-09-19-roadmap-now.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v1/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v1/blueprint-realization.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v1/微光摇篮架构蓝图.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v1/目标物理拓扑.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v2.0/Architecture_Baseline_v2.0_执行宪章.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v2.0/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v2.0/Glimmer_Cradle_Codex_Refactor_Prompt_v2.0.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/architecture-v2.0/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/incidents/2026-05-08-Electron启动环境变量污染.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/incidents/2026-05-08-KernelJS导入不一致.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/incidents/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/00-架构总览.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/01-协议层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/02-基础设施层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/03-领域层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/04-应用层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/05-插件层.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/06-依赖规则与检查清单.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/07-Cognition认知核.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/08-记忆与日志架构.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/09-日志字段表.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-current-architecture/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-extensions/AgentSkill与MCP指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-extensions/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-extensions/扩展API参考.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-extensions/扩展开发指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/Cognition开发指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/Data目录指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/Kernel开发指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/Python环境指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/UI色彩参考.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/UI设计指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/ui-references/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/客户端安装形态.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/客户端打包指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/开发总则.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/开发流程.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/桌面渲染开发指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-guides/音频引擎指南.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-roadmap/后续增强.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-roadmap/当前推进.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/history/legacy-roadmap/蓝图落地流程.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/configuration.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/data-layout.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/engineering-lifecycle.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/extension-sdk.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/observability.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/packaging-layout.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/product-compositions.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/protocol.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/ui-design-tokens.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/architecture-v2-refactor.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/backlog.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/design-briefs/M11-Personal Server UI设计简报.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/design-briefs/reference-assets/m11-ui/accent-a-qingyao.svg",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/design-briefs/reference-assets/m11-ui/accent-b-paraiba.svg",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/design-briefs/reference-assets/m11-ui/accent-c-peacock.svg",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/design-briefs/reference-assets/m11-ui/m11-accepted-overview-dark-light-narrow.png",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/manifests/M11-目标物理清单.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/manifests/M12-目标物理清单.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/manifests/M13-目标物理清单.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/manifests/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M08-SkillPlane、Extension与桌面体验收口.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M09-主体可用性、跨场景记忆与体验收口.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M10-发布形态、安装投影与数据迁移闭环.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M11-Personal Server控制面、区域分发与跨产品Extension闭环.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/M13-工程自动化脊柱与交付生命周期闭环.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/milestones/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/now.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/文档维护规范.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "extension-sdk/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/Directory.Build.props",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/ContentContract.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/ExtensionContext.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/GlimmerCradle.ExtensionSdk.csproj",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/HostClient.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/RendererContract.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/src/GlimmerCradle.ExtensionSdk/packages.lock.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/tests/GlimmerCradle.ExtensionSdk.Tests/GlimmerCradle.ExtensionSdk.Tests.csproj",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/tests/GlimmerCradle.ExtensionSdk.Tests/HostClientTests.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/tests/GlimmerCradle.ExtensionSdk.Tests/RendererContractTests.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/dotnet/tests/GlimmerCradle.ExtensionSdk.Tests/packages.lock.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/pyproject.toml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/__init__.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/content.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/context.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/managed_worker.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/model.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/py.typed",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/speech.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/src/glimmer_cradle/extension_sdk/transport.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/tests/conftest.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/tests/test_public_api.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/python/tests/test_worker_cancellation.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/schemas/extension-config.schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/schemas/extension-manifest.schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/schemas/extension-package.schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/scripts/pack.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/scripts/verify-release.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/scripts/verify-templates.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/capabilities.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/cognition.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/content.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/conversation.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/embodiment.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/extension-context.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/host-api.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/jobs.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/api/ui.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/compatibility/capabilities.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/compatibility/compatibility.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/channel.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/model.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/observation.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/renderer.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/resource.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/skill.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/speech.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/tool.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/contributions/ui.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/lifecycle/activation.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/lifecycle/disposable.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/lifecycle/managed-process.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/manifest/extension-manifest.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/manifest/validate-manifest.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/packaging/package-builder.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/packaging/package-manifest.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/packaging/package-verifier.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/permissions/device-api.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/permissions/file-api.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/permissions/network-api.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/permissions/permission-request.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/permissions/secret-api.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/transport/host-client.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/src/transport/wire-mapper.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/.env.example",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/.gitignore",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/config/schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/gcex.package.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/pnpm-lock.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/src/channel-adapter.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/tests/channel-lifecycle.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/channel/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/.env.example",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/.gitignore",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/config/schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/gcex.package.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/pnpm-lock.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/src/mcp-client-adapter.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/tests/mcp-reconnect.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/mcp-bridge/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/.env.example",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/.gitignore",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/config/schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/gcex.package.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/pnpm-lock.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/src/model-provider.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/tests/model-stream.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/pyproject.toml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/src/extension_worker/__init__.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/src/extension_worker/__main__.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/src/extension_worker/provider.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/tests/test_cancellation.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/model/worker/uv.lock",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/.env.example",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/.gitignore",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/config/schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/gcex.package.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/pnpm-lock.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/scripts/build-renderer.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/scripts/project-assets.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/src/renderer-adapter.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/tests/renderer-readiness.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Editor.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Editor/BuildRenderer.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Editor/BuildRenderer.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/Renderer.asmdef",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/Renderer.asmdef.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/RendererController.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/RendererController.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/RendererScene.unity",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Renderer/RendererScene.unity.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests/Editor.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests/Editor/Renderer.Tests.asmdef",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests/Editor/Renderer.Tests.asmdef.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests/Editor/RendererControllerTests.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Assets/Tests/Editor/RendererControllerTests.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Packages/manifest.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/Packages/packages-lock.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/ProjectSettings/ProjectSettings.asset",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/unity/ProjectSettings/ProjectVersion.txt",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/renderer/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/.env.example",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/.gitignore",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/config/schema.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/gcex.package.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/pnpm-lock.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/src/index.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/src/speech-provider.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/tests/speech-cancellation.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/pyproject.toml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/src/extension_worker/__init__.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/src/extension_worker/__main__.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/src/extension_worker/provider.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/tests/test_cancellation.py",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/templates/speech/worker/uv.lock",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/fixtures/extension-manifest.yaml",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/host-compatibility.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/manifest-validation.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/package-path-traversal.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/public-api.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tests/sdk-public-imports.test.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tsconfig.build.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/tsconfig.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Editor.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Editor/GlimmerCradle.ExtensionSdk.Editor.asmdef",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Editor/GlimmerCradle.ExtensionSdk.Editor.asmdef.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Editor/PackageValidator.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Editor/PackageValidator.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/README.md",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Runtime.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Runtime/GlimmerCradle.ExtensionSdk.asmdef",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Runtime/GlimmerCradle.ExtensionSdk.asmdef.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Runtime/RendererBridge.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Runtime/RendererBridge.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests/Editor.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests/Editor/GlimmerCradle.ExtensionSdk.Tests.asmdef",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests/Editor/GlimmerCradle.ExtensionSdk.Tests.asmdef.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests/Editor/RendererBridgeTests.cs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/Tests/Editor/RendererBridgeTests.cs.meta",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/package.json",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/scripts/project-sdk.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/unity/tests/project-sdk.test.mjs",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "extension-sdk/vitest.config.ts",
+      "owner": "extension-sdk"
+    },
+    {
+      "path": "glimmer-cradle.code-workspace",
+      "owner": "engineering"
+    },
+    {
+      "path": "global.json",
+      "owner": "engineering"
+    },
+    {
+      "path": "package.json",
+      "owner": "engineering"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "owner": "engineering"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "owner": "engineering"
+    },
+    {
+      "path": "protocol/README.md",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/buf.gen.yaml",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/buf.lock",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/buf.yaml",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/document-catalog.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/generated/dotnet/GlimmerCradle.Protocol.csproj",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/generated/python/pyproject.toml",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/generated/typescript/package.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/json-schema/envelope.schema.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/package.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/capabilities/v1/capabilities.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/cognition/v1/cognition.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/content/v1/content.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/conversation/v1/conversation.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/embodiment/v1/embodiment.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/extension/v1/extension.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/jobs/v1/jobs.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/proto/glimmer/platform/v1/platform.proto",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/pyproject.toml",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/scripts/generate-document-catalog.mjs",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/scripts/generate.mjs",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/scripts/verify.mjs",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/src/index.ts",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/dotnet/GlimmerCradle.Protocol.Tests.csproj",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/dotnet/WireRoundtripTests.cs",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/dotnet/packages.lock.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/fixtures/conversation.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/fixtures/envelope.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/public-api.test.ts",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/test_wire_roundtrip.py",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tests/wire-roundtrip.test.ts",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tsconfig.build.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/tsconfig.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/versioning/compatibility.json",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/versioning/wire-baseline.bin",
+      "owner": "protocol"
+    },
+    {
+      "path": "protocol/vitest.config.ts",
+      "owner": "protocol"
+    },
+    {
+      "path": "pyproject.toml",
+      "owner": "engineering"
+    },
+    {
+      "path": "ruff.toml",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/README.md",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/package.json",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/baseline-lock.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/check-architecture.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/cli.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/file-system.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/python-imports.py",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/derived-boundaries.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/legacy-paths.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/platform-boundaries.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/repository-topology.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/workspace-artifact-boundaries.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/rules/workspace-boundaries.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/target-layout-cli.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/target-layout.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/architecture/v2-boundaries.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/docs/check-docs.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/docs/cli.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/encoding/check-encoding.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/encoding/cli.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/repository-root.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/architecture.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/baseline-lock.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/cli.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/docs.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/encoding.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/target-layout.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/v2-boundaries.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/README.md",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/package.json",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/cli-options.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/cli.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/errors.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/package-manager-invocation.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/process-tree.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/product-composition.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/repository-root.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/supervisor.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/src/workspace-plan.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/tests/cli.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/tests/package-manager-invocation.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/tests/process-tree.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/tests/supervisor.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/workspace-supervisor/tests/workspace-plan.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tsconfig.base.json",
+      "owner": "engineering"
+    },
+    {
+      "path": "uv.lock",
+      "owner": "engineering"
+    },
+    {
+      "path": "vitest.workspace.ts",
+      "owner": "engineering"
+    }
+  ],
+  "generatedAreas": [
+    {
+      "root": "protocol/generated/typescript/src",
+      "pattern": "**/*.ts",
+      "producer": "protocol/scripts/generate.mjs",
+      "inventory": "build/inventory/protocol-typescript.json",
+      "lifetime": "可再生；不手写，不提交动态输出"
+    },
+    {
+      "root": "protocol/generated/python/src",
+      "pattern": "**/*.py",
+      "producer": "protocol/scripts/generate.mjs",
+      "inventory": "build/inventory/protocol-python.json",
+      "lifetime": "可再生；含 __init__.py、*_pb2.py 与 *_pb2_grpc.py"
+    },
+    {
+      "root": "protocol/generated/dotnet/src",
+      "pattern": "**/*.cs",
+      "producer": "protocol/scripts/generate.mjs",
+      "inventory": "build/inventory/protocol-dotnet.json",
+      "lifetime": "可再生；由相同 proto 生成"
+    },
+    {
+      "root": "build",
+      "pattern": "**/*",
+      "producer": "各 owner 的构建/验证命令",
+      "inventory": "build/inventory/build.json",
+      "lifetime": "开发编译、日志、报告、中间制品；不作为源码"
+    },
+    {
+      "root": "dist",
+      "pattern": "**/*",
+      "producer": "apps/host/scripts/package-release.mjs 与 apps/desktop/scripts/package-release.mjs",
+      "inventory": "dist/release-inventory.json",
+      "lifetime": "可分发固定制品，逐文件 hash；不依赖工作树"
+    },
+    {
+      "root": "apps/desktop/dist",
+      "pattern": "**/*",
+      "producer": "apps/desktop/package.json#scripts.build",
+      "inventory": "build/inventory/apps-desktop.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "apps/extension-host/dist",
+      "pattern": "**/*",
+      "producer": "apps/extension-host/package.json#scripts.build",
+      "inventory": "build/inventory/apps-extension-host.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "apps/host/dist",
+      "pattern": "**/*",
+      "producer": "apps/host/package.json#scripts.build",
+      "inventory": "build/inventory/apps-host.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/capabilities/dist",
+      "pattern": "**/*",
+      "producer": "core/capabilities/package.json#scripts.build",
+      "inventory": "build/inventory/core-capabilities.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/content/dist",
+      "pattern": "**/*",
+      "producer": "core/content/package.json#scripts.build",
+      "inventory": "build/inventory/core-content.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/conversation/dist",
+      "pattern": "**/*",
+      "producer": "core/conversation/package.json#scripts.build",
+      "inventory": "build/inventory/core-conversation.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/embodiment/dist",
+      "pattern": "**/*",
+      "producer": "core/embodiment/package.json#scripts.build",
+      "inventory": "build/inventory/core-embodiment.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/jobs/dist",
+      "pattern": "**/*",
+      "producer": "core/jobs/package.json#scripts.build",
+      "inventory": "build/inventory/core-jobs.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "core/platform/dist",
+      "pattern": "**/*",
+      "producer": "core/platform/package.json#scripts.build",
+      "inventory": "build/inventory/core-platform.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "extension-sdk/dist",
+      "pattern": "**/*",
+      "producer": "extension-sdk/package.json#scripts.build",
+      "inventory": "build/inventory/extension-sdk.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "protocol/dist",
+      "pattern": "**/*",
+      "producer": "protocol/package.json#scripts.build",
+      "inventory": "build/inventory/protocol.json",
+      "lifetime": "叶子编译输出，含 JavaScript、声明与 source map；不进入版本控制"
+    },
+    {
+      "root": "extension-sdk/unity/Runtime/Generated",
+      "pattern": "**/*",
+      "producer": "extension-sdk/unity/scripts/project-sdk.mjs",
+      "inventory": "build/inventory/unity-sdk.json",
+      "lifetime": "C# wire 与 SDK 投影；GUID 由投影 manifest 稳定管理，不手写"
+    }
+  ],
+  "externalProjects": {
+    "source": "extension-sdk/templates",
+    "rule": "每个模板目录完整复制到主仓库之外；只替换 manifest/README 指明的项目参数，不复制 node_modules/缓存；供应商实现文件由扩展自己的 inventory 维护。"
+  },
+  "physicalSpaces": [
+    {
+      "name": "installation",
+      "root": "<installRoot>",
+      "owner": "host/desktop 安装事务",
+      "files": [
+        "release.json",
+        "inventory.json",
+        "sbom.json",
+        "checksums.sha256",
+        "licenses/THIRD-PARTY-NOTICES.txt",
+        "host/package.json",
+        "host/main.js",
+        "desktop/resources/app.asar",
+        "workers/cognition/pyproject.toml",
+        "extensions/catalog.lock.json",
+        "extension-host/package.json",
+        "extension-host/main.js",
+        "workers/cognition/site-packages/glimmer_cradle/cognition_worker/__main__.py"
+      ],
+      "dynamic": [
+        "host/node_modules/**",
+        "host/assets/**",
+        "workers/cognition/site-packages/**",
+        "workers/cognition/bin/**",
+        "extensions/packages/<extensionId>/<version>/**",
+        "desktop/<platform-launcher>",
+        "desktop/resources/**",
+        "native/<platform>/<architecture>/**",
+        "extension-host/node_modules/**",
+        "defaults/configs/**",
+        "schemas/**"
+      ],
+      "condition": "host 制品包含 host/worker；desktop 制品还包含 desktop/native；无该目标不伪造其文件",
+      "producer": "各 App package-release.mjs，生成完整 inventory 与平台适用性记录"
+    },
+    {
+      "name": "runtime-data",
+      "root": "<dataRoot>",
+      "owner": "各领域 owner；Host 只解析路径",
+      "files": [
+        "state/platform/authority.sqlite",
+        "state/content/assets.sqlite",
+        "state/conversation/bindings.sqlite",
+        "state/conversation/delivery.sqlite",
+        "state/conversation/history.sqlite",
+        "state/conversation/turns.sqlite",
+        "state/cognition/state.sqlite",
+        "state/cognition/memory.sqlite",
+        "state/cognition/knowledge.sqlite",
+        "state/cognition/planning.sqlite",
+        "state/cognition/checkpoints.sqlite",
+        "state/capabilities/execution.sqlite",
+        "state/jobs/jobs.sqlite",
+        "host/installation/transactions.sqlite",
+        "host/installation/active-release.json",
+        "host/extensions/registry.sqlite",
+        "host/desktop/preferences.json"
+      ],
+      "dynamic": [
+        "state/conversation/log/<partition>/manifest.json",
+        "state/conversation/log/<partition>/<segment>.jsonl",
+        "state/content/blobs/<hash-prefix>/<sha256>",
+        "state/content/staging/<uploadId>/metadata.json",
+        "state/content/staging/<uploadId>/content.part",
+        "state/extensions/<extensionId>/**",
+        "cache/<owner>/**",
+        "logs/<owner>/<date>.<sequence>.jsonl",
+        "backups/<backupId>/manifest.json",
+        "backups/<backupId>/owners/**",
+        "run/<hostId>/endpoints.json",
+        "run/<hostId>/processes.json",
+        "state/**/*.sqlite-wal",
+        "state/**/*.sqlite-shm",
+        "config/system/<owner>.yaml",
+        "config/topology.yaml",
+        "config/characters/<characterId>/character.manifest.yaml",
+        "config/characters/<characterId>/profile.yaml",
+        "config/characters/<characterId>/knowledge/index.yaml",
+        "config/characters/<characterId>/knowledge/<source>.md",
+        "config/characters/<characterId>/assets/<assetId>",
+        "config/extensions/<extensionId>.json"
+      ],
+      "condition": "相应 owner 启用后按需建立；分区含用户/角色作用域，DB 内同样隔离 principal；未启用不建空目录",
+      "producer": "owner store/migration；备份 manifest 枚举实际文件与一致切点"
+    },
+    {
+      "name": "local-environment",
+      "root": "<workspace>",
+      "owner": "开发工具",
+      "files": [],
+      "dynamic": [
+        ".git/**",
+        "node_modules/**",
+        "**/node_modules/**",
+        ".venv/**",
+        "**/.venv/**",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**",
+        ".ruff_cache/**",
+        ".pnpm-store/**",
+        ".playwright-cli/**",
+        ".vscode/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/bin/**",
+        "**/obj/**",
+        "**/Library/**",
+        "**/Temp/**",
+        "**/*.tsbuildinfo",
+        "configs/secrets/*.yaml"
+      ],
+      "condition": "本机生成或私有设置；secrets.example.yaml 为唯一版本控制秘密示例，不读取真实秘密",
+      "producer": "Git、pnpm、uv、编译器、Unity 与开发者私有设置；从发布 source inventory 排除"
+    }
+  ],
+  "forbiddenFinalRoots": [
+    "contracts",
+    "engines",
+    "hosts",
+    "native",
+    "packages",
+    "products",
+    "templates",
+    "deploy",
+    "assets",
+    "integrations"
+  ],
+  "forbiddenFinalPaths": [
+    "core/kernel",
+    "core/avatar",
+    "tools/repo-checks/src/architecture/v2-legacy-exceptions.json"
+  ]
+}

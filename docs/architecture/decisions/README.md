@@ -8,11 +8,13 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 
 ## 当前 ADR
 
+- [ADR-0023 最终目标蓝图与物理目录契约](./ADR-0023-最终目标蓝图与物理目录契约.md)（`accepted`；v2.1 联合语义与逐文件目标，修正第三方与 Extension 分类）
+
 - [ADR-0022 Conversation Log 与 Experience 投影边界](./ADR-0022-ConversationLog与Experience投影边界.md)（`accepted`；Conversation 持有交互事实单写者，Cognition 只消费 Experience/Memory 投影）
 - [ADR-0021 架构基线规范修订与命名收束](./ADR-0021-架构基线规范修订与命名收束.md)（`accepted`；v2.0 规范修订 1，保持目标模块与 owner）
 - [ADR-0020 Content 资产单写者与恢复边界](./ADR-0020-Content资产单写者与恢复边界.md)（`accepted`；规定新媒体引用、暂存、Experience 恢复与旧 URI 退出门）
 
-- [ADR-0019 采用 Architecture Baseline v2.0 冻结基线](./ADR-0019-采用Architecture-Baseline-v2冻结基线.md)（`accepted`；替代旧目标中冲突的目录、模块和状态边界，当前实现按阶段迁移）
+- [ADR-0019 采用 Architecture Baseline v2.0 冻结基线](./ADR-0019-采用Architecture-Baseline-v2冻结基线.md)（`accepted`；替代旧目标中冲突的目录、模块和状态边界，目标版本由 ADR-0023 替代；迁移纪律继续有效）
 
 - [ADR-0001 企划平台与角色 Profile 分层](./ADR-0001-企划平台与角色Profile分层.md)
 - [ADR-0002 Attention Lease 与 Cognitive Activity 分层](./ADR-0002-AttentionLease与CognitiveActivity分层.md)

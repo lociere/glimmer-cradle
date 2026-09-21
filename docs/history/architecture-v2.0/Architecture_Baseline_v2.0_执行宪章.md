@@ -10,7 +10,7 @@
 > 事实依据：冻结基线、ADR-0019/0020 与执行要求。
 > 维护触发：用户批准的规范修订或执行治理变化。
 
-当前采用 [ADR-0021](../decisions/ADR-0021-架构基线规范修订与命名收束.md) 授权的 v2.0 规范修订 1。
+当前采用 [ADR-0021](../../architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md) 授权的 v2.0 规范修订 1。
 该修订细化命名和迁移解释，未改变目标模块；原始输入通过 Git `cbb6c853` 追溯。
 
 ## 目录
@@ -27,8 +27,8 @@
 架构重构发生冲突时，按以下顺序判断：
 
 1. 用户明确作出的最新架构决策；
-2. [Architecture Baseline v2.0 (Frozen)](./Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)；
-3. [ADR-0019](../decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 对旧决策的替代关系；
+2. [Architecture Baseline v2.0 (Frozen)](Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)；
+3. [ADR-0019](../../architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 对旧决策的替代关系；
 4. 本执行宪章；
 5. [重构执行记录](../../roadmap/architecture-v2-refactor.md)；
 6. Current、Implementation 和源码所陈述的当前事实。

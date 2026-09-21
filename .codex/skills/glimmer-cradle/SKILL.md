@@ -5,11 +5,14 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 
 # Glimmer Cradle 项目 Skill
 
+> 当前目标采用 [ADR-0023](../../../docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 的 v2.1 蓝图与完整物理清单；旧 v2.0 版本绑定已替代。第三方来源不是强制扩展化条件，按职责、可替换性和生命周期判断。
+
+
 基线规范修订与命名解释以 [ADR-0021](../../../docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md)
 为准；新增名称和迁移旧名先查 [命名规范](../../../docs/guides/development/命名规范.md)。
 
-当前架构重构目标以 [Architecture Baseline v2.0](../../../docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
-和 [ADR-0019](../../../docs/architecture/decisions/ADR-0019-采用Architecture-Baseline-v2冻结基线.md) 为准。
+当前架构重构目标以 [Architecture Baseline v2.1](../../../docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
+和 [ADR-0023](../../../docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 为准。
 卡片中的旧路径是迁移前事实；冲突的目标规则由该 ADR 替代。继续工作前查阅
 [执行记录](../../../docs/roadmap/architecture-v2-refactor.md)，不得直接将旧 Kernel 搬为 Platform 或新增第二契约源。
 
