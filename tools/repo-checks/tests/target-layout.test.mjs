@@ -27,6 +27,28 @@ test('rejects traversal, wildcard source entries, duplicate casing and file-dire
   }
 });
 
+test('uses owner-qualified role names and Python snake_case', () => {
+  const paths = new Set(manifest.repositoryFiles.map(entry => entry.path));
+  for (const file of [
+    'core/platform/src/topology/authority-lease.ts',
+    'core/jobs/src/scheduling/job-lease.ts',
+    'core/cognition/src/glimmer_cradle/cognition/attention/attention_lease.py',
+    'core/conversation/src/glimmer_cradle/conversation/turns/turn_store_port.py',
+    'core/conversation/src/glimmer_cradle/conversation/adapters/persistence/sqlite_turn_store.py',
+    'extension-sdk/src/compatibility/version-compatibility.ts',
+  ]) assert.ok(paths.has(file), file);
+  for (const file of [
+    'core/platform/src/topology/lease.ts',
+    'core/jobs/src/scheduling/lease.ts',
+    'core/conversation/src/glimmer_cradle/conversation/turns/turn_store.py',
+    'extension-sdk/src/compatibility/compatibility.ts',
+  ]) assert.ok(!paths.has(file), file);
+
+  const candidate = structuredClone(manifest);
+  candidate.repositoryFiles.push({ path: 'tools/checks/python-imports.py', owner: 'engineering' });
+  assert.ok(validateTargetManifest(candidate).some(error => error.includes('snake_case')));
+});
+
 test('distinguishes missing target files from unlisted legacy files', () => {
   const candidate = { repositoryFiles: [{ path: 'core/platform/src/index.ts' }, { path: 'apps/host/package.json' }] };
   assert.deepEqual(compareTargetFiles(candidate, ['core/platform/src/index.ts', 'core/kernel/src/index.ts']), [

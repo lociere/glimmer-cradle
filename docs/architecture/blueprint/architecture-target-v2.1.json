@@ -204,7 +204,7 @@
       "owner": "cognition-worker"
     },
     {
-      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/service.py",
+      "path": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
       "owner": "cognition-worker"
     },
     {
@@ -756,27 +756,27 @@
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/devices.ts",
+      "path": "apps/host/src/broker/device-broker.ts",
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/files.ts",
+      "path": "apps/host/src/broker/file-broker.ts",
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/network.ts",
+      "path": "apps/host/src/broker/network-broker.ts",
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/permissions.ts",
+      "path": "apps/host/src/broker/permission-broker.ts",
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/process.ts",
+      "path": "apps/host/src/broker/process-broker.ts",
       "owner": "host"
     },
     {
-      "path": "apps/host/src/broker/secrets.ts",
+      "path": "apps/host/src/broker/secret-broker.ts",
       "owner": "host"
     },
     {
@@ -1304,23 +1304,23 @@
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/checkpoint_store.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_checkpoint_store.py",
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/knowledge_store.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_knowledge_store.py",
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/memory_store.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_memory_store.py",
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/planning_store.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/state_store.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_state_store.py",
       "owner": "cognition"
     },
     {
@@ -1336,7 +1336,7 @@
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/attention/lease.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/attention/attention_lease.py",
       "owner": "cognition"
     },
     {
@@ -1376,7 +1376,7 @@
       "owner": "cognition"
     },
     {
-      "path": "core/cognition/src/glimmer_cradle/cognition/inference/model.py",
+      "path": "core/cognition/src/glimmer_cradle/cognition/inference/model_descriptor.py",
       "owner": "cognition"
     },
     {
@@ -1912,7 +1912,7 @@
       "owner": "conversation"
     },
     {
-      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/turn_store.py",
+      "path": "core/conversation/src/glimmer_cradle/conversation/adapters/persistence/sqlite_turn_store.py",
       "owner": "conversation"
     },
     {
@@ -1992,7 +1992,7 @@
       "owner": "conversation"
     },
     {
-      "path": "core/conversation/src/glimmer_cradle/conversation/turns/turn_store.py",
+      "path": "core/conversation/src/glimmer_cradle/conversation/turns/turn_store_port.py",
       "owner": "conversation"
     },
     {
@@ -2288,7 +2288,7 @@
       "owner": "jobs"
     },
     {
-      "path": "core/jobs/src/scheduling/lease.ts",
+      "path": "core/jobs/src/scheduling/job-lease.ts",
       "owner": "jobs"
     },
     {
@@ -2492,6 +2492,10 @@
       "owner": "platform"
     },
     {
+      "path": "core/platform/src/topology/authority-lease.ts",
+      "owner": "platform"
+    },
+    {
       "path": "core/platform/src/topology/authority.ts",
       "owner": "platform"
     },
@@ -2504,15 +2508,11 @@
       "owner": "platform"
     },
     {
-      "path": "core/platform/src/topology/lease.ts",
-      "owner": "platform"
-    },
-    {
-      "path": "core/platform/src/topology/node.ts",
-      "owner": "platform"
-    },
-    {
       "path": "core/platform/src/topology/offline-proposal.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/topology/topology-node.ts",
       "owner": "platform"
     },
     {
@@ -3412,11 +3412,11 @@
       "owner": "extension-sdk"
     },
     {
-      "path": "extension-sdk/src/compatibility/capabilities.ts",
+      "path": "extension-sdk/src/compatibility/capability-negotiation.ts",
       "owner": "extension-sdk"
     },
     {
-      "path": "extension-sdk/src/compatibility/compatibility.ts",
+      "path": "extension-sdk/src/compatibility/version-compatibility.ts",
       "owner": "extension-sdk"
     },
     {
@@ -4228,7 +4228,7 @@
       "owner": "engineering"
     },
     {
-      "path": "tools/repo-checks/src/architecture/python-imports.py",
+      "path": "tools/repo-checks/src/architecture/python_imports.py",
       "owner": "engineering"
     },
     {

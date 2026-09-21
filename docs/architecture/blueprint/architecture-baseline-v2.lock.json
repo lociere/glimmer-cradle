@@ -17,11 +17,11 @@
     },
     {
       "path": "docs/architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md",
-      "sha256": "851a9b03b0ebc2104b0fb905e37888245d7ac53815ccd510837e2485459cf126"
+      "sha256": "54992b49af3c6666862b02ccc91e419c195b5b4c96853d11a1fab5ccac2618e9"
     },
     {
       "path": "docs/architecture/blueprint/architecture-target-v2.1.json",
-      "sha256": "374a5306b19951cbeace767887c9adcfa9de236df03b51905b199cd608d80118"
+      "sha256": "03c7f130e15bf61bcbc5b9eb7be0ec9b1baffdff09bf8d8433f5036f3fe7cdf2"
     },
     {
       "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",

@@ -132,7 +132,7 @@ export function collectV2Violations(repositoryRoot) {
   for (const cycle of findImportCycles(packageEdges)) add(packages.get(cycle[0]).file, 'package-cycle', cycle.join(' -> '));
   const pythonFiles = files.filter(file => file.endsWith('.py'));
   if (pythonFiles.length) {
-    const parsed = spawnSync('uv', ['run', '--no-project', '--python', '3.12', fileURLToPath(new URL('./python-imports.py', import.meta.url))], {
+    const parsed = spawnSync('uv', ['run', '--no-project', '--python', '3.12', fileURLToPath(new URL('./python_imports.py', import.meta.url))], {
       cwd: repositoryRoot, windowsHide: true, encoding: 'utf8', timeout: 60000, maxBuffer: 16 * 1024 * 1024,
       input: JSON.stringify(pythonFiles.map(file => ({ file: toRepoPath(repositoryRoot, file), text: fs.readFileSync(file, 'utf8') }))),
     });

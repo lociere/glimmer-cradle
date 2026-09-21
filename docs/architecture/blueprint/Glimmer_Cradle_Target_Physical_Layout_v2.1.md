@@ -59,6 +59,10 @@ Python 使用 `src/glimmer_cradle/<owner>/`。`glimmer_cradle` 为共享 namespa
 各 owner 包内显式 `__init__.py` 和 `py.typed`。根 uv workspace/uv.lock 统一主仓库锁，模板自己的 worker 锁供独立项目使用。
 TS 使用 kebab-case 文件；Python 使用 snake_case；React 组件和 C# 使用各自语言惯例，不为视觉统一改写已发布 wire 字段。
 领域内按 feature 组织。只有存在实际 IO 或协议适配的地方才建 adapters，不给每个 feature 机械套四层空文件夹。
+跨 owner 重复的常用词必须在文件名中消歧：Platform 使用 `authority-lease.ts`，Jobs 使用 `job-lease.ts`，Cognition 使用 `attention_lease.py`。
+消费方持久化契约使用 `*_store_port.py`，SQLite 实现使用 `sqlite_*_store.py`；Host 权限代理使用 `*-broker.ts`。
+兼容性文件分别表达版本判断与能力协商，使用 `version-compatibility.ts` 和 `capability-negotiation.ts`。
+这些限定词表达长期职责；如果实现技术变化，应新增相应 Adapter 并在 consumer-zero 后删除旧实现，而不是保留名实不符的文件。
 
 ### 叶子包必须落实的配置内容
 
@@ -233,7 +237,7 @@ glimmer-cradle/
 │   │   │           ├── composition.py
 │   │   │           ├── py.typed
 │   │   │           ├── readiness.py
-│   │   │           ├── service.py
+│   │   │           ├── rpc_service.py
 │   │   │           └── shutdown.py
 │   │   └── tests/
 │   │       ├── conftest.py
@@ -414,12 +418,12 @@ glimmer-cradle/
 │       │   │       ├── extension-client.ts
 │       │   │       └── job-mapper.ts
 │       │   ├── broker/
-│       │   │   ├── devices.ts
-│       │   │   ├── files.ts
-│       │   │   ├── network.ts
-│       │   │   ├── permissions.ts
-│       │   │   ├── process.ts
-│       │   │   └── secrets.ts
+│       │   │   ├── device-broker.ts
+│       │   │   ├── file-broker.ts
+│       │   │   ├── network-broker.ts
+│       │   │   ├── permission-broker.ts
+│       │   │   ├── process-broker.ts
+│       │   │   └── secret-broker.ts
 │       │   ├── cli.ts
 │       │   ├── composition/
 │       │   │   ├── cognition-job-adapter.ts
@@ -593,16 +597,16 @@ glimmer-cradle/
 │   │   │           ├── adapters/
 │   │   │           │   └── persistence/
 │   │   │           │       ├── __init__.py
-│   │   │           │       ├── checkpoint_store.py
-│   │   │           │       ├── knowledge_store.py
-│   │   │           │       ├── memory_store.py
-│   │   │           │       ├── planning_store.py
-│   │   │           │       └── state_store.py
+│   │   │           │       ├── sqlite_checkpoint_store.py
+│   │   │           │       ├── sqlite_knowledge_store.py
+│   │   │           │       ├── sqlite_memory_store.py
+│   │   │           │       ├── sqlite_planning_store.py
+│   │   │           │       └── sqlite_state_store.py
 │   │   │           ├── attention/
 │   │   │           │   ├── __init__.py
 │   │   │           │   ├── attention.py
 │   │   │           │   ├── attention_controller.py
-│   │   │           │   └── lease.py
+│   │   │           │   └── attention_lease.py
 │   │   │           ├── context/
 │   │   │           │   ├── __init__.py
 │   │   │           │   ├── assembler.py
@@ -614,7 +618,7 @@ glimmer-cradle/
 │   │   │           │   ├── __init__.py
 │   │   │           │   ├── event.py
 │   │   │           │   ├── inference_controller.py
-│   │   │           │   ├── model.py
+│   │   │           │   ├── model_descriptor.py
 │   │   │           │   ├── model_port.py
 │   │   │           │   ├── realtime.py
 │   │   │           │   └── request.py
@@ -783,7 +787,7 @@ glimmer-cradle/
 │   │   │   │       │       ├── __init__.py
 │   │   │   │       │       ├── history_store.py
 │   │   │   │       │       ├── log_store.py
-│   │   │   │       │       ├── turn_store.py
+│   │   │   │       │       ├── sqlite_turn_store.py
 │   │   │   │       │       └── writer_guard.py
 │   │   │   │       ├── history/
 │   │   │   │       │   ├── __init__.py
@@ -807,7 +811,7 @@ glimmer-cradle/
 │   │   │   │           ├── __init__.py
 │   │   │   │           ├── turn.py
 │   │   │   │           ├── turn_controller.py
-│   │   │   │           └── turn_store.py
+│   │   │   │           └── turn_store_port.py
 │   │   │   ├── index.ts
 │   │   │   ├── interaction/
 │   │   │   │   ├── input-deduplicator.ts
@@ -909,7 +913,7 @@ glimmer-cradle/
 │   │   │   │   ├── retention.ts
 │   │   │   │   └── retry-policy.ts
 │   │   │   ├── scheduling/
-│   │   │   │   ├── lease.ts
+│   │   │   │   ├── job-lease.ts
 │   │   │   │   ├── schedule.ts
 │   │   │   │   └── scheduler.ts
 │   │   │   └── triggers/
@@ -977,12 +981,12 @@ glimmer-cradle/
 │       │   │   ├── clock.ts
 │       │   │   └── system-clock.ts
 │       │   └── topology/
+│       │       ├── authority-lease.ts
 │       │       ├── authority.ts
 │       │       ├── fencing-token.ts
 │       │       ├── handover.ts
-│       │       ├── lease.ts
-│       │       ├── node.ts
-│       │       └── offline-proposal.ts
+│       │       ├── offline-proposal.ts
+│       │       └── topology-node.ts
 │       ├── tests/
 │       │   ├── authority-fencing.test.ts
 │       │   ├── config-reload.test.ts
@@ -1256,8 +1260,8 @@ glimmer-cradle/
 │   │   │   ├── jobs.ts
 │   │   │   └── ui.ts
 │   │   ├── compatibility/
-│   │   │   ├── capabilities.ts
-│   │   │   └── compatibility.ts
+│   │   │   ├── capability-negotiation.ts
+│   │   │   └── version-compatibility.ts
 │   │   ├── contributions/
 │   │   │   ├── channel.ts
 │   │   │   ├── model.ts
@@ -1547,7 +1551,7 @@ glimmer-cradle/
 │   │   │   │   ├── check-architecture.mjs
 │   │   │   │   ├── cli.mjs
 │   │   │   │   ├── file-system.mjs
-│   │   │   │   ├── python-imports.py
+│   │   │   │   ├── python_imports.py
 │   │   │   │   ├── rules/
 │   │   │   │   │   ├── derived-boundaries.mjs
 │   │   │   │   │   ├── legacy-paths.mjs

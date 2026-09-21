@@ -33,10 +33,15 @@ Execution journal/outbox/unknown；Jobs fencing；共用 Host；authority handov
 下一实现切片须按该清单补当前 → 目标的文件映射；`check:target-layout:final` 在迁移树上预期失败。
 当前架构旧路径规则仍服务于迁移事实，阶段 15 必须切换为最终依赖/路径规则并清空迁移例外。
 
+命名终审将 22 个含混路径收束为“语义限定词 + 职责后缀”：Port 与具体 SQLite Adapter 分名，
+Host 权限入口显式使用 `*-broker`，Lease/Node/Compatibility 按所属语义限定，Python 源文件统一
+`snake_case`。清单校验现会拒绝连字符 Python 文件名；文件名属于物理契约，后续改名须同步清单、生成树、
+引用方、测试与基线锁。
+
 本轮验证（2026-09-21；本地 dirty 候选，仅文档、agent 路由、基线锁和 repo-checks 工具/命令变化）：
 
 - PASS：目录规范/生成树同步，1,097 个目标文件与 333 个父目录；六份规范源的摘要锁一致。
-- PASS：repo-checks 全部 21 项测试；含缺项、多项、非法路径、大小写/文件目录冲突、展示树漂移与最终实物模式反例。
+- PASS：repo-checks 全部 22 项测试；含缺项、多项、非法路径、大小写/文件目录冲突、职责限定命名、Python `snake_case`、展示树漂移与最终实物模式反例。
 - PASS：`pnpm check:docs`（111 份活跃页）、`pnpm check:encoding`、`pnpm check:architecture`、根 `pnpm typecheck`、根 `pnpm build`。
 - 预期 FAIL：最终源码文件核对缺少 816 个目标文件、存在 1,116 个清单外现行文件，无其他规格错误。完整差距输出在本地 `build/reports/architecture-v2/target-layout-final.json`；这些数量反映迁移差距，不代表可直接删除文件。
 - 未执行：产品数据迁移、真实扩展/设备、C#/Unity/native 新目标构建与最终安装恢复；本轮没有实现这些新目标，不宣称已经通过。

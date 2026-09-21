@@ -30,6 +30,10 @@ export function validateTargetManifest(manifest) {
     if (folded.has(entry.path.toLowerCase())) errors.push(`target manifest: duplicate/case collision: ${entry.path}`);
     paths.add(entry.path);
     folded.add(entry.path.toLowerCase());
+    const basename = entry.path.split('/').at(-1);
+    if (basename.endsWith('.py') && !/^(?:__[a-z][a-z0-9_]*__|[a-z][a-z0-9_]*)\.py$/.test(basename)) {
+      errors.push(`target manifest: Python source must use snake_case: ${entry.path}`);
+    }
   }
   for (const file of paths) {
     const parts = file.split('/');

@@ -13,7 +13,7 @@
 | 普通功能或缺陷修复 | [development/功能开发与缺陷修复.md](./development/功能开发与缺陷修复.md) |
 | Schema、IPC、跨进程契约 | [development/Schema与跨进程契约变更.md](./development/Schema与跨进程契约变更.md) |
 | 架构边界、进程、分层重构 | [development/架构性改动.md](./development/架构性改动.md) |
-| Git 分支、v2 领域术语、职责命名和标识符迁移 | [development/命名规范.md](./development/命名规范.md) |
+| Git 分支、v2 领域术语、Port/Adapter/Broker 等职责命名和标识符迁移 | [development/命名规范.md](./development/命名规范.md) |
 | Web、Renderer、视觉设计、响应式与 UI 验收 | [development/前端开发与UI验收.md](./development/前端开发与UI验收.md) |
 | 使用 Codex、浏览器反馈、组件工作台或 AI Skill 开发 UI | [development/AI辅助前端开发.md](./development/AI辅助前端开发.md) |
 | 测试、验收和交付说明 | [development/测试与验收.md](./development/测试与验收.md) |
