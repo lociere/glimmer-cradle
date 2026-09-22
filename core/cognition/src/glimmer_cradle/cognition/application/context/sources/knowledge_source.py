@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from glimmer_cradle.cognition.application.context.sources.base import (
+from glimmer_cradle.cognition.context import (
     ContextItem,
     ContextQuery,
     ContextSource,

@@ -69,6 +69,7 @@ class PerceptionProvider(Provider):
                 "origin": e.origin,
                 "retention_ceiling": e.retention_ceiling,
                 "interaction_id": e.interaction_id,
+                "payload_digest": e.payload_digest,
             }
             if e.actor_id:
                 content["actor_id"] = e.actor_id

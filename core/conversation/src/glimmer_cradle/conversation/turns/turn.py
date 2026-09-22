@@ -27,6 +27,7 @@ class ConversationTurn:
     accepted_at: str = ""
     updated_at: str = ""
     terminal_reason: str | None = None
+    payload_digest: str = ""
 
     @property
     def is_terminal(self) -> bool:

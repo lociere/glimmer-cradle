@@ -8,3 +8,7 @@ export interface TurnSnapshot<Result = unknown> {
   readonly terminal_reason?: string;
 }
 
+/** Python Conversation 持久确认必须绑定接纳时的内容摘要。 */
+export interface PersistedTurnSnapshot<Result = unknown> extends TurnSnapshot<Result> {
+  readonly payload_digest: string;
+}

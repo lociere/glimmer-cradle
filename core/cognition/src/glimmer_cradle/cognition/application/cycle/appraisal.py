@@ -65,6 +65,7 @@ class PerceptionAppraiser:
                 thread_id=thread_id,
                 recall_scope=recall_scope,
                 disclosure_scope=disclosure_scope,
+                payload_digest=str(content.get("payload_digest") or ""),
             )
             existing_turn = turn.turns_by_trace.get(trace_id)
             if existing_turn is not None and existing_turn != candidate_turn:

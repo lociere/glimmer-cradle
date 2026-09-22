@@ -47,6 +47,7 @@ import {
 } from '@glimmer-cradle/extension-sdk';
 import type { PerceptionEvent } from '../../ports/application-models';
 import type { AssetRef } from '@glimmer-cradle/content';
+import { DeliveryController, type DeliveryReceipt } from '@glimmer-cradle/conversation';
 import { FileAssetStore, MAX_ASSET_BYTES } from '../content/file-asset-store';
 import { RECOVERY_REQUIRED_ERROR_CODE } from './recovery-contract';
 import { getPresentationFrameClass } from './presentation-frame-policy';
@@ -198,6 +199,7 @@ export class ControlSurfaceGateway {
     private readonly avatar: AvatarController,
     private readonly audio: AudioService,
     private readonly assetStore: FileAssetStore = new FileAssetStore(),
+    private readonly delivery?: DeliveryController,
   ) {}
 
   public async init(
@@ -272,6 +274,13 @@ export class ControlSurfaceGateway {
       const matchesDesktopUI = isLocalAvatarSurfaceScene(targetChannel);
 
       if (matchesDesktopUI) {
+        const output = this.delivery?.current(`reply:${traceId}`);
+        const deliveryMetadata = output ? {
+          output_id: output.output_id,
+          destination_id: output.destination_id,
+          authority_epoch: output.authority_epoch,
+          generation: output.generation,
+        } : {};
         this._conversationHistoryService?.recordReply(traceId, text);
         this.broadcastFrame({
           kind: 'thought',
@@ -286,9 +295,9 @@ export class ControlSurfaceGateway {
           kind: 'reply',
           trace_id: traceId,
           timestamp: Date.now(),
-          reply: { text, messages: messages ? [...messages] : undefined },
+          reply: { text, messages: messages ? [...messages] : undefined, ...deliveryMetadata },
         });
-        this._speakReply(traceId, text, messages ? [...messages] : undefined);
+        this._speakReply(traceId, text, messages ? [...messages] : undefined, deliveryMetadata);
         if (emotionState && typeof emotionState === 'object') {
           const e = emotionState as { emotion_type?: string; intensity?: number; trigger?: string };
           if (typeof e.emotion_type === 'string' && typeof e.intensity === 'number') {
@@ -549,19 +558,25 @@ export class ControlSurfaceGateway {
       sessionId,
       send: (event) => output.push(event),
     };
-    await this._dispatchSurfaceRequest(frame, client);
-    const event = output[0];
-    callback(null, operation === 'query'
-      ? create(SurfaceGatewayServiceQueryResponseSchema, {
-        operationId: requestId,
-        status: event ? 'success' : 'accepted',
-        event,
-      })
-      : create(SurfaceGatewayServiceCommandResponseSchema, {
-        operationId: requestId,
-        status: event ? 'success' : 'accepted',
-        event,
-      }));
+    try {
+      await this._dispatchSurfaceRequest(frame, client);
+      const event = output[0];
+      callback(null, operation === 'query'
+        ? create(SurfaceGatewayServiceQueryResponseSchema, {
+          operationId: requestId,
+          status: event ? 'success' : 'accepted',
+          event,
+        })
+        : create(SurfaceGatewayServiceCommandResponseSchema, {
+          operationId: requestId,
+          status: event ? 'success' : 'accepted',
+          event,
+        }));
+    } catch (error) {
+      callback(null, this._surfaceRpcError(
+        operation, requestId, ServiceErrorCode.INVALID_REQUEST, errorMessage(error),
+      ));
+    }
   }
 
   private _surfaceRpcError(
@@ -734,23 +749,45 @@ export class ControlSurfaceGateway {
   /** 阶段 8.3：对单个 client 发帧（首帧 avatar_status 使用）。 */
   private _speechGeneration = 0;
 
-  private _speakReply(traceId: string, text: string, messages?: ChannelReplyMessage[]): void {
+  private _speakReply(
+    traceId: string,
+    text: string,
+    messages?: ChannelReplyMessage[],
+    deliveryMetadata: Partial<NonNullable<SurfaceProjectionFrame['reply']>> = {},
+  ): void {
     const speakableText = this._selectSpeakableText(text, messages);
     if (!speakableText) return;
 
     const generation = ++this._speechGeneration;
-    void this._synthesizeAndBroadcastSpeech(traceId, speakableText, generation);
+    void this._synthesizeAndBroadcastSpeech(traceId, speakableText, generation, deliveryMetadata);
   }
 
-  private async _synthesizeAndBroadcastSpeech(traceId: string, text: string, generation: number): Promise<void> {
+  private async _synthesizeAndBroadcastSpeech(
+    traceId: string,
+    text: string,
+    generation: number,
+    deliveryMetadata: Partial<NonNullable<SurfaceProjectionFrame['reply']>>,
+  ): Promise<void> {
     const chunks = this._splitSpeakableText(text);
     for (let index = 0; index < chunks.length; index += 1) {
       if (generation !== this._speechGeneration) return;
-      await this._synthesizeAndBroadcastAudio(traceId, chunks[index], index);
+      await this._synthesizeAndBroadcastAudio(
+        traceId,
+        chunks[index],
+        index,
+        chunks.length,
+        deliveryMetadata,
+      );
     }
   }
 
-  private async _synthesizeAndBroadcastAudio(traceId: string, text: string, sequence = 0): Promise<void> {
+  private async _synthesizeAndBroadcastAudio(
+    traceId: string,
+    text: string,
+    sequence = 0,
+    segmentCount = 1,
+    deliveryMetadata: Partial<NonNullable<SurfaceProjectionFrame['reply']>> = {},
+  ): Promise<void> {
     try {
       const result = await this.audio.synthesizeSpeech({ text, trace_id: traceId });
       if (result.status !== 'success' || !result.output_path) {
@@ -769,6 +806,13 @@ export class ControlSurfaceGateway {
           audio_id: `reply-${traceId}-${sequence}`,
           audio_uri: pathToFileURL(result.output_path).toString(),
           mime_type: 'audio/wav',
+          duration_ms: result.duration_ms,
+          segment_index: sequence,
+          segment_count: segmentCount,
+          output_id: deliveryMetadata.output_id,
+          destination_id: deliveryMetadata.destination_id,
+          authority_epoch: deliveryMetadata.authority_epoch,
+          generation: deliveryMetadata.generation,
         },
       });
     } catch (error) {
@@ -923,6 +967,8 @@ export class ControlSurfaceGateway {
           priority: intent.priority,
         },
       });
+    } else if (kind === 'delivery_receipt') {
+      this._applyDeliveryReceipt(data.delivery_receipt);
     } else if (kind === 'core_skill_action_response' || kind === 'core_skill_confirmation_response') {
       this._handleCoreSkillResponse(data as CoreSkillResponseFrame, ws.sessionId);
     } else if (kind === 'config_snapshot_request') {
@@ -963,6 +1009,45 @@ export class ControlSurfaceGateway {
         : '用户从桌面壳退出 Glimmer Cradle';
       logger.info('产品控制表面请求全局停机', { reason });
       void this._requestApplicationShutdown?.(reason);
+    }
+  }
+
+  private _applyDeliveryReceipt(
+    value: SurfaceRequestFrame['delivery_receipt'],
+  ): void {
+    if (!this.delivery || !value) throw new Error('Delivery receipt owner 尚未就绪');
+    if (!Number.isSafeInteger(value.generation) || value.generation <= 0) {
+      throw new Error('Delivery receipt generation 非法');
+    }
+    const base = { receipt_id: value.receipt_id };
+    let receipt: DeliveryReceipt;
+    if (value.receipt_kind === 'delivered' || value.receipt_kind === 'playback_started') {
+      receipt = { kind: value.receipt_kind, ...base };
+    } else if (
+      value.receipt_kind === 'playback_progress'
+      || value.receipt_kind === 'playback_completed'
+    ) {
+      receipt = {
+        kind: value.receipt_kind,
+        ...base,
+        heard_through_ms: value.heard_through_ms ?? 0,
+        duration_ms: value.duration_ms,
+      };
+    } else if (value.receipt_kind === 'failed' || value.receipt_kind === 'unknown') {
+      receipt = { kind: value.receipt_kind, ...base, reason: value.reason ?? value.receipt_kind };
+    } else {
+      throw new Error(`Delivery receipt kind 非法: ${String(value.receipt_kind)}`);
+    }
+    const decision = this.delivery.applyReceipt({
+      output_id: value.output_id,
+      destination_id: value.destination_id,
+      authority_epoch: value.authority_epoch,
+      generation: value.generation,
+      received_at: value.received_at,
+      receipt,
+    });
+    if (!decision.accepted) {
+      throw new Error(`Delivery receipt 已拒绝: ${decision.reason ?? 'unknown'}`);
     }
   }
 

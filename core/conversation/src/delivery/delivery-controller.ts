@@ -90,6 +90,21 @@ export class DeliveryController {
   }
 
   public applyReceipt(envelope: DeliveryReceiptEnvelope): ReceiptDecision {
+    for (const [name, value] of [
+      ['output_id', envelope.output_id],
+      ['destination_id', envelope.destination_id],
+      ['authority_epoch', envelope.authority_epoch],
+      ['receipt_id', envelope.receipt.receipt_id],
+      ['received_at', envelope.received_at],
+    ] as const) {
+      if (!value.trim()) throw new TypeError(`Delivery receipt ${name} 不得为空`);
+    }
+    if (!Number.isFinite(Date.parse(envelope.received_at))) {
+      throw new TypeError('Delivery receipt received_at 必须是有效时间');
+    }
+    if (!Number.isSafeInteger(envelope.generation) || envelope.generation <= 0) {
+      throw new TypeError('Delivery receipt generation 必须是正安全整数');
+    }
     const receiptOutput = this.store.receiptOutput(envelope.receipt.receipt_id);
     if (receiptOutput) {
       return receiptOutput === envelope.output_id
@@ -150,6 +165,11 @@ export class DeliveryController {
 
   public recover(): OutputGeneration[] {
     return this.store.recover(this.authorityEpoch);
+  }
+
+  public current(outputId: string): OutputGeneration | null {
+    const output = this.store.load(outputId);
+    return output?.authority_epoch === this.authorityEpoch ? output : null;
   }
 
   private move(outputId: string, status: DeliveryStatus): OutputGeneration {

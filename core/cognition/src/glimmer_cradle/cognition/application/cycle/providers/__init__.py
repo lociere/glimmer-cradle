@@ -3,7 +3,7 @@
 5 个内置 provider，对齐 WorkspaceItem.source 枚举：
 - PerceptionProvider  把感知事件翻译为意义
 - AffectProvider      情绪反应 → 工作区候选
-- MemoryProvider      按当前焦点通过 ContextAssembly 检索相关记忆
+- MemoryProvider      按当前焦点通过 ContextAssembler 检索相关记忆
 - DriveProvider       内在动机：好奇 / 陪伴欲 / 休息欲（沉默时的来源）
 - SocialProvider      关系模型 → 对话对象的特征注入
 

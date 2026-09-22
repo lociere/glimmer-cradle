@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -33,6 +35,7 @@ def candidate(turn_id: str = "turn:1", *, thread_id: str = "main") -> Conversati
         conversation_id="conversation:test",
         continuity_id="continuity:test",
         thread_id=thread_id,
+        payload_digest="sha256:turn-payload",
     )
 
 
@@ -52,6 +55,8 @@ async def test_turn_accept_is_idempotent_and_context_conflict_is_rejected(
 
     with pytest.raises(TurnConflictError, match="已绑定不同上下文"):
         await controller.accept(candidate(thread_id="topic:other"))
+    with pytest.raises(TurnConflictError, match="已绑定不同上下文"):
+        await controller.accept(replace(candidate(), payload_digest="sha256:different"))
     await controller.close()
 
 
@@ -113,4 +118,34 @@ async def test_interrupted_and_failed_turns_require_reason(tmp_path: Path) -> No
         await controller.interrupt(accepted.turn_id, expected_revision=accepted.revision, reason=" ")
     with pytest.raises(ValueError, match="必须提供 reason"):
         await controller.fail(accepted.turn_id, expected_revision=accepted.revision, reason="")
+    await controller.close()
+
+
+async def test_legacy_turn_without_digest_is_migrated_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "legacy-turns.db"
+    with sqlite3.connect(database) as connection:
+        connection.executescript(
+            """CREATE TABLE conversation_turns(
+              turn_id TEXT PRIMARY KEY, scene_id TEXT NOT NULL,
+              conversation_id TEXT NOT NULL, continuity_id TEXT NOT NULL,
+              thread_id TEXT NOT NULL, recall_scope TEXT NOT NULL,
+              disclosure_scope TEXT NOT NULL, status TEXT NOT NULL,
+              revision INTEGER NOT NULL, accepted_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL, terminal_reason TEXT
+            );
+            INSERT INTO conversation_turns VALUES(
+              'turn:legacy','scene:test','conversation:test','continuity:test',
+              'main','conversation_private','conversation_private','completed',1,
+              '2025-01-01T00:00:00Z','2025-01-01T00:00:00Z',NULL
+            );"""
+        )
+
+    controller = TurnController(SqliteTurnStore(database), clock=Clock())
+    await controller.connect()
+    loaded = await controller.load("turn:legacy")
+    assert loaded is not None and loaded.payload_digest == ""
+    with pytest.raises(TurnConflictError, match="已绑定不同上下文"):
+        await controller.accept(candidate("turn:legacy"))
     await controller.close()

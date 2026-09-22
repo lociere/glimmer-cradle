@@ -110,15 +110,42 @@ export function proxySurfaceConnection(
   async function handleUpstreamMessage(
     frame: ProductSurfaceProjection,
   ): Promise<void> {
-      if (frame.kind === 'extension_install_preview' && frame.extension_install_preview?.request_id) {
-        await handlePrepareResponse(frame.extension_install_preview.request_id, frame.extension_install_preview.transaction_id);
-      } else if (frame.kind === 'extension_install_result' && frame.extension_install_result?.request_id) {
-        const requestId = frame.extension_install_result.request_id;
-        cleanupRequestTransaction(commitRequests, requestId);
-        cleanupRequestTransaction(cancelRequests, requestId);
-      }
+    if (frame.kind === 'extension_install_preview' && frame.extension_install_preview?.request_id) {
+      await handlePrepareResponse(frame.extension_install_preview.request_id, frame.extension_install_preview.transaction_id);
+    } else if (frame.kind === 'extension_install_result' && frame.extension_install_result?.request_id) {
+      const requestId = frame.extension_install_result.request_id;
+      cleanupRequestTransaction(commitRequests, requestId);
+      cleanupRequestTransaction(cancelRequests, requestId);
+    }
     if (acceptingMessages && client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(frame));
+      client.send(JSON.stringify(frame), (error) => {
+        if (
+          error
+          || frame.kind !== 'reply'
+          || upstream.readyState !== SURFACE_GATEWAY_OPEN
+        ) return;
+        const delivery = frame.reply;
+        if (
+          !delivery?.output_id
+          || !delivery.destination_id
+          || !delivery.authority_epoch
+          || !delivery.generation
+        ) return;
+        upstream.submit({
+          kind: 'delivery_receipt',
+          trace_id: frame.trace_id,
+          timestamp: Date.now(),
+          delivery_receipt: {
+            output_id: delivery.output_id,
+            destination_id: delivery.destination_id,
+            authority_epoch: delivery.authority_epoch,
+            generation: delivery.generation,
+            receipt_id: `personal-server:${delivery.output_id}:${delivery.generation}:delivered`,
+            receipt_kind: 'delivered',
+            received_at: new Date().toISOString(),
+          },
+        });
+      });
     }
   }
 

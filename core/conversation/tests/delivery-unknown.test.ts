@@ -56,4 +56,32 @@ describe('Delivery unknown reconciliation', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('rejects malformed receipt metadata before it can contaminate durable delivery state', () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-delivery-validation-'));
+    const store = new SqliteDeliveryStore(join(root, 'delivery.db'));
+    try {
+      const controller = new DeliveryController(store, 'epoch:stable');
+      const output = controller.begin({
+        output_id: 'output:validation',
+        turn_id: 'turn:validation',
+        destination_id: 'surface:validation',
+        content_digest: 'sha256:validation',
+      });
+      controller.queue(output.output_id);
+      controller.sent(output.output_id);
+      expect(() => controller.applyReceipt({
+        output_id: output.output_id,
+        destination_id: output.destination_id,
+        authority_epoch: output.authority_epoch,
+        generation: output.generation,
+        received_at: 'not-a-time',
+        receipt: { kind: 'delivered', receipt_id: 'receipt:invalid-time' },
+      })).toThrow(/received_at/u);
+      expect(store.load(output.output_id)?.status).toBe('sent');
+    } finally {
+      store.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

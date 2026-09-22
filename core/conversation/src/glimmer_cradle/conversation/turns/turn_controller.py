@@ -129,6 +129,7 @@ class TurnController:
             "thread_id",
             "recall_scope",
             "disclosure_scope",
+            "payload_digest",
         ):
             value = getattr(turn, field_name)
             if not isinstance(value, str) or not value.strip():
@@ -145,6 +146,7 @@ class TurnController:
             "thread_id",
             "recall_scope",
             "disclosure_scope",
+            "payload_digest",
         )
         if any(getattr(existing, field) != getattr(candidate, field) for field in fields):
             raise TurnConflictError(

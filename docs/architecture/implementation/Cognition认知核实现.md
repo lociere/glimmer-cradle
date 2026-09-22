@@ -129,15 +129,20 @@ Kernel CognitionService request
 ## 上下文与推理
 
 ```text
-ContextAssembly
-  -> application/context/sources/*
+ContextAssembler
+  -> context/{source,trust,budget,compaction}.py
+  -> application/context/sources/*（迁移中的具体 source adapters）
   -> memory / knowledge / relationship / episodic
   -> budget and ranking
   -> ReasoningService
   -> inference gateway / configured cloud provider
 ```
 
-Context 是注意力预算控制器，不是字符串拼接器。新增上下文来源必须声明 owner、成本、优先级、失败语义和是否进入经历/记忆。
+Context 是注意力预算控制器，不是字符串拼接器。`context/` 已成为 v2.1 canonical owner：候选分别携带
+数据可信度与 instruction authority，外部/记忆文本不能自行升级为 user/system 指令；retrieval 配额由
+`ContextBudget` 显式缩放，单项超限由 `ContextCompactor` 保留来源信息地截断，零预算明确终止。
+`ContextAssembler` 统一执行来源异常隔离、信任降级、相关度排序与预算选择；MemoryProvider 将信任和权威
+标签继续传播到 Workspace。新增上下文来源必须声明 owner、成本、优先级、失败语义和是否进入经历/记忆。
 
 `ReplyContextBuilder` 按固定分区装配 system prompt：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、近期 Experience 和多模态描述。`ConversationController` 在查询前补投影并从 SQLite 恢复有界 Working Set；近期 Experience 排除当前 trace。所有来源在排序前先按 `recall_scope` 与 conversation/actor/scene owner 过滤，私聊不会因词项相似而召回群聊的 `space_local` 内容。`observe_only` 召回实际 perception，不把策略性 silence 渲染成角色主动沉默。
 
@@ -189,7 +194,7 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
   -> ConversationProjection + EpisodeProjection
   -> consolidation_jobs -> scope-partitioned ConsolidationCoordinator
   -> versioned Memory / Relationship / Knowledge / RecentExperienceSource
-  -> token-budgeted Context Assembly
+  -> token-budgeted ContextAssembler
 ```
 
 已经通电的链路：

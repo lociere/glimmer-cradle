@@ -118,6 +118,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
         conversation_id="conversation-1",
         continuity_id="continuity-1",
         thread_id="main",
+        payload_digest="sha256:trace-tool",
     ))
     await turn_controller.start(
         accepted_turn.turn_id, expected_revision=accepted_turn.revision

@@ -47,7 +47,9 @@ export function useDesktopHost(): void {
       return;
     }
 
-    const audioPlayback = new AudioPlaybackController();
+    const audioPlayback = new AudioPlaybackController((receipt) => (
+      api.reportDeliveryReceipt(receipt)
+    ));
 
     void api.getConnectionStatus()
       .then((status) => setSystemStatus(status.status))
@@ -85,6 +87,22 @@ export function useDesktopHost(): void {
       if (reply.text || reply.messages.length > 0) {
         appendAssistantReply(reply.trace_id, reply.text, reply.messages);
         setThought({ active: false, traceId: reply.trace_id });
+        if (
+          reply.output_id
+          && reply.destination_id
+          && reply.authority_epoch
+          && reply.generation
+        ) {
+          void api.reportDeliveryReceipt({
+            output_id: reply.output_id,
+            destination_id: reply.destination_id,
+            authority_epoch: reply.authority_epoch,
+            generation: reply.generation,
+            receipt_id: `desktop:${reply.output_id}:${reply.generation}:delivered`,
+            receipt_kind: 'delivered',
+            received_at: new Date().toISOString(),
+          }).catch(() => undefined);
+        }
       }
     });
 

@@ -99,4 +99,61 @@ describe('Interaction admission', () => {
       terminal_reason: 'stale_generation',
     });
   });
+
+  it('跨重启先消费持久 Turn 确认，不重复调用 processor', async () => {
+    const process = vi.fn(async () => {
+      throw new Error('不应重复处理已持久 Turn');
+    });
+    const controller = new InteractionController(
+      { process },
+      undefined,
+      undefined,
+      {
+        load: vi.fn(async (turnId: string) => ({
+          turn_id: turnId,
+          payload_digest: 'sha256:persisted',
+          generation: 6,
+          status: 'completed' as const,
+          result: { reply: '已提交' },
+        })),
+      },
+    );
+
+    await expect(controller.accept(
+      input('turn:persisted', 'source:persisted', 'sha256:persisted'),
+    )).resolves.toMatchObject({
+      accepted: true,
+      duplicate: true,
+      generation: 6,
+      snapshot: { status: 'completed', result: { reply: '已提交' } },
+    });
+    expect(process).not.toHaveBeenCalled();
+  });
+
+  it('跨重启持久 Turn 的内容摘要不一致时拒绝复用 identity', async () => {
+    const process = vi.fn();
+    const controller = new InteractionController(
+      { process },
+      undefined,
+      undefined,
+      {
+        load: vi.fn(async (turnId: string) => ({
+          turn_id: turnId,
+          payload_digest: 'sha256:original',
+          generation: 2,
+          status: 'completed' as const,
+        })),
+      },
+    );
+
+    await expect(controller.accept(
+      input('turn:persisted-conflict', 'source:persisted', 'sha256:changed'),
+    )).resolves.toEqual({
+      accepted: false,
+      duplicate: false,
+      generation: 0,
+      reason: 'conflict',
+    });
+    expect(process).not.toHaveBeenCalled();
+  });
 });

@@ -37,6 +37,7 @@ class SqliteTurnStore:
         self._conn = await aiosqlite.connect(str(self._db_path))
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.executescript(_migration_sql("002-turns.sql"))
+        await self._upgrade_legacy_turn_schema()
         await self._conn.commit()
 
     async def close(self) -> None:
@@ -48,7 +49,11 @@ class SqliteTurnStore:
         conn = self._connection
         try:
             await conn.execute(
-                "INSERT INTO conversation_turns VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                """INSERT INTO conversation_turns(
+                       turn_id,scene_id,conversation_id,continuity_id,thread_id,
+                       recall_scope,disclosure_scope,payload_digest,status,revision,
+                       accepted_at,updated_at,terminal_reason
+                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 self._values(turn),
             )
             await conn.commit()
@@ -66,7 +71,7 @@ class SqliteTurnStore:
         cursor = await self._connection.execute(
             """SELECT turn_id,scene_id,conversation_id,continuity_id,thread_id,
                       recall_scope,disclosure_scope,status,revision,accepted_at,
-                      updated_at,terminal_reason
+                      updated_at,terminal_reason,payload_digest
                FROM conversation_turns WHERE turn_id=?""",
             (turn_id,),
         )
@@ -127,6 +132,16 @@ class SqliteTurnStore:
         await self._connection.commit()
         return max(0, cursor.rowcount)
 
+    async def _upgrade_legacy_turn_schema(self) -> None:
+        """旧 002 数据没有摘要；补列后由 Controller 对空摘要 fail closed。"""
+        cursor = await self._connection.execute("PRAGMA table_info(conversation_turns)")
+        columns = {str(row[1]) for row in await cursor.fetchall()}
+        if "payload_digest" not in columns:
+            await self._connection.execute(
+                "ALTER TABLE conversation_turns "
+                "ADD COLUMN payload_digest TEXT NOT NULL DEFAULT ''"
+            )
+
     @staticmethod
     def _values(turn: ConversationTurn) -> tuple[object, ...]:
         return (
@@ -137,6 +152,7 @@ class SqliteTurnStore:
             turn.thread_id,
             turn.recall_scope,
             turn.disclosure_scope,
+            turn.payload_digest,
             turn.status,
             turn.revision,
             turn.accepted_at,

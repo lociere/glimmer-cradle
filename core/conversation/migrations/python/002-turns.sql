@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS conversation_turns(
   thread_id TEXT NOT NULL,
   recall_scope TEXT NOT NULL,
   disclosure_scope TEXT NOT NULL,
+  payload_digest TEXT NOT NULL,
   status TEXT NOT NULL CHECK(status IN ('accepted','running','completed','interrupted','failed')),
   revision INTEGER NOT NULL CHECK(revision > 0),
   accepted_at TEXT NOT NULL,

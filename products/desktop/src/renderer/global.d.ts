@@ -6,6 +6,10 @@ interface ReplyPayload {
   trace_id: string;
   text: string;
   messages: ChannelReplyMessage[];
+  output_id?: string;
+  destination_id?: string;
+  authority_epoch?: string;
+  generation?: number;
 }
 
 interface EmotionStatePayload {
@@ -82,6 +86,25 @@ interface AudioPlayPayload {
   audio_data?: string;
   mime_type?: string;
   duration_ms?: number;
+  output_id?: string;
+  destination_id?: string;
+  authority_epoch?: string;
+  generation?: number;
+  segment_index?: number;
+  segment_count?: number;
+}
+
+interface DeliveryReceiptPayload {
+  output_id: string;
+  destination_id: string;
+  authority_epoch: string;
+  generation: number;
+  receipt_id: string;
+  receipt_kind: 'delivered' | 'playback_started' | 'playback_progress' | 'playback_completed' | 'failed' | 'unknown';
+  heard_through_ms?: number;
+  duration_ms?: number;
+  reason?: string;
+  received_at: string;
 }
 
 interface AudioProviderStatusPayload {
@@ -759,6 +782,7 @@ interface DesktopHostAPI {
   getAvatarActionState: () => Promise<AvatarActionStateSnapshot>;
   setAvatarAction: (payload: AvatarActionIntentRequest) => Promise<void>;
   sendAudioInput: (payload: AudioInputPayload) => Promise<void>;
+  reportDeliveryReceipt: (payload: DeliveryReceiptPayload) => Promise<void>;
   onReply: (callback: (reply: ReplyPayload) => void) => () => void;
   onEmotionUpdate: (callback: (emotion: EmotionStatePayload) => void) => () => void;
   onThoughtUpdate: (callback: (thought: ThoughtStatePayload) => void) => () => void;

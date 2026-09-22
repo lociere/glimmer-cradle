@@ -103,6 +103,23 @@ export function commandRequestToSurfaceFrame(
         priority: command.value.priority || undefined,
       },
     };
+    case 'deliveryReceipt': return {
+      kind: 'delivery_receipt', ...base,
+      delivery_receipt: {
+        output_id: command.value.outputId,
+        destination_id: command.value.destinationId,
+        authority_epoch: command.value.authorityEpoch,
+        generation: Number(command.value.generation),
+        receipt_id: command.value.receiptId,
+        receipt_kind: command.value.kind as never,
+        heard_through_ms: Number(command.value.heardThroughMs),
+        duration_ms: command.value.durationMs === undefined
+          ? undefined
+          : Number(command.value.durationMs),
+        reason: command.value.reason || undefined,
+        received_at: command.value.receivedAt,
+      },
+    };
     case 'coreSkillActionResponse': return {
       kind: 'core_skill_action_response', ...base,
       request_id: command.value.requestId,
@@ -223,6 +240,8 @@ function eventValueFromFrame(frame: SurfaceProjectionFrame): surfaceV1.SurfaceEv
       if (!payload) return null;
       return { case: 'reply', value: create(surfaceV1.ReplyEventSchema, {
         text: payload.text,
+        outputId: payload.output_id ?? '', destinationId: payload.destination_id ?? '',
+        authorityEpoch: payload.authority_epoch ?? '', generation: BigInt(payload.generation ?? 0),
         messages: (payload.messages ?? []).map((item) => create(surfaceV1.ReplyMessageSchema, {
           sequence: item.sequence, contentType: item.content_type, text: item.text, language: item.language ?? '',
         })),
@@ -246,6 +265,10 @@ function eventValueFromFrame(frame: SurfaceProjectionFrame): surfaceV1.SurfaceEv
     case 'audio_play': return frame.audio_play ? { case: 'audioPlay', value: create(surfaceV1.AudioPlayEventSchema, {
       audioId: frame.audio_play.audio_id, audioUri: frame.audio_play.audio_uri ?? '',
       mimeType: frame.audio_play.mime_type ?? '', durationMs: frame.audio_play.duration_ms ?? 0,
+      outputId: frame.audio_play.output_id ?? '', destinationId: frame.audio_play.destination_id ?? '',
+      authorityEpoch: frame.audio_play.authority_epoch ?? '', generation: BigInt(frame.audio_play.generation ?? 0),
+      segmentIndex: frame.audio_play.segment_index ?? 0,
+      segmentCount: frame.audio_play.segment_count ?? 0,
     }) } : null;
     case 'audio_transcript': return frame.audio_transcript ? { case: 'audioTranscript', value: create(surfaceV1.AudioTranscriptEventSchema, {
       audioId: frame.audio_transcript.audio_id, status: frame.audio_transcript.status,

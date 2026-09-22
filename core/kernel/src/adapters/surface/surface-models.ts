@@ -11,14 +11,24 @@ export interface ExtensionUninstallRequest { request_id: string; extension_id: s
 export interface ExtensionLifecycleRequest { request_id: string; extension_id: string; version?: string; operation: 'start' | 'stop'; }
 export interface ExtensionCommandRequest { request_id: string; command_id: string; args: unknown[]; }
 export interface ExtensionRuntimeProjectionRequest { request_id: string; extension_id?: string; }
+export interface DeliveryMetadata { output_id: string; destination_id: string; authority_epoch: string; generation: number; }
+export interface DeliveryReceiptRequest extends DeliveryMetadata {
+  receipt_id: string;
+  receipt_kind: 'delivered' | 'playback_started' | 'playback_progress' | 'playback_completed' | 'failed' | 'unknown';
+  heard_through_ms?: number;
+  duration_ms?: number;
+  reason?: string;
+  received_at: string;
+}
 
 export interface SurfaceRequestFrame {
-  kind: 'heartbeat' | 'chat_input' | 'audio_input' | 'avatar_presentation' | 'avatar_intent' | 'config_snapshot_request' | 'conversation_history_request' | 'skill_catalog_request' | 'config_update_request' | 'config_test_request' | 'extension_install_prepare' | 'extension_install_commit' | 'extension_install_cancel' | 'extension_uninstall_request' | 'extension_lifecycle_request' | 'extension_command_request' | 'extension_runtime_projection_request' | 'shutdown_request' | 'core_skill_action_response' | 'core_skill_confirmation_response';
+  kind: 'heartbeat' | 'chat_input' | 'audio_input' | 'avatar_presentation' | 'avatar_intent' | 'delivery_receipt' | 'config_snapshot_request' | 'conversation_history_request' | 'skill_catalog_request' | 'config_update_request' | 'config_test_request' | 'extension_install_prepare' | 'extension_install_commit' | 'extension_install_cancel' | 'extension_uninstall_request' | 'extension_lifecycle_request' | 'extension_command_request' | 'extension_runtime_projection_request' | 'shutdown_request' | 'core_skill_action_response' | 'core_skill_confirmation_response';
   trace_id?: string; timestamp: number;
   chat_input?: { text: string; source_suffix?: string };
   audio_input?: { audio_id: string; audio_data: string; mime_type: string; duration_ms?: number; sample_rate?: number };
   avatar_presentation?: { placement_id?: string; display_scale?: number; reset_placement?: boolean };
   avatar_intent?: { action_id: string; operation: 'trigger' | 'activate' | 'deactivate'; priority?: number };
+  delivery_receipt?: DeliveryReceiptRequest;
   config_snapshot_request?: ConfigurationSnapshotRequest;
   conversation_history_request?: ConversationHistoryRequest;
   skill_catalog_request?: { request_id: string };
@@ -39,10 +49,10 @@ export interface SurfaceRequestFrame {
 export interface SurfaceProjectionFrame {
   kind: 'reply' | 'emotion' | 'thought' | 'audio_play' | 'audio_transcript' | 'character_presentation_projection' | 'avatar_status' | 'avatar_action_state' | 'runtime_readiness' | 'audio_status' | 'conversation_notice' | 'conversation_history_result' | 'configuration_snapshot_result' | 'configuration_update_result' | 'configuration_test_result' | 'skill_catalog_response' | 'extension_install_preview' | 'extension_install_result' | 'extension_uninstall_result' | 'extension_lifecycle_result' | 'extension_command_result' | 'extension_runtime_projection_result' | 'extension_runtime_projection_changed' | 'extension_status_changed' | 'core_skill_action_request' | 'core_skill_confirmation_request' | 'shutdown';
   trace_id?: string; timestamp: number;
-  reply?: { text: string; messages?: ChannelReplyMessage[]; emotion_snapshot?: { emotion_type: string; intensity: number; trigger?: string; blend_time_ms?: number } };
+  reply?: ({ text: string; messages?: ChannelReplyMessage[]; emotion_snapshot?: { emotion_type: string; intensity: number; trigger?: string; blend_time_ms?: number } } & Partial<DeliveryMetadata>);
   emotion?: { emotion_type: string; intensity: number; trigger?: string; blend_time_ms?: number };
   thought?: { active: boolean; hint?: string };
-  audio_play?: { audio_id: string; audio_uri?: string; mime_type?: string; duration_ms?: number };
+  audio_play?: ({ audio_id: string; audio_uri?: string; mime_type?: string; duration_ms?: number; segment_index?: number; segment_count?: number } & Partial<DeliveryMetadata>);
   audio_transcript?: { audio_id: string; status: 'success' | 'error'; text?: string; message?: string };
   character_presentation_projection?: { avatar_package_id: string; model_id: string; display_name: string; kind: 'live2d'; backend: 'unity'; host_kind: 'unity' | 'offline'; avatar_state: 'pending' | 'starting' | 'ready' | 'degraded' | 'stopped'; appearance: { placement_id?: string; display_scale: number }; lifecycle: { worker_window_state: 'isolated' | 'visible' | 'unknown'; composition_surface_state: 'attached' | 'failed' | 'unknown'; first_frame_presented: boolean; interaction_ready: boolean; ready: boolean; summary: string } };
   avatar_status?: { host_kind: 'unity' | 'offline'; host_id?: string };

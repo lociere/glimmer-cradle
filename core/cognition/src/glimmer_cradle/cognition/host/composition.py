@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from glimmer_cradle.cognition.application.activity import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
-from glimmer_cradle.cognition.application.context import ContextAssembly
+from glimmer_cradle.cognition.context import ContextAssembler
 from glimmer_cradle.conversation import (
     ConversationController,
     ConversationStore,
@@ -208,7 +208,7 @@ def compose_cognition(
         repository=relationship_repository,
         database=cognition_database,
     )
-    context_assembly = ContextAssembly(sources=[
+    context_assembly = ContextAssembler(sources=[
         RecentExperienceSource(conversation_recorder),
         EpisodicMemorySource(memory_substrate, clock=clock),
         KnowledgeSource(knowledge_base),

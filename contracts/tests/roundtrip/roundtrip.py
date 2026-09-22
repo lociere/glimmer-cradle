@@ -15,6 +15,10 @@ from glimmer.common.v1.contract_probe_pb2 import (  # noqa: E402
     TraceMetadata,
 )
 from glimmer.content.v1.content_pb2 import AssetRef, ContentPart, FileContent  # noqa: E402
+from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
+    AudioPlayEvent,
+    DeliveryReceiptCommand,
+)
 
 fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
@@ -64,5 +68,35 @@ if (
     or response_round_trip.document.schema_version != document["schema_version"]
 ):
     raise RuntimeError("Python response protobuf round-trip lost the successful echo result")
+
+receipt = DeliveryReceiptCommand(
+    output_id="reply:trace",
+    destination_id="surface:desktop",
+    authority_epoch="epoch:test",
+    generation=3,
+    receipt_id="receipt:test",
+    kind="playback_progress",
+    heard_through_ms=125,
+    duration_ms=500,
+    received_at="2026-09-22T00:00:00Z",
+)
+receipt_round_trip = DeliveryReceiptCommand()
+receipt_round_trip.ParseFromString(receipt.SerializeToString())
+if receipt_round_trip.generation != 3 or receipt_round_trip.heard_through_ms != 125:
+    raise RuntimeError("Python Surface delivery receipt round-trip lost fencing or progress")
+
+audio_play = AudioPlayEvent(
+    audio_id="audio:1",
+    output_id="reply:trace",
+    destination_id="surface:desktop",
+    authority_epoch="epoch:test",
+    generation=3,
+    segment_index=1,
+    segment_count=2,
+)
+audio_play_round_trip = AudioPlayEvent()
+audio_play_round_trip.ParseFromString(audio_play.SerializeToString())
+if audio_play_round_trip.segment_index != 1 or audio_play_round_trip.segment_count != 2:
+    raise RuntimeError("Python Surface audio segment round-trip lost ordering metadata")
 
 print("contracts roundtrip py: ok")

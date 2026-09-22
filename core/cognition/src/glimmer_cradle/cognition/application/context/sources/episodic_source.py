@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from glimmer_cradle.cognition.application.context.sources.base import (
+from glimmer_cradle.cognition.context import (
     ContextItem,
     ContextQuery,
     ContextSource,
@@ -51,6 +51,7 @@ class EpisodicMemorySource(ContextSource):
                 recency=_iso_recency(mem.updated_at, now=now),
                 importance=min(1.0, float(mem.salience)),
                 token_estimate=estimate_tokens(content),
+                trust_tier="host_verified",
                 metadata={"memory_id": getattr(mem, "memory_id", "")},
             ))
         return items
@@ -141,6 +142,7 @@ class RecentExperienceSource(ContextSource):
                 recency=recency,
                 importance=max(0.0, min(1.0, float(moment.importance))),
                 token_estimate=estimate_tokens(content),
+                trust_tier="host_verified",
                 metadata={
                     "moment_id": moment.moment_id,
                     "scene_id": moment.scene_id,

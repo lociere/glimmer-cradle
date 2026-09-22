@@ -1,5 +1,6 @@
 import type { TurnProcessorPort } from '../turns/turn-processor-port.js';
 import type { TurnSnapshot } from '../turns/turn-snapshot.js';
+import type { TurnSnapshotStorePort } from '../turns/turn-store-port.js';
 import { InputDeduplicator } from './input-deduplicator.js';
 import { interactionRouteKey, type InteractionInput } from './input.js';
 import { InterruptionCoordinator } from './interruption.js';
@@ -19,10 +20,29 @@ export class InteractionController<Payload = unknown, Result = unknown> {
     private readonly processor: TurnProcessorPort<Payload, Result>,
     private readonly deduplicator = new InputDeduplicator(),
     private readonly interruptions = new InterruptionCoordinator(),
+    private readonly turns?: TurnSnapshotStorePort,
   ) {}
 
   public async accept(input: InteractionInput<Payload>): Promise<InteractionAdmission<Result>> {
     this.validate(input);
+    const persisted = await this.turns?.load(input.conversation.interaction_id);
+    if (persisted) {
+      if (persisted.turn_id !== input.conversation.interaction_id) {
+        throw new Error(`持久 Turn identity 冲突: ${input.conversation.interaction_id}`);
+      }
+      if (persisted.payload_digest !== input.payload_digest) {
+        return { accepted: false, duplicate: false, generation: 0, reason: 'conflict' };
+      }
+      return {
+        accepted: true,
+        duplicate: true,
+        generation: persisted.generation,
+        snapshot: persisted as TurnSnapshot<Result>,
+        ...(persisted.status === 'accepted' || persisted.status === 'running'
+          ? { reason: 'pending' as const }
+          : {}),
+      };
+    }
     const claim = this.deduplicator.claim(input);
     if (claim.kind === 'conflict') {
       return { accepted: false, duplicate: false, generation: 0, reason: 'conflict' };

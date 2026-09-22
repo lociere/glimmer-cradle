@@ -145,13 +145,19 @@ export class PerceptionAppService {
       const payloadDigest = event.origin.content_hash?.trim()
         || this.digestContent?.(JSON.stringify(request))
         || request.id;
+      const acceptedRequest = request.origin.content_hash?.trim()
+        ? request
+        : {
+            ...request,
+            origin: { ...request.origin, content_hash: payloadDigest },
+          };
       const admission = await this.interactions.accept({
-        input_id: request.id,
+        input_id: acceptedRequest.id,
         deduplication_key: `${event.origin.provider_id}:${event.origin.source_event_id}`,
         payload_digest: payloadDigest,
-        conversation: request.conversation,
-        received_at: new Date(request.timestamp).toISOString(),
-        payload: request,
+        conversation: acceptedRequest.conversation,
+        received_at: new Date(acceptedRequest.timestamp).toISOString(),
+        payload: acceptedRequest,
       });
       if (!admission.accepted) {
         throw new Error(`Interaction 接纳失败: ${admission.reason ?? 'unknown'}`);

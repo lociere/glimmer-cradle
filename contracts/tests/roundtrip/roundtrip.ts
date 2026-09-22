@@ -10,6 +10,10 @@ import {
   AvatarDownstreamFrameSchema,
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
+import {
+  AudioPlayEventSchema,
+  DeliveryReceiptCommandSchema,
+} from '../../generated/ts/glimmer/surface/v1/surface_gateway_pb';
 
 const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
@@ -90,6 +94,27 @@ const avatarJsonRoundTrip = fromJsonString(AvatarDownstreamFrameSchema, avatarJs
 if (avatarJsonRoundTrip.avatarIntent?.actionId !== 'wave-hand'
     || avatarJsonRoundTrip.avatarIntent.priority !== 7) {
   throw new Error('TypeScript Avatar JSON round-trip lost the control payload');
+}
+
+const receipt = create(DeliveryReceiptCommandSchema, {
+  outputId: 'reply:trace', destinationId: 'surface:desktop', authorityEpoch: 'epoch:test',
+  generation: 3n, receiptId: 'receipt:test', kind: 'playback_progress',
+  heardThroughMs: 125n, durationMs: 500n, receivedAt: '2026-09-22T00:00:00Z',
+});
+const receiptRoundTrip = fromBinary(
+  DeliveryReceiptCommandSchema,
+  toBinary(DeliveryReceiptCommandSchema, receipt),
+);
+if (receiptRoundTrip.generation !== 3n || receiptRoundTrip.heardThroughMs !== 125n) {
+  throw new Error('TypeScript Surface delivery receipt round-trip lost fencing or progress');
+}
+const audioPlay = create(AudioPlayEventSchema, {
+  audioId: 'audio:1', outputId: 'reply:trace', destinationId: 'surface:desktop',
+  authorityEpoch: 'epoch:test', generation: 3n, segmentIndex: 1, segmentCount: 2,
+});
+const audioPlayRoundTrip = fromBinary(AudioPlayEventSchema, toBinary(AudioPlayEventSchema, audioPlay));
+if (audioPlayRoundTrip.segmentIndex !== 1 || audioPlayRoundTrip.segmentCount !== 2) {
+  throw new Error('TypeScript Surface audio segment round-trip lost ordering metadata');
 }
 
 console.log('contracts roundtrip ts: ok');

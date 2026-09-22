@@ -4,7 +4,7 @@
 核心作用：知识库条目的 SQLite 读写（L3）
 设计原则：
 1. 知识库是"被给予的"（curated），与"活出来的"记忆在存储层彻底分开
-2. 只做数据访问，不含检索策略（检索由领域层 ContextAssembly 负责）
+2. 只做数据访问，不含检索策略（检索由领域层 ContextAssembler 负责）
 3. activation（激活规则）在库内存为 JSON 文本，进出由本层序列化
 """
 from __future__ import annotations

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.application.context.sources.base import allowed_recall_scopes
+from glimmer_cradle.cognition.context import allowed_recall_scopes
 
 _EMOTION_HINTS: dict[str, str] = {
     "calm": "平静",

@@ -4,6 +4,62 @@ import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { proxySurfaceConnection } from './surface-proxy';
 import { SurfaceGatewayTestDouble } from './surface-gateway-test-double';
 
+test('reports delivered only after the authenticated browser websocket accepts a reply', async () => {
+  const ingress = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await waitForServer(ingress);
+  let resolveUpstream!: (value: SurfaceGatewayTestDouble) => void;
+  const upstreamReady = new Promise<SurfaceGatewayTestDouble>((resolve) => {
+    resolveUpstream = resolve;
+  });
+  const receiptSeen = new Promise<void>((resolve, reject) => {
+    ingress.on('connection', (socket) => {
+      proxySurfaceConnection(socket, 'grpc://surface-test', 'generation-a', {
+        surfaceGatewayClientFactory: () => {
+          const upstream = new SurfaceGatewayTestDouble();
+          upstream.onSend = (frame) => {
+            if (frame.kind !== 'delivery_receipt') return;
+            try {
+              assert.deepEqual(frame.delivery_receipt, {
+                output_id: 'reply:trace',
+                destination_id: 'surface:browser',
+                authority_epoch: 'epoch:test',
+                generation: 3,
+                receipt_id: 'personal-server:reply:trace:3:delivered',
+                receipt_kind: 'delivered',
+                received_at: frame.delivery_receipt?.received_at,
+              });
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          };
+          resolveUpstream(upstream);
+          return upstream;
+        },
+      });
+    });
+  });
+  const browser = new WebSocket(socketUrl(ingress));
+  await waitForOpen(browser);
+  const upstream = await upstreamReady;
+  upstream.emitFrame({
+    kind: 'reply',
+    trace_id: 'trace',
+    timestamp: Date.now(),
+    reply: {
+      text: '你好',
+      output_id: 'reply:trace',
+      destination_id: 'surface:browser',
+      authority_epoch: 'epoch:test',
+      generation: 3,
+    },
+  });
+  const frame = await onceJsonMessage(browser);
+  assert.equal(frame.reply.text, '你好');
+  await withTimeout(receiptSeen, 2_000, 'expected delivered receipt after websocket send');
+  await Promise.all([closeSocket(browser), closeServer(ingress)]);
+});
+
 test('cancels previewed extension transactions when the browser websocket disconnects', async () => {
   let upstream: SurfaceGatewayTestDouble | null = null;
   const clientIngress = new WebSocketServer({ host: '127.0.0.1', port: 0 });

@@ -36,6 +36,7 @@ class PerceptionEntry:
     origin: dict | None = None
     retention_ceiling: str = "experience"
     interaction_id: str = ""
+    payload_digest: str = ""
 
 
 class PerceptionEventQueue:

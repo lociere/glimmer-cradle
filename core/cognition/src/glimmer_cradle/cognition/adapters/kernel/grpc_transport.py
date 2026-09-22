@@ -255,6 +255,9 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)) from error
             if not duplicate:
                 content = request.content
+                payload_digest = request.origin.content_hash.strip() or hashlib.sha256(
+                    request.SerializeToString(deterministic=True)
+                ).hexdigest()
                 model_input = {
                     "text": content.text,
                     "actor_id": content.actor_id or None,
@@ -288,6 +291,7 @@ class CognitionGrpcHost:
                     origin=MessageToDict(request.origin, preserving_proto_field_name=True),
                     retention_ceiling=retention,
                     interaction_id=conversation.interaction_id,
+                    payload_digest=payload_digest,
                 ))
                 if dropped is not None:
                     self._operations.finish(dropped.trace_id, "failed", "感知队列容量已满")

@@ -1,6 +1,6 @@
 """上下文源（蓝图 §4.6）。"""
 
-from glimmer_cradle.cognition.application.context.sources.base import ContextItem, ContextQuery, ContextSource
+from glimmer_cradle.cognition.context import ContextItem, ContextQuery, ContextSource
 from glimmer_cradle.cognition.application.context.sources.episodic_source import EpisodicMemorySource, RecentExperienceSource
 from glimmer_cradle.cognition.application.context.sources.knowledge_source import KnowledgeSource
 from glimmer_cradle.cognition.application.context.sources.relationship_source import RelationshipSource

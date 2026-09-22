@@ -51,7 +51,7 @@ Cognition 是否履行该感知的处理义务：`ambient` 在 Appraise 写入�
 ```text
 Perception
   -> Appraise
-  -> Recall / Context Assembly
+  -> Recall / ContextAssembler
   -> Workspace Competition
   -> Deliberate / Reasoning
   -> Intend / Volition
@@ -99,7 +99,7 @@ normalized Perception / Emotion / Reply / Action / ActionResult / Silence
   -> structured memory drafts + evidence validation
   -> versioned Memory / Relationship / Intention state
   -> budgeted retrieval
-  -> Context Assembly
+  -> ContextAssembler
 ```
 
 `SourceDescriptor` 记录 provider kind/id/version、source event、schema、trust、privacy 和 cognitive effect。`retention_ceiling` 决定一条 Moment 最多能进入哪一层；只有 `memory_candidate` 才可参与记忆巩固。工具成功结果也只是候选证据，不自动成为事实；失败结果保留为 Experience，不能污染 Memory。

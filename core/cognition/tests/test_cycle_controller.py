@@ -199,6 +199,7 @@ async def test_perception_cycle_persists_and_completes_conversation_turn(
             "thread_id": "main",
             "interaction_id": "turn:test",
             "trace_id": "turn:test",
+            "payload_digest": "sha256:turn-test",
         },
         salience=0.9,
     )])

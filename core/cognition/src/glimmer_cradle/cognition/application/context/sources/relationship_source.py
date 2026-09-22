@@ -1,5 +1,5 @@
 """从关系事实与当前证据化修订中激活对话上下文。"""
-from glimmer_cradle.cognition.application.context.sources.base import ContextItem, ContextQuery, ContextSource, estimate_tokens
+from glimmer_cradle.cognition.context import ContextItem, ContextQuery, ContextSource, estimate_tokens
 from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 
 
@@ -21,5 +21,5 @@ class RelationshipSource(ContextSource):
             content += f" 当前理解：{record.summary}"
         return [ContextItem(source=self.name, content=content, relevance=0.9,
                             recency=0.8, importance=max(0.4, record.confidence),
-                            token_estimate=estimate_tokens(content),
+                            token_estimate=estimate_tokens(content), trust_tier="host_verified",
                             metadata={"actor_id": record.actor_id})]

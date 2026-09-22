@@ -172,7 +172,8 @@ export class SurfaceGatewayClient extends EventEmitter {
 
   private emitProjectionEvent(event: SurfaceEvent | undefined): void {
     const projection = surfaceEventToProjection(event);
-    if (projection) this.emit('message', projection satisfies ProductSurfaceProjection);
+    if (!projection) return;
+    this.emit('message', projection satisfies ProductSurfaceProjection);
   }
 
   private fail(error: Error): void {

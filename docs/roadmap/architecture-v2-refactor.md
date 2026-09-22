@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 待执行 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context canonical owner、retrieval budget、压缩与 trust/authority 分离已接入真实 MemoryProvider；Loop/Memory/Persona/Observation 仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -129,11 +129,11 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 当前事实 | v2.1 目标文件 | 本阶段处理与删除门 |
 |---|---|---|
 | 已拆分的 Binding 与 SQLite adapter | `core/conversation/src/binding/{binding.ts,binding-resolver.ts,binding-store-port.ts}`、`src/adapters/storage/sqlite-binding-store.ts` | 已完成；稳定 ID、旧地址样本与 Kernel consumer 均走公开根 API，旧聚合实现已删除 |
-| 已落位的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 已接入现行 Kernel ingress；阶段 12 由 Host `turn-processor-adapter.ts` 绑定 Cognition，跨重启去重仍需持久 Turn 确认 |
-| 已落位的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出和 unknown 恢复已实现；Surface receipt/播放回执接线仍待阶段 12 |
+| 已落位的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 已接入现行 Kernel ingress 并校验持久 Turn 的 payload digest；阶段 12 由 Host `turn-processor-adapter.ts` 绑定 Python Conversation 确认 Port |
+| 已落位的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出、unknown 恢复及 Desktop/Personal Server 真实 Surface receipt 已接线；阶段 12 迁入共用 Host composition |
 | 已拆分的 Python ordered log | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/{log_store.py,writer_guard.py}` | 源码与 wheel 均已 consumer-zero 删除旧聚合文件；保留 v4/v5 ID、position、单写者和 pack 读取，数据路径迁移仍等待阶段 14 备份/恢复 |
 | 已拆分的 Python History | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | v3→v4、多 thread、分页、重建和权限反例继续通过；`conversations.db` 始终为投影 |
-| `src/glimmer_cradle/conversation/turns/*` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | 目标 Turn 文件和持久 adapter 已就位；Conversation 持久 Turn 与 Cognition Step 分离，跨重启 ingress 确认接线仍待完成 |
+| `src/glimmer_cradle/conversation/turns/*` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | 目标 Turn 文件和持久 adapter 已就位并持久输入摘要；Conversation Turn 与 Cognition Step 分离，旧空摘要失败关闭，跨进程查询 adapter 仍待阶段 12 |
 | Cognition `CycleContinuity`、`AgentSynthesisUseCase` 的 action/result 记录 | Conversation Log 的 ACTION → ACTION_RESULT → REPLY 因果事实；跨进程映射暂经现行 cognition proto | 本切片先确保副作用前 flush、稳定 invocation 与幂等重放；阶段 6 切换 native ToolCall/ToolResult 后删除 `skill_request` 兼容链 |
 | `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 阶段 12 切 App composition；Conversation writer drain 与 Cognition checkpoint 都通过后删除旧 Worker 入口 |
 | Kernel composition、Surface history 与 skill action 接线 | `apps/host/src/adapters/protocol/conversation-mapper.ts`、`composition/{domain-owners.ts,turn-processor-adapter.ts}`、`gateway/conversation-routes.ts` | 阶段 12/15 消费者切换并通过本地/headless 共用 Host 验收后删除旧 Kernel 业务接线 |
@@ -274,6 +274,31 @@ Conversation Python 18 项、TS 9 项、Cognition 全量 258 项和 Kernel 全�
 clean wheel 与 npm tarball 均只携带目标入口和四份 migration，隔离 wheel 安装可读取 Python SQL。
 docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。Surface receipt 与跨重启
 ingress 确认仍未接线，阶段 4 继续进行。
+
+Surface receipt 切片随后为 Contract Spine 增加 typed `DeliveryReceiptCommand`，Reply/Audio projection 传播
+output/destination/authority epoch/generation，音频另传播 segment index/count。Kernel 将回执交给
+Conversation `DeliveryController`；Desktop 以 renderer 文字投影和 HTMLAudioElement 的真实 started/ended/error
+反馈分别提交 delivered 与播放回执，多段播放累计实际已听范围且只在末段完成；Personal Server 只在认证
+浏览器 WebSocket 发送成功后提交 delivered。陈旧 generation、冲突 receipt、非法时间和倒退进度均拒绝。
+InteractionController 也已在内存去重前消费可注入的持久 Turn 确认，重启样例不会重调 processor；但当前
+Kernel 入口尚未接入 Python Turn adapter，完整跨进程/跨重启冲突确认仍归阶段 12 Host/Worker 接线，不能提前
+宣称完成。当前切片的 Contract gates/inventory/schema/toolchain 与
+TypeScript/Python/C# roundtrip、根 typecheck、Conversation/Kernel build、repo-checks 22 项、Desktop 11 项和
+Personal Server Surface Proxy 3 项已通过；受限环境内 Buf 原生命令与 Vite 配置父目录扫描仍不能执行，完整
+门禁状态以本段后续固定候选记录为准。
+
+持久 Turn 摘要切片随后把 Kernel 接纳使用的 payload digest 随 Perception origin 传播到 Cognition，并由
+Python `ConversationTurn` / SQLite store 持久化；`InteractionController` 仅在 identity 与摘要同时匹配时接受
+跨重启重复。旧 002 schema 原位补空摘要列，历史行因无法证明内容一致而失败关闭。Conversation Python 19 项、
+Cognition 258 项、定向 Ruff、Conversation/Kernel typecheck 与 build 均通过；标准 Conversation Vitest 仍受当前
+沙箱禁止 Vite 扫描父目录阻断，阶段 12 的真实 Python Turn query adapter 仍未实现。
+
+阶段 5 首个 Context 切片把旧 `application/context` 的领域 DTO 与 assembly 物理迁入目标
+`cognition/context/{source,trust,budget,compaction,assembler}.py`，删除旧 assembly/base 双 owner，并让 Host
+composition、MemoryProvider 及四类现行 source 直接消费新入口。Context 候选现在正交携带数据可信度与
+instruction authority；未经相应证明的 user/system authority 降级为 data，retrieval budget 显式缩放，单项
+超限按可追溯 metadata 压缩，零预算终止。具体 Memory/Knowledge/Relationship/Experience source adapters
+仍在迁移路径，待对应 owner 阶段物理归位；本切片不宣称 native Loop 或阶段 5 完成。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

@@ -77,6 +77,21 @@ export function commandFromSurfaceRequest(
         operation: frame.avatar_intent.operation,
         priority: frame.avatar_intent.priority ?? 0,
       }) } : null;
+    case 'delivery_receipt':
+      return frame.delivery_receipt ? { case: 'deliveryReceipt', value: create(surfaceV1.DeliveryReceiptCommandSchema, {
+        outputId: frame.delivery_receipt.output_id,
+        destinationId: frame.delivery_receipt.destination_id,
+        authorityEpoch: frame.delivery_receipt.authority_epoch,
+        generation: BigInt(frame.delivery_receipt.generation),
+        receiptId: frame.delivery_receipt.receipt_id,
+        kind: frame.delivery_receipt.receipt_kind,
+        heardThroughMs: BigInt(frame.delivery_receipt.heard_through_ms ?? 0),
+        durationMs: frame.delivery_receipt.duration_ms === undefined
+          ? undefined
+          : BigInt(frame.delivery_receipt.duration_ms),
+        reason: frame.delivery_receipt.reason ?? '',
+        receivedAt: frame.delivery_receipt.received_at,
+      }) } : null;
     case 'core_skill_action_response':
       return { case: 'coreSkillActionResponse', value: create(surfaceV1.CoreSkillActionResponseCommandSchema, {
         requestId: frame.request_id, status: frame.status,
@@ -163,6 +178,10 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
       kind: 'reply', ...base,
       reply: {
         text: item.value.text,
+        output_id: item.value.outputId || undefined,
+        destination_id: item.value.destinationId || undefined,
+        authority_epoch: item.value.authorityEpoch || undefined,
+        generation: item.value.generation > 0n ? Number(item.value.generation) : undefined,
         messages: item.value.messages.map((message) => ({
           sequence: message.sequence,
           content_type: message.contentType as 'text' | 'code',
@@ -185,6 +204,12 @@ export function surfaceEventToProjection(event: surfaceV1.SurfaceEvent | undefin
     case 'audioPlay': return { kind: 'audio_play', ...base, audio_play: {
       audio_id: item.value.audioId, audio_uri: item.value.audioUri || undefined,
       mime_type: item.value.mimeType || undefined, duration_ms: item.value.durationMs || undefined,
+      output_id: item.value.outputId || undefined,
+      destination_id: item.value.destinationId || undefined,
+      authority_epoch: item.value.authorityEpoch || undefined,
+      generation: item.value.generation > 0n ? Number(item.value.generation) : undefined,
+      segment_index: item.value.segmentIndex,
+      segment_count: item.value.segmentCount || undefined,
     } };
     case 'audioTranscript': return { kind: 'audio_transcript', ...base, audio_transcript: {
       audio_id: item.value.audioId, status: item.value.status as 'success' | 'error',

@@ -1,12 +1,12 @@
 """
 MemoryProvider 是 Context Assembly 进入 Global Workspace 的记忆专家入口。
 
-按当前工作区焦点形成查询，由 ContextAssembly 在 episodic Memory、Knowledge、
+按当前工作区焦点形成查询，由 ContextAssembler 在 episodic Memory、Knowledge、
 Relationship 与近期 Conversation Log Moment 中按预算召回候选。
 
 设计要点：
 - **反应型**：工作区空时不投放（无焦点 → 无查询 → 跳过）
-- **预算挂钩活动策略**：调 ContextAssembly 时传 ``policy.context_budget_factor``
+- **预算挂钩活动策略**：调 ContextAssembler 时传 ``policy.context_budget_factor``
 - **数量上限**：默认每拍最多投 3 条（避免占满工作区）
 - **salience**：统一使用 ContextItem.score()
 """
@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
-from glimmer_cradle.cognition.application.context import ContextAssembly, ContextQuery
+from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
@@ -43,7 +43,7 @@ class MemoryProvider(Provider):
 
     def __init__(
         self,
-        context_assembly: ContextAssembly,
+        context_assembly: ContextAssembler,
         *,
         activity_controller: "CognitiveActivityController | None" = None,
         max_items_per_tick: int = 3,
@@ -71,7 +71,7 @@ class MemoryProvider(Provider):
     async def _retrieve_from_assembly(
         self, query_text: str, focus: WorkspaceItem,
     ) -> list[WorkspaceItem]:
-        """通过 ContextAssembly 执行唯一召回路径。"""
+        """通过 ContextAssembler 执行唯一召回路径。"""
         # 无活动策略时按 1.0 满预算。
         budget_factor = 1.0
         if self._activity is not None:
@@ -108,6 +108,8 @@ class MemoryProvider(Provider):
                 content={
                     "text": ci.content,
                     "source_kind": ci.source,  # episodic / knowledge / relationship
+                    "trust_tier": ci.trust_tier,
+                    "instruction_authority": ci.instruction_authority,
                     "metadata": ci.metadata,
                 },
                 salience=min(1.0, max(0.05, ci.score())),

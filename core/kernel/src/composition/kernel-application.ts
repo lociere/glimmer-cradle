@@ -200,11 +200,13 @@ function createOperationalRuntimePlan(options: {
   const cognition = new AIProxy(cognitionAdapter);
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
-  const surface = new ControlSurfaceGateway(projection, avatar, audio, new FileAssetStore());
   const stableIdentity = new NodeStableIdentityAdapter();
   const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));
   const deliveryStore = new SqliteDeliveryStore(resolveStatePath('conversation/delivery.db'));
   const delivery = new DeliveryController(deliveryStore, stableIdentity.newId());
+  const surface = new ControlSurfaceGateway(
+    projection, avatar, audio, new FileAssetStore(), delivery,
+  );
   const conversations = new ConversationDirectory(stableIdentity, bindingStore);
   const channelState = new ChannelStateStore(observability.logger('channel-state'));
   const attentionLeases = new AttentionLeaseStore(clock);

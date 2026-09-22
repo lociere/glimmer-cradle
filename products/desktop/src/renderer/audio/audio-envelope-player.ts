@@ -2,8 +2,14 @@ export interface AudioEnvelopePlayerOptions {
   smoothing?: number;
   gain?: number;
   onEnvelope: (envelope: number) => void;
-  onEnded?: () => void;
-  onError?: (error: unknown) => void;
+  onStarted?: () => void;
+  onEnded?: (timing: AudioPlaybackTiming) => void;
+  onError?: (error: unknown, timing: AudioPlaybackTiming) => void;
+}
+
+export interface AudioPlaybackTiming {
+  heardThroughMs: number;
+  durationMs?: number;
 }
 
 /**
@@ -14,7 +20,7 @@ export interface AudioEnvelopePlayerOptions {
  */
 export class AudioEnvelopePlayer {
   private readonly options: Required<Pick<AudioEnvelopePlayerOptions, 'smoothing' | 'gain' | 'onEnvelope'>>
-    & Pick<AudioEnvelopePlayerOptions, 'onEnded' | 'onError'>;
+    & Pick<AudioEnvelopePlayerOptions, 'onStarted' | 'onEnded' | 'onError'>;
   private context: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
   private source: MediaElementAudioSourceNode | null = null;
@@ -29,6 +35,7 @@ export class AudioEnvelopePlayer {
       smoothing: options.smoothing ?? 0.6,
       gain: options.gain ?? 4,
       onEnvelope: options.onEnvelope,
+      onStarted: options.onStarted,
       onEnded: options.onEnded,
       onError: options.onError,
     };
@@ -56,9 +63,10 @@ export class AudioEnvelopePlayer {
 
       if (context.state === 'suspended') await context.resume();
       await element.play();
+      this.options.onStarted?.();
       this.startSampling();
     } catch (error) {
-      this.options.onError?.(error);
+      this.options.onError?.(error, this.readTiming());
       this.stop();
     }
   }
@@ -114,13 +122,26 @@ export class AudioEnvelopePlayer {
   }
 
   private handleEnded(): void {
+    const timing = this.readTiming();
     this.stop();
-    this.options.onEnded?.();
+    this.options.onEnded?.(timing);
   }
 
   private handleError(error: unknown): void {
-    this.options.onError?.(error);
+    const timing = this.readTiming();
+    this.options.onError?.(error, timing);
     this.stop();
+  }
+
+  private readTiming(): AudioPlaybackTiming {
+    const currentTime = this.element?.currentTime;
+    const duration = this.element?.duration;
+    return {
+      heardThroughMs: Number.isFinite(currentTime) ? Math.max(0, Math.round(Number(currentTime) * 1000)) : 0,
+      ...(Number.isFinite(duration) && Number(duration) >= 0
+        ? { durationMs: Math.round(Number(duration) * 1000) }
+        : {}),
+    };
   }
 
   private describeMediaError(error: MediaError | null): Error {

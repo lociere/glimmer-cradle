@@ -7,6 +7,7 @@ import { captureScreen, readActiveWindow } from './screen-context-action';
 import type {
   AudioStatusPayload,
   CharacterPresentationProjectionPayload,
+  DeliveryReceiptRequest,
   ExtensionInstallCommitRequest,
   ExtensionInstallPrepareRequest,
   ExtensionInstallPreview,
@@ -2764,6 +2765,10 @@ async function connectToKernel(): Promise<void> {
             trace_id: traceId,
             text,
             messages: frame.reply?.messages ?? [],
+            output_id: frame.reply?.output_id,
+            destination_id: frame.reply?.destination_id,
+            authority_epoch: frame.reply?.authority_epoch,
+            generation: frame.reply?.generation,
           });
           const inline = frame.reply?.emotion_snapshot;
           if (inline) {
@@ -2807,6 +2812,12 @@ async function connectToKernel(): Promise<void> {
             audio_data: a.audio_data,
             mime_type: a.mime_type,
             duration_ms: a.duration_ms,
+            output_id: a.output_id,
+            destination_id: a.destination_id,
+            authority_epoch: a.authority_epoch,
+            generation: a.generation,
+            segment_index: a.segment_index,
+            segment_count: a.segment_count,
           });
         } else if (kind === 'avatar_action_state' && frame.avatar_action_state) {
           const state = frame.avatar_action_state;
@@ -2990,6 +3001,43 @@ function sendAudioToOwner(data: { audio_id: string } & Record<string, unknown>):
     if (typeof oldest === 'string') deliveredAudioIds.delete(oldest);
   }
   target.webContents.send('ui:audio-play', data);
+}
+
+function submitDeliveryReceipt(raw: unknown): void {
+  if (kernelSocket?.readyState !== SURFACE_GATEWAY_OPEN || !raw || typeof raw !== 'object') {
+    throw new Error('Kernel 尚未连接，无法提交 Delivery 回执');
+  }
+  const value = raw as Partial<DeliveryReceiptRequest>;
+  const requiredStrings = [
+    value.output_id,
+    value.destination_id,
+    value.authority_epoch,
+    value.receipt_id,
+    value.receipt_kind,
+    value.received_at,
+  ];
+  if (requiredStrings.some((item) => typeof item !== 'string' || !item.trim())) {
+    throw new TypeError('Delivery 回执缺少必需字段');
+  }
+  if (!Number.isSafeInteger(value.generation) || Number(value.generation) <= 0) {
+    throw new TypeError('Delivery 回执 generation 非法');
+  }
+  const allowedKinds = new Set([
+    'delivered',
+    'playback_started',
+    'playback_progress',
+    'playback_completed',
+    'failed',
+    'unknown',
+  ]);
+  if (!allowedKinds.has(value.receipt_kind as string)) {
+    throw new TypeError('Delivery 回执 kind 非法');
+  }
+  kernelSocket.submit({
+    kind: 'delivery_receipt',
+    timestamp: Date.now(),
+    delivery_receipt: value as DeliveryReceiptRequest,
+  });
 }
 
 async function handleCoreSkillActionRequest(frame: Record<string, unknown>): Promise<void> {
@@ -3378,6 +3426,10 @@ export function registerIPCHandlers(
       status: 'error',
       message: 'Kernel 尚未连接，无法识别语音。',
     });
+  });
+
+  desktopIpcRouter.handle('ui:report-delivery-receipt', async (_event, payload: unknown) => {
+    submitDeliveryReceipt(payload);
   });
 
   void connectToKernel();

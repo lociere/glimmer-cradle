@@ -154,6 +154,7 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
             recall_scope="conversation_private",
             disclosure_scope="conversation_private",
         ),
+        origin=cognition_pb.SourceDescriptor(content_hash="a" * 64),
         content=cognition_pb.PerceptionContent(text="hello", parts=[
             cognition_pb.PerceptionPart(content=content_pb.ContentPart(text="hello")),
             cognition_pb.PerceptionPart(content=content_pb.ContentPart(image=content_pb.AssetRef(
@@ -173,6 +174,7 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
     assert second.duplicate is True
     assert len(queue.entries) == 1
     assert queue.entries[0].trace_id == "trace-1"
+    assert queue.entries[0].payload_digest == "a" * 64
     assert [next(iter(part["content"])) for part in queue.entries[0].model_input["parts"]] == [
         "text", "image", "audio", "video", "file",
     ]

@@ -8,6 +8,10 @@ import { ControlSurfaceGateway } from './control-surface-gateway';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import { AvatarController } from '../avatar/avatar-controller';
 import { AudioService } from '../audio/audio-service';
+import { DeliveryController, SqliteDeliveryStore } from '@glimmer-cradle/conversation';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 it('真实 gRPC 会话排除只读观察者，绑定确认回执，并在取消流时释放请求', async () => {
   const projection = new RuntimeReadinessProjectionMapper();
@@ -76,3 +80,80 @@ it('真实 gRPC 会话排除只读观察者，绑定确认回执，并在取消�
     initial.mockRestore(); registry.mockRestore();
   }
 }, 10_000);
+
+it('Surface delivery receipt 只提交匹配 epoch 与 generation 的真实回执', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'glimmer-surface-delivery-'));
+  const store = new SqliteDeliveryStore(join(root, 'delivery.db'));
+  const delivery = new DeliveryController(store, 'epoch:test', {
+    nowIso: () => '2026-09-22T00:00:00Z',
+  });
+  const projection = new RuntimeReadinessProjectionMapper();
+  const gateway = new ControlSurfaceGateway(
+    projection, new AvatarController(projection), new AudioService(), undefined, delivery,
+  );
+  const output = delivery.begin({
+    output_id: 'output:test',
+    turn_id: 'turn:test',
+    destination_id: 'surface:test',
+    content_digest: 'sha256:test',
+  });
+  delivery.queue(output.output_id);
+  delivery.sent(output.output_id);
+  try {
+    await (gateway as any)._dispatchSurfaceRequest({
+      kind: 'delivery_receipt',
+      timestamp: Date.now(),
+      delivery_receipt: {
+        output_id: output.output_id,
+        destination_id: output.destination_id,
+        authority_epoch: output.authority_epoch,
+        generation: output.generation,
+        receipt_id: 'receipt:test',
+        receipt_kind: 'delivered',
+        received_at: '2026-09-22T00:00:01Z',
+      },
+    }, { readyState: 1, send: () => {} });
+    expect(delivery.current(output.output_id)?.status).toBe('delivered');
+
+    await expect((gateway as any)._dispatchSurfaceRequest({
+      kind: 'delivery_receipt',
+      timestamp: Date.now(),
+      delivery_receipt: {
+        output_id: output.output_id,
+        destination_id: output.destination_id,
+        authority_epoch: output.authority_epoch,
+        generation: output.generation + 1,
+        receipt_id: 'receipt:stale',
+        receipt_kind: 'playback_started',
+        received_at: '2026-09-22T00:00:02Z',
+      },
+    }, { readyState: 1, send: () => {} })).rejects.toThrow(/已拒绝/u);
+
+    for (const receipt of [
+      { receipt_id: 'receipt:started', receipt_kind: 'playback_started' },
+      { receipt_id: 'receipt:progress', receipt_kind: 'playback_progress', heard_through_ms: 100 },
+      { receipt_id: 'receipt:completed', receipt_kind: 'playback_completed', heard_through_ms: 250, duration_ms: 250 },
+    ] as const) {
+      await (gateway as any)._dispatchSurfaceRequest({
+        kind: 'delivery_receipt',
+        timestamp: Date.now(),
+        delivery_receipt: {
+          output_id: output.output_id,
+          destination_id: output.destination_id,
+          authority_epoch: output.authority_epoch,
+          generation: output.generation,
+          received_at: '2026-09-22T00:00:03Z',
+          ...receipt,
+        },
+      }, { readyState: 1, send: () => {} });
+    }
+    expect(delivery.current(output.output_id)).toMatchObject({
+      status: 'completed',
+      heard_through_ms: 250,
+      duration_ms: 250,
+    });
+  } finally {
+    store.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

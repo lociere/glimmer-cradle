@@ -13,7 +13,7 @@ History 投影和输出 Delivery。认知内容由 Cognition 决定；平台地�
 
 - `bindings.db` 保存不含外部原始键的 opaque Binding。
 - `delivery.db` 保存 authority epoch、generation、投递状态、播放范围和回执去重。
-- `conversations.db` 是可重建 History 投影，同时保存 Python Turn 状态；canonical 交互事实仍在 Conversation Log。
+- `conversations.db` 是可重建 History 投影，同时保存绑定输入摘要的 Python Turn 状态；旧 Turn 缺少摘要时拒绝冒充可确认重复，canonical 交互事实仍在 Conversation Log。
 - 迁移 SQL 位于 `migrations/`；现有数据路径迁移须按阶段 14 的备份恢复门执行。
 
 ## 验证

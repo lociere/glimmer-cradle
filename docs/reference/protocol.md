@@ -31,6 +31,12 @@
 
 Surface Gateway 的 `ConversationHistoryEntryProjection` 除历史正文与来源外，还以 optional 字段传递 `trace_id`、`interaction_id`、`position`、`title`、`moment_id`、`actor_id` 和 `actor_name`。Kernel 出站与 Desktop/Personal Server 入站 Adapter 保留这些字段的缺省语义，位置 `0` 不等同于缺省；产品以 interaction/trace 身份合并瞬时与持久记录，不按消息文本猜测去重。
 
+Surface Delivery 由 `ReplyEvent` / `AudioPlayEvent` 投影 `output_id`、`destination_id`、`authority_epoch` 与
+`generation`，由 `DeliveryReceiptCommand` 回传 delivered、playback started/progress/completed、failed 或
+unknown。音频分段另携带 `segment_index` / `segment_count`；产品按真实播放器反馈累计已听范围，只有末段可
+提交 completed。Kernel 对 output、destination、epoch、generation、receipt id、时间和单调播放范围统一校验，
+迟到 generation、回执冲突或倒退进度均失败关闭。收到 Event、完成 TTS 或成功写 EventBus 都不是播放回执。
+
 配置、Extension manifest/package、Product composition 与其他 Document 使用 JSON Schema 2020-12，必须声明稳定 `$id`、`x-glimmer-owner`、`x-glimmer-contract-kind=Document` 和兼容策略。Schema 可以跨目录 `$ref`；validator 必须先注册完整 registry，再校验入口 Document。
 
 Content 的 TypeScript/Python/C# DTO 只从 canonical proto 生成；`AssetRef` 的 ID 不作为访问凭据。新 Experience v5 Moment 在 `content.parts` 中写引用与语义，不内联媒体字节；旧 v4 文本 Moment 继续读取。旧 URI-only `items` 当拍消费且不可保证恢复，不生成假引用。长期恢复规则见 [ADR-0020](../architecture/decisions/ADR-0020-Content资产单写者与恢复边界.md)。

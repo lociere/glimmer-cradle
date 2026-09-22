@@ -8,6 +8,7 @@ using GlimmerCradle.Contracts.Glimmer.Cognition.V1;
 using GlimmerCradle.Contracts.Glimmer.Kernel.V1;
 using AvatarV1 = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 using ContentV1 = GlimmerCradle.Contracts.Glimmer.Content.V1;
+using SurfaceV1 = GlimmerCradle.Contracts.Glimmer.Surface.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -130,6 +131,28 @@ if (avatarJsonRoundTrip.AvatarIntent.ActionId != "wave-hand"
     || avatarJsonRoundTrip.AvatarIntent.Priority != 7)
 {
     throw new InvalidOperationException("C# Avatar JSON round-trip lost the control payload");
+}
+
+var receipt = new SurfaceV1.DeliveryReceiptCommand
+{
+    OutputId = "reply:trace", DestinationId = "surface:desktop", AuthorityEpoch = "epoch:test",
+    Generation = 3, ReceiptId = "receipt:test", Kind = "playback_progress",
+    HeardThroughMs = 125, DurationMs = 500, ReceivedAt = "2026-09-22T00:00:00Z",
+};
+var receiptRoundTrip = SurfaceV1.DeliveryReceiptCommand.Parser.ParseFrom(receipt.ToByteArray());
+if (receiptRoundTrip.Generation != 3 || receiptRoundTrip.HeardThroughMs != 125)
+{
+    throw new InvalidOperationException("C# Surface delivery receipt round-trip lost fencing or progress");
+}
+var audioPlay = new SurfaceV1.AudioPlayEvent
+{
+    AudioId = "audio:1", OutputId = "reply:trace", DestinationId = "surface:desktop",
+    AuthorityEpoch = "epoch:test", Generation = 3, SegmentIndex = 1, SegmentCount = 2,
+};
+var audioPlayRoundTrip = SurfaceV1.AudioPlayEvent.Parser.ParseFrom(audioPlay.ToByteArray());
+if (audioPlayRoundTrip.SegmentIndex != 1 || audioPlayRoundTrip.SegmentCount != 2)
+{
+    throw new InvalidOperationException("C# Surface audio segment round-trip lost ordering metadata");
 }
 
 Console.WriteLine("contracts roundtrip cs: ok");

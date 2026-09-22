@@ -34,7 +34,7 @@ Conversation；每次交互的 `interaction_id` 单独变化。已绑定地址�
 fail closed，不能静默改写既有作用域；Kernel Application Runtime 停止时负责关闭 store，即使其他 provider
 释放失败也继续收束该资源。
 
-`ConversationTurn` 保存一次完整交互周期的稳定 identity、权限上下文、状态与修订。`TurnController` 通过
+`ConversationTurn` 保存一次完整交互周期的稳定 identity、输入摘要、权限上下文、状态与修订。`TurnController` 通过
 `SqliteTurnStore` 提供幂等接纳、乐观并发和 `accepted → running → completed/interrupted/failed` 合法转换；
 进程重启会把遗留 active Turn 明确收束为 `interrupted/process_restarted`。普通回复或沉默在 Log 提交后完成
 Turn；能力请求保持 running，直到 ToolCall/ToolResult/Reply 持久并 flush 后完成。Cognition `CycleTurn`
@@ -46,15 +46,22 @@ Turn；能力请求保持 running，直到 ToolCall/ToolResult/Reply 持久并 f
 TypeScript `InteractionController` 以 provider event 去重键和内容摘要接纳输入；同键同内容合并为一次处理，
 同键异内容拒绝，失败接纳可重试。同一 conversation/thread 的新输入先推进 generation 并取消旧 signal，
 忽略取消的下游若仍返回结果，也只会形成 `interrupted/stale_generation`，不能覆盖新 Turn。Kernel
-`PerceptionAppService` 是当前真实入口消费者；摘要算法由 composition 注入 `StableIdentity`，Application
-层不直接依赖 Node crypto。
+`PerceptionAppService` 是当前进程内入口消费者；摘要算法由 composition 注入 `StableIdentity`，Application
+层不直接依赖 Node crypto，并将同一摘要随 Perception origin 交给 Cognition/Conversation 持久 Turn。
+Controller 在内存去重前可消费 `TurnSnapshotStorePort` 的持久确认：turn identity 与 payload digest 都匹配才
+视为跨重启重复，同 ID 异内容失败关闭。旧 SQLite Turn schema 原位补摘要列，历史空摘要不能冒充已验证重复。
+当前 Kernel 尚未接入 Python Conversation Turn adapter，该接线随阶段 12 的 `apps/host` /
+`apps/cognition-worker` 进程边界完成，因而现行进程入口还不能宣称已完成跨进程确认闭环。
 
 `DeliveryController` 与 `SqliteDeliveryStore` 持有输出 authority epoch、destination generation、状态转换、
 回执去重和实际 `heard_through_ms`。Kernel 普通回复和工具合成回复共用该入口：EventBus 调用前先 durable
 queue，成功后只标记 sent，异常或崩溃窗口保留 unknown 并阻止自动重放；权威回执可把 unknown 对账为
 delivered/playing/completed。新 Host epoch 会先 fence 旧 epoch 的所有 active output；中断或新 generation
-之后到达的旧回执不得改变状态。当前 Surface wire 尚未携带 delivery receipt，真实 UI/音频回执接线仍是
-阶段 4 与阶段 11/12 的剩余工作，不能把 EventBus handler 返回当成 delivered 或 heard。
+之后到达的旧回执不得改变状态。Surface Gateway 的 typed `DeliveryReceiptCommand` 传播 output、destination、
+authority epoch、generation 和回执身份；Reply/Audio projection 携带同一 fencing metadata。Desktop renderer
+在文字实际投影后回报 delivered，并以 `HTMLAudioElement` 的 started/ended/error 反馈提交播放状态；分段语音
+按 segment index/count 累计单调 `heard_through_ms`，只在末段完成。Personal Server 仅在认证浏览器 WebSocket
+发送成功后回报 delivered。EventBus handler 返回仍只代表 sent，不能冒充 delivered 或 heard。
 
 ## Canonical Log 与 Experience
 

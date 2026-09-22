@@ -8,6 +8,10 @@ export interface ReplyPayload {
   trace_id: string;
   text: string;
   messages: ChannelReplyMessage[];
+  output_id?: string;
+  destination_id?: string;
+  authority_epoch?: string;
+  generation?: number;
 }
 
 export interface EmotionStatePayload {
@@ -129,6 +133,25 @@ export interface AudioPlayPayload {
   audio_data?: string;
   mime_type?: string;
   duration_ms?: number;
+  output_id?: string;
+  destination_id?: string;
+  authority_epoch?: string;
+  generation?: number;
+  segment_index?: number;
+  segment_count?: number;
+}
+
+export interface DeliveryReceiptPayload {
+  output_id: string;
+  destination_id: string;
+  authority_epoch: string;
+  generation: number;
+  receipt_id: string;
+  receipt_kind: 'delivered' | 'playback_started' | 'playback_progress' | 'playback_completed' | 'failed' | 'unknown';
+  heard_through_ms?: number;
+  duration_ms?: number;
+  reason?: string;
+  received_at: string;
 }
 
 export interface AudioInputPayload {
@@ -738,6 +761,9 @@ contextBridge.exposeInMainWorld('desktopHost', {
 
   sendAudioInput: (payload: AudioInputPayload): Promise<void> =>
     ipcRenderer.invoke('ui:send-audio-input', payload),
+
+  reportDeliveryReceipt: (payload: DeliveryReceiptPayload): Promise<void> =>
+    ipcRenderer.invoke('ui:report-delivery-receipt', payload),
 
   onReply: (callback: (reply: ReplyPayload) => void): (() => void) =>
     subscribe<ReplyPayload>('ui:reply', callback),
