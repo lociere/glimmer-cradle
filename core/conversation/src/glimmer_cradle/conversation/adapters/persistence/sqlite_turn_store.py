@@ -158,4 +158,3 @@ class SqliteTurnStore:
         if self._conn is None:
             raise RuntimeError("SqliteTurnStore 尚未连接")
         return self._conn
-

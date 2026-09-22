@@ -79,7 +79,7 @@ Perception
 | 域 | Owner | 语义 |
 |---|---|---|
 | Conversation Working Set | `core/conversation` `ConversationController` | 从持久 History Store 恢复的有界进程缓存；不是事实源，重启后可恢复 |
-| Conversation History | `core/conversation/python/.../history/`、`data/state/cognition/conversations/conversations.db` | 从 Log 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建，路径待阶段 14 迁移 |
+| Conversation History | `core/conversation/src/glimmer_cradle/conversation/history/`、`data/state/cognition/conversations/conversations.db` | 从 Log 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建，数据路径待阶段 14 迁移 |
 | Conversation Log | `ConversationRecorder` / `ConversationLog` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
 | Episode Projection | `EpisodeProjection` | Cognition 按 turn + scene 从 Log 派生的经历边界；可删除、可重建、可封口 |
 | Memory Substrate | `MemorySubstrate` / repositories | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其状态 |

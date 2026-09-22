@@ -157,8 +157,8 @@ Context 是注意力预算控制器，不是字符串拼接器。新增上下文
 
 | 组件 | 实现位置 | 语义 |
 |---|---|---|
-| Conversation Log | `core/conversation/python/glimmer_cradle/conversation/log/` | 交互事实的不可变 Moment、月度 SQLite pack、全局 position、来源与因果；Cognition 只读消费 |
-| Conversation Projection | `core/conversation/python/glimmer_cradle/conversation/{message,history}/` | Conversation owner 的可重建消息、Chapter、Segment、Conversation State 与进程 Working Set；Cognition Worker 只负责组合与消费 |
+| Conversation Log | `core/conversation/src/glimmer_cradle/conversation/log/` | 交互事实的不可变 Moment、月度 SQLite pack、全局 position、来源与因果；Cognition 只读消费 |
+| Conversation Projection | `core/conversation/src/glimmer_cradle/conversation/{message,history}/` | Conversation owner 的可重建消息、Chapter、Segment、Conversation State 与进程 Working Set；Cognition Worker 只负责组合与消费 |
 | Episode Projection | `adapters/persistence/experience/episodes.py` | interaction/scene 分段、封口、待巩固队列与可重建投影 |
 | Memory Substrate | `application/memory/substrate.py`、`adapters/persistence/memory/memory_repo.py` | 版本化记忆、证据、时间有效修订与有预算召回 |
 | Consolidation | `application/memory/consolidation.py`、`adapters/persistence/memory/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试 |

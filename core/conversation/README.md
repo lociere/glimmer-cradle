@@ -20,7 +20,7 @@ History 投影和输出 Delivery。认知内容由 Cognition 决定；平台地�
 
 ```powershell
 pnpm --filter @glimmer-cradle/conversation test
-uv run --project core/conversation --extra dev pytest -q core/conversation/tests/python
+uv run --project core/conversation --extra dev pytest -q core/conversation/tests
 ```
 
 Kernel/Cognition 接线变化还需分别运行对应全量测试、根 `pnpm typecheck` 与 `pnpm build`。

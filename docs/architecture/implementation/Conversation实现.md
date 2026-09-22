@@ -12,9 +12,9 @@
   `ConversationDirectory`；根入口只负责公开导出。Kernel composition 注入 Platform `StableIdentity` 和
   `SqliteBindingStore`，桌面和 Extension Adapter 只提交平台中立地址；解析后不再保留外部
   account/space/thread 原值。
-- Python `python/glimmer_cradle/conversation/` 拥有持久 `ConversationTurn` 状态机、Message/WorkingSet、
-  `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port；最终源码根迁移到
-  `src/glimmer_cradle/conversation/` 前，现行 `pyproject.toml` 仍以 `python/` 为唯一包入口。
+- Python `src/glimmer_cradle/conversation/` 拥有持久 `ConversationTurn` 状态机、Message/WorkingSet、
+  `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port；`pyproject.toml`、pytest
+  与 Cognition 的 workspace path dependency 均从该唯一源码根安装，不保留旧 `python/` 包入口。
 - Cognition Worker 是当前进程 composition root，不因此拥有 Conversation 状态；它注入 Clock、ID、
   Observability、兼容路径和配置，再通过 Conversation reader 组装 Context、Episode、Relationship 与 Activity。
 

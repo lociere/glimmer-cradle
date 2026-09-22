@@ -41,4 +41,3 @@ class ConversationTurn:
             updated_at=timestamp,
             terminal_reason=None,
         )
-

@@ -14,13 +14,17 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["python"]
+where = ["src"]
 include = ["glimmer_cradle.conversation*"]
 namespaces = true
 
+[tool.setuptools.package-data]
+"glimmer_cradle.conversation" = ["py.typed"]
+
 [tool.pytest.ini_options]
-pythonpath = ["python"]
-testpaths = ["tests/python"]
+pythonpath = ["src"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
 asyncio_mode = "auto"
 
 [build-system]

@@ -131,9 +131,9 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | `core/conversation/src/index.ts` 中 binding 类型与算法 | `core/conversation/src/binding/{binding.ts,binding-resolver.ts,binding-store-port.ts}`、`src/adapters/storage/sqlite-binding-store.ts` | 先拆纯模型/解析与持久绑定；稳定 ID、旧地址样本和 Kernel consumer 全切换后删除聚合实现 |
 | 尚缺的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 由 Host 通过 `apps/host/src/composition/turn-processor-adapter.ts` 绑定 Cognition；接纳、去重和中断反例通过后替换 Kernel 旧入口 |
 | 尚缺的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出和 unknown 回执通过恢复测试后切换 Surface 投递链 |
-| `python/glimmer_cradle/conversation/log/*` | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/log_store.py` | 保留 v4/v5 ID、position、单写者和 pack 读取；阶段 14 备份/恢复及 consumer-zero 后迁路径和文件名 |
-| `python/glimmer_cradle/conversation/history/{store.py,controller.py}` | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | v3→v4、多 thread、分页、重建和权限反例通过后拆分；`conversations.db` 始终为投影 |
-| `python/glimmer_cradle/conversation/turn/models.py` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | Conversation 持久 Turn 与 Cognition Step 分离；重启恢复、合法转换与重复请求通过后删除瞬态替代语义 |
+| `src/glimmer_cradle/conversation/log/{events.py,fact.py,factory.py,ledger.py,recorder.py}` | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/log_store.py` | Python 源码根已迁移；继续保留 v4/v5 ID、position、单写者和 pack 读取，拆分后删除聚合旧文件；数据路径迁移仍等待阶段 14 备份/恢复 |
+| `src/glimmer_cradle/conversation/history/{store.py,controller.py}` | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | Python 源码根已迁移；v3→v4、多 thread、分页、重建和权限反例通过后按职责拆分；`conversations.db` 始终为投影 |
+| `src/glimmer_cradle/conversation/turns/*` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | 目标 Turn 文件和持久 adapter 已就位；Conversation 持久 Turn 与 Cognition Step 分离，跨重启 ingress 确认接线仍待完成 |
 | Cognition `CycleContinuity`、`AgentSynthesisUseCase` 的 action/result 记录 | Conversation Log 的 ACTION → ACTION_RESULT → REPLY 因果事实；跨进程映射暂经现行 cognition proto | 本切片先确保副作用前 flush、稳定 invocation 与幂等重放；阶段 6 切换 native ToolCall/ToolResult 后删除 `skill_request` 兼容链 |
 | `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 阶段 12 切 App composition；Conversation writer drain 与 Cognition checkpoint 都通过后删除旧 Worker 入口 |
 | Kernel composition、Surface history 与 skill action 接线 | `apps/host/src/adapters/protocol/conversation-mapper.ts`、`composition/{domain-owners.ts,turn-processor-adapter.ts}`、`gateway/conversation-routes.ts` | 阶段 12/15 消费者切换并通过本地/headless 共用 Host 验收后删除旧 Kernel 业务接线 |
@@ -255,6 +255,13 @@ destination generation 和稳定 trace output identity 防止晚到/重放。Eve
 receipt/播放回执尚未接线，跨重启 ingress 去重仍需消费 Python 持久 Turn 确认。因此阶段 4 继续进行，
 不宣称 interaction/delivery 完成。Conversation tarball 已包含 Interaction/Delivery 编译产物与两份 SQL
 migration；docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。
+
+Python 源码根物理迁移切片将唯一包入口从 `python/glimmer_cradle/conversation/` 切换为
+`src/glimmer_cradle/conversation/`，pytest 测试统一归入 `core/conversation/tests/`；setuptools、pytest、
+根测试脚本、Cognition workspace editable dependency 与实现文档已同步，旧源码和旧测试入口 consumer-zero
+删除。迁移后的 Conversation Python 14 项、Cognition 全量 258 项、Conversation TS/Node 11 项均 PASS。
+该切片只收束源码根，不改 SQLite 数据路径或 schema；Log/History/Message 聚合文件仍须按目标职责继续拆分，
+因此不宣称目标物理目录或阶段 4 完成。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

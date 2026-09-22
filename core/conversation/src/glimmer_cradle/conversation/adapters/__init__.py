@@ -1,2 +1,1 @@
 """Conversation infrastructure adapters."""
-
