@@ -296,7 +296,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
 
     验证生产装配（非 fake）：
       ObservationQueue → PerceptionProvider → 广播 → Deliberate
-        （persona_injector 组 prompt → ReasoningService(cloud) → boundary 校验）
+        （persona compiler 组 prompt → ReasoningService(cloud) → boundary 校验）
         → _pending_reply → Intend(reply) → Act → action_sink
     action_sink 收到的 dict 形状即内核 ACTION_COMMAND handler 读取的契约。
     """
@@ -311,7 +311,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
             captured["messages"] = llm_request.messages
             return "今天挺好的，谢谢你问我。"
 
-    # ── stub persona_injector / boundary_validator / activity（cloud 档）──
+    # ── stub persona compiler / boundary_validator / activity（cloud 档）──
     persona_calls: list = []
 
     class _Persona:
@@ -369,7 +369,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             activity_controller=_Activity(),
             reasoning=reasoning,
-            persona_injector=_Persona(),
+            persona_compiler=_Persona(),
             boundary_validator=_boundary,
             action_sink=_sink,
         )
@@ -383,7 +383,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     # 2. cloud 链路命中 stub LLM（persona prompt 进了 system 消息）
     assert "messages" in captured
     roles = {m.role: m.content for m in captured["messages"]}
-    assert "月见" in roles["system"]            # persona_injector 的 prompt 流入
+    assert "月见" in roles["system"]            # persona compiler 的 prompt 流入
     assert roles["user"] == "月见今天过得怎么样？"  # 用户原文进 user 消息
     assert persona_calls == ["direct"]           # persona 按 address_mode 调用
     assert boundary_calls == ["今天挺好的，谢谢你问我。"]  # 红线校验生成文本

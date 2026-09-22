@@ -53,7 +53,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     lifecycle_log_level = "debug"
     self_entity: SelfEntity
     llm_engine: LLMPort
-    persona_injector: Any | None = None
+    persona_compiler: Any | None = None
     experience_recorder: ConversationRecorder | None = None
     activity_controller: Any | None = None
     turn_controller: TurnController | None = None
@@ -268,11 +268,11 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         )
 
     def _build_system_prompt(self, nickname: str) -> str:
-        injector = self.persona_injector or getattr(self.self_entity, "persona_injector", None)
+        compiler = self.persona_compiler or getattr(self.self_entity, "persona", None)
         persona_prompt = f"你是{nickname}。请用符合当前角色设定的中文自然回复。"
-        if injector is not None:
+        if compiler is not None:
             try:
-                persona_prompt = injector.build_persona_prompt(
+                persona_prompt = compiler.build_persona_prompt(
                     emotion_state={"emotion_type": "calm", "intensity": 0.4},
                     address_mode="direct",
                 )

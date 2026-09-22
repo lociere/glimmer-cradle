@@ -8,7 +8,7 @@ from glimmer_cradle.cognition.domain.configuration import (
     SafetySettings,
 )
 from glimmer_cradle.cognition.domain.affect.emotion import EmotionSystem, EmotionType
-from glimmer_cradle.cognition.domain.persona.persona_injector import PersonaInjector
+from glimmer_cradle.cognition.persona import PersonaCompiler
 from glimmer_cradle.cognition.domain.exceptions import ConfigException
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
@@ -84,9 +84,9 @@ class SelfEntity:
         self.memory: Final[MemoryModule] = memory
         # 独立知识库
         self.knowledge_base: Final[KnowledgeModule] = knowledge_base
-        # 人设注入器
-        self.persona_injector: Final[PersonaInjector] = PersonaInjector(
-            logger=observability.logger("persona_injector")
+        # Persona 编译器持有当前不可变 revision；模型不能绕过 mutation policy 改写它。
+        self.persona: Final[PersonaCompiler] = PersonaCompiler(
+            logger=observability.logger("persona_compiler")
         )
 
         # ======================================
@@ -126,7 +126,7 @@ class SelfEntity:
             content: 待校验的生成内容
         返回：True=符合人设边界，False=突破红线
         """
-        return self.persona_injector.validate_boundary(content)
+        return self.persona.validate_boundary(content)
 
     def set_cognitive_activity_provider(self, provider) -> None:
         """注入认知活动快照提供者（callable() -> dict）。"""

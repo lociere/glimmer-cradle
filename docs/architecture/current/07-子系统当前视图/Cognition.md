@@ -18,7 +18,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 情绪与觉醒 | `domain/affect/` | UI 动画本地推断 |
 | 经历之流 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` | 普通日志或聊天界面状态替代经历 |
 | 记忆与知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` | Kernel 记忆副本或 Extension 私写记忆 |
-| 上下文装配 | `application/context/`、`PersonaProfileCompiler`、`DialoguePolicyBuilder`、`PromptAssembler` | 简单 prompt 拼接或知识库人格注入 |
+| 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
 | 推理与多模态 | `application/inference/`、`ports/inference.py`、`adapters/inference/` | provider key 管理或桌面 IO |
 | 行动语义 | `application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | 平台 payload、窗口控制、权限执行 |
 
@@ -66,7 +66,7 @@ Perception
 
 `Intent.initiative` 区分响应性意图与主动意图。来自已准入、`address_mode=direct` 的 `PerceptionEvent` 且已经过 Deliberation 的回复、澄清或 Skill 请求属于 `reactive`，不再被用于角色自发行为的 willingness/activity 闸重复压制；ambient 感知以及 drive、affect 等角色自发行为属于 `proactive`，仍必须通过连续意愿阈值和 `CognitiveActivityPolicy.allows_proactive`。Skill 副作用无论来源都继续由 Kernel Skill Policy 与 Invocation Gateway 决定。
 
-这条闭环仍保持单一认知主线：普通闲聊直接生成 `reply`；需要能力时生成 `skill_request` 并记录 `action` Moment，避免把“等待工具结果”误写成沉默。`agent_synthesis` 复用 `PersonaInjector` 的 persona/profile/dialogue/safety prompt 主体，只把外部能力结果作为不可信观察附加给模型；`agent_plan` / `agent_synthesis` 是 Cognition 给 Kernel 编排使用的辅助用例，不重新成为独立聊天回复主线。
+这条闭环仍保持单一认知主线：普通闲聊直接生成 `reply`；需要能力时生成 `skill_request` 并记录 `action` Moment，避免把“等待工具结果”误写成沉默。`agent_synthesis` 复用 `PersonaCompiler` 的 persona/profile/dialogue/safety prompt 主体，只把外部能力结果作为不可信观察附加给模型；`agent_plan` / `agent_synthesis` 是 Cognition 给 Kernel 编排使用的辅助用例，不重新成为独立聊天回复主线。
 
 感知进入全局工作区时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
 
@@ -114,7 +114,7 @@ Memory 采用 `candidate / active / disputed / superseded / redacted` 状态和�
 
 Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `ConversationAddress` 与清洗后的 `perception`/`evidenceProposal`；Kernel `ConversationDirectory` 生成不可逆的 canonical scene/conversation/continuity/thread/actor 和作用域。Extension 可以在自己的 storage 中保存业务状态，但公开 SDK 不提供第二套会话连续性入口，也不能读取、修改或删除 Memory。
 
-角色配置采用最终 Character Package 目录：`character.manifest.yaml` 声明角色包身份和目录，`profile.yaml` 是作者人格种子，`dialogue.yaml` 是对话呈现策略，`safety.yaml` 是红线和边界，`knowledge/index.yaml + *.md` 只保存外部知识。`PersonaInjector` 不从知识库或运行记忆反向编译人格。
+角色配置采用最终 Character Package 目录：`character.manifest.yaml` 声明角色包身份和目录，`profile.yaml` 是作者人格种子，`dialogue.yaml` 是对话呈现策略，`safety.yaml` 是红线和边界，`knowledge/index.yaml + *.md` 只保存外部知识。目标 `persona/PersonaCompiler` 生成版本化稳定快照；model/memory 来源不能通过 mutation policy，也不会从知识库或运行记忆反向编译人格。
 
 ## 情感激活、认知活动、维护与外部注意力
 

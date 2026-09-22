@@ -16,7 +16,7 @@ from glimmer_cradle.conversation import (
 from glimmer_cradle.conversation.log import MomentKind
 
 
-class _FakePersonaInjector:
+class _FakePersonaCompiler:
     def build_persona_prompt(self, emotion_state: dict, address_mode: str = "direct") -> str:
         return (
             "你是月见（Selrena）。\n"
@@ -40,7 +40,7 @@ def _self_entity():
         manifest_config=SimpleNamespace(
             base=SimpleNamespace(nickname="月见"),
         ),
-        persona_injector=_FakePersonaInjector(),
+        persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
         observability=OBSERVABILITY,
     )
@@ -52,7 +52,7 @@ async def test_agent_synthesis_uses_persona_prompt_for_system_message() -> None:
     use_case = AgentSynthesisUseCase(
         self_entity=_self_entity(),
         llm_engine=llm,
-        persona_injector=_FakePersonaInjector(),
+        persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
         observability=OBSERVABILITY,
     )
@@ -83,7 +83,7 @@ async def test_agent_synthesis_error_result_prompt_does_not_pretend_success() ->
     use_case = AgentSynthesisUseCase(
         self_entity=_self_entity(),
         llm_engine=llm,
-        persona_injector=_FakePersonaInjector(),
+        persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
         observability=OBSERVABILITY,
     )
@@ -135,7 +135,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
     use_case = AgentSynthesisUseCase(
         self_entity=_self_entity(),
         llm_engine=_FakeLlmEngine("已经打开。"),
-        persona_injector=_FakePersonaInjector(),
+        persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
         observability=OBSERVABILITY,
         experience_recorder=recorder,

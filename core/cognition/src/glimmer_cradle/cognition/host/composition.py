@@ -147,11 +147,11 @@ def compose_cognition(
         ids=ids,
         observability=observability,
     )
-    self_entity.persona_injector.init(
-        manifest_config=config.manifest,
-        profile_config=config.profile,
-        dialogue_config=config.dialogue,
-        safety_config=config.safety,
+    self_entity.persona.initialize(
+        manifest=config.manifest,
+        profile=config.profile,
+        dialogue=config.dialogue,
+        safety=config.safety,
     )
     memory_substrate.bind_repository(memory_repository)
     knowledge_base.bind_repository(knowledge_repository)
@@ -184,7 +184,7 @@ def compose_cognition(
     agent_synthesis = AgentSynthesisUseCase(
         self_entity=self_entity,
         llm_engine=llm_engine,
-        persona_injector=self_entity.persona_injector,
+        persona_compiler=self_entity.persona,
         experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
         turn_controller=turn_controller,
@@ -270,7 +270,7 @@ def compose_cognition(
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
         action_sink=outbound_adapter.send_action_command,
         reasoning=reasoning,
-        persona_injector=self_entity.persona_injector,
+        persona_compiler=self_entity.persona,
         boundary_validator=self_entity.validate_boundary,
         self_entity=self_entity,
         conversation=conversation_controller,

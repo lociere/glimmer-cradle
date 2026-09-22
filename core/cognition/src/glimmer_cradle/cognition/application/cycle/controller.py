@@ -46,7 +46,7 @@ class CycleController:
         default_tick_interval_ms: int = 5000,
         action_sink=None,
         reasoning: ReasoningService | None = None,
-        persona_injector=None,
+        persona_compiler=None,
         boundary_validator: "Callable[[str], bool] | None" = None,
         self_entity=None,
         conversation=None,
@@ -91,7 +91,7 @@ class CycleController:
             context_builder=reply_context,
             activity_controller=activity_controller,
             emotion_system=emotion_system,
-            persona_injector=persona_injector,
+            persona_compiler=persona_compiler,
             boundary_validator=boundary_validator,
             observability=observability,
         )

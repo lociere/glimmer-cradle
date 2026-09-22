@@ -65,7 +65,7 @@ Host 权限入口显式使用 `*-broker`，Lease/Node/Compatibility 按所属语
 | `core/cognition/.../adapters/persistence/experience/ledger.py` | Python / Cognition | 单写者分包 Moment 日志 | SQLite、文件 writer guard | Moment ordered log、position | append、flush、query | 无厂商语义 | conversation/log 拥有交互事实；其他经验须分类 | 极高：禁止丢失已有 Experience 与因果链 | `test_experience_architecture.py` |
 | `core/cognition/.../adapters/persistence/conversation/store.py` | Python / Cognition | 从 Moment 投影历史、章节、工作集 | aiosqlite、Moment、paths | 投影 checkpoint；不拥有原始交互事实 | project、checkpoint、history queries | 无厂商语义 | conversation/history | 极高：schema v3 不匹配目前要求删除重建，须改迁移路径 | `test_conversation_architecture.py` |
 | `core/cognition/.../adapters/persistence/memory` | Python / Cognition | 记忆、关系、向量、巩固队列 | CognitionDatabase、Episode、memory ports | Memory；巩固 Job 目前同库 | repositories | 存储与业务队列耦合 | cognition/memory；队列 lifecycle 入 jobs | 高：跨表一致性、租约和幂等 | `test_memory_architecture.py` |
-| `core/cognition/.../domain/persona` | Python / Cognition | profile 编译、人设及对话策略 | canonical profile 与领域配置 | 编译后 persona 数据 | profile compiler / prompt assembler | 角色资料不应迁成通用硬编码 | cognition/persona | 中：稳定关系与动态记忆分离 | `test_persona_injector.py` |
+| `core/cognition/.../domain/persona` | Python / Cognition | profile 编译、人设及对话策略 | canonical profile 与领域配置 | 编译后 persona 数据 | profile compiler / prompt assembler | 角色资料不应迁成通用硬编码 | cognition/persona | 中：稳定关系与动态记忆分离 | `test_persona_mutation.py` |
 | `core/cognition/.../application/inference/service.py` | Python / Cognition | 按活动 tier 选择 local/cloud | ReasoningBackendPort | 无 durable state | request | backend location 与业务策略结合 | cognition inference policy + platform topology public contract | 中：保留禁止推理和真实降级语义 | inference tests 待细分 |
 | `core/avatar/src` | C# / Avatar | Avatar command、manifest、行为配置 | domain/application/ports | 身体命令与投影，具体写入链待核对 | command sink | 需核查渲染参数是否已隔离 | embodiment；renderer contract | 高：C# 编译与 Unity 投影 | `AvatarCoreTests.cs` |
 | `hosts/unity-avatar-host` | C# / Unity | Unity/Cubism 渲染与原生合成接线 | Avatar Core、generated C#、native | Renderer 实例状态 | Avatar transport adapter | Unity/Live2D/Cubism | renderer extension/host adapter | 高：真实 Unity 构建与桌面透明窗口 | host tests、Unity 专门构建门 |
@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context budget/trust 与 Perception Observation canonical owner 已接入真实 Host/Cycle；Loop/Memory/Persona 仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Memory/Attention/State 等仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -284,14 +284,15 @@ InteractionController 也已在内存去重前消费可注入的持久 Turn 确�
 Kernel 入口尚未接入 Python Turn adapter，完整跨进程/跨重启冲突确认仍归阶段 12 Host/Worker 接线，不能提前
 宣称完成。当前切片的 Contract gates/inventory/schema/toolchain 与
 TypeScript/Python/C# roundtrip、根 typecheck、Conversation/Kernel build、repo-checks 22 项、Desktop 11 项和
-Personal Server Surface Proxy 3 项已通过；受限环境内 Buf 原生命令与 Vite 配置父目录扫描仍不能执行，完整
-门禁状态以本段后续固定候选记录为准。
+Personal Server Surface Proxy 3 项已通过。后续在解除环境限制后的同一固定候选上重跑完整
+`pnpm contracts:verify`，21 项 gate、inventory、Buf lint/breaking、JSON Schema、toolchain、三语言 roundtrip、
+generated-clean 以及根 `pnpm build`（含 Desktop/Personal Server Vite）均通过。
 
 持久 Turn 摘要切片随后把 Kernel 接纳使用的 payload digest 随 Perception origin 传播到 Cognition，并由
 Python `ConversationTurn` / SQLite store 持久化；`InteractionController` 仅在 identity 与摘要同时匹配时接受
 跨重启重复。旧 002 schema 原位补空摘要列，历史行因无法证明内容一致而失败关闭。Conversation Python 19 项、
-Cognition 258 项、定向 Ruff、Conversation/Kernel typecheck 与 build 均通过；标准 Conversation Vitest 仍受当前
-沙箱禁止 Vite 扫描父目录阻断，阶段 12 的真实 Python Turn query adapter 仍未实现。
+Cognition 258 项、定向 Ruff、Conversation/Kernel typecheck 与 build 均通过；后续同一候选的完整
+Contract Spine 与根 build 已补跑通过。阶段 12 的真实 Python Turn query adapter 仍未实现。
 
 阶段 5 首个 Context 切片把旧 `application/context` 的领域 DTO 与 assembly 物理迁入目标
 `cognition/context/{source,trust,budget,compaction,assembler}.py`，删除旧 assembly/base 双 owner，并让 Host
@@ -306,6 +307,15 @@ PerceptionProvider 与测试只消费新公共入口。Normalizer 在入队前�
 trace/interaction 与 payload digest，并归一 familiarity；未绑定输入以 typed `INVALID_REQUEST` 失败关闭。
 有界队列继续 drop-oldest 并返回被淘汰 Observation，使 operation registry 能进入真实 failed 终态；旧
 `application/cycle/perception_queue.py` 已 consumer-zero 删除。
+
+Persona 切片把旧 `domain/persona` 的 profile、dialogue 与 prompt 拼装物理迁入目标
+`persona/{profile,revision,mutation_policy,compiler}.py`，并由 SelfEntity、Cycle 与 Agent Synthesis 直接消费
+`PersonaCompiler`。Character Package 作者种子会确定性生成初始 revision 和内容摘要；后续改写必须携带
+expected revision、明确来源、author/editor 权限、请求者与原因，冲突或 model/memory 来源均失败关闭。
+`schemas/persona.schema.json` 固定 Cognition-owned 审计文档，`tests/fixtures/persona.yaml` 与
+`test_persona_mutation.py` 覆盖编译、提示词、安全边界、revision 链及越权反例；旧 Persona owner 已
+consumer-zero 删除。revision 持久化将在 Cognition state store 迁移时接入，本切片不把进程内 revision
+冒充 durable state。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

@@ -79,7 +79,7 @@ Character Package 是角色作者设定的事实源，不是 RAG 资料库：
 | `voice.yaml` | `VoiceConfig` | 声音身份、语言、表达和 provider voice id；不承载密钥或系统路由 |
 | `knowledge/index.yaml` | `KnowledgeIndexConfig` | 外部知识索引；Kernel 加载 Markdown 后组装为 `KnowledgeBaseConfig` |
 
-`profile.yaml` 由 Cognition 的 `PersonaProfileCompiler` 编译为稳定人格段；`dialogue.yaml` 由 `DialoguePolicyBuilder` 编译为输出策略；`PromptAssembler` 再组合 persona segment、dialogue policy、当前情绪、场景行为和动态上下文。记忆巩固使用独立结构化指令，不复用对外聊天格式，也不改写 profile。
+`profile.yaml`、`dialogue.yaml`、`safety.yaml` 与 manifest 由 Cognition `persona/PersonaCompiler` 确定性编译为不可变 PersonaProfile 和初始 revision，再组合当前情绪与场景行为形成 system prompt。稳定资料更新必须通过 Persona mutation policy，携带 expected revision、明确来源、author/editor 权限、请求者与原因；模型或 Memory 不能静默改写。记忆巩固使用独立结构化指令，不复用对外聊天格式，也不改写 profile。
 
 角色设定、情绪行为、示例台词、安全边界和表达规则不允许放进 `knowledge/`。发现这类内容时，应迁入 `profile.yaml`、`dialogue.yaml` 或 `safety.yaml`，而不是新增知识条目。
 

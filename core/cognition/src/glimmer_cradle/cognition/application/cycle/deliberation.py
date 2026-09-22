@@ -27,7 +27,7 @@ class DeliberationController:
         context_builder: ReplyContextBuilder,
         activity_controller=None,
         emotion_system=None,
-        persona_injector=None,
+        persona_compiler=None,
         boundary_validator: Callable[[str], bool] | None = None,
         observability: ObservabilityPort,
     ) -> None:
@@ -36,7 +36,7 @@ class DeliberationController:
         self._context = context_builder
         self._activity = activity_controller
         self._emotion = emotion_system
-        self._persona = persona_injector
+        self._persona = persona_compiler
         self._boundary_validator = boundary_validator
         self._observability = observability
         self._logger = observability.logger("cognition_deliberation")

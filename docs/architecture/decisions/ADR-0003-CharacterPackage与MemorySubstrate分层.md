@@ -23,7 +23,7 @@
 | Memory Substrate | working memory、long-term memory、relationship、preference、reflection | 从经历和反思生成的认知投影；写入必须由 Cognition 判断 |
 | Graph / Vector Index | memory graph、embedding、retrieval index | 检索和关系投影；可重建，不是原始事实源 |
 
-Kernel 只加载和校验配置并注入冻结投影，不解释人格。Cognition 使用 `PersonaProfileCompiler`、`DialoguePolicyBuilder` 和 `PromptAssembler` 组装运行时 prompt。`KnowledgeInitPayload` 只负责 Knowledge Vault 预填。
+Kernel 只加载和校验配置并注入冻结投影，不解释人格。Cognition 的 `persona/PersonaCompiler` 编译稳定资料、版本 revision、对话呈现与运行时 prompt；改写由 mutation policy 校验来源、权限和并发前提。`KnowledgeInitPayload` 只负责 Knowledge Vault 预填。
 
 ## Consequences
 

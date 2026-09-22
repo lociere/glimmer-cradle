@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# 当前角色人设全量情绪标签正则（与 persona_injector.py 及 perception-builder.ts 同步维护）
+# 当前角色人设全量情绪标签正则（与 persona/compiler.py 及 perception-builder.ts 同步维护）
 # 覆盖括号格式 [开心]、[emotion:happy] 及无括号前缀 emotion: happy
 _EMOTION_LABEL_WORDS = (
     r'平静|开心|疑惑|撒娇|严肃|害羞|生气|委屈|思考'           # persona 明确标签

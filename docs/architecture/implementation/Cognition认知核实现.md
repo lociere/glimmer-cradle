@@ -125,7 +125,7 @@ Kernel CognitionService request
 
 当前 `CycleController` 的 Deliberate 阶段以 `application/cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；ReasoningService 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
 
-`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaInjector.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
+`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaCompiler.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
 `application/activity/` 是认知资源调度的唯一 owner；状态模型与纯转换位于 `domain/activity/`。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
 
@@ -153,15 +153,16 @@ Context 是注意力预算控制器，不是字符串拼接器。`context/` 已�
 
 出站回复会先经过 `reply_text.py` 归一化：剥除情绪标签、移除高置信度括号动作，并为普通闲聊生成 `payload.messages` 自然分段；完整语义仍保留在 `payload.text`。代码块、列表、表格等结构化输出不做聊天式拆分。
 
-角色 prompt 分层由 `domain/persona/` 下三类组件完成：
+角色 prompt 与稳定资料由目标 `persona/` owner 完成：
 
 | 组件 | 输入 | 输出 |
 |---|---|---|
-| `PersonaProfileCompiler` | `profile.yaml` / `CharacterProfileConfig` | 稳定人格段、表达倾向、示例、情绪/场景行为映射 |
-| `DialoguePolicyBuilder` | `dialogue.yaml` / `DialoguePolicyConfig` | 对外回复呈现策略，包括短句、括号动作、Markdown 与代码规则 |
-| `PromptAssembler` | persona/profile/dialogue、当前情绪、场景行为和动态上下文 | 每轮 system prompt |
+| `profile.py` | Character Package 的 manifest/profile/dialogue/safety | 不可变 PersonaProfile、稳定人格段、表达策略及安全边界 |
+| `revision.py` | PersonaProfile | 确定性内容摘要、单调 revision 与前序链接 |
+| `mutation_policy.py` | expected revision、来源、权限、请求者和原因 | 显式授权或失败关闭 |
+| `compiler.py` | 当前 revision、情绪与 address mode | 每轮 system prompt 与安全边界校验 |
 
-`PersonaInjector` 是对话人格装配门面，不提供知识库 persona 或旧 reflection persona 编译入口。`KnowledgeInitPayload` 只进入 `application/memory/knowledge_base.py`。
+`PersonaCompiler` 是现行运行时门面，不提供知识库 persona 或旧 reflection persona 编译入口。模型与 Memory 无权改写稳定资料；获授权更新也必须形成可审计 revision。`KnowledgeInitPayload` 只进入 `application/memory/knowledge_base.py`。
 
 ## 记忆、经历与持久化
 

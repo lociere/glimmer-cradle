@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/cognition/persona.schema.json",
+  "title": "PersonaRevisionDocument",
+  "description": "Cognition-owned Persona revision audit document. Character Package author seed remains a separate validated input.",
+  "type": "object",
+  "required": ["revision_id", "sequence", "profile_digest", "source", "authority", "requested_by", "reason"],
+  "additionalProperties": false,
+  "properties": {
+    "revision_id": {"type": "string", "minLength": 1},
+    "sequence": {"type": "integer", "minimum": 1},
+    "profile_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source": {"enum": ["character_package", "authorized_operator"]},
+    "authority": {"enum": ["author", "editor"]},
+    "requested_by": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "previous_revision_id": {"type": ["string", "null"], "minLength": 1}
+  },
+  "x-glimmer-owner": "Cognition Persona",
+  "x-glimmer-contract-kind": "PersistedDocument"
+}
