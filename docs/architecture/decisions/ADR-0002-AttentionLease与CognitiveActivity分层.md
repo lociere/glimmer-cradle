@@ -45,7 +45,9 @@ Global Workspace 广播是易失的当前意识焦点。自动广播、循环 ti
 
 - Extension 只能申请 Attention Lease，不能控制 Cognitive Activity、Affect、Volition 或 Maintenance。
 - Kernel 只消费 `CognitiveActivitySnapshot.policy.frequency_hint_ms` 调整活性探测间隔，不判断角色是否愿意回复。
-- Cognition 不读取平台私有字段，也不查询 Kernel Attention 内部对象。
+- Cognition 不读取平台私有字段，也不查询 Kernel Attention 内部对象。Cognition v2.1 的
+  `CognitiveAttentionLease` 只固定一次内部候选处理，不是本 ADR 的外部 scene/channel lease，
+  不携带平台焦点或回复授权。
 - `response_policy=observe_only` 仍可进入 Experience、关系观察和记忆候选，但不能产生外显回复。
 - Activity transition 只写 `cognition.activity.state`、`cognition.activity.transition` 和结构化日志；不得新增对应 MomentKind。
 - Maintenance run 只写维护 span/metric、Episode projection、consolidation run 和有证据的 Memory revision。

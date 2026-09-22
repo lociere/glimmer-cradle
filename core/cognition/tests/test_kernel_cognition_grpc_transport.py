@@ -14,13 +14,13 @@ from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
-from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace as _GlobalWorkspace
+from glimmer_cradle.cognition.attention import AttentionController as _AttentionController
 from glimmer_cradle.cognition.ports.kernel.models import AgentPlanResult
 
 
-def GlobalWorkspace(*args, **kwargs):
+def AttentionController(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
-    return _GlobalWorkspace(*args, **kwargs)
+    return _AttentionController(*args, **kwargs)
 
 
 def PerceptionProvider(*args, **kwargs):
@@ -134,7 +134,7 @@ async def service():
         cycle=_Cycle(),
         shutdown=shutdown,
         operations=PerceptionOperationRegistry(),
-        workspace=GlobalWorkspace(),
+        workspace=AttentionController(),
     )
     await host.start()
     host.mark_ready()
@@ -228,7 +228,7 @@ async def test_queue_capacity_drop_closes_the_accepted_perception_operation() ->
         cycle=_Cycle(),
         shutdown=lambda: asyncio.sleep(0),
         operations=operations,
-        workspace=GlobalWorkspace(),
+        workspace=AttentionController(),
     )
     await host.start()
     host.mark_ready()
@@ -317,7 +317,7 @@ async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> N
 
     queue = ObservationQueue(max_size=10)
     operations = PerceptionOperationRegistry()
-    workspace = GlobalWorkspace(capacity=5)
+    workspace = AttentionController(capacity=5)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     cycle = CycleController(
@@ -407,7 +407,7 @@ async def test_synthesis_cancellation_reaches_the_running_use_case(mode: str) ->
         cycle=_Cycle(),
         shutdown=lambda: asyncio.sleep(0),
         operations=PerceptionOperationRegistry(),
-        workspace=GlobalWorkspace(),
+        workspace=AttentionController(),
     )
     await host.start()
     host.mark_ready()

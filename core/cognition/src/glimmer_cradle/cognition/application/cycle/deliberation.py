@@ -7,7 +7,7 @@ from collections.abc import Callable
 from glimmer_cradle.cognition.application.cycle.action_planner import ActionPlan, CognitiveActionPlanner
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem
+from glimmer_cradle.cognition.attention import Attention
 from glimmer_cradle.cognition.application.inference.service import (
     ModelTierEnum,
     ReasoningRequest,
@@ -42,7 +42,7 @@ class DeliberationController:
         self._logger = observability.logger("cognition_deliberation")
 
     async def deliberate(
-        self, broadcast: WorkspaceItem | None, turn: CycleTurn
+        self, broadcast: Attention | None, turn: CycleTurn
     ) -> str | None:
         if self._reasoning is None or broadcast is None or broadcast.source != "perception":
             return None

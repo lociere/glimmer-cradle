@@ -2,17 +2,17 @@
 PerceptionProvider —— 感知专家。
 
 每拍 drain ObservationQueue（IPC 入站写入的近期感知事件），把每条事件转为
-一个 WorkspaceItem(source=perception)。direct 表示外部互动义务，必须进入本拍
+一个 Attention(source=perception)。direct 表示外部互动义务，必须进入本拍
 竞争的最高显著度；ambient 仍由 familiarity 调整显著度。
 
 即时觉醒由 Cognition 入站边界负责；本 Provider 只在 Sense 相位 drain 队列并产出
-WorkspaceItem，避免把跨层调度副作用塞进专家投放逻辑。
+Attention，避免把跨层调度副作用塞进专家投放逻辑。
 """
 from __future__ import annotations
 
 from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
@@ -46,13 +46,13 @@ class PerceptionProvider(Provider):
         self._clock = clock
         self._ids = ids
 
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         entries: list[Observation] = self._queue.drain(max_items=self._max_items)
         if not entries:
             return []
 
         # 触发觉醒（蓝图挂钩 ①）
-        items: list[WorkspaceItem] = []
+        items: list[Attention] = []
         for e in entries:
             content = {
                 "text": e.text,
@@ -78,7 +78,7 @@ class PerceptionProvider(Provider):
             # 携带规范化多模态输入，供 PerceptionAppraiser 单次路由。
             if e.model_input is not None:
                 content["model_input"] = e.model_input
-            items.append(make_item(
+            items.append(make_attention(
                 source=self.name,
                 content=content,
                 salience=salience_for_perception(

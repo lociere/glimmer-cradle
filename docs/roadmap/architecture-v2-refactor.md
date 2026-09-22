@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Memory/Attention/State 等仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Cognition Attention 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Memory/State 等仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -316,6 +316,13 @@ expected revision、明确来源、author/editor 权限、请求者与原因，�
 `test_persona_mutation.py` 覆盖编译、提示词、安全边界、revision 链及越权反例；旧 Persona owner 已
 consumer-zero 删除。revision 持久化将在 Cognition state store 迁移时接入，本切片不把进程内 revision
 冒充 durable state。
+
+Cognition Attention 切片把旧 `domain/workspace.py` 的有界候选、显著度竞争、过期清理和当前焦点迁入目标
+`attention/{attention,attention_controller,attention_lease}.py`，Provider、Cycle、gRPC cancel 与 Host composition
+只消费新 owner。内部 `CognitiveAttentionLease` 在一次认知 focus 处理期间固定候选，消费、淘汰、取消或候选
+过期时释放；它不等同于 Kernel 面向外部 scene/channel 的 `AttentionLease`，不授予回复或工具执行权。
+direct Perception 的同分优先级、ambient 成功语义、drop/eviction 终态和 Clock 注入均保持；旧 workspace owner
+已 consumer-zero 删除。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

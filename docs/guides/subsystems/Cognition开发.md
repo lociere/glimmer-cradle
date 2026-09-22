@@ -10,7 +10,7 @@
 | 进程入口/组装 | `host/process.py`、`host/composition.py` |
 | Kernel Service Adapter | `adapters/kernel/` |
 | Kernel 应用 Port | `ports/kernel/` |
-| 认知主循环 | `application/cycle/`、`domain/workspace.py`、`domain/volition/` |
+| 认知主循环 | `application/cycle/`、`attention/`、`domain/volition/` |
 | Volition/巩固 | `domain/volition/`、`application/memory/consolidation.py`、`adapters/persistence/experience/episodes.py` |
 | 上下文 | `application/context/` |
 | 推理/LLM | `ports/inference.py`、`application/inference/`、`adapters/inference/` |

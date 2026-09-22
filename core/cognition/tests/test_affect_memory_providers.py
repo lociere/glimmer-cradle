@@ -1,5 +1,5 @@
 from glimmer_cradle.cognition.application.cycle.providers import AffectProvider, MemoryProvider
-from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.context import ContextItem
 from tests.support import CLOCK, IDS
 
@@ -28,7 +28,7 @@ async def test_affect_proposes_current_emotion() -> None:
 async def test_memory_uses_context_assembly_with_actor_and_scene() -> None:
     assembly = _Assembly()
     provider = MemoryProvider(assembly, clock=CLOCK, ids=IDS)
-    focus = make_item(source="perception", content={"text": "雨天", "actor_id": "u1",
+    focus = make_attention(source="perception", content={"text": "雨天", "actor_id": "u1",
                                                     "scene_id": "s1"}, salience=1,
                       clock=CLOCK, ids=IDS)
     items = await provider.propose([focus])

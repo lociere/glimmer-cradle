@@ -2,7 +2,7 @@
 认知循环专家模块基类。
 
 每个 Provider 是一个常驻协程，每拍认知循环被并发调用 ``propose()`` —— 读当前
-工作区快照，根据自身职责产出新候选列表（``WorkspaceItem``）。
+工作区快照，根据自身职责产出新候选列表（``Attention``）。
 
 设计约束：
 - propose() 必须**纯**：不直接改写工作区（CycleController 收集结果后统一 propose）
@@ -14,17 +14,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem
+from glimmer_cradle.cognition.attention import Attention
 
 
 class Provider(ABC):
     """专家模块基类。子类必须实现 ``name`` 与 ``propose()``。"""
 
-    #: provider 名（与 WorkspaceItem.source 枚举一一对应）
+    #: provider 名（与 Attention.source 枚举一一对应）
     name: str = ""
 
     @abstractmethod
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         """读当前工作区快照 → 产出本拍候选。
 
         Args:

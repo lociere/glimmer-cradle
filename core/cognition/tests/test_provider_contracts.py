@@ -18,7 +18,7 @@ def test_all_provider_classes_subclass_provider() -> None:
 
 
 def test_all_provider_names_align_with_source_enum() -> None:
-    """provider.name 必须与 WorkspaceItem.source 枚举一一对应。"""
+    """provider.name 必须与 Attention.source 枚举一一对应。"""
     names = {cls.name for cls in ALL_PROVIDER_CLASSES}
     expected = {"perception", "affect", "memory", "drive", "social"}
     assert names == expected

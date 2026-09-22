@@ -34,7 +34,7 @@ from glimmer_cradle.cognition.application.cycle.perception_operations import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )
-from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace
+from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.trace_context import TraceContext, new_trace_id
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
@@ -126,7 +126,7 @@ class CognitionGrpcHost:
         cycle: CycleController,
         shutdown: Callable[[], Awaitable[None]],
         operations: PerceptionOperationRegistry,
-        workspace: GlobalWorkspace,
+        workspace: AttentionController,
     ) -> None:
         self.generation = generation
         self._inbound = inbound

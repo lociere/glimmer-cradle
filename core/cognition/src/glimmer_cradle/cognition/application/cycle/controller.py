@@ -23,7 +23,7 @@ from glimmer_cradle.cognition.domain.volition import (
     make_intent,
     threshold_for,
 )
-from glimmer_cradle.cognition.domain.workspace import GlobalWorkspace, WorkspaceItem
+from glimmer_cradle.cognition.attention import AttentionController, Attention
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
@@ -37,7 +37,7 @@ class CycleController:
     def __init__(
         self,
         *,
-        workspace: GlobalWorkspace,
+        workspace: AttentionController,
         providers: Sequence[Provider],
         experience_recorder: ConversationRecorder,
         activity_controller: CognitiveActivityController | None = None,
@@ -212,10 +212,10 @@ class CycleController:
             self._active_perception_trace = ""
             self._cycle_perception_traces.clear()
 
-    async def _do_tick(self) -> WorkspaceItem | None:
+    async def _do_tick(self) -> Attention | None:
         self._turn = CycleTurn()
         # ── Sense / Appraise / Recall（并发投放）──────────────────────────
-        snapshot: list[WorkspaceItem] = []
+        snapshot: list[Attention] = []
         with self._observability.span("sense_appraise_recall"):
             snapshot = await self._ws.snapshot()
             results = await asyncio.gather(
@@ -260,9 +260,9 @@ class CycleController:
             self._observability.counter("cognition.accepted", accepted_total, labels={"phase": "compete"})
 
         # ── Broadcast（取 top 作"意识内容"）──────────────────────────────
-        broadcast_item: WorkspaceItem | None = None
+        broadcast_item: Attention | None = None
         with self._observability.span("broadcast") as s_bc:
-            broadcast_item = await self._ws.broadcast()
+            broadcast_item = await self._ws.focus()
             s_bc.set_attribute("has_content", broadcast_item is not None)
         trace_id = self._perception_trace(broadcast_item)
         if trace_id:
@@ -302,7 +302,7 @@ class CycleController:
             operation = self._perception_operations.get_by_trace(trace_id)
             if operation is not None and operation.state == "cancelled":
                 if broadcast_item is not None:
-                    await self._ws.remove(broadcast_item.item_id)
+                    await self._ws.remove(broadcast_item.attention_id)
                 raise asyncio.CancelledError
             task = asyncio.current_task()
             if task is not None:
@@ -385,24 +385,24 @@ class CycleController:
 
     # ── 内部辅助 ─────────────────────────────────────────────────────────
 
-    async def _consume_ephemeral_broadcast(self, broadcast_item: WorkspaceItem | None) -> None:
+    async def _consume_ephemeral_broadcast(self, broadcast_item: Attention | None) -> None:
         """消费事件型广播，避免同一外部输入在后续 tick 被重复处理。"""
         if broadcast_item is None or broadcast_item.source != "perception":
             return
         content = broadcast_item.content if isinstance(broadcast_item.content, dict) else {}
         if not content.get("scene_id") or not content.get("trace_id"):
             return
-        if await self._ws.remove(broadcast_item.item_id):
+        if await self._ws.remove(broadcast_item.attention_id):
             self._observability.counter("cognition.workspace_consumed", 1, labels={"source": "perception"})
 
     @staticmethod
-    def _perception_trace(item: WorkspaceItem | None) -> str:
+    def _perception_trace(item: Attention | None) -> str:
         if item is None or item.source != "perception" or not isinstance(item.content, dict):
             return ""
         return str(item.content.get("trace_id") or "")
 
     @staticmethod
-    def _is_ambient_perception(item: WorkspaceItem | None) -> bool:
+    def _is_ambient_perception(item: Attention | None) -> bool:
         return bool(
             item is not None
             and item.source == "perception"
@@ -410,7 +410,7 @@ class CycleController:
             and item.content.get("address_mode") != "direct"
         )
 
-    def _finish_perception_success(self, item: WorkspaceItem, outcome: str) -> None:
+    def _finish_perception_success(self, item: Attention, outcome: str) -> None:
         if self._perception_operations is None:
             return
         trace_id = self._perception_trace(item)
@@ -419,7 +419,7 @@ class CycleController:
                 "cognition.perception_consumed", 1, labels={"outcome": outcome}
             )
 
-    def _finish_unbroadcast_perception(self, item: WorkspaceItem, outcome: str) -> None:
+    def _finish_unbroadcast_perception(self, item: Attention, outcome: str) -> None:
         """关闭无法广播的感知；只有 direct 丢失属于服务失败。"""
         if self._perception_operations is None:
             return
@@ -437,8 +437,8 @@ class CycleController:
             )
 
     async def _safe_propose(
-        self, provider: Provider, snapshot: list[WorkspaceItem]
-    ) -> list[WorkspaceItem]:
+        self, provider: Provider, snapshot: list[Attention]
+    ) -> list[Attention]:
         """Provider 异常隔离：单个崩不影响他人。"""
         try:
             return await provider.propose(snapshot)
@@ -459,8 +459,8 @@ class CycleController:
 
     def _build_intents(
         self,
-        broadcast_item: WorkspaceItem | None,
-        snapshot: list[WorkspaceItem],
+        broadcast_item: Attention | None,
+        snapshot: list[Attention],
     ) -> list[Intent]:
         """为本拍构建候选 Intent。
 
@@ -543,8 +543,8 @@ class CycleController:
 
     def _gather_willingness_inputs(
         self,
-        broadcast_item: WorkspaceItem,
-        snapshot: list[WorkspaceItem],
+        broadcast_item: Attention,
+        snapshot: list[Attention],
     ) -> WillingnessInputs:
         """从工作区快照 + 周边子系统抽取意愿公式输入。"""
         bc = broadcast_item.content if isinstance(broadcast_item.content, dict) else {}

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
@@ -80,7 +80,7 @@ class DriveProvider(Provider):
 
     # ── propose ──────────────────────────────────────────────────────────
 
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         now = self._clock.now()
         if self._last_tick_at is None:
             tick_seconds = 0.0  # 首拍不累积
@@ -120,7 +120,7 @@ class DriveProvider(Provider):
         if top_level < self._cfg.propose_threshold:
             return []
 
-        return [make_item(
+        return [make_attention(
             source=self.name,
             content={
                 "drive": top_drive,

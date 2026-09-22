@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import timedelta
 
 from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, SocialProvider
-from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 from tests.support import CLOCK, IDS
@@ -21,7 +21,7 @@ async def test_social_projects_deterministic_relationship(tmp_path: Path) -> Non
     await database.connect()
     repository = RelationshipRepository(database)
     provider = SocialProvider(repository, clock=CLOCK, ids=IDS)
-    focus = make_item(source="perception", content={"actor_id": "u1", "actor_name": "小林",
+    focus = make_attention(source="perception", content={"actor_id": "u1", "actor_name": "小林",
                                                      "address_mode": "direct", "text": "你好"},
                       salience=1, clock=CLOCK, ids=IDS)
     await repository.observe("u1", kind="direct", evidence_moment_id="m1", display_name="小林")

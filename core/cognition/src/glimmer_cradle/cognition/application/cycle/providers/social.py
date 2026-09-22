@@ -4,13 +4,13 @@ SocialProvider 只把已经投影的关系状态带入 Global Workspace，不修
 from __future__ import annotations
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
-def _extract_actor_info(item: WorkspaceItem) -> tuple[str | None, str | None, str]:
+def _extract_actor_info(item: Attention) -> tuple[str | None, str | None, str]:
     """从工作区项抽取 (actor_id, display_name, kind)。
 
     kind: 'direct' (perception.address_mode=direct) / 'ambient'（其它）。
@@ -38,7 +38,7 @@ class SocialProvider(Provider):
         self._clock = clock
         self._ids = ids
 
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         if not workspace_snapshot:
             return []
 
@@ -63,7 +63,7 @@ class SocialProvider(Provider):
             return []
 
         salience = min(1.0, 0.3 + record.familiarity * 0.5)
-        return [make_item(
+        return [make_attention(
             source=self.name,
             content={
                 "actor_id": record.actor_id,

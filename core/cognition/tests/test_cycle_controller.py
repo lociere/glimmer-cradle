@@ -9,25 +9,28 @@ import pytest
 
 from glimmer_cradle.cognition.application.cycle import (
     CycleController as _CycleController,
-    GlobalWorkspace as _GlobalWorkspace,
 )
 from glimmer_cradle.cognition.application.cycle.providers import Provider, PerceptionProvider as _PerceptionProvider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item as _make_item
+from glimmer_cradle.cognition.attention import (
+    Attention,
+    AttentionController as _AttentionController,
+    make_attention as _make_attention,
+)
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 from glimmer_cradle.conversation import ConversationLog, SqliteTurnStore, TurnController
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
 
 
-def GlobalWorkspace(*args, **kwargs):
+def AttentionController(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
-    return _GlobalWorkspace(*args, **kwargs)
+    return _AttentionController(*args, **kwargs)
 
 
-def make_item(*args, **kwargs):
+def make_attention(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
     kwargs.setdefault("ids", IDS)
-    return _make_item(*args, **kwargs)
+    return _make_attention(*args, **kwargs)
 
 
 def PerceptionProvider(*args, **kwargs):
@@ -106,7 +109,7 @@ def _action_plan_json(
 class _FixedProvider(Provider):
     """返回固定候选列表的测试 provider。"""
 
-    def __init__(self, name: str, items: list[WorkspaceItem]) -> None:
+    def __init__(self, name: str, items: list[Attention]) -> None:
         self.name = name
         self._items = items
         self.call_count = 0
@@ -126,10 +129,10 @@ class _CrashingProvider(Provider):
 # ── 基本 tick ────────────────────────────────────────────────────────────
 
 async def test_tick_runs_all_providers(tmp_path: Path) -> None:
-    ws = GlobalWorkspace(capacity=5)
-    p1 = _FixedProvider("perception", [make_item(source="perception",
+    ws = AttentionController(capacity=5)
+    p1 = _FixedProvider("perception", [make_attention(source="perception",
                                                  content={"v": 1}, salience=0.8)])
-    p2 = _FixedProvider("affect", [make_item(source="affect",
+    p2 = _FixedProvider("affect", [make_attention(source="affect",
                                              content={"v": 2}, salience=0.3)])
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -148,8 +151,8 @@ async def test_tick_runs_all_providers(tmp_path: Path) -> None:
 
 async def test_internal_broadcast_does_not_become_thought_moment(tmp_path: Path) -> None:
     """工作区注意焦点不是已经形成的语义 Thought，不能自动成为经历。"""
-    ws = GlobalWorkspace(capacity=3)
-    p = _FixedProvider("drive", [make_item(source="drive",
+    ws = AttentionController(capacity=3)
+    p = _FixedProvider("drive", [make_attention(source="drive",
                                            content={"drive": "curiosity"}, salience=0.9)])
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -167,8 +170,8 @@ async def test_internal_broadcast_does_not_become_thought_moment(tmp_path: Path)
 
 async def test_perception_broadcast_writes_no_thought_moment(tmp_path: Path) -> None:
     """perception 广播不写 thought（由 PERCEPTION + REPLY/SILENCE 记录，阶段 7.5b-4）。"""
-    ws = GlobalWorkspace(capacity=3)
-    p = _FixedProvider("perception", [make_item(source="perception",
+    ws = AttentionController(capacity=3)
+    p = _FixedProvider("perception", [make_attention(source="perception",
                                                 content={"text": "hi", "scene_id": "s",
                                                          "trace_id": "t"}, salience=0.9)])
     recorder = build_experience_recorder(tmp_path)
@@ -188,8 +191,8 @@ async def test_perception_broadcast_writes_no_thought_moment(tmp_path: Path) -> 
 async def test_perception_cycle_persists_and_completes_conversation_turn(
     tmp_path: Path,
 ) -> None:
-    ws = GlobalWorkspace(capacity=3)
-    p = _FixedProvider("perception", [make_item(
+    ws = AttentionController(capacity=3)
+    p = _FixedProvider("perception", [make_attention(
         source="perception",
         content={
             "text": "hi",
@@ -227,7 +230,7 @@ async def test_perception_cycle_persists_and_completes_conversation_turn(
 async def test_tick_no_broadcast_writes_no_moment(tmp_path: Path) -> None:
     """空拍（无广播）不写 thought Moment（阶段 7.3）—— liveness 改记 gauge，
     经历之流只收真实的一刻，不被"她什么都没想"灌满。"""
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     p = _FixedProvider("drive", [])  # 没有候选
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -249,9 +252,9 @@ async def test_tick_no_broadcast_writes_no_moment(tmp_path: Path) -> None:
 # ── Provider 异常隔离 ────────────────────────────────────────────────────
 
 async def test_crashing_provider_does_not_break_loop(tmp_path: Path) -> None:
-    ws = GlobalWorkspace(capacity=5)
+    ws = AttentionController(capacity=5)
     crasher = _CrashingProvider()
-    good = _FixedProvider("affect", [make_item(source="affect",
+    good = _FixedProvider("affect", [make_attention(source="affect",
                                                content={"v": 1}, salience=0.5)])
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -269,10 +272,10 @@ async def test_crashing_provider_does_not_break_loop(tmp_path: Path) -> None:
 # ── 竞争行为：salience 排序 ──────────────────────────────────────────────
 
 async def test_compete_picks_highest_salience(tmp_path: Path) -> None:
-    ws = GlobalWorkspace(capacity=3)
-    p_low = _FixedProvider("memory", [make_item(source="memory",
+    ws = AttentionController(capacity=3)
+    p_low = _FixedProvider("memory", [make_attention(source="memory",
                                                 content={"v": "low"}, salience=0.2)])
-    p_high = _FixedProvider("affect", [make_item(source="affect",
+    p_high = _FixedProvider("affect", [make_attention(source="affect",
                                                  content={"v": "high"}, salience=0.9)])
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -283,7 +286,7 @@ async def test_compete_picks_highest_salience(tmp_path: Path) -> None:
     finally:
         await recorder.stop()
 
-    broadcast = await ws.broadcast()
+    broadcast = await ws.focus()
     assert broadcast is not None
     assert broadcast.source == "affect"
     assert broadcast.salience == 0.9
@@ -292,7 +295,7 @@ async def test_compete_picks_highest_salience(tmp_path: Path) -> None:
 # ── start/stop ───────────────────────────────────────────────────────────
 
 async def test_start_stop_no_providers(tmp_path: Path) -> None:
-    ws = GlobalWorkspace()
+    ws = AttentionController()
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     loop = CycleController(workspace=ws, providers=[],
@@ -310,7 +313,7 @@ async def test_start_stop_no_providers(tmp_path: Path) -> None:
 
 async def test_notify_external_input_interrupts_long_sleep(tmp_path: Path) -> None:
     """外部输入应打断长睡眠，让入站感知不再等 dormant 的下一次自然 tick。"""
-    ws = GlobalWorkspace()
+    ws = AttentionController()
     provider = _FixedProvider("drive", [])
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -345,12 +348,12 @@ async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "今天怎么样", "scene_id": "s",
                                        "trace_id": "t", "address_mode": "direct"},
                               salience=0.9)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -374,12 +377,12 @@ async def test_deliberate_no_reasoning_no_reply(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "在吗", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct"},
                               salience=0.9)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -402,12 +405,12 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "你是 AI 吗", "scene_id": "s",
                                        "trace_id": "t", "address_mode": "direct"},
                               salience=0.9)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -433,7 +436,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "hi", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct"},
                               salience=0.9)]
@@ -444,7 +447,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
                     "policy": {"model_tier": "cloud_allowed", "allows_proactive": True}}
 
     fake = _FakeReasoning("回复")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -470,7 +473,7 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "你好", "scene_id": "s1", "trace_id": "t-1",
                          "address_mode": "direct", "familiarity": 8},
@@ -482,7 +485,7 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     async def _sink(cmd):
         emitted.append(cmd)
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -514,7 +517,7 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "查一下今天的天气", "scene_id": "s1", "trace_id": "t-skill",
                          "address_mode": "direct", "familiarity": 8},
@@ -537,7 +540,7 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
             0.92,
         ),
     ])
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -591,7 +594,7 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": user_text, "scene_id": "s1", "trace_id": f"trace-{capability_kind}",
                          "address_mode": "direct", "familiarity": 8},
@@ -606,7 +609,7 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
     reasoning = _SequenceReasoning([
         _action_plan_json("skill_request", user_text, capability_kind, "需要外部能力", 0.91),
     ])
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -643,7 +646,7 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": user_text, "scene_id": "s1", "trace_id": "trace-reply",
                          "address_mode": "direct", "familiarity": 8},
@@ -659,7 +662,7 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
         _action_plan_json("reply", user_text, "none", "不需要执行外部能力", 0.88),
         "可以，我直接告诉你。",
     ])
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -690,7 +693,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "（用户正在输入中）", "scene_id": "s1", "trace_id": "trace-noop",
                          "address_mode": "direct", "familiarity": 8},
@@ -706,7 +709,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
         _action_plan_json("noop", "（用户正在输入中）", "none", "输入尚不完整，等待下一拍", 0.86),
         "这条普通回复不应该被消费",
     ])
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -742,7 +745,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "帮我处理一下那个", "scene_id": "s1", "trace_id": "trace-clarify",
                          "address_mode": "direct", "familiarity": 8},
@@ -765,7 +768,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
         ),
         "这条普通回复不应该被消费",
     ])
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -795,7 +798,7 @@ async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: 
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "我想打开 B 站", "scene_id": "s1", "trace_id": "trace-unavailable",
                          "address_mode": "direct", "familiarity": 8},
@@ -807,7 +810,7 @@ async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: 
     async def _sink(cmd):
         emitted.append(cmd)
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -838,7 +841,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
             if self.emitted:
                 return []
             self.emitted = True
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "你好", "scene_id": "s1", "trace_id": "t-1",
                          "address_mode": "direct", "familiarity": 8},
@@ -851,7 +854,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
         emitted.append(cmd)
 
     reasoning = _FakeReasoning("你好呀")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -914,7 +917,7 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
         trace_id="t-wake",
     ))
     reasoning = _FakeReasoning("你好呀")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -961,8 +964,8 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
         text="在吗？",
         trace_id="t-direct-over-drive",
     ))
-    ws = GlobalWorkspace(capacity=1)
-    await ws.propose(make_item(
+    ws = AttentionController(capacity=1)
+    await ws.propose(make_attention(
         source="drive",
         content={"drive": "companionship", "level": 1.0},
         salience=1.0,
@@ -997,11 +1000,11 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "hi", "scene_id": "s", "trace_id": "t"},
                               salience=0.9)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1023,7 +1026,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "在吗", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct"},
                               salience=0.9)]
@@ -1033,7 +1036,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     async def _sink(cmd):
         emitted.append(cmd)
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1057,7 +1060,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "hi", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct"},
                               salience=0.9)]
@@ -1065,7 +1068,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     async def _bad_sink(cmd):
         raise RuntimeError("ipc down")
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1089,7 +1092,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "hi", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct"},
                               salience=0.9)]
@@ -1103,7 +1106,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     async def _sink(cmd):
         emitted.append(cmd)
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1133,7 +1136,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "今天好开心", "scene_id": "s1",
                                        "trace_id": "tr-1", "address_mode": "direct",
                                        "familiarity": 8},
@@ -1148,7 +1151,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
             return {"emotion_type": "开心", "intensity": 0.8}
 
     emo = _Emotion()
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1188,7 +1191,7 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
     class _DriveOnly(Provider):
         name = "drive"
         async def propose(self, snap):
-            return [make_item(source="drive",
+            return [make_attention(source="drive",
                               content={"drive": "curiosity", "level": 0.5},
                               salience=0.6)]
 
@@ -1201,7 +1204,7 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
             return {"emotion_type": "平静", "intensity": 0.2}
 
     emo = _Emotion()
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1227,7 +1230,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "你好月见", "scene_id": "sc1",
                                        "conversation_id": "conversation:sc1",
                                        "continuity_id": "continuity:user",
@@ -1238,7 +1241,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
                                        "familiarity": 9},
                               salience=0.95)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1268,7 +1271,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
 
         async def propose(self, snap):
             return [
-                make_item(
+                make_attention(
                     source="perception",
                     content={
                         "text": "A 的直接消息",
@@ -1285,7 +1288,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
                     },
                     salience=0.95,
                 ),
-                make_item(
+                make_attention(
                     source="perception",
                     content={
                         "text": "B 的背景消息",
@@ -1309,7 +1312,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
     await recorder.start()
     try:
         loop = CycleController(
-            workspace=GlobalWorkspace(capacity=3),
+            workspace=AttentionController(capacity=3),
             providers=[_Batch()],
             experience_recorder=recorder,
             willingness_config=WillingnessConfig(
@@ -1344,7 +1347,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "嗯", "scene_id": "sc2", "trace_id": "t2",
                                        "conversation_id": "conversation:sc2",
                                        "continuity_id": "continuity:user",
@@ -1354,7 +1357,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
                                        "address_mode": "ambient", "familiarity": 1},
                               salience=0.5)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1399,7 +1402,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "在吗", "scene_id": "scX", "trace_id": "t",
                                        "conversation_id": "conversation:scX",
                                        "continuity_id": "continuity:user",
@@ -1439,7 +1442,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
         knowledge_base = _KB()
 
     cap = _CapturingReasoning("我在呀")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1474,7 +1477,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
         name = "perception"
 
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={
                     "text": "QQ那边发生了什么？",
@@ -1507,7 +1510,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
                 return []
 
     cap = _CapturingReasoning("我看到了")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1582,7 +1585,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "你好", "scene_id": "sc", "trace_id": "tr",
                                        "address_mode": "direct", "familiarity": 8},
                               salience=0.95)]
@@ -1591,7 +1594,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
         def update_by_input(self, text): pass
         def get_state(self): return {"emotion_type": "开心", "intensity": 0.7}
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1627,12 +1630,12 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "嗯", "scene_id": "sc", "trace_id": "tr",
                                        "address_mode": "ambient", "familiarity": 1},
                               salience=0.5)]
 
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1664,7 +1667,7 @@ async def test_observe_only_perception_records_without_reasoning(tmp_path: Path)
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-                return [make_item(source="perception",
+                return [make_attention(source="perception",
                                   content={"text": "群里在聊晚饭。", "scene_id": "napcat:group:42",
                                            "conversation_id": "conversation:napcat:group:42",
                                            "continuity_id": "continuity:napcat:group:42",
@@ -1676,7 +1679,7 @@ async def test_observe_only_perception_records_without_reasoning(tmp_path: Path)
                               salience=0.5)]
 
     reasoning = _FakeReasoning("不应该生成")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1736,7 +1739,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct", "familiarity": 8,
                                        "model_input": {"text": "", "items": []}},
@@ -1744,7 +1747,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
 
     router = _FakeRouter(_Route(primary_text="", semantic_text="一张开心的表情包"))
     cap = _CapturingReasoning("哈哈")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -1771,7 +1774,7 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(source="perception",
+            return [make_attention(source="perception",
                               content={"text": "看这个", "scene_id": "s", "trace_id": "t",
                                        "address_mode": "direct", "familiarity": 8,
                                        "model_input": {"text": "看这个", "items": []}},
@@ -1789,7 +1792,7 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
                    vision_messages=[_VM("描述这张图", "http://img/1.png", "image/png")])
     router = _FakeRouter(route)
     cap = _CapturingReasoning("好看")
-    ws = GlobalWorkspace(capacity=3)
+    ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:

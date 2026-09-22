@@ -45,7 +45,8 @@ core/cognition/
 │   ├── domain/                         # 心智模型、不变量与内部模块 API
 │   │   ├── activity/ affect/ conversation/
 │   │   ├── experience/ identity/ persona/ volition/
-│   │   └── configuration.py, memory.py, workspace.py
+│   │   └── configuration.py, memory.py
+│   ├── attention/           # 候选、竞争、内部 focus lease
 │   ├── application/                    # 认知循环、查询、维护与本地事务编排
 │   │   ├── activity/ context/ conversation/ cycle/
 │   │   ├── experience/ inference/ maintenance/ memory/
@@ -99,7 +100,7 @@ Kernel CognitionService request
 
 外部平台注意力不进入 Cognition 私有模型。Extension Adapter 可以把平台上下文映射为 attention channel，由 Kernel `AttentionLeaseStore` 维护短期焦点；进入 Cognition 的仍是 `address_mode`、`response_policy`、`source`、`content` 等通用感知。`life_heartbeat` 只返回活性状态，不生成 Thought、不衰减情绪；`CycleController` 按 `CognitiveActivityPolicy` 自主调度认知节拍。群聊、直播间、频道线程等平台差异不得写进认知循环。
 
-`PerceptionProvider` 只负责把规范化入站事件投放为 `WorkspaceItem`。`address_mode=direct` 的感知显著度固定为最高值，表示“有人正在叫她”，避免被长驻 internal drive 挡住回复链路；`ambient` 和其他模式才继续按 familiarity 计算背景显著度。`response_policy=observe_only` 不改变 Appraise/Experience/Memory 链路，但在 Deliberate 阶段直接沉默，不调用回复推理；Consolidate 写入的 `silence` 会标记 `reason=observe_only`，近期经历召回时跳过这类 silence 文本，只保留对应 `perception` 的实际内容。工作区同分时仍由来源优先级决定当前焦点，直接感知优先于 drive。
+`PerceptionProvider` 只负责把规范化入站事件投放为 `Attention`。`address_mode=direct` 的感知显著度固定为最高值，表示“有人正在叫她”，避免被长驻 internal drive 挡住回复链路；`ambient` 和其他模式才继续按 familiarity 计算背景显著度。`response_policy=observe_only` 不改变 Appraise/Experience/Memory 链路，但在 Deliberate 阶段直接沉默，不调用回复推理；Consolidate 写入的 `silence` 会标记 `reason=observe_only`，近期经历召回时跳过这类 silence 文本，只保留对应 `perception` 的实际内容。`AttentionController` 同分时由来源优先级决定当前 focus，直接感知优先于 drive；内部 `CognitiveAttentionLease` 在本次处理期间固定 focus，并在消费、淘汰、取消或过期时释放。
 
 ## 唯一认知循环
 

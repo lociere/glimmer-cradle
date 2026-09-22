@@ -68,7 +68,7 @@ Perception
 
 这条闭环仍保持单一认知主线：普通闲聊直接生成 `reply`；需要能力时生成 `skill_request` 并记录 `action` Moment，避免把“等待工具结果”误写成沉默。`agent_synthesis` 复用 `PersonaCompiler` 的 persona/profile/dialogue/safety prompt 主体，只把外部能力结果作为不可信观察附加给模型；`agent_plan` / `agent_synthesis` 是 Cognition 给 Kernel 编排使用的辅助用例，不重新成为独立聊天回复主线。
 
-感知进入全局工作区时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
+感知进入 Cognition `AttentionController` 时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
 
 ## 记忆与连续性
 
@@ -124,7 +124,7 @@ Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `Co
 
 外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`CognitionService.Heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `CycleController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
 
-按 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，Cognition 不拥有 Attention Lease，也不查询 Kernel attention 内部对象。它只消费规范化感知中的 `address_mode`、`response_policy`、`scene_id`、`actor_id/actor_name`。外部场景是否被关注属于 Kernel Attention Projection；情绪强度属于 Affect；认知资源档位属于 Cognitive Activity；是否愿意开口属于 Volition；Episode 和 Memory 维护属于 Maintenance Scheduler。
+按 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，Cognition 不拥有或查询 Kernel 的外部 scene/channel Attention Lease。它只消费规范化感知中的 `address_mode`、`response_policy`、`scene_id`、`actor_id/actor_name`。Cognition 自有的 `CognitiveAttentionLease` 仅在一次内部 focus 处理期间固定候选，不表达外部焦点，也不授予回复权。外部场景是否被关注属于 Kernel Attention Projection；情绪强度属于 Affect；认知资源档位属于 Cognitive Activity；是否愿意开口属于 Volition；Episode 和 Memory 维护属于 Maintenance Scheduler。
 
 ## 失败与降级语义
 

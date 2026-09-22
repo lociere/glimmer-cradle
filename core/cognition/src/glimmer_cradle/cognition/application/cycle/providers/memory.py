@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from glimmer_cradle.cognition.application.activity import CognitiveActivityController
 
 
-def _extract_query_text(item: WorkspaceItem) -> str:
+def _extract_query_text(item: Attention) -> str:
     """从工作区项抽取查询文本。"""
     content = item.content if isinstance(item.content, dict) else {}
     for key in ("text", "query", "broadcast"):
@@ -56,7 +56,7 @@ class MemoryProvider(Provider):
         self._clock = clock
         self._ids = ids
 
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         if not workspace_snapshot:
             return []  # 无焦点 → 不主动检索
 
@@ -69,8 +69,8 @@ class MemoryProvider(Provider):
         return await self._retrieve_from_assembly(query_text, focus)
 
     async def _retrieve_from_assembly(
-        self, query_text: str, focus: WorkspaceItem,
-    ) -> list[WorkspaceItem]:
+        self, query_text: str, focus: Attention,
+    ) -> list[Attention]:
         """通过 ContextAssembler 执行唯一召回路径。"""
         # 无活动策略时按 1.0 满预算。
         budget_factor = 1.0
@@ -100,10 +100,10 @@ class MemoryProvider(Provider):
         except Exception:
             return []
 
-        # 取前 max_items 条按综合分排序的 ContextItem → WorkspaceItem
+        # 取前 max_items 条按综合分排序的 ContextItem → Attention
         picks = assembled.items[: self._max_items]
         return [
-            make_item(
+            make_attention(
                 source=self.name,
                 content={
                     "text": ci.content,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem
+from glimmer_cradle.cognition.attention import Attention
 from glimmer_cradle.conversation import ConversationTurn, MomentKind, SourceDescriptor
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
@@ -23,7 +23,7 @@ class PerceptionAppraiser:
         self._logger = observability.logger("perception_appraisal")
 
     async def appraise(
-        self, sense_results: list[list[WorkspaceItem]], turn: CycleTurn
+        self, sense_results: list[list[Attention]], turn: CycleTurn
     ) -> None:
         perceptions = [
             item
@@ -37,7 +37,7 @@ class PerceptionAppraiser:
         emotion_inputs: list[str] = []
         for item in perceptions:
             content = item.content
-            trace_id = str(content.get("trace_id") or item.item_id)
+            trace_id = str(content.get("trace_id") or item.attention_id)
             scene_id = content.get("scene_id", "")
             conversation_id = content.get("conversation_id", "")
             continuity_id = content.get("continuity_id", "")

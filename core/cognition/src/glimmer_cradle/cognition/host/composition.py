@@ -20,7 +20,8 @@ from glimmer_cradle.cognition.application.context.sources import (
     RecentExperienceSource,
     RelationshipSource,
 )
-from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import (
@@ -202,7 +203,7 @@ def compose_cognition(
 
     perception_queue = ObservationQueue(max_size=100)
     perception_operations = PerceptionOperationRegistry()
-    workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity, clock=clock)
+    workspace = AttentionController(capacity=cognition_config.workspace_capacity, clock=clock)
     relationship_projection = RelationshipProjection(
         recorder=conversation_recorder,
         repository=relationship_repository,

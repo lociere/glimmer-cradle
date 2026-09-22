@@ -1,7 +1,7 @@
 """
 AffectProvider —— 情绪专家模块。
 
-每拍读 EmotionSystem.get_state() 当前情绪 → 产出 1 个 WorkspaceItem(source=affect)。
+每拍读 EmotionSystem.get_state() 当前情绪 → 产出 1 个 Attention(source=affect)。
 salience 直接用情绪 intensity ——
 - 情绪强（intensity 接近 1）→ 易胜出工作区竞争 → 影响后续 Deliberation
 - 情绪平淡（intensity 接近 0.1，本系统最低不低于 0.1）→ 易被其他 source 挤掉
@@ -15,7 +15,7 @@ salience 直接用情绪 intensity ——
 from __future__ import annotations
 
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
-from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.domain.affect.emotion import EmotionSystem
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
@@ -29,7 +29,7 @@ class AffectProvider(Provider):
         self._clock = clock
         self._ids = ids
 
-    async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
         try:
             state = self._emotion.get_state()
         except Exception:
@@ -40,7 +40,7 @@ class AffectProvider(Provider):
         if intensity <= 0.05:
             return []
 
-        return [make_item(
+        return [make_attention(
             source=self.name,
             content={
                 "emotion_type": state.get("emotion_type", ""),

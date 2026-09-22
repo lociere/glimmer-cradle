@@ -209,8 +209,8 @@ def test_arbitrate_proactive_blocked_dormant_scenario() -> None:
 
 async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> None:
     """CycleController 接 Volition 后：perception 广播 → reply intent。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
-    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.attention import AttentionController, make_attention
     from glimmer_cradle.cognition.application.cycle.providers import Provider
 
     from glimmer_cradle.cognition.application.inference.service import ReasoningResponse
@@ -218,7 +218,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
     class _Fixed(Provider):
         name = "perception"
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="perception",
                 content={"text": "你好", "address_mode": "direct",
                          "familiarity": 8, "scene_id": "s"},
@@ -230,7 +230,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
         async def request(self, req, *, tier):
             return ReasoningResponse(text="你好呀", tier_used=tier)
 
-    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
+    ws = AttentionController(capacity=3, clock=CLOCK)
     recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:
@@ -258,9 +258,10 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
 
 async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
     """无广播（providers 全空）→ 无意图。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
+    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.attention import AttentionController
 
-    ws = GlobalWorkspace(clock=CLOCK)
+    ws = AttentionController(clock=CLOCK)
     recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:
@@ -278,14 +279,14 @@ async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
 
 async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
     """drive(curiosity) 广播 → thought intent；不是 reply。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
-    from glimmer_cradle.cognition.domain.workspace import make_item
+    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.attention import AttentionController, make_attention
     from glimmer_cradle.cognition.application.cycle.providers import Provider
 
     class _Fixed(Provider):
         name = "drive"
         async def propose(self, snap):
-            return [make_item(
+            return [make_attention(
                 source="drive",
                 content={"drive": "curiosity", "level": 0.8,
                          "all_levels": {"curiosity": 0.8, "companionship": 0.2, "rest": 0.1}},
@@ -293,7 +294,7 @@ async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
                 clock=CLOCK, ids=IDS,
             )]
 
-    ws = GlobalWorkspace(capacity=3, clock=CLOCK)
+    ws = AttentionController(capacity=3, clock=CLOCK)
     recorder = build_experience_recorder(tmp_path, **recorder_args())
     await recorder.start()
     try:

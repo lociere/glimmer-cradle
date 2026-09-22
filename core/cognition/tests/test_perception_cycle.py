@@ -3,20 +3,22 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.application.cycle import (
     CycleController as _CycleController,
-    GlobalWorkspace as _GlobalWorkspace,
 )
 from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
-from glimmer_cradle.cognition.domain.workspace import make_item
+from glimmer_cradle.cognition.attention import (
+    AttentionController as _AttentionController,
+    make_attention,
+)
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from glimmer_cradle.cognition.domain.configuration import CognitionSettings
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 
 
-def GlobalWorkspace(*args, **kwargs):
+def AttentionController(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
-    return _GlobalWorkspace(*args, **kwargs)
+    return _AttentionController(*args, **kwargs)
 
 
 def PerceptionProvider(*args, **kwargs):
@@ -75,7 +77,7 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         async def request(self, req, *, tier):
             return ReasoningResponse(text="你好呀，我在", tier_used=tier)
 
-    ws = GlobalWorkspace(capacity=5)
+    ws = AttentionController(capacity=5)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
@@ -125,8 +127,8 @@ async def test_ambient_not_selected_is_successful_ingress_without_reply(tmp_path
         "perception:ambient-not-selected",
         "trace-ambient-not-selected",
     )
-    workspace = GlobalWorkspace(capacity=1)
-    await workspace.propose(make_item(
+    workspace = AttentionController(capacity=1)
+    await workspace.propose(make_attention(
         source="drive",
         content={"drive": "curiosity", "level": 1.0},
         salience=1.0,
@@ -173,8 +175,8 @@ async def test_ambient_accepted_behind_persistent_drive_reaches_terminal_success
     operation, _ = operations.accept(
         "perception:ambient-accepted", "trace-ambient-accepted"
     )
-    workspace = GlobalWorkspace(capacity=5)
-    await workspace.propose(make_item(
+    workspace = AttentionController(capacity=5)
+    await workspace.propose(make_attention(
         source="drive",
         content={"drive": "curiosity", "level": 1.0},
         salience=1.0,
@@ -214,8 +216,8 @@ async def test_direct_perception_rejected_by_workspace_is_a_real_failure(tmp_pat
     operation, _ = operations.accept(
         "perception:direct-rejected", "trace-direct-rejected"
     )
-    workspace = GlobalWorkspace(capacity=1)
-    incumbent = make_item(
+    workspace = AttentionController(capacity=1)
+    incumbent = make_attention(
         source="perception",
         content={"trace_id": "older-direct", "address_mode": "direct"},
         salience=1.0,
@@ -267,7 +269,7 @@ async def test_new_input_cancels_real_inference_operation_before_action(tmp_path
     await recorder.start()
     try:
         loop = CycleController(
-            workspace=GlobalWorkspace(capacity=5),
+            workspace=AttentionController(capacity=5),
             providers=[PerceptionProvider(queue)],
             experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
@@ -358,7 +360,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
         observability=OBSERVABILITY,
     )
 
-    ws = GlobalWorkspace(capacity=5)
+    ws = AttentionController(capacity=5)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
