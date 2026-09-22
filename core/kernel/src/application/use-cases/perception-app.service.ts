@@ -1,4 +1,8 @@
-import { ConversationDirectory } from '@glimmer-cradle/conversation';
+import {
+  ConversationDirectory,
+  InteractionController,
+  type InteractionInput,
+} from '@glimmer-cradle/conversation';
 
 import type { AudioApplicationPort, AudioStatusSnapshot } from '../../ports/runtime-capabilities.port';
 
@@ -21,6 +25,8 @@ import { IngressGateManager } from "../../application/ingress/ingress-gate-manag
 
 export class PerceptionAppService {
 
+  private readonly interactions: InteractionController<PerceptionEvent>;
+
   constructor(
 
     private conversationDirectory: ConversationDirectory,
@@ -32,7 +38,28 @@ export class PerceptionAppService {
     private attentionMgr: AttentionSessionManager,
     private ingressGate: IngressGateManager,
     private logger: KernelLoggerPort,
-  ) {}
+    private readonly digestContent?: (content: string) => string,
+  ) {
+    this.interactions = new InteractionController({
+      process: async (input: InteractionInput<PerceptionEvent>, generation, signal) => {
+        signal.throwIfAborted();
+        const channelState = await this.channelStateStore.handleInboundMessage(input.payload);
+        this.logger.debug('通道状态刷新完成', {
+          source: channelState.source,
+          message_count: channelState.messageCount,
+          last_trace_id: channelState.lastTraceId,
+        });
+        signal.throwIfAborted();
+        await this.attentionMgr.ingest(input.payload);
+        signal.throwIfAborted();
+        return {
+          turn_id: input.conversation.interaction_id,
+          generation,
+          status: 'accepted',
+        };
+      },
+    });
+  }
 
 
 
@@ -115,23 +142,20 @@ export class PerceptionAppService {
 
     try {
 
-      const channelState = await this.channelStateStore.handleInboundMessage(request);
-
-      this.logger.debug('通道状态刷新完成', {
-
-        source: channelState.source,
-
-        message_count: channelState.messageCount,
-
-        last_trace_id: channelState.lastTraceId,
-
+      const payloadDigest = event.origin.content_hash?.trim()
+        || this.digestContent?.(JSON.stringify(request))
+        || request.id;
+      const admission = await this.interactions.accept({
+        input_id: request.id,
+        deduplication_key: `${event.origin.provider_id}:${event.origin.source_event_id}`,
+        payload_digest: payloadDigest,
+        conversation: request.conversation,
+        received_at: new Date(request.timestamp).toISOString(),
+        payload: request,
       });
-
-
-
-      // 通过 AttentionSessionManager 注入，启用防抖、批处理与生成中断机制
-
-      await this.attentionMgr.ingest(request);
+      if (!admission.accepted) {
+        throw new Error(`Interaction 接纳失败: ${admission.reason ?? 'unknown'}`);
+      }
 
       gate.complete(true);
 
@@ -190,4 +214,3 @@ export class PerceptionAppService {
   }
 
 }
-

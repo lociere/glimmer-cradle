@@ -16,7 +16,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm run build && node --test tests/*.test.mjs"
+    "test": "pnpm run build && node --test tests/*.test.mjs && vitest run"
   },
   "dependencies": {
     "@glimmer-cradle/platform": "workspace:*",
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.13.3",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^0.34.6"
   }
 }

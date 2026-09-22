@@ -1,8 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import type { ActionCommand } from '../../ports/application-models';
 import type { AgentSynthesisRequest } from '../../ports/cognition-service-port';
-import { SkillActionController, type ChannelReplyPublishRequest } from './skill-action-controller';
+import {
+  createChannelReplyPublisher,
+  SkillActionController,
+  type ChannelReplyPublishRequest,
+} from './skill-action-controller';
 import { RecoveryRequiredError } from '../../domain/errors';
+import { DeliveryController, SqliteDeliveryStore } from '@glimmer-cradle/conversation';
 
 const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined };
 
@@ -263,5 +271,60 @@ describe('SkillActionController', () => {
     });
     expect(retry).toBe(first);
     expect(executeCount).toBe(1);
+  });
+});
+
+describe('Channel reply durable delivery handoff', () => {
+  it('does not republish a sent output with the same stable trace identity', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-reply-delivery-'));
+    const store = new SqliteDeliveryStore(join(root, 'delivery.db'));
+    const delivery = new DeliveryController(store, 'epoch:test', {
+      nowIso: () => '2026-01-01T00:00:00Z',
+    });
+    const publish = vi.fn(async () => undefined);
+    const publisher = createChannelReplyPublisher(
+      { publish } as never,
+      { createTraceContext: () => ({}) } as never,
+      delivery,
+      (content) => `digest:${content}`,
+    );
+    try {
+      const request = { traceId: 'trace:stable', sceneId: 'scene:test', text: '你好' };
+      await publisher(request);
+      await publisher(request);
+      expect(publish).toHaveBeenCalledOnce();
+      expect(store.load('reply:trace:stable')?.status).toBe('sent');
+    } finally {
+      store.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves an ambiguous publish failure as unknown and blocks replay', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-reply-unknown-'));
+    const store = new SqliteDeliveryStore(join(root, 'delivery.db'));
+    const delivery = new DeliveryController(store, 'epoch:test', {
+      nowIso: () => '2026-01-01T00:00:00Z',
+    });
+    const publish = vi.fn(async () => { throw new Error('surface disconnected'); });
+    const publisher = createChannelReplyPublisher(
+      { publish } as never,
+      { createTraceContext: () => ({}) } as never,
+      delivery,
+      (content) => `digest:${content}`,
+    );
+    const request = { traceId: 'trace:unknown', sceneId: 'scene:test', text: '你好' };
+    try {
+      await expect(publisher(request)).rejects.toThrow('surface disconnected');
+      expect(store.load('reply:trace:unknown')).toMatchObject({
+        status: 'unknown',
+        terminal_reason: 'event_publish_failed:surface disconnected',
+      });
+      await expect(publisher(request)).rejects.toBeInstanceOf(RecoveryRequiredError);
+      expect(publish).toHaveBeenCalledOnce();
+    } finally {
+      store.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

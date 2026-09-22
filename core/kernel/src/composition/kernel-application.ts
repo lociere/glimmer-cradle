@@ -35,7 +35,12 @@ import { AvatarController } from '../adapters/avatar/avatar-controller';
 import { AvatarRuntimeAdapter } from '../adapters/avatar/avatar-runtime-adapter';
 import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gateway';
 import { NodeStableIdentityAdapter } from '../adapters/identity/node-stable-identity-adapter';
-import { ConversationDirectory, SqliteBindingStore } from '@glimmer-cradle/conversation';
+import {
+  ConversationDirectory,
+  DeliveryController,
+  SqliteBindingStore,
+  SqliteDeliveryStore,
+} from '@glimmer-cradle/conversation';
 import { ChannelStateStore } from '../application/channel/channel-state-store';
 import { AttentionLeaseStore } from '../application/attention/attention-lease-store';
 import { AttentionSessionManager } from '../application/attention/attention-session-manager';
@@ -196,8 +201,11 @@ function createOperationalRuntimePlan(options: {
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
   const surface = new ControlSurfaceGateway(projection, avatar, audio, new FileAssetStore());
+  const stableIdentity = new NodeStableIdentityAdapter();
   const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));
-  const conversations = new ConversationDirectory(new NodeStableIdentityAdapter(), bindingStore);
+  const deliveryStore = new SqliteDeliveryStore(resolveStatePath('conversation/delivery.db'));
+  const delivery = new DeliveryController(deliveryStore, stableIdentity.newId());
+  const conversations = new ConversationDirectory(stableIdentity, bindingStore);
   const channelState = new ChannelStateStore(observability.logger('channel-state'));
   const attentionLeases = new AttentionLeaseStore(clock);
   const actionStream = new ActionStreamManager(config.character.inference.action_stream, eventBus, observability);
@@ -223,10 +231,22 @@ function createOperationalRuntimePlan(options: {
   );
   const action = new SkillActionController(
     planning, (request, signal) => cognition.requestAgentSynthesis(request, signal),
-    createChannelReplyPublisher(eventBus, observability), observability.logger('skill-action-controller'),
+    createChannelReplyPublisher(
+      eventBus,
+      observability,
+      delivery,
+      (content) => stableIdentity.digest([content]),
+    ),
+    observability.logger('skill-action-controller'),
   );
   const perception = new PerceptionAppService(
-    conversations, audio, channelState, attention, ingress, observability.logger('perception-gateway'),
+    conversations,
+    audio,
+    channelState,
+    attention,
+    ingress,
+    observability.logger('perception-gateway'),
+    (content) => stableIdentity.digest([content]),
   );
   const availability = createSkillAvailability(product);
   const skillPlanePolicy = new SkillPlanePolicy();
@@ -251,7 +271,7 @@ function createOperationalRuntimePlan(options: {
     logger: observability.logger('application-runtime'), skillProviders: providers,
     providerReadiness: () => mcpProvider.getReadinessSnapshots(), extensionHostService: extensionHost,
     skillCatalog: catalog, skillPlanning: planning, skillAction: action, perception,
-    ownedResources: [bindingStore],
+    ownedResources: [bindingStore, deliveryStore],
   });
   const configApplication = new ConfigApplicationService({ configManager: ConfigManager.instance, cognition: cognitionAdapter });
   const presentationAdapter = new KernelPresentationAdapter(

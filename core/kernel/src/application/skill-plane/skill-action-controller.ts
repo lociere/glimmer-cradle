@@ -13,6 +13,7 @@ import type { KernelEventBusPort } from '../../ports/event-bus.port';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { RecoveryRequiredError } from '../../domain/errors';
+import type { DeliveryController } from '@glimmer-cradle/conversation';
 
 export type AgentSynthesisRequester = (
   request: AgentSynthesisRequest,
@@ -288,16 +289,51 @@ export class SkillActionController {
 export function createChannelReplyPublisher(
   eventBus: KernelEventBusPort,
   observability: KernelObservabilityPort,
+  delivery?: DeliveryController,
+  digestContent?: (content: string) => string,
 ): ChannelReplyPublisher {
   return async (request) => {
     const messages = normalizeReplyMessages(request.text, request.messages);
-    await eventBus.publish(new ChannelReplyEvent({
-      trace_id: request.traceId,
+    const outputId = `reply:${request.traceId}`;
+    const serializedContent = JSON.stringify({
       text: request.text,
       messages,
       emotion_state: request.emotionState,
-      target_channel: request.sceneId,
-    }, observability.createTraceContext(request.traceId)));
+    });
+    if (delivery && !digestContent) {
+      throw new Error('Delivery publisher 缺少 content digest capability');
+    }
+    const output = delivery?.begin({
+      output_id: outputId,
+      turn_id: request.traceId,
+      destination_id: request.sceneId,
+      content_digest: digestContent!(serializedContent),
+    });
+    if (output?.status === 'unknown') {
+      throw new RecoveryRequiredError(outputId);
+    }
+    if (output && ['sent', 'delivered', 'playing', 'completed'].includes(output.status)) return;
+    if (output && ['interrupted', 'failed'].includes(output.status)) {
+      throw new RecoveryRequiredError(outputId);
+    }
+    if (output?.status === 'queued') {
+      delivery?.unknown(outputId, 'process_restarted_after_queue');
+      throw new RecoveryRequiredError(outputId);
+    }
+    delivery?.queue(outputId);
+    try {
+      await eventBus.publish(new ChannelReplyEvent({
+        trace_id: request.traceId,
+        text: request.text,
+        messages,
+        emotion_state: request.emotionState,
+        target_channel: request.sceneId,
+      }, observability.createTraceContext(request.traceId)));
+      delivery?.sent(outputId);
+    } catch (error) {
+      if (delivery) delivery.unknown(outputId, `event_publish_failed:${normalizeError(error)}`);
+      throw error;
+    }
   };
 }
 

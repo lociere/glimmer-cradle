@@ -245,6 +245,17 @@ binding-store-port}.ts`，并以 `migrations/001-binding.sql`、`SqliteBindingSt
 Conversation tarball 同时包含编译后的 adapter/API 与唯一 SQL migration。interaction/delivery 尚未实现，
 本切片不扩大阶段完成声明。
 
+Interaction/Delivery 实施切片新增目标清单中的全部 TS owner 文件、`migrations/002-delivery.sql` 与三份目标
+测试入口。Interaction 已接入 Kernel `PerceptionAppService`，按 provider event identity/content digest 去重，
+同 route 新输入使旧 generation 失效；Delivery 已接入普通与工具回复唯一 publisher，以进程 authority epoch、
+destination generation 和稳定 trace output identity 防止晚到/重放。EventBus 发布成功只形成 sent；异常形成
+可恢复 unknown，播放只按 receipt 推进实际 heard range。Conversation 当前 11 项与 Kernel 相关 17 项定向
+测试 PASS；Kernel 首轮全量发现 Application 直接导入 `node:crypto` 的架构门违规，已改为 composition
+注入 Platform identity digest。修复后 Kernel 全量 204 项 PASS（另 7 项跳过）。Surface wire 的 delivery
+receipt/播放回执尚未接线，跨重启 ingress 去重仍需消费 Python 持久 Turn 确认。因此阶段 4 继续进行，
+不宣称 interaction/delivery 完成。Conversation tarball 已包含 Interaction/Delivery 编译产物与两份 SQL
+migration；docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

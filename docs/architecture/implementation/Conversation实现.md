@@ -38,6 +38,21 @@ Turn；能力请求保持 running，直到 ToolCall/ToolResult/Reply 持久并 f
 只保存一拍内的 perception、ActionPlan、intent 和 arbitration，并引用持久 Turn；模型推理 Step 在阶段 5
 留在 Cognition Loop，不再把 Turn 和 Step 当同一种状态。
 
+## Interaction 与 Delivery
+
+TypeScript `InteractionController` 以 provider event 去重键和内容摘要接纳输入；同键同内容合并为一次处理，
+同键异内容拒绝，失败接纳可重试。同一 conversation/thread 的新输入先推进 generation 并取消旧 signal，
+忽略取消的下游若仍返回结果，也只会形成 `interrupted/stale_generation`，不能覆盖新 Turn。Kernel
+`PerceptionAppService` 是当前真实入口消费者；摘要算法由 composition 注入 `StableIdentity`，Application
+层不直接依赖 Node crypto。
+
+`DeliveryController` 与 `SqliteDeliveryStore` 持有输出 authority epoch、destination generation、状态转换、
+回执去重和实际 `heard_through_ms`。Kernel 普通回复和工具合成回复共用该入口：EventBus 调用前先 durable
+queue，成功后只标记 sent，异常或崩溃窗口保留 unknown 并阻止自动重放；权威回执可把 unknown 对账为
+delivered/playing/completed。新 Host epoch 会先 fence 旧 epoch 的所有 active output；中断或新 generation
+之后到达的旧回执不得改变状态。当前 Surface wire 尚未携带 delivery receipt，真实 UI/音频回执接线仍是
+阶段 4 与阶段 11/12 的剩余工作，不能把 EventBus handler 返回当成 delivered 或 heard。
+
 ## Canonical Log 与 Experience
 
 `log/ledger.py` 是唯一 writer：月度 SQLite pack 只追加 Moment，`catalog.db` 维护全局 position 和 pack 范围，
@@ -91,4 +106,5 @@ pnpm build
 
 高风险变化还要覆盖单写者冲突、重启 position、旧 v4/v5 pack、catalog 重建、损坏读取、History 重建、
 权限域漂移、多 thread 隔离、v3→v4 无损迁移、Turn 重启恢复/非法转换/重复接纳、分页 cursor、
-transient 不落盘、工具结果恢复和停机 flush。路径迁移必须额外执行备份恢复。
+Interaction 去重/冲突/晚到 generation、Delivery epoch/unknown/回执冲突/播放范围、transient 不落盘、
+工具结果恢复和停机 flush。路径迁移必须额外执行备份恢复。
