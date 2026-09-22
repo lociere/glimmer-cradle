@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from glimmer_cradle.cognition.application.activity import CognitiveActivityController
+from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
 from glimmer_cradle.cognition.context import ContextAssembler
@@ -37,10 +37,12 @@ from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
+    resolve_cognition_state_db_path,
     resolve_conversation_db_path,
     resolve_episode_projection_path,
     resolve_experience_dir,
 )
+from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
@@ -77,6 +79,7 @@ class CognitionComponents:
     memory_substrate: MemorySubstrate
     knowledge_base: KnowledgeBase
     activity_controller: CognitiveActivityController
+    state_store: SqliteStateStore
     cognition_database: CognitionDatabase
     conversation_controller: ConversationController
     turn_controller: TurnController
@@ -113,6 +116,7 @@ def compose_cognition(
         observability=observability,
     )
     cognition_database = CognitionDatabase()
+    state_store = SqliteStateStore(resolve_cognition_state_db_path())
     memory_repository = MemoryRepository(cognition_database)
     knowledge_repository = KnowledgeRepository(cognition_database)
     vector_repository = VectorRepository(cognition_database)
@@ -162,6 +166,7 @@ def compose_cognition(
         experience_recorder=conversation_recorder,
         clock=clock,
         observability=observability,
+        state_store=state_store,
         affect_activation_provider=lambda: float(
             self_entity.emotion_system.get_state().get("intensity", 0.0)
         ),
@@ -307,6 +312,7 @@ def compose_cognition(
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,
         activity_controller=activity_controller,
+        state_store=state_store,
         cognition_database=cognition_database,
         conversation_controller=conversation_controller,
         turn_controller=turn_controller,

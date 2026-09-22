@@ -21,7 +21,7 @@ from google.protobuf.json_format import MessageToDict, ParseDict
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
-from glimmer_cradle.cognition.application.activity import CognitiveActivityController
+from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
 from glimmer_cradle.cognition.application.cycle import CycleController

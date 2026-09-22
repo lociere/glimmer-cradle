@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Memory/State 等仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Memory/Knowledge 等仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -329,6 +329,13 @@ Inference 切片把旧 `application/inference/service.py` 与 `ports/inference.p
 Host 与 provider adapters 只消费新公共面；文本/多模态请求和输出不含供应商 payload，模型档位禁止、cloud
 失败后 local fallback 与真实 unavailable 语义保持。Realtime session 以单调 event sequence 和 generation
 约束取消，terminal 后拒绝晚到帧；具体 realtime provider 尚未接入，因此不宣称完整低延迟音频链完成。
+
+State 切片把旧 `domain/affect`、`domain/activity` 与 `application/activity` 收束进目标
+`state/{cognitive_state,decay,state_controller,state_store}.py`。情绪衰减与活动档位转换成为不读系统时间的纯策略，
+现行 Emotion/Cognitive Activity 消费者只使用新公共面；活动恢复继续合并 Conversation Log 真实活动时间线。
+新增 `migrations/001-state.sql` 与 `adapters/persistence/sqlite_state_store.py`，Host 在活动控制器启动前连接独立
+state DB，按 expected revision 乐观写入，并在正常停机前刷新、随后关闭。当前持久化覆盖 Cognitive Activity；
+Emotion、Persona revision 与其他 State 子域将在统一 state controller 后续切片纳入同一版本模型。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

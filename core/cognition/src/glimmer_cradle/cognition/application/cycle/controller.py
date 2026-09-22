@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 from typing import Callable, Sequence
 
-from glimmer_cradle.cognition.application.activity import CognitiveActivityController
+from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.application.cycle.action_emitter import ActionEmitter
 from glimmer_cradle.cognition.application.cycle.appraisal import PerceptionAppraiser
 from glimmer_cradle.cognition.application.cycle.continuity import CycleContinuity

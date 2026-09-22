@@ -15,7 +15,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 职责 | 当前事实源 | 不承担 |
 |---|---|---|
 | 身份与人格 | `domain/{identity,persona}/`、`configs/characters/<character-id>/{persona,profile,dialogue}.yaml` | 平台账号、窗口状态、Extension 生命周期 |
-| 情绪与觉醒 | `domain/affect/` | UI 动画本地推断 |
+| 情绪、活动态与觉醒 | `state/`、`domain/identity/` | UI 动画本地推断 |
 | 经历之流 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` | 普通日志或聊天界面状态替代经历 |
 | 记忆与知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` | Kernel 记忆副本或 Extension 私写记忆 |
 | 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
@@ -118,7 +118,7 @@ Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `Co
 
 ## 情感激活、认知活动、维护与外部注意力
 
-`domain/affect/` 维护 Emotion 与连续的 affect activation；`domain/activity/` 维护 `engaged / ambient / quiescent` 三档 `CognitiveActivityState` 和对应资源策略。直接互动进入 `engaged`，背景观察最多进入 `ambient`，无活动时受最短驻留和 affect activation hold 约束逐级衰减。自动迁移只进入 metrics、结构化日志和 span，不写 Experience，也没有 `arousal` Moment。
+`state/` 维护 Emotion、连续 affect activation、`engaged / ambient / quiescent` 三档 `CognitiveActivityState` 和对应资源策略。直接互动进入 `engaged`，背景观察最多进入 `ambient`，无活动时受最短驻留和 affect activation hold 约束逐级衰减。活动快照以 expected revision 写入 Cognition state DB，冷启动与 Conversation Log 活动投影合并；自动迁移只进入 state store、metrics、结构化日志和 span，不写 Experience，也没有 `arousal` Moment。
 
 `application/maintenance/` 的 `MaintenanceScheduler` 拥有独立任务和间隔，串行调用 Episode/Relationship projection 与 `ConsolidationCoordinator`。终结 Moment 提供低延迟唤醒，sealed Episode 提供持久可恢复工作项，周期扫描提供补偿；`quiescent` 只提供一次强制封口提示。不存在 Dreaming 活动态，也不把维护运行解释为角色正在做梦。Global Workspace 广播同样是易失注意力过程，当前通用链路不会把它写成 Thought。
 

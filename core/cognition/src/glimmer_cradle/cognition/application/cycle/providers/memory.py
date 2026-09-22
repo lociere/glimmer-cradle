@@ -21,7 +21,7 @@ from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 if TYPE_CHECKING:
-    from glimmer_cradle.cognition.application.activity import CognitiveActivityController
+    from glimmer_cradle.cognition.state import CognitiveActivityController
 
 
 def _extract_query_text(item: Attention) -> str:

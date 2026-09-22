@@ -106,7 +106,8 @@ class CognitionHost:
             await start_metrics(resolve_metrics_dir())
             await start_tracer(resolve_traces_dir())
 
-            # 认知活动控制器先于认知循环启动，保证首拍可读取完整 policy。
+            # 状态库先于认知活动恢复，保证首拍可读取持久状态与完整 policy。
+            await components.state_store.connect()
             activity_controller = components.activity_controller
             activity_controller.on_transition(self._request_state_sync)
             await activity_controller.start()
@@ -233,6 +234,11 @@ class CognitionHost:
                 await components.cognition_database.close()
             except Exception as e:
                 logger.error(f"Error closing cognition database: {e}")
+
+            try:
+                await components.state_store.close()
+            except Exception as e:
+                logger.error(f"Error closing cognition state store: {e}")
 
             try:
                 await components.kernel_client.stop()

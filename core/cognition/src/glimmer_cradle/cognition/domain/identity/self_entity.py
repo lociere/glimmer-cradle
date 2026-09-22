@@ -7,7 +7,7 @@ from glimmer_cradle.cognition.domain.configuration import (
     InferenceSettings,
     SafetySettings,
 )
-from glimmer_cradle.cognition.domain.affect.emotion import EmotionSystem, EmotionType
+from glimmer_cradle.cognition.state import EmotionSystem, EmotionType
 from glimmer_cradle.cognition.persona import PersonaCompiler
 from glimmer_cradle.cognition.domain.exceptions import ConfigException
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort

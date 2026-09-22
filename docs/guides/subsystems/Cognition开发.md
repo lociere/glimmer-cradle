@@ -17,7 +17,7 @@
 | 推理/模型 | `inference/`、`adapters/inference/` |
 | 记忆/知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` |
 | 经历 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` |
-| 身份/人格/情绪/觉醒 | `domain/identity/`、`persona/`、`domain/affect/` |
+| 身份/人格/情绪/觉醒 | `domain/identity/`、`persona/`、`state/` |
 | Kernel–Cognition 契约投影 | `contracts/generated/python/glimmer/`（只在 Adapter 使用） |
 
 ## 标准步骤

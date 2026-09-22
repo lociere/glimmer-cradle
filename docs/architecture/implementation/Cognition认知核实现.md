@@ -43,12 +43,12 @@ core/cognition/
 ├── src/glimmer_cradle/cognition/
 │   ├── __init__.py
 │   ├── domain/                         # 心智模型、不变量与内部模块 API
-│   │   ├── activity/ affect/ conversation/
-│   │   ├── experience/ identity/ persona/ volition/
+│   │   ├── conversation/ experience/ identity/ volition/
 │   │   └── configuration.py, memory.py
 │   ├── attention/           # 候选、竞争、内部 focus lease
+│   ├── state/               # 情绪/活动状态、纯衰减、控制器与持久化 Port
 │   ├── application/                    # 认知循环、查询、维护与本地事务编排
-│   │   ├── activity/ context/ conversation/ cycle/
+│   │   ├── context/ conversation/ cycle/
 │   │   ├── experience/ maintenance/ memory/
 │   │   └── *_use_case.py
 │   ├── inference/           # 通用请求/事件、模型 Port、选择/故障与 realtime session
@@ -129,7 +129,7 @@ Kernel CognitionService request
 
 `AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaCompiler.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
-`application/activity/` 是认知资源调度的唯一 owner；状态模型与纯转换位于 `domain/activity/`。`projection.py` 只从真实 Perception、Reply、Action 重建最近活动；`transition.py` 纯计算 `engaged / ambient / quiescent` 迁移；`controller.py` 只写 activity metrics、log、span 和 `CognitiveActivitySnapshot`。Affect activation 只是衰减 hold 输入，外部 Attention Lease 不参与活动态计算，任何自动迁移都不写 Experience。
+`state/` 是情绪与认知资源状态的唯一 owner。`cognitive_state.py` 定义 affect/activity 状态和资源策略，`decay.py` 纯计算情绪衰减与 `engaged / ambient / quiescent` 迁移，`state_controller.py` 从真实 Perception、Reply、Action 重建最近活动并驱动生命周期。`SqliteStateStore` 使用 `001-state.sql` 和 expected revision 持久化活动快照；冷启动把快照与 Conversation Log 的更新事实合并。控制器不把自动迁移写成 Experience；Kernel 外部 Attention Lease 也不参与活动态计算。
 
 `application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。Conversation `ConversationRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`CycleController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
 
