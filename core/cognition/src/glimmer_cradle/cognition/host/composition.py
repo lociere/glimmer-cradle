@@ -21,7 +21,7 @@ from glimmer_cradle.cognition.application.context.sources import (
     RelationshipSource,
 )
 from glimmer_cradle.cognition.application.cycle import CycleController, GlobalWorkspace
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import (
     AffectProvider,
@@ -200,7 +200,7 @@ def compose_cognition(
     kernel_client = KernelGrpcClient(generation, registration_nonce, registration_secret)
     outbound_adapter = KernelEventOutboundAdapter(kernel_client)
 
-    perception_queue = PerceptionEventQueue(max_size=100)
+    perception_queue = ObservationQueue(max_size=100)
     perception_operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=cognition_config.workspace_capacity, clock=clock)
     relationship_projection = RelationshipProjection(

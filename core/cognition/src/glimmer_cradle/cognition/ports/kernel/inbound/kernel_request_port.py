@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.ports.kernel.models import (
 class KernelRequestPort(ABC):
     """定义 knowledge、agent planning/synthesis 的请求契约。
 
-    持续感知通过 PerceptionEventQueue 进入 CycleController，不混入请求/响应用例。
+    持续感知通过规范化 ObservationQueue 进入 CycleController，不混入请求/响应用例。
     """
 
     @abstractmethod

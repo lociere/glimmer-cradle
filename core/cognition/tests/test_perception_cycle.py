@@ -5,7 +5,7 @@ from glimmer_cradle.cognition.application.cycle import (
     CycleController as _CycleController,
     GlobalWorkspace as _GlobalWorkspace,
 )
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.workspace import make_item
@@ -55,8 +55,8 @@ def test_cognition_config_frozen() -> None:
 
 async def test_end_to_end_perception_to_intent(tmp_path) -> None:
     """主路径：入队 → CycleController tick → 产出 reply intent。"""
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="napcat:group:1",
         conversation_id="conversation:napcat:group:1",
         continuity_id="continuity:user:1",
@@ -106,8 +106,8 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
 
 async def test_ambient_not_selected_is_successful_ingress_without_reply(tmp_path) -> None:
     """正常的环境观察可以不进入广播，但不能反馈为系统失败并触发 Kernel 熔断。"""
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="napcat:group:1",
         conversation_id="conversation:napcat:group:1",
         continuity_id="continuity:napcat:group:1",
@@ -155,8 +155,8 @@ async def test_ambient_not_selected_is_successful_ingress_without_reply(tmp_path
 
 async def test_ambient_accepted_behind_persistent_drive_reaches_terminal_success(tmp_path) -> None:
     """背景感知写入经历后即完成，不因等待未来广播而永久占住 Kernel 入站。"""
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="napcat:group:1",
         conversation_id="conversation:napcat:group:1",
         continuity_id="continuity:napcat:group:1",
@@ -202,8 +202,8 @@ async def test_ambient_accepted_behind_persistent_drive_reaches_terminal_success
 
 async def test_direct_perception_rejected_by_workspace_is_a_real_failure(tmp_path) -> None:
     """direct 是互动义务；若连工作区都无法接纳，必须报告真实失败。"""
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="scene-1", conversation_id="conversation-1",
         continuity_id="continuity-1", thread_id="main",
         recall_scope="conversation_private", disclosure_scope="conversation_private",
@@ -255,8 +255,8 @@ async def test_new_input_cancels_real_inference_operation_before_action(tmp_path
     async def _sink(command: dict) -> None:
         emitted.append(command)
 
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="scene-1", conversation_id="conversation-1", continuity_id="continuity-1",
         thread_id="main", recall_scope="conversation_private", disclosure_scope="conversation_private",
         address_mode="direct", familiarity=10, text="first", trace_id="trace-cancel-real",
@@ -295,7 +295,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     """端到端冒烟：真实 ReasoningService 链路 → Act → action_sink 收到 ActionCommand。
 
     验证生产装配（非 fake）：
-      PerceptionEventQueue → PerceptionProvider → 广播 → Deliberate
+      ObservationQueue → PerceptionProvider → 广播 → Deliberate
         （persona_injector 组 prompt → ReasoningService(cloud) → boundary 校验）
         → _pending_reply → Intend(reply) → Act → action_sink
     action_sink 收到的 dict 形状即内核 ACTION_COMMAND handler 读取的契约。
@@ -336,8 +336,8 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     async def _sink(cmd: dict) -> None:
         emitted.append(cmd)
 
-    queue = PerceptionEventQueue(max_size=10)
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue(max_size=10)
+    queue.put(Observation(
         scene_id="napcat:group:42",
         conversation_id="conversation:napcat:group:42",
         continuity_id="continuity:user:7",
@@ -395,13 +395,13 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     assert cmd["payload"]["text"] == "今天挺好的，谢谢你问我。"  # 真实生成文本
     assert cmd["trace_id"] == "trace-smoke-1"     # 原 perception trace 贯通（下游路由键）
 def test_perception_queue_reports_the_operation_dropped_by_capacity() -> None:
-    queue = PerceptionEventQueue(max_size=1)
-    first = PerceptionEntry(
+    queue = ObservationQueue(max_size=1)
+    first = Observation(
         scene_id="scene", conversation_id="conversation", continuity_id="continuity",
         thread_id="main", recall_scope="private", disclosure_scope="private",
         address_mode="direct", familiarity=10, text="first", trace_id="trace-first",
     )
-    second = PerceptionEntry(
+    second = Observation(
         scene_id="scene", conversation_id="conversation", continuity_id="continuity",
         thread_id="main", recall_scope="private", disclosure_scope="private",
         address_mode="direct", familiarity=10, text="second", trace_id="trace-second",

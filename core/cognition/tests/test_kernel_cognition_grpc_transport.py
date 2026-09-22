@@ -10,7 +10,7 @@ from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle import CycleController as _CycleController
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEventQueue
+from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
@@ -95,6 +95,18 @@ def _metadata(generation: str, trace_id: str, key: str = ""):
         correlation_id="correlation-1",
         generation=generation,
         idempotency_key=key,
+    )
+
+
+def _conversation(interaction_id: str) -> cognition_pb.ConversationContext:
+    return cognition_pb.ConversationContext(
+        scene_id="scene-1",
+        conversation_id="conversation-1",
+        continuity_id="continuity-1",
+        thread_id="main",
+        interaction_id=interaction_id,
+        recall_scope="conversation_private",
+        disclosure_scope="conversation_private",
     )
 
 
@@ -228,6 +240,7 @@ async def test_queue_capacity_drop_closes_the_accepted_perception_operation() ->
             await submit(cognition_pb.SubmitPerceptionRequest(
                 call=_metadata("generation-capacity", trace_id, f"operation:{trace_id}"),
                 perception_id=trace_id,
+                conversation=_conversation(trace_id),
                 content=cognition_pb.PerceptionContent(text=trace_id),
             ), timeout=1)
         dropped = await status(cognition_pb.GetPerceptionOperationRequest(
@@ -240,6 +253,23 @@ async def test_queue_capacity_drop_closes_the_accepted_perception_operation() ->
     finally:
         await channel.close()
         await host.stop()
+
+
+@pytest.mark.asyncio
+async def test_unbound_observation_is_rejected_as_invalid_request(service) -> None:
+    _host, channel, _queue, _stopped = service
+    submit = _call(
+        channel,
+        "SubmitPerception",
+        cognition_pb.SubmitPerceptionRequest,
+        cognition_pb.SubmitPerceptionResponse,
+    )
+    with pytest.raises(grpc.aio.AioRpcError) as caught:
+        await submit(cognition_pb.SubmitPerceptionRequest(
+            call=_metadata("generation-1", "invalid-observation", "invalid-observation"),
+            content=cognition_pb.PerceptionContent(text="missing context"),
+        ), timeout=1)
+    assert caught.value.code() is grpc.StatusCode.INVALID_ARGUMENT
 
 
 @pytest.mark.asyncio
@@ -257,7 +287,7 @@ async def test_deadline_and_perception_cancellation_reach_terminal_state(service
     await submit(cognition_pb.SubmitPerceptionRequest(
         call=_metadata("generation-1", "cancel-trace", "perception-cancel"),
         address_mode=cognition_pb.ADDRESS_MODE_DIRECT,
-        conversation=cognition_pb.ConversationContext(scene_id="scene-1"),
+        conversation=_conversation("cancel-trace"),
         content=cognition_pb.PerceptionContent(text="cancel me"),
     ), timeout=1)
     result = await cancel(cognition_pb.CancelPerceptionRequest(
@@ -285,7 +315,7 @@ async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> N
             started.set()
             await asyncio.Future()
 
-    queue = PerceptionEventQueue(max_size=10)
+    queue = ObservationQueue(max_size=10)
     operations = PerceptionOperationRegistry()
     workspace = GlobalWorkspace(capacity=5)
     recorder = build_experience_recorder(tmp_path)
@@ -350,11 +380,7 @@ def _perception_request(generation: str, trace_id: str, operation_id: str, text:
         familiarity=10,
         address_mode=cognition_pb.ADDRESS_MODE_DIRECT,
         response_policy=cognition_pb.RESPONSE_POLICY_REPLY_ALLOWED,
-        conversation=cognition_pb.ConversationContext(
-            scene_id="scene-1", conversation_id="conversation-1", continuity_id="continuity-1",
-            thread_id="main", interaction_id=trace_id, recall_scope="conversation_private",
-            disclosure_scope="conversation_private",
-        ),
+        conversation=_conversation(trace_id),
         content=cognition_pb.PerceptionContent(text=text),
     )
 

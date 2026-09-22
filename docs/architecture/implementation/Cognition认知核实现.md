@@ -91,7 +91,7 @@ Kernel CognitionService request
   -> adapters/kernel/grpc_transport.py
   -> adapters/kernel/inbound_adapter.py
   -> ports/kernel/inbound/kernel_request_port.py
-  -> PerceptionEventQueue
+  -> ObservationNormalizer / ObservationQueue
   -> CycleController
 ```
 
@@ -113,6 +113,11 @@ Kernel CognitionService request
 6. volition/arbiter；
 7. experience recorder；
 8. outbound kernel event port。
+
+跨进程感知在 gRPC Adapter 只解释 wire enum/DTO，随后必须经 `perception/observation_normalizer.py`
+校验 canonical Conversation identity、trace/interaction、payload digest、scope 与策略字段，再进入有界
+`ObservationQueue`。队列满时明确返回被淘汰 Observation 以关闭对应 operation；非法未绑定输入返回
+`INVALID_REQUEST`，不能以内存默认值进入 Cycle。旧 `application/cycle/perception_queue.py` 已删除。
 
 单拍临时状态全部进入 `application/cycle/turn.py` 的 `CycleTurn`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。
 

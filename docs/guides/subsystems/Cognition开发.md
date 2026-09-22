@@ -53,7 +53,7 @@
 
 1. Kernel 是否把感知发到 Cognition。
 2. `adapters/kernel/` 是否通过 generation 校验并完成 DTO mapping。
-3. `PerceptionEventQueue` 是否收到。
+3. `ObservationNormalizer` 是否接受，`ObservationQueue` 是否收到。
 4. `CycleController` 是否 tick。
 5. context assembly 是否产生可用上下文。
 6. ReasoningService/LLMEngine 是否返回。

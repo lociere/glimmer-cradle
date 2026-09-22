@@ -1,7 +1,11 @@
-"""PerceptionProvider + PerceptionEventQueue 测试（阶段 5.6c）。"""
+"""PerceptionProvider + ObservationQueue 测试（阶段 5.6c）。"""
 import pytest
 
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.perception import (
+    Observation,
+    ObservationNormalizer,
+    ObservationQueue,
+)
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
 from glimmer_cradle.cognition.application.cycle.providers.perception import salience_for_perception
 from tests.support import CLOCK, IDS
@@ -9,8 +13,9 @@ from tests.support import CLOCK, IDS
 
 def _entry(*, address_mode="direct", familiarity=5, text="hi",
            scene_id="napcat:group:1", trace_id="t1", actor_id=None,
-           actor_name=None, response_policy="reply_allowed") -> PerceptionEntry:
-    return PerceptionEntry(
+           actor_name=None, response_policy="reply_allowed",
+           interaction_id="interaction:1", payload_digest="sha256:payload") -> Observation:
+    return Observation(
         scene_id=scene_id,
         conversation_id=f"conversation:{scene_id}",
         continuity_id="continuity:test-user",
@@ -24,13 +29,15 @@ def _entry(*, address_mode="direct", familiarity=5, text="hi",
         trace_id=trace_id,
         actor_id=actor_id,
         actor_name=actor_name,
+        interaction_id=interaction_id,
+        payload_digest=payload_digest,
     )
 
 
 # ═══════════════════════════ Queue 行为 ═══════════════════════════════════
 
 def test_queue_put_and_drain_fifo() -> None:
-    q = PerceptionEventQueue(max_size=10)
+    q = ObservationQueue(max_size=10)
     q.put(_entry(text="A"))
     q.put(_entry(text="B"))
     q.put(_entry(text="C"))
@@ -40,7 +47,7 @@ def test_queue_put_and_drain_fifo() -> None:
 
 
 def test_queue_drain_partial() -> None:
-    q = PerceptionEventQueue(max_size=10)
+    q = ObservationQueue(max_size=10)
     for i in range(5):
         q.put(_entry(text=f"e{i}"))
     drained = q.drain(max_items=2)
@@ -52,7 +59,7 @@ def test_queue_drain_partial() -> None:
 
 
 def test_queue_max_size_drops_oldest() -> None:
-    q = PerceptionEventQueue(max_size=3)
+    q = ObservationQueue(max_size=3)
     for i in range(5):
         q.put(_entry(text=f"e{i}"))
     assert q.size() == 3
@@ -62,21 +69,35 @@ def test_queue_max_size_drops_oldest() -> None:
 
 
 def test_queue_drain_empty_returns_empty() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     assert q.drain() == []
 
 
 def test_queue_invalid_max_size() -> None:
     with pytest.raises(ValueError):
-        PerceptionEventQueue(max_size=0)
+        ObservationQueue(max_size=0)
 
 
 def test_queue_clear() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     q.put(_entry())
     q.put(_entry())
     q.clear()
     assert q.size() == 0
+
+
+def test_observation_normalizer_clamps_familiarity_and_trims_identity() -> None:
+    normalized = ObservationNormalizer().normalize(
+        _entry(familiarity=99, text="  hello  ", actor_name=" Alice ")
+    )
+    assert normalized.familiarity == 10
+    assert normalized.text == "hello"
+    assert normalized.actor_name == "Alice"
+
+
+def test_observation_normalizer_rejects_unbound_payload() -> None:
+    with pytest.raises(ValueError, match="payload_digest"):
+        ObservationNormalizer().normalize(_entry(payload_digest=" "))
 
 
 # ═══════════════════════════ salience 公式 ═══════════════════════════════
@@ -115,13 +136,13 @@ def test_salience_floor_at_point_one() -> None:
 # ═══════════════════════════ Provider 行为 ═══════════════════════════════
 
 async def test_provider_empty_queue_returns_empty() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     assert await p.propose([]) == []
 
 
 async def test_provider_drains_and_proposes() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     q.put(_entry(text="你好", address_mode="direct", familiarity=8))
     q.put(_entry(text="哈喽", address_mode="ambient", familiarity=2))
     p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
@@ -138,7 +159,7 @@ async def test_provider_drains_and_proposes() -> None:
 
 
 async def test_provider_carries_response_policy() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     q.put(_entry(address_mode="ambient", response_policy="observe_only"))
     p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
@@ -146,7 +167,7 @@ async def test_provider_carries_response_policy() -> None:
 
 
 async def test_provider_max_items_per_tick_caps_drain() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     for i in range(10):
         q.put(_entry(text=f"e{i}"))
     p = PerceptionProvider(q, max_items_per_tick=3, clock=CLOCK, ids=IDS)
@@ -156,7 +177,7 @@ async def test_provider_max_items_per_tick_caps_drain() -> None:
 
 
 async def test_provider_carries_actor_info_when_present() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     q.put(_entry(actor_id="napcat:user:U_1", actor_name="Alice"))
     p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])
@@ -165,7 +186,7 @@ async def test_provider_carries_actor_info_when_present() -> None:
 
 
 async def test_provider_omits_actor_fields_when_absent() -> None:
-    q = PerceptionEventQueue()
+    q = ObservationQueue()
     q.put(_entry(actor_id=None, actor_name=None))
     p = PerceptionProvider(q, clock=CLOCK, ids=IDS)
     items = await p.propose([])

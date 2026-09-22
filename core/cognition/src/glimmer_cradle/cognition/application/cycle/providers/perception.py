@@ -1,7 +1,7 @@
 """
 PerceptionProvider —— 感知专家。
 
-每拍 drain PerceptionEventQueue（IPC 入站写入的近期感知事件），把每条事件转为
+每拍 drain ObservationQueue（IPC 入站写入的近期感知事件），把每条事件转为
 一个 WorkspaceItem(source=perception)。direct 表示外部互动义务，必须进入本拍
 竞争的最高显著度；ambient 仍由 familiarity 调整显著度。
 
@@ -10,7 +10,7 @@ WorkspaceItem，避免把跨层调度副作用塞进专家投放逻辑。
 """
 from __future__ import annotations
 
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.domain.workspace import WorkspaceItem, make_item
 from glimmer_cradle.cognition.ports.clock import ClockPort
@@ -35,7 +35,7 @@ class PerceptionProvider(Provider):
 
     def __init__(
         self,
-        queue: PerceptionEventQueue,
+        queue: ObservationQueue,
         *,
         max_items_per_tick: int = 5,
         clock: ClockPort,
@@ -47,7 +47,7 @@ class PerceptionProvider(Provider):
         self._ids = ids
 
     async def propose(self, workspace_snapshot: list[WorkspaceItem]) -> list[WorkspaceItem]:
-        entries: list[PerceptionEntry] = self._queue.drain(max_items=self._max_items)
+        entries: list[Observation] = self._queue.drain(max_items=self._max_items)
         if not entries:
             return []
 

@@ -13,7 +13,9 @@ PACKAGE_ROOT = (
     / "glimmer_cradle"
     / "cognition"
 )
-TARGET_ROOTS = {"domain", "application", "ports", "adapters", "context", "host"}
+TARGET_ROOTS = {
+    "domain", "application", "ports", "adapters", "context", "perception", "host"
+}
 LEGACY_ROOTS = {
     "activity", "affect", "conversation", "cycle", "experience",
     "foundation", "identity", "inference", "maintenance", "memory",
@@ -21,11 +23,14 @@ LEGACY_ROOTS = {
 }
 ALLOWED_DEPENDENCIES = {
     "domain": {"domain", "ports"},
-    "application": {"domain", "application", "context", "ports"},
+    "application": {"domain", "application", "context", "perception", "ports"},
     # inbound Port 使用 application command/result 类型描述调用契约。
     "ports": {"domain", "application", "ports"},
-    "adapters": {"domain", "application", "context", "ports", "adapters"},
+    "adapters": {
+        "domain", "application", "context", "perception", "ports", "adapters"
+    },
     "context": {"context", "ports"},
+    "perception": {"perception"},
     "host": TARGET_ROOTS,
 }
 FORBIDDEN_BOUNDARY_TERMS = (
@@ -156,11 +161,11 @@ def _dependency_violations(
         target = _cognition_root(module)
         if target and target not in ALLOWED_DEPENDENCIES[owner]:
             violations.append(f"{label}: forbidden dependency {module}")
-        if owner in {"domain", "application", "context", "ports"} and any(
+        if owner in {"domain", "application", "context", "perception", "ports"} and any(
             term in module for term in FORBIDDEN_BOUNDARY_TERMS
         ):
             violations.append(f"{label}: boundary concrete {module}")
-        if owner in {"domain", "application", "context", "ports"} and _is_generated_import(module):
+        if owner in {"domain", "application", "context", "perception", "ports"} and _is_generated_import(module):
             violations.append(f"{label}: generated package {module}")
     return violations
 
@@ -259,9 +264,9 @@ def _structure_violations(
             violations.append(f"{label}:{node.name}")
         if isinstance(node, ast.ClassDef) and node.name in {"EventBus", "ServiceLocator"}:
             violations.append(f"{label}:{node.name}")
-        if owner in {"domain", "application", "context", "ports"} and isinstance(node, ast.Global):
+        if owner in {"domain", "application", "context", "perception", "ports"} and isinstance(node, ast.Global):
             violations.append(f"{label}: module global mutation {','.join(node.names)}")
-    if owner in {"domain", "application", "context", "ports"}:
+    if owner in {"domain", "application", "context", "perception", "ports"}:
         violations.extend(
             f"{label}: module mutable binding {binding}"
             for binding in _module_mutable_bindings(tree)
@@ -313,9 +318,9 @@ def _direct_capability_violations(tree: ast.Module, *, label: str) -> list[str]:
     ]
 
 
-def test_domain_application_and_context_do_not_read_system_clock_or_generate_ids() -> None:
+def test_domain_application_context_and_perception_do_not_read_system_capabilities() -> None:
     violations = []
-    for owner in ("domain", "application", "context"):
+    for owner in ("domain", "application", "context", "perception"):
         for path in _python_files(PACKAGE_ROOT / owner):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             violations.extend(_direct_capability_violations(

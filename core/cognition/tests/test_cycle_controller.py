@@ -873,7 +873,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
 
 async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
     """直接外部输入应在同一拍即时唤醒，再进入 Deliberate/Volition。"""
-    from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Activity:
@@ -900,8 +900,8 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
         emitted.append(cmd)
 
     activity = _Activity()
-    queue = PerceptionEventQueue()
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue()
+    queue.put(Observation(
             scene_id="desktop-ui:user",
             conversation_id="conversation:desktop:primary",
             continuity_id="continuity:desktop:user",
@@ -940,7 +940,7 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
 
 async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: Path) -> None:
     """工作区被 drive 填满时，直接对话仍应成为本拍广播并回复。"""
-    from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     emitted: list[dict] = []
@@ -948,8 +948,8 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
     async def _sink(cmd):
         emitted.append(cmd)
 
-    queue = PerceptionEventQueue()
-    queue.put(PerceptionEntry(
+    queue = ObservationQueue()
+    queue.put(Observation(
             scene_id="napcat:group:1082719157",
             conversation_id="conversation:napcat:group:1082719157",
             continuity_id="continuity:napcat:user",

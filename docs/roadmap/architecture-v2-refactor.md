@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context canonical owner、retrieval budget、压缩与 trust/authority 分离已接入真实 MemoryProvider；Loop/Memory/Persona/Observation 仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context budget/trust 与 Perception Observation canonical owner 已接入真实 Host/Cycle；Loop/Memory/Persona 仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -299,6 +299,13 @@ composition、MemoryProvider 及四类现行 source 直接消费新入口。Cont
 instruction authority；未经相应证明的 user/system authority 降级为 data，retrieval budget 显式缩放，单项
 超限按可追溯 metadata 压缩，零预算终止。具体 Memory/Knowledge/Relationship/Experience source adapters
 仍在迁移路径，待对应 owner 阶段物理归位；本切片不宣称 native Loop 或阶段 5 完成。
+
+Perception/Observation 切片随后把 `PerceptionEntry` 与旧 Cycle 队列迁为目标
+`perception/{observation,observation_normalizer,observation_queue}.py`，gRPC Adapter、Host composition、
+PerceptionProvider 与测试只消费新公共入口。Normalizer 在入队前校验 canonical Conversation identity、scope、
+trace/interaction 与 payload digest，并归一 familiarity；未绑定输入以 typed `INVALID_REQUEST` 失败关闭。
+有界队列继续 drop-oldest 并返回被淘汰 Observation，使 operation registry 能进入真实 failed 终态；旧
+`application/cycle/perception_queue.py` 已 consumer-zero 删除。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

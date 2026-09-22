@@ -25,7 +25,11 @@ from glimmer_cradle.cognition.application.activity import CognitiveActivityContr
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
 from glimmer_cradle.cognition.application.cycle import CycleController
-from glimmer_cradle.cognition.application.cycle.perception_queue import PerceptionEntry, PerceptionEventQueue
+from glimmer_cradle.cognition.perception import (
+    Observation,
+    ObservationNormalizer,
+    ObservationQueue,
+)
 from glimmer_cradle.cognition.application.cycle.perception_operations import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
@@ -117,7 +121,7 @@ class CognitionGrpcHost:
         *,
         generation: str,
         inbound: KernelRequestPort,
-        queue: PerceptionEventQueue,
+        queue: ObservationQueue,
         activity: CognitiveActivityController,
         cycle: CycleController,
         shutdown: Callable[[], Awaitable[None]],
@@ -132,6 +136,7 @@ class CognitionGrpcHost:
         self._shutdown = shutdown
         self._operations = operations
         self._workspace = workspace
+        self._observation_normalizer = ObservationNormalizer()
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._phase = "binding"
@@ -273,26 +278,32 @@ class CognitionGrpcHost:
                     cognition_pb.RETENTION_CEILING_TRANSIENT: "transient",
                     cognition_pb.RETENTION_CEILING_MEMORY_CANDIDATE: "memory_candidate",
                 }.get(request.retention_ceiling, "experience")
-                dropped = self._queue.put(PerceptionEntry(
-                    scene_id=conversation.scene_id,
-                    conversation_id=conversation.conversation_id,
-                    continuity_id=conversation.continuity_id,
-                    thread_id=conversation.thread_id,
-                    recall_scope=conversation.recall_scope,
-                    disclosure_scope=conversation.disclosure_scope,
-                    address_mode=address_mode,
-                    familiarity=request.familiarity,
-                    response_policy=response_policy,
-                    text=content.text,
-                    trace_id=trace_id,
-                    actor_id=content.actor_id or None,
-                    actor_name=content.actor_name or None,
-                    model_input=model_input,
-                    origin=MessageToDict(request.origin, preserving_proto_field_name=True),
-                    retention_ceiling=retention,
-                    interaction_id=conversation.interaction_id,
-                    payload_digest=payload_digest,
-                ))
+                try:
+                    observation = self._observation_normalizer.normalize(Observation(
+                        scene_id=conversation.scene_id,
+                        conversation_id=conversation.conversation_id,
+                        continuity_id=conversation.continuity_id,
+                        thread_id=conversation.thread_id,
+                        recall_scope=conversation.recall_scope,
+                        disclosure_scope=conversation.disclosure_scope,
+                        address_mode=address_mode,
+                        familiarity=request.familiarity,
+                        response_policy=response_policy,
+                        text=content.text,
+                        trace_id=trace_id,
+                        actor_id=content.actor_id or None,
+                        actor_name=content.actor_name or None,
+                        model_input=model_input,
+                        origin=MessageToDict(request.origin, preserving_proto_field_name=True),
+                        retention_ceiling=retention,
+                        interaction_id=conversation.interaction_id,
+                        payload_digest=payload_digest,
+                    ))
+                except ValueError as error:
+                    raise ServiceFault(
+                        common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)
+                    ) from error
+                dropped = self._queue.put(observation)
                 if dropped is not None:
                     self._operations.finish(dropped.trace_id, "failed", "感知队列容量已满")
                 if address_mode == "direct":
