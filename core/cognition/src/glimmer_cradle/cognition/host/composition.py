@@ -46,7 +46,7 @@ from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
-from glimmer_cradle.cognition.application.inference.service import ReasoningService
+from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
 from glimmer_cradle.cognition.application.memory import KnowledgeBase, MemorySubstrate
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
@@ -215,7 +215,7 @@ def compose_cognition(
         KnowledgeSource(knowledge_base),
         RelationshipSource(relationship_repository),
     ], observability=observability)
-    reasoning = ReasoningService(
+    reasoning = InferenceController(
         cloud=CloudReasoning(llm_engine), local=None, observability=observability
     )
 

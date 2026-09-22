@@ -8,7 +8,7 @@ from typing import List
 
 from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.ports.kernel.models import (
     SkillToolDescriptor,
     AgentPlanResult,
@@ -45,7 +45,7 @@ class AgentPlanUseCase(BaseUseCase[AgentPlanInput, AgentPlanOutput]):
 
     lifecycle_log_level = "debug"
     self_entity: SelfEntity
-    llm_engine: LLMPort
+    llm_engine: ModelPort
 
     async def _execute(self, input_data: AgentPlanInput, trace_id: str) -> AgentPlanOutput:
         goal = input_data.user_goal.strip()
@@ -67,10 +67,10 @@ class AgentPlanUseCase(BaseUseCase[AgentPlanInput, AgentPlanOutput]):
             + "\n\n请输出规划 JSON。"
         )
 
-        llm_request = LLMRequest(
+        llm_request = ModelRequest(
             messages=[
-                LLMMessage(role="system", content=_PLAN_SYSTEM_PROMPT),
-                LLMMessage(role="user", content=user_prompt),
+                ModelMessage(role="system", content=_PLAN_SYSTEM_PROMPT),
+                ModelMessage(role="user", content=user_prompt),
             ],
             metadata={
                 "purpose": "agent_plan",

@@ -19,7 +19,7 @@ from glimmer_cradle.cognition.attention import (
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 from glimmer_cradle.conversation import ConversationLog, SqliteTurnStore, TurnController
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
-from glimmer_cradle.cognition.application.inference.service import ModelTierEnum, ReasoningResponse, ReasoningUnavailable
+from glimmer_cradle.cognition.inference import ModelTier, InferenceResponse, InferenceUnavailable
 
 
 def AttentionController(*args, **kwargs):
@@ -51,7 +51,7 @@ def read_ledger_moments(path):
 
 
 class _FakeReasoning:
-    """假 ReasoningService —— request 返回固定回复文本（阶段 7.2 测试用）。"""
+    """假 InferenceController —— request 返回固定回复文本（阶段 7.2 测试用）。"""
 
     def __init__(self, text: str = "[生成的回复]") -> None:
         self._text = text
@@ -61,7 +61,7 @@ class _FakeReasoning:
     async def request(self, req, *, tier):
         self.call_count += 1
         self.last_tier = tier
-        return ReasoningResponse(text=self._text, tier_used=tier)
+        return InferenceResponse(text=self._text, tier_used=tier)
 
 
 class _SequenceReasoning:
@@ -74,12 +74,12 @@ class _SequenceReasoning:
     async def request(self, req, *, tier):
         self.requests.append(req)
         text = self._texts.pop(0) if self._texts else ""
-        return ReasoningResponse(text=text, tier_used=tier)
+        return InferenceResponse(text=text, tier_used=tier)
 
 
 class _UnavailableReasoning:
     async def request(self, req, *, tier):
-        raise ReasoningUnavailable("fixture unavailable")
+        raise InferenceUnavailable("fixture unavailable")
 
 
 def _action_plan_json(
@@ -431,7 +431,7 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
 async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
     """Deliberate 按 activity profile.model_tier 选档。"""
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
-    from glimmer_cradle.cognition.application.inference.service import ModelTierEnum
+    from glimmer_cradle.cognition.inference import ModelTier
 
     class _Fixed(Provider):
         name = "perception"
@@ -460,7 +460,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
         await loop.tick_once()
     finally:
         await recorder.stop()
-    assert fake.last_tier == ModelTierEnum.CLOUD_ALLOWED
+    assert fake.last_tier == ModelTier.CLOUD_ALLOWED
 
 
 # ── Act 阶段自主输出（阶段 7.1） ─────────────────────────────────────────
@@ -790,7 +790,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
 
 
 async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: Path) -> None:
-    """ReasoningService 不可用时不能靠关键词或副作用兜底执行 Skill。"""
+    """InferenceController 不可用时不能靠关键词或副作用兜底执行 Skill。"""
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
@@ -936,7 +936,7 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
         await recorder.stop()
 
     assert activity.engage_calls == 1
-    assert reasoning.last_tier == ModelTierEnum.CLOUD_ALLOWED
+    assert reasoning.last_tier == ModelTier.CLOUD_ALLOWED
     assert len(emitted) == 1
     assert emitted[0]["payload"]["text"] == "你好呀"
 
@@ -1379,7 +1379,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
 # ── 富上下文：Deliberate prompt 纳入记忆/知识/会话历史（阶段 7.5b-3） ──────
 
 class _CapturingReasoning:
-    """捕获 ReasoningRequest 的假 reasoning —— 用于断言 system prompt / vision 等。"""
+    """捕获 InferenceRequest 的假 reasoning —— 用于断言 system prompt / vision 等。"""
     def __init__(self, text="好的"):
         self._text = text
         self.last_system = None
@@ -1391,7 +1391,7 @@ class _CapturingReasoning:
         self.last_user = req.user
         self.last_vision = req.vision
         self.last_provider_key = req.provider_key
-        return ReasoningResponse(text=self._text, tier_used=tier)
+        return InferenceResponse(text=self._text, tier_used=tier)
 
 
 async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
@@ -1767,7 +1767,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
 
 
 async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -> None:
-    """core_direct：vision 消息随 ReasoningRequest 直发主模型 + 带 provider_key。"""
+    """core_direct：vision 消息随 InferenceRequest 直发主模型 + 带 provider_key。"""
     from glimmer_cradle.cognition.application.cycle.providers import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 

@@ -139,7 +139,7 @@ data/observability/model-invocations/captures/<UTC-date>/trace-<trace-id>/
 `timeline.md` 是人类阅读入口，跨分类按完成顺序列出 category、purpose、model、outcome、耗时与输入/输出链接；`00-manifest.json` 是单次调用的结构化摘要。数字前缀在整个 Trace 内全局递增，所以分类不会破坏实际调用顺序。`model-invocations/records/*.jsonl` 仍是查询与索引事实源，Markdown 只是可再生成的人类投影。
 
 当前真实接入路径至少覆盖：
-- `ReasoningService -> CloudReasoning -> LLMEngine`
+- `InferenceController -> CloudReasoning -> LLMEngine`
 - `AgentPlanUseCase`
 - `AgentSynthesisUseCase`
 

@@ -7,7 +7,7 @@ from glimmer_cradle.cognition.domain.configuration import (
     ModelSettings, MultimodalSettings,
 )
 from glimmer_cradle.cognition.domain.exceptions import InferenceException
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, LLMMessage, LLMRequest
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, ModelMessage, ModelRequest
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 
 def ModelConfig(**updates):
@@ -75,7 +75,7 @@ def test_llm_gateway_without_real_provider_fails_explicitly() -> None:
     engine = LLMEngine(_SelfEntity(), None)
 
     with pytest.raises(InferenceException, match="真实 LLM provider"):
-        engine.generate(LLMRequest(messages=[LLMMessage(role="user", content="你好")]))
+        engine.generate(ModelRequest(messages=[ModelMessage(role="user", content="你好")]))
 
 
 def test_unknown_provider_does_not_fallback_to_default() -> None:
@@ -90,7 +90,7 @@ def test_unknown_provider_does_not_fallback_to_default() -> None:
 
     with pytest.raises(InferenceException, match="未知 LLM provider"):
         engine.generate(
-            LLMRequest(messages=[LLMMessage(role="user", content="你好")]),
+            ModelRequest(messages=[ModelMessage(role="user", content="你好")]),
             provider_key="missing/chat",
         )
 

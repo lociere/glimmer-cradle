@@ -49,11 +49,12 @@ core/cognition/
 │   ├── attention/           # 候选、竞争、内部 focus lease
 │   ├── application/                    # 认知循环、查询、维护与本地事务编排
 │   │   ├── activity/ context/ conversation/ cycle/
-│   │   ├── experience/ inference/ maintenance/ memory/
+│   │   ├── experience/ maintenance/ memory/
 │   │   └── *_use_case.py
+│   ├── inference/           # 通用请求/事件、模型 Port、选择/故障与 realtime session
 │   ├── ports/                          # 仅 Cognition 真实外部能力边界
 │   │   ├── kernel/
-│   │   └── clock.py, inference.py, observability.py,
+│   │   └── clock.py, observability.py,
 │   │       persistence.py, trace_context.py
 │   ├── adapters/                       # 外部能力与 contract edge 的具体实现
 │   │   ├── kernel/ content/ inference/ observability/ persistence/
@@ -124,7 +125,7 @@ Kernel CognitionService request
 
 旧的“收到消息直接生成聊天回复”通路不得恢复。内部驱动只能通过 Provider 进入 Cycle；工具规划、记忆巩固和合成必须以主循环或明确请求型 use case 接入，且不能对同一感知重复产生互相冲突的 action。
 
-当前 `CycleController` 的 Deliberate 阶段以 `application/cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；ReasoningService 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
+当前 `CycleController` 的 Deliberate 阶段以 `application/cycle/action_planner.py` 中的 `CognitiveActionPlanner` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO；InferenceController 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
 
 `AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`CycleController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Synthesize -> ChannelReplyEvent`。工具使用决定写入 `action` Moment，工具结果写入带 provider/source/schema 的 `action_result` Moment，最终合成文本再以这些结果为因写入 `reply` Moment 并回写场景会话；结果仍是不可信输入，是否形成 Memory 由 Episode 巩固和 evidence 校验决定。`Synthesize` 的 system prompt 由 `PersonaCompiler.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
@@ -140,8 +141,8 @@ ContextAssembler
   -> application/context/sources/*（迁移中的具体 source adapters）
   -> memory / knowledge / relationship / episodic
   -> budget and ranking
-  -> ReasoningService
-  -> inference gateway / configured cloud provider
+  -> InferenceController
+  -> inference model port / configured provider adapter
 ```
 
 Context 是注意力预算控制器，不是字符串拼接器。`context/` 已成为 v2.1 canonical owner：候选分别携带
@@ -149,6 +150,11 @@ Context 是注意力预算控制器，不是字符串拼接器。`context/` 已�
 `ContextBudget` 显式缩放，单项超限由 `ContextCompactor` 保留来源信息地截断，零预算明确终止。
 `ContextAssembler` 统一执行来源异常隔离、信任降级、相关度排序与预算选择；MemoryProvider 将信任和权威
 标签继续传播到 Workspace。新增上下文来源必须声明 owner、成本、优先级、失败语义和是否进入经历/记忆。
+
+`inference/` 是 provider-neutral 推理 owner：`request.py` / `event.py` 定义文本、多模态及流事件，
+`model_port.py` 定义模型与 realtime 外部能力边界，`InferenceController` 按 Cognitive Activity model tier
+执行禁止、本地限定或 cloud→local 显式 fallback。供应商 HTTP、密钥、payload 与响应提取仍只在
+`adapters/inference/`；`RealtimeSession` 用 generation、单调 sequence 和 terminal 状态拒绝陈旧取消及晚到帧。
 
 `ReplyContextBuilder` 按固定分区装配 system prompt：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、近期 Experience 和多模态描述。`ConversationController` 在查询前补投影并从 SQLite 恢复有界 Working Set；近期 Experience 排除当前 trace。所有来源在排序前先按 `recall_scope` 与 conversation/actor/scene owner 过滤，私聊不会因词项相似而召回群聊的 `space_local` 内容。`observe_only` 召回实际 perception，不把策略性 silence 渲染成角色主动沉默。
 
@@ -233,7 +239,7 @@ CycleController / use case
 |---|---|
 | Cognition 进程未 ready | `host/process.py` 启动、配置、DB、provider warmup、generation/PID 注册、gRPC readiness |
 | 输入进来但无行动 | inbound adapter、perception queue、`CycleController` tick、volition |
-| 回复空或异常 | context assembly、ReasoningService、LLMEngine、provider 错误 |
+| 回复空或异常 | context assembly、InferenceController、LLMEngine、provider 错误 |
 | 记忆异常 | `adapters/persistence/memory/database.py`、`memory_repo.py`、`application/memory/substrate.py`、consolidation run |
 | trace 断裂 | inbound gRPC metadata/DTO、context/reasoning span、outbound adapter |
 | 重启后状态丢失 | `data/state/cognition/`、Experience catalog/pack、Episode Projection、Memory revision |

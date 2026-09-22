@@ -19,7 +19,7 @@ from glimmer_cradle.cognition.domain.configuration import LLMSettings
 from glimmer_cradle.cognition.domain.exceptions import InferenceException
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.model_invocations import record_model_invocation
-from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMRequest
+from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 
 # 初始化模块日志器
 logger = get_logger("llm_engine")
@@ -63,8 +63,8 @@ class LLMApiResult:
     model_id: str
 
 
-def _build_message_payload(messages: list[LLMMessage]) -> list[dict]:
-    """将 LLMMessage 列表转为 OpenAI 兼容的消息载荷。
+def _build_message_payload(messages: list[ModelMessage]) -> list[dict]:
+    """将 ModelMessage 列表转为 OpenAI 兼容的消息载荷。
 
     带 vision_url 的消息构造为 content 数组（image_url + text）格式，
     符合 OpenAI Vision / Qwen-VL / DeepSeek-VL 的 chat/completions 兼容接口。
@@ -108,7 +108,7 @@ class LLMEngine:
             llm_config=_summarize_llm_config(self.llm_config),
         )
 
-    def _render_messages_as_prompt(self, llm_request: LLMRequest) -> str:
+    def _render_messages_as_prompt(self, llm_request: ModelRequest) -> str:
         sections: list[str] = []
         for message in llm_request.messages:
             content = message.content.strip()
@@ -180,7 +180,7 @@ class LLMEngine:
 
         return _build(self.llm_config, resolved_model, prov)
 
-    def _generate_via_api(self, llm_request: LLMRequest, cfg: LLMSettings, provider_id: str) -> LLMApiResult:
+    def _generate_via_api(self, llm_request: ModelRequest, cfg: LLMSettings, provider_id: str) -> LLMApiResult:
         """通过指定的 LLMSettings（可为 provider 子配置）调用 API 生成回复。"""
         api_type = cfg.api_type.lower().strip()
         api_key = cfg.api_key
@@ -320,7 +320,7 @@ class LLMEngine:
             return current.strip()
         return str(current)
 
-    def generate(self, llm_request: LLMRequest, provider_key: str | None = None) -> str:
+    def generate(self, llm_request: ModelRequest, provider_key: str | None = None) -> str:
         """生成回复。
 
         Args:

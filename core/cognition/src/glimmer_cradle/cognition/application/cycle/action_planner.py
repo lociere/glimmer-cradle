@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from typing import Literal, cast
 
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.application.inference.service import (
-    ModelTierEnum,
-    ReasoningRequest,
-    ReasoningService,
-    ReasoningUnavailable,
+from glimmer_cradle.cognition.inference import (
+    ModelTier,
+    InferenceRequest,
+    InferenceController,
+    InferenceUnavailable,
 )
 
 CognitiveAction = Literal["reply", "skill_request", "ask_clarification", "noop"]
@@ -69,7 +69,7 @@ class ActionPlan:
 class CognitiveActionPlanner:
     """基于结构化推理结果判断本拍行动类型。"""
 
-    def __init__(self, reasoning: ReasoningService | None, *, observability: ObservabilityPort) -> None:
+    def __init__(self, reasoning: InferenceController | None, *, observability: ObservabilityPort) -> None:
         self._reasoning = reasoning
         self._observability = observability
         self._logger = observability.logger("cognitive_action_planner")
@@ -79,7 +79,7 @@ class CognitiveActionPlanner:
         *,
         goal: str,
         scene_id: str,
-        tier: ModelTierEnum,
+        tier: ModelTier,
         trace_id: str = "",
     ) -> ActionPlan:
         normalized_goal = goal.strip()
@@ -95,7 +95,7 @@ class CognitiveActionPlanner:
         if self._reasoning is None:
             return ActionPlan.reply(normalized_goal, "推理服务不可用，降级为普通回复路径")
 
-        req = ReasoningRequest(
+        req = InferenceRequest(
             system=(
                 "你是微光摇篮 Cognition 内部行动规划器，只做结构化行动判断，不扮演角色，"
                 "也不生成给用户看的回复。\n"
@@ -124,7 +124,7 @@ class CognitiveActionPlanner:
         )
         try:
             resp = await self._reasoning.request(req, tier=tier)
-        except ReasoningUnavailable as error:
+        except InferenceUnavailable as error:
             self._logger.debug("ActionPlan 推理不可用，降级为普通回复路径", error=str(error))
             return ActionPlan.reply(normalized_goal, "推理服务不可用，未触发 Skill")
         except Exception as error:

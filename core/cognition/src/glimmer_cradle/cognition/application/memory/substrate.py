@@ -10,7 +10,7 @@ from typing import Any
 from glimmer_cradle.cognition.domain.memory import MemoryKind
 from glimmer_cradle.cognition.ports.persistence import MemoryRepositoryPort
 from glimmer_cradle.cognition.ports.persistence import VectorRepositoryPort
-from glimmer_cradle.cognition.ports.inference import EmbeddingPort
+from glimmer_cradle.cognition.inference import EmbeddingPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]")

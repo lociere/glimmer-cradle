@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.application.cycle.deliberation import Deliberation
 from glimmer_cradle.cognition.application.cycle.providers import Provider
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
-from glimmer_cradle.cognition.application.inference.service import ReasoningService
+from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.domain.volition import (
     ArbitrationResult,
     Intent,
@@ -45,7 +45,7 @@ class CycleController:
         willingness_config: WillingnessConfig | None = None,
         default_tick_interval_ms: int = 5000,
         action_sink=None,
-        reasoning: ReasoningService | None = None,
+        reasoning: InferenceController | None = None,
         persona_compiler=None,
         boundary_validator: "Callable[[str], bool] | None" = None,
         self_entity=None,

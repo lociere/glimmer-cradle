@@ -13,7 +13,7 @@ from typing import Any, List
 from .base_use_case import BaseUseCase
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.conversation import (
     ConversationRecorder,
     MomentKind,
@@ -52,7 +52,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
 
     lifecycle_log_level = "debug"
     self_entity: SelfEntity
-    llm_engine: LLMPort
+    llm_engine: ModelPort
     persona_compiler: Any | None = None
     experience_recorder: ConversationRecorder | None = None
     activity_controller: Any | None = None
@@ -82,10 +82,10 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
             "请给出你的最终回复。"
         )
 
-        llm_request = LLMRequest(
+        llm_request = ModelRequest(
             messages=[
-                LLMMessage(role="system", content=system_prompt),
-                LLMMessage(role="user", content=user_prompt),
+                ModelMessage(role="system", content=system_prompt),
+                ModelMessage(role="user", content=user_prompt),
             ],
             metadata={
                 "purpose": "agent_synthesis",

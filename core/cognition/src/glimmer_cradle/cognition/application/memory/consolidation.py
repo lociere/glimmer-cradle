@@ -13,7 +13,7 @@ from glimmer_cradle.cognition.domain.experience.episode import Episode
 from glimmer_cradle.cognition.application.memory.substrate import MemoryRecord, MemorySubstrate
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.domain.memory import MemoryKind
-from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.ports.persistence import (
     ConsolidationJob,
     ConsolidationJobRepositoryPort,
@@ -57,7 +57,7 @@ class ConsolidationCoordinator:
 
     def __init__(
         self, *, episodes: EpisodeProjectionPort, memory: MemorySubstrate,
-        jobs: ConsolidationJobRepositoryPort, llm: LLMPort | None,
+        jobs: ConsolidationJobRepositoryPort, llm: ModelPort | None,
         clock: ClockPort,
         ids: IdGeneratorPort,
         observability: ObservabilityPort,
@@ -382,10 +382,10 @@ class ConsolidationCoordinator:
             "\"content\":\"...\",\"summary\":\"...\",\"confidence\":0.0,\"salience\":0.0,"
             "\"actor_id\":null,\"attributes\":{},\"evidence_moment_ids\":[\"...\"]}]}。"
         )
-        request = LLMRequest(
+        request = ModelRequest(
             messages=[
-                LLMMessage(role="system", content=system),
-                LLMMessage(role="user", content=json.dumps(payload, ensure_ascii=False)),
+                ModelMessage(role="system", content=system),
+                ModelMessage(role="user", content=json.dumps(payload, ensure_ascii=False)),
             ],
             metadata={
                 "purpose": "memory_consolidation",

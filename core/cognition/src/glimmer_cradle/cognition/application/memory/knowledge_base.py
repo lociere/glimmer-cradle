@@ -20,7 +20,7 @@ import numpy as np
 
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.ports.inference import EmbeddingPort
+from glimmer_cradle.cognition.inference import EmbeddingPort
 from glimmer_cradle.cognition.ports.persistence import KnowledgeRepositoryPort, VectorRepositoryPort
 
 # 英文单词 / 汉字逐字分词（bigram 在 _tokenize 中生成）

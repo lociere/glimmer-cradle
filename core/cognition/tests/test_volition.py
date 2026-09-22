@@ -213,7 +213,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
     from glimmer_cradle.cognition.application.cycle.providers import Provider
 
-    from glimmer_cradle.cognition.application.inference.service import ReasoningResponse
+    from glimmer_cradle.cognition.inference import InferenceResponse
 
     class _Fixed(Provider):
         name = "perception"
@@ -228,7 +228,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
 
     class _FakeReasoning:
         async def request(self, req, *, tier):
-            return ReasoningResponse(text="你好呀", tier_used=tier)
+            return InferenceResponse(text="你好呀", tier_used=tier)
 
     ws = AttentionController(capacity=3, clock=CLOCK)
     recorder = build_experience_recorder(tmp_path, **recorder_args())

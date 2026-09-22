@@ -71,11 +71,11 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         trace_id="trace-1",
     ))
 
-    from glimmer_cradle.cognition.application.inference.service import ReasoningResponse
+    from glimmer_cradle.cognition.inference import InferenceResponse
 
     class _FakeReasoning:
         async def request(self, req, *, tier):
-            return ReasoningResponse(text="你好呀，我在", tier_used=tier)
+            return InferenceResponse(text="你好呀，我在", tier_used=tier)
 
     ws = AttentionController(capacity=5)
     recorder = build_experience_recorder(tmp_path)
@@ -288,22 +288,22 @@ async def test_new_input_cancels_real_inference_operation_before_action(tmp_path
         await recorder.stop()
 
 
-# ─── 生产接线冒烟：感知 → 循环 → 真实 ReasoningService → Act → action_sink ───
-# 不用 _FakeReasoning，而用生产接线（ReasoningService→CloudReasoning→LLMEngine），
+# ─── 生产接线冒烟：感知 → 循环 → 真实 InferenceController → Act → action_sink ───
+# 不用 _FakeReasoning，而用生产接线（InferenceController→CloudReasoning→LLMEngine），
 # 覆盖容器实际装配的完整自主输出通路（不含跨进程 gRPC transport）。Act 推出的
 # ActionCommand dict 即内核 ACTION_COMMAND handler 入参，跨进程契约在此对齐。
 
 async def test_smoke_perception_to_action_command_production_wiring(tmp_path) -> None:
-    """端到端冒烟：真实 ReasoningService 链路 → Act → action_sink 收到 ActionCommand。
+    """端到端冒烟：真实 InferenceController 链路 → Act → action_sink 收到 ActionCommand。
 
     验证生产装配（非 fake）：
       ObservationQueue → PerceptionProvider → 广播 → Deliberate
-        （persona compiler 组 prompt → ReasoningService(cloud) → boundary 校验）
+        （persona compiler 组 prompt → InferenceController(cloud) → boundary 校验）
         → _pending_reply → Intend(reply) → Act → action_sink
     action_sink 收到的 dict 形状即内核 ACTION_COMMAND handler 读取的契约。
     """
     from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
-    from glimmer_cradle.cognition.application.inference.service import ReasoningService
+    from glimmer_cradle.cognition.inference import InferenceController
 
     # ── stub LLMEngine：记录收到的 prompt，返回固定回复（鸭子类型 .generate）──
     captured: dict = {}
@@ -354,7 +354,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
         actor_name="Elise",
     ))
 
-    reasoning = ReasoningService(
+    reasoning = InferenceController(
         cloud=CloudReasoning(_StubLLM()),  # type: ignore[arg-type]
         local=None,
         observability=OBSERVABILITY,

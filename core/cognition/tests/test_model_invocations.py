@@ -5,7 +5,7 @@ import pytest
 
 import glimmer_cradle.cognition.adapters.inference.gateway as llm_module
 from glimmer_cradle.cognition.domain.configuration import LLMSettings, ModelSettings
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMApiResult, LLMEngine, LLMMessage, LLMRequest
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMApiResult, LLMEngine, ModelMessage, ModelRequest
 
 def ModelConfig():
     return ModelSettings(
@@ -67,10 +67,10 @@ def test_model_invocation_summary_mode_records_hash_not_prompt(monkeypatch: pyte
         model_id="test-model",
     ))
 
-    reply = engine.generate(LLMRequest(
+    reply = engine.generate(ModelRequest(
         messages=[
-            LLMMessage(role="system", content="system prompt"),
-            LLMMessage(role="user", content="secret prompt"),
+            ModelMessage(role="system", content="system prompt"),
+            ModelMessage(role="user", content="secret prompt"),
         ],
         metadata={
             "purpose": "reply",
@@ -111,10 +111,10 @@ def test_model_invocation_full_mode_writes_captures_and_redacts_payload(monkeypa
         model_id="test-model",
     ))
 
-    engine.generate(LLMRequest(
+    engine.generate(ModelRequest(
         messages=[
-            LLMMessage(role="system", content="system"),
-            LLMMessage(role="user", content="full prompt"),
+            ModelMessage(role="system", content="system"),
+            ModelMessage(role="user", content="full prompt"),
         ],
         metadata={
             "purpose": "cognitive_action_plan",
@@ -122,12 +122,12 @@ def test_model_invocation_full_mode_writes_captures_and_redacts_payload(monkeypa
             "trace_id": "trace-full",
         },
     ))
-    engine.generate(LLMRequest(
-        messages=[LLMMessage(role="user", content="plan a skill")],
+    engine.generate(ModelRequest(
+        messages=[ModelMessage(role="user", content="plan a skill")],
         metadata={"purpose": "agent_plan", "capture_category": "skill", "trace_id": "trace-full"},
     ))
-    engine.generate(LLMRequest(
-        messages=[LLMMessage(role="user", content="second prompt")],
+    engine.generate(ModelRequest(
+        messages=[ModelMessage(role="user", content="second prompt")],
         metadata={"purpose": "reply", "capture_category": "response", "trace_id": "trace-full"},
     ))
 
@@ -180,8 +180,8 @@ def test_model_invocation_redacts_provider_error(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(engine, "_generate_via_api", _raise)
 
     with pytest.raises(llm_module.InferenceException, match="401"):
-        engine.generate(LLMRequest(
-            messages=[LLMMessage(role="user", content="hello")],
+        engine.generate(ModelRequest(
+            messages=[ModelMessage(role="user", content="hello")],
             metadata={"purpose": "reply"},
         ))
 

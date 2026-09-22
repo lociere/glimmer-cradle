@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from glimmer_cradle.cognition.domain.configuration import InferenceSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.ports.inference import LLMMessage, LLMPort, LLMRequest
+from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
 
 logger = get_logger("multimodal_router")
@@ -131,10 +131,10 @@ class MultimodalRouter:
 
     def __init__(self, inference_config: InferenceSettings, asset_reader: AssetReader | None = None) -> None:
         self._config = inference_config
-        self._llm_engine: LLMPort | None = None   # 由 Composition Root 在组装期注入。
+        self._llm_engine: ModelPort | None = None   # 由 Composition Root 在组装期注入。
         self._assets = asset_reader or AssetReader()
 
-    def set_llm_engine(self, llm_engine: LLMPort) -> None:
+    def set_llm_engine(self, llm_engine: ModelPort) -> None:
         """注入 LLMEngine 实例（避免构造时循环依赖）。"""
         self._llm_engine = llm_engine
 
@@ -340,8 +340,8 @@ class MultimodalRouter:
                 continue
             prompt = _build_vision_prompt(img)
             try:
-                req = LLMRequest(messages=[
-                    LLMMessage(
+                req = ModelRequest(messages=[
+                    ModelMessage(
                         role="user",
                         content=prompt,
                         vision_url=img.uri,

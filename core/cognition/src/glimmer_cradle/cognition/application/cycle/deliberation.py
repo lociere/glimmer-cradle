@@ -8,11 +8,11 @@ from glimmer_cradle.cognition.application.cycle.action_planner import ActionPlan
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.cognition.attention import Attention
-from glimmer_cradle.cognition.application.inference.service import (
-    ModelTierEnum,
-    ReasoningRequest,
-    ReasoningService,
-    ReasoningUnavailable,
+from glimmer_cradle.cognition.inference import (
+    ModelTier,
+    InferenceRequest,
+    InferenceController,
+    InferenceUnavailable,
 )
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
@@ -23,7 +23,7 @@ class DeliberationController:
     def __init__(
         self,
         *,
-        reasoning: ReasoningService | None,
+        reasoning: InferenceController | None,
         context_builder: ReplyContextBuilder,
         activity_controller=None,
         emotion_system=None,
@@ -69,7 +69,7 @@ class DeliberationController:
             if plan.action in {"noop", "ask_clarification"}:
                 return planned_reply
 
-        request = ReasoningRequest(
+        request = InferenceRequest(
             system=await self._build_system_prompt(content, turn, multimodal_text),
             user=user_text,
             vision=vision,
@@ -83,7 +83,7 @@ class DeliberationController:
         )
         try:
             response = await self._reasoning.request(request, tier=self._reasoning_tier())
-        except ReasoningUnavailable as exc:
+        except InferenceUnavailable as exc:
             self._logger.debug("回复推理不可用，本拍不回复", error=str(exc))
             return None
         except Exception as exc:
@@ -164,15 +164,15 @@ class DeliberationController:
             multimodal_text=multimodal_text,
         )
 
-    def _reasoning_tier(self) -> ModelTierEnum:
+    def _reasoning_tier(self) -> ModelTier:
         if self._activity is not None:
             try:
                 tier = self._activity.get_state().get("policy", {}).get("model_tier")
                 if tier:
-                    return ModelTierEnum(tier)
+                    return ModelTier(tier)
             except Exception:
                 pass
-        return ModelTierEnum.LOCAL_ONLY
+        return ModelTier.LOCAL_ONLY
 
     def _within_boundary(self, reply: str) -> bool:
         if self._boundary_validator is None:

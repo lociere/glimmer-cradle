@@ -15,25 +15,27 @@ PACKAGE_ROOT = (
 )
 TARGET_ROOTS = {
     "domain", "application", "ports", "adapters", "attention", "context",
-    "perception", "persona", "host",
+    "inference", "perception", "persona", "host",
 }
 LEGACY_ROOTS = {
     "activity", "affect", "conversation", "cycle", "experience",
-    "foundation", "identity", "inference", "maintenance", "memory",
+    "foundation", "identity", "maintenance", "memory",
     "observability", "protocol",
 }
 ALLOWED_DEPENDENCIES = {
     "domain": {"domain", "persona", "ports"},
     "application": {
-        "domain", "application", "attention", "context", "perception", "persona", "ports"
+        "domain", "application", "attention", "context", "inference", "perception", "persona", "ports"
     },
     # inbound Port 使用 application command/result 类型描述调用契约。
     "ports": {"domain", "application", "ports"},
     "adapters": {
-        "domain", "application", "attention", "context", "perception", "persona", "ports", "adapters"
+        "domain", "application", "attention", "context", "inference", "perception", "persona", "ports", "adapters"
     },
     "attention": {"attention", "ports"},
     "context": {"context", "ports"},
+    # ModelTier 尚由 activity policy 定义；State 迁移后移除 inference -> domain。
+    "inference": {"domain", "inference", "ports"},
     "perception": {"perception"},
     # 配置投影尚在 domain/configuration；迁移完成后移除该临时依赖。
     "persona": {"domain", "persona", "ports"},
@@ -167,11 +169,11 @@ def _dependency_violations(
         target = _cognition_root(module)
         if target and target not in ALLOWED_DEPENDENCIES[owner]:
             violations.append(f"{label}: forbidden dependency {module}")
-        if owner in {"domain", "application", "attention", "context", "perception", "persona", "ports"} and any(
+        if owner in {"domain", "application", "attention", "context", "inference", "perception", "persona", "ports"} and any(
             term in module for term in FORBIDDEN_BOUNDARY_TERMS
         ):
             violations.append(f"{label}: boundary concrete {module}")
-        if owner in {"domain", "application", "attention", "context", "perception", "persona", "ports"} and _is_generated_import(module):
+        if owner in {"domain", "application", "attention", "context", "inference", "perception", "persona", "ports"} and _is_generated_import(module):
             violations.append(f"{label}: generated package {module}")
     return violations
 
@@ -266,13 +268,19 @@ def _structure_violations(
 ) -> list[str]:
     violations: list[str] = []
     for node in ast.walk(tree):
-        if owner != "ports" and isinstance(node, ast.ClassDef) and node.name.endswith("Port"):
+        is_inference_port_module = owner == "inference" and label.endswith("model_port.py")
+        if (
+            owner != "ports"
+            and not is_inference_port_module
+            and isinstance(node, ast.ClassDef)
+            and node.name.endswith("Port")
+        ):
             violations.append(f"{label}:{node.name}")
         if isinstance(node, ast.ClassDef) and node.name in {"EventBus", "ServiceLocator"}:
             violations.append(f"{label}:{node.name}")
-        if owner in {"domain", "application", "attention", "context", "perception", "persona", "ports"} and isinstance(node, ast.Global):
+        if owner in {"domain", "application", "attention", "context", "inference", "perception", "persona", "ports"} and isinstance(node, ast.Global):
             violations.append(f"{label}: module global mutation {','.join(node.names)}")
-    if owner in {"domain", "application", "attention", "context", "perception", "persona", "ports"}:
+    if owner in {"domain", "application", "attention", "context", "inference", "perception", "persona", "ports"}:
         violations.extend(
             f"{label}: module mutable binding {binding}"
             for binding in _module_mutable_bindings(tree)
@@ -326,7 +334,7 @@ def _direct_capability_violations(tree: ast.Module, *, label: str) -> list[str]:
 
 def test_target_domain_roots_do_not_read_system_capabilities() -> None:
     violations = []
-    for owner in ("domain", "application", "attention", "context", "perception", "persona"):
+    for owner in ("domain", "application", "attention", "context", "inference", "perception", "persona"):
         for path in _python_files(PACKAGE_ROOT / owner):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             violations.extend(_direct_capability_violations(

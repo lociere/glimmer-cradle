@@ -11,9 +11,10 @@
 | Kernel Service Adapter | `adapters/kernel/` |
 | Kernel 应用 Port | `ports/kernel/` |
 | 认知主循环 | `application/cycle/`、`attention/`、`domain/volition/` |
+| 推理边界 | `inference/`；供应商调用只在 `adapters/inference/` |
 | Volition/巩固 | `domain/volition/`、`application/memory/consolidation.py`、`adapters/persistence/experience/episodes.py` |
 | 上下文 | `application/context/` |
-| 推理/LLM | `ports/inference.py`、`application/inference/`、`adapters/inference/` |
+| 推理/模型 | `inference/`、`adapters/inference/` |
 | 记忆/知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` |
 | 经历 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` |
 | 身份/人格/情绪/觉醒 | `domain/identity/`、`persona/`、`domain/affect/` |
@@ -56,7 +57,7 @@
 3. `ObservationNormalizer` 是否接受，`ObservationQueue` 是否收到。
 4. `CycleController` 是否 tick。
 5. context assembly 是否产生可用上下文。
-6. ReasoningService/LLMEngine 是否返回。
+6. InferenceController/LLMEngine 是否返回。
 7. Volition 是否拒绝行动。
 8. `KernelControlService.PublishAction` 是否把 action 发回 Kernel。
 9. Kernel 是否投影到 Channel/Desktop/Avatar。
