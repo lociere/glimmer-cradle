@@ -81,7 +81,7 @@ describe('Interaction admission', () => {
     const processor: TurnProcessorPort<{ text: string }> = {
       process: vi.fn(async (value, generation) => {
         if (value.input_id === 'turn:first') await firstBlocked;
-        return { turn_id: value.input_id, generation, status: 'completed' };
+        return { turn_id: value.input_id, generation, status: 'completed' as const };
       }),
     };
     const controller = new InteractionController(processor);
@@ -100,4 +100,3 @@ describe('Interaction admission', () => {
     });
   });
 });
-

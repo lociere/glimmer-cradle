@@ -1,8 +1,11 @@
-"""Conversation Log 的不可变 ordered fact；Moment 字段名保持持久兼容。"""
+"""Conversation Log 的不可变 record；Moment 字段名保持持久兼容。"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Protocol
+
+from glimmer_cradle.conversation.log.position import LogPosition, as_log_position
 
 SCHEMA_VERSION = 5
 
@@ -41,7 +44,7 @@ class SourceDescriptor:
 
 @dataclass(frozen=True)
 class Moment:
-    seq: int
+    seq: LogPosition
     moment_id: str
     occurred_at: str
     kind: str
@@ -93,7 +96,7 @@ class Moment:
         except ValueError as error:
             raise ValueError(f"不支持的 Conversation Moment kind: {kind}") from error
         return Moment(
-            seq=seq,
+            seq=as_log_position(seq),
             moment_id=event_id,
             occurred_at=occurred_at,
             kind=kind_value,
@@ -114,3 +117,23 @@ class Moment:
             importance=max(0.0, min(1.0, importance)),
             trace_id=trace_id,
         )
+
+
+class ConversationFact(Protocol):
+    """Conversation Log reader 与 History 投影之间的最小结构契约。"""
+
+    seq: int
+    moment_id: str
+    occurred_at: str
+    kind: str
+    content: dict
+    scene_id: str | None
+    conversation_id: str
+    continuity_id: str
+    thread_id: str
+    interaction_id: str
+    actor_id: str | None
+    actor_name: str | None
+    importance: float
+    recall_scope: str
+    disclosure_scope: str

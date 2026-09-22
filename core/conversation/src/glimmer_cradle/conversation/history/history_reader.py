@@ -1,9 +1,11 @@
-"""Conversation ordered fact 到 History 投影、恢复与检索的唯一 owner。"""
+"""Conversation History 的恢复与受控读取入口。"""
 
 from __future__ import annotations
 
-from glimmer_cradle.conversation.message.models import ConversationWorkingSet
-from glimmer_cradle.conversation.ports import ConversationHistoryStorePort, ConversationLogReaderPort
+from glimmer_cradle.conversation.history.checkpoint import ConversationHistoryStorePort
+from glimmer_cradle.conversation.history.projection import HistoryProjection
+from glimmer_cradle.conversation.history.working_set import ConversationWorkingSet
+from glimmer_cradle.conversation.log.reader import ConversationLogReaderPort
 
 
 class ConversationController:
@@ -15,47 +17,29 @@ class ConversationController:
         working_config,
     ) -> None:
         self._store = store
-        self._recorder = recorder
         self._working_config = working_config
         self._working_sets: dict[tuple[str, str], ConversationWorkingSet] = {}
-        self._connected = False
+        self._projection = HistoryProjection(store=store, recorder=recorder)
 
     async def connect(self) -> None:
-        if self._connected:
-            return
-        await self._store.connect()
-        self._connected = True
-        try:
-            await self.project_pending()
-        except Exception:
-            await self._store.close()
-            self._connected = False
-            raise
+        affected = await self._projection.connect()
+        self._invalidate(affected)
 
     async def close(self) -> None:
-        if not self._connected:
-            self._working_sets.clear()
-            return
         try:
-            await self.project_pending()
+            affected = await self._projection.close()
+            self._invalidate(affected)
         finally:
             self._working_sets.clear()
-            await self._store.close()
-            self._connected = False
 
     async def project_pending(self) -> int:
-        if not self._connected:
-            raise RuntimeError("ConversationController 尚未连接")
-        await self._recorder.flush()
-        checkpoint = await self._store.checkpoint()
-        moments = self._recorder.moments_after(checkpoint)
-        affected: set[tuple[str, str]] = set()
-        for moment in moments:
-            if await self._store.project(moment) and moment.conversation_id:
-                affected.add((moment.conversation_id, moment.thread_id))
+        count, affected = await self._projection.project_pending()
+        self._invalidate(affected)
+        return count
+
+    def _invalidate(self, affected: set[tuple[str, str]]) -> None:
         for key in affected:
             self._working_sets.pop(key, None)
-        return len(moments)
 
     async def working_set(
         self, conversation_id: str, thread_id: str

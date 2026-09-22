@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -6,6 +6,15 @@ import { describe, expect, it } from 'vitest';
 import { DeliveryController, SqliteDeliveryStore } from '../src/index';
 
 describe('Delivery unknown reconciliation', () => {
+  it('固定 playout fixture 保持 epoch、generation 与 heard range 单调', () => {
+    const events = JSON.parse(readFileSync(
+      join(__dirname, 'fixtures', 'playout-events.json'), 'utf8',
+    )) as Array<{ authority_epoch: number; generation: number; heard_through: number }>;
+    expect(new Set(events.map((event) => event.authority_epoch))).toEqual(new Set([7]));
+    expect(new Set(events.map((event) => event.generation))).toEqual(new Set([3]));
+    expect(events.map((event) => event.heard_through)).toEqual([0, 12, 12]);
+  });
+
   it('keeps an ambiguous send unknown across restart until an authoritative receipt arrives', () => {
     const root = mkdtempSync(join(tmpdir(), 'glimmer-delivery-unknown-'));
     const databasePath = join(root, 'delivery.db');
@@ -48,4 +57,3 @@ describe('Delivery unknown reconciliation', () => {
     }
   });
 });
-

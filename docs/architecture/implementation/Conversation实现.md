@@ -15,6 +15,9 @@
 - Python `src/glimmer_cradle/conversation/` 拥有持久 `ConversationTurn` 状态机、Message/WorkingSet、
   `ConversationLog`、`ConversationRecorder`、History Store/Controller 和所需 Port；`pyproject.toml`、pytest
   与 Cognition 的 workspace path dependency 均从该唯一源码根安装，不保留旧 `python/` 包入口。
+- `migrations/python/001-history.sql` 与 `002-turns.sql` 是 fresh-schema 的唯一 SQL 来源并随 Python wheel
+  安装；代码迁移只保留 v3→v4 的有状态数据转换。`schemas/conversation-config.schema.json` 固定 owner 配置边界，
+  现行 Cognition 配置消费将在 App composition 迁移时切换。
 - Cognition Worker 是当前进程 composition root，不因此拥有 Conversation 状态；它注入 Clock、ID、
   Observability、兼容路径和配置，再通过 Conversation reader 组装 Context、Episode、Relationship 与 Activity。
 
@@ -55,7 +58,7 @@ delivered/playing/completed。新 Host epoch 会先 fence 旧 epoch 的所有 ac
 
 ## Canonical Log 与 Experience
 
-`log/ledger.py` 是唯一 writer：月度 SQLite pack 只追加 Moment，`catalog.db` 维护全局 position 和 pack 范围，
+`adapters/persistence/log_store.py` 是唯一 SQLite writer adapter：月度 pack 只追加 Moment，`catalog.db` 维护全局 position 和 pack 范围，
 writer guard 阻止同一目录双写。`perception`、`emotion`、`reply`、`action`、`action_result` 与 `silence`
 保存直接交互事实、终态或相关 durable observation；`transient` 不落盘。
 
@@ -75,8 +78,8 @@ Cognition 的 Episode、Relationship、Activity、Recent Experience 与 Memory c
 
 ## History 与恢复
 
-`history/store.py` 只按 Log position 增量投影 user/assistant Message、Chapter、Segment 和 Conversation State。
-`history/controller.py` 在读取前 flush Log 并推进 checkpoint；Working Set 只从 History Store 恢复。
+`adapters/persistence/history_store.py` 只按 Log position 增量投影 user/assistant Message、Chapter、Segment 和 Conversation State。
+`history/projection.py` 在读取前通过 commit barrier 推进 checkpoint；`history/history_reader.py` 只从投影恢复 Working Set。
 `conversations.db` 是可删除重建的 projection，不是第二事实源。
 
 当前兼容路径为 `data/state/cognition/conversations/conversations.db`；阶段 14 迁移前保持不变。History

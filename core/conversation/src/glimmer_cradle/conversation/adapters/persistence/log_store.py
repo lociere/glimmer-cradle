@@ -1,9 +1,8 @@
-"""单写者、分包、可校验的 Conversation Log。"""
+"""单写者、分包、可校验的 SQLite Conversation Log adapter。"""
 from __future__ import annotations
 
 import asyncio
 import json
-import os
 import sqlite3
 import threading
 from collections import Counter
@@ -11,9 +10,10 @@ from contextlib import closing
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import BinaryIO
 
-from glimmer_cradle.conversation.log.events import AffectSnapshot, Moment, SourceDescriptor
+from glimmer_cradle.conversation.adapters.persistence.writer_guard import WriterGuard
+from glimmer_cradle.conversation.log.position import as_log_position
+from glimmer_cradle.conversation.log.record import AffectSnapshot, Moment, SourceDescriptor
 
 _PACK_DDL = """
 CREATE TABLE IF NOT EXISTS moments (
@@ -52,7 +52,7 @@ class ConversationLog:
         self._lock = threading.RLock()
         self._lifecycle_lock = asyncio.Lock()
         self._flush_lock = asyncio.Lock()
-        self._writer_guard: BinaryIO | None = None
+        self._writer_guard = WriterGuard(base_dir / ".writer.lock")
         self._state = "stopped"
 
     @property
@@ -68,11 +68,11 @@ class ConversationLog:
             self.base_dir.mkdir(parents=True, exist_ok=True)
             self.packs_dir.mkdir(parents=True, exist_ok=True)
             self._state = "starting"
-            self._acquire_writer_guard()
+            self._writer_guard.acquire()
             try:
                 await asyncio.to_thread(self._initialize)
             except Exception:
-                self._release_writer_guard()
+                self._writer_guard.release()
                 self._state = "stopped"
                 raise
             self._state = "started"
@@ -89,7 +89,7 @@ class ConversationLog:
             except Exception:
                 self._state = "stop_failed"
                 raise
-            self._release_writer_guard()
+            self._writer_guard.release()
             self._state = "stopped"
 
     def append(self, moment: Moment) -> Moment:
@@ -116,7 +116,7 @@ class ConversationLog:
 
     def _append_locked(self, moment: Moment) -> Moment:
         self._last_position += 1
-        stored = replace(moment, seq=self._last_position)
+        stored = replace(moment, seq=as_log_position(self._last_position))
         self._pending.append(stored)
         return stored
 
@@ -372,7 +372,7 @@ class ConversationLog:
     @staticmethod
     def _row_to_moment(row: tuple, causes: tuple[str, ...]) -> Moment:
         affect_raw = json.loads(row[13]) if row[13] else None
-        return Moment(seq=row[0], moment_id=row[1], occurred_at=row[2], kind=row[4],
+        return Moment(seq=as_log_position(row[0]), moment_id=row[1], occurred_at=row[2], kind=row[4],
                       content=json.loads(row[5]), causation_ids=causes, scene_id=row[6],
                       conversation_id=row[7], continuity_id=row[8], thread_id=row[9],
                       interaction_id=row[10], actor_id=row[11], actor_name=row[12],
@@ -381,37 +381,3 @@ class ConversationLog:
                       origin=SourceDescriptor(**json.loads(row[16])),
                       retention_ceiling=row[17], recall_scope=row[18],
                       disclosure_scope=row[19], schema_version=row[20])
-
-    def _acquire_writer_guard(self) -> None:
-        handle = open(self.base_dir / ".writer.lock", "a+b")
-        try:
-            if os.name == "nt":
-                import msvcrt
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(  # type: ignore[attr-defined]
-                    handle.fileno(),
-                    fcntl.LOCK_EX | fcntl.LOCK_NB,  # type: ignore[attr-defined]
-                )
-        except OSError as exc:
-            handle.close()
-            raise RuntimeError("Conversation Log 已有写入者") from exc
-        self._writer_guard = handle
-
-    def _release_writer_guard(self) -> None:
-        handle = self._writer_guard
-        if handle is None:
-            return
-        try:
-            if os.name == "nt":
-                import msvcrt
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
-        finally:
-            handle.close()
-            self._writer_guard = None

@@ -1,0 +1,5 @@
+[
+  { "output_id": "output:fixture", "generation": 3, "authority_epoch": 7, "heard_through": 0, "status": "started" },
+  { "output_id": "output:fixture", "generation": 3, "authority_epoch": 7, "heard_through": 12, "status": "progress" },
+  { "output_id": "output:fixture", "generation": 3, "authority_epoch": 7, "heard_through": 12, "status": "completed" }
+]

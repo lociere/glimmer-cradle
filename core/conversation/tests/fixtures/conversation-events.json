@@ -1,0 +1,21 @@
+[
+  {
+    "position": 1,
+    "moment_id": "fixture-perception-1",
+    "kind": "perception",
+    "conversation_id": "conversation:fixture",
+    "thread_id": "main",
+    "interaction_id": "interaction:fixture",
+    "content": { "text": "你好" }
+  },
+  {
+    "position": 2,
+    "moment_id": "fixture-reply-1",
+    "kind": "reply",
+    "conversation_id": "conversation:fixture",
+    "thread_id": "main",
+    "interaction_id": "interaction:fixture",
+    "causation_ids": ["fixture-perception-1"],
+    "content": { "text": "晚上好" }
+  }
+]

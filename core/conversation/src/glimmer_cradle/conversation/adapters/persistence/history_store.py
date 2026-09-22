@@ -1,4 +1,4 @@
-"""从 ordered Conversation fact 构建的持久 History 查询投影。"""
+"""Conversation History 的可删除、可重建 SQLite persistence adapter。"""
 
 from __future__ import annotations
 
@@ -7,68 +7,30 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from importlib.metadata import files
 from pathlib import Path
 
 import aiosqlite
 
-from glimmer_cradle.conversation.log.fact import ConversationFact
-from glimmer_cradle.conversation.message.models import ConversationMessage
+from glimmer_cradle.conversation.log.record import ConversationFact
+from glimmer_cradle.conversation.messages.message import ConversationMessage
+from glimmer_cradle.conversation.messages.participant import Participant
 
 logger = logging.getLogger("glimmer_cradle.conversation.history")
 SCHEMA_VERSION = 4
 _TOKENS = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]{1,2}")
 
-_DDL = """
-CREATE TABLE schema_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-CREATE TABLE projection_meta(name TEXT PRIMARY KEY,position INTEGER NOT NULL,updated_at TEXT NOT NULL);
-CREATE TABLE conversation_threads(
-  conversation_id TEXT NOT NULL, thread_id TEXT NOT NULL, scene_id TEXT NOT NULL,
-  recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
-  PRIMARY KEY(conversation_id,thread_id)
-);
-CREATE TABLE conversation_messages(
-  position INTEGER PRIMARY KEY, moment_id TEXT NOT NULL UNIQUE,
-  conversation_id TEXT NOT NULL, chapter_id TEXT, scene_id TEXT NOT NULL, thread_id TEXT NOT NULL,
-  interaction_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('user','assistant')),
-  content TEXT NOT NULL, actor_id TEXT, actor_name TEXT, occurred_at TEXT NOT NULL,
-  importance REAL NOT NULL, recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL,
-  FOREIGN KEY(conversation_id,thread_id)
-    REFERENCES conversation_threads(conversation_id,thread_id)
-);
-CREATE INDEX idx_conversation_messages_thread
-  ON conversation_messages(conversation_id,thread_id,position DESC);
-CREATE TABLE conversation_chapters(
-  chapter_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, thread_id TEXT NOT NULL,
-  sequence INTEGER NOT NULL, status TEXT NOT NULL,
-  first_position INTEGER NOT NULL, last_position INTEGER NOT NULL,
-  started_at TEXT NOT NULL, ended_at TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '',
-  UNIQUE(conversation_id,thread_id,sequence)
-);
-CREATE INDEX idx_conversation_chapters_active
-  ON conversation_chapters(conversation_id,thread_id,status,last_position);
-CREATE TABLE conversation_segments(
-  segment_id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, thread_id TEXT NOT NULL,
-  chapter_id TEXT NOT NULL,
-  level INTEGER NOT NULL, parent_segment_id TEXT,
-  first_position INTEGER NOT NULL, last_position INTEGER NOT NULL,
-  summary TEXT NOT NULL, keywords_json TEXT NOT NULL, actor_ids_json TEXT NOT NULL,
-  recall_scope TEXT NOT NULL, disclosure_scope TEXT NOT NULL, created_at TEXT NOT NULL,
-  UNIQUE(conversation_id,thread_id,level,first_position,last_position)
-);
-CREATE INDEX idx_conversation_segments_lookup
-  ON conversation_segments(conversation_id,thread_id,level,last_position DESC);
-CREATE TABLE conversation_segment_members(
-  segment_id TEXT NOT NULL,position INTEGER NOT NULL,
-  PRIMARY KEY(segment_id,position)
-);
-CREATE TABLE conversation_state(
-  conversation_id TEXT NOT NULL,thread_id TEXT NOT NULL,
-  version INTEGER NOT NULL,through_position INTEGER NOT NULL,
-  state_json TEXT NOT NULL,updated_at TEXT NOT NULL,
-  PRIMARY KEY(conversation_id,thread_id)
-);
-"""
+
+def _migration_sql(filename: str) -> str:
+    source_path = Path(__file__).resolve().parents[5] / "migrations" / "python" / filename
+    if source_path.is_file():
+        return source_path.read_text(encoding="utf-8")
+    for entry in files("glimmer-cradle-conversation") or ():
+        if entry.as_posix().endswith(
+            f"share/glimmer-cradle-conversation/migrations/python/{filename}"
+        ):
+            return Path(entry.locate()).read_text(encoding="utf-8")
+    raise RuntimeError(f"Conversation migration 缺失: {filename}")
 
 
 class ConversationStore:
@@ -90,7 +52,7 @@ class ConversationStore:
             "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'"
         )
         if await cursor.fetchone() is None:
-            await self._conn.executescript(_DDL)
+            await self._conn.executescript(_migration_sql("001-history.sql"))
             await self._conn.execute(
                 "INSERT INTO schema_meta VALUES('schema_version',?)", (str(SCHEMA_VERSION),)
             )
@@ -130,7 +92,7 @@ class ConversationStore:
                 "idx_conversation_segments_lookup",
             ):
                 await conn.execute(f"DROP INDEX IF EXISTS {index}")
-            for statement in _DDL.split(";"):
+            for statement in _migration_sql("001-history.sql").split(";"):
                 if statement.strip():
                     await conn.execute(statement)
             await conn.execute(
@@ -263,7 +225,11 @@ class ConversationStore:
             ),
         )
         chapter_id = await self._resolve_chapter(conn, moment)
-        role = "user" if moment.kind == "perception" else "assistant"
+        role = (
+            Participant.USER.value
+            if moment.kind == "perception"
+            else Participant.ASSISTANT.value
+        )
         await conn.execute(
             """
             INSERT INTO conversation_messages VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -444,7 +410,9 @@ class ConversationStore:
         if len(messages) < self._state_update_messages and row is not None:
             return
         recent = messages[-self._state_update_messages:]
-        user_lines = [str(item[1]) for item in recent if item[0] == "user"]
+        user_lines = [
+            str(item[1]) for item in recent if item[0] == Participant.USER.value
+        ]
         questions = [line for line in user_lines if line.rstrip().endswith(("?", "？"))]
         state = {
             "active_topic": user_lines[-1][:160] if user_lines else "",
@@ -651,7 +619,7 @@ class ConversationStore:
         clauses.append(f"recall_scope IN ({placeholders})")
         params.extend(sorted(allowed_scopes))
         if actor_id:
-            clauses.append("(actor_id=? OR role='assistant')")
+            clauses.append(f"(actor_id=? OR role='{Participant.ASSISTANT.value}')")
             params.append(actor_id)
         return clauses, params
 
@@ -677,7 +645,7 @@ class ConversationStore:
         assistant_cursor = await self._connection.execute(
             f"""
             SELECT position FROM conversation_messages
-            WHERE {" AND ".join([*base_clauses, "role='assistant'"])}
+            WHERE {" AND ".join([*base_clauses, f"role='{Participant.ASSISTANT.value}'"])}
             ORDER BY position DESC LIMIT 1
             """,
             tuple(base_params),

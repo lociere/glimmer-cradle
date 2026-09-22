@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from glimmer_cradle.conversation.ports import ClockPort
+from typing import Protocol
+
 from glimmer_cradle.conversation.turns.turn import ConversationTurn, TurnStatus
 from glimmer_cradle.conversation.turns.turn_store_port import (
     TurnConflictError,
     TurnStorePort,
     TurnTransitionError,
 )
+
+
+class ClockPort(Protocol):
+    def now_iso(self) -> str: ...
 
 _TRANSITIONS: dict[TurnStatus, frozenset[TurnStatus]] = {
     "accepted": frozenset({"running", "completed", "interrupted", "failed"}),

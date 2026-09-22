@@ -1,0 +1,9 @@
+{
+  "schema_version": 4,
+  "position": 41,
+  "moment_id": "legacy-v4-fixture",
+  "kind": "perception",
+  "scene_id": "scene:legacy",
+  "interaction_id": "interaction:legacy-v4",
+  "content": { "text": "旧格式文本" }
+}

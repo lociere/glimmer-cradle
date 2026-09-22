@@ -1,6 +1,9 @@
+"""Conversation Log durability 与 History 重建的集成反例。"""
+
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -16,6 +19,18 @@ from glimmer_cradle.conversation import (
     MomentKind,
     build_conversation_recorder,
 )
+
+
+def test_frozen_log_fixtures_preserve_version_and_position_contract() -> None:
+    fixtures = Path(__file__).parent / "fixtures"
+    legacy_v4 = json.loads((fixtures / "legacy-log-v4.json").read_text(encoding="utf-8"))
+    legacy_v5 = json.loads((fixtures / "legacy-log-v5.json").read_text(encoding="utf-8"))
+    events = json.loads((fixtures / "conversation-events.json").read_text(encoding="utf-8"))
+
+    assert (legacy_v4["schema_version"], legacy_v5["schema_version"]) == (4, 5)
+    assert legacy_v4["position"] < legacy_v5["position"]
+    assert [event["position"] for event in events] == [1, 2]
+    assert events[1]["causation_ids"] == [events[0]["moment_id"]]
 
 
 class Clock:

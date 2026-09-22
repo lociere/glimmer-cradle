@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "glimmer://conversation/config/v1",
+  "title": "ConversationConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["working", "history", "log"],
+  "properties": {
+    "working": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_messages_per_conversation", "hydrate_recent_messages", "context_message_limit"],
+      "properties": {
+        "max_messages_per_conversation": { "type": "integer", "minimum": 2 },
+        "hydrate_recent_messages": { "type": "integer", "minimum": 2 },
+        "context_message_limit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segment_target_messages", "chapter_idle_minutes", "chapter_segment_limit", "state_update_messages", "history_candidate_limit", "history_result_limit", "summary_max_chars"],
+      "properties": {
+        "segment_target_messages": { "type": "integer", "minimum": 4 },
+        "chapter_idle_minutes": { "type": "integer", "minimum": 1 },
+        "chapter_segment_limit": { "type": "integer", "minimum": 2 },
+        "state_update_messages": { "type": "integer", "minimum": 1 },
+        "history_candidate_limit": { "type": "integer", "minimum": 1 },
+        "history_result_limit": { "type": "integer", "minimum": 1 },
+        "summary_max_chars": { "type": "integer", "minimum": 256 }
+      }
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "pack_max_size_mb", "flush_interval_ms", "flush_max_buffer"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "pack_max_size_mb": { "type": "integer", "minimum": 16 },
+        "flush_interval_ms": { "type": "integer", "minimum": 50 },
+        "flush_max_buffer": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

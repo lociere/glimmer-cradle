@@ -1,17 +1,67 @@
-"""向 Conversation Log 写入 durable interaction Moment 的唯一门面。"""
+"""Conversation Log 的唯一写入用例与组装入口。"""
 from __future__ import annotations
 
 import asyncio
 import uuid
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Protocol
 
-from glimmer_cradle.conversation.log.events import AffectSnapshot, Moment, MomentKind, SourceDescriptor
-from glimmer_cradle.conversation.ports import (
-    ClockPort,
-    ConversationLogPort,
-    IdGeneratorPort,
-    ObservabilityPort,
-)
+from glimmer_cradle.conversation.log.record import AffectSnapshot, Moment, MomentKind, SourceDescriptor
+
+
+class ConversationLogPort(Protocol):
+    @property
+    def base_dir(self) -> object: ...
+
+    async def start(self) -> None: ...
+
+    async def stop(self) -> None: ...
+
+    async def flush(self) -> None: ...
+
+    def append(self, moment: Moment) -> Moment: ...
+
+    def append_idempotent(self, moment: Moment) -> Moment: ...
+
+    def query(
+        self, *, after_position: int = 0, limit: int | None = None
+    ) -> list[Moment]: ...
+
+    def recent(
+        self,
+        *,
+        limit: int,
+        kinds: set[str] | None = None,
+        scene_id: str | None = None,
+        exclude_trace_id: str | None = None,
+    ) -> list[Moment]: ...
+
+    def verify(self) -> dict[str, object]: ...
+
+
+class ClockPort(Protocol):
+    def now_iso(self) -> str: ...
+
+    async def wait(self, seconds: float) -> None: ...
+
+
+class IdGeneratorPort(Protocol):
+    def new(self) -> str: ...
+
+
+class LoggerPort(Protocol):
+    def info(self, event: str, **values: Any) -> Any: ...
+
+    def warning(self, event: str, **values: Any) -> Any: ...
+
+    def error(self, event: str, **values: Any) -> Any: ...
+
+
+class ObservabilityPort(Protocol):
+    def logger(self, module_name: str) -> LoggerPort: ...
+
+    def current_trace_id(self) -> str | None: ...
 
 class ConversationRecorder:
     def __init__(self, log: ConversationLogPort, *, clock: ClockPort,
@@ -174,3 +224,38 @@ class ConversationRecorder:
                 return
             except Exception as exc:
                 self._logger.error("Conversation Log 刷盘失败", error=str(exc), exc_info=True)
+
+
+def build_conversation_recorder(
+    base_dir: Path,
+    *,
+    enabled: bool = True,
+    pack_max_size_mb: int = 256,
+    flush_interval_ms: int = 500,
+    flush_max_buffer: int = 64,
+    clock: ClockPort,
+    ids: IdGeneratorPort,
+    observability: ObservabilityPort,
+) -> ConversationRecorder:
+    from glimmer_cradle.conversation.adapters.persistence.log_store import ConversationLog
+
+    log = ConversationLog(base_dir, pack_max_size_mb=pack_max_size_mb)
+    return ConversationRecorder(
+        log,
+        clock=clock,
+        ids=ids,
+        observability=observability,
+        enabled=enabled,
+        flush_interval_ms=flush_interval_ms,
+        flush_max_buffer=flush_max_buffer,
+    )
+
+
+__all__ = [
+    "ClockPort",
+    "ConversationLogPort",
+    "ConversationRecorder",
+    "IdGeneratorPort",
+    "ObservabilityPort",
+    "build_conversation_recorder",
+]

@@ -12,6 +12,8 @@ export * from './interaction/input.js';
 export * from './interaction/input-deduplicator.js';
 export * from './interaction/interaction-controller.js';
 export * from './interaction/interruption.js';
+export * from './messages/message.js';
+export * from './messages/participant.js';
 export * from './turns/turn-processor-port.js';
 export * from './turns/turn-snapshot.js';
 export * from './turns/turn-store-port.js';

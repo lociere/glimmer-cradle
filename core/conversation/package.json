@@ -14,9 +14,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.json",
-    "test": "pnpm run build && node --test tests/*.test.mjs && vitest run"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm run build && vitest run"
   },
   "dependencies": {
     "@glimmer-cradle/platform": "workspace:*",

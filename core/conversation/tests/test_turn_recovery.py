@@ -1,3 +1,5 @@
+"""持久 Turn 的接纳、转换与重启恢复反例。"""
+
 from __future__ import annotations
 
 from pathlib import Path

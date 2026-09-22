@@ -1,0 +1,15 @@
+{
+  "schema_version": 5,
+  "position": 42,
+  "moment_id": "legacy-v5-fixture",
+  "kind": "perception",
+  "conversation_id": "conversation:legacy",
+  "continuity_id": "continuity:legacy",
+  "thread_id": "main",
+  "interaction_id": "interaction:legacy-v5",
+  "content": {
+    "parts": [
+      { "kind": "text", "text": "带 ContentPart 的格式" }
+    ]
+  }
+}

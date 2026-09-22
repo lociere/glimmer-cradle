@@ -1,8 +1,11 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from glimmer_cradle.conversation import ConversationController, ConversationStore
-from glimmer_cradle.conversation.log.recorder import ConversationRecorder
+from glimmer_cradle.conversation import (
+    ConversationController,
+    ConversationRecorder,
+    ConversationStore,
+)
 from tests.support import CLOCK, IDS, build_experience_recorder
 from glimmer_cradle.conversation.log import Moment, MomentKind
 

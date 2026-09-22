@@ -128,11 +128,11 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 
 | 当前事实 | v2.1 目标文件 | 本阶段处理与删除门 |
 |---|---|---|
-| `core/conversation/src/index.ts` 中 binding 类型与算法 | `core/conversation/src/binding/{binding.ts,binding-resolver.ts,binding-store-port.ts}`、`src/adapters/storage/sqlite-binding-store.ts` | 先拆纯模型/解析与持久绑定；稳定 ID、旧地址样本和 Kernel consumer 全切换后删除聚合实现 |
-| 尚缺的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 由 Host 通过 `apps/host/src/composition/turn-processor-adapter.ts` 绑定 Cognition；接纳、去重和中断反例通过后替换 Kernel 旧入口 |
-| 尚缺的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出和 unknown 回执通过恢复测试后切换 Surface 投递链 |
-| `src/glimmer_cradle/conversation/log/{events.py,fact.py,factory.py,ledger.py,recorder.py}` | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/log_store.py` | Python 源码根已迁移；继续保留 v4/v5 ID、position、单写者和 pack 读取，拆分后删除聚合旧文件；数据路径迁移仍等待阶段 14 备份/恢复 |
-| `src/glimmer_cradle/conversation/history/{store.py,controller.py}` | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | Python 源码根已迁移；v3→v4、多 thread、分页、重建和权限反例通过后按职责拆分；`conversations.db` 始终为投影 |
+| 已拆分的 Binding 与 SQLite adapter | `core/conversation/src/binding/{binding.ts,binding-resolver.ts,binding-store-port.ts}`、`src/adapters/storage/sqlite-binding-store.ts` | 已完成；稳定 ID、旧地址样本与 Kernel consumer 均走公开根 API，旧聚合实现已删除 |
+| 已落位的 TS interaction 协调 | `core/conversation/src/interaction/{input.ts,input-deduplicator.ts,interaction-controller.ts,interruption.ts}` | 已接入现行 Kernel ingress；阶段 12 由 Host `turn-processor-adapter.ts` 绑定 Cognition，跨重启去重仍需持久 Turn 确认 |
+| 已落位的 TS delivery 状态 | `core/conversation/src/delivery/{delivery-controller.ts,delivery-store-port.ts,output-generation.ts,playout.ts,receipt.ts}` 与 SQLite adapter | generation/epoch、晚到输出和 unknown 恢复已实现；Surface receipt/播放回执接线仍待阶段 12 |
+| 已拆分的 Python ordered log | `src/glimmer_cradle/conversation/log/{record.py,position.py,reader.py,writer.py,commit_barrier.py}` 与 `adapters/persistence/{log_store.py,writer_guard.py}` | 源码与 wheel 均已 consumer-zero 删除旧聚合文件；保留 v4/v5 ID、position、单写者和 pack 读取，数据路径迁移仍等待阶段 14 备份/恢复 |
+| 已拆分的 Python History | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | v3→v4、多 thread、分页、重建和权限反例继续通过；`conversations.db` 始终为投影 |
 | `src/glimmer_cradle/conversation/turns/*` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | 目标 Turn 文件和持久 adapter 已就位；Conversation 持久 Turn 与 Cognition Step 分离，跨重启 ingress 确认接线仍待完成 |
 | Cognition `CycleContinuity`、`AgentSynthesisUseCase` 的 action/result 记录 | Conversation Log 的 ACTION → ACTION_RESULT → REPLY 因果事实；跨进程映射暂经现行 cognition proto | 本切片先确保副作用前 flush、稳定 invocation 与幂等重放；阶段 6 切换 native ToolCall/ToolResult 后删除 `skill_request` 兼容链 |
 | `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 阶段 12 切 App composition；Conversation writer drain 与 Cognition checkpoint 都通过后删除旧 Worker 入口 |
@@ -262,6 +262,18 @@ Python 源码根物理迁移切片将唯一包入口从 `python/glimmer_cradle/c
 删除。迁移后的 Conversation Python 14 项、Cognition 全量 258 项、Conversation TS/Node 11 项均 PASS。
 该切片只收束源码根，不改 SQLite 数据路径或 schema；Log/History/Message 聚合文件仍须按目标职责继续拆分，
 因此不宣称目标物理目录或阶段 4 完成。
+
+Python 职责拆分切片进一步删除 `events/fact/factory/ledger/recorder`、`history/store/controller`、单数
+`message/` 与通用 `ports.py` 聚合入口；Log record/position/reader/writer/commit barrier、History
+checkpoint/projection/reader/working set、复数 Messages 和 persistence adapters 均按 v2.1 文件契约归位。
+writer guard 从 SQLite adapter 中独立并保持跨进程 fencing；History/Turn 新库由
+`migrations/python/{001-history,002-turns}.sql` 作为唯一 fresh-schema 来源，wheel 明确携带且隔离安装读取通过。
+Conversation 精确清单已无缺失文件；仅现行 `core/conversation/uv.lock` 在根 uv workspace 尚未建立前作为
+迁移保护继续保留。新增公开 API、投影缓存失效、writer fencing 与固定 v4/v5/playout fixture 反例后，
+Conversation Python 18 项、TS 9 项、Cognition 全量 258 项和 Kernel 全量 204 项（另 7 项跳过）PASS；
+clean wheel 与 npm tarball 均只携带目标入口和四份 migration，隔离 wheel 安装可读取 Python SQL。
+docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。Surface receipt 与跨重启
+ingress 确认仍未接线，阶段 4 继续进行。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 
