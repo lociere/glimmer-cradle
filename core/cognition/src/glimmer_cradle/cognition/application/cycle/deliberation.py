@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from glimmer_cradle.cognition.application.cycle.action_planner import ActionPlan, CognitiveActionPlanner
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.cognition.attention import Attention
@@ -14,6 +13,7 @@ from glimmer_cradle.cognition.inference import (
     InferenceController,
     InferenceUnavailable,
 )
+from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 
 
@@ -24,6 +24,7 @@ class DeliberationController:
         self,
         *,
         reasoning: InferenceController | None,
+        planning_controller: PlanningController | None,
         context_builder: ReplyContextBuilder,
         activity_controller=None,
         emotion_system=None,
@@ -32,7 +33,9 @@ class DeliberationController:
         observability: ObservabilityPort,
     ) -> None:
         self._reasoning = reasoning
-        self._planner = CognitiveActionPlanner(reasoning, observability=observability)
+        self._planner = planning_controller or PlanningController(
+            reasoning, observability=observability
+        )
         self._context = context_builder
         self._activity = activity_controller
         self._emotion = emotion_system

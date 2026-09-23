@@ -92,7 +92,12 @@ def resolve_cognition_db_path() -> Path:
 
 def resolve_cognition_state_db_path() -> Path:
     """解析 Cognition 状态快照数据库路径。"""
-    return resolve_state_dir() / "cognition" / "state" / "state.db"
+    return resolve_state_dir() / "cognition" / "state.sqlite"
+
+
+def resolve_cognition_planning_db_path() -> Path:
+    """解析 Cognition 规划决策数据库路径。"""
+    return resolve_state_dir() / "cognition" / "planning.sqlite"
 
 
 def resolve_conversation_db_path() -> Path:

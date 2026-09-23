@@ -12,6 +12,7 @@
 | Kernel 应用 Port | `ports/kernel/` |
 | 认知主循环 | `application/cycle/`、`attention/`、`domain/volition/` |
 | 推理边界 | `inference/`；供应商调用只在 `adapters/inference/` |
+| 规划边界 | `planning/`；SQLite concrete 只在 `adapters/persistence/sqlite_planning_store.py` |
 | Volition/巩固 | `domain/volition/`、`application/memory/consolidation.py`、`adapters/persistence/experience/episodes.py` |
 | 上下文 | `application/context/` |
 | 推理/模型 | `inference/`、`adapters/inference/` |

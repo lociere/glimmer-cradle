@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from glimmer_cradle.conversation import ConversationTurn
-from glimmer_cradle.cognition.application.cycle.action_planner import ActionPlan
+from glimmer_cradle.cognition.planning import ActionPlan
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult
 
 

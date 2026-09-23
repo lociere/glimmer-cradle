@@ -37,18 +37,21 @@ from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
+    resolve_cognition_planning_db_path,
     resolve_cognition_state_db_path,
     resolve_conversation_db_path,
     resolve_episode_projection_path,
     resolve_experience_dir,
 )
 from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
+from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import InferenceController
+from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
 from glimmer_cradle.cognition.application.memory import KnowledgeBase, MemorySubstrate
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
@@ -80,6 +83,7 @@ class CognitionComponents:
     knowledge_base: KnowledgeBase
     activity_controller: CognitiveActivityController
     state_store: SqliteStateStore
+    planning_store: SqlitePlanningStore
     cognition_database: CognitionDatabase
     conversation_controller: ConversationController
     turn_controller: TurnController
@@ -117,6 +121,7 @@ def compose_cognition(
     )
     cognition_database = CognitionDatabase()
     state_store = SqliteStateStore(resolve_cognition_state_db_path())
+    planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
     memory_repository = MemoryRepository(cognition_database)
     knowledge_repository = KnowledgeRepository(cognition_database)
     vector_repository = VectorRepository(cognition_database)
@@ -223,6 +228,11 @@ def compose_cognition(
     reasoning = InferenceController(
         cloud=CloudReasoning(llm_engine), local=None, observability=observability
     )
+    planning_controller = PlanningController(
+        reasoning,
+        observability=observability,
+        store=planning_store,
+    )
 
     episode_projection = EpisodeProjection(
         resolve_episode_projection_path(),
@@ -276,6 +286,7 @@ def compose_cognition(
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
         action_sink=outbound_adapter.send_action_command,
         reasoning=reasoning,
+        planning_controller=planning_controller,
         persona_compiler=self_entity.persona,
         boundary_validator=self_entity.validate_boundary,
         self_entity=self_entity,
@@ -313,6 +324,7 @@ def compose_cognition(
         knowledge_base=knowledge_base,
         activity_controller=activity_controller,
         state_store=state_store,
+        planning_store=planning_store,
         cognition_database=cognition_database,
         conversation_controller=conversation_controller,
         turn_controller=turn_controller,

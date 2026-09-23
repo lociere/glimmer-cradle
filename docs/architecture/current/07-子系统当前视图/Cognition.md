@@ -20,7 +20,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 记忆与知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` | Kernel 记忆副本或 Extension 私写记忆 |
 | 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
 | 推理与多模态 | `inference/`、`adapters/inference/` | provider key 管理或桌面 IO |
-| 行动语义 | `application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | 平台 payload、窗口控制、权限执行 |
+| 规划与行动语义 | `planning/`、`application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | Skill catalog、平台 payload、窗口控制、权限执行 |
 
 ## 当前结构
 
@@ -30,6 +30,7 @@ core/cognition/src/glimmer_cradle/cognition/
 ├── application/                       # Cycle、维护、查询和本地事务编排
 ├── ports/                             # Kernel/provider/persistence/clock/observability 外部能力
 ├── adapters/                          # gRPC、provider、persistence、config/path 与观测 concrete
+├── planning/                          # Cognition 目标、行动计划、承诺与规划持久化边界
 └── host/{process,composition}.py      # 唯一进程入口、组装与受监督生命周期
 ```
 
@@ -62,7 +63,7 @@ Perception
 
 这条主线保证同一感知不会被旧用例、UI 层或平台 Adapter 重复编排。`application/agent_plan_use_case.py`、`agent_synthesis_use_case.py` 等用例可以服务工具规划与结果综合，但不能重新成为独立聊天回复主线。
 
-当前聊天主循环能生成 `reply` 并通过 `ActionCommand` 外发；Deliberate 先由 `CognitiveActionPlanner` 生成结构化 ActionPlan，语义级判断当前目标应 `reply`、`skill_request`、`ask_clarification` 或 `noop`。`reply` 才继续普通 persona reply prompt；高置信度 `skill_request` 会停止普通回复并发出 `action_type=skill_request` 的 `ActionCommand`，携带 `original_goal`、`capability_kind`、`confidence`、`reason` 和可选 `planning_hint`；`ask_clarification` 生成 ActionPlan 驱动的澄清回复；`noop` 不发行动并记录 `action_plan_noop` 的 silence。Cognition 只表达行动语义，不读取 catalog、不执行 handler、不接触平台 IO；推理不可用或规划非法时不会用关键词规则兜底执行工具。Kernel 的 `SkillActionController` 接收该请求后暴露 character audience 的 ready catalog 给 `agent_plan` RPC，执行结果再通过 `agent_synthesis` RPC 回到 Cognition 合成角色回复。
+当前聊天主循环能生成 `reply` 并通过 `ActionCommand` 外发；Deliberate 先由 `planning/PlanningController` 生成结构化 ActionPlan，语义级判断当前目标应 `reply`、`skill_request`、`ask_clarification` 或 `noop`。`reply` 才继续普通 persona reply prompt；高置信度 `skill_request` 会停止普通回复并发出 `action_type=skill_request` 的 `ActionCommand`，携带 `original_goal`、`capability_kind`、`confidence`、`reason` 和可选 `planning_hint`；`ask_clarification` 生成 ActionPlan 驱动的澄清回复；`noop` 不发行动并记录 `action_plan_noop` 的 silence。真实规划和显式降级写入独立 `planning.sqlite` journal。Cognition 只表达行动语义，不读取 catalog、不执行 handler、不接触平台 IO；推理不可用或规划非法时不会用关键词规则兜底执行工具。Kernel 的 `SkillActionController` 接收该请求后暴露 character audience 的 ready catalog 给 `agent_plan` RPC，执行结果再通过 `agent_synthesis` RPC 回到 Cognition 合成角色回复。
 
 `Intent.initiative` 区分响应性意图与主动意图。来自已准入、`address_mode=direct` 的 `PerceptionEvent` 且已经过 Deliberation 的回复、澄清或 Skill 请求属于 `reactive`，不再被用于角色自发行为的 willingness/activity 闸重复压制；ambient 感知以及 drive、affect 等角色自发行为属于 `proactive`，仍必须通过连续意愿阈值和 `CognitiveActivityPolicy.allows_proactive`。Skill 副作用无论来源都继续由 Kernel Skill Policy 与 Invocation Gateway 决定。
 
