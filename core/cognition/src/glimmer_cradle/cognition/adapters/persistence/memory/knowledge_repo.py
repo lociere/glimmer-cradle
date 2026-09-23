@@ -13,7 +13,7 @@ import json
 from typing import Any
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 
 logger = get_logger("knowledge_repo")
 
@@ -21,7 +21,7 @@ logger = get_logger("knowledge_repo")
 class KnowledgeRepository:
     """知识库条目数据访问层。"""
 
-    def __init__(self, database: CognitionDatabase) -> None:
+    def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
     async def upsert_entry(

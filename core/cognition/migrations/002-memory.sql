@@ -1,16 +1,3 @@
-"""Cognition 版本化记忆、关系、意向、知识与索引的单写者数据库。"""
-from __future__ import annotations
-
-from pathlib import Path
-import aiosqlite
-
-from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.paths import resolve_cognition_db_path
-
-logger = get_logger("cognition_database")
-SCHEMA_VERSION = 3
-
-_DDL = """
 CREATE TABLE schema_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 CREATE TABLE memory_items(
   memory_id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL,
@@ -92,43 +79,3 @@ CREATE INDEX idx_memory_actor ON memory_items(actor_id,status);
 CREATE INDEX idx_relationship_recent ON relationship_actors(last_seen_at);
 CREATE INDEX idx_relationship_observation_actor ON relationship_observations(actor_id,observed_at);
 CREATE INDEX idx_consolidation_jobs_due ON consolidation_jobs(state,available_at,priority);
-"""
-
-class CognitionDatabase:
-    def __init__(self, db_path: Path | None = None) -> None:
-        self._db_path = db_path or resolve_cognition_db_path()
-        self._conn: aiosqlite.Connection | None = None
-
-    async def connect(self) -> None:
-        if self._conn is not None:
-            return
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = await aiosqlite.connect(str(self._db_path))
-        await self._conn.execute("PRAGMA journal_mode=WAL")
-        await self._conn.execute("PRAGMA foreign_keys=ON")
-        cursor = await self._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'")
-        if await cursor.fetchone() is None:
-            await self._conn.executescript(_DDL)
-            await self._conn.execute("INSERT INTO schema_meta VALUES('schema_version',?)",
-                                     (str(SCHEMA_VERSION),))
-            await self._conn.commit()
-        else:
-            cursor = await self._conn.execute(
-                "SELECT value FROM schema_meta WHERE key='schema_version'")
-            row = await cursor.fetchone()
-            version = int(row[0]) if row is not None else 0
-            if version != SCHEMA_VERSION:
-                raise RuntimeError("检测到非当前记忆架构数据库；开发阶段请删除旧数据后重启")
-        logger.info("记忆事实库已就绪", db_path=str(self._db_path), schema_version=SCHEMA_VERSION)
-
-    async def close(self) -> None:
-        if self._conn is not None:
-            await self._conn.close()
-            self._conn = None
-
-    @property
-    def connection(self) -> aiosqlite.Connection:
-        if self._conn is None:
-            raise RuntimeError("CognitionDatabase 尚未连接")
-        return self._conn

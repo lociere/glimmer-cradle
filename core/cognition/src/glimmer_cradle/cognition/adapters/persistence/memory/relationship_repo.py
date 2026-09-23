@@ -4,13 +4,13 @@ from __future__ import annotations
 import json
 import uuid
 
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
 from glimmer_cradle.cognition.domain.relationship import RelationshipRecord
 
 
 class RelationshipRepository:
-    def __init__(self, database: CognitionDatabase) -> None:
+    def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
     async def observe(self, actor_id: str, *, kind: str,

@@ -17,7 +17,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 身份与人格 | `domain/{identity,persona}/`、`configs/characters/<character-id>/{persona,profile,dialogue}.yaml` | 平台账号、窗口状态、Extension 生命周期 |
 | 情绪、活动态与觉醒 | `state/`、`domain/identity/` | UI 动画本地推断 |
 | 经历之流 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` | 普通日志或聊天界面状态替代经历 |
-| 记忆与知识 | `domain/memory.py`、`application/memory/`、`adapters/persistence/memory/` | Kernel 记忆副本或 Extension 私写记忆 |
+| 记忆与知识 | `memory/`、现行 `application/memory/knowledge_base.py`、persistence adapters | Kernel 记忆副本或 Extension 私写记忆 |
 | 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
 | 推理与多模态 | `inference/`、`adapters/inference/` | provider key 管理或桌面 IO |
 | 规划与行动语义 | `planning/`、`application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | Skill catalog、平台 payload、窗口控制、权限执行 |
@@ -83,7 +83,7 @@ Perception
 | Conversation History | `core/conversation/src/glimmer_cradle/conversation/history/`、`data/state/cognition/conversations/conversations.db` | 从 Log 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建，数据路径待阶段 14 迁移 |
 | Conversation Log | `ConversationRecorder` / `ConversationLog` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
 | Episode Projection | `EpisodeProjection` | Cognition 按 turn + scene 从 Log 派生的经历边界；可删除、可重建、可封口 |
-| Memory Substrate | `MemorySubstrate` / repositories | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其状态 |
+| Memory | `MemoryController` / `MemoryStore` | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其版本、证据与纠错状态 |
 | 记忆修订与证据 | `memory_revisions` / `memory_evidence` | 当前有效修订、历史有效期、来源 Moment 和 consolidation id |
 | 关系投影 | `RelationshipProjection` / `relationship_*` | 按 checkpoint 从 Moment 幂等派生直接互动、环境观察、回复计数和有证据修订 |
 | 知识库 | Cognition knowledge repo | `scope=knowledge` 的 Knowledge Vault 条目，不是角色经历 |

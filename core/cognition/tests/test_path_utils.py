@@ -2,6 +2,7 @@ from pathlib import Path
 
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_cognition_planning_db_path,
+    resolve_cognition_db_path,
     resolve_cognition_state_db_path,
     resolve_global_data_dir,
     resolve_repo_root,
@@ -24,6 +25,7 @@ def test_deployment_data_root_owns_all_data_paths(monkeypatch, tmp_path: Path) -
 
     assert resolve_global_data_dir() == deployment_root
     assert resolve_cognition_state_db_path() == deployment_root / "state/cognition/state.sqlite"
+    assert resolve_cognition_db_path() == deployment_root / "state/cognition/memory.sqlite"
     assert resolve_cognition_planning_db_path() == deployment_root / "state/cognition/planning.sqlite"
 
 

@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import re
 import numpy as np
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from glimmer_cradle.cognition.domain.memory import MemoryKind
-from glimmer_cradle.cognition.ports.persistence import MemoryRepositoryPort
-from glimmer_cradle.cognition.ports.persistence import VectorRepositoryPort
+from glimmer_cradle.cognition.memory.memory import MemoryKind, MemoryRecord
+from glimmer_cradle.cognition.memory.memory_store import MemoryStore, VectorIndexStore
+from glimmer_cradle.cognition.memory.provenance import normalize_evidence
 from glimmer_cradle.cognition.inference import EmbeddingPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 
@@ -24,28 +23,7 @@ def _tokens(text: str) -> set[str]:
     return result
 
 
-@dataclass(frozen=True)
-class MemoryRecord:
-    memory_id: str
-    revision_id: str
-    kind: MemoryKind
-    status: str
-    content: str
-    summary: str
-    actor_id: str | None
-    scene_id: str | None
-    conversation_id: str | None
-    continuity_id: str | None
-    recall_scope: str
-    disclosure_scope: str
-    confidence: float
-    salience: float
-    valid_from: str
-    updated_at: str
-    attributes: dict[str, Any] = field(default_factory=dict)
-
-
-class MemorySubstrate:
+class MemoryController:
     """记忆业务 owner；repository 只负责事务，检索始终按 token 预算截断。"""
 
     def __init__(
@@ -53,21 +31,21 @@ class MemorySubstrate:
         candidate_limit: int = 24, result_limit: int = 6
     ) -> None:
         self._clock = clock
-        self._repo: MemoryRepositoryPort | None = None
+        self._repo: MemoryStore | None = None
         self._records: dict[str, MemoryRecord] = {}
         self._token_budget = max(128, token_budget)
         self._candidate_limit = max(1, candidate_limit)
         self._result_limit = max(1, result_limit)
         self._vector_engine: EmbeddingPort | None = None
-        self._vector_repository: VectorRepositoryPort | None = None
+        self._vector_repository: VectorIndexStore | None = None
         self._vectors: dict[str, np.ndarray] = {}
         self._semantic_weight = 0.0
 
-    def bind_repository(self, repository: MemoryRepositoryPort) -> None:
+    def bind_repository(self, repository: MemoryStore) -> None:
         self._repo = repository
 
     def bind_vector_search(
-        self, *, engine: EmbeddingPort, repository: VectorRepositoryPort,
+        self, *, engine: EmbeddingPort, repository: VectorIndexStore,
         semantic_weight: float,
     ) -> None:
         self._vector_engine = engine
@@ -114,16 +92,10 @@ class MemorySubstrate:
 
     async def remember_batch(self, drafts: list[dict[str, Any]]) -> list[str]:
         if self._repo is None:
-            raise RuntimeError("MemorySubstrate 未绑定 repository")
+            raise RuntimeError("MemoryController 未绑定 store")
         normalized: list[dict[str, Any]] = []
         for draft in drafts:
-            evidence_by_id = {
-                str(item.get("moment_id") or ""): item
-                for item in draft.get("evidence", [])
-                if str(item.get("moment_id") or "")
-            }
-            if not evidence_by_id:
-                raise ValueError("记忆修订必须携带 Moment 证据")
+            evidence = normalize_evidence(draft.get("evidence", []))
             kind = draft["kind"]
             kind_value = kind.value if isinstance(kind, MemoryKind) else str(kind)
             content = str(draft["content"])
@@ -138,7 +110,7 @@ class MemorySubstrate:
                 "attributes": dict(draft.get("attributes") or {}),
                 "recall_scope": str(draft.get("recall_scope") or "character_internal"),
                 "disclosure_scope": str(draft.get("disclosure_scope") or "conversation_private"),
-                "evidence": list(evidence_by_id.values()),
+                "evidence": evidence,
             })
         memory_ids = await self._repo.create_revisions(normalized)
         await self.load()

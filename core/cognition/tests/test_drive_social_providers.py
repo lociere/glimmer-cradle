@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, SocialProvider
 from glimmer_cradle.cognition.attention import make_attention
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 from tests.support import CLOCK, IDS
 
@@ -17,7 +17,7 @@ async def test_drive_accumulates_and_can_propose() -> None:
 
 
 async def test_social_projects_deterministic_relationship(tmp_path: Path) -> None:
-    database = CognitionDatabase(tmp_path / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.db")
     await database.connect()
     repository = RelationshipRepository(database)
     provider = SocialProvider(repository, clock=CLOCK, ids=IDS)

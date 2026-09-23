@@ -52,11 +52,11 @@ from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.planning import PlanningController
-from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator
-from glimmer_cradle.cognition.application.memory import KnowledgeBase, MemorySubstrate
+from glimmer_cradle.cognition.application.memory import KnowledgeBase
+from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
@@ -79,12 +79,12 @@ class CognitionComponents:
     cognition_grpc_host: CognitionGrpcHost
     outbound_adapter: KernelEventOutboundAdapter
     conversation_recorder: ConversationRecorder
-    memory_substrate: MemorySubstrate
+    memory_substrate: MemoryController
     knowledge_base: KnowledgeBase
     activity_controller: CognitiveActivityController
     state_store: SqliteStateStore
     planning_store: SqlitePlanningStore
-    cognition_database: CognitionDatabase
+    cognition_database: SqliteMemoryStore
     conversation_controller: ConversationController
     turn_controller: TurnController
     maintenance_scheduler: MaintenanceScheduler
@@ -119,7 +119,7 @@ def compose_cognition(
         ids=ids,
         observability=observability,
     )
-    cognition_database = CognitionDatabase()
+    cognition_database = SqliteMemoryStore()
     state_store = SqliteStateStore(resolve_cognition_state_db_path())
     planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
     memory_repository = MemoryRepository(cognition_database)
@@ -138,7 +138,7 @@ def compose_cognition(
         clock=clock,
     )
 
-    memory_substrate = MemorySubstrate(
+    memory_substrate = MemoryController(
         clock=clock,
         token_budget=memory_config.retrieval.token_budget,
         candidate_limit=memory_config.retrieval.candidate_limit,

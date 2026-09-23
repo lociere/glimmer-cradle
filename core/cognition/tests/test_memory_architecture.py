@@ -4,24 +4,24 @@ import json
 
 import pytest
 
-from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate as _MemorySubstrate
-from glimmer_cradle.cognition.application.memory.consolidation import ConsolidationCoordinator as _ConsolidationCoordinator
+from glimmer_cradle.cognition.memory import MemoryController as _MemoryController
+from glimmer_cradle.cognition.memory import ConsolidationCoordinator as _ConsolidationCoordinator
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler as _MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
 from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.conversation.log import Moment, MomentKind
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
-from glimmer_cradle.cognition.domain.memory import MemoryKind
+from glimmer_cradle.cognition.memory import MemoryKind
 
 
-def MemorySubstrate(*args, **kwargs):
+def MemoryController(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
-    return _MemorySubstrate(*args, **kwargs)
+    return _MemoryController(*args, **kwargs)
 
 
 def ConsolidationCoordinator(*args, **kwargs):
@@ -37,10 +37,10 @@ def MaintenanceScheduler(*args, **kwargs):
 
 @pytest.fixture
 async def memory_stack(tmp_path: Path):
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
     repository = MemoryRepository(database)
-    memory = MemorySubstrate(token_budget=128, result_limit=3)
+    memory = MemoryController(token_budget=128, result_limit=3)
     memory.bind_repository(repository)
     await memory.load()
     yield database, repository, memory
@@ -134,7 +134,7 @@ async def test_relationship_projection_is_idempotent_from_ledger(tmp_path: Path)
         actor_id="user:1",
         actor_name="小林",
     )
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
     relationships = RelationshipRepository(database)
     projection = RelationshipProjection(
@@ -238,9 +238,9 @@ async def test_running_scheduler_consolidates_semantic_boundary_without_shutdown
 ) -> None:
     recorder = build_experience_recorder(tmp_path / "experience")
     await recorder.start()
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
-    memory = MemorySubstrate(token_budget=128, result_limit=3)
+    memory = MemoryController(token_budget=128, result_limit=3)
     memory.bind_repository(MemoryRepository(database))
     await memory.load()
     llm = _ConsolidationLlm('{"decisions":[]}')
@@ -317,9 +317,9 @@ async def test_episode_consolidation_writes_evidence_backed_memory(tmp_path: Pat
         importance=0.9,
     )
     episodes = EpisodeProjection(tmp_path / "projections" / "episodes.db", recorder)
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
-    memory = MemorySubstrate(token_budget=128, result_limit=3)
+    memory = MemoryController(token_budget=128, result_limit=3)
     memory.bind_repository(MemoryRepository(database))
     await memory.load()
     llm = _ConsolidationLlm(json.dumps({"decisions": [{
@@ -353,9 +353,9 @@ async def test_invalid_consolidation_evidence_remains_retryable(tmp_path: Path) 
     recorder.record(MomentKind.PERCEPTION, {"text": "候选"}, interaction_id="turn-1",
                     retention_ceiling="memory_candidate", importance=0.9)
     episodes = EpisodeProjection(tmp_path / "projections" / "episodes.db", recorder)
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
-    memory = MemorySubstrate(token_budget=128, result_limit=3)
+    memory = MemoryController(token_budget=128, result_limit=3)
     memory.bind_repository(MemoryRepository(database))
     await memory.load()
     llm = _ConsolidationLlm(
@@ -398,9 +398,9 @@ async def test_consolidation_batches_are_partitioned_by_permission_domain(
             importance=0.9,
         )
     episodes = EpisodeProjection(tmp_path / "projections" / "episodes.db", recorder)
-    database = CognitionDatabase(tmp_path / "memory" / "memory.db")
+    database = SqliteMemoryStore(tmp_path / "memory.sqlite")
     await database.connect()
-    memory = MemorySubstrate(token_budget=128, result_limit=3)
+    memory = MemoryController(token_budget=128, result_limit=3)
     memory.bind_repository(MemoryRepository(database))
     await memory.load()
     llm = _ConsolidationLlm('{"decisions":[]}')

@@ -10,14 +10,14 @@ from glimmer_cradle.cognition.context import (
     estimate_tokens,
 )
 from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
-from glimmer_cradle.cognition.application.memory.substrate import MemorySubstrate
+from glimmer_cradle.cognition.memory import MemoryController
 from glimmer_cradle.cognition.ports.clock import ClockPort
 
 
 class EpisodicMemorySource(ContextSource):
     name = "episodic"
 
-    def __init__(self, memory: MemorySubstrate, *, clock: ClockPort) -> None:
+    def __init__(self, memory: MemoryController, *, clock: ClockPort) -> None:
         self._memory = memory
         self._clock = clock
 

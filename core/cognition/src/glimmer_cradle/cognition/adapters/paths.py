@@ -87,7 +87,7 @@ def resolve_experience_dir() -> Path:
 
 def resolve_cognition_db_path() -> Path:
     """解析 Cognition 记忆事实库路径。"""
-    return resolve_state_dir() / "cognition" / "memory" / "memory.db"
+    return resolve_state_dir() / "cognition" / "memory.sqlite"
 
 
 def resolve_cognition_state_db_path() -> Path:

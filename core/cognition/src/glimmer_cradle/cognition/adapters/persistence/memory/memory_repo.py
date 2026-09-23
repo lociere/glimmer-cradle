@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 
 
 def now_iso() -> str:
@@ -14,7 +14,7 @@ def now_iso() -> str:
 
 
 class MemoryRepository:
-    def __init__(self, database: CognitionDatabase) -> None:
+    def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
     async def create_revision(self, *, memory_id: str | None, kind: str, content: str,

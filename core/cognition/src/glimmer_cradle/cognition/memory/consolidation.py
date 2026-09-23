@@ -10,9 +10,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from glimmer_cradle.cognition.domain.experience.episode import Episode
-from glimmer_cradle.cognition.application.memory.substrate import MemoryRecord, MemorySubstrate
+from glimmer_cradle.cognition.memory.memory import MemoryRecord
+from glimmer_cradle.cognition.memory.memory_controller import MemoryController
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.domain.memory import MemoryKind
+from glimmer_cradle.cognition.memory.memory import MemoryKind
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.ports.persistence import (
     ConsolidationJob,
@@ -56,7 +57,7 @@ class ConsolidationCoordinator:
     """将 sealed Episode 转为可重试任务，并以一次调用完成批量记忆对账。"""
 
     def __init__(
-        self, *, episodes: EpisodeProjectionPort, memory: MemorySubstrate,
+        self, *, episodes: EpisodeProjectionPort, memory: MemoryController,
         jobs: ConsolidationJobRepositoryPort, llm: ModelPort | None,
         clock: ClockPort,
         ids: IdGeneratorPort,

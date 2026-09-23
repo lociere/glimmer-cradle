@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from glimmer_cradle.conversation import ConversationLogReaderPort, MomentKind
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 
@@ -10,7 +10,7 @@ from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo impo
 class RelationshipProjection:
     def __init__(self, *, recorder: ConversationLogReaderPort,
                  repository: RelationshipRepository,
-                 database: CognitionDatabase) -> None:
+                 database: SqliteMemoryStore) -> None:
         self._recorder = recorder
         self._repository = repository
         self._database = database

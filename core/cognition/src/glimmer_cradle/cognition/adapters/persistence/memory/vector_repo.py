@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 
 logger = get_logger("vector_repo")
 
@@ -24,7 +24,7 @@ _DTYPE = np.float32
 class VectorRepository:
     """embedding 向量数据访问层。owner_kind 取 'memory' / 'knowledge'。"""
 
-    def __init__(self, database: CognitionDatabase) -> None:
+    def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
     async def upsert_vector(

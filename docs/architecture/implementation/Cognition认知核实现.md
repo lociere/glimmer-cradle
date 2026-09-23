@@ -179,12 +179,12 @@ Context 是注意力预算控制器，不是字符串拼接器。`context/` 已�
 | Conversation Log | `core/conversation/src/glimmer_cradle/conversation/log/` | 交互事实的不可变 Moment、月度 SQLite pack、全局 position、来源与因果；Cognition 只读消费 |
 | Conversation Projection | `core/conversation/src/glimmer_cradle/conversation/{message,history}/` | Conversation owner 的可重建消息、Chapter、Segment、Conversation State 与进程 Working Set；Cognition Worker 只负责组合与消费 |
 | Episode Projection | `adapters/persistence/experience/episodes.py` | interaction/scene 分段、封口、待巩固队列与可重建投影 |
-| Memory Substrate | `application/memory/substrate.py`、`adapters/persistence/memory/memory_repo.py` | 版本化记忆、证据、时间有效修订与有预算召回 |
-| Consolidation | `application/memory/consolidation.py`、`adapters/persistence/memory/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试 |
+| Memory Controller | `memory/{memory,memory_controller,memory_store,provenance,correction}.py`、`adapters/persistence/sqlite_memory_store.py` | 版本化记忆、证据、时间有效修订、纠错与有预算召回 |
+| Consolidation | `memory/consolidation.py`、`adapters/persistence/memory/consolidation_job_repo.py` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试；Job adapter 待迁入 Jobs owner |
 | Relationship | `adapters/persistence/memory/relationship_projection.py`、`relationship_repo.py` | 从 Conversation Log 幂等派生互动计数、熟悉度与证据修订 |
 | Knowledge | `application/memory/knowledge_base.py`、`adapters/persistence/memory/knowledge_repo.py` | 知识条目 |
 | Vector | `adapters/persistence/memory/vector_repo.py` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
-| Memory Database | `adapters/persistence/memory/database.py` | `data/state/cognition/memory/memory.db` |
+| Memory Database | `adapters/persistence/sqlite_memory_store.py`、`migrations/002-memory.sql` | `data/state/cognition/memory.sqlite`；Knowledge/Job/checkpoint 表仍处于拆库迁移窗口 |
 
 长期交互连续性由 Conversation 拥有；Cognition 拥有 Experience、Memory、Persona 与推理语义。Kernel 可以收到投影或行动结果，但不直接写 Cognition/Conversation DB。
 
@@ -241,7 +241,7 @@ CycleController / use case
 | Cognition 进程未 ready | `host/process.py` 启动、配置、DB、provider warmup、generation/PID 注册、gRPC readiness |
 | 输入进来但无行动 | inbound adapter、perception queue、`CycleController` tick、volition |
 | 回复空或异常 | context assembly、InferenceController、LLMEngine、provider 错误 |
-| 记忆异常 | `adapters/persistence/memory/database.py`、`memory_repo.py`、`application/memory/substrate.py`、consolidation run |
+| 记忆异常 | `adapters/persistence/sqlite_memory_store.py`、`memory_controller.py`、consolidation run |
 | trace 断裂 | inbound gRPC metadata/DTO、context/reasoning span、outbound adapter |
 | 重启后状态丢失 | `data/state/cognition/`、Experience catalog/pack、Episode Projection、Memory revision |
 

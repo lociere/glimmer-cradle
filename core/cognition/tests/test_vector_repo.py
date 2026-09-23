@@ -3,12 +3,12 @@ from pathlib import Path
 
 import numpy as np
 
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
 
 
-async def _open(tmp_path: Path) -> CognitionDatabase:
-    db = CognitionDatabase(db_path=tmp_path / "cognition.db")
+async def _open(tmp_path: Path) -> SqliteMemoryStore:
+    db = SqliteMemoryStore(db_path=tmp_path / "cognition.db")
     await db.connect()
     return db
 

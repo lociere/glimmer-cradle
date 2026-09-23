@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from glimmer_cradle.cognition.domain.experience.episode import Episode
 from glimmer_cradle.cognition.ports.persistence import ConsolidationJob
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
 
 
@@ -20,7 +20,7 @@ def _iso(value: datetime) -> str:
 
 
 class ConsolidationJobRepository:
-    def __init__(self, database: CognitionDatabase) -> None:
+    def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
     async def recover_expired(self) -> None:

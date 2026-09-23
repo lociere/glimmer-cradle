@@ -3,7 +3,7 @@ from pathlib import Path
 
 from glimmer_cradle.cognition.application.memory.knowledge_base import KnowledgeBase
 from tests.support import OBSERVABILITY
-from glimmer_cradle.cognition.adapters.persistence.memory.database import CognitionDatabase
+from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
 
 
@@ -12,7 +12,7 @@ def _fresh_kb() -> KnowledgeBase:
 
 
 async def test_load_persisted_populates_entries(tmp_path: Path) -> None:
-    db = CognitionDatabase(db_path=tmp_path / "cognition.db")
+    db = SqliteMemoryStore(db_path=tmp_path / "cognition.db")
     await db.connect()
     try:
         repo = KnowledgeRepository(db)
@@ -34,7 +34,7 @@ async def test_load_persisted_populates_entries(tmp_path: Path) -> None:
 
 
 async def test_load_persisted_empty(tmp_path: Path) -> None:
-    db = CognitionDatabase(db_path=tmp_path / "cognition.db")
+    db = SqliteMemoryStore(db_path=tmp_path / "cognition.db")
     await db.connect()
     try:
         kb = _fresh_kb()
