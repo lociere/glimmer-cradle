@@ -11,7 +11,7 @@ from glimmer_cradle.cognition.domain.volition import (
     make_intent as domain_make_intent,
     threshold_for,
 )
-from tests.support import CLOCK, IDS, OBSERVABILITY, recorder_args
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, recorder_args
 
 
 def make_intent(**values) -> Intent:

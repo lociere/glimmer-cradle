@@ -8,7 +8,7 @@ from glimmer_cradle.cognition.inference import (
     InferenceController as _InferenceController,
     InferenceUnavailable,
 )
-from tests.support import OBSERVABILITY
+from tests.conftest import OBSERVABILITY
 
 
 def InferenceController(*args, **kwargs):

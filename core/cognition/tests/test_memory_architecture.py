@@ -9,7 +9,7 @@ from glimmer_cradle.cognition.memory import ConsolidationCoordinator as _Consoli
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler as _MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
-from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.conversation.log import Moment, MomentKind
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore

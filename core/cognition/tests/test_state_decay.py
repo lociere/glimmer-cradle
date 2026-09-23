@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.state import (
     StoredCognitiveState,
     decay_intensity,
 )
-from tests.support import OBSERVABILITY, build_experience_recorder
+from tests.conftest import OBSERVABILITY, build_experience_recorder
 
 
 def test_affect_decay_is_pure_bounded_and_time_based() -> None:

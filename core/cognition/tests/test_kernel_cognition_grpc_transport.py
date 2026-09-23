@@ -13,7 +13,7 @@ from glimmer_cradle.cognition.loop import LoopController as _CycleController
 from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
-from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.attention import AttentionController as _AttentionController
 from glimmer_cradle.cognition.ports.kernel.models import AgentPlanResult
 

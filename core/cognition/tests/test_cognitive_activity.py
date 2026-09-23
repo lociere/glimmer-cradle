@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.state import (
 )
 from glimmer_cradle.cognition.state import project_activity_history
 from glimmer_cradle.conversation.log import MomentKind
-from tests.support import OBSERVABILITY, build_experience_recorder
+from tests.conftest import OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 
 CFG = ActivityTransitionConfig(

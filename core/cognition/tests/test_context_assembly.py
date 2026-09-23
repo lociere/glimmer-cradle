@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.context import (
 )
 from glimmer_cradle.cognition.context import estimate_tokens
 from glimmer_cradle.cognition.application.context.sources.episodic_source import EpisodicMemorySource
-from tests.support import CLOCK, OBSERVABILITY
+from tests.conftest import CLOCK, OBSERVABILITY
 
 
 def ContextAssembler(*args, **kwargs):

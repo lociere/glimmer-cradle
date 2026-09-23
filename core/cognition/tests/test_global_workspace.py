@@ -9,7 +9,7 @@ from glimmer_cradle.cognition.attention import (
     make_attention,
     now_iso_ms,
 )
-from tests.support import CLOCK, IDS
+from tests.conftest import CLOCK, IDS
 
 
 def _item(source: str, salience: float, *, decay_in_seconds: float | None = None,

@@ -5,7 +5,7 @@ from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, 
 from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
-from tests.support import CLOCK, IDS
+from tests.conftest import CLOCK, IDS
 
 
 async def test_drive_accumulates_and_can_propose() -> None:

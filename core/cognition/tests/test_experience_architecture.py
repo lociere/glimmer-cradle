@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from glimmer_cradle.cognition.adapters.observability import trace_context
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
-from tests.support import build_experience_recorder
+from tests.conftest import build_experience_recorder
 from glimmer_cradle.conversation.log import MomentKind
 from glimmer_cradle.conversation.log import Moment, SourceDescriptor
 

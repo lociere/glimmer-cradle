@@ -9,7 +9,7 @@ from glimmer_cradle.cognition.ports import (
     CapabilityInvocation,
     CapabilityResult,
 )
-from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 
 
 class NativeModel:

@@ -6,7 +6,7 @@ from glimmer_cradle.conversation import (
     ConversationRecorder,
     ConversationStore,
 )
-from tests.support import CLOCK, IDS, build_experience_recorder
+from tests.conftest import CLOCK, IDS, build_experience_recorder
 from glimmer_cradle.conversation.log import Moment, MomentKind
 
 

@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.domain.configuration import (
     SafetySettings,
 )
 from glimmer_cradle.cognition.persona import PersonaCompiler, PersonaMutation
-from tests.support import OBSERVABILITY
+from tests.conftest import OBSERVABILITY
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "persona.yaml"

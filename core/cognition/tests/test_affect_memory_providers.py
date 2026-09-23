@@ -1,7 +1,7 @@
 from glimmer_cradle.cognition.application.cycle.providers import AffectProvider, MemoryProvider
 from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.context import ContextItem
-from tests.support import CLOCK, IDS
+from tests.conftest import CLOCK, IDS
 
 
 class _Emotion:

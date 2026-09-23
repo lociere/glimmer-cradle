@@ -8,7 +8,7 @@ from glimmer_cradle.cognition.adapters.persistence.sqlite_checkpoint_store impor
 from glimmer_cradle.cognition.loop import LoopCheckpoint, recover_checkpoint
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.loop import LoopController
-from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 
 
 async def test_loop_checkpoint_survives_restart_and_fences_stale_writer(

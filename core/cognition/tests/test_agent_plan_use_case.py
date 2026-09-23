@@ -3,7 +3,7 @@ import json
 import pytest
 
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanUseCase
-from tests.support import IDS, OBSERVABILITY
+from tests.conftest import IDS, OBSERVABILITY
 from glimmer_cradle.cognition.ports.kernel.models import SkillToolDescriptor
 
 

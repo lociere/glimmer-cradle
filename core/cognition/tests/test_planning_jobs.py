@@ -5,7 +5,7 @@ from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import 
 )
 from glimmer_cradle.cognition.inference import InferenceResponse, ModelTier
 from glimmer_cradle.cognition.planning import PlanningController
-from tests.support import RecordingObservability
+from tests.conftest import RecordingObservability
 
 
 class _Reasoning:

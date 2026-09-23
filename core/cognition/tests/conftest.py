@@ -1,3 +1,5 @@
+"""Deterministic shared test adapters for Cognition."""
+
 from __future__ import annotations
 
 import asyncio

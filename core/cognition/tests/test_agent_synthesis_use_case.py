@@ -7,7 +7,7 @@ from glimmer_cradle.cognition.application.agent_synthesis_use_case import (
     AgentSynthesisInput,
     AgentSynthesisUseCase,
 )
-from tests.support import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.conversation import (
     ConversationTurn,
     SqliteTurnStore,

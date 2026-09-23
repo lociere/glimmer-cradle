@@ -4,7 +4,7 @@ from glimmer_cradle.cognition.adapters.configuration import map_character_runtim
 from glimmer_cradle.cognition.adapters.observability import binding
 from glimmer_cradle.cognition.host.composition import compose_cognition
 from tests.config_fixture import normalized_document
-from tests.support import RecordingLogger
+from tests.conftest import RecordingLogger
 
 
 def test_production_composition_injects_reachable_logger_sink(monkeypatch, tmp_path) -> None:

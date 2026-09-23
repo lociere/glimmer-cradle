@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex
-from tests.support import OBSERVABILITY
+from tests.conftest import OBSERVABILITY
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
 
 

@@ -8,7 +8,7 @@ from glimmer_cradle.cognition.perception import (
 )
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
 from glimmer_cradle.cognition.application.cycle.providers.perception import salience_for_perception
-from tests.support import CLOCK, IDS
+from tests.conftest import CLOCK, IDS
 
 
 def _entry(*, address_mode="direct", familiarity=5, text="hi",
