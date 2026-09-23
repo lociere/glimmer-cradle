@@ -124,6 +124,8 @@ Kernel CognitionService request
 
 单拍临时状态全部进入 `loop/step.py` 的 `LoopStep`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。循环以 expected revision 把拍数和运行终态写入独立 checkpoint；启动时先把遗留 `running` 状态落为 `interrupted`，再进入新一轮运行。
 
+原生模型/工具迭代由 `LoopController.run_native()` 承担。模型事件中的 `ToolCall` 不再先分类为 `skill_request`；Loop 仅接受本 Step 经 `CapabilityPort.expose()` 暴露的能力名称，使用 `run_id + call_id` 形成稳定幂等键，把执行结果作为下一次模型请求的 `capability_results`。`StopPolicy` 同时限制 Step、能力调用次数和输出字符数；非法调用、未曝光能力和不完整事件流显式失败，不做关键词或静默降级。当前 Host 仍使用下述 ActionPlan 兼容链，待 Cognition Worker 的 capability adapter 接线后删除。
+
 旧的“收到消息直接生成聊天回复”通路不得恢复。内部驱动只能通过 Provider 进入 Cycle；工具规划、记忆巩固和合成必须以主循环或明确请求型 use case 接入，且不能对同一感知重复产生互相冲突的 action。
 
 当前 `LoopController` 的 Deliberate 阶段以 `planning/PlanningController` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。每次真实规划或显式降级写入 `data/state/cognition/planning.sqlite`，供同一 trace 审计与恢复；Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO。InferenceController 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。

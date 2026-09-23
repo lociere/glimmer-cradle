@@ -13,8 +13,15 @@ from glimmer_cradle.cognition.application.cycle.providers import Provider
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
+from glimmer_cradle.cognition.loop.run import LoopRun
 from glimmer_cradle.cognition.loop.step import LoopStep
+from glimmer_cradle.cognition.loop.stop_policy import StopPolicy
 from glimmer_cradle.cognition.inference import InferenceController
+from glimmer_cradle.cognition.inference import (
+    InferenceRequest,
+    ModelEventKind,
+    RealtimeModelPort,
+)
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.domain.volition import (
     ArbitrationResult,
@@ -31,6 +38,11 @@ from glimmer_cradle.cognition.application.cycle.perception_operations import Per
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports.capability_port import (
+    CapabilityInvocation,
+    CapabilityPort,
+    CapabilityResult,
+)
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 
@@ -162,6 +174,167 @@ class LoopController:
     def notify_external_input(self) -> None:
         """通知认知循环有外部输入到达，应跳过当前睡眠并尽快跑下一拍。"""
         self._tick_requested.set()
+
+    async def run_native(
+        self,
+        request: InferenceRequest,
+        *,
+        model: RealtimeModelPort,
+        capabilities: CapabilityPort,
+        scope: str,
+        stop_policy: StopPolicy | None = None,
+    ) -> LoopRun:
+        """Run a bounded native model/tool loop without reclassifying tool calls."""
+        policy = stop_policy or StopPolicy()
+        run_id = self._ids.new()
+        exposed = await capabilities.expose(scope=scope)
+        exposed_names = {descriptor.name for descriptor in exposed}
+        results: list[CapabilityResult] = []
+        output_parts: list[str] = []
+        step_count = 0
+        capability_calls = 0
+        current = InferenceRequest(
+            system=request.system,
+            user=request.user,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            metadata={
+                **request.metadata,
+                "run_id": run_id,
+                "capabilities": tuple(exposed),
+                "capability_results": (),
+            },
+            vision=request.vision,
+            provider_key=request.provider_key,
+        )
+
+        while True:
+            reason = policy.stop_reason(
+                step_count=step_count,
+                capability_calls=capability_calls,
+                output_chars=sum(len(part) for part in output_parts),
+            )
+            if reason is not None:
+                return LoopRun(
+                    run_id=run_id,
+                    status="stopped",
+                    step_count=step_count,
+                    output="".join(output_parts),
+                    stop_reason=reason,
+                    capability_results=tuple(results),
+                )
+
+            step_count += 1
+            step_calls: list[dict[str, object]] = []
+            completed = False
+            async for event in model.events(current):
+                if event.kind == ModelEventKind.TEXT_DELTA:
+                    text = event.payload.get("text")
+                    if isinstance(text, str):
+                        remaining = policy.max_output_chars - sum(
+                            len(part) for part in output_parts
+                        )
+                        output_parts.append(text[:remaining])
+                        if len(text) > remaining:
+                            return LoopRun(
+                                run_id=run_id,
+                                status="stopped",
+                                step_count=step_count,
+                                output="".join(output_parts),
+                                stop_reason="output_limit",
+                                capability_results=tuple(results),
+                            )
+                elif event.kind == ModelEventKind.TOOL_CALL:
+                    step_calls.append(event.payload)
+                elif event.kind == ModelEventKind.FAILED:
+                    return LoopRun(
+                        run_id=run_id,
+                        status="failed",
+                        step_count=step_count,
+                        output="".join(output_parts),
+                        stop_reason=str(event.payload.get("error") or "model_failed"),
+                        capability_results=tuple(results),
+                    )
+                elif event.kind == ModelEventKind.COMPLETED:
+                    completed = True
+
+            if not step_calls:
+                return LoopRun(
+                    run_id=run_id,
+                    status="completed" if completed else "failed",
+                    step_count=step_count,
+                    output="".join(output_parts),
+                    stop_reason="" if completed else "model_stream_incomplete",
+                    capability_results=tuple(results),
+                )
+
+            for payload in step_calls:
+                if capability_calls >= policy.max_capability_calls:
+                    return LoopRun(
+                        run_id=run_id,
+                        status="stopped",
+                        step_count=step_count,
+                        output="".join(output_parts),
+                        stop_reason="capability_call_limit",
+                        capability_results=tuple(results),
+                    )
+                call_id = payload.get("call_id")
+                name = payload.get("name")
+                arguments = payload.get("arguments", {})
+                if not isinstance(call_id, str) or not call_id or not isinstance(name, str) or not name:
+                    return LoopRun(
+                        run_id=run_id,
+                        status="failed",
+                        step_count=step_count,
+                        output="".join(output_parts),
+                        stop_reason="invalid_tool_call",
+                        capability_results=tuple(results),
+                    )
+                if not isinstance(arguments, dict):
+                    return LoopRun(
+                        run_id=run_id,
+                        status="failed",
+                        step_count=step_count,
+                        output="".join(output_parts),
+                        stop_reason="invalid_tool_arguments",
+                        capability_results=tuple(results),
+                    )
+                if name not in exposed_names:
+                    return LoopRun(
+                        run_id=run_id,
+                        status="failed",
+                        step_count=step_count,
+                        output="".join(output_parts),
+                        stop_reason="capability_not_exposed",
+                        capability_results=tuple(results),
+                    )
+                capability_calls += 1
+                result = await capabilities.invoke(
+                    CapabilityInvocation(
+                        run_id=run_id,
+                        step=step_count,
+                        call_id=call_id,
+                        name=name,
+                        arguments=arguments,
+                        idempotency_key=f"{run_id}:{call_id}",
+                    )
+                )
+                results.append(result)
+
+            current = InferenceRequest(
+                system=request.system,
+                user=request.user,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                metadata={
+                    **request.metadata,
+                    "run_id": run_id,
+                    "capabilities": tuple(exposed),
+                    "capability_results": tuple(results),
+                },
+                vision=request.vision,
+                provider_key=request.provider_key,
+            )
 
     # ── 循环本体 ──────────────────────────────────────────────────────────
 

@@ -1,0 +1,14 @@
+[
+  {
+    "sequence": 0,
+    "kind": "tool_call",
+    "payload": {
+      "call_id": "call-weather-1",
+      "name": "weather.lookup",
+      "arguments": {"city": "Shanghai"}
+    }
+  },
+  {"sequence": 1, "kind": "completed", "payload": {}},
+  {"sequence": 0, "kind": "text_delta", "payload": {"text": "上海今天晴。"}},
+  {"sequence": 1, "kind": "completed", "payload": {}}
+]

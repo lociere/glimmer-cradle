@@ -47,7 +47,7 @@ Cognition 是否履行该感知的处理义务：`ambient` 在 Appraise 写入�
 
 ## 唯一认知主线
 
-当前认知主线是 `loop/loop_controller.py` 的 `LoopController`。`LoopStep` 持有单拍状态，迁移期 `ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。Loop checkpoint 以 expected revision 持久化 cycle count 与运行终态，重启时把未完成的 running 状态恢复为 interrupted。它把感知处理为行动的基本语义顺序是：
+当前认知主线是 `loop/loop_controller.py` 的 `LoopController`。`LoopStep` 持有单拍状态，迁移期 `ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。Loop checkpoint 以 expected revision 持久化 cycle count 与运行终态，重启时把未完成的 running 状态恢复为 interrupted。原生迭代入口直接消费模型 `ToolCall`，只允许调用 `CapabilityPort.expose()` 返回的能力，并把带稳定幂等键的执行结果传入下一模型 Step；step、调用次数和输出长度均受 `StopPolicy` 限制。它把感知处理为行动的基本语义顺序是：
 
 ```text
 Perception
