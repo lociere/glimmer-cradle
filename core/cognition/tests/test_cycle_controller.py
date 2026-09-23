@@ -7,9 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.application.cycle import (
-    CycleController as _CycleController,
-)
+from glimmer_cradle.cognition.loop import LoopController as _CycleController
 from glimmer_cradle.cognition.application.cycle.providers import Provider, PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.attention import (
     Attention,

@@ -20,7 +20,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 记忆与知识 | `memory/`、`knowledge/`、各自 SQLite persistence adapter | Kernel 记忆副本、Extension 私写记忆或未授权知识变更 |
 | 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
 | 推理与多模态 | `inference/`、`adapters/inference/` | provider key 管理或桌面 IO |
-| 规划与行动语义 | `planning/`、`application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | Skill catalog、平台 payload、窗口控制、权限执行 |
+| 规划与行动语义 | `planning/`、`loop/loop_controller.py`、迁移期 Cycle helpers、`application/agent_*`、Kernel outbound adapter | Skill catalog、平台 payload、窗口控制、权限执行 |
 
 ## 当前结构
 
@@ -47,7 +47,7 @@ Cognition 是否履行该感知的处理义务：`ambient` 在 Appraise 写入�
 
 ## 唯一认知主线
 
-当前认知主线是 `application/cycle/controller.py` 的 `CycleController`。控制器只编排阶段顺序：`CycleTurn` 持有单拍状态，`ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。它把感知处理为行动的基本语义顺序是：
+当前认知主线是 `loop/loop_controller.py` 的 `LoopController`。`LoopStep` 持有单拍状态，迁移期 `ReplyContextBuilder` 装配回复上下文，`ActionEmitter` 负责行动命令映射，`CycleContinuity` 在仲裁后写入会话与经历。Loop checkpoint 以 expected revision 持久化 cycle count 与运行终态，重启时把未完成的 running 状态恢复为 interrupted。它把感知处理为行动的基本语义顺序是：
 
 ```text
 Perception
@@ -123,7 +123,7 @@ Kernel 不直接读写 Cognition 数据库。Extension 只提交平台中立 `Co
 
 `application/maintenance/` 的 `MaintenanceScheduler` 拥有独立任务和间隔，串行调用 Episode/Relationship projection 与 `ConsolidationCoordinator`。终结 Moment 提供低延迟唤醒，sealed Episode 提供持久可恢复工作项，周期扫描提供补偿；`quiescent` 只提供一次强制封口提示。不存在 Dreaming 活动态，也不把维护运行解释为角色正在做梦。Global Workspace 广播同样是易失注意力过程，当前通用链路不会把它写成 Thought。
 
-外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`CognitionService.Heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `CycleController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
+外部平台的注意力窗口由 Kernel `AttentionLeaseStore` 和 Extension Adapter 申请的 Attention Lease 维护；Cognition 不理解 QQ 群、WebUI 或其他平台细节。`CognitionService.Heartbeat` 只做 Kernel 到 Cognition 的活性探测；认知节拍由 `LoopController` 读取 `CognitiveActivityPolicy.frequency_hint_ms` 自主调度，主动性由 `allows_proactive` 约束。
 
 按 [ADR-0002](../../decisions/ADR-0002-AttentionLease与CognitiveActivity分层.md)，Cognition 不拥有或查询 Kernel 的外部 scene/channel Attention Lease。它只消费规范化感知中的 `address_mode`、`response_policy`、`scene_id`、`actor_id/actor_name`。Cognition 自有的 `CognitiveAttentionLease` 仅在一次内部 focus 处理期间固定候选，不表达外部焦点，也不授予回复权。外部场景是否被关注属于 Kernel Attention Projection；情绪强度属于 Affect；认知资源档位属于 Cognitive Activity；是否愿意开口属于 Volition；Episode 和 Memory 维护属于 Maintenance Scheduler。
 

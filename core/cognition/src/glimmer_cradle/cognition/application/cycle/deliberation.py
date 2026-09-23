@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
-from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.cognition.attention import Attention
 from glimmer_cradle.cognition.inference import (
     ModelTier,
@@ -45,7 +45,7 @@ class DeliberationController:
         self._logger = observability.logger("cognition_deliberation")
 
     async def deliberate(
-        self, broadcast: Attention | None, turn: CycleTurn
+        self, broadcast: Attention | None, turn: Any
     ) -> str | None:
         if self._reasoning is None or broadcast is None or broadcast.source != "perception":
             return None
@@ -113,7 +113,7 @@ class DeliberationController:
             trace_id=content.get("trace_id", ""),
         )
 
-    def _apply_plan(self, plan: ActionPlan, turn: CycleTurn) -> str | None:
+    def _apply_plan(self, plan: ActionPlan, turn: Any) -> str | None:
         if plan.action == "skill_request":
             if plan.confidence >= 0.6 and plan.capability_kind != "none":
                 turn.skill_request = {
@@ -136,7 +136,7 @@ class DeliberationController:
         return f"我想先确认一下：{prompt}"
 
     async def _build_system_prompt(
-        self, content: dict, turn: CycleTurn, multimodal_text: str
+        self, content: dict, turn: Any, multimodal_text: str
     ) -> str:
         emotion_state: dict = {}
         if self._emotion is not None:

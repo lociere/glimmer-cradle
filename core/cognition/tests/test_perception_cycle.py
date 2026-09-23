@@ -1,9 +1,7 @@
 """感知进入 CycleController 唯一主线的端到端验证。"""
 from __future__ import annotations
 
-from glimmer_cradle.cognition.application.cycle import (
-    CycleController as _CycleController,
-)
+from glimmer_cradle.cognition.loop import LoopController as _CycleController
 from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider

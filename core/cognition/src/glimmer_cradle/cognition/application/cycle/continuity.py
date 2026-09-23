@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
-from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
 from glimmer_cradle.conversation import MomentKind
 
 
@@ -13,10 +14,10 @@ class CycleContinuity:
     def __init__(self, *, recorder) -> None:
         self._recorder = recorder
 
-    async def commit(self, turn: CycleTurn) -> None:
+    async def commit(self, turn: Any) -> None:
         self._write_outcome(turn)
 
-    async def record_action(self, turn: CycleTurn) -> str | None:
+    async def record_action(self, turn: Any) -> str | None:
         """在外部执行前提交行动请求，使晚到结果可以引用稳定事实。"""
         accepted = turn.arbitration.accepted if turn.arbitration is not None else ()
         action = next((intent for intent in accepted if intent.type.value == "action"), None)
@@ -57,7 +58,7 @@ class CycleContinuity:
             await self._recorder.flush()
         return turn.action_moment_id
 
-    def _write_outcome(self, turn: CycleTurn) -> str | None:
+    def _write_outcome(self, turn: Any) -> str | None:
         causation = tuple(
             moment_id
             for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id)

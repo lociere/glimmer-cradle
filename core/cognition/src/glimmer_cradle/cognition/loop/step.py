@@ -10,7 +10,7 @@ from glimmer_cradle.cognition.domain.volition import ArbitrationResult
 
 
 @dataclass(slots=True)
-class CycleTurn:
+class LoopStep:
     """只在一拍内有效的感知、规划与仲裁状态。"""
 
     perception_moment_ids: list[str] = field(default_factory=list)

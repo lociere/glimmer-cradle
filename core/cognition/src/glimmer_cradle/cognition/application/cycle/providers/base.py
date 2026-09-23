@@ -5,10 +5,10 @@
 工作区快照，根据自身职责产出新候选列表（``Attention``）。
 
 设计约束：
-- propose() 必须**纯**：不直接改写工作区（CycleController 收集结果后统一 propose）
+- propose() 必须**纯**：不直接改写工作区（LoopController 收集结果后统一 propose）
 - propose() 可读外部状态（情绪系统、记忆库、感知队列等）—— 各 Provider 自定
 - 异步：长 IO（向量检索 / LLM 调用）应 await；CPU 重活走 asyncio.to_thread
-- 异常隔离：CycleController 单独捕获各 Provider 的异常，不让一个崩溃影响其他
+- 异常隔离：LoopController 单独捕获各 Provider 的异常，不让一个崩溃影响其他
 """
 from __future__ import annotations
 

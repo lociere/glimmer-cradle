@@ -15,7 +15,7 @@ PACKAGE_ROOT = (
 )
 TARGET_ROOTS = {
     "domain", "application", "ports", "adapters", "attention", "context",
-    "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "host",
+    "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "host",
 }
 LEGACY_ROOTS = {
     "activity", "affect", "conversation", "cycle", "experience",
@@ -25,17 +25,21 @@ LEGACY_ROOTS = {
 ALLOWED_DEPENDENCIES = {
     "domain": {"domain", "persona", "state", "ports"},
     "application": {
-        "domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports"
+        "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"
     },
     # inbound Port 使用 application command/result 类型描述调用契约。
     "ports": {"domain", "application", "ports"},
     "adapters": {
-        "domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
+        "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
     },
     "attention": {"attention", "ports"},
     "context": {"context", "ports"},
     "inference": {"inference", "state", "ports"},
     "knowledge": {"inference", "knowledge", "memory", "ports"},
+    # Cycle helper extraction is transitional; remove application once Loop owns all stages.
+    "loop": {
+        "application", "attention", "domain", "inference", "loop", "perception", "planning", "ports", "state"
+    },
     "memory": {"domain", "inference", "memory", "ports"},
     "perception": {"perception"},
     # 配置投影尚在 domain/configuration；迁移完成后移除该临时依赖。
@@ -172,11 +176,11 @@ def _dependency_violations(
         target = _cognition_root(module)
         if target and target not in ALLOWED_DEPENDENCIES[owner]:
             violations.append(f"{label}: forbidden dependency {module}")
-        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports"} and any(
+        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"} and any(
             term in module for term in FORBIDDEN_BOUNDARY_TERMS
         ):
             violations.append(f"{label}: boundary concrete {module}")
-        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports"} and _is_generated_import(module):
+        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"} and _is_generated_import(module):
             violations.append(f"{label}: generated package {module}")
     return violations
 
@@ -281,9 +285,9 @@ def _structure_violations(
             violations.append(f"{label}:{node.name}")
         if isinstance(node, ast.ClassDef) and node.name in {"EventBus", "ServiceLocator"}:
             violations.append(f"{label}:{node.name}")
-        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports"} and isinstance(node, ast.Global):
+        if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"} and isinstance(node, ast.Global):
             violations.append(f"{label}: module global mutation {','.join(node.names)}")
-    if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state", "ports"}:
+    if owner in {"domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"}:
         violations.extend(
             f"{label}: module mutable binding {binding}"
             for binding in _module_mutable_bindings(tree)
@@ -337,7 +341,7 @@ def _direct_capability_violations(tree: ast.Module, *, label: str) -> list[str]:
 
 def test_target_domain_roots_do_not_read_system_capabilities() -> None:
     violations = []
-    for owner in ("domain", "application", "attention", "context", "inference", "knowledge", "memory", "perception", "persona", "planning", "state"):
+    for owner in ("domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state"):
         for path in _python_files(PACKAGE_ROOT / owner):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             violations.extend(_direct_capability_violations(

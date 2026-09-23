@@ -6,7 +6,7 @@
 - ``willingness.py``  连续意愿值计算（蓝图 §4.7 加权公式）
 - ``arbiter.py``      多意图仲裁（阈值 + proactive 闸 + 去重）
 
-输出由 Protocol 生成的 Intent，并在 CycleController 中进入仲裁与 ActionEmitter。
+输出由 Protocol 生成的 Intent，并在 LoopController 中进入仲裁与 ActionEmitter。
 """
 from glimmer_cradle.cognition.domain.volition.models import Initiative, Intent, IntentType
 

@@ -10,7 +10,7 @@
 | 进程入口/组装 | `host/process.py`、`host/composition.py` |
 | Kernel Service Adapter | `adapters/kernel/` |
 | Kernel 应用 Port | `ports/kernel/` |
-| 认知主循环 | `application/cycle/`、`attention/`、`domain/volition/` |
+| 认知主循环 | `loop/`、迁移期 `application/cycle/` helpers、`attention/`、`domain/volition/` |
 | 推理边界 | `inference/`；供应商调用只在 `adapters/inference/` |
 | 规划边界 | `planning/`；SQLite concrete 只在 `adapters/persistence/sqlite_planning_store.py` |
 | Volition/巩固 | `domain/volition/`、`memory/consolidation.py`、`adapters/persistence/experience/episodes.py` |
@@ -26,7 +26,7 @@
 
 1. 判断改动是否属于心智语义；平台 IO、窗口、权限、进程不应放进 Cognition。
 2. 若 Kernel–Cognition RPC 改变，先改 `contracts/proto/glimmer/{common,cognition,kernel}/v1/` 并运行 `pnpm contracts:generate` / `pnpm contracts:verify`。
-3. 找到唯一主线：感知应进入 `CycleController`，不要新增并行聊天回复路径。
+3. 找到唯一主线：感知应进入 `LoopController`，不要新增并行聊天回复路径。
 4. 对上下文来源写清 owner、成本、排序、预算和失败语义。
 5. 对记忆/经历改动写清持久化 owner、迁移、回滚和 trace。
 6. 对 provider 改动处理限流、超时、空响应、坏 JSON、多模态不支持。
@@ -57,7 +57,7 @@
 1. Kernel 是否把感知发到 Cognition。
 2. `adapters/kernel/` 是否通过 generation 校验并完成 DTO mapping。
 3. `ObservationNormalizer` 是否接受，`ObservationQueue` 是否收到。
-4. `CycleController` 是否 tick。
+4. `LoopController` 是否 tick。
 5. context assembly 是否产生可用上下文。
 6. InferenceController/LLMEngine 是否返回。
 7. Volition 是否拒绝行动。

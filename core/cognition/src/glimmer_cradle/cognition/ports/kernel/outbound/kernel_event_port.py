@@ -42,7 +42,7 @@ class KernelEventPort(ABC):
         """
         发送 ActionCommand 给 Kernel。
 
-        CycleController 的 Act 阶段决定开口时，把 reply intent 转成 ActionCommand
+        LoopController 的 Act 阶段决定开口时，把 reply intent 转成 ActionCommand
         经此推送给内核（Python → 内核单向，非 RPC）。内核侧映射为 ChannelReplyEvent
         走现有适配器回传链路。
 

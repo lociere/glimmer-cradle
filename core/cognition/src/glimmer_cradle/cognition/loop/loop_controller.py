@@ -11,7 +11,9 @@ from glimmer_cradle.cognition.application.cycle.continuity import CycleContinuit
 from glimmer_cradle.cognition.application.cycle.deliberation import DeliberationController
 from glimmer_cradle.cognition.application.cycle.providers import Provider
 from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
-from glimmer_cradle.cognition.application.cycle.turn import CycleTurn
+from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
+from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
+from glimmer_cradle.cognition.loop.step import LoopStep
 from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.domain.volition import (
@@ -32,7 +34,7 @@ from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
 
-class CycleController:
+class LoopController:
     """只负责编排 Sense 到 Consolidate 的阶段顺序与故障隔离。"""
 
     def __init__(
@@ -48,6 +50,7 @@ class CycleController:
         action_sink=None,
         reasoning: InferenceController | None = None,
         planning_controller: PlanningController | None = None,
+        checkpoint_store: LoopCheckpointStore | None = None,
         persona_compiler=None,
         boundary_validator: "Callable[[str], bool] | None" = None,
         self_entity=None,
@@ -62,7 +65,7 @@ class CycleController:
         self._clock = clock
         self._ids = ids
         self._observability = observability
-        self.logger = observability.logger("cycle_controller")
+        self.logger = observability.logger("loop_controller")
         self._ws = workspace
         self._providers: list[Provider] = list(providers)
         recent_experience_source = RecentExperienceSource(experience_recorder)
@@ -106,7 +109,9 @@ class CycleController:
         self._tick_requested = asyncio.Event()
         self._cycle_count: int = 0
         self._last_arbitration: ArbitrationResult | None = None
-        self._turn = CycleTurn()
+        self._turn = LoopStep()
+        self._checkpoint_store = checkpoint_store
+        self._checkpoint_revision = 0
         self._perception_operations = perception_operations
         self._turn_controller = turn_controller
         self._active_perception_trace = ""
@@ -118,7 +123,20 @@ class CycleController:
         if self._running:
             self.logger.warning("认知循环已在运行")
             return
+        if self._checkpoint_store is not None:
+            checkpoint = await self._checkpoint_store.load("main")
+            if checkpoint is not None:
+                recovered = recover_checkpoint(checkpoint)
+                self._cycle_count = recovered.cycle_count
+                self._checkpoint_revision = recovered.revision
+                if recovered.status != checkpoint.status:
+                    saved = await self._checkpoint_store.save(
+                        recovered,
+                        expected_revision=self._checkpoint_revision,
+                    )
+                    self._checkpoint_revision = saved.revision
         self._running = True
+        await self._persist_checkpoint("running")
         self._task = asyncio.create_task(self._main_loop())
         self.logger.info(
             "认知循环已启动",
@@ -134,6 +152,7 @@ class CycleController:
                 await self._task
             except asyncio.CancelledError:
                 pass
+        await self._persist_checkpoint("stopped")
         self.logger.info("认知循环已停止", total_cycles=self._cycle_count)
 
     @property
@@ -200,23 +219,26 @@ class CycleController:
                         trace_id = self._perception_trace(broadcast_item)
                         if trace_id and self._perception_operations is not None:
                             self._perception_operations.finish(trace_id, "succeeded")
+                    await self._persist_checkpoint("completed")
         except asyncio.CancelledError:
             await self._finish_active_turn("interrupted", "cycle_cancelled")
             if self._active_perception_trace and self._perception_operations is not None:
                 self._perception_operations.finish(self._active_perception_trace, "cancelled", "感知操作已取消")
+            await self._persist_checkpoint("interrupted")
             raise
         except Exception:
             await self._finish_active_turn("failed", "cycle_failed")
             if self._perception_operations is not None:
                 for trace_id in self._cycle_perception_traces:
                     self._perception_operations.finish(trace_id, "failed", "认知循环处理失败")
+            await self._persist_checkpoint("failed")
             raise
         finally:
             self._active_perception_trace = ""
             self._cycle_perception_traces.clear()
 
     async def _do_tick(self) -> Attention | None:
-        self._turn = CycleTurn()
+        self._turn = LoopStep()
         # ── Sense / Appraise / Recall（并发投放）──────────────────────────
         snapshot: list[Attention] = []
         with self._observability.span("sense_appraise_recall"):
@@ -609,3 +631,17 @@ class CycleController:
             return (activity_state, allows)
         except Exception:
             return ("engaged", True)
+
+    async def _persist_checkpoint(self, status: str) -> None:
+        if self._checkpoint_store is None:
+            return
+        saved = await self._checkpoint_store.save(
+            LoopCheckpoint(
+                checkpoint_key="main",
+                cycle_count=self._cycle_count,
+                status=status,
+                revision=self._checkpoint_revision,
+            ),
+            expected_revision=self._checkpoint_revision,
+        )
+        self._checkpoint_revision = saved.revision

@@ -24,7 +24,7 @@ from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
-from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.perception import (
     Observation,
     ObservationNormalizer,
@@ -123,7 +123,7 @@ class CognitionGrpcHost:
         inbound: KernelRequestPort,
         queue: ObservationQueue,
         activity: CognitiveActivityController,
-        cycle: CycleController,
+        cycle: LoopController,
         shutdown: Callable[[], Awaitable[None]],
         operations: PerceptionOperationRegistry,
         workspace: AttentionController,

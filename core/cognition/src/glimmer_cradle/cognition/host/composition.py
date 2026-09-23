@@ -20,7 +20,7 @@ from glimmer_cradle.cognition.application.context.sources import (
     RecentExperienceSource,
     RelationshipSource,
 )
-from glimmer_cradle.cognition.application.cycle import CycleController
+from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue
 from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
@@ -37,6 +37,7 @@ from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
+    resolve_cognition_checkpoint_db_path,
     resolve_cognition_knowledge_db_path,
     resolve_cognition_planning_db_path,
     resolve_cognition_state_db_path,
@@ -47,6 +48,7 @@ from glimmer_cradle.cognition.adapters.paths import (
 from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
+from glimmer_cradle.cognition.adapters.persistence.sqlite_checkpoint_store import SqliteCheckpointStore
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
@@ -83,6 +85,7 @@ class CognitionComponents:
     memory_substrate: MemoryController
     knowledge_base: KnowledgeIndex
     knowledge_store: SqliteKnowledgeStore
+    checkpoint_store: SqliteCheckpointStore
     activity_controller: CognitiveActivityController
     state_store: SqliteStateStore
     planning_store: SqlitePlanningStore
@@ -90,7 +93,7 @@ class CognitionComponents:
     conversation_controller: ConversationController
     turn_controller: TurnController
     maintenance_scheduler: MaintenanceScheduler
-    cycle_controller: CycleController
+    cycle_controller: LoopController
 
 
 def compose_cognition(
@@ -125,6 +128,7 @@ def compose_cognition(
     state_store = SqliteStateStore(resolve_cognition_state_db_path())
     planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
     knowledge_store = SqliteKnowledgeStore(resolve_cognition_knowledge_db_path())
+    checkpoint_store = SqliteCheckpointStore(resolve_cognition_checkpoint_db_path())
     memory_repository = MemoryRepository(cognition_database)
     vector_repository = VectorRepository(cognition_database)
     relationship_repository = RelationshipRepository(cognition_database)
@@ -272,7 +276,7 @@ def compose_cognition(
     )
     activity_controller.on_transition(maintenance_scheduler.notify_activity_transition)
     conversation_recorder.on_recorded(maintenance_scheduler.notify_moment)
-    cycle_controller = CycleController(
+    cycle_controller = LoopController(
         workspace=workspace,
         providers=[
             PerceptionProvider(perception_queue, clock=clock, ids=ids),
@@ -289,6 +293,7 @@ def compose_cognition(
         action_sink=outbound_adapter.send_action_command,
         reasoning=reasoning,
         planning_controller=planning_controller,
+        checkpoint_store=checkpoint_store,
         persona_compiler=self_entity.persona,
         boundary_validator=self_entity.validate_boundary,
         self_entity=self_entity,
@@ -325,6 +330,7 @@ def compose_cognition(
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,
         knowledge_store=knowledge_store,
+        checkpoint_store=checkpoint_store,
         activity_controller=activity_controller,
         state_store=state_store,
         planning_store=planning_store,

@@ -209,7 +209,7 @@ def test_arbitrate_proactive_blocked_dormant_scenario() -> None:
 
 async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> None:
     """CycleController 接 Volition 后：perception 广播 → reply intent。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.loop import LoopController as CycleController
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
     from glimmer_cradle.cognition.application.cycle.providers import Provider
 
@@ -258,7 +258,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
 
 async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
     """无广播（providers 全空）→ 无意图。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.loop import LoopController as CycleController
     from glimmer_cradle.cognition.attention import AttentionController
 
     ws = AttentionController(clock=CLOCK)
@@ -279,7 +279,7 @@ async def test_loop_intend_no_broadcast_no_intent(tmp_path) -> None:
 
 async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
     """drive(curiosity) 广播 → thought intent；不是 reply。"""
-    from glimmer_cradle.cognition.application.cycle import CycleController
+    from glimmer_cradle.cognition.loop import LoopController as CycleController
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
     from glimmer_cradle.cognition.application.cycle.providers import Provider
 

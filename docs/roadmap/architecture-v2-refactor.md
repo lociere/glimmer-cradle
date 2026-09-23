@@ -59,7 +59,7 @@ Host 权限入口显式使用 `*-broker`，Lease/Node/Compatibility 按所属语
 | `core/kernel/src/application/skill-plane/skill-registry.ts` | TS / 主 Host | 一个 Skill 下装 tools/resources/prompts | skill-plane ports | 注册定义与 provider health 缓存 | registerSkill、getCatalogSnapshot | provider kind 含 mcp_server | tools registry / skills catalog / resources registry | 中：不能把存在直接等同暴露 | skill scope 与 catalog 测试 |
 | `core/kernel/src/adapters/skill-plane/mcp-server` | TS / 主 Host | MCP 连接、重连、能力包装 | MCP SDK、ConfigManager、readiness | 连接与重试状态 | SkillProvider | MCP Tool/Resource/Prompt | apps 或 extension bridge，内部使用通用契约 | 高：重连/销毁与注册撤销 | MCP readiness 与 gateway 测试待逐项核对 |
 | `core/kernel/src/application/capabilities/conversation/conversation-directory.ts` | TS / 主 Host | 外部地址生成稳定 conversation/thread/scope | StableIdentityPort、application models | 无独立存储 | resolve | provider 字符串开放；无封闭平台 enum | conversation/binding | 高：改变 ID 算法会割裂既有历史 | `conversation-directory.test.ts` |
-| `core/cognition/.../application/cycle` | Python / Cognition | 注意、deliberation、ActionPlan 分类、回复 | persona、inference、experience、memory | 当前 Turn 临时状态 | CycleController | skill_request 前置分类、固定 capability categories | cognition/loop、attention、perception；Turn 入 conversation | 高：普通聊天与工具调用必须共用迭代链 | `test_cycle_controller.py` |
+| Cognition `loop/` 与迁移期 `application/cycle` helpers | Python / Cognition | native iterative Loop、deliberation、行动与回复 | persona、inference、experience、memory | LoopStep + durable checkpoint | LoopController | helper 文件尚待并入目标 owner | cognition/loop；Turn 属于 conversation | 高：普通聊天与工具调用必须共用迭代链 | `test_cycle_controller.py`、`test_loop_checkpoint.py` |
 | `core/cognition/.../application/agent_plan_use_case.py`、`agent_synthesis_use_case.py` | Python / Cognition | 一次计划和结果合成 | ModelPort、SelfEntity、experience | 非独立 owner | AgentPlan/AgentSynthesis use case | JSON 规划协议、SkillToolSuggestion | cognition/loop/step | 高：现有 RPC producer/consumer 成对替换 | 对应用例及 gRPC transport tests |
 | `core/cognition/.../adapters/inference/gateway.py`、`cloud.py` | Python / Cognition | HTTP provider payload、响应解析、推理后端 | urllib、LLMSettings、observability | provider 调用状态 | LLMEngine.generate | OpenAI-compatible payload；local/cloud 分支 | provider 实现迁 app/extension；核心保留 inference contract | 高：当前接口只返回字符串，不支持原生 tool calls | model invocation / inference tests 待细分 |
 | `core/cognition/.../adapters/persistence/experience/ledger.py` | Python / Cognition | 单写者分包 Moment 日志 | SQLite、文件 writer guard | Moment ordered log、position | append、flush、query | 无厂商语义 | conversation/log 拥有交互事实；其他经验须分类 | 极高：禁止丢失已有 Experience 与因果链 | `test_experience_architecture.py` |
@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop 及 Memory Jobs/checkpoint adapter 解耦仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint 与版本化 Persona canonical owner 已接入真实 Host；Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -363,6 +363,15 @@ Knowledge 切片把旧 `application/memory/knowledge_base.py` 与 Memory persist
 新库为空时读取旧 `memory.sqlite.knowledge_entry` 并形成 revision 1，随后只写新库、不双写；旧 Memory fresh
 schema 已删除 Knowledge 表。当前生产知识均来自 Character Package 配置；未来外部资料采集仍须通过明确
 Resource/Content Port 与授权 ingestion，不能绕过 Knowledge owner。
+
+Loop/checkpoint 切片把旧 `application/cycle/controller.py` 与 `turn.py` 迁入目标
+`loop/{loop_controller,step}.py`，运行时与 gRPC adapter 只消费 `LoopController`；其余 Appraise、Deliberate、
+Act、Continuity 与 Provider helpers 暂留 `application/cycle/`，退出条件是合并进目标 Loop/Attention/Perception
+owner 后删除整个旧目录。新增 `checkpoint.py`、`run.py`、`recovery.py`、`stop_policy.py`、
+`migrations/005-checkpoints.sql` 与 `SqliteCheckpointStore`，使用蓝图路径
+`data/state/cognition/checkpoints.sqlite`。Loop 启动恢复 cycle count，把上次 `running` 解释为 interrupted；每拍终态、
+异常、中断和正常停止均按 expected revision 写 checkpoint，陈旧 writer 失败关闭。Memory 库中的
+`projection_checkpoints` 仍只服务 Relationship 派生投影，待其 owner 迁移时另行拆出，不与 Loop checkpoint 混用。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 
