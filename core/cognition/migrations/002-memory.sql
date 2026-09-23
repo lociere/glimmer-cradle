@@ -52,12 +52,6 @@ CREATE TABLE intention_transitions(
   from_status TEXT, to_status TEXT NOT NULL, reason TEXT NOT NULL,
   evidence_moment_id TEXT, occurred_at TEXT NOT NULL
 );
-CREATE TABLE knowledge_entry(
-  entry_id TEXT PRIMARY KEY, content TEXT NOT NULL, priority INTEGER NOT NULL DEFAULT 1,
-  enabled INTEGER NOT NULL DEFAULT 1, scope TEXT NOT NULL DEFAULT 'knowledge',
-  source TEXT NOT NULL DEFAULT 'config', activation_json TEXT NOT NULL DEFAULT '{}',
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
 CREATE TABLE embedding(
   owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL, model TEXT NOT NULL,
   dim INTEGER NOT NULL, vector BLOB NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

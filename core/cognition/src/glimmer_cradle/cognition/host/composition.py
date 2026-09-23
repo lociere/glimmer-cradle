@@ -37,6 +37,7 @@ from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
+    resolve_cognition_knowledge_db_path,
     resolve_cognition_planning_db_path,
     resolve_cognition_state_db_path,
     resolve_conversation_db_path,
@@ -45,6 +46,7 @@ from glimmer_cradle.cognition.adapters.paths import (
 )
 from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
+from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
@@ -52,12 +54,11 @@ from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.planning import PlanningController
-from glimmer_cradle.cognition.application.memory import KnowledgeBase
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex
 from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
 from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
@@ -80,7 +81,8 @@ class CognitionComponents:
     outbound_adapter: KernelEventOutboundAdapter
     conversation_recorder: ConversationRecorder
     memory_substrate: MemoryController
-    knowledge_base: KnowledgeBase
+    knowledge_base: KnowledgeIndex
+    knowledge_store: SqliteKnowledgeStore
     activity_controller: CognitiveActivityController
     state_store: SqliteStateStore
     planning_store: SqlitePlanningStore
@@ -122,8 +124,8 @@ def compose_cognition(
     cognition_database = SqliteMemoryStore()
     state_store = SqliteStateStore(resolve_cognition_state_db_path())
     planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
+    knowledge_store = SqliteKnowledgeStore(resolve_cognition_knowledge_db_path())
     memory_repository = MemoryRepository(cognition_database)
-    knowledge_repository = KnowledgeRepository(cognition_database)
     vector_repository = VectorRepository(cognition_database)
     relationship_repository = RelationshipRepository(cognition_database)
     conversation_controller = ConversationController(
@@ -144,7 +146,7 @@ def compose_cognition(
         candidate_limit=memory_config.retrieval.candidate_limit,
         result_limit=memory_config.retrieval.result_limit,
     )
-    knowledge_base = KnowledgeBase(observability=observability)
+    knowledge_base = KnowledgeIndex(observability=observability)
     self_entity = SelfEntity(
         manifest_config=config.manifest,
         inference_config=config.inference,
@@ -164,8 +166,8 @@ def compose_cognition(
         safety=config.safety,
     )
     memory_substrate.bind_repository(memory_repository)
-    knowledge_base.bind_repository(knowledge_repository)
-    knowledge_base.bind_vector_repository(vector_repository)
+    knowledge_base.bind_repository(knowledge_store)
+    knowledge_base.bind_vector_repository(knowledge_store)
 
     activity_controller = CognitiveActivityController(
         experience_recorder=conversation_recorder,
@@ -322,6 +324,7 @@ def compose_cognition(
         conversation_recorder=conversation_recorder,
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,
+        knowledge_store=knowledge_store,
         activity_controller=activity_controller,
         state_store=state_store,
         planning_store=planning_store,
@@ -334,7 +337,7 @@ def compose_cognition(
 
 
 def _build_embedding_engine(
-    config: CharacterRuntimeSettings, knowledge_base: KnowledgeBase
+    config: CharacterRuntimeSettings, knowledge_base: KnowledgeIndex
 ) -> EmbeddingEngine:
     engine = EmbeddingEngine(config.embedding)
     knowledge_base.set_embedding_engine(engine)

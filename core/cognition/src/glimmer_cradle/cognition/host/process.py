@@ -109,6 +109,7 @@ class CognitionHost:
             # 状态库先于认知活动恢复，保证首拍可读取持久状态与完整 policy。
             await components.state_store.connect()
             await components.planning_store.connect()
+            await components.knowledge_store.connect()
             activity_controller = components.activity_controller
             activity_controller.on_transition(self._request_state_sync)
             await activity_controller.start()
@@ -235,6 +236,11 @@ class CognitionHost:
                 await components.cognition_database.close()
             except Exception as e:
                 logger.error(f"Error closing cognition database: {e}")
+
+            try:
+                await components.knowledge_store.close()
+            except Exception as e:
+                logger.error(f"Error closing cognition knowledge store: {e}")
 
             try:
                 await components.planning_store.close()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol
-import numpy as np
 
 from glimmer_cradle.cognition.domain.experience.episode import Episode
 from glimmer_cradle.cognition.domain.relationship import RelationshipRecord
@@ -39,22 +38,6 @@ class ConsolidationJobRepositoryPort(Protocol):
     async def complete(self, jobs: list[ConsolidationJob]) -> None: ...
     async def fail(self, jobs: list[ConsolidationJob], *, error_code: str,
                    retry_base_seconds: int) -> None: ...
-
-
-class MemoryRepositoryPort(Protocol):
-    async def all_current(self) -> list[dict]: ...
-    async def create_revisions(self, drafts: list[dict]) -> list[str]: ...
-
-
-class KnowledgeRepositoryPort(Protocol):
-    async def get_all_entries(self) -> list[dict]: ...
-    async def replace_config_entries(self, entries: list[dict]) -> None: ...
-
-
-class VectorRepositoryPort(Protocol):
-    async def get_vectors(self, owner_kind: str, model: str) -> dict[str, np.ndarray]: ...
-    async def upsert_vector(self, *, owner_kind: str, owner_id: str,
-                            model: str, vector: np.ndarray) -> None: ...
 
 
 class RelationshipRepositoryPort(Protocol):

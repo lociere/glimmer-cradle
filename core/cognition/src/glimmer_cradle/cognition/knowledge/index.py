@@ -12,8 +12,6 @@
 """
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -21,30 +19,17 @@ import numpy as np
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.inference import EmbeddingPort
-from glimmer_cradle.cognition.ports.persistence import KnowledgeRepositoryPort, VectorRepositoryPort
-
-# 英文单词 / 汉字逐字分词（bigram 在 _tokenize 中生成）
-_TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]")
-
-
-@dataclass
-class KnowledgeRetrievalPolicy:
-    mode: str = "full_injection"  # "full_injection" | "semantic_rag"
-    top_k: int = 5
-    min_score: float = 0.3
-    semantic_weight: float = 0.6
+from glimmer_cradle.cognition.knowledge.ingestion import config_entries_from
+from glimmer_cradle.cognition.knowledge.knowledge_store import KnowledgeStore
+from glimmer_cradle.cognition.knowledge.retrieval import (
+    KnowledgeRetrievalPolicy,
+    bigram_retrieve,
+)
+from glimmer_cradle.cognition.knowledge.source import KnowledgeEntry
+from glimmer_cradle.cognition.memory import VectorIndexStore
 
 
-@dataclass
-class KnowledgeEntry:
-    entry_id: str
-    content: str
-    priority: int = 1
-    enabled: bool = True
-    _embedding: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
-
-
-class KnowledgeBase:
+class KnowledgeIndex:
     """由 SelfEntity 独占的世界知识管理器。
 
     初始化流程：
@@ -59,9 +44,9 @@ class KnowledgeBase:
         self._policy = KnowledgeRetrievalPolicy()
         self._embedding_engine: Optional[EmbeddingPort] = None
         # Repository 由 Composition Root 注入，领域对象不创建存储。
-        self._repo: Optional[KnowledgeRepositoryPort] = None
+        self._repo: Optional[KnowledgeStore] = None
         # 向量持久化避免每次进程启动重新计算。
-        self._vec_repo: Optional[VectorRepositoryPort] = None
+        self._vec_repo: Optional[VectorIndexStore] = None
         self._logger.info("世界知识库初始化完成")
 
     def set_embedding_engine(self, engine: EmbeddingPort) -> None:
@@ -70,11 +55,11 @@ class KnowledgeBase:
         if self._embedding_engine:
             self._logger.info("知识库已接入向量引擎，semantic_rag 模式可用")
 
-    def bind_repository(self, repo: KnowledgeRepositoryPort) -> None:
+    def bind_repository(self, repo: KnowledgeStore) -> None:
         """绑定知识持久化仓库。"""
         self._repo = repo
 
-    def bind_vector_repository(self, vec_repo: VectorRepositoryPort) -> None:
+    def bind_vector_repository(self, vec_repo: VectorIndexStore) -> None:
         """绑定可重建向量索引仓库。"""
         self._vec_repo = vec_repo
 
@@ -89,6 +74,9 @@ class KnowledgeBase:
                 content=r["content"],
                 priority=r["priority"],
                 enabled=r["enabled"],
+                revision=r.get("revision", 1),
+                source=r.get("source", "config"),
+                attributes={"activation": r.get("activation", {})},
             )
             for r in rows
         }
@@ -99,7 +87,7 @@ class KnowledgeBase:
         """从内核 knowledge_init 载荷预填知识库。
 
         knowledge_init 是知识库的配置预填入口，只接收
-        scope=knowledge 条目，以 source='config' 持久化到 memory.db，再从库
+        scope=knowledge 条目，以 source='config' 持久化到 knowledge.sqlite，再从库
         重新加载。检索策略（policy）是运行时配置，不持久化。
         """
         retrieval = payload.retrieval
@@ -110,16 +98,7 @@ class KnowledgeBase:
             semantic_weight=retrieval.semantic_weight,
         )
 
-        config_entries = [
-            {
-                "entry_id": r.entry_id,
-                "content": r.content,
-                "priority": r.priority,
-                "enabled": r.enabled,
-            }
-            for r in payload.entries
-            if r.scope == "knowledge" and r.enabled
-        ]
+        config_entries = config_entries_from(payload)
 
         if self._repo is None:
             self._logger.error("知识库未绑定持久化仓库，knowledge_init 已跳过")
@@ -218,7 +197,7 @@ class KnowledgeBase:
                     self._logger.warning("语义检索异常，继续使用基础检索", error=str(exc))
 
         # 退化为 bigram
-        return self._bigram_retrieve(query, entries)
+        return bigram_retrieve(query, entries, policy=self._policy)
 
     async def _semantic_retrieve(
         self, query: str, entries: List[KnowledgeEntry]
@@ -232,30 +211,3 @@ class KnowledgeBase:
         sims = self._embedding_engine.cosine_similarities(query_vec, matrix)
         scored = sorted(zip(sims, entries), key=lambda x: float(x[0]), reverse=True)
         return [e for sim, e in scored[:self._policy.top_k] if float(sim) >= self._policy.min_score]
-
-    def _bigram_retrieve(self, query: str, entries: List[KnowledgeEntry]) -> List[KnowledgeEntry]:
-        """bigram 关键词退化检索。"""
-        query_tokens = self._tokenize(query)
-        if not query_tokens:
-            return entries[:self._policy.top_k]
-
-        scored = []
-        for entry in entries:
-            content_tokens = self._tokenize(entry.content)
-            overlap = len(query_tokens & content_tokens)
-            if overlap > 0:
-                score = overlap / len(query_tokens)
-                scored.append((score, entry))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return [e for score, e in scored[:self._policy.top_k] if score >= self._policy.min_score]
-
-    @staticmethod
-    def _tokenize(text: str) -> set:
-        """Bigram 分词：逐字 + 相邻汉字双字组合。"""
-        chars = _TOKEN_RE.findall(text or "")
-        tokens: set = {c.lower() for c in chars}
-        for i in range(len(chars) - 1):
-            if len(chars[i]) == 1 and len(chars[i + 1]) == 1:
-                tokens.add(chars[i] + chars[i + 1])
-        return tokens

@@ -17,7 +17,7 @@
 | 上下文 | `application/context/` |
 | 推理/模型 | `inference/`、`adapters/inference/` |
 | 记忆 | `memory/`、`adapters/persistence/sqlite_memory_store.py`；迁移期 repository projection 仍在 `adapters/persistence/memory/` |
-| 知识 | 现行 `application/memory/knowledge_base.py` 与 persistence repository；目标归 `knowledge/` |
+| 知识 | `knowledge/`、`adapters/persistence/sqlite_knowledge_store.py`、`migrations/003-knowledge.sql` |
 | 经历 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` |
 | 身份/人格/情绪/觉醒 | `domain/identity/`、`persona/`、`state/` |
 | Kernel–Cognition 契约投影 | `contracts/generated/python/glimmer/`（只在 Adapter 使用） |

@@ -17,7 +17,7 @@ Cognition 是当前角色的心智主权边界。用户输入、平台事件、�
 | 身份与人格 | `domain/{identity,persona}/`、`configs/characters/<character-id>/{persona,profile,dialogue}.yaml` | 平台账号、窗口状态、Extension 生命周期 |
 | 情绪、活动态与觉醒 | `state/`、`domain/identity/` | UI 动画本地推断 |
 | 经历之流 | `domain/experience/`、`application/experience/`、`adapters/persistence/experience/` | 普通日志或聊天界面状态替代经历 |
-| 记忆与知识 | `memory/`、现行 `application/memory/knowledge_base.py`、persistence adapters | Kernel 记忆副本或 Extension 私写记忆 |
+| 记忆与知识 | `memory/`、`knowledge/`、各自 SQLite persistence adapter | Kernel 记忆副本、Extension 私写记忆或未授权知识变更 |
 | 上下文装配 | `context/`、`persona/PersonaCompiler` | 简单 prompt 拼接或知识库人格注入 |
 | 推理与多模态 | `inference/`、`adapters/inference/` | provider key 管理或桌面 IO |
 | 规划与行动语义 | `planning/`、`application/cycle/controller.py`、`application/agent_*`、Kernel outbound adapter | Skill catalog、平台 payload、窗口控制、权限执行 |

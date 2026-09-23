@@ -1,27 +1,25 @@
-"""知识库通过 Cognition memory.db Repository 持久化。"""
+"""知识库通过独立 Knowledge store 持久化。"""
 from pathlib import Path
 
-from glimmer_cradle.cognition.application.memory.knowledge_base import KnowledgeBase
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex
 from tests.support import OBSERVABILITY
-from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.knowledge_repo import KnowledgeRepository
+from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
 
 
-def _fresh_kb() -> KnowledgeBase:
-    return KnowledgeBase(observability=OBSERVABILITY)
+def _fresh_kb() -> KnowledgeIndex:
+    return KnowledgeIndex(observability=OBSERVABILITY)
 
 
 async def test_load_persisted_populates_entries(tmp_path: Path) -> None:
-    db = SqliteMemoryStore(db_path=tmp_path / "cognition.db")
+    db = SqliteKnowledgeStore(path=tmp_path / "knowledge.sqlite")
     await db.connect()
     try:
-        repo = KnowledgeRepository(db)
-        await repo.replace_config_entries([
+        await db.replace_config_entries([
             {"entry_id": "k1", "content": "月见的世界观", "priority": 5, "enabled": True},
             {"entry_id": "k2", "content": "用户的生日", "priority": 1, "enabled": True},
         ])
         kb = _fresh_kb()
-        kb.bind_repository(repo)
+        kb.bind_repository(db)
         await kb.load_persisted()
 
         assert len(kb.get_all_entries()) == 2
@@ -34,11 +32,11 @@ async def test_load_persisted_populates_entries(tmp_path: Path) -> None:
 
 
 async def test_load_persisted_empty(tmp_path: Path) -> None:
-    db = SqliteMemoryStore(db_path=tmp_path / "cognition.db")
+    db = SqliteKnowledgeStore(path=tmp_path / "knowledge.sqlite")
     await db.connect()
     try:
         kb = _fresh_kb()
-        kb.bind_repository(KnowledgeRepository(db))
+        kb.bind_repository(db)
         await kb.load_persisted()
         assert kb.get_all_entries() == []
     finally:

@@ -11,7 +11,8 @@ Data 是角色连续性的物理投影，Observability 是多进程系统的工�
 | 数据域 | 语义 | Owner |
 |---|---|---|
 | `data/state/cognition/experience/` | Conversation Log catalog 与月度 packs；旧路径名待阶段 14 迁移 | Conversation |
-| `data/state/cognition/memory/` | 版本化 Memory、Relationship、Intention、Knowledge 与索引事实库 | Cognition |
+| `data/state/cognition/memory.sqlite` | 版本化 Memory、Relationship、Intention 与迁移期 Job/checkpoint 表 | Cognition Memory |
+| `data/state/cognition/knowledge.sqlite` | 版本化 Knowledge、tombstone 与可重建向量索引 | Cognition Knowledge |
 | `data/state/cognition/conversations/` | 从 Log 可重建的 Conversation、Chapter、Segment 与 State 投影；旧路径名待阶段 14 迁移 | Conversation |
 | `data/state/cognition/projections/` | 可从事实源重建的 Episode 等投影 | Cognition |
 | `data/state/kernel/` | Kernel 基础设施状态、扩展宿主数据、TS DLQ | Kernel |

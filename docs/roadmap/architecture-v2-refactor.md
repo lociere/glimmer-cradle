@@ -64,7 +64,7 @@ Host 权限入口显式使用 `*-broker`，Lease/Node/Compatibility 按所属语
 | `core/cognition/.../adapters/inference/gateway.py`、`cloud.py` | Python / Cognition | HTTP provider payload、响应解析、推理后端 | urllib、LLMSettings、observability | provider 调用状态 | LLMEngine.generate | OpenAI-compatible payload；local/cloud 分支 | provider 实现迁 app/extension；核心保留 inference contract | 高：当前接口只返回字符串，不支持原生 tool calls | model invocation / inference tests 待细分 |
 | `core/cognition/.../adapters/persistence/experience/ledger.py` | Python / Cognition | 单写者分包 Moment 日志 | SQLite、文件 writer guard | Moment ordered log、position | append、flush、query | 无厂商语义 | conversation/log 拥有交互事实；其他经验须分类 | 极高：禁止丢失已有 Experience 与因果链 | `test_experience_architecture.py` |
 | `core/cognition/.../adapters/persistence/conversation/store.py` | Python / Cognition | 从 Moment 投影历史、章节、工作集 | aiosqlite、Moment、paths | 投影 checkpoint；不拥有原始交互事实 | project、checkpoint、history queries | 无厂商语义 | conversation/history | 极高：schema v3 不匹配目前要求删除重建，须改迁移路径 | `test_conversation_architecture.py` |
-| Cognition `memory/` 与迁移期 `adapters/persistence/memory` projections | Python / Cognition | 记忆、关系、向量、巩固队列 | SqliteMemoryStore、Episode、MemoryStore | Memory；巩固 Job 目前同库 | controller/repositories | Knowledge/Job/checkpoint 尚待拆库 | cognition/memory；队列 lifecycle 入 jobs | 高：跨表一致性、租约和幂等 | `test_memory_architecture.py` |
+| Cognition `memory/` 与迁移期 `adapters/persistence/memory` projections | Python / Cognition | 记忆、关系、向量、巩固队列 | SqliteMemoryStore、Episode、MemoryStore | Memory；巩固 Job 目前同库 | controller/repositories | Job/checkpoint 尚待拆库 | cognition/memory；队列 lifecycle 入 jobs | 高：跨表一致性、租约和幂等 | `test_memory_architecture.py` |
 | `core/cognition/.../domain/persona` | Python / Cognition | profile 编译、人设及对话策略 | canonical profile 与领域配置 | 编译后 persona 数据 | profile compiler / prompt assembler | 角色资料不应迁成通用硬编码 | cognition/persona | 中：稳定关系与动态记忆分离 | `test_persona_mutation.py` |
 | `core/cognition/.../application/inference/service.py` | Python / Cognition | 按活动 tier 选择 local/cloud | ReasoningBackendPort | 无 durable state | request | backend location 与业务策略结合 | cognition inference policy + platform topology public contract | 中：保留禁止推理和真实降级语义 | inference tests 待细分 |
 | `core/avatar/src` | C# / Avatar | Avatar command、manifest、行为配置 | domain/application/ports | 身体命令与投影，具体写入链待核对 | command sink | 需核查渲染参数是否已隔离 | embodiment；renderer contract | 高：C# 编译与 Unity 投影 | `AvatarCoreTests.cs` |
@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop/Knowledge 及 Memory adapter 解耦仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge 与版本化 Persona canonical owner 已接入真实 Host/Cycle；Loop 及 Memory Jobs/checkpoint adapter 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -351,9 +351,18 @@ Memory 领域切片把旧 `domain/memory.py`、`application/memory/{substrate,co
 与测试只消费 `MemoryController` 公共面。证据去重与空证据失败关闭成为独立 provenance 规则，修订操作到
 `active / disputed / superseded / redacted` 的状态映射成为纯 correction policy。旧内嵌 DDL 已改为唯一
 `migrations/002-memory.sql`，数据库入口迁到 `adapters/persistence/sqlite_memory_store.py`，运行路径同步对齐
-`data/state/cognition/memory.sqlite`。现行 v3 库仍暂含 Knowledge、Relationship、Consolidation Job 与 projection
-checkpoint 表；这是 Knowledge/Jobs 原子拆库前的受控迁移窗口，旧 repository 子文件只作为该 store 的内部投影
-实现保留，退出条件为 `003-knowledge.sql`、Jobs owner 与 checkpoint store 接线并完成旧样本迁移。
+`data/state/cognition/memory.sqlite`。Knowledge 已在下一切片拆出；现行 v3 库仍暂含 Relationship、Consolidation
+Job 与 projection checkpoint 表。旧 repository 子文件只作为该 store 的内部投影实现保留，退出条件为 Jobs
+owner 与 checkpoint store 接线并完成旧样本迁移。
+
+Knowledge 切片把旧 `application/memory/knowledge_base.py` 与 Memory persistence 内的 `knowledge_repo.py` 收束为
+目标 `knowledge/{source,ingestion,transformation,index,retrieval,freshness,revision,invalidation,knowledge_store}.py`。
+`SqliteKnowledgeStore` 使用唯一 `migrations/003-knowledge.sql` 和蓝图路径
+`data/state/cognition/knowledge.sqlite`，保存递增 revision、内容摘要、来源、tombstone 与独立可重建 embedding；
+配置替换在单事务中增量修订，删除要求 expected revision，model/memory 来源不能取得修改权限。首次连接仅在
+新库为空时读取旧 `memory.sqlite.knowledge_entry` 并形成 revision 1，随后只写新库、不双写；旧 Memory fresh
+schema 已删除 Knowledge 表。当前生产知识均来自 Character Package 配置；未来外部资料采集仍须通过明确
+Resource/Content Port 与授权 ingestion，不能绕过 Knowledge owner。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

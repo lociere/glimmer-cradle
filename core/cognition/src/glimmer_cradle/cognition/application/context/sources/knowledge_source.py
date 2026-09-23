@@ -1,7 +1,7 @@
 """
-知识库源（蓝图 §4.6）—— 包装 KnowledgeBase.get_knowledge。
+知识库源（蓝图 §4.6）—— 包装 KnowledgeIndex.get_knowledge。
 
-激活规则：关键词 / 向量 / 常驻（由 KnowledgeBase 内部 mode 决定）。
+激活规则：关键词 / 向量 / 常驻（由 KnowledgeIndex 内部 mode 决定）。
 """
 from __future__ import annotations
 
@@ -11,13 +11,13 @@ from glimmer_cradle.cognition.context import (
     ContextSource,
     estimate_tokens,
 )
-from glimmer_cradle.cognition.application.memory.knowledge_base import KnowledgeBase
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex
 
 
 class KnowledgeSource(ContextSource):
     name = "knowledge"
 
-    def __init__(self, knowledge_base: KnowledgeBase) -> None:
+    def __init__(self, knowledge_base: KnowledgeIndex) -> None:
         self._kb = knowledge_base
 
     async def activate(self, query: ContextQuery, *, max_items: int = 10) -> list[ContextItem]:
@@ -35,7 +35,7 @@ class KnowledgeSource(ContextSource):
             items.append(ContextItem(
                 source=self.name,
                 content=content,
-                relevance=0.6,  # KnowledgeBase 命中即给中等相关度
+                relevance=0.6,  # KnowledgeIndex 命中即给中等相关度
                 recency=0.5,    # 知识无时效性概念
                 importance=importance,
                 token_estimate=estimate_tokens(content),
