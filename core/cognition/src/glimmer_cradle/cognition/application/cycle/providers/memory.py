@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 if TYPE_CHECKING:

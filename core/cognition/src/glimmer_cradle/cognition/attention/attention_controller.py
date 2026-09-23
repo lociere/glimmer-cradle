@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.attention.attention import (
     is_expired,
 )
 from glimmer_cradle.cognition.attention.attention_lease import CognitiveAttentionLease
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 
 
 class AttentionController:

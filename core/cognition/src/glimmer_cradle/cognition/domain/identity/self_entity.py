@@ -12,7 +12,7 @@ from glimmer_cradle.cognition.persona import PersonaCompiler
 from glimmer_cradle.cognition.domain.exceptions import ConfigException
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 class MemoryModule(Protocol):

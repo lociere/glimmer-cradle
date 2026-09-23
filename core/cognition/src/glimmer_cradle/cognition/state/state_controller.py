@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 from glimmer_cradle.cognition.ports.observability import LoggerPort, ObservabilityPort
 from glimmer_cradle.cognition.state.cognitive_state import (

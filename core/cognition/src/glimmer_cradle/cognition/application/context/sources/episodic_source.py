@@ -11,7 +11,7 @@ from glimmer_cradle.cognition.context import (
 )
 from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 from glimmer_cradle.cognition.memory import MemoryController
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 
 
 class EpisodicMemorySource(ContextSource):

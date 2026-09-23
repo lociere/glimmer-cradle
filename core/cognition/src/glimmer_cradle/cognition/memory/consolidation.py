@@ -21,7 +21,7 @@ from glimmer_cradle.cognition.ports.persistence import (
     EpisodeProjectionPort,
     RelationshipProjectionPort,
 )
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 class MemoryDecision(BaseModel):

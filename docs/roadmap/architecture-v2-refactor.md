@@ -105,7 +105,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
-| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代与版本化 Persona canonical owner 已落位；Cognition Worker capability adapter 接线、Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
+| 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports 与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
@@ -374,6 +374,8 @@ owner 后删除整个旧目录。新增 `checkpoint.py`、`run.py`、`recovery.p
 `projection_checkpoints` 仍只服务 Relationship 派生投影，待其 owner 迁移时另行拆出，不与 Loop checkpoint 混用。
 
 原生工具迭代切片新增消费方 `ports/capability_port.py` 与 `LoopController.run_native()`：每次 Run 先按 scope 获取能力曝光，模型 `ToolCall` 只可命中曝光集合，调用使用 `run_id:call_id` 幂等键，结果原样进入下一模型 Step。`StopPolicy` 对 Step、能力调用次数与输出字符数执行硬上限；未知能力、非法参数和不完整流均失败关闭。`test_loop_native_tools.py` 固定 ToolCall/ToolResult 两步闭环与零调用预算反例。Cognition Worker 尚未存在，因此生产装配仍走 ActionPlan 兼容路径；该路径的删除条件是 Worker adapter、Conversation Log 幂等接纳和 durable execution journal 完成接线。
+
+消费方 Port 切片把旧 `ports/clock.py` 迁为清单规定的 `clock_port.py`，并补齐 `content_port.py`、`conversation_port.py`、`job_port.py` 与 `resource_port.py`。Core 契约只描述 Cognition 所需的受限资产读取、Conversation 事实读写、幂等长期工作请求和带 revision/principal 的资源读取；实现与 wire mapper 留在 App。目标 Cognition 源码缺项因此只剩 owner Schema、README 与测试装配入口；Schema 在 `contracts/json-schema` 仍是现行唯一事实源期间不会复制，必须随 catalog、consumer 和验证流程原子迁移。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

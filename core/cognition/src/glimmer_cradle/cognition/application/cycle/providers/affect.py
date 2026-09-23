@@ -17,7 +17,7 @@ from __future__ import annotations
 from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.state import EmotionSystem
-from glimmer_cradle.cognition.ports.clock import ClockPort
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 
 
