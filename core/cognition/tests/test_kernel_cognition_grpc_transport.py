@@ -9,9 +9,8 @@ from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.adapters.kernel.grpc_transport import CognitionGrpcHost, KernelGrpcClient, KernelServiceError
 from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
-from glimmer_cradle.cognition.loop import LoopController as _CycleController
+from glimmer_cradle.cognition.loop import LoopController as _CycleController, PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.perception import ObservationQueue
-from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.attention import AttentionController as _AttentionController

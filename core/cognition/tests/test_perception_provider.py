@@ -6,8 +6,7 @@ from glimmer_cradle.cognition.perception import (
     ObservationNormalizer,
     ObservationQueue,
 )
-from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider
-from glimmer_cradle.cognition.application.cycle.providers.perception import salience_for_perception
+from glimmer_cradle.cognition.loop import PerceptionProvider, salience_for_perception
 from tests.conftest import CLOCK, IDS
 
 

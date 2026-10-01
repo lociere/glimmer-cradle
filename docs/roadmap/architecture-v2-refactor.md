@@ -394,6 +394,12 @@ Worker composition、Loop、Kernel wire adapter 与测试均改用 `glimmer_crad
 公共入口。旧 `application/cycle/perception_operations.py` consumer-zero 后物理删除，未改变
 operation/trace 冲突、取消 task 或 terminal trimming 语义，也没有把 transport DTO 引入领域 owner。
 
+Perception Provider 随后从旧 `application/cycle/providers` 迁入目标 `loop/loop_controller.py`：
+Observation 继续由 Perception owner 定义和排队，Loop 的 Sense 阶段负责把它 drain 为 Attention，
+direct/ambient 显著度、actor/model input 与 scope/digest 传播保持不变。Worker 和测试只消费
+`glimmer_cradle.cognition.loop` 公共入口，旧 `providers/perception.py` consumer-zero 后删除；
+其余四类 provider 尚未归位，旧 providers package 仍有明确退出条件。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

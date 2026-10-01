@@ -9,7 +9,7 @@ from glimmer_cradle.cognition.application.cycle.action_emitter import ActionEmit
 from glimmer_cradle.cognition.application.cycle.appraisal import PerceptionAppraiser
 from glimmer_cradle.cognition.application.cycle.continuity import CycleContinuity
 from glimmer_cradle.cognition.application.cycle.deliberation import DeliberationController
-from glimmer_cradle.cognition.application.cycle.providers import Provider
+from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
 from glimmer_cradle.cognition.loop.run import LoopRun
@@ -32,7 +32,8 @@ from glimmer_cradle.cognition.domain.volition import (
     make_intent,
     threshold_for,
 )
-from glimmer_cradle.cognition.attention import AttentionController, Attention
+from glimmer_cradle.cognition.attention import AttentionController, Attention, make_attention
+from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
@@ -44,6 +45,74 @@ from glimmer_cradle.cognition.ports.capability_port import (
 )
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
+
+
+def salience_for_perception(*, address_mode: str, familiarity: int) -> float:
+    """将明确呼叫固定为最高显著度，其余感知按熟悉度有限提升。"""
+    if address_mode == "direct":
+        return 1.0
+    bonus = max(0, min(10, int(familiarity))) / 10.0 * 0.3
+    return max(0.1, min(1.0, 0.4 + bonus))
+
+
+class PerceptionProvider(Provider):
+    """在 Loop Sense 阶段 drain Observation，并生成 Attention 候选。"""
+
+    name = "perception"
+
+    def __init__(
+        self,
+        queue: ObservationQueue,
+        *,
+        max_items_per_tick: int = 5,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+    ) -> None:
+        self._queue = queue
+        self._max_items = max(1, int(max_items_per_tick))
+        self._clock = clock
+        self._ids = ids
+
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        entries: list[Observation] = self._queue.drain(max_items=self._max_items)
+        items: list[Attention] = []
+        for entry in entries:
+            content = {
+                "text": entry.text,
+                "scene_id": entry.scene_id,
+                "conversation_id": entry.conversation_id,
+                "continuity_id": entry.continuity_id,
+                "thread_id": entry.thread_id,
+                "recall_scope": entry.recall_scope,
+                "disclosure_scope": entry.disclosure_scope,
+                "address_mode": entry.address_mode,
+                "response_policy": entry.response_policy,
+                "familiarity": entry.familiarity,
+                "trace_id": entry.trace_id,
+                "origin": entry.origin,
+                "retention_ceiling": entry.retention_ceiling,
+                "interaction_id": entry.interaction_id,
+                "payload_digest": entry.payload_digest,
+            }
+            if entry.actor_id:
+                content["actor_id"] = entry.actor_id
+            if entry.actor_name:
+                content["actor_name"] = entry.actor_name
+            if entry.model_input is not None:
+                content["model_input"] = entry.model_input
+            items.append(
+                make_attention(
+                    source=self.name,
+                    content=content,
+                    salience=salience_for_perception(
+                        address_mode=entry.address_mode,
+                        familiarity=entry.familiarity,
+                    ),
+                    clock=self._clock,
+                    ids=self._ids,
+                )
+            )
+        return items
 
 class LoopController:
     """只负责编排 Sense 到 Consolidate 的阶段顺序与故障隔离。"""

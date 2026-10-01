@@ -6,27 +6,30 @@ from glimmer_cradle.cognition.application.cycle.providers import (
     AffectProvider,
     DriveProvider,
     MemoryProvider,
-    PerceptionProvider,
     Provider,
     SocialProvider,
 )
+from glimmer_cradle.cognition.loop import PerceptionProvider
+
+
+PROVIDER_CLASSES = (PerceptionProvider, *ALL_PROVIDER_CLASSES)
 
 
 def test_all_provider_classes_subclass_provider() -> None:
-    for cls in ALL_PROVIDER_CLASSES:
+    for cls in PROVIDER_CLASSES:
         assert issubclass(cls, Provider)
 
 
 def test_all_provider_names_align_with_source_enum() -> None:
     """provider.name 必须与 Attention.source 枚举一一对应。"""
-    names = {cls.name for cls in ALL_PROVIDER_CLASSES}
+    names = {cls.name for cls in PROVIDER_CLASSES}
     expected = {"perception", "affect", "memory", "drive", "social"}
     assert names == expected
 
 
 def test_all_provider_classes_unique() -> None:
     """五个 provider 类各自独立。"""
-    cls_set = set(ALL_PROVIDER_CLASSES)
+    cls_set = set(PROVIDER_CLASSES)
     assert len(cls_set) == 5
 
 
@@ -39,7 +42,7 @@ def test_all_providers_implemented() -> None:
     - PerceptionProvider:               test_cognition_perception
     本文件只验证它们都能 subclass Provider + 注册到 ALL_PROVIDER_CLASSES。
     """
-    for cls in ALL_PROVIDER_CLASSES:
+    for cls in PROVIDER_CLASSES:
         assert issubclass(cls, Provider)
 
 
@@ -51,7 +54,7 @@ def test_provider_is_abstract() -> None:
 
 def test_provider_class_list_order() -> None:
     """ALL_PROVIDER_CLASSES 与 __init__ 列表对齐。"""
-    assert ALL_PROVIDER_CLASSES == (
+    assert PROVIDER_CLASSES == (
         PerceptionProvider,
         AffectProvider,
         MemoryProvider,
