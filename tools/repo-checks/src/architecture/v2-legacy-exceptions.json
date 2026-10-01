@@ -1,5 +1,23 @@
 [
   {
+    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
+    "rule": "deep-import",
+    "detail": "glimmer_cradle.cognition.*",
+    "count": 24,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-12",
+    "reason": "Cognition Worker composition 暂时装配迁移中的 Core concrete；随目标 adapters 迁入 App 和 Core public API 收束逐项清零。"
+  },
+  {
+    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
+    "rule": "deep-import",
+    "detail": "glimmer_cradle.cognition.*",
+    "count": 7,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-12",
+    "reason": "兼容 RPC 生命周期仍读取 Cognition 配置与 observability concrete；拆入 Worker adapters/readiness/shutdown 后删除。"
+  },
+  {
     "file": "core/avatar/scripts/avatar-package-catalog.mjs",
     "rule": "vendor-core",
     "detail": "live2d",

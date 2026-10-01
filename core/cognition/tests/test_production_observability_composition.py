@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
 from glimmer_cradle.cognition.adapters.observability import binding
-from glimmer_cradle.cognition.host.composition import compose_cognition
+from glimmer_cradle.cognition_worker.composition import compose_cognition
 from tests.config_fixture import normalized_document
 from tests.conftest import RecordingLogger
 

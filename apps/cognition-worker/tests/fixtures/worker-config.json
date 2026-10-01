@@ -1,0 +1,5 @@
+{
+  "readiness_timeout_ms": 120000,
+  "shutdown_timeout_ms": 30000,
+  "state_sync_interval_ms": 5000
+}

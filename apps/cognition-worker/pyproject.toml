@@ -1,0 +1,37 @@
+[project]
+name = "glimmer-cradle-cognition-worker"
+version = "0.1.0"
+description = "Cognition and Conversation process composition for Glimmer Cradle"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "glimmer-cradle-cognition==0.2.6",
+    "glimmer-cradle-conversation==0.1.0",
+]
+
+[tool.uv.sources]
+glimmer-cradle-cognition = { path = "../../core/cognition" }
+glimmer-cradle-conversation = { path = "../../core/conversation" }
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+glimmer-cradle-cognition-worker = "glimmer_cradle.cognition_worker.rpc_service:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["glimmer_cradle.cognition_worker*"]
+namespaces = true
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "../../core/cognition/src", "../../core/conversation/src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"

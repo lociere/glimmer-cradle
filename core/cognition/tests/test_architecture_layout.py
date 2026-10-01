@@ -15,7 +15,7 @@ PACKAGE_ROOT = (
 )
 TARGET_ROOTS = {
     "domain", "application", "ports", "adapters", "attention", "context",
-    "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "host",
+    "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state",
 }
 LEGACY_ROOTS = {
     "activity", "affect", "conversation", "cycle", "experience",
@@ -46,7 +46,6 @@ ALLOWED_DEPENDENCIES = {
     "persona": {"domain", "persona", "ports"},
     "planning": {"inference", "planning", "ports"},
     "state": {"state", "ports"},
-    "host": TARGET_ROOTS,
 }
 FORBIDDEN_BOUNDARY_TERMS = (
     ".protocol.generated",

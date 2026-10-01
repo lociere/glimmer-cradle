@@ -1,4 +1,4 @@
-"""Cognition 进程 Host：管理启动、停止和 Kernel Port 生命周期。"""
+"""Cognition Worker RPC process and lifecycle supervision."""
 import asyncio
 import argparse
 import base64
@@ -8,7 +8,7 @@ from typing import Final
 
 from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
-from glimmer_cradle.cognition.host.composition import CognitionComponents, compose_cognition
+from glimmer_cradle.cognition_worker.composition import CognitionComponents, compose_cognition
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.trace_context import new_boot_id, set_boot_id
 from glimmer_cradle.cognition.adapters.paths import (

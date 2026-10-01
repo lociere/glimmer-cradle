@@ -33,9 +33,6 @@ dev = [
     "ruff>=0.5",
 ]
 
-[project.scripts]
-glimmer-cradle-cognition = "glimmer_cradle.cognition.host.process:main"
-
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["glimmer_cradle.cognition*"]
@@ -46,7 +43,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "../../apps/cognition-worker/src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 

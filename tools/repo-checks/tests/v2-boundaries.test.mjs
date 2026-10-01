@@ -42,6 +42,37 @@ test('allow public cross-module entrypoints and provider implementations outside
   assert.deepEqual(collectV2Violations(root), []);
 });
 
+test('allows Python package-internal imports in app composition', t => {
+  const root = fixture(t, {
+    'apps/cognition-worker/src/glimmer_cradle/cognition_worker/__init__.py':
+      'from glimmer_cradle.cognition_worker.composition import compose\n',
+    'apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py':
+      'def compose(): return None\n',
+  });
+  assert.deepEqual(collectV2Violations(root), []);
+});
+
+test('allows Python cross-package imports through explicit package entrypoints', t => {
+  const root = fixture(t, {
+    'apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py':
+      'from glimmer_cradle.cognition.ports import CapabilityPort\n',
+    'core/cognition/src/glimmer_cradle/cognition/__init__.py': '',
+    'core/cognition/src/glimmer_cradle/cognition/ports/__init__.py': 'class CapabilityPort: pass\n',
+  });
+  assert.deepEqual(collectV2Violations(root), []);
+});
+
+test('aggregates Python app-to-Core internal imports as counted migration debt', t => {
+  const root = fixture(t, {
+    'apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py':
+      'from glimmer_cradle.cognition.adapters.clock import SystemClock\nfrom glimmer_cradle.cognition.state import CognitiveState\n',
+    'core/cognition/src/glimmer_cradle/cognition/__init__.py': '',
+  });
+  const findings = collectV2Violations(root).filter(item => item.rule === 'deep-import');
+  assert.equal(findings.length, 2);
+  assert.deepEqual(new Set(findings.map(item => item.detail)), new Set(['glimmer_cradle.cognition.*']));
+});
+
 test('detect source cycles and package cycles, including manifests without source imports', t => {
   const root = fixture(t, {
     'core/content/package.json': JSON.stringify({ name: '@glimmer-cradle/content', exports: { '.': './src/index.ts' }, dependencies: { '@glimmer-cradle/cognition': '*' } }),

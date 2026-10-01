@@ -1,4 +1,4 @@
-from glimmer_cradle.cognition.host import process
+from glimmer_cradle.cognition_worker import rpc_service as process
 
 
 def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:

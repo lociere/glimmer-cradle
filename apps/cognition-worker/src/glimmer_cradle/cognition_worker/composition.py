@@ -1,4 +1,4 @@
-"""Cognition 进程的唯一对象组装根。"""
+"""Cognition Worker 的唯一对象组装根。"""
 
 from __future__ import annotations
 

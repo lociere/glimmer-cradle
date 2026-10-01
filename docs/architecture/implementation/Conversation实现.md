@@ -50,8 +50,8 @@ TypeScript `InteractionController` 以 provider event 去重键和内容摘要�
 层不直接依赖 Node crypto，并将同一摘要随 Perception origin 交给 Cognition/Conversation 持久 Turn。
 Controller 在内存去重前可消费 `TurnSnapshotStorePort` 的持久确认：turn identity 与 payload digest 都匹配才
 视为跨重启重复，同 ID 异内容失败关闭。旧 SQLite Turn schema 原位补摘要列，历史空摘要不能冒充已验证重复。
-当前 Kernel 尚未接入 Python Conversation Turn adapter，该接线随阶段 12 的 `apps/host` /
-`apps/cognition-worker` 进程边界完成，因而现行进程入口还不能宣称已完成跨进程确认闭环。
+`apps/cognition-worker` 的物理进程入口已形成，但 Kernel 尚未接入 Python Conversation Turn adapter；
+`conversation_mapper.py` 与 Host consumer 接线完成前，仍不能宣称跨进程确认闭环已经完成。
 
 `DeliveryController` 与 `SqliteDeliveryStore` 持有输出 authority epoch、destination generation、状态转换、
 回执去重和实际 `heard_through_ms`。Kernel 普通回复和工具合成回复共用该入口：EventBus 调用前先 durable

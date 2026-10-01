@@ -3,7 +3,7 @@ import path from 'node:path';
 import { readJson } from '../file-system.mjs';
 
 const requiredRoots = [
-  'assets', 'configs', 'contracts', 'core', 'data', 'deploy', 'docs', 'engines', 'hosts',
+  'apps', 'assets', 'configs', 'contracts', 'core', 'data', 'deploy', 'docs', 'engines', 'hosts',
   'native', 'packages', 'products', 'templates', 'tools',
 ];
 
@@ -18,7 +18,7 @@ const requiredOwnerPaths = [
   'core/cognition/src/glimmer_cradle/cognition/application',
   'core/cognition/src/glimmer_cradle/cognition/ports',
   'core/cognition/src/glimmer_cradle/cognition/adapters',
-  'core/cognition/src/glimmer_cradle/cognition/host',
+  'apps/cognition-worker/src/glimmer_cradle/cognition_worker',
   'core/avatar',
   'hosts/extension-host',
   'hosts/unity-avatar-host',

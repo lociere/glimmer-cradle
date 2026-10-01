@@ -26,3 +26,6 @@ pnpm check:architecture
 
 跨包装配变化还需运行根 `pnpm typecheck` 与 `pnpm build`。Cognition owner Schema 迁移完成前，
 `contracts/json-schema/config/v1/` 仍是现行唯一 Schema 来源。
+
+`setup.py` 只负责在 wheel 构建前清理该包的旧 `build/lib` 投影，防止已经删除的迁移模块泄漏进
+安装制品；项目元数据与依赖仍由 `pyproject.toml` 唯一拥有。

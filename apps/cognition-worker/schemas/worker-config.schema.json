@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/apps/cognition-worker/worker-config.schema.json",
+  "title": "CognitionWorkerConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["readiness_timeout_ms", "shutdown_timeout_ms"],
+  "properties": {
+    "readiness_timeout_ms": {"type": "integer", "minimum": 1000, "default": 120000},
+    "shutdown_timeout_ms": {"type": "integer", "minimum": 1000, "default": 30000},
+    "state_sync_interval_ms": {"type": "integer", "minimum": 100, "default": 5000}
+  },
+  "x-glimmer-owner": "Cognition Worker",
+  "x-glimmer-contract-kind": "AppConfig"
+}

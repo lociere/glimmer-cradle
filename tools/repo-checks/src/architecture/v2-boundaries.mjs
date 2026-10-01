@@ -17,6 +17,10 @@ const vendor = /QQ|Discord|Telegram|VRChat|Live2D|OpenAI|Anthropic|Gemini|GitHub
 
 function coreModule(file) { return /^core\/([^/]+)\//.exec(file)?.[1]; }
 function isExtension(file) { return /^(?:extensions|templates)\//.test(file) || file.includes('/extensions/'); }
+function pythonPackageOwner(moduleName) {
+  const parts = moduleName.split('.');
+  return parts[0] === 'glimmer_cradle' && parts.length > 1 ? parts[1] : undefined;
+}
 
 export function readSourceImports(file, text) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
@@ -143,14 +147,22 @@ export function collectV2Violations(repositoryRoot) {
       const byName = new Map(modules.map(module => [module.module, module]));
       const pythonEdges = new Map(modules.map(module => [module.module, new Set()]));
       for (const module of modules) {
-        const owner = coreModule(module.file);
-        if (owner) for (const match of module.vendors) add(module.file, 'vendor-core', match.value, match.line);
+        const coreOwner = coreModule(module.file);
+        const owner = coreOwner ?? pythonPackageOwner(module.module);
+        if (coreOwner) for (const match of module.vendors) add(module.file, 'vendor-core', match.value, match.line);
         for (const spec of module.imports) {
-          const targetOwner = /^glimmer_cradle\.([^.]*)/.exec(spec.value)?.[1];
-          if (owner && targetOwner && dependencies[owner] && targetOwner !== owner && !dependencies[owner].includes(targetOwner)) {
-            add(module.file, 'dependency-direction', `${owner} -> ${targetOwner}: ${spec.value}`, spec.line);
+          const targetOwner = pythonPackageOwner(spec.value);
+          if (coreOwner && targetOwner && dependencies[coreOwner] && targetOwner !== coreOwner && !dependencies[coreOwner].includes(targetOwner)) {
+            add(module.file, 'dependency-direction', `${coreOwner} -> ${targetOwner}: ${spec.value}`, spec.line);
           }
-          if (targetOwner && owner !== targetOwner && spec.value.split('.').length > 2) add(module.file, 'deep-import', spec.value, spec.line);
+          const targetEntry = byName.get(spec.value);
+          const isPublicPackageEntry = targetEntry?.file.endsWith('/__init__.py');
+          if (targetOwner && owner !== targetOwner && spec.value.split('.').length > 2 && !isPublicPackageEntry) {
+            const detail = !coreOwner && module.file.startsWith('apps/')
+              ? `${spec.value.split('.').slice(0, 2).join('.')}.*`
+              : spec.value;
+            add(module.file, 'deep-import', detail, spec.line);
+          }
           if (isExtension(module.file) && targetOwner) add(module.file, 'extension-internal', spec.value, spec.line);
           for (const target of [spec.value, ...(spec.members ?? []).map(member => spec.value + '.' + member)]) {
             if (target !== module.module && byName.has(target)) pythonEdges.get(module.module).add(target);

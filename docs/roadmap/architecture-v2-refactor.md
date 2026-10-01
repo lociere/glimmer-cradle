@@ -135,7 +135,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 已拆分的 Python History | `history/{checkpoint.py,history_reader.py,projection.py,working_set.py}` 与 `adapters/persistence/history_store.py` | v3→v4、多 thread、分页、重建和权限反例继续通过；`conversations.db` 始终为投影 |
 | `src/glimmer_cradle/conversation/turns/*` 与 Cognition `CycleTurn` | `turns/{turn.py,turn_controller.py,turn_store_port.py}`、`adapters/persistence/sqlite_turn_store.py` | 目标 Turn 文件和持久 adapter 已就位并持久输入摘要；Conversation Turn 与 Cognition Step 分离，旧空摘要失败关闭，跨进程查询 adapter 仍待阶段 12 |
 | Cognition `CycleContinuity`、`AgentSynthesisUseCase` 的 action/result 记录 | Conversation Log 的 ACTION → ACTION_RESULT → REPLY 因果事实；跨进程映射暂经现行 cognition proto | 本切片先确保副作用前 flush、稳定 invocation 与幂等重放；阶段 6 切换 native ToolCall/ToolResult 后删除 `skill_request` 兼容链 |
-| `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 阶段 12 切 App composition；Conversation writer drain 与 Cognition checkpoint 都通过后删除旧 Worker 入口 |
+| `core/cognition/.../host/*` 中 Conversation/Cognition 同进程装配 | `apps/cognition-worker/src/glimmer_cradle/cognition_worker/{composition.py,rpc_service.py,shutdown.py}` | 已迁移生产入口、composition、runtime 打包与 Kernel 启动模块；clients/mappers 拆分及 Conversation 跨进程确认仍待完成 |
 | Kernel composition、Surface history 与 skill action 接线 | `apps/host/src/adapters/protocol/conversation-mapper.ts`、`composition/{domain-owners.ts,turn-processor-adapter.ts}`、`gateway/conversation-routes.ts` | 阶段 12/15 消费者切换并通过本地/headless 共用 Host 验收后删除旧 Kernel 业务接线 |
 
 ## 兼容窗口与删除门
@@ -378,6 +378,8 @@ owner 后删除整个旧目录。新增 `checkpoint.py`、`run.py`、`recovery.p
 消费方 Port 切片把旧 `ports/clock.py` 迁为清单规定的 `clock_port.py`，并补齐 `content_port.py`、`conversation_port.py`、`job_port.py` 与 `resource_port.py`。Core 契约只描述 Cognition 所需的受限资产读取、Conversation 事实读写、幂等长期工作请求和带 revision/principal 的资源读取；实现与 wire mapper 留在 App。目标 Cognition 源码缺项因此只剩 owner Schema、README 与测试装配入口；Schema 在 `contracts/json-schema` 仍是现行唯一事实源期间不会复制，必须随 catalog、consumer 和验证流程原子迁移。
 
 Cognition 包入口切片新增目标 `README.md`，并把共享确定性测试 adapter 从清单外 `tests/support.py` 迁入目标 `tests/conftest.py`；299 项测试保持通过。Cognition 物理清单至此只缺 5 个 owner Schema，这些文件将在现行 Contract Spine catalog 与所有消费方可原子切换时迁移。
+
+Cognition Worker 入口切片把生产 composition 与受监督 RPC 进程从 Core `host/` 迁入 `apps/cognition-worker`，Kernel 启动命令和 Desktop Python runtime 同步切到 `glimmer_cradle.cognition_worker`，Core 不再发布进程脚本。新增 worker config、readiness 状态、幂等有序 shutdown 协调器，以及 capability/content/conversation/job/model/resource mapper/client；RPC roundtrip 固定能力幂等键、模型事件顺序和 Content digest 失败关闭。Worker 测试已加入根测试入口。当前 `rpc_service.py` 仍包含兼容生命周期主体，clients 也尚未连接真实 Host broker；退出条件是这些 adapter 的生产接线与 flush/recovery 门完成后进一步收束。Cognition wheel 构建额外清理旧 `build/lib` 包投影，fresh runtime 冒烟已证明已删除模块不会泄漏进安装制品。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

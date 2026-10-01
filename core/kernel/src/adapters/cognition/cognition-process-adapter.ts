@@ -49,7 +49,7 @@ export class CognitionManager {
     const cognitionDir = path.resolve(repoRoot, 'core', 'cognition');
     const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
     const command = packagedPython || await ensureDevelopmentPython(cognitionDir);
-    const args = ['-m', 'glimmer_cradle.cognition.host.process'];
+    const args = ['-m', 'glimmer_cradle.cognition_worker'];
     this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
     this.transport.configureActionDeadline(this.requestTimeoutMs);
     processLogDir = path.join(resolveLogDir(), 'application');

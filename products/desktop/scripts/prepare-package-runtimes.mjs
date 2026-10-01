@@ -109,7 +109,7 @@ try {
     kernelContracts,
   ]);
   await run(python, ['-I', '-c', 'from glimmer.cognition.v1 import cognition_service_pb2; print(cognition_service_pb2.DESCRIPTOR.package)']);
-  await run(python, ['-I', '-m', 'glimmer_cradle.cognition.host.process', '--help']);
+  await run(python, ['-I', '-m', 'glimmer_cradle.cognition_worker', '--help']);
   await fs.writeFile(path.join(temporaryRoot, 'runtime-manifest.json'), `${JSON.stringify({
     schema_version: 1,
     platform: 'windows-x64',
@@ -117,7 +117,7 @@ try {
     python: { version: pythonVersion, executable: 'python/python.exe' },
     kernel: { entry: 'kernel/dist/index.js', dependencies: 'kernel/node_modules' },
     extension_host: { entry: 'kernel/node_modules/@glimmer-cradle/extension-host/dist/main.js' },
-    cognition: { module: 'glimmer_cradle.cognition.host.process' },
+    cognition: { module: 'glimmer_cradle.cognition_worker' },
     audio: { module: 'glimmer_cradle.audio.main' },
     contracts: {
       typescript_module: 'kernel/node_modules/@glimmer-cradle/contracts/dist/glimmer/cognition/v1/cognition_service_pb.js',
