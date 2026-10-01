@@ -1,6 +1,9 @@
 """Cognition Memory public API."""
 
-from glimmer_cradle.cognition.memory.consolidation import ConsolidationCoordinator
+from glimmer_cradle.cognition.memory.consolidation import (
+    ConsolidationCoordinator,
+    MaintenanceScheduler,
+)
 from glimmer_cradle.cognition.memory.correction import (
     CorrectionOperation,
     corrected_status,
@@ -14,6 +17,7 @@ __all__ = [
     "ConsolidationCoordinator",
     "CorrectionOperation",
     "MemoryController",
+    "MaintenanceScheduler",
     "MemoryKind",
     "MemoryRecord",
     "MemoryStore",

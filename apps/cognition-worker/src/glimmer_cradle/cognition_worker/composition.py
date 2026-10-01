@@ -57,7 +57,7 @@ from glimmer_cradle.cognition.inference import InferenceController
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex
 from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
-from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler
+from glimmer_cradle.cognition.memory import MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository

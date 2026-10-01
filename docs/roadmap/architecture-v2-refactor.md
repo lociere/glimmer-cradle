@@ -426,6 +426,12 @@ Relationship 四类只读来源归入目标 `context/source.py`，Worker、Loop 
 成为架构测试允许的正向依赖，持久 writer 仍归原领域 owner。Loop 已不再导入任何 Cognition
 Application 模块，因此同步删除了 Loop→Application 的迁移期依赖例外。
 
+Memory maintenance 收口切片把独立节拍、静息封口提示、终结 Moment 唤醒和 Consolidation 生命周期
+归入目标 `memory/consolidation.py`，Worker 与测试改用 Memory 公共入口；旧
+`application/maintenance/` 删除。零消费者的 `NarrativeJournal` 及其专用 `NarrativeEntry` renderer
+不在 v2.1 物理清单内，也未参与持久恢复或公开 wire，因此连同 `application/experience/` 和对应
+`domain/experience/narrative.py` 物理删除；Episode 持久模型与 projection port 保持不变。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

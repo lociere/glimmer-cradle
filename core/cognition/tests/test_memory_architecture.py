@@ -6,7 +6,7 @@ import pytest
 
 from glimmer_cradle.cognition.memory import MemoryController as _MemoryController
 from glimmer_cradle.cognition.memory import ConsolidationCoordinator as _ConsolidationCoordinator
-from glimmer_cradle.cognition.application.maintenance import MaintenanceScheduler as _MaintenanceScheduler
+from glimmer_cradle.cognition.memory import MaintenanceScheduler as _MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
