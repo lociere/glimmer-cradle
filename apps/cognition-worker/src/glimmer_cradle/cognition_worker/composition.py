@@ -24,14 +24,12 @@ from glimmer_cradle.cognition.loop import (
     AffectProvider,
     DriveProvider,
     LoopController,
+    MemoryProvider,
     PerceptionProvider,
+    SocialProvider,
 )
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
-from glimmer_cradle.cognition.application.cycle.providers import (
-    MemoryProvider,
-    SocialProvider,
-)
 from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
 from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock

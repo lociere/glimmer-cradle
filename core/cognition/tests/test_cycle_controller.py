@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from glimmer_cradle.cognition.loop import LoopController as _CycleController, PerceptionProvider as _PerceptionProvider
-from glimmer_cradle.cognition.application.cycle.providers import Provider
+from glimmer_cradle.cognition.loop import Provider
 from glimmer_cradle.cognition.attention import (
     Attention,
     AttentionController as _AttentionController,
@@ -465,7 +465,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
 
 async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     """perception 广播 → reply intent → Act 推 ActionCommand 经 sink。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -508,7 +508,7 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
 
 async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path) -> None:
     """结构化 ActionPlan 判定需要外部能力时发 skill_request。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -585,7 +585,7 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
 )
 async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, capability_kind: str) -> None:
     """自然表达经 ActionPlan 进入 Skill，不依赖关键词 gate。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -637,7 +637,7 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
 )
 async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user_text: str) -> None:
     """解释概念、禁止执行和普通互动不触发 Skill。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -684,7 +684,7 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
 
 async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: Path) -> None:
     """ActionPlan=noop 是显式沉默，不会落入普通回复生成。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -736,7 +736,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
 
 async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: Path) -> None:
     """ActionPlan=ask_clarification 生成显式澄清回复，不走普通 reply fallback。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -789,7 +789,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
 
 async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: Path) -> None:
     """InferenceController 不可用时不能靠关键词或副作用兜底执行 Skill。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -992,7 +992,7 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
 
 async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
     """无 action_sink → Act 不推送，不报错（沉默默认）。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1018,7 +1018,7 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
 
 async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     """Deliberate 生成空文本 → 无 reply intent → 不推 ActionCommand（沉默）。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1052,7 +1052,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
 
 async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     """sink 抛错 → 隔离，不连坐 tick。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1084,7 +1084,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
 
 async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     """有 emotion_system → ActionCommand 带 emotion_state。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1127,7 +1127,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
 
 async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> None:
     """perception 入站 → Appraise 调 update_by_input + 写 PERCEPTION/EMOTION Moment。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
     from glimmer_cradle.conversation.log import MomentKind
 
@@ -1183,7 +1183,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
 
 async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
     """无 perception 广播 → 情绪不动、不写 PERCEPTION/EMOTION Moment。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.conversation.log import MomentKind
 
     class _DriveOnly(Provider):
@@ -1222,7 +1222,7 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
 
 async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> None:
     """用户输入与真实回复只写 Experience，供 Conversation 投影重建。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1260,7 +1260,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
 
 async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path: Path) -> None:
     """同拍跨域感知只允许广播项成为回复的 Turn 与因果来源。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
     from glimmer_cradle.conversation import MomentKind
 
@@ -1339,7 +1339,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
 
 async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: Path) -> None:
     """回复未通过仲裁时只保留感知与沉默事实。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1394,7 +1394,7 @@ class _CapturingReasoning:
 
 async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     """Deliberate 按固定分区装配会话状态、历史片段、记忆与知识。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1467,7 +1467,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
 
 async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: Path) -> None:
     """本地私聊不能召回扩展群聊的 space-local 经历。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
     from glimmer_cradle.conversation.log import MomentKind
 
@@ -1577,7 +1577,7 @@ async def test_recent_experience_digest_does_not_duplicate_speaker_tag(tmp_path:
 
 async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
     """perception→回复 一拍走完：PERCEPTION→EMOTION→REPLY 因果链成形。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1622,7 +1622,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
 
 async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> None:
     """收到输入但回复被压制 → SILENCE Moment 链回 perception（沉默不等于无感）。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1659,7 +1659,7 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
 
 async def test_observe_only_perception_records_without_reasoning(tmp_path: Path) -> None:
     """observe_only 进入经历链路，但 Deliberate 不调用推理、不生成回复。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1731,7 +1731,7 @@ class _FakeRouter:
 
 async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> None:
     """specialist_then_core：图片描述（semantic_text）进 system prompt。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):
@@ -1766,7 +1766,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
 
 async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -> None:
     """core_direct：vision 消息随 InferenceRequest 直发主模型 + 带 provider_key。"""
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
     from glimmer_cradle.cognition.domain.volition import WillingnessConfig
 
     class _Fixed(Provider):

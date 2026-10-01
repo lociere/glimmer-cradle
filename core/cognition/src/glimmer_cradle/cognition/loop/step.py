@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from glimmer_cradle.conversation import ConversationTurn
-from glimmer_cradle.cognition.application.cycle.providers.base import Provider
 from glimmer_cradle.cognition.attention import Attention, make_attention
+from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery
 from glimmer_cradle.cognition.planning import ActionPlan
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 from glimmer_cradle.cognition.state import EmotionSystem
+
+if TYPE_CHECKING:
+    from glimmer_cradle.cognition.state import CognitiveActivityController
 
 
 _EMOTION_LABEL_WORDS = (
@@ -41,6 +46,17 @@ _ACTION_CUES = (
     "凑近", "退后", "递", "坐", "站", "走", "伸手", "收手", "拉", "推",
     "摊手", "眯眼", "抿嘴", "咳", "沉默", "停顿", "轻声", "小声", "脸红",
 )
+
+
+class Provider(ABC):
+    """Loop Sense 阶段候选来源的统一契约。"""
+
+    name: str = ""
+
+    @abstractmethod
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        """读取工作区快照并返回本拍候选，不直接修改工作区。"""
+        ...
 
 
 @dataclass(slots=True)
@@ -226,6 +242,149 @@ class DriveProvider(Provider):
         except Exception:
             return False
         return intensity > self._cfg.emotion_strong_threshold
+
+
+def _extract_query_text(item: Attention) -> str:
+    content = item.content if isinstance(item.content, dict) else {}
+    for key in ("text", "query", "broadcast"):
+        value = content.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, dict):
+            inner = value.get("text") or value.get("content")
+            if isinstance(inner, str) and inner.strip():
+                return inner.strip()
+    return str(item.content)[:200]
+
+
+class MemoryProvider(Provider):
+    """按当前焦点通过 ContextAssembler 召回有界上下文候选。"""
+
+    name = "memory"
+
+    def __init__(
+        self,
+        context_assembly: ContextAssembler,
+        *,
+        activity_controller: "CognitiveActivityController | None" = None,
+        max_items_per_tick: int = 3,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+    ) -> None:
+        self._assembler = context_assembly
+        self._activity = activity_controller
+        self._max_items = max(1, int(max_items_per_tick))
+        self._clock = clock
+        self._ids = ids
+
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        if not workspace_snapshot:
+            return []
+        focus = max(workspace_snapshot, key=lambda item: item.salience)
+        query_text = _extract_query_text(focus)
+        if not query_text:
+            return []
+        budget_factor = 1.0
+        if self._activity is not None:
+            try:
+                value = self._activity.get_state().get("policy", {}).get(
+                    "context_budget_factor"
+                )
+                if isinstance(value, (int, float)):
+                    budget_factor = float(value)
+            except Exception:
+                pass
+        content = focus.content if isinstance(focus.content, dict) else {}
+        query = ContextQuery(
+            text=query_text,
+            scene_id=content.get("scene_id"),
+            conversation_id=content.get("conversation_id"),
+            actor_id=content.get("actor_id"),
+            recall_scope=content.get("recall_scope", "global_safe"),
+            focus_summary=query_text[:80],
+        )
+        try:
+            assembled = await self._assembler.assemble(
+                query,
+                budget_factor=budget_factor,
+                per_source_limit=self._max_items,
+            )
+        except Exception:
+            return []
+        return [
+            make_attention(
+                source=self.name,
+                content={
+                    "text": item.content,
+                    "source_kind": item.source,
+                    "trust_tier": item.trust_tier,
+                    "instruction_authority": item.instruction_authority,
+                    "metadata": item.metadata,
+                },
+                salience=min(1.0, max(0.05, item.score())),
+                clock=self._clock,
+                ids=self._ids,
+            )
+            for item in assembled.items[: self._max_items]
+        ]
+
+
+def _extract_actor_id(item: Attention) -> str | None:
+    content = item.content if isinstance(item.content, dict) else {}
+    actor = content.get("actor")
+    actor_id = content.get("actor_id")
+    if not actor_id and isinstance(actor, dict):
+        actor_id = actor.get("actor_id")
+    return actor_id if isinstance(actor_id, str) and actor_id else None
+
+
+class SocialProvider(Provider):
+    """把已投影的关系状态只读映射为 Attention 候选。"""
+
+    name = "social"
+
+    def __init__(
+        self,
+        relationship_repo: RelationshipRepositoryPort,
+        *,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+    ) -> None:
+        self._repo = relationship_repo
+        self._clock = clock
+        self._ids = ids
+
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        if not workspace_snapshot:
+            return []
+        focus = max(workspace_snapshot, key=lambda item: item.salience)
+        actor_id = _extract_actor_id(focus)
+        if not actor_id:
+            return []
+        try:
+            record = await self._repo.get(actor_id)
+        except Exception:
+            return []
+        if record is None:
+            return []
+        return [
+            make_attention(
+                source=self.name,
+                content={
+                    "actor_id": record.actor_id,
+                    "display_name": record.display_name,
+                    "familiarity": record.familiarity,
+                    "direct_interactions": record.direct_interactions,
+                    "ambient_observations": record.ambient_observations,
+                    "replies": record.replies,
+                    "relationship_summary": record.summary,
+                    "relationship_attributes": record.attributes,
+                },
+                salience=min(1.0, 0.3 + record.familiarity * 0.5),
+                clock=self._clock,
+                ids=self._ids,
+            )
+        ]
 
 
 def strip_emotion_tags(text: str) -> str:

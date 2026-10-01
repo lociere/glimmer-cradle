@@ -406,6 +406,13 @@ Worker composition 与测试改用 Loop 公共入口，旧 `providers/{affect,dr
 全局 provider class registry 删除；Memory/Social provider 仍留在旧目录，待 Context 与关系投影
 依赖同时归位后删除，避免制造 State→Attention 的反向依赖。
 
+Memory/Social Provider 收口切片把 ContextAssembler 的有界召回和关系投影的只读候选映射归入
+`loop/step.py`，Loop→Context 成为架构测试固定的正向领域依赖；Context 与关系 repository 仍分别
+拥有来源装配和持久事实，Loop 不写入它们。统一 `Provider` 契约同时迁入 Loop 公共入口，Worker 与
+全部测试消费者完成切换，旧 `application/cycle/providers/` 五个实现及 package 入口 consumer-zero
+后物理删除。至此旧 providers owner 清空；剩余 Cycle helpers 仍需按 appraisal、deliberation、
+continuity 与 action emission 的职责继续归位。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -211,7 +211,7 @@ async def test_cycle_intend_with_perception_creates_reply_intent(tmp_path) -> No
     """CycleController 接 Volition 后：perception 广播 → reply intent。"""
     from glimmer_cradle.cognition.loop import LoopController as CycleController
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
 
     from glimmer_cradle.cognition.inference import InferenceResponse
 
@@ -281,7 +281,7 @@ async def test_loop_intend_drive_source_creates_thought(tmp_path) -> None:
     """drive(curiosity) 广播 → thought intent；不是 reply。"""
     from glimmer_cradle.cognition.loop import LoopController as CycleController
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
-    from glimmer_cradle.cognition.application.cycle.providers import Provider
+    from glimmer_cradle.cognition.loop import Provider
 
     class _Fixed(Provider):
         name = "drive"

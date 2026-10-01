@@ -1,5 +1,4 @@
-from glimmer_cradle.cognition.application.cycle.providers import MemoryProvider
-from glimmer_cradle.cognition.loop import AffectProvider
+from glimmer_cradle.cognition.loop import AffectProvider, MemoryProvider
 from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.context import ContextItem
 from tests.conftest import CLOCK, IDS
