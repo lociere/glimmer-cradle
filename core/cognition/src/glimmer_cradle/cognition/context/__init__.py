@@ -12,7 +12,11 @@ from glimmer_cradle.cognition.context.source import (
     ContextQuery,
     ContextSource,
     ContextTrustTier,
+    EpisodicMemorySource,
     InstructionAuthority,
+    KnowledgeSource,
+    RecentExperienceSource,
+    RelationshipSource,
     allowed_recall_scopes,
     estimate_tokens,
 )
@@ -30,7 +34,11 @@ __all__ = [
     "ContextSource",
     "ContextTrustPolicy",
     "ContextTrustTier",
+    "EpisodicMemorySource",
     "InstructionAuthority",
+    "KnowledgeSource",
+    "RecentExperienceSource",
+    "RelationshipSource",
     "allowed_recall_scopes",
     "estimate_tokens",
 ]

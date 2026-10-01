@@ -420,6 +420,12 @@ action_emitter,continuity}.py` consumer-zero 后物理删除。至此 `applicati
 Loop 对旧 `application/context/sources` 的 RecentExperienceSource 依赖仍待 Context source adapter
 归位，不能提前移除迁移期 application 依赖例外。
 
+Context source 收口切片随后把 Episodic Memory、近期 Conversation Experience、Knowledge 与
+Relationship 四类只读来源归入目标 `context/source.py`，Worker、Loop 与测试只消费 Context 公共入口。
+旧 `application/context/` 五个手写文件 consumer-zero 后物理删除；Context→Memory/Knowledge 公共面
+成为架构测试允许的正向依赖，持久 writer 仍归原领域 owner。Loop 已不再导入任何 Cognition
+Application 模块，因此同步删除了 Loop→Application 的迁移期依赖例外。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

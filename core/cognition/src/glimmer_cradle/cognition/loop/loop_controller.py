@@ -44,7 +44,7 @@ from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityResult,
 )
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
-from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
+from glimmer_cradle.cognition.context import RecentExperienceSource
 
 
 def salience_for_perception(*, address_mode: str, familiarity: int) -> float:

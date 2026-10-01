@@ -14,7 +14,7 @@ from glimmer_cradle.cognition.attention import (
     AttentionController as _AttentionController,
     make_attention as _make_attention,
 )
-from glimmer_cradle.cognition.application.context.sources.episodic_source import RecentExperienceSource
+from glimmer_cradle.cognition.context import RecentExperienceSource
 from glimmer_cradle.conversation import ConversationLog, SqliteTurnStore, TurnController
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.cognition.inference import ModelTier, InferenceResponse, InferenceUnavailable

@@ -7,18 +7,18 @@ from dataclasses import dataclass
 from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
 from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
-from glimmer_cradle.cognition.context import ContextAssembler
+from glimmer_cradle.cognition.context import (
+    ContextAssembler,
+    EpisodicMemorySource,
+    KnowledgeSource,
+    RecentExperienceSource,
+    RelationshipSource,
+)
 from glimmer_cradle.conversation import (
     ConversationController,
     ConversationStore,
     SqliteTurnStore,
     TurnController,
-)
-from glimmer_cradle.cognition.application.context.sources import (
-    EpisodicMemorySource,
-    KnowledgeSource,
-    RecentExperienceSource,
-    RelationshipSource,
 )
 from glimmer_cradle.cognition.loop import (
     AffectProvider,

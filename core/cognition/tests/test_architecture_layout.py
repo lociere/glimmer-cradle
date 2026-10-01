@@ -33,12 +33,11 @@ ALLOWED_DEPENDENCIES = {
         "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
     },
     "attention": {"attention", "ports"},
-    "context": {"context", "ports"},
+    "context": {"context", "knowledge", "memory", "ports"},
     "inference": {"inference", "state", "ports"},
     "knowledge": {"inference", "knowledge", "memory", "ports"},
-    # Cycle helper extraction is transitional; remove application once Loop owns all stages.
     "loop": {
-        "application", "attention", "context", "domain", "inference", "loop", "perception", "planning", "ports", "state"
+        "attention", "context", "domain", "inference", "loop", "perception", "planning", "ports", "state"
     },
     "memory": {"domain", "inference", "memory", "ports"},
     "perception": {"perception"},
