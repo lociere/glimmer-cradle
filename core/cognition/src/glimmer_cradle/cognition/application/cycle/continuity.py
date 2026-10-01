@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
+from glimmer_cradle.cognition.loop.step import normalize_reply_text
 from glimmer_cradle.conversation import MomentKind
 
 

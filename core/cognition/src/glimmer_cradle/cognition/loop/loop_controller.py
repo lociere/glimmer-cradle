@@ -10,7 +10,6 @@ from glimmer_cradle.cognition.application.cycle.appraisal import PerceptionAppra
 from glimmer_cradle.cognition.application.cycle.continuity import CycleContinuity
 from glimmer_cradle.cognition.application.cycle.deliberation import DeliberationController
 from glimmer_cradle.cognition.application.cycle.providers import Provider
-from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
 from glimmer_cradle.cognition.loop.run import LoopRun
@@ -90,12 +89,6 @@ class LoopController:
         self._action_emitter = ActionEmitter(
             sink=action_sink, emotion_system=emotion_system, observability=observability
         )
-        reply_context = ReplyContextBuilder(
-            self_entity=self_entity,
-            conversation=conversation,
-            recent_experience_source=recent_experience_source,
-            observability=observability,
-        )
         self._appraiser = PerceptionAppraiser(
             recorder=experience_recorder,
             emotion_system=emotion_system,
@@ -106,7 +99,9 @@ class LoopController:
         self._deliberation = DeliberationController(
             reasoning=reasoning,
             planning_controller=planning_controller,
-            context_builder=reply_context,
+            self_entity=self_entity,
+            conversation=conversation,
+            recent_experience_source=recent_experience_source,
             activity_controller=activity_controller,
             emotion_system=emotion_system,
             persona_compiler=persona_compiler,

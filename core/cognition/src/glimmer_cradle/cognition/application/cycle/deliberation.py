@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from glimmer_cradle.cognition.application.cycle.reply_context import ReplyContextBuilder
+from glimmer_cradle.cognition.context import ReplyContextBuilder
 from glimmer_cradle.cognition.attention import Attention
 from glimmer_cradle.cognition.inference import (
     ModelTier,
@@ -25,7 +25,9 @@ class DeliberationController:
         *,
         reasoning: InferenceController | None,
         planning_controller: PlanningController | None,
-        context_builder: ReplyContextBuilder,
+        self_entity=None,
+        conversation=None,
+        recent_experience_source=None,
         activity_controller=None,
         emotion_system=None,
         persona_compiler=None,
@@ -36,7 +38,12 @@ class DeliberationController:
         self._planner = planning_controller or PlanningController(
             reasoning, observability=observability
         )
-        self._context = context_builder
+        self._context = ReplyContextBuilder(
+            self_entity=self_entity,
+            conversation=conversation,
+            recent_experience_source=recent_experience_source,
+            observability=observability,
+        )
         self._activity = activity_controller
         self._emotion = emotion_system
         self._persona = persona_compiler

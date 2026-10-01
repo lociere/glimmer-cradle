@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from glimmer_cradle.cognition.application.cycle.reply_text import build_reply_messages, normalize_reply_text
+from glimmer_cradle.cognition.loop.step import build_reply_messages, normalize_reply_text
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult, Intent
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 

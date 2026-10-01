@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, List
 
 from .base_use_case import BaseUseCase
-from glimmer_cradle.cognition.application.cycle.reply_text import normalize_reply_text
+from glimmer_cradle.cognition.loop.step import normalize_reply_text
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.conversation import (
