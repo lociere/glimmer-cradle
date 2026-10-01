@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from glimmer_cradle.cognition.loop import LoopController as _CycleController
 from glimmer_cradle.cognition.perception import Observation, ObservationQueue
-from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.attention import (
     AttentionController as _AttentionController,

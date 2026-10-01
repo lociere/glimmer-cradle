@@ -7,13 +7,21 @@ from glimmer_cradle.cognition.perception.observation import (
     RetentionCeiling,
 )
 from glimmer_cradle.cognition.perception.observation_normalizer import ObservationNormalizer
-from glimmer_cradle.cognition.perception.observation_queue import ObservationQueue
+from glimmer_cradle.cognition.perception.observation_queue import (
+    ObservationQueue,
+    PerceptionOperation,
+    PerceptionOperationConflict,
+    PerceptionOperationRegistry,
+)
 
 __all__ = [
     "AddressMode",
     "Observation",
     "ObservationNormalizer",
     "ObservationQueue",
+    "PerceptionOperation",
+    "PerceptionOperationConflict",
+    "PerceptionOperationRegistry",
     "ResponsePolicy",
     "RetentionCeiling",
 ]

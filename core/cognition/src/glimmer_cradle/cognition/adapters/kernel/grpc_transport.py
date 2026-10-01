@@ -29,8 +29,6 @@ from glimmer_cradle.cognition.perception import (
     Observation,
     ObservationNormalizer,
     ObservationQueue,
-)
-from glimmer_cradle.cognition.application.cycle.perception_operations import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )

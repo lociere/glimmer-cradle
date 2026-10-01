@@ -22,8 +22,7 @@ from glimmer_cradle.cognition.application.context.sources import (
 )
 from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.attention import AttentionController
-from glimmer_cradle.cognition.perception import ObservationQueue
-from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import (
     AffectProvider,
     DriveProvider,

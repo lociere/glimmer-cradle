@@ -33,7 +33,7 @@ from glimmer_cradle.cognition.domain.volition import (
     threshold_for,
 )
 from glimmer_cradle.cognition.attention import AttentionController, Attention
-from glimmer_cradle.cognition.application.cycle.perception_operations import PerceptionOperationRegistry
+from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort

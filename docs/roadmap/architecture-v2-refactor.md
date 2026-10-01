@@ -388,6 +388,12 @@ consumer-zero 后物理删除。Context 信任/预算装配与回复 prompt 的�
 没有复制实现；其余 appraisal、deliberation、continuity、action emitter 与 provider helpers 仍按职责等待
 后续原子归位，不能据此宣称旧 `application/cycle` 已清空。
 
+Perception operation 归位切片把 RPC 接纳、运行、取消、终态查询与有界历史登记并入目标
+`perception/observation_queue.py`，与 Observation 的入队、淘汰和 Loop 消费共享同一领域生命周期；
+Worker composition、Loop、Kernel wire adapter 与测试均改用 `glimmer_cradle.cognition.perception`
+公共入口。旧 `application/cycle/perception_operations.py` consumer-zero 后物理删除，未改变
+operation/trace 冲突、取消 task 或 terminal trimming 语义，也没有把 transport DTO 引入领域 owner。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
