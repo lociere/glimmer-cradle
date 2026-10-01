@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,6 +27,33 @@ class AgentPlanResult(BaseModel):
     summary: str
     reasoning: str
     suggestions: list[SkillToolSuggestion]
+    trace_id: str
+
+
+@dataclass
+class AgentPlanInput:
+    user_goal: str
+    scene_id: str = ""
+    available_tools: list[SkillToolDescriptor] = field(default_factory=list)
+    trace_id: str = ""
+
+
+AgentPlanOutput = AgentPlanResult
+
+
+@dataclass
+class AgentSynthesisInput:
+    original_goal: str
+    scene_id: str = ""
+    conversation: dict = field(default_factory=dict)
+    tool_results: list[dict] = field(default_factory=list)
+    trace_id: str = ""
+
+
+@dataclass
+class AgentSynthesisOutput:
+    reply_content: str
+    emotion_state: dict
     trace_id: str
 
 

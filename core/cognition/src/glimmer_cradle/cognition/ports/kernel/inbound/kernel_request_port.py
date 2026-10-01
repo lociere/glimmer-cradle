@@ -1,8 +1,10 @@
 """Kernel 请求型入站消息的应用端口。"""
 from abc import ABC, abstractmethod
-from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput, AgentPlanOutput
-from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput, AgentSynthesisOutput
 from glimmer_cradle.cognition.ports.kernel.models import (
+    AgentPlanInput,
+    AgentPlanOutput,
+    AgentSynthesisInput,
+    AgentSynthesisOutput,
     ConversationHistoryQuery,
     ConversationHistoryResult,
     KnowledgeInitialization,

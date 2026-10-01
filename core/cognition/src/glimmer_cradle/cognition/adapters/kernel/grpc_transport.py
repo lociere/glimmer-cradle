@@ -22,8 +22,6 @@ from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.state import CognitiveActivityController
-from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanInput
-from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisInput
 from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.perception import (
     Observation,
@@ -37,6 +35,8 @@ from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.trace_context import TraceContext, new_trace_id
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.ports.kernel.models import (
+    AgentPlanInput,
+    AgentSynthesisInput,
     ConversationHistoryQuery,
     KnowledgeEntryInput,
     KnowledgeInitialization,

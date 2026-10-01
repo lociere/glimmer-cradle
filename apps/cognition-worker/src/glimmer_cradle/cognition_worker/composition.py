@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from glimmer_cradle.cognition.state import CognitiveActivityController
-from glimmer_cradle.cognition.application.agent_plan_use_case import AgentPlanUseCase
-from glimmer_cradle.cognition.application.agent_synthesis_use_case import AgentSynthesisUseCase
+from glimmer_cradle.cognition.adapters.kernel.inbound_adapter import (
+    AgentPlanUseCase,
+    AgentSynthesisUseCase,
+)
 from glimmer_cradle.cognition.context import (
     ContextAssembler,
     EpisodicMemorySource,

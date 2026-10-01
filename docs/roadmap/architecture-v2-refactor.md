@@ -432,6 +432,14 @@ Memory maintenance 收口切片把独立节拍、静息封口提示、终结 Mom
 不在 v2.1 物理清单内，也未参与持久恢复或公开 wire，因此连同 `application/experience/` 和对应
 `domain/experience/narrative.py` 物理删除；Episode 持久模型与 projection port 保持不变。
 
+Legacy Agent RPC 用例收口切片把 Plan/Synthesize 的输入输出移入现有 Kernel request port models，
+把仅服务该 RPC 的执行与生命周期包装收束到 `adapters/kernel/inbound_adapter.py`；Worker composition、
+gRPC transport、port 与测试不再依赖 Cognition Application。旧 `application/{base_use_case,
+agent_plan_use_case,agent_synthesis_use_case}.py` 及空 package 物理删除，Cognition 架构门同步移除
+`application` 源码根与 Ports→Application 依赖。Plan/Synthesize wire 仍有 Kernel 生产消费者，需在
+native capability loop、execution journal 和新 Host broker 接线后原子删除；本切片不把 adapter
+内的兼容 RPC 实现冒充最终 Core owner。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

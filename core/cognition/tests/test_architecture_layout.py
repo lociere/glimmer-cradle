@@ -14,7 +14,7 @@ PACKAGE_ROOT = (
     / "cognition"
 )
 TARGET_ROOTS = {
-    "domain", "application", "ports", "adapters", "attention", "context",
+    "domain", "ports", "adapters", "attention", "context",
     "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state",
 }
 LEGACY_ROOTS = {
@@ -24,11 +24,7 @@ LEGACY_ROOTS = {
 }
 ALLOWED_DEPENDENCIES = {
     "domain": {"domain", "persona", "state", "ports"},
-    "application": {
-        "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports"
-    },
-    # inbound Port 使用 application command/result 类型描述调用契约。
-    "ports": {"domain", "application", "ports"},
+    "ports": {"domain", "ports"},
     "adapters": {
         "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
     },
@@ -363,8 +359,8 @@ def test_import_gate_reports_alias_relative_generated_and_dynamic_violations() -
     """))
     violations = _dependency_violations(
         tree,
-        module_package="glimmer_cradle.cognition.application",
-        owner="application",
+        module_package="glimmer_cradle.cognition.loop",
+        owner="loop",
         label="synthetic_imports.py",
     )
 
