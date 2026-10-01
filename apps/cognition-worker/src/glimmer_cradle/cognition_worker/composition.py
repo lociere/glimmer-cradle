@@ -20,12 +20,15 @@ from glimmer_cradle.cognition.application.context.sources import (
     RecentExperienceSource,
     RelationshipSource,
 )
-from glimmer_cradle.cognition.loop import LoopController, PerceptionProvider
+from glimmer_cradle.cognition.loop import (
+    AffectProvider,
+    DriveProvider,
+    LoopController,
+    PerceptionProvider,
+)
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
 from glimmer_cradle.cognition.application.cycle.providers import (
-    AffectProvider,
-    DriveProvider,
     MemoryProvider,
     SocialProvider,
 )

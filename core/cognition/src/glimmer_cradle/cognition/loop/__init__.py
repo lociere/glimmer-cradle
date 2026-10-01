@@ -9,6 +9,9 @@ from glimmer_cradle.cognition.loop.loop_controller import (
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
 from glimmer_cradle.cognition.loop.run import LoopRun
 from glimmer_cradle.cognition.loop.step import (
+    AffectProvider,
+    DriveConfig,
+    DriveProvider,
     LoopStep,
     build_reply_messages,
     normalize_reply_text,
@@ -23,6 +26,9 @@ __all__ = [
     "PerceptionProvider",
     "LoopRun",
     "LoopStep",
+    "AffectProvider",
+    "DriveConfig",
+    "DriveProvider",
     "build_reply_messages",
     "normalize_reply_text",
     "strip_emotion_tags",

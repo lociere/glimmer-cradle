@@ -2,17 +2,20 @@
 import pytest
 
 from glimmer_cradle.cognition.application.cycle.providers import (
-    ALL_PROVIDER_CLASSES,
-    AffectProvider,
-    DriveProvider,
     MemoryProvider,
     Provider,
     SocialProvider,
 )
-from glimmer_cradle.cognition.loop import PerceptionProvider
+from glimmer_cradle.cognition.loop import AffectProvider, DriveProvider, PerceptionProvider
 
 
-PROVIDER_CLASSES = (PerceptionProvider, *ALL_PROVIDER_CLASSES)
+PROVIDER_CLASSES = (
+    PerceptionProvider,
+    AffectProvider,
+    MemoryProvider,
+    DriveProvider,
+    SocialProvider,
+)
 
 
 def test_all_provider_classes_subclass_provider() -> None:
@@ -40,7 +43,7 @@ def test_all_providers_implemented() -> None:
     - AffectProvider / MemoryProvider:  test_cognition_providers_56a
     - DriveProvider / SocialProvider:   test_cognition_providers_56b
     - PerceptionProvider:               test_cognition_perception
-    本文件只验证它们都能 subclass Provider + 注册到 ALL_PROVIDER_CLASSES。
+    本文件只验证它们都实现统一 Provider 契约。
     """
     for cls in PROVIDER_CLASSES:
         assert issubclass(cls, Provider)
@@ -53,7 +56,7 @@ def test_provider_is_abstract() -> None:
 
 
 def test_provider_class_list_order() -> None:
-    """ALL_PROVIDER_CLASSES 与 __init__ 列表对齐。"""
+    """内建 provider 的稳定次序与 Sense 阶段装配一致。"""
     assert PROVIDER_CLASSES == (
         PerceptionProvider,
         AffectProvider,

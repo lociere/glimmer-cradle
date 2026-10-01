@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from glimmer_cradle.conversation import ConversationTurn
+from glimmer_cradle.cognition.application.cycle.providers.base import Provider
+from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.planning import ActionPlan
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
+from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.state import EmotionSystem
 
 
 _EMOTION_LABEL_WORDS = (
@@ -55,6 +61,171 @@ class LoopStep:
     action_plan: ActionPlan | None = None
     arbitration: ArbitrationResult | None = None
     action_moment_id: str | None = None
+
+
+class AffectProvider(Provider):
+    """把当前情绪状态投影为本拍 Attention 候选。"""
+
+    name = "affect"
+
+    def __init__(
+        self,
+        emotion_system: EmotionSystem,
+        *,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+    ) -> None:
+        self._emotion = emotion_system
+        self._clock = clock
+        self._ids = ids
+
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        try:
+            state = self._emotion.get_state()
+        except Exception:
+            return []
+        intensity = float(state.get("intensity", 0.0))
+        if intensity <= 0.05:
+            return []
+        return [
+            make_attention(
+                source=self.name,
+                content={
+                    "emotion_type": state.get("emotion_type", ""),
+                    "intensity": intensity,
+                    "trigger": state.get("trigger", ""),
+                },
+                salience=min(1.0, intensity),
+                clock=self._clock,
+                ids=self._ids,
+            )
+        ]
+
+
+@dataclass(frozen=True)
+class DriveConfig:
+    curiosity_rise_per_s: float = 0.005
+    companionship_rise_per_s: float = 0.003
+    rest_rise_per_s: float = 0.002
+    curiosity_satisfaction: float = 0.4
+    companionship_satisfaction: float = 0.5
+    rest_satisfaction: float = 0.7
+    propose_threshold: float = 0.6
+    activity_boost: dict[str, float] = field(
+        default_factory=lambda: {
+            "engaged": 1.5,
+            "ambient": 1.0,
+            "quiescent": 0.0,
+        }
+    )
+    emotion_strong_threshold: float = 0.7
+    emotion_strong_rest_multiplier: float = 2.0
+
+
+class DriveProvider(Provider):
+    """按单调时钟累积内在动机，并投放最高过阈候选。"""
+
+    name = "drive"
+    DRIVES = ("curiosity", "companionship", "rest")
+
+    def __init__(
+        self,
+        *,
+        activity_controller=None,
+        emotion_system=None,
+        config: DriveConfig | None = None,
+        clock: ClockPort,
+        ids: IdGeneratorPort,
+    ) -> None:
+        self._cfg = config or DriveConfig()
+        self._activity = activity_controller
+        self._emotion = emotion_system
+        self._clock = clock
+        self._ids = ids
+        self._levels: dict[str, float] = {drive: 0.0 for drive in self.DRIVES}
+        self._last_tick_at: datetime | None = None
+        self._pending_satisfaction: set[str] = set()
+
+    def signal_satisfied(self, drive: str) -> None:
+        if drive in self._levels:
+            self._pending_satisfaction.add(drive)
+
+    @property
+    def levels(self) -> dict[str, float]:
+        return dict(self._levels)
+
+    async def propose(self, workspace_snapshot: list[Attention]) -> list[Attention]:
+        now = self._clock.now()
+        tick_seconds = (
+            0.0
+            if self._last_tick_at is None
+            else max(0.0, (now - self._last_tick_at).total_seconds())
+        )
+        self._last_tick_at = now
+        boost = self._compute_activity_boost()
+        self._levels["curiosity"] = min(
+            1.0,
+            self._levels["curiosity"]
+            + self._cfg.curiosity_rise_per_s * tick_seconds * boost,
+        )
+        self._levels["companionship"] = min(
+            1.0,
+            self._levels["companionship"]
+            + self._cfg.companionship_rise_per_s * tick_seconds * boost,
+        )
+        rest_multiplier = (
+            self._cfg.emotion_strong_rest_multiplier
+            if self._compute_emotion_strong()
+            else 1.0
+        )
+        self._levels["rest"] = min(
+            1.0,
+            self._levels["rest"]
+            + self._cfg.rest_rise_per_s * tick_seconds * rest_multiplier,
+        )
+        satisfaction = {
+            "curiosity": self._cfg.curiosity_satisfaction,
+            "companionship": self._cfg.companionship_satisfaction,
+            "rest": self._cfg.rest_satisfaction,
+        }
+        for drive in self._pending_satisfaction:
+            self._levels[drive] = max(0.0, self._levels[drive] - satisfaction[drive])
+        self._pending_satisfaction.clear()
+        top_drive = max(self._levels, key=self._levels.__getitem__)
+        top_level = self._levels[top_drive]
+        if top_level < self._cfg.propose_threshold:
+            return []
+        return [
+            make_attention(
+                source=self.name,
+                content={
+                    "drive": top_drive,
+                    "level": top_level,
+                    "all_levels": dict(self._levels),
+                },
+                salience=top_level,
+                clock=self._clock,
+                ids=self._ids,
+            )
+        ]
+
+    def _compute_activity_boost(self) -> float:
+        if self._activity is None:
+            return 1.0
+        try:
+            state = self._activity.get_state().get("state", "")
+        except Exception:
+            return 1.0
+        return float(self._cfg.activity_boost.get(state, 1.0))
+
+    def _compute_emotion_strong(self) -> bool:
+        if self._emotion is None:
+            return False
+        try:
+            intensity = float(self._emotion.get_state().get("intensity", 0.0))
+        except Exception:
+            return False
+        return intensity > self._cfg.emotion_strong_threshold
 
 
 def strip_emotion_tags(text: str) -> str:

@@ -1,7 +1,8 @@
 from pathlib import Path
 from datetime import timedelta
 
-from glimmer_cradle.cognition.application.cycle.providers import DriveProvider, SocialProvider
+from glimmer_cradle.cognition.application.cycle.providers import SocialProvider
+from glimmer_cradle.cognition.loop import DriveProvider
 from glimmer_cradle.cognition.attention import make_attention
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository

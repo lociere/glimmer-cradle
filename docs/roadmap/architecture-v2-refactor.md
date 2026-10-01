@@ -400,6 +400,12 @@ direct/ambient 显著度、actor/model input 与 scope/digest 传播保持不变
 `glimmer_cradle.cognition.loop` 公共入口，旧 `providers/perception.py` consumer-zero 后删除；
 其余四类 provider 尚未归位，旧 providers package 仍有明确退出条件。
 
+Affect/Drive Provider 归位切片把情绪快照候选、内在动机随时间累积与满足衰减迁入目标
+`loop/step.py`，State 继续只拥有情绪和活动事实，Loop 只在单拍边界把这些事实映射为 Attention。
+Worker composition 与测试改用 Loop 公共入口，旧 `providers/{affect,drive}.py` 及已无消费者的
+全局 provider class registry 删除；Memory/Social provider 仍留在旧目录，待 Context 与关系投影
+依赖同时归位后删除，避免制造 State→Attention 的反向依赖。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
