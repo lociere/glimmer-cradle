@@ -2,19 +2,32 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, TYPE_CHECKING
 
-from glimmer_cradle.conversation import ConversationTurn
+from glimmer_cradle.conversation import (
+    ConversationTurn,
+    MomentKind,
+    SourceDescriptor,
+)
 from glimmer_cradle.cognition.attention import Attention, make_attention
-from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery
-from glimmer_cradle.cognition.planning import ActionPlan
+from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery, ReplyContextBuilder
+from glimmer_cradle.cognition.inference import (
+    InferenceController,
+    InferenceRequest,
+    InferenceUnavailable,
+    ModelTier,
+)
+from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
 from glimmer_cradle.cognition.domain.volition import ArbitrationResult
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 from glimmer_cradle.cognition.state import EmotionSystem
 
@@ -479,3 +492,387 @@ def _hard_wrap(text: str, *, max_chars: int) -> list[str]:
         for index in range(0, len(text), max_chars)
         if text[index:index + max_chars].strip()
     ]
+
+
+class PerceptionAppraiser:
+    """将本拍感知统一解释为多模态路由、情绪变化和 Moment。"""
+
+    def __init__(self, *, recorder, emotion_system=None, multimodal_router=None,
+                 self_entity=None, observability: ObservabilityPort) -> None:
+        self._recorder = recorder
+        self._emotion = emotion_system
+        self._router = multimodal_router
+        self._entity = self_entity
+        self._observability = observability
+        self._logger = observability.logger("perception_appraisal")
+
+    async def appraise(
+        self, sense_results: list[list[Attention]], turn: Any
+    ) -> None:
+        perceptions = [
+            item
+            for items in sense_results
+            for item in items
+            if item.source == "perception" and isinstance(item.content, dict)
+        ]
+        if not perceptions:
+            return
+
+        emotion_inputs: list[str] = []
+        for item in perceptions:
+            content = item.content
+            trace_id = str(content.get("trace_id") or item.attention_id)
+            scene_id = content.get("scene_id", "")
+            conversation_id = content.get("conversation_id", "")
+            continuity_id = content.get("continuity_id", "")
+            thread_id = content.get("thread_id", "main")
+            recall_scope = content.get("recall_scope", "conversation_private")
+            disclosure_scope = content.get("disclosure_scope", "conversation_private")
+            text, semantic_text, vision, provider_key = await self._route(content)
+            if trace_id:
+                turn.routes[trace_id] = {
+                    "user_text": text,
+                    "multimodal_text": semantic_text,
+                    "vision": vision,
+                    "provider_key": provider_key,
+                }
+            emotion_input = "\n".join(
+                part for part in [text, semantic_text] if part
+            ).strip()
+            if emotion_input:
+                emotion_inputs.append(emotion_input)
+            candidate_turn = ConversationTurn(
+                turn_id=str(content.get("interaction_id") or trace_id),
+                scene_id=scene_id,
+                conversation_id=conversation_id,
+                continuity_id=continuity_id,
+                thread_id=thread_id,
+                recall_scope=recall_scope,
+                disclosure_scope=disclosure_scope,
+                payload_digest=str(content.get("payload_digest") or ""),
+            )
+            existing_turn = turn.turns_by_trace.get(trace_id)
+            if existing_turn is not None and existing_turn != candidate_turn:
+                raise ValueError("同一 perception trace 不得跨 Conversation 或权限域")
+            turn.turns_by_trace[trace_id] = candidate_turn
+            response_policy = content.get("response_policy", "reply_allowed")
+            if not isinstance(response_policy, str):
+                response_policy = "reply_allowed"
+            turn.response_policies.append(response_policy)
+            turn.response_policy_by_trace.setdefault(trace_id, []).append(response_policy)
+            moment = self._recorder.record(
+                MomentKind.PERCEPTION,
+                content={
+                    "text": text,
+                    "semantic_text": semantic_text,
+                    "parts": self._moment_parts(content.get("model_input")),
+                    "legacy_media_unrecoverable": self._legacy_media_unrecoverable(content.get("model_input")),
+                    "address_mode": content.get("address_mode", "direct"),
+                    "response_policy": response_policy,
+                    "familiarity": content.get("familiarity", 0),
+                    "has_multimodal": bool(semantic_text or vision),
+                    "actor_id": content.get("actor_id"),
+                    "actor_name": content.get("actor_name"),
+                },
+                scene_id=scene_id or None,
+                conversation_id=conversation_id,
+                continuity_id=continuity_id,
+                thread_id=thread_id,
+                interaction_id=str(content.get("interaction_id") or trace_id or ""),
+                actor_id=content.get("actor_id"),
+                actor_name=content.get("actor_name"),
+                origin=(
+                    SourceDescriptor(**content["origin"])
+                    if isinstance(content.get("origin"), dict)
+                    else None
+                ),
+                retention_ceiling=str(content.get("retention_ceiling") or "experience"),
+                recall_scope=recall_scope,
+                disclosure_scope=disclosure_scope,
+                trace_id=trace_id or None,
+                importance=0.5,
+            )
+            if moment is not None:
+                turn.perception_moment_ids.append(moment.moment_id)
+                turn.perception_moment_ids_by_trace.setdefault(trace_id, []).append(moment.moment_id)
+                content["experience_moment_id"] = moment.moment_id
+        self._update_emotion(emotion_inputs, turn)
+
+    @staticmethod
+    def _moment_parts(model_input: object) -> list[dict]:
+        if not isinstance(model_input, dict):
+            return []
+        result: list[dict] = []
+        for part in model_input.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            content = part.get("content")
+            if not isinstance(content, dict):
+                continue
+            kind = next((key for key in ("text", "image", "audio", "video", "file") if key in content), None)
+            if kind is None:
+                continue
+            value = content[kind]
+            if kind == "text":
+                result.append({"kind": "text", "text": value})
+            elif isinstance(value, dict):
+                asset = value.get("asset") if kind == "file" else value
+                if isinstance(asset, dict):
+                    result.append({"kind": kind, "asset": asset,
+                                   "semantic": part.get("semantic"),
+                                   **({"name": value.get("name")} if kind == "file" else {})})
+        return result
+
+    @staticmethod
+    def _legacy_media_unrecoverable(model_input: object) -> bool:
+        if not isinstance(model_input, dict):
+            return False
+        return any(
+            isinstance(item, dict) and item.get("uri") and item.get("modality") in ("image", "audio", "video")
+            for item in model_input.get("items") or []
+        )
+
+    async def _route(self, content: dict) -> tuple[str, str, tuple, str | None]:
+        text = content.get("text", "")
+        text = text if isinstance(text, str) else ""
+        model_input = content.get("model_input")
+        if self._router is None or not model_input:
+            return text, "", (), None
+        try:
+            route = await asyncio.to_thread(self._router.route, model_input)
+        except Exception as exc:
+            self._logger.warning("多模态路由失败，回落纯文本", error=str(exc))
+            return text, "", (), None
+        effective_text = route.primary_text or "[多模态输入]"
+        semantic_text = route.semantic_text or ""
+        vision = tuple(
+            (message.prompt, message.uri, message.mime_type)
+            for message in route.vision_messages
+        )
+        provider_key = None
+        if vision and self._entity is not None:
+            try:
+                provider_key = self._entity.inference_config.multimodal.core_model
+            except Exception:
+                provider_key = None
+        return effective_text, semantic_text, vision, provider_key
+
+    def _update_emotion(self, inputs: list[str], turn: Any) -> None:
+        if self._emotion is None or not inputs:
+            return
+        try:
+            self._emotion.update_by_input("\n".join(inputs).strip())
+            state = self._emotion.get_state()
+        except Exception as exc:
+            self._logger.warning("感知情绪评价失败（已隔离）", error=str(exc))
+            return
+        if not isinstance(state, dict):
+            return
+        self._observability.gauge(
+            "emotion.intensity",
+            float(state.get("intensity", 0.0)),
+            labels={"emotion": str(state.get("emotion_type", ""))},
+        )
+        turn.pending_emotion_state = state
+
+    def record_active_emotion(self, turn: Any) -> None:
+        state = turn.pending_emotion_state
+        if not isinstance(state, dict) or not turn.perception_moment_ids:
+            return
+        moment = self._recorder.record(
+            MomentKind.EMOTION,
+            content={"emotion": state},
+            scene_id=turn.turn.scene_id or None,
+            conversation_id=turn.turn.conversation_id,
+            continuity_id=turn.turn.continuity_id,
+            thread_id=turn.turn.thread_id,
+            recall_scope=turn.turn.recall_scope,
+            disclosure_scope=turn.turn.disclosure_scope,
+            trace_id=turn.turn.turn_id or None,
+            causation_ids=tuple(turn.perception_moment_ids),
+            importance=0.4,
+        )
+        if moment is not None:
+            turn.emotion_moment_id = moment.moment_id
+
+
+class DeliberationController:
+    """先生成 ActionPlan，再按计划决定回复、能力请求、澄清或沉默。"""
+
+    def __init__(
+        self,
+        *,
+        reasoning: InferenceController | None,
+        planning_controller: PlanningController | None,
+        self_entity=None,
+        conversation=None,
+        recent_experience_source=None,
+        activity_controller=None,
+        emotion_system=None,
+        persona_compiler=None,
+        boundary_validator: Callable[[str], bool] | None = None,
+        observability: ObservabilityPort,
+    ) -> None:
+        self._reasoning = reasoning
+        self._planner = planning_controller or PlanningController(
+            reasoning, observability=observability
+        )
+        self._context = ReplyContextBuilder(
+            self_entity=self_entity,
+            conversation=conversation,
+            recent_experience_source=recent_experience_source,
+            observability=observability,
+        )
+        self._activity = activity_controller
+        self._emotion = emotion_system
+        self._persona = persona_compiler
+        self._boundary_validator = boundary_validator
+        self._observability = observability
+        self._logger = observability.logger("cognition_deliberation")
+
+    async def deliberate(
+        self, broadcast: Attention | None, turn: Any
+    ) -> str | None:
+        if self._reasoning is None or broadcast is None or broadcast.source != "perception":
+            return None
+        content = broadcast.content if isinstance(broadcast.content, dict) else {}
+        if content.get("response_policy", "reply_allowed") == "observe_only":
+            return None
+        route = turn.routes.get(content.get("trace_id", ""), {})
+        raw_text = content.get("text", "")
+        user_text = route.get("user_text") or (
+            raw_text if isinstance(raw_text, str) else ""
+        )
+        vision = route.get("vision", ())
+        provider_key = route.get("provider_key")
+        multimodal_text = route.get("multimodal_text", "")
+        if (not user_text or not user_text.strip()) and not vision:
+            return None
+
+        plan = await self._plan(content, user_text, multimodal_text)
+        if plan is not None:
+            turn.action_plan = plan
+            planned_reply = self._apply_plan(plan, turn)
+            if plan.action == "skill_request" and turn.skill_request is not None:
+                return None
+            if plan.action in {"noop", "ask_clarification"}:
+                return planned_reply
+
+        request = InferenceRequest(
+            system=await self._build_system_prompt(content, turn, multimodal_text),
+            user=user_text,
+            vision=vision,
+            provider_key=provider_key,
+            metadata={
+                "purpose": "reply",
+                "capture_category": "response",
+                "scene_id": content.get("scene_id", ""),
+                "trace_id": content.get("trace_id", ""),
+            },
+        )
+        try:
+            response = await self._reasoning.request(request, tier=self._reasoning_tier())
+        except InferenceUnavailable as exc:
+            self._logger.debug("回复推理不可用，本拍不回复", error=str(exc))
+            return None
+        except Exception as exc:
+            self._logger.error("回复推理异常", error=str(exc), exc_info=True)
+            self._observability.counter("cognition.deliberate_error", 1)
+            return None
+        reply = (response.text or "").strip()
+        if not reply or not self._within_boundary(reply):
+            return None
+        return reply
+
+    async def _plan(
+        self, content: dict, user_text: str, multimodal_text: str
+    ) -> ActionPlan | None:
+        goal = "\n".join(
+            part for part in [user_text, multimodal_text] if part
+        ).strip()
+        if not goal:
+            return None
+        return await self._planner.plan(
+            goal=goal,
+            scene_id=content.get("scene_id", ""),
+            tier=self._reasoning_tier(),
+            trace_id=content.get("trace_id", ""),
+        )
+
+    def _apply_plan(self, plan: ActionPlan, turn: Any) -> str | None:
+        if plan.action == "skill_request":
+            if plan.confidence >= 0.6 and plan.capability_kind != "none":
+                turn.skill_request = {
+                    "original_goal": plan.original_goal,
+                    "reason": plan.reason,
+                    "capability_kind": plan.capability_kind,
+                    "confidence": plan.confidence,
+                    "planning_hint": plan.planning_hint,
+                }
+            return None
+        if plan.action == "noop":
+            return None
+        if plan.action != "ask_clarification":
+            return None
+        prompt = (plan.planning_hint or plan.reason or "").strip()
+        if not prompt:
+            prompt = "我需要再确认一下你的意思"
+        if prompt.endswith(("?", "？")):
+            return prompt
+        return f"我想先确认一下：{prompt}"
+
+    async def _build_system_prompt(
+        self, content: dict, turn: Any, multimodal_text: str
+    ) -> str:
+        emotion_state: dict = {}
+        if self._emotion is not None:
+            try:
+                emotion_state = self._emotion.get_state() or {}
+            except Exception:
+                emotion_state = {}
+        persona_prompt = "你是当前角色。用简短、自然的中文回应。"
+        if self._persona is not None:
+            try:
+                persona_prompt = self._persona.build_persona_prompt(
+                    emotion_state=emotion_state,
+                    address_mode=content.get("address_mode", "direct"),
+                )
+            except Exception as exc:
+                self._logger.warning("角色 prompt 构建失败，使用最小 prompt", error=str(exc))
+        user_text = content.get("text", "")
+        return await self._context.build(
+            persona_prompt=persona_prompt,
+            scene_id=content.get("scene_id", ""),
+            conversation_id=content.get("conversation_id", ""),
+            thread_id=content.get("thread_id", "main"),
+            actor_id=content.get("actor_id"),
+            recall_scope=content.get("recall_scope", "conversation_private"),
+            user_text=user_text if isinstance(user_text, str) else "",
+            emotion_state=emotion_state,
+            trace_id=turn.turn.turn_id,
+            multimodal_text=multimodal_text,
+        )
+
+    def _reasoning_tier(self) -> ModelTier:
+        if self._activity is not None:
+            try:
+                tier = self._activity.get_state().get("policy", {}).get("model_tier")
+                if tier:
+                    return ModelTier(tier)
+            except Exception:
+                pass
+        return ModelTier.LOCAL_ONLY
+
+    def _within_boundary(self, reply: str) -> bool:
+        if self._boundary_validator is None:
+            return True
+        try:
+            allowed = self._boundary_validator(reply)
+        except Exception as exc:
+            self._logger.error("角色边界校验异常，本拍不回复", error=str(exc), exc_info=True)
+            self._observability.counter("cognition.deliberate_boundary_error", 1)
+            return False
+        if not allowed:
+            self._logger.warning("回复越过角色边界，已拦截")
+            self._observability.counter("cognition.deliberate_boundary_block", 1)
+        return allowed

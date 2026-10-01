@@ -7,13 +7,15 @@ from glimmer_cradle.cognition.loop.loop_controller import (
     salience_for_perception,
 )
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
-from glimmer_cradle.cognition.loop.run import LoopRun
+from glimmer_cradle.cognition.loop.run import ActionEmitter, CycleContinuity, LoopRun
 from glimmer_cradle.cognition.loop.step import (
     AffectProvider,
+    DeliberationController,
     DriveConfig,
     DriveProvider,
     LoopStep,
     MemoryProvider,
+    PerceptionAppraiser,
     Provider,
     SocialProvider,
     build_reply_messages,
@@ -28,11 +30,15 @@ __all__ = [
     "LoopController",
     "PerceptionProvider",
     "LoopRun",
+    "ActionEmitter",
+    "CycleContinuity",
     "LoopStep",
     "AffectProvider",
+    "DeliberationController",
     "DriveConfig",
     "DriveProvider",
     "MemoryProvider",
+    "PerceptionAppraiser",
     "Provider",
     "SocialProvider",
     "build_reply_messages",

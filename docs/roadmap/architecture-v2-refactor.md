@@ -413,6 +413,13 @@ Memory/Social Provider 收口切片把 ContextAssembler 的有界召回和关系
 后物理删除。至此旧 providers owner 清空；剩余 Cycle helpers 仍需按 appraisal、deliberation、
 continuity 与 action emission 的职责继续归位。
 
+Cycle helper 最终收口切片把感知评价与回复决策并入目标 `loop/step.py`，把已仲裁 ActionCommand
+映射、外部副作用前的 durable flush barrier 以及 reply/silence outcome 提交并入目标 `loop/run.py`。
+`LoopController` 只从目标 Loop 文件装配这些协作者；旧 `application/cycle/{appraisal,deliberation,
+action_emitter,continuity}.py` consumer-zero 后物理删除。至此 `application/cycle/` 已无手写源码；
+Loop 对旧 `application/context/sources` 的 RecentExperienceSource 依赖仍待 Context source adapter
+归位，不能提前移除迁移期 application 依赖例外。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
