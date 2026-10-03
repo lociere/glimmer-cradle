@@ -499,6 +499,13 @@ Cognition 工具元数据清理切片删除已被 Ruff 调用链替代的 `.flak
 `setup.py` 仍负责 wheel 构建前清除 stale `build/lib`，子项目
 `uv.lock` 仍是当前 Python 解析锁；二者需先建立等价目标入口再删除，本切片保留。
 
+Worker 配置投影归位切片把完整运行配置、Action Stream 进程设置与 fail-closed Document mapper
+移入目标 `cognition_worker/composition.py`。这些类型描述 Kernel 注入给 Worker 的进程配置聚合，不是
+环境中立 Cognition Core 模型；RPC host、生产组装与映射测试统一消费 Worker owner。清单外
+`cognition/adapters/configuration.py` 在旧导入 consumer-zero 后物理删除，字段、严格校验与稳定错误码
+保持不变，未新增 wire 契约或兼容导出；Worker 的 Core deep-import 基线随之从 `19/6` 收紧为
+`18/5`，后续 adapter 归位只能继续递减。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

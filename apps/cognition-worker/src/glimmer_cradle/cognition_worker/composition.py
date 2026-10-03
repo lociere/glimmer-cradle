@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import time
+from typing import Any
 import uuid
+
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from glimmer_cradle.cognition.state import (
     CognitiveActivityController,
@@ -32,6 +36,7 @@ from glimmer_cradle.conversation import (
 )
 from glimmer_cradle.cognition.loop import (
     AffectProvider,
+    CognitionSettings,
     DriveProvider,
     LoopController,
     MemoryProvider,
@@ -42,7 +47,6 @@ from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
 from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
 from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
-from glimmer_cradle.cognition.adapters.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_cognition_checkpoint_db_path,
     resolve_cognition_knowledge_db_path,
@@ -57,15 +61,28 @@ from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import 
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_checkpoint_store import SqliteCheckpointStore
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
-from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
+from glimmer_cradle.cognition.adapters.inference.embedding import (
+    EmbeddingEngine,
+    EmbeddingSettings,
+)
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, LLMSettings
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
-from glimmer_cradle.cognition.inference import InferenceController
+from glimmer_cradle.cognition.inference import InferenceController, InferenceSettings
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex
-from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
-from glimmer_cradle.cognition.memory import MaintenanceScheduler
-from glimmer_cradle.cognition.persona import PersonaCompiler
+from glimmer_cradle.cognition.memory import (
+    ConsolidationCoordinator,
+    MaintenanceScheduler,
+    MemoryController,
+    MemorySettings,
+)
+from glimmer_cradle.cognition.persona import (
+    CharacterManifestSettings,
+    CharacterProfileSettings,
+    DialoguePolicySettings,
+    PersonaCompiler,
+    SafetySettings,
+)
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
@@ -79,6 +96,59 @@ from glimmer_cradle.cognition.adapters.kernel import (
     KernelEventOutboundAdapter,
     KernelGrpcClient,
 )
+
+
+class ConfigException(ValueError):
+    """Kernel 规范化配置无法映射为 Worker 运行时投影。"""
+
+    code = "CONFIG_ERROR"
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(f"[{self.code}] {message}")
+
+
+class ActionStreamSettings(BaseModel):
+    """Worker/Kernel action projection configuration, outside Inference Core."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    enabled: bool
+    channel: str
+
+
+class WorkerInferenceSettings(InferenceSettings):
+    action_stream: ActionStreamSettings
+
+
+class CharacterRuntimeSettings(BaseModel):
+    """Worker 接收的完整、冻结配置 Document 投影。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    manifest: CharacterManifestSettings
+    profile: CharacterProfileSettings
+    dialogue: DialoguePolicySettings
+    safety: SafetySettings
+    inference: WorkerInferenceSettings
+    llm: LLMSettings | None = None
+    memory: MemorySettings
+    embedding: EmbeddingSettings
+    cognition: CognitionSettings
+
+
+def map_character_runtime_document(
+    document: Mapping[str, Any],
+) -> CharacterRuntimeSettings:
+    """只接受 Kernel Schema normalizer 输出的完整、无未知字段 Document。"""
+    try:
+        return CharacterRuntimeSettings.model_validate(dict(document))
+    except ValidationError as error:
+        details = "; ".join(
+            f"{'.'.join(str(part) for part in item['loc'])}: {item['type']}"
+            for item in error.errors(include_url=False)
+        )
+        raise ConfigException(f"Cognition 配置 Document 映射失败: {details}") from error
 
 
 class SystemClock:

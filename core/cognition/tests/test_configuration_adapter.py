@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.configuration import (
+from glimmer_cradle.cognition_worker.composition import (
     ConfigException,
     map_character_runtime_document,
 )
