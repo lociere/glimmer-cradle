@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
 from glimmer_cradle.cognition.state import (
     CognitiveActivityController,
@@ -12,7 +11,7 @@ from glimmer_cradle.cognition.state import (
     StoredCognitiveState,
     decay_intensity,
 )
-from tests.conftest import OBSERVABILITY, build_experience_recorder
+from tests.conftest import OBSERVABILITY, TestClock as _TestClock, build_experience_recorder
 
 
 def test_affect_decay_is_pure_bounded_and_time_based() -> None:
@@ -55,7 +54,7 @@ async def test_activity_controller_restores_persisted_direct_activity(
     first = CognitiveActivityController(
         experience_recorder=recorder,
         affect_activation_provider=lambda: 0.0,
-        clock=SystemClock(),
+        clock=_TestClock(),
         observability=OBSERVABILITY,
         state_store=store,
         tick_interval_s=60,
@@ -67,7 +66,7 @@ async def test_activity_controller_restores_persisted_direct_activity(
     restored = CognitiveActivityController(
         experience_recorder=recorder,
         affect_activation_provider=lambda: 0.0,
-        clock=SystemClock(),
+        clock=_TestClock(),
         observability=OBSERVABILITY,
         state_store=store,
         tick_interval_s=60,

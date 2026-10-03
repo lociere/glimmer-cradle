@@ -37,7 +37,7 @@ from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort
 from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityInvocation,
     CapabilityPort,

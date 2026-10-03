@@ -16,7 +16,7 @@ from glimmer_cradle.conversation import (
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.loop.step import normalize_reply_text
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import KernelRequestPort
 from glimmer_cradle.cognition.ports.kernel.models import (

@@ -31,7 +31,7 @@ from glimmer_cradle.cognition.inference import (
 )
 from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.state import EmotionSystem
 

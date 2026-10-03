@@ -9,8 +9,13 @@ from glimmer_cradle.cognition.memory import ConsolidationCoordinator as _Consoli
 from glimmer_cradle.cognition.memory import MaintenanceScheduler as _MaintenanceScheduler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
-from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
-from glimmer_cradle.cognition.adapters.clock import SystemClock
+from tests.conftest import (
+    CLOCK,
+    IDS,
+    OBSERVABILITY,
+    TestClock as _TestClock,
+    build_experience_recorder,
+)
 from glimmer_cradle.conversation.log import Moment, MomentKind
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
@@ -187,7 +192,7 @@ async def test_maintenance_scheduler_is_independent_and_quiescent_forces_seal() 
         memory=object(),
         jobs=_SchedulingJobs(),
         llm=None,
-        clock=SystemClock(),
+        clock=_TestClock(),
     )
     state = "engaged"
     scheduler = MaintenanceScheduler(
@@ -215,7 +220,7 @@ async def test_terminal_moment_wakes_maintenance_without_forced_seal() -> None:
         memory=object(),
         jobs=_SchedulingJobs(),
         llm=None,
-        clock=SystemClock(),
+        clock=_TestClock(),
     )
     scheduler = MaintenanceScheduler(
         consolidation=coordinator,
@@ -252,7 +257,7 @@ async def test_running_scheduler_consolidates_semantic_boundary_without_shutdown
         memory=memory,
         jobs=ConsolidationJobRepository(database),
         llm=llm,
-        clock=SystemClock(),
+        clock=_TestClock(),
         minimum_salience=0.1,
         debounce_seconds=0,
     )
@@ -335,7 +340,7 @@ async def test_episode_consolidation_writes_evidence_backed_memory(tmp_path: Pat
     }]}, ensure_ascii=False))
     coordinator = ConsolidationCoordinator(
         episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
-        llm=llm, clock=SystemClock(), minimum_salience=0.1, debounce_seconds=0)
+        llm=llm, clock=_TestClock(), minimum_salience=0.1, debounce_seconds=0)
     await coordinator.start()
 
     assert await coordinator.consolidate(force_seal=True) == 1
@@ -365,7 +370,7 @@ async def test_invalid_consolidation_evidence_remains_retryable(tmp_path: Path) 
     )
     coordinator = ConsolidationCoordinator(
         episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
-        llm=llm, clock=SystemClock(), minimum_salience=0.1, debounce_seconds=0)
+        llm=llm, clock=_TestClock(), minimum_salience=0.1, debounce_seconds=0)
     await coordinator.start()
 
     assert await coordinator.consolidate(force_seal=True) == 0
@@ -409,7 +414,7 @@ async def test_consolidation_batches_are_partitioned_by_permission_domain(
         memory=memory,
         jobs=ConsolidationJobRepository(database),
         llm=llm,
-        clock=SystemClock(),
+        clock=_TestClock(),
         minimum_salience=0.1,
         debounce_seconds=0,
         batch_size=8,

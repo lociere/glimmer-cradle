@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import time
+import uuid
 
 from glimmer_cradle.cognition.state import (
     CognitiveActivityController,
@@ -38,8 +42,6 @@ from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
 from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
 from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
-from glimmer_cradle.cognition.adapters.clock import SystemClock
-from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
 from glimmer_cradle.cognition.adapters.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_cognition_checkpoint_db_path,
@@ -77,6 +79,32 @@ from glimmer_cradle.cognition.adapters.kernel import (
     KernelEventOutboundAdapter,
     KernelGrpcClient,
 )
+
+
+class SystemClock:
+    """Worker-owned wall/monotonic clock adapter."""
+
+    def now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def now_iso(self) -> str:
+        return self.now().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+    async def wait(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
+
+
+class SystemIdGenerator:
+    """Worker-owned opaque identifier adapter."""
+
+    def new(self) -> str:
+        return uuid.uuid4().hex
+
+    def stable(self, namespace: str, value: str) -> str:
+        return uuid.uuid5(uuid.NAMESPACE_URL, f"{namespace}:{value}").hex
 
 
 class CharacterSession:

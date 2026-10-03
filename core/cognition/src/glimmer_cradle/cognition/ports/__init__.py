@@ -1,5 +1,7 @@
 """Cognition consumer-owned ports."""
 
+from typing import Protocol
+
 from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityDescriptor,
     CapabilityInvocation,
@@ -18,6 +20,13 @@ from glimmer_cradle.cognition.ports.job_port import (
 )
 from glimmer_cradle.cognition.ports.resource_port import ResourcePort, ResourceSnapshot
 
+
+class IdGeneratorPort(Protocol):
+    """生成不透明运行时标识和稳定派生标识。"""
+
+    def new(self) -> str: ...
+    def stable(self, namespace: str, value: str) -> str: ...
+
 __all__ = [
     "CapabilityDescriptor",
     "CapabilityInvocation",
@@ -32,6 +41,7 @@ __all__ = [
     "JobReceipt",
     "JobRequest",
     "JobRequestStatus",
+    "IdGeneratorPort",
     "ResourcePort",
     "ResourceSnapshot",
 ]

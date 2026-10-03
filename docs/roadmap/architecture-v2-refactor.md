@@ -489,6 +489,11 @@ Memory Schema 由各 owner 的严格 Pydantic 模型确定性派生；Knowledge 
 文件明确标记为 `InternalPolicy`/`InternalSourceRecord`，不替代也不复制 `contracts/` 中 Kernel→Worker
 跨进程 Document wire，Contract Spine catalog、兼容基线与 generated DTO 因此无需变更。
 
+Clock/Identity adapter 归位切片把系统时间、单调时间与 UUID concrete 移入唯一 Worker composition，
+Core 继续只消费 `ClockPort`；`IdGeneratorPort` 收入目标 `ports/__init__.py` 公共面，不再占用清单外文件。
+测试改用确定性 test adapter，旧 `adapters/{clock,identity}.py` 与 `ports/identity.py` consumer-zero 后
+物理删除。Core 没有新增直接系统能力，Worker 仍是这些进程资源的唯一装配 owner。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

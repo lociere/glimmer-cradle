@@ -22,7 +22,7 @@ from glimmer_cradle.cognition.memory.memory_store import (
     RelationshipProjectionStore,
 )
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort
 from glimmer_cradle.conversation import Moment, MomentKind
 
 class MemoryDecision(BaseModel):

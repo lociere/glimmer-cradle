@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort
 
 
 class AttentionSource(StrEnum):
