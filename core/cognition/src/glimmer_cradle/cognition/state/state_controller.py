@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports import IdGeneratorPort
-from glimmer_cradle.cognition.ports.observability import LoggerPort, ObservabilityPort
+from glimmer_cradle.cognition.ports import LoggerPort, ObservabilityPort
 from glimmer_cradle.cognition.state.cognitive_state import (
     CognitiveActivityState,
     EmotionState,

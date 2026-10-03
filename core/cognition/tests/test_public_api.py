@@ -31,6 +31,9 @@ def test_consumer_owned_ports_are_explicit() -> None:
         "JobRequest",
         "JobRequestStatus",
         "IdGeneratorPort",
+        "LoggerPort",
+        "ObservabilityPort",
         "ResourcePort",
         "ResourceSnapshot",
+        "SpanPort",
     ]

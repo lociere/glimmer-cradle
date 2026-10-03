@@ -517,6 +517,11 @@ Memory SQLite 物理归位切片把版本化记忆、向量、关系、巩固队
 摘要校验、幂等 checkpoint 与可重建 Episode 语义保持不变。Worker composition 的 Core deep-import
 基线因公共入口收束从 `18` 降为 `7`，不保留旧模块兼容导出。
 
+Observability Port 公共面切片把 Logger、Span 与 Observability 的消费方协议并入目标
+`ports/__init__.py`，所有 Core 消费者只从受控公共入口导入。旧 `ports/observability.py` 以及无额外
+语义的 `adapters/__init__.py`、`adapters/inference/__init__.py` 在 consumer-zero 后删除；协议方法与
+依赖注入行为不变，也不为后续清单外 observability concrete 建立兼容壳。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -23,7 +23,7 @@ from glimmer_cradle.cognition.planning.plan import (
     VALID_CAPABILITY_KINDS,
 )
 from glimmer_cradle.cognition.planning.planning_store import PlanningStore
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports import ObservabilityPort
 
 
 class PlanningController:

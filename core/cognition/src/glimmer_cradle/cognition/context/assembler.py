@@ -10,7 +10,7 @@ from glimmer_cradle.cognition.context.budget import ContextBudget
 from glimmer_cradle.cognition.context.compaction import ContextCompactor
 from glimmer_cradle.cognition.context.source import ContextItem, ContextQuery, ContextSource
 from glimmer_cradle.cognition.context.trust import ContextTrustPolicy
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.context.source import allowed_recall_scopes
 
 

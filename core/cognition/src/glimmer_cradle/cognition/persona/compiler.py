@@ -16,7 +16,7 @@ from glimmer_cradle.cognition.persona.mutation_policy import (
 )
 from glimmer_cradle.cognition.persona.profile import PersonaProfile, compile_profile
 from glimmer_cradle.cognition.persona.revision import PersonaRevision
-from glimmer_cradle.cognition.ports.observability import LoggerPort
+from glimmer_cradle.cognition.ports import LoggerPort
 
 
 class PersonaCompiler:

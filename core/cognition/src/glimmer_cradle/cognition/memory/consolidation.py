@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from glimmer_cradle.cognition.memory.memory import Episode, MemoryRecord
 from glimmer_cradle.cognition.memory.memory_controller import MemoryController
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.memory.memory import MemoryKind
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.memory.memory_store import (

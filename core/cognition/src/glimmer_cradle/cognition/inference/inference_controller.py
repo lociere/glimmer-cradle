@@ -6,7 +6,7 @@ from glimmer_cradle.cognition.inference.event import InferenceResponse
 from glimmer_cradle.cognition.inference.model_descriptor import ModelTier
 from glimmer_cradle.cognition.inference.model_port import InferenceBackendPort
 from glimmer_cradle.cognition.inference.request import InferenceRequest
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports import ObservabilityPort
 
 
 class InferenceUnavailable(Exception):

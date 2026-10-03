@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from glimmer_cradle.cognition.ports.capability_port import CapabilityResult
-from glimmer_cradle.cognition.ports.observability import ObservabilityPort
+from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.loop.step import (
     ArbitrationResult,
     Intent,
