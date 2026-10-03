@@ -12,6 +12,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from glimmer_cradle.cognition_worker.adapters import FileAssetReader
+
 from glimmer_cradle.cognition.state import (
     CognitiveActivityController,
     EmotionSystem,
@@ -55,6 +57,8 @@ from glimmer_cradle.cognition.adapters.paths import (
     resolve_conversation_db_path,
     resolve_episode_projection_path,
     resolve_experience_dir,
+    resolve_state_dir,
+    resolve_work_dir,
 )
 from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
@@ -345,7 +349,13 @@ def compose_cognition(
     character_session.set_cognitive_activity_provider(activity_controller.get_state)
 
     llm_engine = LLMEngine(config.inference.model, llm_config=config.llm)
-    multimodal_router = MultimodalRouter(inference_config=config.inference)
+    multimodal_router = MultimodalRouter(
+        inference_config=config.inference,
+        asset_reader=FileAssetReader(
+            resolve_state_dir() / "content" / "assets",
+            resolve_work_dir() / "content" / "transient" / "assets",
+        ),
+    )
     multimodal_router.set_llm_engine(llm_engine)
     embedding_engine = _build_embedding_engine(config, knowledge_base)
     memory_substrate.bind_vector_search(

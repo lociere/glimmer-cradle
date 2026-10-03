@@ -18,17 +18,26 @@
   - 视频与音频不得伪装为 image_url 输入。
   - vision_prompt 根据 visual_kind 动态生成，在文本侧标记图片语义性质
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Protocol
 
 from pydantic import BaseModel, Field
 
 from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
-from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
 
 logger = get_logger("multimodal_router")
+
+
+class ContentAssetReader(Protocol):
+    """Worker 注入的受验证 Content 资产读取能力。"""
+
+    def verify(self, ref: dict) -> object: ...
+
+    def image_data_url(self, ref: dict) -> str: ...
 
 
 class PerceptionSemantic(BaseModel):
@@ -129,10 +138,14 @@ class MultimodalRouter:
     LLMEngine 在 container 中初始化后通过 set_llm_engine() 注入，避免循环依赖。
     """
 
-    def __init__(self, inference_config: InferenceSettings, asset_reader: AssetReader | None = None) -> None:
+    def __init__(
+        self,
+        inference_config: InferenceSettings,
+        asset_reader: ContentAssetReader | None = None,
+    ) -> None:
         self._config = inference_config
         self._llm_engine: ModelPort | None = None   # 由 Composition Root 在组装期注入。
-        self._assets = asset_reader or AssetReader()
+        self._assets = asset_reader
 
     def set_llm_engine(self, llm_engine: ModelPort) -> None:
         """注入 LLMEngine 实例（避免构造时循环依赖）。"""
@@ -185,6 +198,8 @@ class MultimodalRouter:
                     semantic = {}
                 uri = None
                 try:
+                    if self._assets is None:
+                        raise ValueError("Content 资产读取能力未装配")
                     if kind == "image":
                         uri = self._assets.image_data_url(ref)
                     else:

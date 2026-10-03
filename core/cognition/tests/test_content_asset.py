@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import (
     InferenceSettings, LifeClockSettings, ModelSettings, MultimodalSettings,
 )
+from glimmer_cradle.cognition_worker.adapters import FileAssetReader
 
 
 def _asset(root: Path, asset_id: str, media_type: str, data: bytes) -> dict:
@@ -26,7 +26,7 @@ def _asset(root: Path, asset_id: str, media_type: str, data: bytes) -> dict:
     return ref
 
 
-def _router(reader: AssetReader) -> MultimodalRouter:
+def _router(reader: FileAssetReader) -> MultimodalRouter:
     return MultimodalRouter(InferenceSettings(
         model=ModelSettings(max_tokens=1024, temperature=0.8, top_p=0.9, frequency_penalty=0),
         life_clock=LifeClockSettings(heartbeat_enabled=False, heartbeat_interval_ms=45000,
@@ -43,7 +43,7 @@ def test_restarted_reader_verifies_bytes_and_routes_image_audio_video(tmp_path: 
     audio = _asset(state, "00000000-0000-4000-8000-000000000002", "audio/wav", b"wav")
     video = _asset(state, "00000000-0000-4000-8000-000000000003", "video/mp4", b"mp4")
     document = _asset(state, "00000000-0000-4000-8000-000000000004", "application/pdf", b"pdf")
-    reader = AssetReader(state, tmp_path / "work")
+    reader = FileAssetReader(state, tmp_path / "work")
     route = _router(reader).route({"text": "看和听", "parts": [
         {"content": {"image": image}},
         {"content": {"audio": audio}, "semantic": {"text": "你好", "resolved": True}},
@@ -59,14 +59,14 @@ def test_restarted_reader_verifies_bytes_and_routes_image_audio_video(tmp_path: 
 
     (state / image["asset_id"] / "blob").write_bytes(b"bad")
     with pytest.raises(ValueError, match="损坏"):
-        AssetReader(state, tmp_path / "work").verify(image)
-    degraded = _router(AssetReader(state, tmp_path / "work")).route({"parts": [{"content": {"image": image}}]})
+        FileAssetReader(state, tmp_path / "work").verify(image)
+    degraded = _router(FileAssetReader(state, tmp_path / "work")).route({"parts": [{"content": {"image": image}}]})
     assert degraded.vision_messages == []
     assert "视觉能力当前不可用" in degraded.semantic_text
 
 
 def test_legacy_video_audio_and_expired_uri_degrade_without_forged_asset(tmp_path: Path) -> None:
-    route = _router(AssetReader(tmp_path / "missing", tmp_path / "work")).route({"items": [
+    route = _router(FileAssetReader(tmp_path / "missing", tmp_path / "work")).route({"items": [
         {"modality": "video", "uri": "https://expired.example/voice", "mime_type": "audio/wav"},
         {"modality": "video", "uri": "https://expired.example/video", "mime_type": "video/mp4"},
     ]})

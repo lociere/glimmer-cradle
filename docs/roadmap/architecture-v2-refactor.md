@@ -506,6 +506,11 @@ Worker 配置投影归位切片把完整运行配置、Action Stream 进程设�
 保持不变，未新增 wire 契约或兼容导出；Worker 的 Core deep-import 基线随之从 `19/6` 收紧为
 `18/5`，后续 adapter 归位只能继续递减。
 
+Content 本地资产 adapter 归位切片把 UUID、元数据、大小与摘要校验实现移入目标 Worker
+`adapters/content_client.py`，由 composition 使用当前 state/work roots 显式注入；Core 的多模态路由
+只保留最小读取协议，在未装配能力时如实降级。旧 `cognition/adapters/content/` 两个清单外文件在
+consumer-zero 后物理删除；跨重启读取、图片 data URL、损坏拒绝和音视频不伪装为视觉输入的行为不变。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
