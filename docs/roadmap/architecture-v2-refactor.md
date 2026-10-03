@@ -494,6 +494,11 @@ Core 继续只消费 `ClockPort`；`IdGeneratorPort` 收入目标 `ports/__init_
 测试改用确定性 test adapter，旧 `adapters/{clock,identity}.py` 与 `ports/identity.py` consumer-zero 后
 物理删除。Core 没有新增直接系统能力，Worker 仍是这些进程资源的唯一装配 owner。
 
+Cognition 工具元数据清理切片删除已被 Ruff 调用链替代的 `.flake8`，以及无内容的
+`tests/__init__.py`；pytest 以 `pythonpath = ["src", ".", ...]` 显式支持 PEP 420 测试命名空间。
+`setup.py` 仍负责 wheel 构建前清除 stale `build/lib`，子项目
+`uv.lock` 仍是当前 Python 解析锁；二者需先建立等价目标入口再删除，本切片保留。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
