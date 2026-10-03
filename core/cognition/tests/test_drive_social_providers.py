@@ -3,8 +3,10 @@ from datetime import timedelta
 
 from glimmer_cradle.cognition.loop import DriveProvider, SocialProvider
 from glimmer_cradle.cognition.attention import make_attention
-from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
+from glimmer_cradle.cognition.adapters.persistence import (
+    RelationshipRepository,
+    SqliteMemoryStore,
+)
 from tests.conftest import CLOCK, IDS
 
 

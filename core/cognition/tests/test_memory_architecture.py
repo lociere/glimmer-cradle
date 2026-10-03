@@ -7,8 +7,14 @@ import pytest
 from glimmer_cradle.cognition.memory import MemoryController as _MemoryController
 from glimmer_cradle.cognition.memory import ConsolidationCoordinator as _ConsolidationCoordinator
 from glimmer_cradle.cognition.memory import MaintenanceScheduler as _MaintenanceScheduler
-from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
-from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
+from glimmer_cradle.cognition.adapters.persistence import (
+    ConsolidationJobRepository,
+    EpisodeProjection,
+    MemoryRepository,
+    RelationshipProjection,
+    RelationshipRepository,
+    SqliteMemoryStore,
+)
 from tests.conftest import (
     CLOCK,
     IDS,
@@ -17,10 +23,6 @@ from tests.conftest import (
     build_experience_recorder,
 )
 from glimmer_cradle.conversation.log import Moment, MomentKind
-from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
-from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
-from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
 from glimmer_cradle.cognition.memory import MemoryKind
 
 

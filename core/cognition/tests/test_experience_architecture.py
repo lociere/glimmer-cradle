@@ -3,7 +3,7 @@ import sqlite3
 from dataclasses import replace
 
 from glimmer_cradle.cognition.adapters.observability import trace_context
-from glimmer_cradle.cognition.adapters.persistence.experience import EpisodeProjection
+from glimmer_cradle.cognition.adapters.persistence import EpisodeProjection
 from tests.conftest import build_experience_recorder
 from glimmer_cradle.conversation.log import MomentKind
 from glimmer_cradle.conversation.log import Moment, SourceDescriptor

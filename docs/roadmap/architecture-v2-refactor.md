@@ -511,6 +511,12 @@ Content 本地资产 adapter 归位切片把 UUID、元数据、大小与摘要�
 只保留最小读取协议，在未装配能力时如实降级。旧 `cognition/adapters/content/` 两个清单外文件在
 consumer-zero 后物理删除；跨重启读取、图片 data URL、损坏拒绝和音视频不伪装为视觉输入的行为不变。
 
+Memory SQLite 物理归位切片把版本化记忆、向量、关系、巩固队列、关系投影与 Episode 投影集中到
+目标 `adapters/persistence/sqlite_memory_store.py`，并由目标 persistence 包入口统一导出。旧
+`persistence/{memory,experience}/` 八个清单外文件在所有生产与测试消费者切换后物理删除；事务、租约、
+摘要校验、幂等 checkpoint 与可重建 Episode 语义保持不变。Worker composition 的 Core deep-import
+基线因公共入口收束从 `18` 降为 `7`，不保留旧模块兼容导出。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

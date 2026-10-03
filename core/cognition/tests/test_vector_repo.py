@@ -3,8 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
+from glimmer_cradle.cognition.adapters.persistence import SqliteMemoryStore, VectorRepository
 
 
 async def _open(tmp_path: Path) -> SqliteMemoryStore:

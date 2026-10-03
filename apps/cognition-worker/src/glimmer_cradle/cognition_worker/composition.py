@@ -47,7 +47,6 @@ from glimmer_cradle.cognition.loop import (
 )
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
-from glimmer_cradle.cognition.adapters.persistence.experience.episodes import EpisodeProjection
 from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_cognition_checkpoint_db_path,
@@ -60,10 +59,19 @@ from glimmer_cradle.cognition.adapters.paths import (
     resolve_state_dir,
     resolve_work_dir,
 )
-from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import SqliteStateStore
-from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
-from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
-from glimmer_cradle.cognition.adapters.persistence.sqlite_checkpoint_store import SqliteCheckpointStore
+from glimmer_cradle.cognition.adapters.persistence import (
+    ConsolidationJobRepository,
+    EpisodeProjection,
+    MemoryRepository,
+    RelationshipProjection,
+    RelationshipRepository,
+    SqliteCheckpointStore,
+    SqliteKnowledgeStore,
+    SqliteMemoryStore,
+    SqlitePlanningStore,
+    SqliteStateStore,
+    VectorRepository,
+)
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import (
     EmbeddingEngine,
@@ -87,12 +95,6 @@ from glimmer_cradle.cognition.persona import (
     PersonaCompiler,
     SafetySettings,
 )
-from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
-from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
-from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
-from glimmer_cradle.cognition.adapters.persistence.memory.consolidation_job_repo import ConsolidationJobRepository
-from glimmer_cradle.cognition.adapters.persistence.memory.relationship_repo import RelationshipRepository
-from glimmer_cradle.cognition.adapters.persistence.memory.vector_repo import VectorRepository
 from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
 from glimmer_cradle.cognition.adapters.kernel import (
     CognitionGrpcHost,
