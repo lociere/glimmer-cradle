@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from typing import Any, TYPE_CHECKING
 
 from glimmer_cradle.conversation import (
@@ -24,7 +25,6 @@ from glimmer_cradle.cognition.inference import (
     ModelTier,
 )
 from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
-from glimmer_cradle.cognition.domain.volition import ArbitrationResult
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
@@ -33,6 +33,192 @@ from glimmer_cradle.cognition.state import EmotionSystem
 
 if TYPE_CHECKING:
     from glimmer_cradle.cognition.state import CognitiveActivityController
+
+
+class IntentType(StrEnum):
+    """Loop 单拍可产生的意图类型。"""
+
+    REPLY = "reply"
+    SILENCE = "silence"
+    THOUGHT = "thought"
+    EMOTION = "emotion"
+    ACTION = "action"
+
+
+class Initiative(StrEnum):
+    """意图由外部刺激响应还是由角色主动发起。"""
+
+    REACTIVE = "reactive"
+    PROACTIVE = "proactive"
+
+
+@dataclass(frozen=True, slots=True)
+class Intent:
+    """Loop 单拍内参与仲裁的候选意图。"""
+
+    intent_id: str
+    type: IntentType
+    initiative: Initiative
+    willingness: float
+    payload: dict[str, Any] | None = None
+    causation_ids: list[str] = field(default_factory=list)
+    created_at: str = ""
+
+
+@dataclass(frozen=True)
+class WillingnessConfig:
+    """连续意愿公式权重与认知活动态阈值。"""
+
+    weight_address: float = 0.30
+    weight_emotion: float = 0.20
+    weight_intimacy: float = 0.15
+    weight_drive: float = 0.15
+    weight_silence: float = 0.10
+    weight_persona: float = 0.10
+    threshold_by_activity: dict[str, float] = field(default_factory=lambda: {
+        "engaged": 0.40,
+        "ambient": 0.70,
+        "quiescent": 1.10,
+    })
+    default_extraversion: float = 0.5
+    silence_normalize_s: float = 600.0
+
+
+@dataclass(frozen=True)
+class WillingnessInputs:
+    """连续意愿公式的归一化输入。"""
+
+    address_mode: str = ""
+    emotion_intensity: float = 0.0
+    relationship_intimacy: float = 0.0
+    drive_companionship: float = 0.0
+    silence_seconds: float = 0.0
+    persona_extraversion: float | None = None
+
+
+@dataclass(frozen=True)
+class ArbitrationResult:
+    """单拍意图仲裁结果。"""
+
+    accepted: list[Intent] = field(default_factory=list)
+    suppressed: list[tuple[Intent, str]] = field(default_factory=list)
+
+
+def _clip01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _address_score(mode: str) -> float:
+    if mode == "direct":
+        return 1.0
+    if mode == "ambient":
+        return 0.5
+    return 0.0
+
+
+def compute_willingness(
+    inputs: WillingnessInputs,
+    config: WillingnessConfig | None = None,
+) -> float:
+    """按权重计算并裁剪本拍行动意愿。"""
+    cfg = config or WillingnessConfig()
+    extraversion = (
+        cfg.default_extraversion
+        if inputs.persona_extraversion is None
+        else inputs.persona_extraversion
+    )
+    silence_score = _clip01(inputs.silence_seconds / cfg.silence_normalize_s)
+    raw = (
+        cfg.weight_address * _address_score(inputs.address_mode)
+        + cfg.weight_emotion * _clip01(inputs.emotion_intensity)
+        + cfg.weight_intimacy * _clip01(inputs.relationship_intimacy)
+        + cfg.weight_drive * _clip01(inputs.drive_companionship)
+        + cfg.weight_silence * silence_score
+        + cfg.weight_persona * _clip01(extraversion)
+    )
+    return _clip01(raw)
+
+
+def threshold_for(activity_state: str, config: WillingnessConfig | None = None) -> float:
+    """返回当前认知活动态的行动意愿阈值。"""
+    cfg = config or WillingnessConfig()
+    return float(cfg.threshold_by_activity.get(activity_state, 0.5))
+
+
+def arbitrate(
+    intents: list[Intent],
+    *,
+    threshold: float,
+    allows_proactive: bool,
+) -> ArbitrationResult:
+    """按主动性闸、阈值与回复唯一性仲裁本拍候选。"""
+    accepted: list[Intent] = []
+    suppressed: list[tuple[Intent, str]] = []
+    above: list[Intent] = []
+    for intent in intents:
+        initiative = (
+            intent.initiative.value
+            if hasattr(intent.initiative, "value")
+            else str(intent.initiative)
+        )
+        if initiative == "proactive" and float(intent.willingness) < threshold:
+            suppressed.append((intent, "below_threshold"))
+        else:
+            above.append(intent)
+
+    if not allows_proactive:
+        passable: list[Intent] = []
+        for intent in above:
+            initiative = (
+                intent.initiative.value
+                if hasattr(intent.initiative, "value")
+                else str(intent.initiative)
+            )
+            if initiative == "proactive":
+                suppressed.append((intent, "proactive_blocked"))
+            else:
+                passable.append(intent)
+        above = passable
+
+    replies: list[Intent] = []
+    others: list[Intent] = []
+    for intent in above:
+        intent_type = intent.type.value if hasattr(intent.type, "value") else str(intent.type)
+        if intent_type == "reply":
+            replies.append(intent)
+        else:
+            others.append(intent)
+
+    if replies:
+        replies.sort(key=lambda item: float(item.willingness), reverse=True)
+        accepted.append(replies[0])
+        for reply in replies[1:]:
+            suppressed.append((reply, "reply_duplicate"))
+    accepted.extend(others)
+    accepted.sort(key=lambda item: float(item.willingness), reverse=True)
+    return ArbitrationResult(accepted=accepted, suppressed=suppressed)
+
+
+def make_intent(
+    *,
+    type: str,
+    initiative: str,
+    willingness: float,
+    payload: dict | None = None,
+    causation_ids: list[str] | None = None,
+    intent_id: str,
+    created_at: str,
+) -> Intent:
+    """使用边界注入的 ID 与时间构造单拍意图。"""
+    return Intent(
+        intent_id=intent_id,
+        type=IntentType(type),
+        initiative=Initiative(initiative),
+        willingness=_clip01(willingness),
+        payload=payload or {},
+        causation_ids=list(causation_ids or []),
+        created_at=created_at,
+    )
 
 
 _EMOTION_LABEL_WORDS = (

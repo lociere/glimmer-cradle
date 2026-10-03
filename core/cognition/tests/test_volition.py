@@ -2,7 +2,7 @@
 import pytest
 from glimmer_cradle.conversation import build_conversation_recorder as build_experience_recorder
 
-from glimmer_cradle.cognition.domain.volition import (
+from glimmer_cradle.cognition.loop import (
     Intent,
     WillingnessConfig,
     WillingnessInputs,

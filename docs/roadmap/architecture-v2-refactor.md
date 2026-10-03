@@ -440,6 +440,12 @@ agent_plan_use_case,agent_synthesis_use_case}.py` 及空 package 物理删除，
 native capability loop、execution journal 和新 Host broker 接线后原子删除；本切片不把 adapter
 内的兼容 RPC 实现冒充最终 Core owner。
 
+Loop 意愿与仲裁收口切片把 `Intent`、连续意愿公式、认知活动态阈值与回复唯一性仲裁归入目标
+`loop/step.py`，这些对象只描述单拍候选及其胜出结果，不再作为横跨 owner 的通用 Domain。
+`LoopController`、Run outcome 与测试统一消费 Loop 公共入口，旧 `domain/volition/` 四个文件
+consumer-zero 后物理删除；主动性闸、响应性意图豁免、抑制原因和 ID/时间边界注入语义保持不变。
+Loop 对其余旧 Domain 的依赖仍来自 Episode、Relationship 等尚未归位事实，本切片不扩大删除范围。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -3,10 +3,14 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from glimmer_cradle.cognition.domain.volition import ArbitrationResult, Intent
 from glimmer_cradle.cognition.ports.capability_port import CapabilityResult
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.loop.step import build_reply_messages, normalize_reply_text
+from glimmer_cradle.cognition.loop.step import (
+    ArbitrationResult,
+    Intent,
+    build_reply_messages,
+    normalize_reply_text,
+)
 from glimmer_cradle.conversation import MomentKind
 
 
