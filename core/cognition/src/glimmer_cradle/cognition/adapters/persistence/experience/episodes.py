@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
-from glimmer_cradle.cognition.domain.experience.episode import Episode
+from glimmer_cradle.cognition.memory import Episode
 
 
 class EpisodeProjection:

@@ -6,7 +6,7 @@ import uuid
 
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
-from glimmer_cradle.cognition.domain.relationship import RelationshipRecord
+from glimmer_cradle.cognition.memory import RelationshipRecord
 
 
 class RelationshipRepository:

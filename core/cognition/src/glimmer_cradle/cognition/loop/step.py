@@ -17,7 +17,12 @@ from glimmer_cradle.conversation import (
     SourceDescriptor,
 )
 from glimmer_cradle.cognition.attention import Attention, make_attention
-from glimmer_cradle.cognition.context import ContextAssembler, ContextQuery, ReplyContextBuilder
+from glimmer_cradle.cognition.context import (
+    ContextAssembler,
+    ContextQuery,
+    RelationshipReader,
+    ReplyContextBuilder,
+)
 from glimmer_cradle.cognition.inference import (
     InferenceController,
     InferenceRequest,
@@ -28,7 +33,6 @@ from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
-from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 from glimmer_cradle.cognition.state import EmotionSystem
 
 if TYPE_CHECKING:
@@ -544,7 +548,7 @@ class SocialProvider(Provider):
 
     def __init__(
         self,
-        relationship_repo: RelationshipRepositoryPort,
+        relationship_repo: RelationshipReader,
         *,
         clock: ClockPort,
         ids: IdGeneratorPort,

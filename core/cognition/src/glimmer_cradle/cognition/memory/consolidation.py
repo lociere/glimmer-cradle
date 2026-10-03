@@ -10,17 +10,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from glimmer_cradle.cognition.domain.experience.episode import Episode
-from glimmer_cradle.cognition.memory.memory import MemoryRecord
+from glimmer_cradle.cognition.memory.memory import Episode, MemoryRecord
 from glimmer_cradle.cognition.memory.memory_controller import MemoryController
 from glimmer_cradle.cognition.ports.observability import ObservabilityPort
 from glimmer_cradle.cognition.memory.memory import MemoryKind
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
-from glimmer_cradle.cognition.ports.persistence import (
+from glimmer_cradle.cognition.memory.memory_store import (
     ConsolidationJob,
-    ConsolidationJobRepositoryPort,
-    EpisodeProjectionPort,
-    RelationshipProjectionPort,
+    ConsolidationJobStore,
+    EpisodeProjectionStore,
+    RelationshipProjectionStore,
 )
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.identity import IdGeneratorPort
@@ -59,12 +58,12 @@ class ConsolidationCoordinator:
     """将 sealed Episode 转为可重试任务，并以一次调用完成批量记忆对账。"""
 
     def __init__(
-        self, *, episodes: EpisodeProjectionPort, memory: MemoryController,
-        jobs: ConsolidationJobRepositoryPort, llm: ModelPort | None,
+        self, *, episodes: EpisodeProjectionStore, memory: MemoryController,
+        jobs: ConsolidationJobStore, llm: ModelPort | None,
         clock: ClockPort,
         ids: IdGeneratorPort,
         observability: ObservabilityPort,
-        relationship_projection: RelationshipProjectionPort | None = None,
+        relationship_projection: RelationshipProjectionStore | None = None,
         enabled: bool = True, batch_size: int = 8, max_batch_moments: int = 64,
         debounce_seconds: int = 120, max_wait_seconds: int = 900,
         lease_seconds: int = 180, retry_base_seconds: int = 30,

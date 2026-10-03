@@ -24,7 +24,7 @@ LEGACY_ROOTS = {
 }
 ALLOWED_DEPENDENCIES = {
     "domain": {"domain", "persona", "state", "ports"},
-    "ports": {"domain", "ports"},
+    "ports": {"ports"},
     "adapters": {
         "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
     },
@@ -33,9 +33,9 @@ ALLOWED_DEPENDENCIES = {
     "inference": {"inference", "state", "ports"},
     "knowledge": {"inference", "knowledge", "memory", "ports"},
     "loop": {
-        "attention", "context", "domain", "inference", "loop", "perception", "planning", "ports", "state"
+        "attention", "context", "inference", "loop", "perception", "planning", "ports", "state"
     },
-    "memory": {"domain", "inference", "memory", "ports"},
+    "memory": {"inference", "memory", "ports"},
     "perception": {"perception"},
     # 配置投影尚在 domain/configuration；迁移完成后移除该临时依赖。
     "persona": {"domain", "persona", "ports"},

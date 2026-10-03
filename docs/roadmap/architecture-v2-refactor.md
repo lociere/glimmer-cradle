@@ -446,6 +446,13 @@ Loop 意愿与仲裁收口切片把 `Intent`、连续意愿公式、认知活动
 consumer-zero 后物理删除；主动性闸、响应性意图豁免、抑制原因和 ID/时间边界注入语义保持不变。
 Loop 对其余旧 Domain 的依赖仍来自 Episode、Relationship 等尚未归位事实，本切片不扩大删除范围。
 
+Memory 投影模型与 Store 收口切片随后把 `Episode`、`RelationshipRecord` 归入目标
+`memory/memory.py`，把 Episode 投影、巩固任务和关系投影的持久边界归入目标
+`memory/memory_store.py`。Context 只保留其消费关系投影所需的最小 `RelationshipReader`，Loop 经
+Context 公共入口依赖该只读契约；旧 `domain/experience/episode.py`、`domain/relationship.py` 与
+清单外 `ports/persistence.py` consumer-zero 后物理删除。架构门同步移除 Ports、Loop、Memory 对
+通用 Domain 的迁移期依赖，未改变 Conversation Log 派生、关系证据计数或巩固重试语义。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

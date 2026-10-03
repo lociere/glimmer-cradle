@@ -5,16 +5,21 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex
-from glimmer_cradle.cognition.memory import MemoryController
+from glimmer_cradle.cognition.memory import MemoryController, RelationshipRecord
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports.persistence import RelationshipRepositoryPort
 
 ContextTrustTier = Literal["untrusted", "user_asserted", "host_verified", "authoritative"]
 InstructionAuthority = Literal["data", "user", "system"]
+
+
+class RelationshipReader(Protocol):
+    """Context 消费关系投影所需的最小只读边界。"""
+
+    async def get(self, actor_id: str) -> RelationshipRecord | None: ...
 
 
 @dataclass(frozen=True)
@@ -334,7 +339,7 @@ class KnowledgeSource(ContextSource):
 class RelationshipSource(ContextSource):
     name = "relationship"
 
-    def __init__(self, repository: RelationshipRepositoryPort) -> None:
+    def __init__(self, repository: RelationshipReader) -> None:
         self._repository = repository
 
     async def activate(self, query: ContextQuery, *, max_items: int = 10) -> list[ContextItem]:

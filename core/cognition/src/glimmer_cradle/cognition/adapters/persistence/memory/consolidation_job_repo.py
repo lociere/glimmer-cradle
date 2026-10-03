@@ -5,8 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from glimmer_cradle.cognition.domain.experience.episode import Episode
-from glimmer_cradle.cognition.ports.persistence import ConsolidationJob
+from glimmer_cradle.cognition.memory import ConsolidationJob, Episode
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import now_iso
 
