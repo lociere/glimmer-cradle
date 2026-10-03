@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from glimmer_cradle.cognition.domain.configuration import (
+from glimmer_cradle.cognition.persona.profile import (
     CharacterManifestSettings,
     CharacterProfileSettings,
     DialoguePolicySettings,

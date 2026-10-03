@@ -12,7 +12,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 7,
+    "count": 6,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "兼容 RPC 生命周期仍读取 Cognition 配置与 observability concrete；拆入 Worker adapters/readiness/shutdown 后删除。"

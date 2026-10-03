@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from glimmer_cradle.cognition.domain.configuration import (
+from glimmer_cradle.cognition.persona.profile import (
     CharacterManifestSettings,
     CharacterProfileSettings,
     DialoguePolicySettings,

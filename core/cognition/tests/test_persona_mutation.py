@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.domain.configuration import (
+from glimmer_cradle.cognition.persona import (
     CharacterManifestSettings,
     CharacterProfileSettings,
     DialoguePolicySettings,

@@ -5,12 +5,38 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
+from glimmer_cradle.cognition.domain.configuration import ConfigException
 from glimmer_cradle.cognition.domain.configuration import (
-    CharacterRuntimeSettings,
-    ConfigException,
+    CognitionSettings,
+    EmbeddingSettings,
+    InferenceSettings,
+    LLMSettings,
+    MemorySettings,
 )
+from glimmer_cradle.cognition.persona import (
+    CharacterManifestSettings,
+    CharacterProfileSettings,
+    DialoguePolicySettings,
+    SafetySettings,
+)
+
+
+class CharacterRuntimeSettings(BaseModel):
+    """Worker 接收的完整、冻结配置 Document 投影。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    manifest: CharacterManifestSettings
+    profile: CharacterProfileSettings
+    dialogue: DialoguePolicySettings
+    safety: SafetySettings
+    inference: InferenceSettings
+    llm: LLMSettings | None = None
+    memory: MemorySettings
+    embedding: EmbeddingSettings
+    cognition: CognitionSettings
 
 
 def map_character_runtime_document(document: Mapping[str, Any]) -> CharacterRuntimeSettings:

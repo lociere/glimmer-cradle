@@ -6,8 +6,10 @@ import json
 import os
 from typing import Final
 
-from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
-from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
+from glimmer_cradle.cognition.adapters.configuration import (
+    CharacterRuntimeSettings,
+    map_character_runtime_document,
+)
 from glimmer_cradle.cognition_worker.composition import CognitionComponents, compose_cognition
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.trace_context import new_boot_id, set_boot_id

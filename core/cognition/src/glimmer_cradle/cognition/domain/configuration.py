@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+
 class ConfigException(ValueError):
     """Kernel 规范化配置无法映射为 Cognition 投影。"""
 
@@ -21,91 +22,6 @@ class _Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
-class CharacterBaseSettings(_Settings):
-    name: str
-    nickname: str
-
-
-class CharacterAssetsSettings(_Settings):
-    root: str
-
-
-class CharacterKnowledgeSettings(_Settings):
-    index: str
-
-
-class CharacterMigrationsSettings(_Settings):
-    root: str
-
-
-class CharacterManifestSettings(_Settings):
-    character_id: str
-    base: CharacterBaseSettings
-    persona_mode: Literal["api", "local_base", "local_finetune"]
-    assets: CharacterAssetsSettings
-    knowledge: CharacterKnowledgeSettings
-    migrations: CharacterMigrationsSettings
-
-
-class ProfileTextEntrySettings(_Settings):
-    id: str
-    content: str
-    priority: int
-    enabled: bool
-
-
-class ProfileConditionalEntrySettings(ProfileTextEntrySettings):
-    condition: str
-
-
-class ProfileIdentitySettings(_Settings):
-    summary: str
-    appearance: str
-    values: list[ProfileTextEntrySettings]
-
-
-class CharacterProfileSettings(_Settings):
-    identity: ProfileIdentitySettings
-    traits: list[ProfileTextEntrySettings]
-    relationship: list[ProfileTextEntrySettings]
-    expression: list[ProfileTextEntrySettings]
-    emotion_behaviors: list[ProfileConditionalEntrySettings]
-    context_behaviors: list[ProfileConditionalEntrySettings]
-    examples: list[ProfileTextEntrySettings]
-
-
-class DialoguePresentationSettings(_Settings):
-    forbid_stage_directions: bool
-    forbid_emotion_labels: bool
-    casual_max_sentences: int
-    casual_max_chars_per_message: int
-    complex_reply_policy: str
-    message_split_policy: str
-    rules: list[str]
-
-
-class StructuredOutputSettings(_Settings):
-    preserve_markdown: bool
-    preserve_code_blocks: bool
-    require_fenced_code_blocks: bool
-    rules: list[str]
-
-
-class DialogueNormalizationSettings(_Settings):
-    strip_stage_directions: bool
-    strip_emotion_labels: bool
-
-
-class DialoguePolicySettings(_Settings):
-    presentation: DialoguePresentationSettings
-    structured_output: StructuredOutputSettings
-    normalization: DialogueNormalizationSettings
-
-
-class SafetySettings(_Settings):
-    taboos: str
-    forbidden_phrases: list[str]
-    forbidden_regex: list[str]
 
 
 class ModelSettings(_Settings):
@@ -272,15 +188,3 @@ class EmbeddingSettings(_Settings):
     enabled: bool
     route: EmbeddingRouteSettings
     providers: EmbeddingProvidersSettings
-
-
-class CharacterRuntimeSettings(_Settings):
-    manifest: CharacterManifestSettings
-    profile: CharacterProfileSettings
-    dialogue: DialoguePolicySettings
-    safety: SafetySettings
-    inference: InferenceSettings
-    llm: LLMSettings | None = None
-    memory: MemorySettings
-    embedding: EmbeddingSettings
-    cognition: CognitionSettings

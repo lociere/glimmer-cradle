@@ -40,7 +40,7 @@ from glimmer_cradle.cognition.adapters.persistence.experience.episodes import Ep
 from glimmer_cradle.conversation import ConversationRecorder, build_conversation_recorder
 from glimmer_cradle.cognition.adapters.clock import SystemClock
 from glimmer_cradle.cognition.adapters.identity import SystemIdGenerator
-from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
+from glimmer_cradle.cognition.adapters.configuration import CharacterRuntimeSettings
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_cognition_checkpoint_db_path,
     resolve_cognition_knowledge_db_path,

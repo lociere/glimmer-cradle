@@ -465,6 +465,12 @@ Kernel 入站 adapter 只接收 Knowledge 初始化对象。旧 `domain/identity
 `SelfEntity`/`self_entity` 活跃引用 consumer-zero 后删除，Domain 的架构允许依赖同步收紧为自身。
 该迁移保持 persona revision、情绪状态、边界校验与状态投影行为，不把 App 会话容器重新导出给 Core。
 
+Persona 配置投影归位切片把 Character Manifest、Profile、Dialogue 与 Safety 的强类型模型迁入目标
+`persona/profile.py`，Compiler、Mutation Policy 与测试均改用 Persona 公共入口。完整 Worker Document
+聚合与 fail-closed mapper 暂收束在配置 adapter，不再迫使旧 Domain 反向依赖 Persona；Persona→Domain
+迁移期依赖已从架构门移除。Inference、Memory、Embedding 与 Loop 配置仍在旧聚合文件，需按各自
+owner 继续拆分后才能删除 `domain/configuration.py` 与清单外配置 adapter。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

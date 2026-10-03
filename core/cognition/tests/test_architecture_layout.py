@@ -37,8 +37,7 @@ ALLOWED_DEPENDENCIES = {
     },
     "memory": {"inference", "memory", "ports"},
     "perception": {"perception"},
-    # 配置投影尚在 domain/configuration；迁移完成后移除该临时依赖。
-    "persona": {"domain", "persona", "ports"},
+    "persona": {"persona", "ports"},
     "planning": {"inference", "planning", "ports"},
     "state": {"state", "ports"},
 }
