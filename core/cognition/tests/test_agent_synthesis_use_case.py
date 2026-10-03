@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -33,22 +32,11 @@ class _FakeLlmEngine:
         return self.text
 
 
-def _self_entity():
-    return SimpleNamespace(
-        manifest_config=SimpleNamespace(
-            base=SimpleNamespace(nickname="月见"),
-        ),
-        persona_compiler=_FakePersonaCompiler(),
-        ids=IDS,
-        observability=OBSERVABILITY,
-    )
-
-
 @pytest.mark.asyncio
 async def test_agent_synthesis_uses_persona_prompt_for_system_message() -> None:
     llm = _FakeLlmEngine()
     use_case = AgentSynthesisUseCase(
-        self_entity=_self_entity(),
+        nickname="月见",
         llm_engine=llm,
         persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
@@ -79,7 +67,7 @@ async def test_agent_synthesis_uses_persona_prompt_for_system_message() -> None:
 async def test_agent_synthesis_error_result_prompt_does_not_pretend_success() -> None:
     llm = _FakeLlmEngine("这次外部结果没有成功返回，我不能假装已经完成。")
     use_case = AgentSynthesisUseCase(
-        self_entity=_self_entity(),
+        nickname="月见",
         llm_engine=llm,
         persona_compiler=_FakePersonaCompiler(),
         ids=IDS,
@@ -131,7 +119,7 @@ async def test_agent_synthesis_records_tool_result_with_source(tmp_path: Path) -
         trace_id="trace-tool",
     )
     use_case = AgentSynthesisUseCase(
-        self_entity=_self_entity(),
+        nickname="月见",
         llm_engine=_FakeLlmEngine("已经打开。"),
         persona_compiler=_FakePersonaCompiler(),
         ids=IDS,

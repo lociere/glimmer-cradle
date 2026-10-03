@@ -14,8 +14,7 @@ from typing import Optional
 from urllib import error, request
 from urllib.parse import urljoin
 
-from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
-from glimmer_cradle.cognition.domain.configuration import LLMSettings
+from glimmer_cradle.cognition.domain.configuration import LLMSettings, ModelSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.model_invocations import record_model_invocation
 from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
@@ -108,9 +107,8 @@ class LLMEngine:
     LLM推理引擎，纯算力调用。
     支持多 provider 路由：通过 provider_key 选择 LLMSettings.providers 中的配置。
     """
-    def __init__(self, self_entity: SelfEntity, llm_config: Optional[LLMSettings] = None):
-        self.self_entity = self_entity
-        self.config = self_entity.inference_config.model
+    def __init__(self, model_config: ModelSettings, llm_config: Optional[LLMSettings] = None):
+        self.config = model_config
         self.llm_config = llm_config
         logger.info(
             "LLM引擎初始化完成",

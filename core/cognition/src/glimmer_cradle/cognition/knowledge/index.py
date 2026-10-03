@@ -30,7 +30,7 @@ from glimmer_cradle.cognition.memory import VectorIndexStore
 
 
 class KnowledgeIndex:
-    """由 SelfEntity 独占的世界知识管理器。
+    """由 Worker composition 注入的世界知识管理器。
 
     初始化流程：
       1. Kernel 内核发送 knowledge_init IPC

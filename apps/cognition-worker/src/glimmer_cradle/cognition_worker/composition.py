@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from glimmer_cradle.cognition.state import CognitiveActivityController
+from glimmer_cradle.cognition.state import (
+    CognitiveActivityController,
+    EmotionSystem,
+    EmotionType,
+)
 from glimmer_cradle.cognition.adapters.kernel.inbound_adapter import (
     AgentPlanUseCase,
     AgentSynthesisUseCase,
@@ -50,7 +54,6 @@ from glimmer_cradle.cognition.adapters.persistence.sqlite_state_store import Sql
 from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import SqlitePlanningStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
 from glimmer_cradle.cognition.adapters.persistence.sqlite_checkpoint_store import SqliteCheckpointStore
-from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine
@@ -60,6 +63,7 @@ from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex
 from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
 from glimmer_cradle.cognition.memory import MaintenanceScheduler
+from glimmer_cradle.cognition.persona import PersonaCompiler
 from glimmer_cradle.cognition.adapters.persistence.memory.relationship_projection import RelationshipProjection
 from glimmer_cradle.cognition.adapters.persistence.sqlite_memory_store import SqliteMemoryStore
 from glimmer_cradle.cognition.adapters.persistence.memory.memory_repo import MemoryRepository
@@ -74,11 +78,78 @@ from glimmer_cradle.cognition.adapters.kernel import (
     KernelGrpcClient,
 )
 
+
+class CharacterSession:
+    """Worker composition 拥有的会话期角色组件集合。"""
+
+    def __init__(
+        self,
+        config: CharacterRuntimeSettings,
+        *,
+        memory: MemoryController,
+        knowledge_base: KnowledgeIndex,
+        clock,
+        ids,
+        observability,
+    ) -> None:
+        self.manifest_config = config.manifest
+        self.profile_config = config.profile
+        self.dialogue_config = config.dialogue
+        self.safety_config = config.safety
+        self.inference_config = config.inference
+        self.memory = memory
+        self.knowledge_base = knowledge_base
+        self.emotion_system = EmotionSystem(
+            clock=clock,
+            ids=ids,
+            logger=observability.logger("emotion_system"),
+        )
+        self.persona = PersonaCompiler(logger=observability.logger("persona_compiler"))
+        self.persona.initialize(
+            manifest=config.manifest,
+            profile=config.profile,
+            dialogue=config.dialogue,
+            safety=config.safety,
+        )
+        self._logger = observability.logger("character_session")
+        self._activity_state_provider = None
+        self.is_awake = False
+
+    def wake_up(self) -> None:
+        self.is_awake = True
+        self.emotion_system.update(EmotionType.HAPPY, 0.2, trigger="wake_up")
+        self._logger.info("角色会话已唤醒", character_id=self.manifest_config.character_id)
+
+    def sleep(self) -> None:
+        self.is_awake = False
+        self.emotion_system.update(EmotionType.CALM, 0.1, trigger="sleep")
+        self._logger.info("角色会话已休眠", character_id=self.manifest_config.character_id)
+
+    def validate_boundary(self, content: str) -> bool:
+        return self.persona.validate_boundary(content)
+
+    def set_cognitive_activity_provider(self, provider) -> None:
+        self._activity_state_provider = provider
+
+    def get_state(self) -> dict:
+        state = {
+            "name": self.manifest_config.base.nickname,
+            "is_awake": self.is_awake,
+            "emotion": self.emotion_system.get_state(),
+            "memory_count": self.memory.count(),
+        }
+        if self._activity_state_provider is not None:
+            try:
+                state["cognitive_activity"] = self._activity_state_provider()
+            except Exception:
+                pass
+        return state
+
 @dataclass(frozen=True, slots=True)
 class CognitionComponents:
     """由组装根创建并交给 Host 监督生命周期的组件图。"""
 
-    self_entity: SelfEntity
+    character_session: CharacterSession
     kernel_client: KernelGrpcClient
     cognition_grpc_host: CognitionGrpcHost
     outbound_adapter: KernelEventOutboundAdapter
@@ -152,23 +223,13 @@ def compose_cognition(
         result_limit=memory_config.retrieval.result_limit,
     )
     knowledge_base = KnowledgeIndex(observability=observability)
-    self_entity = SelfEntity(
-        manifest_config=config.manifest,
-        inference_config=config.inference,
-        profile_config=config.profile,
-        dialogue_config=config.dialogue,
-        safety_config=config.safety,
+    character_session = CharacterSession(
+        config,
         memory=memory_substrate,
         knowledge_base=knowledge_base,
         clock=clock,
         ids=ids,
         observability=observability,
-    )
-    self_entity.persona.initialize(
-        manifest=config.manifest,
-        profile=config.profile,
-        dialogue=config.dialogue,
-        safety=config.safety,
     )
     memory_substrate.bind_repository(memory_repository)
     knowledge_base.bind_repository(knowledge_store)
@@ -180,12 +241,12 @@ def compose_cognition(
         observability=observability,
         state_store=state_store,
         affect_activation_provider=lambda: float(
-            self_entity.emotion_system.get_state().get("intensity", 0.0)
+            character_session.emotion_system.get_state().get("intensity", 0.0)
         ),
     )
-    self_entity.set_cognitive_activity_provider(activity_controller.get_state)
+    character_session.set_cognitive_activity_provider(activity_controller.get_state)
 
-    llm_engine = LLMEngine(self_entity=self_entity, llm_config=config.llm)
+    llm_engine = LLMEngine(config.inference.model, llm_config=config.llm)
     multimodal_router = MultimodalRouter(inference_config=config.inference)
     multimodal_router.set_llm_engine(llm_engine)
     embedding_engine = _build_embedding_engine(config, knowledge_base)
@@ -196,13 +257,12 @@ def compose_cognition(
     )
 
     agent_plan = AgentPlanUseCase(
-        ids=ids, observability=observability,
-        self_entity=self_entity, llm_engine=llm_engine
+        ids=ids, observability=observability, llm_engine=llm_engine
     )
     agent_synthesis = AgentSynthesisUseCase(
-        self_entity=self_entity,
+        nickname=config.manifest.base.nickname,
         llm_engine=llm_engine,
-        persona_compiler=self_entity.persona,
+        persona_compiler=character_session.persona,
         experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
         turn_controller=turn_controller,
@@ -210,7 +270,7 @@ def compose_cognition(
         observability=observability,
     )
     inbound_adapter = KernelEventInboundAdapter(
-        self_entity=self_entity,
+        knowledge_base=knowledge_base,
         agent_plan_use_case=agent_plan,
         agent_synthesis_use_case=agent_synthesis,
         conversation_controller=conversation_controller,
@@ -281,7 +341,7 @@ def compose_cognition(
         workspace=workspace,
         providers=[
             PerceptionProvider(perception_queue, clock=clock, ids=ids),
-            AffectProvider(self_entity.emotion_system, clock=clock, ids=ids),
+            AffectProvider(character_session.emotion_system, clock=clock, ids=ids),
             MemoryProvider(context_assembly, activity_controller=activity_controller,
                            clock=clock, ids=ids),
             DriveProvider(activity_controller=activity_controller, clock=clock, ids=ids),
@@ -289,17 +349,19 @@ def compose_cognition(
         ],
         experience_recorder=conversation_recorder,
         activity_controller=activity_controller,
-        emotion_system=self_entity.emotion_system,
+        emotion_system=character_session.emotion_system,
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
         action_sink=outbound_adapter.send_action_command,
         reasoning=reasoning,
         planning_controller=planning_controller,
         checkpoint_store=checkpoint_store,
-        persona_compiler=self_entity.persona,
-        boundary_validator=self_entity.validate_boundary,
-        self_entity=self_entity,
+        persona_compiler=character_session.persona,
+        boundary_validator=character_session.validate_boundary,
+        memory=memory_substrate,
+        knowledge_base=knowledge_base,
         conversation=conversation_controller,
         multimodal_router=multimodal_router,
+        multimodal_core_model=config.inference.multimodal.core_model,
         perception_operations=perception_operations,
         turn_controller=turn_controller,
         clock=clock,
@@ -323,7 +385,7 @@ def compose_cognition(
         tick_interval_ms=cognition_config.default_tick_interval_ms,
     )
     return CognitionComponents(
-        self_entity=self_entity,
+        character_session=character_session,
         kernel_client=kernel_client,
         cognition_grpc_host=cognition_grpc_host,
         outbound_adapter=outbound_adapter,

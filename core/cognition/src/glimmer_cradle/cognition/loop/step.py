@@ -688,11 +688,11 @@ class PerceptionAppraiser:
     """将本拍感知统一解释为多模态路由、情绪变化和 Moment。"""
 
     def __init__(self, *, recorder, emotion_system=None, multimodal_router=None,
-                 self_entity=None, observability: ObservabilityPort) -> None:
+                 multimodal_core_model: str = "", observability: ObservabilityPort) -> None:
         self._recorder = recorder
         self._emotion = emotion_system
         self._router = multimodal_router
-        self._entity = self_entity
+        self._multimodal_core_model = multimodal_core_model
         self._observability = observability
         self._logger = observability.logger("perception_appraisal")
 
@@ -840,11 +840,8 @@ class PerceptionAppraiser:
             for message in route.vision_messages
         )
         provider_key = None
-        if vision and self._entity is not None:
-            try:
-                provider_key = self._entity.inference_config.multimodal.core_model
-            except Exception:
-                provider_key = None
+        if vision and self._multimodal_core_model:
+            provider_key = self._multimodal_core_model
         return effective_text, semantic_text, vision, provider_key
 
     def _update_emotion(self, inputs: list[str], turn: Any) -> None:
@@ -894,7 +891,8 @@ class DeliberationController:
         *,
         reasoning: InferenceController | None,
         planning_controller: PlanningController | None,
-        self_entity=None,
+        memory=None,
+        knowledge_base=None,
         conversation=None,
         recent_experience_source=None,
         activity_controller=None,
@@ -908,7 +906,8 @@ class DeliberationController:
             reasoning, observability=observability
         )
         self._context = ReplyContextBuilder(
-            self_entity=self_entity,
+            memory=memory,
+            knowledge_base=knowledge_base,
             conversation=conversation,
             recent_experience_source=recent_experience_source,
             observability=observability,

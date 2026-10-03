@@ -13,13 +13,6 @@ def ModelConfig():
     )
 
 
-class _SelfEntity:
-    class _Inference:
-        model = ModelConfig()
-
-    inference_config = _Inference()
-
-
 class _LoggerCapture:
     def __init__(self) -> None:
         self.messages: list[str] = []
@@ -46,7 +39,7 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, capture_mo
     fake_logger = _LoggerCapture()
     monkeypatch.setattr(llm_module, "logger", fake_logger)
     return LLMEngine(
-        _SelfEntity(),
+        ModelConfig(),
         LLMSettings(
             api_type="openai",
             api_key="sk-top-secret",

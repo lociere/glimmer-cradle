@@ -144,12 +144,14 @@ class ReplyContextBuilder:
     def __init__(
         self,
         *,
-        self_entity=None,
+        memory=None,
+        knowledge_base=None,
         conversation=None,
         recent_experience_source=None,
         observability: ObservabilityPort,
     ) -> None:
-        self._entity = self_entity
+        self._memory = memory
+        self._knowledge_base = knowledge_base
         self._conversation = conversation
         self._experience = recent_experience_source
         self._logger = observability.logger("reply_context")
@@ -168,7 +170,7 @@ class ReplyContextBuilder:
         trace_id: str,
         multimodal_text: str = "",
     ) -> str:
-        if self._entity is None:
+        if self._memory is None and self._knowledge_base is None:
             if not multimodal_text:
                 return persona_prompt
             return self._compose(persona_prompt, {"multimodal": multimodal_text})
@@ -216,7 +218,7 @@ class ReplyContextBuilder:
         try:
             preferences = [
                 item
-                for item in self._entity.memory.all_current()
+                for item in self._memory.all_current()
                 if item.attributes.get("preference")
                 and self._memory_visible(
                     item,
@@ -232,7 +234,7 @@ class ReplyContextBuilder:
         except Exception as exc:
             self._logger.debug("偏好记忆取用失败", error=str(exc))
         try:
-            memories = await self._entity.memory.retrieve(
+            memories = await self._memory.retrieve(
                 query,
                 actor_id=actor_id,
                 scene_id=scene_id,
@@ -244,7 +246,7 @@ class ReplyContextBuilder:
         except Exception as exc:
             self._logger.debug("相关记忆检索失败", error=str(exc))
         try:
-            knowledge = await self._entity.knowledge_base.get_knowledge(query=query)
+            knowledge = await self._knowledge_base.get_knowledge(query=query)
             context["knowledge"] = "\n".join(
                 f"知识：{item.content}" for item in knowledge
             )

@@ -1447,7 +1447,10 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap, self_entity=_Entity(), conversation=_Conversation(),
+            reasoning=cap,
+            memory=_Entity.memory,
+            knowledge_base=_Entity.knowledge_base,
+            conversation=_Conversation(),
         )
         await loop.tick_once()
     finally:
@@ -1526,7 +1529,9 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap, self_entity=_Entity(),
+            reasoning=cap,
+            memory=_Entity.memory,
+            knowledge_base=_Entity.knowledge_base,
         )
         await loop.tick_once()
     finally:
@@ -1778,14 +1783,6 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
                                        "model_input": {"text": "看这个", "items": []}},
                               salience=0.95)]
 
-    class _MMCfg:
-        core_model = "vision-pro"
-    class _InfCfg:
-        memory = type("M", (), {"max_recall_count": 5, "context_limit": 10})()
-        multimodal = _MMCfg()
-    class _Entity:
-        inference_config = _InfCfg()
-
     route = _Route(primary_text="看这个",
                    vision_messages=[_VM("描述这张图", "http://img/1.png", "image/png")])
     router = _FakeRouter(route)
@@ -1797,7 +1794,9 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap, multimodal_router=router, self_entity=_Entity(),
+            reasoning=cap,
+            multimodal_router=router,
+            multimodal_core_model="vision-pro",
         )
         await loop.tick_once()
     finally:

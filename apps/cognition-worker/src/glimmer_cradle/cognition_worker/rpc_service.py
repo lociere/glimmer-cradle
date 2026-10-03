@@ -135,8 +135,8 @@ class CognitionHost:
             )
 
             # 3. 唤醒当前角色
-            self_entity = components.self_entity
-            self_entity.wake_up()
+            character_session = components.character_session
+            character_session.wake_up()
             components.cognition_grpc_host.mark_ready()
 
             # 4. 发出首条状态同步消息。启动快照用于建立 Kernel/Renderer 投影，
@@ -198,8 +198,8 @@ class CognitionHost:
                 logger.error(f"Error stopping cognitive loop: {e}")
 
             try:
-                self_entity = components.self_entity
-                self_entity.sleep()
+                character_session = components.character_session
+                character_session.sleep()
             except Exception as e:
                 logger.error(f"Error during entity sleep: {e}")
 
@@ -314,8 +314,8 @@ class CognitionHost:
         if self.components is None:
             return
 
-        self_entity = self.components.self_entity
-        state = self_entity.get_state()
+        character_session = self.components.character_session
+        state = character_session.get_state()
         fingerprint = self._state_sync_fingerprint(state)
         now = asyncio.get_running_loop().time()
         elapsed = now - self._last_state_sync_at

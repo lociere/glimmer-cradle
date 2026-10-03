@@ -13,7 +13,6 @@ from glimmer_cradle.conversation import (
     SourceDescriptor,
     TurnController,
 )
-from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.loop.step import normalize_reply_text
@@ -120,7 +119,6 @@ class AgentPlanUseCase(BaseUseCase[AgentPlanInput, AgentPlanOutput]):
     """Agent 规划用例：LLM 驱动的智能工具规划，执行由 TS 层 / MCP 调度完成。"""
 
     lifecycle_log_level = "debug"
-    self_entity: SelfEntity
     llm_engine: ModelPort
 
     async def _execute(self, input_data: AgentPlanInput, trace_id: str) -> AgentPlanOutput:
@@ -206,7 +204,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     """Agent 合成用例：LLM 将工具执行结果转化为角色自然语言回复。"""
 
     lifecycle_log_level = "debug"
-    self_entity: SelfEntity
+    nickname: str
     llm_engine: ModelPort
     persona_compiler: Any | None = None
     experience_recorder: ConversationRecorder | None = None
@@ -214,7 +212,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     turn_controller: TurnController | None = None
 
     async def _execute(self, input_data: AgentSynthesisInput, trace_id: str) -> AgentSynthesisOutput:
-        nickname = self.self_entity.manifest_config.base.nickname
+        nickname = self.nickname
 
         persisted_reply = self._persisted_reply(input_data.trace_id or trace_id)
         if persisted_reply is not None:
@@ -423,7 +421,7 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         )
 
     def _build_system_prompt(self, nickname: str) -> str:
-        compiler = self.persona_compiler or getattr(self.self_entity, "persona", None)
+        compiler = self.persona_compiler
         persona_prompt = f"你是{nickname}。请用符合当前角色设定的中文自然回复。"
         if compiler is not None:
             try:
@@ -456,19 +454,19 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
 class KernelEventInboundAdapter(KernelRequestPort):
     def __init__(
         self,
-        self_entity: SelfEntity,
+        knowledge_base,
         agent_plan_use_case: AgentPlanUseCase,
         agent_synthesis_use_case: AgentSynthesisUseCase,
         conversation_controller: ConversationController,
     ) -> None:
-        self.self_entity = self_entity
+        self.knowledge_base = knowledge_base
         self.agent_plan_use_case = agent_plan_use_case
         self.agent_synthesis_use_case = agent_synthesis_use_case
         self.conversation_controller = conversation_controller
 
     async def on_knowledge_init(self, knowledge_base: KnowledgeInitialization) -> None:
         logger.info("收到内核知识库注入", version=knowledge_base.version, entry_count=len(knowledge_base.entries))
-        await self.self_entity.knowledge_base.init_from_kernel(knowledge_base)
+        await self.knowledge_base.init_from_kernel(knowledge_base)
 
     async def on_agent_plan(self, input_data: AgentPlanInput) -> AgentPlanOutput:
         return await self.agent_plan_use_case.execute(input_data, input_data.trace_id)

@@ -458,6 +458,13 @@ Domain 异常与指标清理切片确认旧 `domain/exceptions.py` 仅剩配置�
 adapter。`MetricKind` 仅描述 observability adapter 的落盘事件类型，随其实现归位。旧
 `domain/{exceptions,metrics}.py` consumer-zero 后物理删除，未改变异常字符串、`code` 值或指标 wire。
 
+SelfEntity 解耦切片拆除跨 Persona、State、Memory、Knowledge 与 Inference 的旧领域根：Worker
+`composition.py` 现在以 `CharacterSession` 仅持有进程会话期组件与 wake/sleep 状态；Core 推理 adapter
+直接接收模型配置，Context 直接接收 Memory/Knowledge reader，感知评价直接接收多模态主模型名，
+Kernel 入站 adapter 只接收 Knowledge 初始化对象。旧 `domain/identity/` 两个文件及所有
+`SelfEntity`/`self_entity` 活跃引用 consumer-zero 后删除，Domain 的架构允许依赖同步收紧为自身。
+该迁移保持 persona revision、情绪状态、边界校验与状态投影行为，不把 App 会话容器重新导出给 Core。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

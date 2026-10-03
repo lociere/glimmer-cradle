@@ -23,7 +23,7 @@ LEGACY_ROOTS = {
     "observability", "protocol",
 }
 ALLOWED_DEPENDENCIES = {
-    "domain": {"domain", "persona", "state", "ports"},
+    "domain": {"domain"},
     "ports": {"ports"},
     "adapters": {
         "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"

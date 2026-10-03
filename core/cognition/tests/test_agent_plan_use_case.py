@@ -31,7 +31,7 @@ class _PlanningLLM:
 async def test_agent_plan_keeps_kernel_skill_identity_in_suggestion():
     llm = _PlanningLLM()
     use_case = AgentPlanUseCase(
-        ids=IDS, observability=OBSERVABILITY, self_entity=object(), llm_engine=llm
+        ids=IDS, observability=OBSERVABILITY, llm_engine=llm
     )
 
     result = await use_case.execute(AgentPlanInput(

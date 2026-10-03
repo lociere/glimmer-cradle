@@ -39,13 +39,6 @@ def ActionStreamConfig(**updates):
     return ActionStreamSettings(enabled=False, channel="live2d", **updates)
 
 
-class _SelfEntity:
-    class _Inference:
-        model = ModelConfig()
-
-    inference_config = _Inference()
-
-
 def test_llm_provider_resolution_uses_models_contract() -> None:
     """解析 provider 后仍返回新契约 models，不再写旧 model 字段。"""
     llm_config = LLMSettings(
@@ -62,7 +55,7 @@ def test_llm_provider_resolution_uses_models_contract() -> None:
             }
         },
     )
-    engine = LLMEngine(_SelfEntity(), llm_config)
+    engine = LLMEngine(ModelConfig(), llm_config)
 
     root_cfg = engine._resolve_provider_config(None)
     vision_cfg = engine._resolve_provider_config("qwen/vision")
@@ -76,7 +69,7 @@ def test_llm_provider_resolution_uses_models_contract() -> None:
 
 
 def test_llm_gateway_without_real_provider_fails_explicitly() -> None:
-    engine = LLMEngine(_SelfEntity(), None)
+    engine = LLMEngine(ModelConfig(), None)
 
     with pytest.raises(InferenceException, match="真实 LLM provider"):
         engine.generate(ModelRequest(messages=[ModelMessage(role="user", content="你好")]))
@@ -84,7 +77,7 @@ def test_llm_gateway_without_real_provider_fails_explicitly() -> None:
 
 def test_unknown_provider_does_not_fallback_to_default() -> None:
     engine = LLMEngine(
-        _SelfEntity(),
+        ModelConfig(),
         LLMSettings(
             api_type="openai",
             api_key="test-key",
