@@ -7,8 +7,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from glimmer_cradle.cognition.domain.configuration import CharacterRuntimeSettings
-from glimmer_cradle.cognition.domain.exceptions import ConfigException
+from glimmer_cradle.cognition.domain.configuration import (
+    CharacterRuntimeSettings,
+    ConfigException,
+)
 
 
 def map_character_runtime_document(document: Mapping[str, Any]) -> CharacterRuntimeSettings:

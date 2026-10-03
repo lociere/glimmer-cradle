@@ -15,6 +15,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from enum import StrEnum
 from pathlib import Path
 
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
@@ -22,8 +23,14 @@ from glimmer_cradle.cognition.adapters.observability.trace_context import (
     get_current_boot_id,
     get_current_trace_id,
 )
-# MetricKind 直接消费由协议 Schema 生成的单一事实源。
-from glimmer_cradle.cognition.domain.metrics import MetricKind
+
+
+class MetricKind(StrEnum):
+    """观测 adapter 接受的指标事件类型。"""
+
+    COUNTER = "counter"
+    GAUGE = "gauge"
+    HISTOGRAM = "histogram"
 
 logger = get_logger("metrics")
 

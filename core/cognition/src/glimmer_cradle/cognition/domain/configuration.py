@@ -7,6 +7,16 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ConfigException(ValueError):
+    """Kernel 规范化配置无法映射为 Cognition 投影。"""
+
+    code = "CONFIG_ERROR"
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(f"[{self.code}] {message}")
+
+
 class _Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 

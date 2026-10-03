@@ -16,13 +16,22 @@ from urllib.parse import urljoin
 
 from glimmer_cradle.cognition.domain.identity.self_entity import SelfEntity
 from glimmer_cradle.cognition.domain.configuration import LLMSettings
-from glimmer_cradle.cognition.domain.exceptions import InferenceException
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.model_invocations import record_model_invocation
 from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 
 # 初始化模块日志器
 logger = get_logger("llm_engine")
+
+
+class InferenceException(RuntimeError):
+    """真实推理 provider 调用或响应映射失败。"""
+
+    code = "INFERENCE_ERROR"
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(f"[{self.code}] {message}")
 
 
 def _summarize_llm_config(config: Optional[LLMSettings]) -> dict:

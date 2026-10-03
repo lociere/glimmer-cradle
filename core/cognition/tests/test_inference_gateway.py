@@ -6,8 +6,12 @@ from glimmer_cradle.cognition.domain.configuration import (
     ActionStreamSettings, InferenceSettings, LifeClockSettings, LLMSettings,
     ModelSettings, MultimodalSettings,
 )
-from glimmer_cradle.cognition.domain.exceptions import InferenceException
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, ModelMessage, ModelRequest
+from glimmer_cradle.cognition.adapters.inference.gateway import (
+    InferenceException,
+    LLMEngine,
+    ModelMessage,
+    ModelRequest,
+)
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 
 def ModelConfig(**updates):

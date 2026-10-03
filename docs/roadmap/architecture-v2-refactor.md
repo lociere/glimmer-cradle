@@ -453,6 +453,11 @@ Context 公共入口依赖该只读契约；旧 `domain/experience/episode.py`�
 清单外 `ports/persistence.py` consumer-zero 后物理删除。架构门同步移除 Ports、Loop、Memory 对
 通用 Domain 的迁移期依赖，未改变 Conversation Log 派生、关系证据计数或巩固重试语义。
 
+Domain 异常与指标清理切片确认旧 `domain/exceptions.py` 仅剩配置映射与推理 adapter 两类消费者，
+其余异常类型和本地 `ErrorCode` 已无生产引用；配置错误随现行配置投影收口，推理错误归真实 provider
+adapter。`MetricKind` 仅描述 observability adapter 的落盘事件类型，随其实现归位。旧
+`domain/{exceptions,metrics}.py` consumer-zero 后物理删除，未改变异常字符串、`code` 值或指标 wire。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
