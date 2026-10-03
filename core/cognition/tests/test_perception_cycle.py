@@ -9,7 +9,7 @@ from glimmer_cradle.cognition.attention import (
     make_attention,
 )
 from glimmer_cradle.cognition.loop import WillingnessConfig
-from glimmer_cradle.cognition.domain.configuration import CognitionSettings
+from glimmer_cradle.cognition.loop import CognitionSettings
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 
 

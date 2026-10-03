@@ -5,7 +5,66 @@ from enum import StrEnum
 import math
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from glimmer_cradle.conversation import Moment
+
+
+class _MemorySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+class WorkingMemorySettings(_MemorySettings):
+    max_messages_per_conversation: int = Field(ge=2)
+    hydrate_recent_messages: int = Field(ge=2)
+    context_message_limit: int = Field(ge=1)
+
+
+class ConversationProjectionSettings(_MemorySettings):
+    segment_target_messages: int = Field(ge=4)
+    chapter_idle_minutes: int = Field(ge=1)
+    chapter_segment_limit: int = Field(ge=2)
+    state_update_messages: int = Field(ge=1)
+    history_candidate_limit: int = Field(ge=1)
+    history_result_limit: int = Field(ge=1)
+    summary_max_chars: int = Field(ge=256)
+
+
+class ExperienceSettings(_MemorySettings):
+    enabled: bool
+    pack_max_size_mb: int = Field(ge=16)
+    flush_interval_ms: int = Field(ge=50)
+    flush_max_buffer: int = Field(ge=1)
+    episode_idle_seconds: int = Field(ge=10)
+    seal_integrity_check: bool
+
+
+class ConsolidationSettings(_MemorySettings):
+    enabled: bool
+    batch_size: int = Field(ge=1)
+    max_batch_moments: int = Field(ge=1)
+    debounce_seconds: int = Field(ge=0)
+    max_wait_seconds: int = Field(ge=10)
+    lease_seconds: int = Field(ge=10)
+    retry_base_seconds: int = Field(ge=1)
+    minimum_salience: float = Field(ge=0, le=1)
+    autobiographical_evidence_threshold: int = Field(ge=2)
+    schedule_interval_seconds: int = Field(ge=10)
+
+
+class RetrievalSettings(_MemorySettings):
+    token_budget: int = Field(ge=128)
+    candidate_limit: int = Field(ge=1)
+    result_limit: int = Field(ge=1)
+    semantic_weight: float = Field(ge=0, le=1)
+
+
+class MemorySettings(_MemorySettings):
+    working: WorkingMemorySettings
+    conversation: ConversationProjectionSettings
+    experience: ExperienceSettings
+    consolidation: ConsolidationSettings
+    retrieval: RetrievalSettings
 
 
 class MemoryKind(StrEnum):

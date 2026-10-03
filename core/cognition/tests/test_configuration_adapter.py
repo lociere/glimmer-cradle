@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.configuration import map_character_runtime_document
-from glimmer_cradle.cognition.domain.configuration import ConfigException
+from glimmer_cradle.cognition.adapters.configuration import (
+    ConfigException,
+    map_character_runtime_document,
+)
 from tests.config_fixture import normalized_document
 
 

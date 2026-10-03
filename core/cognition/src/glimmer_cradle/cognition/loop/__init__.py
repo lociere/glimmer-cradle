@@ -2,6 +2,7 @@
 
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.loop_controller import (
+    CognitionSettings,
     LoopController,
     PerceptionProvider,
     salience_for_perception,
@@ -35,6 +36,7 @@ from glimmer_cradle.cognition.loop.step import (
 from glimmer_cradle.cognition.loop.stop_policy import StopPolicy
 
 __all__ = [
+    "CognitionSettings",
     "LoopCheckpoint",
     "LoopCheckpointStore",
     "LoopController",

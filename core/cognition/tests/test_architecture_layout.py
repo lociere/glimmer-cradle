@@ -14,7 +14,7 @@ PACKAGE_ROOT = (
     / "cognition"
 )
 TARGET_ROOTS = {
-    "domain", "ports", "adapters", "attention", "context",
+    "ports", "adapters", "attention", "context",
     "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state",
 }
 LEGACY_ROOTS = {
@@ -23,10 +23,9 @@ LEGACY_ROOTS = {
     "observability", "protocol",
 }
 ALLOWED_DEPENDENCIES = {
-    "domain": {"domain"},
     "ports": {"ports"},
     "adapters": {
-        "domain", "application", "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
+        "attention", "context", "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state", "ports", "adapters"
     },
     "attention": {"attention", "ports"},
     "context": {"context", "knowledge", "memory", "ports"},

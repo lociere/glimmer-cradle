@@ -476,6 +476,13 @@ Inference 配置投影归位切片把模型生成参数、生命时钟、多模�
 避免把 vendor payload 伪装成 provider-neutral Core 模型。Multimodal、Worker mapper 与测试已切换新入口，
 旧配置聚合不再定义任何 Inference/LLM 类型；Memory、Embedding、Loop 配置仍待后续 owner 拆分。
 
+配置投影最终拆分切片把 Working/Conversation/Experience/Consolidation/Retrieval 策略归入
+`memory/memory.py`，Loop 容量与兜底节拍归入 `loop/loop_controller.py`，Embedding provider 配置归
+其 adapter；完整 Worker Document 与 fail-closed 映射继续由过渡配置 adapter 组装。所有活跃消费者
+完成切换后，最后的 `domain/configuration.py` 与空 `domain/__init__.py` 物理删除，Cognition 架构门
+移除 Domain 源码根以及 Adapters→Domain/Application 依赖。五个目标 owner Schema 尚未落盘，必须在
+Contract Spine catalog 与验证链原子切换时完成，不能以本次 Python 投影归位冒充 Schema 迁移完成。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 from typing import Callable, Sequence
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
@@ -43,6 +45,15 @@ from glimmer_cradle.cognition.ports.capability_port import (
 )
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from glimmer_cradle.cognition.context import RecentExperienceSource
+
+
+class CognitionSettings(BaseModel):
+    """Loop composition 所需的容量与兜底节拍配置。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    workspace_capacity: int = Field(ge=1)
+    default_tick_interval_ms: int = Field(ge=1)
 
 
 def salience_for_perception(*, address_mode: str, familiarity: int) -> float:

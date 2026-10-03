@@ -6,7 +6,7 @@ import pytest
 
 from glimmer_cradle.cognition.adapters.inference import embedding as embedding_module
 from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
-from glimmer_cradle.cognition.domain.configuration import EmbeddingSettings
+from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingSettings
 
 
 def _config(*, enabled: bool = True, provider: str = "dashscope-text-embedding") -> EmbeddingSettings:

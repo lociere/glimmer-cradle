@@ -16,14 +16,49 @@ from typing import Literal, Protocol, TYPE_CHECKING
 from urllib import error, request
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
 
 from glimmer_cradle.cognition.adapters.paths import resolve_cache_dir, resolve_models_dir
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.domain.configuration import (
-    DashScopeEmbeddingSettings,
-    EmbeddingSettings,
-    LocalEmbeddingSettings,
-)
+
+
+class _EmbeddingSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+class EmbeddingRouteSettings(_EmbeddingSettings):
+    provider: Literal["dashscope-text-embedding", "local-sentence-transformers"]
+
+
+class DashScopeEmbeddingSettings(_EmbeddingSettings):
+    endpoint: str
+    model: str
+    dimensions: Literal[64, 128, 256, 512, 768, 1024, 1536, 2048]
+    request_timeout_ms: int = Field(ge=1000)
+    max_retries: int = Field(ge=0, le=3)
+
+
+class LocalEmbeddingSettings(_EmbeddingSettings):
+    model_path: str
+    model_id: str
+    auto_download: bool
+    device: str
+    batch_size: int = Field(ge=1)
+
+
+class EmbeddingProvidersSettings(_EmbeddingSettings):
+    dashscope_text_embedding: DashScopeEmbeddingSettings = Field(
+        validation_alias="dashscope-text-embedding"
+    )
+    local_sentence_transformers: LocalEmbeddingSettings = Field(
+        validation_alias="local-sentence-transformers"
+    )
+
+
+class EmbeddingSettings(_EmbeddingSettings):
+    enabled: bool
+    route: EmbeddingRouteSettings
+    providers: EmbeddingProvidersSettings
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer

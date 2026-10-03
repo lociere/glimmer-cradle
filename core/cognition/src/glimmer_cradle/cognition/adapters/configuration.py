@@ -7,20 +7,27 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from glimmer_cradle.cognition.domain.configuration import ConfigException
-from glimmer_cradle.cognition.domain.configuration import (
-    CognitionSettings,
-    EmbeddingSettings,
-    MemorySettings,
-)
+from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingSettings
 from glimmer_cradle.cognition.adapters.inference.gateway import LLMSettings
 from glimmer_cradle.cognition.inference import InferenceSettings
+from glimmer_cradle.cognition.loop import CognitionSettings
+from glimmer_cradle.cognition.memory import MemorySettings
 from glimmer_cradle.cognition.persona import (
     CharacterManifestSettings,
     CharacterProfileSettings,
     DialoguePolicySettings,
     SafetySettings,
 )
+
+
+class ConfigException(ValueError):
+    """Kernel 规范化配置无法映射为 Worker 运行时投影。"""
+
+    code = "CONFIG_ERROR"
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(f"[{self.code}] {message}")
 
 
 class ActionStreamSettings(BaseModel):
