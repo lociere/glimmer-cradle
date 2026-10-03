@@ -3,10 +3,19 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 7,
+    "count": 5,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Cognition Worker composition 暂时装配迁移中的 Core concrete；随目标 adapters 迁入 App 和 Core public API 收束逐项清零。"
+  },
+  {
+    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
+    "rule": "deep-import",
+    "detail": "glimmer_cradle.cognition.*",
+    "count": 2,
+    "owner": "architecture-v2-refactor",
+    "removeBy": "phase-12",
+    "reason": "Worker model provider 已归位，仍临时消费待迁出的 Core observability concrete；随 App observability adapter 接线清零。"
   },
   {
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
@@ -34,15 +43,6 @@
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-8",
     "reason": "现存厂商配置或 adapter 实现；迁入 provider/renderer boundary 后删除。"
-  },
-  {
-    "file": "core/cognition/src/glimmer_cradle/cognition/adapters/inference/gateway.py",
-    "rule": "vendor-core",
-    "detail": "openai",
-    "count": 1,
-    "owner": "architecture-v2-refactor",
-    "removeBy": "phase-9",
-    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
   },
   {
     "file": "core/kernel/package.json",

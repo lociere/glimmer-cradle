@@ -299,7 +299,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
         → _pending_reply → Intend(reply) → Act → action_sink
     action_sink 收到的 dict 形状即内核 ACTION_COMMAND handler 读取的契约。
     """
-    from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
+    from glimmer_cradle.cognition_worker.adapters.model_client import CloudReasoning
     from glimmer_cradle.cognition.inference import InferenceController
 
     # ── stub LLMEngine：记录收到的 prompt，返回固定回复（鸭子类型 .generate）──

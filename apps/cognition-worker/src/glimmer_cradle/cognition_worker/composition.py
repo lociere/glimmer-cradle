@@ -72,12 +72,15 @@ from glimmer_cradle.cognition.adapters.persistence import (
     SqliteStateStore,
     VectorRepository,
 )
-from glimmer_cradle.cognition.adapters.inference.cloud import CloudReasoning
 from glimmer_cradle.cognition.adapters.inference.embedding import (
     EmbeddingEngine,
     EmbeddingSettings,
 )
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMEngine, LLMSettings
+from glimmer_cradle.cognition_worker.adapters.model_client import (
+    CloudReasoning,
+    LLMEngine,
+    LLMSettings,
+)
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import InferenceController, InferenceSettings
 from glimmer_cradle.cognition.planning import PlanningController

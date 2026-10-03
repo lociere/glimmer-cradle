@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-import glimmer_cradle.cognition.adapters.inference.gateway as llm_module
-from glimmer_cradle.cognition.adapters.inference.gateway import (
+import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
+from glimmer_cradle.cognition_worker.adapters.model_client import (
     LLMApiResult,
     LLMEngine,
     LLMSettings,

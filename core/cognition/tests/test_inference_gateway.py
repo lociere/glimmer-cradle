@@ -2,7 +2,7 @@
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.inference.gateway import (
+from glimmer_cradle.cognition_worker.adapters.model_client import (
     InferenceException,
     LLMSettings,
     LLMEngine,

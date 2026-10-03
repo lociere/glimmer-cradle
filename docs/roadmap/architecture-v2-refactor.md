@@ -526,6 +526,16 @@ Python Namespace 空壳清理继续删除 Kernel Port 子树三个空 `__init__.
 子模块的 Observability `__init__.py`。setuptools namespace discovery 与现有模块入口保持可用；真实
 Kernel wire adapter 和 observability concrete 尚未归位，本切片不提前宣称对应边界完成。
 
+Model provider gateway 归位切片把同步 LLM provider、配置投影、错误映射与现有流式 ModelClient 合并到
+目标 Worker `adapters/model_client.py`。Worker composition、Cloud bridge 与测试消费者完成切换，旧
+Core `adapters/inference/gateway.py` 物理删除；模型请求/事件契约仍由 Core Inference 公共面拥有，
+provider payload 与凭据继续只存在于 App adapter。
+
+同切片随后把只包装同步 provider 的 `CloudReasoning` 一并收入 Worker `model_client.py`，删除第二个
+Core inference concrete；composition deep-import 基线由 `7` 收紧为 `5`。Model client 仍有一处对
+旧 Core model-invocation observability concrete 的迁移期依赖，已单独锁定为 `2`，退出条件是 App
+observability adapter 完成接线，禁止该债务增长。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
