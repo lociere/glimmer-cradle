@@ -72,12 +72,10 @@ from glimmer_cradle.cognition.adapters.persistence import (
     SqliteStateStore,
     VectorRepository,
 )
-from glimmer_cradle.cognition.adapters.inference.embedding import (
-    EmbeddingEngine,
-    EmbeddingSettings,
-)
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     CloudReasoning,
+    EmbeddingEngine,
+    EmbeddingSettings,
     LLMEngine,
     LLMSettings,
 )

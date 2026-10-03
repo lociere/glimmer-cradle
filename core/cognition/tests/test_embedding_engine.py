@@ -4,9 +4,11 @@ import json
 import numpy as np
 import pytest
 
-from glimmer_cradle.cognition.adapters.inference import embedding as embedding_module
-from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingEngine
-from glimmer_cradle.cognition.adapters.inference.embedding import EmbeddingSettings
+from glimmer_cradle.cognition_worker.adapters import model_client as embedding_module
+from glimmer_cradle.cognition_worker.adapters.model_client import (
+    EmbeddingEngine,
+    EmbeddingSettings,
+)
 
 
 def _config(*, enabled: bool = True, provider: str = "dashscope-text-embedding") -> EmbeddingSettings:

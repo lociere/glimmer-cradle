@@ -536,6 +536,13 @@ Core inference concrete；composition deep-import 基线由 `7` 收紧为 `5`。
 旧 Core model-invocation observability concrete 的迁移期依赖，已单独锁定为 `2`，退出条件是 App
 observability adapter 完成接线，禁止该债务增长。
 
+Embedding provider 归位切片把 DashScope 与本地 Sentence Transformers 的配置投影、模型缓存、
+批处理和向量归一实现收入目标 Worker `adapters/model_client.py`。Worker composition 与测试完成切换，
+旧 Core `adapters/inference/embedding.py` 在 consumer-zero 后物理删除；Core Memory 仍只通过注入的
+Embedding Port 使用向量能力。composition deep-import 基线由 `5` 收紧为 `4`；model client 对旧
+Core 路径 helper 的一处依赖与 observability concrete 一同锁定为 `3`，待 Worker 路径与
+observability adapter 归位后清零，不建立 Core 兼容壳。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
