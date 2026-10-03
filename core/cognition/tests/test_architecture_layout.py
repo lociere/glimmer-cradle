@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from pathlib import Path
 from textwrap import dedent
 
@@ -13,10 +14,69 @@ PACKAGE_ROOT = (
     / "glimmer_cradle"
     / "cognition"
 )
+SCHEMA_ROOT = Path(__file__).parents[1] / "schemas"
 TARGET_ROOTS = {
     "ports", "adapters", "attention", "context",
     "inference", "knowledge", "loop", "memory", "perception", "persona", "planning", "state",
 }
+
+
+def test_owner_schemas_are_deterministic_model_projections() -> None:
+    from glimmer_cradle.cognition.inference import InferenceSettings
+    from glimmer_cradle.cognition.knowledge import KnowledgeSourceRecord
+    from glimmer_cradle.cognition.loop import CognitionSettings
+    from glimmer_cradle.cognition.memory import MemorySettings
+    from glimmer_cradle.cognition.persona import CharacterManifestSettings
+
+    specifications = (
+        (
+            "character-manifest.schema.json",
+            CharacterManifestSettings,
+            "InternalPolicy",
+            "persona.CharacterManifestSettings",
+        ),
+        (
+            "cognition-config.schema.json",
+            CognitionSettings,
+            "InternalPolicy",
+            "loop.CognitionSettings",
+        ),
+        (
+            "inference-policy.schema.json",
+            InferenceSettings,
+            "InternalPolicy",
+            "inference.InferenceSettings",
+        ),
+        (
+            "knowledge-source.schema.json",
+            KnowledgeSourceRecord,
+            "InternalSourceRecord",
+            "knowledge.KnowledgeSourceRecord",
+        ),
+        (
+            "memory-policy.schema.json",
+            MemorySettings,
+            "InternalPolicy",
+            "memory.MemorySettings",
+        ),
+    )
+    for filename, model, contract_kind, origin in specifications:
+        expected = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": f"https://glimmer-cradle.local/cognition/{filename}",
+            "x-glimmer-owner": "Cognition",
+            "x-glimmer-contract-kind": contract_kind,
+            "x-glimmer-derived-from": origin,
+            **model.model_json_schema(),
+        }
+        actual = json.loads((SCHEMA_ROOT / filename).read_text(encoding="utf-8"))
+        assert actual == expected
+
+    fixture = Path(__file__).parent / "fixtures" / "knowledge-source.json"
+    record = KnowledgeSourceRecord.model_validate_json(fixture.read_text(encoding="utf-8"))
+    assert record.entry_id == "fixture-knowledge-1"
+
+
 LEGACY_ROOTS = {
     "activity", "affect", "conversation", "cycle", "experience",
     "foundation", "identity", "maintenance",

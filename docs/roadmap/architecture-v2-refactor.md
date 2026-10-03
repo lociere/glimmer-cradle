@@ -483,6 +483,12 @@ Inference 配置投影归位切片把模型生成参数、生命时钟、多模�
 移除 Domain 源码根以及 Adapters→Domain/Application 依赖。五个目标 owner Schema 尚未落盘，必须在
 Contract Spine catalog 与验证链原子切换时完成，不能以本次 Python 投影归位冒充 Schema 迁移完成。
 
+Cognition owner Schema 切片随后补齐物理清单最后五个缺项。Character Manifest、Loop、Inference 与
+Memory Schema 由各 owner 的严格 Pydantic 模型确定性派生；Knowledge 新增不含向量运行态的
+`KnowledgeSourceRecord`，并验证目标 fixture。架构测试逐字重建五份 Schema，防止手改与模型漂移；
+文件明确标记为 `InternalPolicy`/`InternalSourceRecord`，不替代也不复制 `contracts/` 中 Kernel→Worker
+跨进程 Document wire，Contract Spine catalog、兼容基线与 generated DTO 因此无需变更。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

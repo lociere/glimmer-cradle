@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/cognition/character-manifest.schema.json",
+  "x-glimmer-owner": "Cognition",
+  "x-glimmer-contract-kind": "InternalPolicy",
+  "x-glimmer-derived-from": "persona.CharacterManifestSettings",
+  "$defs": {
+    "CharacterAssetsSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "title": "Root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root"
+      ],
+      "title": "CharacterAssetsSettings",
+      "type": "object"
+    },
+    "CharacterBaseSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "nickname"
+      ],
+      "title": "CharacterBaseSettings",
+      "type": "object"
+    },
+    "CharacterKnowledgeSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "title": "Index",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "title": "CharacterKnowledgeSettings",
+      "type": "object"
+    },
+    "CharacterMigrationsSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "title": "Root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "root"
+      ],
+      "title": "CharacterMigrationsSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "character_id": {
+      "title": "Character Id",
+      "type": "string"
+    },
+    "base": {
+      "$ref": "#/$defs/CharacterBaseSettings"
+    },
+    "persona_mode": {
+      "enum": [
+        "api",
+        "local_base",
+        "local_finetune"
+      ],
+      "title": "Persona Mode",
+      "type": "string"
+    },
+    "assets": {
+      "$ref": "#/$defs/CharacterAssetsSettings"
+    },
+    "knowledge": {
+      "$ref": "#/$defs/CharacterKnowledgeSettings"
+    },
+    "migrations": {
+      "$ref": "#/$defs/CharacterMigrationsSettings"
+    }
+  },
+  "required": [
+    "character_id",
+    "base",
+    "persona_mode",
+    "assets",
+    "knowledge",
+    "migrations"
+  ],
+  "title": "CharacterManifestSettings",
+  "type": "object"
+}

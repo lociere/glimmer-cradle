@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/cognition/inference-policy.schema.json",
+  "x-glimmer-owner": "Cognition",
+  "x-glimmer-contract-kind": "InternalPolicy",
+  "x-glimmer-derived-from": "inference.InferenceSettings",
+  "$defs": {
+    "LifeClockSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "heartbeat_enabled": {
+          "title": "Heartbeat Enabled",
+          "type": "boolean"
+        },
+        "heartbeat_interval_ms": {
+          "title": "Heartbeat Interval Ms",
+          "type": "integer"
+        },
+        "focus_duration_ms": {
+          "title": "Focus Duration Ms",
+          "type": "integer"
+        },
+        "ingress_debounce_ms": {
+          "title": "Ingress Debounce Ms",
+          "type": "integer"
+        },
+        "ingress_focused_debounce_ms": {
+          "title": "Ingress Focused Debounce Ms",
+          "type": "integer"
+        },
+        "ingress_max_batch_messages": {
+          "title": "Ingress Max Batch Messages",
+          "type": "integer"
+        },
+        "ingress_max_batch_items": {
+          "title": "Ingress Max Batch Items",
+          "type": "integer"
+        },
+        "summon_keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Summon Keywords",
+          "type": "array"
+        },
+        "focus_on_any_chat": {
+          "title": "Focus On Any Chat",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "heartbeat_enabled",
+        "heartbeat_interval_ms",
+        "focus_duration_ms",
+        "ingress_debounce_ms",
+        "ingress_focused_debounce_ms",
+        "ingress_max_batch_messages",
+        "ingress_max_batch_items",
+        "summon_keywords",
+        "focus_on_any_chat"
+      ],
+      "title": "LifeClockSettings",
+      "type": "object"
+    },
+    "ModelSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "max_tokens": {
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "type": "number"
+        },
+        "top_p": {
+          "title": "Top P",
+          "type": "number"
+        },
+        "frequency_penalty": {
+          "title": "Frequency Penalty",
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_tokens",
+        "temperature",
+        "top_p",
+        "frequency_penalty"
+      ],
+      "title": "ModelSettings",
+      "type": "object"
+    },
+    "MultimodalSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "strategy": {
+          "enum": [
+            "core_direct",
+            "specialist_then_core"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "max_items": {
+          "title": "Max Items",
+          "type": "integer"
+        },
+        "core_model": {
+          "title": "Core Model",
+          "type": "string"
+        },
+        "image_model": {
+          "title": "Image Model",
+          "type": "string"
+        },
+        "video_model": {
+          "title": "Video Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "strategy",
+        "max_items",
+        "core_model",
+        "image_model",
+        "video_model"
+      ],
+      "title": "MultimodalSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "model": {
+      "$ref": "#/$defs/ModelSettings"
+    },
+    "life_clock": {
+      "$ref": "#/$defs/LifeClockSettings"
+    },
+    "multimodal": {
+      "$ref": "#/$defs/MultimodalSettings"
+    }
+  },
+  "required": [
+    "model",
+    "life_clock",
+    "multimodal"
+  ],
+  "title": "InferenceSettings",
+  "type": "object"
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/cognition/knowledge-source.schema.json",
+  "x-glimmer-owner": "Cognition",
+  "x-glimmer-contract-kind": "InternalSourceRecord",
+  "x-glimmer-derived-from": "knowledge.KnowledgeSourceRecord",
+  "additionalProperties": false,
+  "description": "进入 Knowledge owner 前的可审计来源记录。",
+  "properties": {
+    "entry_id": {
+      "minLength": 1,
+      "title": "Entry Id",
+      "type": "string"
+    },
+    "content": {
+      "minLength": 1,
+      "title": "Content",
+      "type": "string"
+    },
+    "priority": {
+      "minimum": 1,
+      "title": "Priority",
+      "type": "integer"
+    },
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "source": {
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "attributes": {
+      "additionalProperties": true,
+      "title": "Attributes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "entry_id",
+    "content",
+    "priority",
+    "enabled",
+    "source",
+    "revision"
+  ],
+  "title": "KnowledgeSourceRecord",
+  "type": "object"
+}

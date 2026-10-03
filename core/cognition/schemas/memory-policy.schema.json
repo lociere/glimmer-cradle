@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/cognition/memory-policy.schema.json",
+  "x-glimmer-owner": "Cognition",
+  "x-glimmer-contract-kind": "InternalPolicy",
+  "x-glimmer-derived-from": "memory.MemorySettings",
+  "$defs": {
+    "ConsolidationSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "batch_size": {
+          "minimum": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "max_batch_moments": {
+          "minimum": 1,
+          "title": "Max Batch Moments",
+          "type": "integer"
+        },
+        "debounce_seconds": {
+          "minimum": 0,
+          "title": "Debounce Seconds",
+          "type": "integer"
+        },
+        "max_wait_seconds": {
+          "minimum": 10,
+          "title": "Max Wait Seconds",
+          "type": "integer"
+        },
+        "lease_seconds": {
+          "minimum": 10,
+          "title": "Lease Seconds",
+          "type": "integer"
+        },
+        "retry_base_seconds": {
+          "minimum": 1,
+          "title": "Retry Base Seconds",
+          "type": "integer"
+        },
+        "minimum_salience": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Salience",
+          "type": "number"
+        },
+        "autobiographical_evidence_threshold": {
+          "minimum": 2,
+          "title": "Autobiographical Evidence Threshold",
+          "type": "integer"
+        },
+        "schedule_interval_seconds": {
+          "minimum": 10,
+          "title": "Schedule Interval Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "batch_size",
+        "max_batch_moments",
+        "debounce_seconds",
+        "max_wait_seconds",
+        "lease_seconds",
+        "retry_base_seconds",
+        "minimum_salience",
+        "autobiographical_evidence_threshold",
+        "schedule_interval_seconds"
+      ],
+      "title": "ConsolidationSettings",
+      "type": "object"
+    },
+    "ConversationProjectionSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "segment_target_messages": {
+          "minimum": 4,
+          "title": "Segment Target Messages",
+          "type": "integer"
+        },
+        "chapter_idle_minutes": {
+          "minimum": 1,
+          "title": "Chapter Idle Minutes",
+          "type": "integer"
+        },
+        "chapter_segment_limit": {
+          "minimum": 2,
+          "title": "Chapter Segment Limit",
+          "type": "integer"
+        },
+        "state_update_messages": {
+          "minimum": 1,
+          "title": "State Update Messages",
+          "type": "integer"
+        },
+        "history_candidate_limit": {
+          "minimum": 1,
+          "title": "History Candidate Limit",
+          "type": "integer"
+        },
+        "history_result_limit": {
+          "minimum": 1,
+          "title": "History Result Limit",
+          "type": "integer"
+        },
+        "summary_max_chars": {
+          "minimum": 256,
+          "title": "Summary Max Chars",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "segment_target_messages",
+        "chapter_idle_minutes",
+        "chapter_segment_limit",
+        "state_update_messages",
+        "history_candidate_limit",
+        "history_result_limit",
+        "summary_max_chars"
+      ],
+      "title": "ConversationProjectionSettings",
+      "type": "object"
+    },
+    "ExperienceSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "pack_max_size_mb": {
+          "minimum": 16,
+          "title": "Pack Max Size Mb",
+          "type": "integer"
+        },
+        "flush_interval_ms": {
+          "minimum": 50,
+          "title": "Flush Interval Ms",
+          "type": "integer"
+        },
+        "flush_max_buffer": {
+          "minimum": 1,
+          "title": "Flush Max Buffer",
+          "type": "integer"
+        },
+        "episode_idle_seconds": {
+          "minimum": 10,
+          "title": "Episode Idle Seconds",
+          "type": "integer"
+        },
+        "seal_integrity_check": {
+          "title": "Seal Integrity Check",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "pack_max_size_mb",
+        "flush_interval_ms",
+        "flush_max_buffer",
+        "episode_idle_seconds",
+        "seal_integrity_check"
+      ],
+      "title": "ExperienceSettings",
+      "type": "object"
+    },
+    "RetrievalSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "token_budget": {
+          "minimum": 128,
+          "title": "Token Budget",
+          "type": "integer"
+        },
+        "candidate_limit": {
+          "minimum": 1,
+          "title": "Candidate Limit",
+          "type": "integer"
+        },
+        "result_limit": {
+          "minimum": 1,
+          "title": "Result Limit",
+          "type": "integer"
+        },
+        "semantic_weight": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Semantic Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "token_budget",
+        "candidate_limit",
+        "result_limit",
+        "semantic_weight"
+      ],
+      "title": "RetrievalSettings",
+      "type": "object"
+    },
+    "WorkingMemorySettings": {
+      "additionalProperties": false,
+      "properties": {
+        "max_messages_per_conversation": {
+          "minimum": 2,
+          "title": "Max Messages Per Conversation",
+          "type": "integer"
+        },
+        "hydrate_recent_messages": {
+          "minimum": 2,
+          "title": "Hydrate Recent Messages",
+          "type": "integer"
+        },
+        "context_message_limit": {
+          "minimum": 1,
+          "title": "Context Message Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_messages_per_conversation",
+        "hydrate_recent_messages",
+        "context_message_limit"
+      ],
+      "title": "WorkingMemorySettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "working": {
+      "$ref": "#/$defs/WorkingMemorySettings"
+    },
+    "conversation": {
+      "$ref": "#/$defs/ConversationProjectionSettings"
+    },
+    "experience": {
+      "$ref": "#/$defs/ExperienceSettings"
+    },
+    "consolidation": {
+      "$ref": "#/$defs/ConsolidationSettings"
+    },
+    "retrieval": {
+      "$ref": "#/$defs/RetrievalSettings"
+    }
+  },
+  "required": [
+    "working",
+    "conversation",
+    "experience",
+    "consolidation",
+    "retrieval"
+  ],
+  "title": "MemorySettings",
+  "type": "object"
+}
