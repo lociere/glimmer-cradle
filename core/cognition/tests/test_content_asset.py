@@ -8,8 +8,8 @@ import pytest
 
 from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
-from glimmer_cradle.cognition.domain.configuration import (
-    ActionStreamSettings, InferenceSettings, LifeClockSettings, ModelSettings, MultimodalSettings,
+from glimmer_cradle.cognition.inference import (
+    InferenceSettings, LifeClockSettings, ModelSettings, MultimodalSettings,
 )
 
 
@@ -34,7 +34,6 @@ def _router(reader: AssetReader) -> MultimodalRouter:
             ingress_max_batch_messages=4, ingress_max_batch_items=24, summon_keywords=[], focus_on_any_chat=False),
         multimodal=MultimodalSettings(enabled=True, strategy="core_direct", max_items=6,
             core_model="vision", image_model="", video_model=""),
-        action_stream=ActionStreamSettings(enabled=False, channel="live2d"),
     ), reader)
 
 

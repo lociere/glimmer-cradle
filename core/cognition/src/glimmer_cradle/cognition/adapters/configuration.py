@@ -11,16 +11,29 @@ from glimmer_cradle.cognition.domain.configuration import ConfigException
 from glimmer_cradle.cognition.domain.configuration import (
     CognitionSettings,
     EmbeddingSettings,
-    InferenceSettings,
-    LLMSettings,
     MemorySettings,
 )
+from glimmer_cradle.cognition.adapters.inference.gateway import LLMSettings
+from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.persona import (
     CharacterManifestSettings,
     CharacterProfileSettings,
     DialoguePolicySettings,
     SafetySettings,
 )
+
+
+class ActionStreamSettings(BaseModel):
+    """Worker/Kernel action projection configuration, outside Inference Core."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    enabled: bool
+    channel: str
+
+
+class WorkerInferenceSettings(InferenceSettings):
+    action_stream: ActionStreamSettings
 
 
 class CharacterRuntimeSettings(BaseModel):
@@ -32,7 +45,7 @@ class CharacterRuntimeSettings(BaseModel):
     profile: CharacterProfileSettings
     dialogue: DialoguePolicySettings
     safety: SafetySettings
-    inference: InferenceSettings
+    inference: WorkerInferenceSettings
     llm: LLMSettings | None = None
     memory: MemorySettings
     embedding: EmbeddingSettings

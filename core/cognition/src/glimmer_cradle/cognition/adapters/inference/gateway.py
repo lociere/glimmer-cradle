@@ -10,17 +10,56 @@ from dataclasses import dataclass
 import json
 import time
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 from urllib import error, request
 from urllib.parse import urljoin
 
-from glimmer_cradle.cognition.domain.configuration import LLMSettings, ModelSettings
+from pydantic import BaseModel, ConfigDict
+
+from glimmer_cradle.cognition.inference import ModelSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.observability.model_invocations import record_model_invocation
 from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 
 # 初始化模块日志器
 logger = get_logger("llm_engine")
+
+
+class _GatewaySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+class LLMRouteSettings(_GatewaySettings):
+    provider: str | None = None
+    model_alias: str | None = None
+
+
+class LLMProviderSettings(_GatewaySettings):
+    api_type: str
+    api_key: str | None = None
+    base_url: str | None = None
+    models: dict[str, str]
+    temperature: float | None = None
+    request_method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
+    request_path: str | None = None
+    request_headers: dict[str, str] | None = None
+    request_body_template: str | None = None
+    response_extract: str | None = None
+
+
+class LLMSettings(_GatewaySettings):
+    default_route: LLMRouteSettings | None = None
+    api_type: str
+    api_key: str | None = None
+    base_url: str | None = None
+    models: dict[str, str] | None = None
+    temperature: float | None = None
+    providers: dict[str, LLMProviderSettings] | None = None
+    request_method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
+    request_path: str | None = None
+    request_headers: dict[str, str] | None = None
+    request_body_template: str | None = None
+    response_extract: str | None = None
 
 
 class InferenceException(RuntimeError):

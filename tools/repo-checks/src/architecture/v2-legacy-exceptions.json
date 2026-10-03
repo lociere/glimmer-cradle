@@ -45,15 +45,6 @@
     "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
   },
   {
-    "file": "core/cognition/src/glimmer_cradle/cognition/domain/configuration.py",
-    "rule": "vendor-core",
-    "detail": "live2d",
-    "count": 1,
-    "owner": "architecture-v2-refactor",
-    "removeBy": "phase-9",
-    "reason": "扩展至 Python AST 与 MCP import 后确认的起始 vendor adapter/config 债务；迁到领域外 provider/bridge 后删除。"
-  },
-  {
     "file": "core/kernel/package.json",
     "rule": "core-sdk",
     "detail": "@glimmer-cradle/extension-sdk",

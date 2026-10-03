@@ -471,6 +471,11 @@ Persona 配置投影归位切片把 Character Manifest、Profile、Dialogue 与 
 迁移期依赖已从架构门移除。Inference、Memory、Embedding 与 Loop 配置仍在旧聚合文件，需按各自
 owner 继续拆分后才能删除 `domain/configuration.py` 与清单外配置 adapter。
 
+Inference 配置投影归位切片把模型生成参数、生命时钟、多模态与动作流策略迁入目标
+`inference/model_descriptor.py`；provider 路由、凭据和 HTTP 请求/响应模板随真实推理 adapter 收口，
+避免把 vendor payload 伪装成 provider-neutral Core 模型。Multimodal、Worker mapper 与测试已切换新入口，
+旧配置聚合不再定义任何 Inference/LLM 类型；Memory、Embedding、Loop 配置仍待后续 owner 拆分。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

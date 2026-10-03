@@ -9,7 +9,13 @@ from glimmer_cradle.cognition.inference.inference_controller import (
     InferenceController,
     InferenceUnavailable,
 )
-from glimmer_cradle.cognition.inference.model_descriptor import ModelTier
+from glimmer_cradle.cognition.inference.model_descriptor import (
+    InferenceSettings,
+    LifeClockSettings,
+    ModelSettings,
+    ModelTier,
+    MultimodalSettings,
+)
 from glimmer_cradle.cognition.inference.model_port import (
     EmbeddingPort,
     EmbeddingTextType,
@@ -26,8 +32,8 @@ from glimmer_cradle.cognition.inference.request import (
 
 __all__ = [
     "EmbeddingPort", "EmbeddingTextType", "InferenceBackendPort",
-    "InferenceController", "InferenceRequest", "InferenceResponse",
+    "InferenceController", "InferenceRequest", "InferenceResponse", "InferenceSettings",
     "InferenceUnavailable", "ModelEvent", "ModelEventKind", "ModelMessage",
-    "ModelPort", "ModelRequest", "ModelTier", "RealtimeModelPort",
-    "RealtimeSession", "RealtimeState",
+    "ModelPort", "ModelRequest", "ModelSettings", "ModelTier", "MultimodalSettings",
+    "LifeClockSettings", "RealtimeModelPort", "RealtimeSession", "RealtimeState",
 ]

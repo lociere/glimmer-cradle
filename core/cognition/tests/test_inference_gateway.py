@@ -2,15 +2,18 @@
 
 import pytest
 
-from glimmer_cradle.cognition.domain.configuration import (
-    ActionStreamSettings, InferenceSettings, LifeClockSettings, LLMSettings,
-    ModelSettings, MultimodalSettings,
-)
 from glimmer_cradle.cognition.adapters.inference.gateway import (
     InferenceException,
+    LLMSettings,
     LLMEngine,
     ModelMessage,
     ModelRequest,
+)
+from glimmer_cradle.cognition.inference import (
+    InferenceSettings,
+    LifeClockSettings,
+    ModelSettings,
+    MultimodalSettings,
 )
 from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 
@@ -33,10 +36,6 @@ def MultimodalConfig(**updates):
                   core_model="deepseek", image_model="", video_model="")
     values.update(updates)
     return MultimodalSettings(**values)
-
-
-def ActionStreamConfig(**updates):
-    return ActionStreamSettings(enabled=False, channel="live2d", **updates)
 
 
 def test_llm_provider_resolution_uses_models_contract() -> None:
@@ -98,7 +97,6 @@ def test_multimodal_router_accepts_text_input_with_null_items() -> None:
         model=ModelConfig(),
         life_clock=LifeClockConfig(),
         multimodal=MultimodalConfig(enabled=True, strategy="core_direct"),
-        action_stream=ActionStreamConfig(),
     )
     router = MultimodalRouter(inference)
 
@@ -115,7 +113,6 @@ def test_audio_media_is_not_sent_to_visual_provider(strategy: str) -> None:
         model=ModelConfig(),
         life_clock=LifeClockConfig(),
         multimodal=MultimodalConfig(enabled=True, strategy=strategy),
-        action_stream=ActionStreamConfig(),
     )
     router = MultimodalRouter(inference)
     route = router.route({"text": "听一下", "items": [
@@ -139,7 +136,6 @@ def test_audio_classification_preserves_image_routing_and_trusted_transcript_whe
     inference = InferenceSettings(
         model=ModelConfig(), life_clock=LifeClockConfig(),
         multimodal=MultimodalConfig(enabled=True, strategy="core_direct"),
-        action_stream=ActionStreamConfig(),
     )
     route = MultimodalRouter(inference).route({"items": [
         {"modality": "image", "uri": "https://example.test/image.png", "mime_type": "image/png"},
@@ -152,7 +148,7 @@ def test_audio_classification_preserves_image_routing_and_trusted_transcript_whe
 
     disabled = InferenceSettings(
         model=ModelConfig(), life_clock=LifeClockConfig(),
-        multimodal=MultimodalConfig(enabled=False), action_stream=ActionStreamConfig(),
+        multimodal=MultimodalConfig(enabled=False),
     )
     disabled_route = MultimodalRouter(disabled).route({"items": [
         {"modality": "audio", "semantic": {"text": "准确转写", "resolved": True}},

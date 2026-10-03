@@ -4,8 +4,14 @@ from pathlib import Path
 import pytest
 
 import glimmer_cradle.cognition.adapters.inference.gateway as llm_module
-from glimmer_cradle.cognition.domain.configuration import LLMSettings, ModelSettings
-from glimmer_cradle.cognition.adapters.inference.gateway import LLMApiResult, LLMEngine, ModelMessage, ModelRequest
+from glimmer_cradle.cognition.adapters.inference.gateway import (
+    LLMApiResult,
+    LLMEngine,
+    LLMSettings,
+    ModelMessage,
+    ModelRequest,
+)
+from glimmer_cradle.cognition.inference import ModelSettings
 
 def ModelConfig():
     return ModelSettings(

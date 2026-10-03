@@ -23,7 +23,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from glimmer_cradle.cognition.domain.configuration import InferenceSettings
+from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
 from glimmer_cradle.cognition.adapters.content.asset_reader import AssetReader
