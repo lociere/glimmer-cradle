@@ -543,6 +543,12 @@ Embedding Port 使用向量能力。composition deep-import 基线由 `5` 收紧
 Core 路径 helper 的一处依赖与 observability concrete 一同锁定为 `3`，待 Worker 路径与
 observability adapter 归位后清零，不建立 Core 兼容壳。
 
+多模态模型路由归位切片把 Content 引用归一、视觉消息构造、specialist/core-direct 策略与
+模型调用收入目标 Worker `adapters/model_client.py`；资产字节校验仍由注入的
+`FileAssetReader` 拥有。Worker composition 与测试完成切换后，旧 Core
+`adapters/inference/multimodal.py` consumer-zero 并物理删除；音频只消费可信转写、视频显式降级与
+旧 URI-only 当拍兼容语义不变。composition deep-import 基线由 `4` 收紧为 `3`。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

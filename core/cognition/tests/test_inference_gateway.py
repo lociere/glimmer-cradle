@@ -15,7 +15,7 @@ from glimmer_cradle.cognition.inference import (
     ModelSettings,
     MultimodalSettings,
 )
-from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
+from glimmer_cradle.cognition_worker.adapters.model_client import MultimodalRouter
 
 def ModelConfig(**updates):
     return ModelSettings(max_tokens=1024, temperature=0.8, top_p=0.9,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
+from glimmer_cradle.cognition_worker.adapters.model_client import MultimodalRouter
 from glimmer_cradle.cognition.inference import (
     InferenceSettings, LifeClockSettings, ModelSettings, MultimodalSettings,
 )

@@ -78,8 +78,8 @@ from glimmer_cradle.cognition_worker.adapters.model_client import (
     EmbeddingSettings,
     LLMEngine,
     LLMSettings,
+    MultimodalRouter,
 )
-from glimmer_cradle.cognition.adapters.inference.multimodal import MultimodalRouter
 from glimmer_cradle.cognition.inference import InferenceController, InferenceSettings
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex

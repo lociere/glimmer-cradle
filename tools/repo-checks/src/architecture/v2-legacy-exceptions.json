@@ -3,7 +3,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 4,
+    "count": 3,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Cognition Worker composition 暂时装配迁移中的 Core concrete；随目标 adapters 迁入 App 和 Core public API 收束逐项清零。"
