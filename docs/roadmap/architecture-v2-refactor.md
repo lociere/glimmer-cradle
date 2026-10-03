@@ -522,6 +522,10 @@ Observability Port 公共面切片把 Logger、Span 与 Observability 的消费�
 语义的 `adapters/__init__.py`、`adapters/inference/__init__.py` 在 consumer-zero 后删除；协议方法与
 依赖注入行为不变，也不为后续清单外 observability concrete 建立兼容壳。
 
+Python Namespace 空壳清理继续删除 Kernel Port 子树三个空 `__init__.py`，以及只重复暴露可直接导入
+子模块的 Observability `__init__.py`。setuptools namespace discovery 与现有模块入口保持可用；真实
+Kernel wire adapter 和 observability concrete 尚未归位，本切片不提前宣称对应边界完成。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
