@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from glimmer_cradle.cognition_worker.composition import AgentSynthesisUseCase
-from glimmer_cradle.cognition.ports.kernel.models import AgentSynthesisInput
+from glimmer_cradle.cognition.ports import AgentSynthesisInput
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 from glimmer_cradle.conversation import (
     ConversationTurn,

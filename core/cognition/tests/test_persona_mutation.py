@@ -142,7 +142,7 @@ def test_boundary_allows_code_blocks_and_rejects_forbidden_identity() -> None:
 
 def test_knowledge_init_rejects_legacy_persona_compile_fields() -> None:
     from pydantic import ValidationError
-    from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
+    from glimmer_cradle.cognition.ports import KnowledgeInitialization
 
     legacy_scope = "person" + "a"
     legacy_compile_field = "compile" + "_group"

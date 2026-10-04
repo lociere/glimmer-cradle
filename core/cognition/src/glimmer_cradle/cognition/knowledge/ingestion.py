@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
+from glimmer_cradle.cognition.ports import KnowledgeInitialization
 
 
 def config_entries_from(payload: KnowledgeInitialization) -> list[dict]:

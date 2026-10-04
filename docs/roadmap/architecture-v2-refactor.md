@@ -568,6 +568,12 @@ deadline/cancellation 与 typed failure 统一迁入目标 Worker `rpc_service.p
 generated wire 类型不再进入 Cognition Core；目标 Core `ports/__init__.py` 只公开 Worker 所需的
 Kernel request 消费方契约。
 
+Kernel 消费方 Port 公共面收束切片把 Agent/Knowledge/Conversation request DTO、`KernelRequestPort`
+与 `KernelEventPort` 定义本体并入目标 `ports/__init__.py`。Core Knowledge、Worker RPC/Composition
+与测试全部改用公开入口；旧 `ports/kernel/{models.py,inbound/kernel_request_port.py,
+outbound/kernel_event_port.py}` 三个清单外文件 consumer-zero 后物理删除，不保留嵌套
+namespace 或兼容导出。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

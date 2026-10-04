@@ -3,9 +3,9 @@ import json
 import pytest
 
 from glimmer_cradle.cognition_worker.composition import AgentPlanUseCase
-from glimmer_cradle.cognition.ports.kernel.models import AgentPlanInput
+from glimmer_cradle.cognition.ports import AgentPlanInput
 from tests.conftest import IDS, OBSERVABILITY
-from glimmer_cradle.cognition.ports.kernel.models import SkillToolDescriptor
+from glimmer_cradle.cognition.ports import SkillToolDescriptor
 
 
 class _PlanningLLM:

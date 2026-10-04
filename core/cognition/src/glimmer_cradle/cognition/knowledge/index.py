@@ -16,7 +16,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from glimmer_cradle.cognition.ports.kernel.models import KnowledgeInitialization
+from glimmer_cradle.cognition.ports import KnowledgeInitialization
 from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.inference import EmbeddingPort
 from glimmer_cradle.cognition.knowledge.ingestion import config_entries_from
