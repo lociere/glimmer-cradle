@@ -433,7 +433,7 @@ Memory maintenance 收口切片把独立节拍、静息封口提示、终结 Mom
 `domain/experience/narrative.py` 物理删除；Episode 持久模型与 projection port 保持不变。
 
 Legacy Agent RPC 用例收口切片把 Plan/Synthesize 的输入输出移入现有 Kernel request port models，
-把仅服务该 RPC 的执行与生命周期包装收束到 `adapters/kernel/inbound_adapter.py`；Worker composition、
+当时把仅服务该 RPC 的执行与生命周期包装收束到迁移期 `adapters/kernel/inbound_adapter.py`；Worker composition、
 gRPC transport、port 与测试不再依赖 Cognition Application。旧 `application/{base_use_case,
 agent_plan_use_case,agent_synthesis_use_case}.py` 及空 package 物理删除，Cognition 架构门同步移除
 `application` 源码根与 Ports→Application 依赖。Plan/Synthesize wire 仍有 Kernel 生产消费者，需在
@@ -560,6 +560,13 @@ logger。Kernel request Port 与 DTO 经目标 `ports/__init__.py` 公开，消�
 port 文件。旧 `adapters/kernel/inbound_adapter.py` consumer-zero 后物理删除；Action RPC 仍是
 阶段 5 兼容窗口，待 native Loop producer/consumer 全部切换后再删除用例本身。Composition
 deep-import 基线由 `3` 收紧为 `2`。
+
+Kernel gRPC transport 归位切片把 Cognition Service host、Kernel Control client、wire mapper、认证证明、
+deadline/cancellation 与 typed failure 统一迁入目标 Worker `rpc_service.py`。Composition 改为只接收
+`action_sink` 并返回领域组件图；RPC 生命周期创建 client/server，注入入站 Port、注册动态
+回环端点并负责 ready/停机顺序。旧 `adapters/kernel/{grpc_transport.py,__init__.py}` 物理删除，
+generated wire 类型不再进入 Cognition Core；目标 Core `ports/__init__.py` 只公开 Worker 所需的
+Kernel request 消费方契约。
 
 ### 阶段 2 后续候选审计与 Configuration 切片
 

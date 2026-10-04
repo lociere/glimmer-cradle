@@ -30,7 +30,10 @@ from glimmer_cradle.cognition.ports.kernel.models import (
     ConversationHistoryEntry,
     ConversationHistoryQuery,
     ConversationHistoryResult,
+    KnowledgeEntryInput,
     KnowledgeInitialization,
+    KnowledgeRetrievalInput,
+    SkillToolDescriptor,
     SkillToolSuggestion,
 )
 from glimmer_cradle.cognition.ports.resource_port import ResourcePort, ResourceSnapshot
@@ -94,7 +97,10 @@ __all__ = [
     "ConversationHistoryEntry",
     "ConversationHistoryQuery",
     "ConversationHistoryResult",
+    "KnowledgeEntryInput",
     "KnowledgeInitialization",
+    "KnowledgeRetrievalInput",
+    "SkillToolDescriptor",
     "SkillToolSuggestion",
     "IdGeneratorPort",
     "LoggerPort",

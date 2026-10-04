@@ -1,25 +1,603 @@
 """Cognition Worker RPC process and lifecycle supervision."""
+from __future__ import annotations
+
 import asyncio
 import argparse
 import base64
+from collections import OrderedDict
+from collections.abc import Awaitable, Callable
+import hashlib
+import hmac
 import json
 import os
-from typing import Final
+from typing import Any, Final
 
-from glimmer_cradle.cognition_worker.composition import (
-    CharacterRuntimeSettings,
-    CognitionComponents,
-    compose_cognition,
-    map_character_runtime_document,
+import grpc
+from google.protobuf.json_format import MessageToDict, ParseDict
+
+from glimmer.common.v1 import service_contract_pb2 as common_pb
+from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
+from glimmer_cradle.cognition.attention import AttentionController
+from glimmer_cradle.cognition.loop import LoopController
+from glimmer_cradle.cognition.perception import (
+    Observation,
+    ObservationNormalizer,
+    ObservationQueue,
+    PerceptionOperationConflict,
+    PerceptionOperationRegistry,
 )
+from glimmer_cradle.cognition.ports import (
+    AgentPlanInput,
+    AgentSynthesisInput,
+    ConversationHistoryQuery,
+    KernelRequestPort,
+    KnowledgeEntryInput,
+    KnowledgeInitialization,
+    KnowledgeRetrievalInput,
+    SkillToolDescriptor,
+)
+from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.observability.trace_context import new_boot_id, set_boot_id
+from glimmer_cradle.cognition.adapters.observability.trace_context import (
+    TraceContext,
+    new_boot_id,
+    new_trace_id,
+    set_boot_id,
+)
 from glimmer_cradle.cognition.adapters.paths import (
     resolve_metrics_dir,
     resolve_traces_dir,
 )
 from glimmer_cradle.cognition.adapters.observability.metrics import start_metrics, stop_metrics
 from glimmer_cradle.cognition.adapters.observability.tracer import start_tracer, stop_tracer
+
+transport_logger = get_logger("kernel_cognition_grpc")
+
+_ERROR_KEY = "glimmer-error-bin"
+_COGNITION_SERVICE = "glimmer.cognition.v1.CognitionService"
+_KERNEL_SERVICE = "glimmer.kernel.v1.KernelControlService"
+
+
+def _perception_state(state: str) -> int:
+    return {
+        "accepted": cognition_pb.PERCEPTION_OPERATION_STATE_ACCEPTED,
+        "running": cognition_pb.PERCEPTION_OPERATION_STATE_RUNNING,
+        "succeeded": cognition_pb.PERCEPTION_OPERATION_STATE_SUCCEEDED,
+        "cancelled": cognition_pb.PERCEPTION_OPERATION_STATE_CANCELLED,
+        "failed": cognition_pb.PERCEPTION_OPERATION_STATE_FAILED,
+    }.get(state, cognition_pb.PERCEPTION_OPERATION_STATE_UNSPECIFIED)
+
+
+def _struct_dict(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    return MessageToDict(value, preserving_proto_field_name=True)
+
+
+def _parse_struct(value: dict[str, Any] | None, target: Any) -> None:
+    ParseDict(value or {}, target)
+
+
+class ServiceFault(Exception):
+    def __init__(self, code: int, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retryable = retryable
+
+
+class KernelServiceError(Exception):
+    """Kernel 返回的受控 typed failure；不暴露远端内部异常文本。"""
+
+    def __init__(
+        self,
+        code: int,
+        safe_message: str,
+        *,
+        retryable: bool = False,
+        call: Any = None,
+        recovery_actions: tuple[int, ...] = (),
+        operation_id: str = "",
+    ) -> None:
+        super().__init__(safe_message)
+        self.code = code
+        self.safe_message = safe_message
+        self.retryable = retryable
+        self.call = call
+        self.recovery_actions = recovery_actions
+        self.operation_id = operation_id
+
+
+def _grpc_status(code: int) -> grpc.StatusCode:
+    return {
+        common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST: grpc.StatusCode.INVALID_ARGUMENT,
+        common_pb.SERVICE_ERROR_CODE_NOT_READY: grpc.StatusCode.FAILED_PRECONDITION,
+        common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH: grpc.StatusCode.PERMISSION_DENIED,
+        common_pb.SERVICE_ERROR_CODE_CANCELLED: grpc.StatusCode.CANCELLED,
+        common_pb.SERVICE_ERROR_CODE_DEADLINE_EXCEEDED: grpc.StatusCode.DEADLINE_EXCEEDED,
+        common_pb.SERVICE_ERROR_CODE_UNAVAILABLE: grpc.StatusCode.UNAVAILABLE,
+        common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED: grpc.StatusCode.FAILED_PRECONDITION,
+    }.get(code, grpc.StatusCode.INTERNAL)
+
+
+class CognitionGrpcHost:
+    """由 CognitionHost 监督的动态回环 gRPC Service host。"""
+
+    def __init__(
+        self,
+        *,
+        generation: str,
+        inbound: KernelRequestPort,
+        queue: ObservationQueue,
+        activity: CognitiveActivityController,
+        cycle: LoopController,
+        shutdown: Callable[[], Awaitable[None]],
+        operations: PerceptionOperationRegistry,
+        workspace: AttentionController,
+    ) -> None:
+        self.generation = generation
+        self._inbound = inbound
+        self._queue = queue
+        self._activity = activity
+        self._cycle = cycle
+        self._shutdown = shutdown
+        self._operations = operations
+        self._workspace = workspace
+        self._observation_normalizer = ObservationNormalizer()
+        self._server: grpc.aio.Server | None = None
+        self._endpoint: str | None = None
+        self._phase = "binding"
+        self._ready = False
+        self._inflight: dict[str, asyncio.Task[Any]] = {}
+        self._completed: OrderedDict[str, None] = OrderedDict()
+
+    @property
+    def endpoint(self) -> str:
+        if self._endpoint is None:
+            raise RuntimeError("Cognition gRPC host 尚未绑定")
+        return self._endpoint
+
+    async def start(self) -> None:
+        if self._server is not None:
+            return
+        server = grpc.aio.server()
+        handlers = {
+            "SubmitPerception": self._method(self._submit_perception, cognition_pb.SubmitPerceptionRequest, cognition_pb.SubmitPerceptionResponse),
+            "CancelPerception": self._method(self._cancel_perception, cognition_pb.CancelPerceptionRequest, cognition_pb.CancelPerceptionResponse),
+            "GetPerceptionOperation": self._method(self._get_perception_operation, cognition_pb.GetPerceptionOperationRequest, cognition_pb.GetPerceptionOperationResponse),
+            "InitializeKnowledge": self._method(self._initialize_knowledge, cognition_pb.InitializeKnowledgeRequest, cognition_pb.InitializeKnowledgeResponse),
+            "Plan": self._method(self._plan, cognition_pb.PlanRequest, cognition_pb.PlanResponse),
+            "Synthesize": self._method(self._synthesize, cognition_pb.SynthesizeRequest, cognition_pb.SynthesizeResponse),
+            "GetConversationHistory": self._method(self._history, cognition_pb.GetConversationHistoryRequest, cognition_pb.GetConversationHistoryResponse),
+            "Heartbeat": self._method(self._heartbeat, cognition_pb.HeartbeatRequest, cognition_pb.HeartbeatResponse),
+            "GetReadiness": self._method(self._readiness, cognition_pb.GetReadinessRequest, cognition_pb.GetReadinessResponse),
+            "Shutdown": self._method(self._shutdown_rpc, cognition_pb.ShutdownRequest, cognition_pb.ShutdownResponse),
+        }
+        server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
+        port = server.add_insecure_port("127.0.0.1:0")
+        if port <= 0:
+            raise RuntimeError("Cognition gRPC 动态回环端点绑定失败")
+        await server.start()
+        self._server = server
+        self._endpoint = f"grpc://127.0.0.1:{port}"
+        self._phase = "domain_starting"
+        transport_logger.info("Cognition gRPC Service 已绑定动态回环端点")
+
+    def mark_ready(self) -> None:
+        self._ready = True
+        self._phase = "ready"
+
+    async def stop(self) -> None:
+        self._ready = False
+        self._phase = "stopping"
+        for task in tuple(self._inflight.values()):
+            if not task.done():
+                task.cancel()
+        self._inflight.clear()
+        if self._server is not None:
+            await self._server.stop(grace=1.0)
+            await self._server.wait_for_termination(timeout=2.0)
+            self._server = None
+        self._endpoint = None
+        self._phase = "stopped"
+
+    @staticmethod
+    def _method(handler: Callable[..., Awaitable[Any]], request_type: Any, response_type: Any) -> Any:
+        return grpc.unary_unary_rpc_method_handler(
+            handler,
+            request_deserializer=request_type.FromString,
+            response_serializer=response_type.SerializeToString,
+        )
+
+    def _assert_call(self, call: common_pb.CallMetadata | None) -> str:
+        if call is None or not call.trace_id:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "缺少调用 trace metadata")
+        if call.generation != self.generation:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH, "Kernel 调用世代已失效")
+        return call.trace_id
+
+    async def _invoke(self, request: Any, context: grpc.aio.ServicerContext, operation: Callable[[str], Awaitable[Any]], *, track: bool = False) -> Any:
+        try:
+            trace_id = self._assert_call(request.call)
+            with TraceContext(trace_id):
+                task = asyncio.current_task()
+                if track and task is not None:
+                    self._inflight[trace_id] = task
+                try:
+                    return await operation(trace_id)
+                finally:
+                    if track:
+                        self._inflight.pop(trace_id, None)
+        except asyncio.CancelledError:
+            await self._abort(context, common_pb.SERVICE_ERROR_CODE_CANCELLED, "请求已取消", getattr(request, "call", None))
+            raise
+        except ServiceFault as fault:
+            await self._abort(context, fault.code, str(fault), getattr(request, "call", None), fault.retryable)
+        except Exception:
+            transport_logger.exception("Cognition gRPC 调用失败")
+            await self._abort(context, common_pb.SERVICE_ERROR_CODE_INTERNAL, "Cognition 处理请求失败", getattr(request, "call", None))
+        raise RuntimeError("gRPC abort 未终止调用")
+
+    @staticmethod
+    async def _abort(context: grpc.aio.ServicerContext, code: int, message: str, call: Any, retryable: bool = False) -> None:
+        detail = common_pb.ServiceErrorDetail(code=code, safe_message=message, retryable=retryable)
+        if call is not None:
+            detail.call.CopyFrom(call)
+        context.set_trailing_metadata(((_ERROR_KEY, detail.SerializeToString()),))
+        await context.abort(_grpc_status(code), message)
+
+    def _is_completed(self, call: common_pb.CallMetadata) -> bool:
+        key = call.idempotency_key
+        return bool(key and key in self._completed)
+
+    def _mark_completed(self, call: common_pb.CallMetadata) -> None:
+        key = call.idempotency_key
+        if not key:
+            return
+        self._completed[key] = None
+        if len(self._completed) > 2048:
+            self._completed.popitem(last=False)
+
+    async def _submit_perception(self, request: Any, context: Any) -> Any:
+        async def operation(trace_id: str) -> Any:
+            operation_id = request.call.idempotency_key or trace_id
+            try:
+                perception_operation, duplicate = self._operations.accept(operation_id, trace_id)
+            except PerceptionOperationConflict as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)) from error
+            if not duplicate:
+                content = request.content
+                payload_digest = request.origin.content_hash.strip() or hashlib.sha256(
+                    request.SerializeToString(deterministic=True)
+                ).hexdigest()
+                model_input = {
+                    "text": content.text,
+                    "actor_id": content.actor_id or None,
+                    "actor_name": content.actor_name or None,
+                    "modality": list(content.modality),
+                    "items": [MessageToDict(item, preserving_proto_field_name=True) for item in content.items],
+                    "parts": [MessageToDict(part, preserving_proto_field_name=True) for part in content.parts],
+                }
+                conversation = request.conversation
+                address_mode = "direct" if request.address_mode == cognition_pb.ADDRESS_MODE_DIRECT else "ambient"
+                response_policy = "observe_only" if request.response_policy == cognition_pb.RESPONSE_POLICY_OBSERVE_ONLY else "reply_allowed"
+                retention = {
+                    cognition_pb.RETENTION_CEILING_TRANSIENT: "transient",
+                    cognition_pb.RETENTION_CEILING_MEMORY_CANDIDATE: "memory_candidate",
+                }.get(request.retention_ceiling, "experience")
+                try:
+                    observation = self._observation_normalizer.normalize(Observation(
+                        scene_id=conversation.scene_id,
+                        conversation_id=conversation.conversation_id,
+                        continuity_id=conversation.continuity_id,
+                        thread_id=conversation.thread_id,
+                        recall_scope=conversation.recall_scope,
+                        disclosure_scope=conversation.disclosure_scope,
+                        address_mode=address_mode,
+                        familiarity=request.familiarity,
+                        response_policy=response_policy,
+                        text=content.text,
+                        trace_id=trace_id,
+                        actor_id=content.actor_id or None,
+                        actor_name=content.actor_name or None,
+                        model_input=model_input,
+                        origin=MessageToDict(request.origin, preserving_proto_field_name=True),
+                        retention_ceiling=retention,
+                        interaction_id=conversation.interaction_id,
+                        payload_digest=payload_digest,
+                    ))
+                except ValueError as error:
+                    raise ServiceFault(
+                        common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)
+                    ) from error
+                dropped = self._queue.put(observation)
+                if dropped is not None:
+                    self._operations.finish(dropped.trace_id, "failed", "感知队列容量已满")
+                if address_mode == "direct":
+                    self._activity.engage("direct_perception")
+                else:
+                    self._activity.observe_activity("ambient_perception")
+                self._cycle.notify_external_input()
+            return cognition_pb.SubmitPerceptionResponse(
+                operation_id=perception_operation.operation_id,
+                state=_perception_state(perception_operation.state),
+                duplicate=duplicate,
+            )
+        return await self._invoke(request, context, operation)
+
+    async def _cancel_perception(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            self._queue.remove(request.target_trace_id)
+            await self._workspace.remove_perception(request.target_trace_id)
+            perception_operation = await self._operations.cancel(request.target_trace_id)
+            if perception_operation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "感知操作不存在")
+            return cognition_pb.CancelPerceptionResponse(
+                operation_id=perception_operation.operation_id,
+                target_trace_id=request.target_trace_id,
+                state=_perception_state(perception_operation.state),
+                terminal=perception_operation.terminal,
+            )
+        return await self._invoke(request, context, operation)
+
+    async def _get_perception_operation(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            perception_operation = self._operations.get(request.operation_id)
+            if perception_operation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "感知操作不存在")
+            return cognition_pb.GetPerceptionOperationResponse(
+                operation_id=perception_operation.operation_id,
+                state=_perception_state(perception_operation.state),
+                terminal=perception_operation.terminal,
+                safe_message=perception_operation.safe_message,
+            )
+        return await self._invoke(request, context, operation)
+
+    async def _initialize_knowledge(self, request: Any, context: Any) -> Any:
+        async def operation(trace_id: str) -> Any:
+            duplicate = self._is_completed(request.call)
+            if not duplicate:
+                await self._inbound.on_knowledge_init(KnowledgeInitialization(
+                    version=request.version,
+                    retrieval=KnowledgeRetrievalInput(
+                        mode=request.retrieval.mode or "full_injection",
+                        top_k=request.retrieval.top_k or 5,
+                        min_score=request.retrieval.min_score,
+                        semantic_weight=request.retrieval.semantic_weight,
+                    ),
+                    entries=[KnowledgeEntryInput(entry_id=e.entry_id, scope=e.scope, content=e.content, enabled=e.enabled, priority=e.priority) for e in request.entries],
+                ))
+                self._mark_completed(request.call)
+            return cognition_pb.InitializeKnowledgeResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "initialized", duplicate=duplicate)
+        return await self._invoke(request, context, operation)
+
+    async def _plan(self, request: Any, context: Any) -> Any:
+        async def operation(trace_id: str) -> Any:
+            output = await self._inbound.on_agent_plan(AgentPlanInput(
+                user_goal=request.user_goal,
+                scene_id=request.scene_id,
+                trace_id=trace_id,
+                available_tools=[SkillToolDescriptor(skill_id=t.skill_id, tool_name=t.tool_name, description=t.description, parameters=_struct_dict(t.parameters_schema)) for t in request.available_tools],
+            ))
+            response = cognition_pb.PlanResponse(summary=output.summary, reasoning=output.reasoning, trace_id=output.trace_id)
+            for suggestion in output.suggestions:
+                item = response.suggestions.add(skill_id=suggestion.skill_id, tool_name=suggestion.tool_name, purpose=suggestion.purpose, confidence=suggestion.confidence)
+                _parse_struct(suggestion.arguments_hint, item.arguments_hint)
+            return response
+        return await self._invoke(request, context, operation, track=True)
+
+    async def _synthesize(self, request: Any, context: Any) -> Any:
+        async def operation(trace_id: str) -> Any:
+            output = await self._inbound.on_agent_synthesis(AgentSynthesisInput(
+                original_goal=request.original_goal,
+                scene_id=request.scene_id,
+                conversation=MessageToDict(request.conversation, preserving_proto_field_name=True),
+                tool_results=[MessageToDict(item, preserving_proto_field_name=True) for item in request.tool_results],
+                trace_id=trace_id,
+            ))
+            response = cognition_pb.SynthesizeResponse(reply_content=output.reply_content, trace_id=output.trace_id)
+            _parse_struct(output.emotion_state, response.emotion_state)
+            return response
+        return await self._invoke(request, context, operation, track=True)
+
+    async def _history(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            output = await self._inbound.on_conversation_history(ConversationHistoryQuery(
+                request_id=request.request_id,
+                conversation_id=request.conversation_id,
+                scene_id=request.scene_id,
+                thread_id=request.thread_id,
+                actor_id=request.actor_id or None,
+                actor_name=request.actor_name or None,
+                source_provider_id=request.source_provider_id,
+                cursor=request.cursor or None,
+                limit=request.limit or 50,
+                allowed_scopes=list(request.allowed_scopes),
+            ))
+            response = cognition_pb.GetConversationHistoryResponse(request_id=output.request_id, status=output.status, next_cursor=output.next_cursor or "", has_more=output.has_more, message=output.message or "")
+            if output.conversation:
+                conversation = output.conversation
+                response.conversation.CopyFrom(cognition_pb.ConversationContext(
+                    source_provider_id=str(conversation.get("source_provider_id") or ""),
+                    scene_id=str(conversation.get("scene_id") or ""),
+                    conversation_id=str(conversation.get("conversation_id") or ""),
+                    continuity_id=str(conversation.get("continuity_id") or ""),
+                    thread_id=str(conversation.get("thread_id") or ""),
+                    interaction_id=str(conversation.get("interaction_id") or ""),
+                    recall_scope=str(conversation.get("recall_scope") or ""),
+                    disclosure_scope=str(conversation.get("disclosure_scope") or ""),
+                ))
+            for entry in output.items:
+                response.items.add(**entry.model_dump(exclude_none=True))
+            return response
+        return await self._invoke(request, context, operation, track=True)
+
+    async def _heartbeat(self, request: Any, context: Any) -> Any:
+        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.HeartbeatResponse(status="alive", generation=self.generation)))
+
+    async def _readiness(self, request: Any, context: Any) -> Any:
+        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.GetReadinessResponse(state="ready" if self._ready else "starting", phase=self._phase, generation=self.generation)))
+
+    async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
+        async def operation(trace_id: str) -> Any:
+            duplicate = self._is_completed(request.call)
+            if not duplicate:
+                asyncio.ensure_future(self._shutdown())
+                self._mark_completed(request.call)
+            return cognition_pb.ShutdownResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "accepted", duplicate=duplicate)
+        return await self._invoke(request, context, operation)
+
+
+async def _return(value: Any) -> Any:
+    return value
+
+
+class KernelGrpcClient:
+    """Cognition 进程独占的 KernelControlService client。"""
+
+    def __init__(self, generation: str, registration_nonce: str, registration_secret: bytearray | str) -> None:
+        self.generation = generation
+        self._registration_nonce = registration_nonce
+        self._registration_secret = registration_secret if isinstance(registration_secret, bytearray) else bytearray(
+            base64.urlsafe_b64decode(registration_secret + "=" * (-len(registration_secret) % 4))
+        )
+        self._channel: grpc.aio.Channel | None = None
+
+    async def start(self, kernel_endpoint: str, cognition_endpoint: str) -> None:
+        if not kernel_endpoint.startswith("grpc://127.0.0.1:"):
+            raise ValueError("Kernel gRPC endpoint 必须是动态回环地址")
+        self._channel = grpc.aio.insecure_channel(kernel_endpoint.removeprefix("grpc://"))
+        proof_payload = f"{self.generation}\n{self._registration_nonce}\n{cognition_endpoint}\n{os.getpid()}\n{os.getppid()}".encode()
+        auth_proof = hmac.new(bytes(self._registration_secret), proof_payload, hashlib.sha256).digest()
+        try:
+            response = await self._call(
+                "RegisterCognition",
+                kernel_pb.RegisterCognitionRequest(
+                    call=self._call_metadata(),
+                    endpoint=cognition_endpoint,
+                    process_id=os.getpid(),
+                    supervisor_process_id=os.getppid(),
+                    registration_nonce=self._registration_nonce,
+                    auth_proof=auth_proof,
+                ),
+                kernel_pb.RegisterCognitionRequest,
+                kernel_pb.RegisterCognitionResponse,
+            )
+        finally:
+            self._registration_secret[:] = b"\0" * len(self._registration_secret)
+            self._registration_nonce = ""
+        if not response.accepted or response.generation != self.generation:
+            raise RuntimeError("Kernel 拒绝 Cognition gRPC Service 注册")
+
+    async def stop(self) -> None:
+        if self._channel is not None:
+            await self._channel.close(grace=1.0)
+            self._channel = None
+
+    def _call_metadata(self, trace_id: str | None = None, idempotency_key: str = "") -> common_pb.CallMetadata:
+        resolved = trace_id or new_trace_id()
+        return common_pb.CallMetadata(trace_id=resolved, correlation_id=resolved, generation=self.generation, idempotency_key=idempotency_key)
+
+    async def send_state_sync(self, state: dict[str, Any]) -> None:
+        """Implement KernelEventPort without a stateless forwarding adapter."""
+        await self.publish_state(state)
+
+    async def send_log(
+        self, level: str, message: str, extra: dict[str, Any] | None = None
+    ) -> None:
+        await self.publish_log(level, message, extra or {})
+
+    async def send_action_command(self, command: dict[str, Any]) -> None:
+        transport_logger.debug(
+            "发送 ActionCommand 给 Kernel",
+            action_type=command.get("action_type"),
+        )
+        await self.publish_action(command)
+
+    async def publish_state(self, state: dict[str, Any]) -> None:
+        request = kernel_pb.PublishStateRequest(call=self._call_metadata())
+        _parse_struct(state, request.state)
+        await self._call("PublishState", request, kernel_pb.PublishStateRequest, kernel_pb.PublishStateResponse)
+
+    async def publish_log(self, level: str, message: str, attributes: dict[str, Any]) -> None:
+        request = kernel_pb.PublishLogRequest(call=self._call_metadata(), level=level, message=message)
+        _parse_struct(attributes, request.attributes)
+        await self._call("PublishLog", request, kernel_pb.PublishLogRequest, kernel_pb.PublishLogResponse)
+
+    async def publish_action(self, command: dict[str, Any]) -> None:
+        trace_id = str(command.get("trace_id") or new_trace_id())
+        target = command.get("target") or {}
+        payload = command.get("payload") or {}
+        request = kernel_pb.PublishActionRequest(
+            call=self._call_metadata(trace_id, f"action:{trace_id}"),
+            action_type=str(command.get("action_type") or ""),
+            target_scene_id=str(target.get("scene_id") or ""),
+            channel_hint=str(target.get("channel_hint") or ""),
+            text=str(payload.get("text") or ""),
+        )
+        for message in payload.get("messages") or []:
+            request.messages.add(sequence=int(message.get("sequence") or 0), content_type=str(message.get("content_type") or "text"), text=str(message.get("text") or ""), language=str(message.get("language") or ""))
+        for item in payload.get("items") or []:
+            request.items.add(type=str(item.get("type") or ""), uri=str(item.get("uri") or ""), mime_type=str(item.get("mime_type") or ""))
+        skill = payload.get("skill_request")
+        if isinstance(skill, dict):
+            request.skill_request.original_goal = str(skill.get("original_goal") or "")
+            request.skill_request.capability_kind = str(skill.get("capability_kind") or "")
+            request.skill_request.confidence = float(skill.get("confidence") or 0.0)
+            request.skill_request.reason = str(skill.get("reason") or "")
+            request.skill_request.planning_hint = str(skill.get("planning_hint") or "")
+            conversation = skill.get("conversation") or {}
+            for field in ("source_provider_id", "scene_id", "conversation_id", "continuity_id", "thread_id", "interaction_id", "recall_scope", "disclosure_scope"):
+                setattr(request.skill_request.conversation, field, str(conversation.get(field) or ""))
+        _parse_struct(command.get("emotion_state") or {}, request.emotion_state)
+        response = await self._call(
+            "PublishAction",
+            request,
+            kernel_pb.PublishActionRequest,
+            kernel_pb.PublishActionResponse,
+            timeout=None,
+        )
+        if response.status not in {"completed", "duplicate"}:
+            raise KernelServiceError(common_pb.SERVICE_ERROR_CODE_INTERNAL, "Kernel action 未到达终态")
+
+    async def _call(self, method: str, request: Any, request_type: Any, response_type: Any, *, timeout: float | None = 5.0) -> Any:
+        if self._channel is None:
+            raise RuntimeError("Kernel gRPC client 尚未启动")
+        call = self._channel.unary_unary(
+            f"/{_KERNEL_SERVICE}/{method}",
+            request_serializer=request_type.SerializeToString,
+            response_deserializer=response_type.FromString,
+        )
+        try:
+            return await call(request, timeout=timeout)
+        except grpc.aio.AioRpcError as error:
+            for key, value in error.trailing_metadata() or ():
+                if key == _ERROR_KEY and isinstance(value, bytes):
+                    detail = common_pb.ServiceErrorDetail()
+                    try:
+                        detail.ParseFromString(value)
+                    except Exception:
+                        break
+                    raise KernelServiceError(
+                        detail.code,
+                        detail.safe_message or "Kernel 请求失败",
+                        retryable=detail.retryable,
+                        call=detail.call if detail.HasField("call") else None,
+                        recovery_actions=tuple(detail.recovery_actions),
+                        operation_id=detail.operation_id,
+                    ) from None
+            code = {
+                grpc.StatusCode.CANCELLED: common_pb.SERVICE_ERROR_CODE_CANCELLED,
+                grpc.StatusCode.DEADLINE_EXCEEDED: common_pb.SERVICE_ERROR_CODE_DEADLINE_EXCEEDED,
+                grpc.StatusCode.UNAVAILABLE: common_pb.SERVICE_ERROR_CODE_UNAVAILABLE,
+            }.get(error.code(), common_pb.SERVICE_ERROR_CODE_INTERNAL)
+            raise KernelServiceError(
+                code,
+                "Kernel 请求已取消" if code == common_pb.SERVICE_ERROR_CODE_CANCELLED else "Kernel Service 暂不可用",
+                retryable=code == common_pb.SERVICE_ERROR_CODE_UNAVAILABLE,
+            ) from None
+
+
 
 # 初始化模块日志器
 logger = get_logger("cognition_host")
@@ -38,7 +616,7 @@ class CognitionHost:
     """
     def __init__(
         self,
-        config: CharacterRuntimeSettings,
+        config: Any,
         kernel_endpoint: str,
         generation: str,
         registration_nonce: str,
@@ -54,12 +632,14 @@ class CognitionHost:
             ConfigException: 配置校验失败时抛出
         """
         # 全局冻结配置，会话期不可修改
-        self.config: Final[CharacterRuntimeSettings] = config
+        self.config: Final[Any] = config
         self.kernel_endpoint: Final[str] = kernel_endpoint
         self.generation: Final[str] = generation
         self.registration_nonce: Final[str] = registration_nonce
         self.registration_secret: bytearray | None = registration_secret
-        self.components: CognitionComponents | None = None
+        self.components: Any | None = None
+        self.kernel_client: KernelGrpcClient | None = None
+        self.cognition_grpc_host: CognitionGrpcHost | None = None
         # 运行状态
         self._is_running: bool = False
         # 主运行任务
@@ -85,17 +665,31 @@ class CognitionHost:
         try:
             logger.info("Cognition 认知核开始启动")
 
+            from glimmer_cradle.cognition_worker.composition import compose_cognition
+
             registration_secret = self.registration_secret
             if registration_secret is None:
                 raise RuntimeError("Cognition 注册 capability 已失效")
+            self.kernel_client = KernelGrpcClient(
+                self.generation,
+                self.registration_nonce,
+                registration_secret,
+            )
             self.components = compose_cognition(
                 self.config,
-                generation=self.generation,
-                registration_nonce=self.registration_nonce,
-                registration_secret=registration_secret,
-                shutdown=self._accept_shutdown_request,
+                action_sink=self.kernel_client.send_action_command,
             )
             components = self._require_components()
+            self.cognition_grpc_host = CognitionGrpcHost(
+                generation=self.generation,
+                inbound=components.inbound_adapter,
+                queue=components.observation_queue,
+                activity=components.activity_controller,
+                cycle=components.cycle_controller,
+                shutdown=self._accept_shutdown_request,
+                operations=components.perception_operations,
+                workspace=components.workspace,
+            )
 
             # 1.5 启动 Conversation Log 单写者。
             #     先确立进程级 boot_id（telemetry 层用），交互事实流本身是连续的，
@@ -131,16 +725,16 @@ class CognitionHost:
             await components.cycle_controller.start()
 
             # 2. 先绑定受监督入站 Service，再向 Kernel 注册动态端点。
-            await components.cognition_grpc_host.start()
-            await components.kernel_client.start(
+            await self.cognition_grpc_host.start()
+            await self.kernel_client.start(
                 self.kernel_endpoint,
-                components.cognition_grpc_host.endpoint,
+                self.cognition_grpc_host.endpoint,
             )
 
             # 3. 唤醒当前角色
             character_session = components.character_session
             character_session.wake_up()
-            components.cognition_grpc_host.mark_ready()
+            self.cognition_grpc_host.mark_ready()
 
             # 4. 发出首条状态同步消息。启动快照用于建立 Kernel/Renderer 投影，
             # 不代表一次认知活动状态转换。
@@ -186,14 +780,16 @@ class CognitionHost:
                 pass
 
         # 2. 依次停止入站、认知生产者与持久化消费者。
-        if self.components is not None:
-            components = self.components
-            # 先关闭 Kernel 入站，避免停机期间继续接收新感知。
+        if self.cognition_grpc_host is not None:
             try:
-                await components.cognition_grpc_host.stop()
+                await self.cognition_grpc_host.stop()
             except Exception as e:
                 logger.error(f"Error stopping Cognition gRPC host: {e}")
+            finally:
+                self.cognition_grpc_host = None
 
+        if self.components is not None:
+            components = self.components
             # 停止认知循环后，Experience 不再产生新的对话 Moment。
             try:
                 await components.cycle_controller.stop()
@@ -261,10 +857,13 @@ class CognitionHost:
             except Exception as e:
                 logger.error(f"Error closing cognition state store: {e}")
 
-            try:
-                await components.kernel_client.stop()
-            except Exception as e:
-                logger.error(f"Error stopping Kernel gRPC client: {e}")
+            if self.kernel_client is not None:
+                try:
+                    await self.kernel_client.stop()
+                except Exception as e:
+                    logger.error(f"Error stopping Kernel gRPC client: {e}")
+                finally:
+                    self.kernel_client = None
 
             # 最后刷新遥测，确保上述停机错误仍可被记录。
             try:
@@ -330,11 +929,13 @@ class CognitionHost:
         ):
             return
 
-        await self.components.kernel_client.send_state_sync(state)
+        if self.kernel_client is None:
+            return
+        await self.kernel_client.send_state_sync(state)
         self._last_state_sync_fingerprint = fingerprint
         self._last_state_sync_at = now
 
-    def _require_components(self) -> CognitionComponents:
+    def _require_components(self) -> Any:
         if self.components is None:
             raise RuntimeError("Cognition 尚未完成组件组装")
         return self.components
@@ -417,6 +1018,10 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("缺少 Cognition 启动配置、Kernel gRPC endpoint 或 generation")
 
         config_dict = json.loads(config_json)
+        from glimmer_cradle.cognition_worker.composition import (
+            map_character_runtime_document,
+        )
+
         config = map_character_runtime_document(config_dict)
     except Exception as e:
         if registration_secret is not None:
@@ -479,7 +1084,6 @@ def main(argv: list[str] | None = None) -> int:
             loop.close()
             asyncio.set_event_loop(None)
     return exit_code
-
 
 # 直接运行时启动
 if __name__ == "__main__":

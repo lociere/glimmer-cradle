@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
@@ -119,10 +119,6 @@ from glimmer_cradle.cognition.persona import (
     SafetySettings,
 )
 from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
-from glimmer_cradle.cognition.adapters.kernel import (
-    CognitionGrpcHost,
-    KernelGrpcClient,
-)
 
 
 class ConfigException(ValueError):
@@ -275,8 +271,10 @@ class CognitionComponents:
     """由组装根创建并交给 Host 监督生命周期的组件图。"""
 
     character_session: CharacterSession
-    kernel_client: KernelGrpcClient
-    cognition_grpc_host: CognitionGrpcHost
+    inbound_adapter: KernelEventInboundAdapter
+    observation_queue: ObservationQueue
+    perception_operations: PerceptionOperationRegistry
+    workspace: AttentionController
     conversation_recorder: ConversationRecorder
     memory_substrate: MemoryController
     knowledge_base: KnowledgeIndex
@@ -295,10 +293,7 @@ class CognitionComponents:
 def compose_cognition(
     config: CharacterRuntimeSettings,
     *,
-    generation: str,
-    registration_nonce: str,
-    registration_secret: bytearray,
-    shutdown,
+    action_sink: Callable[[dict], Awaitable[None]],
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     observability = FileObservability()
@@ -406,7 +401,6 @@ def compose_cognition(
         conversation_controller=conversation_controller,
         observability=observability,
     )
-    kernel_client = KernelGrpcClient(generation, registration_nonce, registration_secret)
 
     perception_queue = ObservationQueue(max_size=100)
     perception_operations = PerceptionOperationRegistry()
@@ -481,7 +475,7 @@ def compose_cognition(
         activity_controller=activity_controller,
         emotion_system=character_session.emotion_system,
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
-        action_sink=kernel_client.send_action_command,
+        action_sink=action_sink,
         reasoning=reasoning,
         planning_controller=planning_controller,
         checkpoint_store=checkpoint_store,
@@ -499,16 +493,6 @@ def compose_cognition(
         observability=observability,
     )
 
-    cognition_grpc_host = CognitionGrpcHost(
-        generation=generation,
-        inbound=inbound_adapter,
-        queue=perception_queue,
-        activity=activity_controller,
-        cycle=cycle_controller,
-        shutdown=shutdown,
-        operations=perception_operations,
-        workspace=workspace,
-    )
     logger.info(
         "Cognition Composition 组装完成",
         workspace_capacity=cognition_config.workspace_capacity,
@@ -516,8 +500,10 @@ def compose_cognition(
     )
     return CognitionComponents(
         character_session=character_session,
-        kernel_client=kernel_client,
-        cognition_grpc_host=cognition_grpc_host,
+        inbound_adapter=inbound_adapter,
+        observation_queue=perception_queue,
+        perception_operations=perception_operations,
+        workspace=workspace,
         conversation_recorder=conversation_recorder,
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,

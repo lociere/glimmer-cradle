@@ -264,12 +264,12 @@ def test_domain_application_and_ports_dependency_direction() -> None:
     assert violations == []
 
 
-def test_generated_contract_types_exist_only_at_kernel_adapter_edge() -> None:
+def test_generated_contract_types_do_not_leak_into_cognition_core() -> None:
     consumers = []
     for path in _python_files():
         if any(_is_generated_import(module) for module in _imports(path)):
             consumers.append(path.relative_to(PACKAGE_ROOT).as_posix())
-    assert consumers == ["adapters/kernel/grpc_transport.py"]
+    assert consumers == []
 
 
 def test_ports_are_not_manufactured_inside_internal_modules() -> None:

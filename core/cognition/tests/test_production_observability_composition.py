@@ -22,10 +22,7 @@ def test_production_composition_injects_reachable_logger_sink(monkeypatch, tmp_p
 
     components = compose_cognition(
         map_character_runtime_document(normalized_document()),
-        generation="test-generation",
-        registration_nonce="test-nonce",
-        registration_secret=bytearray(b"test-secret"),
-        shutdown=shutdown,
+        action_sink=lambda _command: shutdown(),
     )
     components.cycle_controller.logger.info("production-sink-probe", marker="reachable")
 
