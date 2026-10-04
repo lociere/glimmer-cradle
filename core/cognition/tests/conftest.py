@@ -7,7 +7,7 @@ import hashlib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from glimmer_cradle.cognition.adapters.observability.trace_context import (
+from glimmer_cradle.cognition_worker.rpc_service import (
     TraceContext,
     get_current_trace_id,
 )

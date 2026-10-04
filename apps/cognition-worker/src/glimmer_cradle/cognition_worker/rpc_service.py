@@ -6,19 +6,28 @@ import argparse
 import base64
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+import contextvars
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from enum import StrEnum
 import hashlib
 import hmac
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import re
+import sys
 import threading
-from typing import Any, Final
+import time
+from typing import Any, Final, Optional
+import uuid
 
 import grpc
 from google.protobuf.json_format import MessageToDict, ParseDict
+import structlog
+from structlog.stdlib import ProcessorFormatter
 
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
@@ -43,24 +52,873 @@ from glimmer_cradle.cognition.ports import (
     SkillToolDescriptor,
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
-from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
-from glimmer_cradle.cognition.adapters.observability.trace_context import (
-    TraceContext,
-    get_current_span_id,
-    get_current_trace_id,
-    new_boot_id,
-    new_trace_id,
-    set_boot_id,
-)
 from glimmer_cradle.cognition.adapters.paths import (
     ensure_dir,
+    resolve_global_log_dir,
     resolve_model_invocations_dir,
     resolve_metrics_dir,
     resolve_traces_dir,
 )
-from glimmer_cradle.cognition.adapters.observability.metrics import start_metrics, stop_metrics
-from glimmer_cradle.cognition.adapters.observability.tracer import start_tracer, stop_tracer
+
+_trace_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "cognition_trace_id", default=None
+)
+
+
+def get_current_trace_id() -> Optional[str]:
+    """返回当前协程上下文中的 trace_id；未设置返回 None。"""
+    return _trace_id_var.get()
+
+
+def set_current_trace_id(trace_id: Optional[str]) -> contextvars.Token:
+    """直接设置 trace_id，返回 token；调用方负责在合适时机调用 reset。
+
+    通常优先使用 :class:`TraceContext` 上下文管理器，保证异常路径也能还原。
+    """
+    return _trace_id_var.set(trace_id)
+
+
+def reset_trace_id(token: contextvars.Token) -> None:
+    """还原到 token 之前的状态。"""
+    _trace_id_var.reset(token)
+
+
+def new_trace_id() -> str:
+    """生成新的 trace_id（UUIDv4，无连字符前缀）。
+
+    用于系统自发性事件（如生命时钟唤醒、定时任务）这种没有上游 trace_id 的入口。
+    """
+    return uuid.uuid4().hex
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 三层 trace（Glimmer Cradle 架构蓝图 §6.2）
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# telemetry 层只关心三层，从粗到细：
+#   boot_id     一次进程启动周期 —— 进程级，启动时设定一次
+#                （参考 Linux systemd boot_id 约定；不承载"清醒/心境"的认知含义）
+#   trace_id    一次跨层因果链关联 —— 协程级（W3C TraceContext 对齐）
+#   span_id     trace 内一个原子操作 —— 协程级（OTel Span 对齐）
+#
+# boot_id 是进程级常量，用模块级持有；trace / span 是协程级，用 contextvar。
+# 认知主体的"清醒/心境/经历"语义不在此层 —— 见 experience/events.py 的 Moment。
+
+_boot_id: Optional[str] = None
+
+_span_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "cognition_span_id", default=None
+)
+
+
+def new_boot_id() -> str:
+    """生成新的 boot_id（UUIDv4 hex）。"""
+    return uuid.uuid4().hex
+
+
+def set_boot_id(boot_id: str) -> None:
+    """设定进程级 boot_id（通常在 main 启动时调用一次）。"""
+    global _boot_id
+    _boot_id = boot_id
+
+
+def get_current_boot_id() -> Optional[str]:
+    """返回当前进程的 boot_id；未设定返回 None。"""
+    return _boot_id
+
+
+def set_current_span_id(span_id: Optional[str]) -> contextvars.Token:
+    """设置当前协程的 span_id，返回 token；调用方负责 reset。"""
+    return _span_id_var.set(span_id)
+
+
+def get_current_span_id() -> Optional[str]:
+    """返回当前协程的 span_id；未设置返回 None。"""
+    return _span_id_var.get()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 上下文管理器
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TraceContext:
+    """``with`` 上下文管理器：进入时设置 trace_id，退出时还原（含异常路径）。
+
+    用法::
+
+        with TraceContext(event.trace_id):
+            await process_event(event)
+            # 这里发出的所有日志自动带 trace_id
+
+    嵌套使用时遵循栈语义：内层覆盖外层，退出后还原到外层值。
+    """
+
+    __slots__ = ("trace_id", "_token")
+
+    def __init__(self, trace_id: str) -> None:
+        if not trace_id:
+            raise ValueError("trace_id 不能为空；如需自动生成请使用 new_trace_id()")
+        self.trace_id: str = trace_id
+        self._token: Optional[contextvars.Token] = None
+
+    def __enter__(self) -> "TraceContext":
+        self._token = _trace_id_var.set(self.trace_id)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._token is not None:
+            _trace_id_var.reset(self._token)
+            self._token = None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 合成 trace_id（无上游入口的占位）
+# ──────────────────────────────────────────────────────────────────────────────
+
+# 每模块独立计数器，用于 boot_id 尚未确立时（启动早期）的占位
+_synthetic_counters: dict[str, int] = {}
+# boot_id 确立后的全局占位计数器
+_boot_synthetic_counter: int = 0
+
+
+def _next_synthetic_trace_id(module_name: str) -> str:
+    """生成无上游 trace_id 时的占位（系统自发事件：启动序列、定时任务、心跳等）。
+
+    - boot_id 已确立 → ``run-{boot_id}-{n}``：与本次启动周期绑定，跨 run 不会撞。
+    - boot_id 尚未确立（启动极早期）→ ``synthetic-{module}-{n}``：按模块对齐。
+
+    见 docs/architecture/blueprint/微光摇篮架构蓝图.md §6.2 / docs/architecture/current/log-fields-glossary.md §5.4。
+    """
+    global _boot_synthetic_counter
+    if _boot_id:
+        _boot_synthetic_counter += 1
+        return f"run-{_boot_id}-{_boot_synthetic_counter}"
+    n = _synthetic_counters.get(module_name, 0) + 1
+    _synthetic_counters[module_name] = n
+    return f"synthetic-{module_name}-{n}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# structlog processor
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def trace_context_processor(_logger: Any, _method: str, event_dict: dict) -> dict:
+    """structlog processor：把 trace 上下文注入 event_dict。
+
+    注入字段（Glimmer Cradle 架构蓝图 §6.2）：
+      - boot_id —— 进程级，存在即注入
+      - trace_id —— 协程级；缺失时合成 run-/synthetic- 占位
+      - span_id —— 协程级；存在才注入（多数日志无 span）
+
+    各字段若调用方已显式传入则不覆盖。
+    """
+    if _boot_id and "boot_id" not in event_dict:
+        event_dict["boot_id"] = _boot_id
+
+    span = _span_id_var.get()
+    if span and "span_id" not in event_dict:
+        event_dict["span_id"] = span
+
+    if "trace_id" not in event_dict:
+        current = _trace_id_var.get()
+        if current is not None:
+            event_dict["trace_id"] = current
+        else:
+            module = event_dict.get("module") or event_dict.get("logger") or "unknown"
+            event_dict["trace_id"] = _next_synthetic_trace_id(str(module))
+    return event_dict
+
+
+def _normalize_timestamp_precision(_logger, _method, event_dict):
+    """把 ISO timestamp 从 microsecond 精度截断到 millisecond。
+
+    structlog TimeStamper(fmt='iso') 输出形如 '2026-05-08T07:03:33.522226Z'，
+    Python isoformat 默认 6 位小数。我们截断到 3 位以与 TypeScript 端 ms 精度对齐。
+    """
+    ts = event_dict.get("timestamp")
+    if isinstance(ts, str) and "." in ts:
+        # 形如 "2026-05-08T07:03:33.522226Z" 或 "2026-05-08T07:03:33.522226"
+        head, _, tail = ts.partition(".")
+        # 提取小数部分（保留 3 位）+ 时区/Z 后缀
+        digits = ""
+        suffix = ""
+        for i, ch in enumerate(tail):
+            if ch.isdigit():
+                digits += ch
+            else:
+                suffix = tail[i:]
+                break
+        truncated = digits[:3].ljust(3, "0")
+        event_dict["timestamp"] = f"{head}.{truncated}{suffix}"
+    return event_dict
+
+
+def _normalize_level_name(_logger, _method, event_dict):
+    """把 Python stdlib 的 ``warning`` 映射为协议规定的 ``warn``。"""
+    level = event_dict.get("level")
+    if level == "warning":
+        event_dict["level"] = "warn"
+    return event_dict
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 幂等保护
+# ──────────────────────────────────────────────────────────────────────────────
+_initialized: bool = False
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 共享预处理链
+#   文件 formatter、控制台 formatter、以及 structlog.configure 三处共用同一组处理器
+#   执行顺序：日志级别 → 记录器名称 → 时间戳 → trace_id → 调用栈 → 异常信息
+# ──────────────────────────────────────────────────────────────────────────────
+_PRE_CHAIN: list = [
+    structlog.stdlib.add_log_level,       # 注入 level 字段
+    _normalize_level_name,                # warning → warn（与 TS 对齐）
+    structlog.stdlib.add_logger_name,     # 注入 logger 字段
+    structlog.processors.TimeStamper(fmt="iso"),
+    _normalize_timestamp_precision,       # μs → ms（与 TS 对齐）
+    trace_context_processor,              # 自动注入四层 trace 上下文（来自 contextvar）
+    structlog.processors.StackInfoRenderer(),
+    structlog.processors.ExceptionRenderer(),   # 替代已废弃的 format_exc_info
+]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Formatter 工厂
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _make_json_formatter() -> ProcessorFormatter:
+    """JSON formatter —— 用于文件 handler，始终输出机器可读的 JSON 行。"""
+    return ProcessorFormatter(
+        foreign_pre_chain=_PRE_CHAIN,
+        processors=[
+            ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(),
+        ],
+    )
+
+
+def _make_console_formatter() -> ProcessorFormatter:
+    """
+    控制台 formatter —— 输出格式由 PRETTY_LOGS 环境变量决定：
+      PRETTY_LOGS=1   彩色可读格式（开发调试用）
+      默认            纯 JSON（生产 / Kernel 内核读取 stdout 解析用）
+    """
+    pretty = os.environ.get("PRETTY_LOGS", "").lower() in ("1", "true", "yes")
+    renderer = (
+        structlog.dev.ConsoleRenderer(colors=True)
+        if pretty
+        else structlog.processors.JSONRenderer()
+    )
+    return ProcessorFormatter(
+        foreign_pre_chain=_PRE_CHAIN,
+        processors=[
+            ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 未捕获异常 hook
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _install_excepthook() -> None:
+    """将所有未处理的同步异常写入日志系统，避免静默崩溃。"""
+    _crash_logger = logging.getLogger("glimmer_cradle.cognition.crash")
+
+    def _handler(
+        exc_type: type[BaseException],
+        exc_value: BaseException,
+        exc_tb: Any,
+    ) -> None:
+        # KeyboardInterrupt 保持默认行为（Ctrl-C 正常退出）
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        _crash_logger.critical(
+            "未捕获的全局异常，程序即将退出",
+            exc_info=(exc_type, exc_value, exc_tb),
+        )
+
+    sys.excepthook = _handler
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# stdlib logging 配置
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _resolve_log_dir() -> Path:
+    """解析日志目录，优先使用 Kernel 内核注入的 LOG_DIR 环境变量。"""
+    env_dir = os.environ.get("LOG_DIR")
+    if env_dir:
+        return ensure_dir(Path(env_dir))
+    return ensure_dir(resolve_global_log_dir())
+
+
+def _configure_std_logging() -> None:
+    """配置 stdlib 根日志器（幂等）。"""
+    global _initialized
+    if _initialized:
+        return
+    _initialized = True
+
+    log_dir = _resolve_log_dir()
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.handlers.clear()
+
+    # ── 控制台 handler（写入 stdout，被 Kernel 内核捕获）
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(_make_console_formatter())
+
+    root.addHandler(stream_handler)
+
+    # 默认仅通过 stdout 输出，由 Kernel 统一汇总进进程日志。
+    # 如需 Python 侧独立文件日志，可设置 PYTHON_FILE_LOGGING=1。
+    enable_file_logging = os.environ.get("PYTHON_FILE_LOGGING", "0").lower() in ("1", "true", "yes")
+    if enable_file_logging:
+        application_log_dir = ensure_dir(log_dir / "application")
+        main_handler = RotatingFileHandler(
+            filename=str(application_log_dir / "cognition.jsonl"),
+            maxBytes=10 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        main_handler.setLevel(level)
+        main_handler.setFormatter(_make_json_formatter())
+
+        error_handler = RotatingFileHandler(
+            filename=str(application_log_dir / "cognition.errors.jsonl"),
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        error_handler.setLevel(logging.WARNING)
+        error_handler.setFormatter(_make_json_formatter())
+
+        root.addHandler(main_handler)
+        root.addHandler(error_handler)
+
+    _install_excepthook()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# structlog 配置
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _configure_structlog() -> None:
+    """
+    将 structlog 与 stdlib logging 深度集成（ProcessorFormatter 模式）。
+    chain 末尾的 wrap_for_formatter 将事件字典交由各 handler 的 ProcessorFormatter 渲染，
+    从而实现文件与控制台各自独立的输出格式。
+    """
+    structlog.configure(
+        processors=[
+            *_PRE_CHAIN,
+            ProcessorFormatter.wrap_for_formatter,
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 模块加载时立即初始化
+# ──────────────────────────────────────────────────────────────────────────────
+_configure_std_logging()
+_configure_structlog()
+
+_root_logger = structlog.get_logger("glimmer_cradle.cognition")
+
+
+def get_logger(module_name: str) -> Any:
+    """返回绑定了 module 字段的结构化日志器。"""
+    return _root_logger.bind(module=module_name)
+
+
+class MetricKind(StrEnum):
+    """观测 adapter 接受的指标事件类型。"""
+
+    COUNTER = "counter"
+    GAUGE = "gauge"
+    HISTOGRAM = "histogram"
+
+metrics_logger = get_logger("metrics")
+
+_METRIC_LABEL_ALLOWLIST = {
+    "action",
+    "backend",
+    "capability_kind",
+    "emotion",
+    "error_code",
+    "error_kind",
+    "from",
+    "module",
+    "op",
+    "owner",
+    "phase",
+    "process_kind",
+    "provider",
+    "provider_id",
+    "provider_kind",
+    "purpose",
+    "reason",
+    "risk_level",
+    "scene_kind",
+    "source",
+    "state",
+    "status",
+    "target_kind",
+    "target_name",
+    "tier",
+    "tool_name",
+    "to",
+}
+
+
+def _metric_now_iso_ms() -> str:
+    """UTC 毫秒 ISO8601 时间戳。"""
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+@dataclass(frozen=True)
+class MetricEvent:
+    """一条 metric 事件。"""
+
+    ts: str
+    name: str
+    kind: str
+    value: float
+    labels: dict = field(default_factory=dict)
+    trace_id: str = ""
+    boot_id: str | None = None
+
+    def to_jsonl(self) -> str:
+        return json.dumps(asdict(self), ensure_ascii=False, default=str)
+
+
+class MetricsWriter:
+    """metrics 事件的 append-only JSONL 写入器。异步缓冲，后台批量落盘。"""
+
+    def __init__(
+        self,
+        metrics_dir: Path,
+        *,
+        proc: str = "python",
+        flush_interval_ms: int = 2000,
+        segment_max_bytes: int = 8 * 1024 * 1024,
+    ) -> None:
+        self._dir = metrics_dir
+        self._path = metrics_dir / f"{proc}.jsonl"
+        self._flush_interval = max(0.1, flush_interval_ms / 1000.0)
+        self._segment_max_bytes = segment_max_bytes
+        self._buffer: list[MetricEvent] = []
+        self._task: asyncio.Task | None = None
+        self._running = False
+        self._lock = asyncio.Lock()
+
+    async def start(self) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        self._running = True
+        self._task = asyncio.create_task(self._flush_loop())
+        metrics_logger.info("metrics 写入器已启动", path=str(self._path))
+
+    async def stop(self) -> None:
+        self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        await self.flush()
+        metrics_logger.info("metrics 写入器已停止")
+
+    def append(self, event: MetricEvent) -> None:
+        """入缓冲（廉价同步操作）。"""
+        self._buffer.append(event)
+
+    async def flush(self) -> None:
+        async with self._lock:
+            if not self._buffer:
+                return
+            pending, self._buffer = self._buffer, []
+        await asyncio.to_thread(self._write_batch, pending)
+
+    def _write_batch(self, pending: list[MetricEvent]) -> None:
+        self._maybe_rotate()
+        with open(self._path, "a", encoding="utf-8") as f:
+            for event in pending:
+                f.write(event.to_jsonl() + "\n")
+
+    def _maybe_rotate(self) -> None:
+        """文件超过阈值则改名归档，重新开新文件。"""
+        try:
+            if self._path.exists() and self._path.stat().st_size >= self._segment_max_bytes:
+                archived = self._path.with_name(f"{self._path.name}.{int(time.time())}")
+                self._path.rename(archived)
+        except OSError as exc:
+            metrics_logger.warning("metrics 文件轮转失败", error=str(exc))
+
+    async def _flush_loop(self) -> None:
+        while self._running:
+            try:
+                await asyncio.sleep(self._flush_interval)
+                await self.flush()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                metrics_logger.error("metrics flush 异常", error=str(exc), exc_info=True)
+
+
+# ── 模块级门面：全进程唯一写入器 ──────────────────────────────────────────────
+
+_metrics_writer: MetricsWriter | None = None
+
+
+async def start_metrics(metrics_dir: Path, *, proc: str = "cognition") -> None:
+    """启动 metrics 写入器（由 CognitionHost 启动序列调用）。"""
+    global _metrics_writer
+    if _metrics_writer is not None:
+        return
+    _metrics_writer = MetricsWriter(metrics_dir, proc=proc)
+    await _metrics_writer.start()
+
+
+async def stop_metrics() -> None:
+    """停止 metrics 写入器（落盘剩余缓冲）。"""
+    global _metrics_writer
+    if _metrics_writer is not None:
+        await _metrics_writer.stop()
+        _metrics_writer = None
+
+
+def metric(name: str, kind: MetricKind | str, value: float, labels: dict | None = None) -> None:
+    """记录一条 metric。未启动时为无操作 —— 自动带 boot/trace 上下文。"""
+    if _metrics_writer is None:
+        return
+    _metrics_writer.append(MetricEvent(
+        ts=_metric_now_iso_ms(),
+        name=name,
+        kind=kind.value if isinstance(kind, MetricKind) else str(kind),
+        value=float(value),
+        labels=sanitize_metric_labels(name, labels or {}),
+        trace_id=get_current_trace_id() or "",
+        boot_id=get_current_boot_id(),
+    ))
+
+
+def counter(name: str, value: float = 1, labels: dict | None = None) -> None:
+    """累加计数（调用次数、错误数等）。"""
+    metric(name, MetricKind.COUNTER, value, labels)
+
+
+def gauge(name: str, value: float, labels: dict | None = None) -> None:
+    """瞬时值（情绪强度、记忆条数等）。"""
+    metric(name, MetricKind.GAUGE, value, labels)
+
+
+def histogram(name: str, value: float, labels: dict | None = None) -> None:
+    """分布采样（延迟、耗时、token 数等）。"""
+    metric(name, MetricKind.HISTOGRAM, value, labels)
+
+
+def sanitize_metric_labels(name: str, labels: dict[str, str]) -> dict[str, str]:
+    sanitized: dict[str, str] = {}
+    for key, value in labels.items():
+        if key not in _METRIC_LABEL_ALLOWLIST:
+            metrics_logger.warning("metrics label 已丢弃（不在白名单）", metric_name=name, label_key=key)
+            continue
+        sanitized[key] = value
+    return sanitized
+
+
+tracer_logger = get_logger("tracer")
+
+
+def _span_now_iso_ms() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _new_span_id() -> str:
+    """生成新的 span_id（OTel 通常 16 hex chars；这里取 UUID 前 16）。"""
+    return uuid.uuid4().hex[:16]
+
+
+@dataclass(frozen=True)
+class SpanEvent:
+    """一个完成的 span —— 结构对齐 OTel Span（精简版）。"""
+
+    name: str
+    trace_id: str
+    span_id: str
+    parent_span_id: str | None
+    started_at: str            # ISO ms
+    ended_at: str              # ISO ms
+    duration_ms: float
+    status: str                # ok | error
+    attributes: dict = field(default_factory=dict)
+    error: str | None = None
+    boot_id: str | None = None
+
+    def to_jsonl(self) -> str:
+        return json.dumps(asdict(self), ensure_ascii=False, default=str)
+
+
+class SpanWriter:
+    """span 事件的 append-only JSONL 写入器（与 metrics 写入器同构）。"""
+
+    def __init__(
+        self,
+        traces_dir: Path,
+        *,
+        proc: str = "python",
+        flush_interval_ms: int = 2000,
+        segment_max_bytes: int = 8 * 1024 * 1024,
+    ) -> None:
+        self._dir = traces_dir
+        self._path = traces_dir / f"{proc}.jsonl"
+        self._flush_interval = max(0.1, flush_interval_ms / 1000.0)
+        self._segment_max_bytes = segment_max_bytes
+        self._buffer: list[SpanEvent] = []
+        self._task: asyncio.Task | None = None
+        self._running = False
+        self._lock = asyncio.Lock()
+
+    async def start(self) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        self._running = True
+        self._task = asyncio.create_task(self._flush_loop())
+        tracer_logger.info("span 写入器已启动", path=str(self._path))
+
+    async def stop(self) -> None:
+        self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        await self.flush()
+        tracer_logger.info("span 写入器已停止")
+
+    def append(self, event: SpanEvent) -> None:
+        self._buffer.append(event)
+
+    async def flush(self) -> None:
+        async with self._lock:
+            if not self._buffer:
+                return
+            pending, self._buffer = self._buffer, []
+        await asyncio.to_thread(self._write_batch, pending)
+
+    def _write_batch(self, pending: list[SpanEvent]) -> None:
+        self._maybe_rotate()
+        with open(self._path, "a", encoding="utf-8") as f:
+            for event in pending:
+                f.write(event.to_jsonl() + "\n")
+
+    def _maybe_rotate(self) -> None:
+        try:
+            if self._path.exists() and self._path.stat().st_size >= self._segment_max_bytes:
+                archived = self._path.with_name(f"{self._path.name}.{int(time.time())}")
+                self._path.rename(archived)
+        except OSError as exc:
+            tracer_logger.warning("span 文件轮转失败", error=str(exc))
+
+    async def _flush_loop(self) -> None:
+        while self._running:
+            try:
+                await asyncio.sleep(self._flush_interval)
+                await self.flush()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                tracer_logger.error("span flush 异常", error=str(exc), exc_info=True)
+
+
+# ── 模块级门面：全进程唯一写入器 ──────────────────────────────────────────────
+
+_span_writer: SpanWriter | None = None
+
+
+async def start_tracer(traces_dir: Path, *, proc: str = "cognition") -> None:
+    """启动 span 写入器（由 CognitionHost 启动序列调用）。"""
+    global _span_writer
+    if _span_writer is not None:
+        return
+    _span_writer = SpanWriter(traces_dir, proc=proc)
+    await _span_writer.start()
+
+
+async def stop_tracer() -> None:
+    """停止 span 写入器（落盘剩余缓冲）。"""
+    global _span_writer
+    if _span_writer is not None:
+        await _span_writer.stop()
+        _span_writer = None
+
+
+class span:
+    """``with`` 上下文管理器：开启一个 span。
+
+    用法::
+
+        with span("llm.generate", attributes={"model": "gpt-4"}) as s:
+            result = call_llm(...)
+            s.set_attribute("tokens", result.tokens)
+
+    - 父 span：当前 contextvar 中的 span_id（如有），否则为 None（根 span）。
+    - trace_id：当前 contextvar 中的 trace_id；缺失时合成一个新 trace 头。
+    - 异常路径：自动标记 status=error，并把异常类名写入 ``error`` 字段。
+    """
+
+    __slots__ = ("name", "_attrs", "_span_id", "_trace_id", "_parent", "_started_at",
+                 "_started_mono", "_span_token", "_trace_token", "_status", "_error")
+
+    def __init__(self, name: str, *, attributes: dict | None = None) -> None:
+        self.name = name
+        self._attrs: dict = dict(attributes or {})
+        self._span_id: str = _new_span_id()
+        self._trace_id: str = ""
+        self._parent: str | None = None
+        self._started_at: str = ""
+        self._started_mono: float = 0.0
+        self._span_token: Any = None
+        self._trace_token: Any = None
+        self._status: str = "ok"
+        self._error: str | None = None
+
+    @property
+    def span_id(self) -> str:
+        return self._span_id
+
+    @property
+    def trace_id(self) -> str:
+        return self._trace_id
+
+    def set_attribute(self, key: str, value: Any) -> None:
+        """在 span 完成前追加属性（OTel `setAttribute` 等价）。"""
+        self._attrs[key] = value
+
+    def set_status(self, status: str, error: str | None = None) -> None:
+        """显式标记 span 状态。"""
+        self._status = status
+        if error is not None:
+            self._error = error
+
+    def __enter__(self) -> "span":
+        # 父 span：当前 contextvar
+        self._parent = get_current_span_id()
+        # trace_id：当前 contextvar；无则新建（根 span 自带新 trace）
+        current_trace = get_current_trace_id()
+        if current_trace is None:
+            self._trace_id = new_trace_id()
+            self._trace_token = _trace_id_var.set(self._trace_id)
+        else:
+            self._trace_id = current_trace
+        self._span_token = _span_id_var.set(self._span_id)
+        self._started_at = _span_now_iso_ms()
+        self._started_mono = time.monotonic()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        duration_ms = (time.monotonic() - self._started_mono) * 1000.0
+        if exc_type is not None and self._status == "ok":
+            self._status = "error"
+            self._error = exc_type.__name__
+        ended_at = _span_now_iso_ms()
+        if _span_writer is not None:
+            _span_writer.append(SpanEvent(
+                name=self.name,
+                trace_id=self._trace_id,
+                span_id=self._span_id,
+                parent_span_id=self._parent,
+                started_at=self._started_at,
+                ended_at=ended_at,
+                duration_ms=duration_ms,
+                status=self._status,
+                attributes=self._attrs,
+                error=self._error,
+                boot_id=get_current_boot_id(),
+            ))
+        # 还原 contextvar（异常路径也保证还原）
+        if self._span_token is not None:
+            _span_id_var.reset(self._span_token)
+            self._span_token = None
+        if self._trace_token is not None:
+            _trace_id_var.reset(self._trace_token)
+            self._trace_token = None
+
+
+class with_remote_parent_span:
+    """IPC 入站用：把信封里携带的 trace_id + span_id 建为本协程的父上下文。
+
+    用法（在 ingress 处）::
+
+        with with_remote_parent_span(envelope.trace_id, envelope.span_id or None):
+            # 这里 `with span("...")` 开出来的 span 会自动挂到远端父 span 下
+            await handler(envelope)
+    """
+
+    __slots__ = ("_trace_id", "_parent_span_id", "_trace_token", "_span_token")
+
+    def __init__(self, trace_id: str, parent_span_id: str | None) -> None:
+        if not trace_id:
+            raise ValueError("trace_id 不能为空")
+        self._trace_id = trace_id
+        self._parent_span_id = parent_span_id
+        self._trace_token: Any = None
+        self._span_token: Any = None
+
+    def __enter__(self) -> "with_remote_parent_span":
+        self._trace_token = _trace_id_var.set(self._trace_id)
+        if self._parent_span_id:
+            self._span_token = _span_id_var.set(self._parent_span_id)
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._span_token is not None:
+            _span_id_var.reset(self._span_token)
+            self._span_token = None
+        if self._trace_token is not None:
+            _trace_id_var.reset(self._trace_token)
+            self._trace_token = None
+
+
+class FileObservability:
+    def logger(self, module_name: str):
+        return get_logger(module_name)
+
+    def counter(self, name: str, value: float = 1, labels: dict | None = None) -> None:
+        counter(name, value, labels)
+
+    def gauge(self, name: str, value: float, labels: dict | None = None) -> None:
+        gauge(name, value, labels)
+
+    def histogram(self, name: str, value: float, labels: dict | None = None) -> None:
+        histogram(name, value, labels)
+
+    def span(self, name: str, *, attributes: dict | None = None):
+        return span(name, attributes=attributes)
+
+    def trace_context(self, trace_id: str):
+        return TraceContext(trace_id)
+
+    def new_trace_id(self) -> str:
+        return new_trace_id()
+
+    def current_trace_id(self) -> str | None:
+        return get_current_trace_id()
+
 
 invocation_logger = get_logger("model_invocations")
 

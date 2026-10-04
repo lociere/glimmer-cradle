@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-from glimmer_cradle.cognition.adapters.observability import metrics
-from glimmer_cradle.cognition.adapters.observability import trace_context as tc
+import glimmer_cradle.cognition_worker.rpc_service as metrics
+import glimmer_cradle.cognition_worker.rpc_service as tc
 
 
 def test_metric_noop_when_not_started() -> None:

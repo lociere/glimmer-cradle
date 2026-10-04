@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from glimmer_cradle.cognition.adapters.observability import binding
-from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
+import glimmer_cradle.cognition_worker.rpc_service as binding
+from glimmer_cradle.cognition_worker.rpc_service import FileObservability
 from glimmer_cradle.cognition_worker.composition import (
     compose_cognition,
     map_character_runtime_document,

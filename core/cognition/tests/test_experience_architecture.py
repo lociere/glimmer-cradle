@@ -2,7 +2,7 @@ from pathlib import Path
 import sqlite3
 from dataclasses import replace
 
-from glimmer_cradle.cognition.adapters.observability import trace_context
+import glimmer_cradle.cognition_worker.rpc_service as trace_context
 from glimmer_cradle.cognition.adapters.persistence import EpisodeProjection
 from tests.conftest import build_experience_recorder
 from glimmer_cradle.conversation.log import MomentKind

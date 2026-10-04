@@ -21,10 +21,10 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 6,
+    "count": 1,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
-    "reason": "Worker RPC 已拥有 gRPC transport，仍读取待迁出的 Core observability concrete 与路径 helper；随 Worker 生命周期 adapter 归位清零。"
+    "reason": "Worker RPC 已拥有 gRPC transport 与 observability concrete，仅余待归位的 Core 路径 helper；随 Worker 路径装配归位清零。"
   },
   {
     "file": "core/avatar/scripts/avatar-package-catalog.mjs",

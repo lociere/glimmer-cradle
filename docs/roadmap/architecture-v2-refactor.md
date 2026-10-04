@@ -595,6 +595,12 @@ recorder 暂由 RPC 唯一进程 owner 注入。
 测试与生产入口共用 Worker owner；旧 Core
 `adapters/observability/model_invocations.py` consumer-zero 后物理删除。
 
+Worker 进程可观测性归位切片按 trace context、structured logger、metrics、tracer 与
+`FileObservability` 的依赖顺序整体迁入目标 `rpc_service.py`。生产与测试统一消费
+Worker owner，旧 Core `adapters/observability/{binding,logger,metrics,trace_context,tracer}.py`
+五个清单外文件物理删除。RPC deep-import 基线由 `6` 收紧为 `1`，剩余债务仅为
+路径 helper。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

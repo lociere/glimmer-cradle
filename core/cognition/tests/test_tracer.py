@@ -2,8 +2,8 @@
 import json
 from pathlib import Path
 
-from glimmer_cradle.cognition.adapters.observability import tracer
-from glimmer_cradle.cognition.adapters.observability import trace_context as tc
+import glimmer_cradle.cognition_worker.rpc_service as tracer
+import glimmer_cradle.cognition_worker.rpc_service as tc
 
 
 def _reset() -> None:
