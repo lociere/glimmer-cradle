@@ -590,6 +590,11 @@ invocation concrete 的直接依赖。Composition 按职责注入 `LoggerPort`�
 deep-import 基线由 `3` 收紧为 `1`，剩余一处仅为待归位的模型路径 helper；生产
 recorder 暂由 RPC 唯一进程 owner 注入。
 
+模型调用观测归位切片把 capture policy、脱敏、JSONL 索引、full bundle 与 trace timeline
+落盘实现迁入目标 Worker `rpc_service.py`。`LLMEngine` 只调用注入的 recorder callback，
+测试与生产入口共用 Worker owner；旧 Core
+`adapters/observability/model_invocations.py` consumer-zero 后物理删除。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
