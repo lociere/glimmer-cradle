@@ -554,6 +554,13 @@ Kernel 出站转发空壳清理切片让已拥有 gRPC channel、认证与 wire 
 `adapters/kernel/outbound_adapter.py`。Composition 和 RPC 生命周期统一持有同一 client，未改变端点注册、
 鉴权证明、幂等键、deadline 或跨进程契约。
 
+Kernel 入站应用编排归位切片把 Agent Plan/Synthesis 兼容用例与 `KernelRequestPort`
+实现收入 Worker `composition.py`，并由组装根注入 Observability，不再读取 Core 进程全局
+logger。Kernel request Port 与 DTO 经目标 `ports/__init__.py` 公开，消费方不再深导入嵌套
+port 文件。旧 `adapters/kernel/inbound_adapter.py` consumer-zero 后物理删除；Action RPC 仍是
+阶段 5 兼容窗口，待 native Loop producer/consumer 全部切换后再删除用例本身。Composition
+deep-import 基线由 `3` 收紧为 `2`。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -19,6 +19,20 @@ from glimmer_cradle.cognition.ports.job_port import (
     JobRequest,
     JobRequestStatus,
 )
+from glimmer_cradle.cognition.ports.kernel.inbound.kernel_request_port import (
+    KernelRequestPort,
+)
+from glimmer_cradle.cognition.ports.kernel.models import (
+    AgentPlanInput,
+    AgentPlanOutput,
+    AgentSynthesisInput,
+    AgentSynthesisOutput,
+    ConversationHistoryEntry,
+    ConversationHistoryQuery,
+    ConversationHistoryResult,
+    KnowledgeInitialization,
+    SkillToolSuggestion,
+)
 from glimmer_cradle.cognition.ports.resource_port import ResourcePort, ResourceSnapshot
 
 
@@ -72,6 +86,16 @@ __all__ = [
     "JobReceipt",
     "JobRequest",
     "JobRequestStatus",
+    "KernelRequestPort",
+    "AgentPlanInput",
+    "AgentPlanOutput",
+    "AgentSynthesisInput",
+    "AgentSynthesisOutput",
+    "ConversationHistoryEntry",
+    "ConversationHistoryQuery",
+    "ConversationHistoryResult",
+    "KnowledgeInitialization",
+    "SkillToolSuggestion",
     "IdGeneratorPort",
     "LoggerPort",
     "ObservabilityPort",
