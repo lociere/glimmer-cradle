@@ -164,7 +164,7 @@ class LoopController:
         self._emotion = emotion_system
         self._willingness_cfg = willingness_config or WillingnessConfig()
         self._default_interval_s: float = max(0.5, default_tick_interval_ms / 1000.0)
-        # Act 阶段出口：Callable[[dict], Awaitable] —— 一般 = outbound_adapter.
+        # Act 阶段出口：Callable[[dict], Awaitable]，由 Worker 注入 KernelEventPort。
         # send_action_command。None 时 Act 只记 metric 不推送（蓝图 §4.7 沉默默认）。
         self._action_emitter = ActionEmitter(
             sink=action_sink, emotion_system=emotion_system, observability=observability

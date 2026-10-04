@@ -100,7 +100,6 @@ from glimmer_cradle.cognition.adapters.observability.binding import FileObservab
 from glimmer_cradle.cognition.adapters.kernel import (
     CognitionGrpcHost,
     KernelEventInboundAdapter,
-    KernelEventOutboundAdapter,
     KernelGrpcClient,
 )
 
@@ -257,7 +256,6 @@ class CognitionComponents:
     character_session: CharacterSession
     kernel_client: KernelGrpcClient
     cognition_grpc_host: CognitionGrpcHost
-    outbound_adapter: KernelEventOutboundAdapter
     conversation_recorder: ConversationRecorder
     memory_substrate: MemoryController
     knowledge_base: KnowledgeIndex
@@ -387,7 +385,6 @@ def compose_cognition(
         conversation_controller=conversation_controller,
     )
     kernel_client = KernelGrpcClient(generation, registration_nonce, registration_secret)
-    outbound_adapter = KernelEventOutboundAdapter(kernel_client)
 
     perception_queue = ObservationQueue(max_size=100)
     perception_operations = PerceptionOperationRegistry()
@@ -462,7 +459,7 @@ def compose_cognition(
         activity_controller=activity_controller,
         emotion_system=character_session.emotion_system,
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
-        action_sink=outbound_adapter.send_action_command,
+        action_sink=kernel_client.send_action_command,
         reasoning=reasoning,
         planning_controller=planning_controller,
         checkpoint_store=checkpoint_store,
@@ -499,7 +496,6 @@ def compose_cognition(
         character_session=character_session,
         kernel_client=kernel_client,
         cognition_grpc_host=cognition_grpc_host,
-        outbound_adapter=outbound_adapter,
         conversation_recorder=conversation_recorder,
         memory_substrate=memory_substrate,
         knowledge_base=knowledge_base,

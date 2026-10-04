@@ -489,6 +489,22 @@ class KernelGrpcClient:
         resolved = trace_id or new_trace_id()
         return common_pb.CallMetadata(trace_id=resolved, correlation_id=resolved, generation=self.generation, idempotency_key=idempotency_key)
 
+    async def send_state_sync(self, state: dict[str, Any]) -> None:
+        """Implement KernelEventPort without a stateless forwarding adapter."""
+        await self.publish_state(state)
+
+    async def send_log(
+        self, level: str, message: str, extra: dict[str, Any] | None = None
+    ) -> None:
+        await self.publish_log(level, message, extra or {})
+
+    async def send_action_command(self, command: dict[str, Any]) -> None:
+        logger.debug(
+            "发送 ActionCommand 给 Kernel",
+            action_type=command.get("action_type"),
+        )
+        await self.publish_action(command)
+
     async def publish_state(self, state: dict[str, Any]) -> None:
         request = kernel_pb.PublishStateRequest(call=self._call_metadata())
         _parse_struct(state, request.state)

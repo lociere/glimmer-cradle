@@ -330,8 +330,7 @@ class CognitionHost:
         ):
             return
 
-        outbound_adapter = self.components.outbound_adapter
-        await outbound_adapter.send_state_sync(state)
+        await self.components.kernel_client.send_state_sync(state)
         self._last_state_sync_fingerprint = fingerprint
         self._last_state_sync_at = now
 

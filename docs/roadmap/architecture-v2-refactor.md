@@ -549,6 +549,11 @@ observability adapter 归位后清零，不建立 Core 兼容壳。
 `adapters/inference/multimodal.py` consumer-zero 并物理删除；音频只消费可信转写、视频显式降级与
 旧 URI-only 当拍兼容语义不变。composition deep-import 基线由 `4` 收紧为 `3`。
 
+Kernel 出站转发空壳清理切片让已拥有 gRPC channel、认证与 wire mapper 的 `KernelGrpcClient`
+直接实现 `KernelEventPort` 所需的 state/log/action 方法，删除只委托同一 client 的清单外
+`adapters/kernel/outbound_adapter.py`。Composition 和 RPC 生命周期统一持有同一 client，未改变端点注册、
+鉴权证明、幂等键、deadline 或跨进程契约。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
