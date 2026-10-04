@@ -51,6 +51,9 @@ from glimmer_cradle.cognition.adapters.paths import (
     resolve_traces_dir,
 )
 from glimmer_cradle.cognition.adapters.observability.metrics import start_metrics, stop_metrics
+from glimmer_cradle.cognition.adapters.observability.model_invocations import (
+    record_model_invocation,
+)
 from glimmer_cradle.cognition.adapters.observability.tracer import start_tracer, stop_tracer
 
 transport_logger = get_logger("kernel_cognition_grpc")
@@ -680,6 +683,7 @@ class CognitionHost:
                 self.config,
                 action_sink=self.kernel_client.send_action_command,
                 observability=FileObservability(),
+                model_invocation_recorder=record_model_invocation,
             )
             components = self._require_components()
             self.cognition_grpc_host = CognitionGrpcHost(

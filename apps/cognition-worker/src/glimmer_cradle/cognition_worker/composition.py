@@ -294,6 +294,7 @@ def compose_cognition(
     *,
     action_sink: Callable[[dict], Awaitable[None]],
     observability: ObservabilityPort,
+    model_invocation_recorder: Callable[..., None] | None = None,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     logger = observability.logger("cognition_composition")
@@ -314,7 +315,9 @@ def compose_cognition(
         ids=ids,
         observability=observability,
     )
-    cognition_database = SqliteMemoryStore()
+    cognition_database = SqliteMemoryStore(
+        logger=observability.logger("sqlite_memory_store")
+    )
     state_store = SqliteStateStore(resolve_cognition_state_db_path())
     planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
     knowledge_store = SqliteKnowledgeStore(resolve_cognition_knowledge_db_path())
@@ -364,16 +367,22 @@ def compose_cognition(
     )
     character_session.set_cognitive_activity_provider(activity_controller.get_state)
 
-    llm_engine = LLMEngine(config.inference.model, llm_config=config.llm)
+    llm_engine = LLMEngine(
+        config.inference.model,
+        llm_config=config.llm,
+        logger=observability.logger("llm_engine"),
+        invocation_recorder=model_invocation_recorder,
+    )
     multimodal_router = MultimodalRouter(
         inference_config=config.inference,
         asset_reader=FileAssetReader(
             resolve_state_dir() / "content" / "assets",
             resolve_work_dir() / "content" / "transient" / "assets",
         ),
+        logger=observability.logger("multimodal_router"),
     )
     multimodal_router.set_llm_engine(llm_engine)
-    embedding_engine = _build_embedding_engine(config, knowledge_base)
+    embedding_engine = _build_embedding_engine(config, knowledge_base, observability)
     memory_substrate.bind_vector_search(
         engine=embedding_engine,
         repository=vector_repository,
@@ -520,9 +529,14 @@ def compose_cognition(
 
 
 def _build_embedding_engine(
-    config: CharacterRuntimeSettings, knowledge_base: KnowledgeIndex
+    config: CharacterRuntimeSettings,
+    knowledge_base: KnowledgeIndex,
+    observability: ObservabilityPort,
 ) -> EmbeddingEngine:
-    engine = EmbeddingEngine(config.embedding)
+    engine = EmbeddingEngine(
+        config.embedding,
+        logger=observability.logger("embedding_engine"),
+    )
     knowledge_base.set_embedding_engine(engine)
     return engine
 

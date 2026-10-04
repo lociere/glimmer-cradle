@@ -12,7 +12,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 3,
+    "count": 1,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Worker model/embedding provider 已归位，仍临时消费待迁出的 Core observability concrete 与路径 helper；随 App adapter 接线清零。"
@@ -21,7 +21,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 6,
+    "count": 7,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Worker RPC 已拥有 gRPC transport，仍读取待迁出的 Core observability concrete 与路径 helper；随 Worker 生命周期 adapter 归位清零。"

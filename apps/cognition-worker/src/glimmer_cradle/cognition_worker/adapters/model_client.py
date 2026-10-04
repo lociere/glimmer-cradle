@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 import importlib.util
 import json
@@ -34,17 +34,20 @@ from glimmer_cradle.cognition.inference import (
     ModelSettings,
     InferenceResponse,
 )
-from glimmer_cradle.cognition.adapters.observability.logger import get_logger
-from glimmer_cradle.cognition.adapters.observability.model_invocations import record_model_invocation
 from glimmer_cradle.cognition.adapters.paths import resolve_cache_dir, resolve_models_dir
+from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
     inference_request_to_wire,
     model_event_from_wire,
 )
 
-# 初始化模块日志器
-logger = get_logger("llm_engine")
+class _NullLogger:
+    def debug(self, _event: str, **_values: object) -> None: pass
+    def info(self, _event: str, **_values: object) -> None: pass
+    def warning(self, _event: str, **_values: object) -> None: pass
+    def error(self, _event: str, **_values: object) -> None: pass
+    def critical(self, _event: str, **_values: object) -> None: pass
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -90,7 +93,6 @@ class EmbeddingSettings(_EmbeddingSettings):
 
 
 EmbeddingTextType = Literal["query", "document"]
-embedding_logger = get_logger("embedding_engine")
 
 
 class EmbeddingProvider(Protocol):
@@ -107,10 +109,13 @@ class EmbeddingProvider(Protocol):
 class EmbeddingEngine:
     """把选定 provider 投影为 Cognition 使用的稳定向量 Port。"""
 
-    def __init__(self, config: EmbeddingSettings | None = None) -> None:
+    def __init__(
+        self, config: EmbeddingSettings | None = None, *, logger: LoggerPort | None = None
+    ) -> None:
+        self._logger = logger or _NullLogger()
         self._provider: EmbeddingProvider | None = None
         if config is None or not config.enabled:
-            embedding_logger.info("语义向量增强未启用，基础召回保持就绪")
+            self._logger.info("语义向量增强未启用，基础召回保持就绪")
             return
         provider_id = str(config.route.provider)
         if provider_id == "dashscope-text-embedding":
@@ -125,13 +130,13 @@ class EmbeddingEngine:
         else:
             raise ValueError(f"未知 Embedding provider: {provider_id}")
         if self._provider.is_configured():
-            embedding_logger.info(
+            self._logger.info(
                 "语义向量增强已配置",
                 provider_id=self._provider.provider_id,
                 model_id=self._provider.model_id,
             )
         else:
-            embedding_logger.warning(
+            self._logger.warning(
                 "语义向量增强已启用但 provider 配置不完整",
                 provider_id=self._provider.provider_id,
             )
@@ -500,10 +505,19 @@ class LLMEngine:
     LLM推理引擎，纯算力调用。
     支持多 provider 路由：通过 provider_key 选择 LLMSettings.providers 中的配置。
     """
-    def __init__(self, model_config: ModelSettings, llm_config: Optional[LLMSettings] = None):
+    def __init__(
+        self,
+        model_config: ModelSettings,
+        llm_config: Optional[LLMSettings] = None,
+        *,
+        logger: LoggerPort | None = None,
+        invocation_recorder: Callable[..., None] | None = None,
+    ):
         self.config = model_config
         self.llm_config = llm_config
-        logger.info(
+        self._logger = logger or _NullLogger()
+        self._record_model_invocation = invocation_recorder
+        self._logger.info(
             "LLM引擎初始化完成",
             llm_config=_summarize_llm_config(self.llm_config),
         )
@@ -553,7 +567,7 @@ class LLMEngine:
         if not provider_key:
             resolved = _first_model(self.llm_config.models)
             if not resolved:
-                logger.warning("根配置 models 为空，无法解析默认模型")
+                self._logger.warning("根配置 models 为空，无法解析默认模型")
             return _build(self.llm_config, resolved)
 
         # ── 解析复合格式 "provider/model_alias" ─────────────────
@@ -760,7 +774,7 @@ class LLMEngine:
             raw_response = api_result.response_data
             provider_id = api_result.provider_id
             model_id = api_result.model_id
-            logger.debug(
+            self._logger.debug(
                 "LLM API 生成完成",
                 provider=provider_id,
                 reply_length=len(reply),
@@ -776,7 +790,8 @@ class LLMEngine:
             raise InferenceException(f"LLM生成失败: {str(e)}") from e
         finally:
             try:
-                record_model_invocation(
+                if self._record_model_invocation is not None:
+                    self._record_model_invocation(
                     invocation_id=invocation_id,
                     purpose=purpose,
                     capture_category=capture_category,
@@ -795,10 +810,7 @@ class LLMEngine:
                     trace_id=trace_id,
                 )
             except Exception as capture_error:
-                logger.warning("模型调用观测记录写入失败", error=str(capture_error))
-
-
-multimodal_logger = get_logger("multimodal_router")
+                self._logger.warning("模型调用观测记录写入失败", error=str(capture_error))
 
 
 class ContentAssetReader(Protocol):
@@ -911,10 +923,13 @@ class MultimodalRouter:
         self,
         inference_config: InferenceSettings,
         asset_reader: ContentAssetReader | None = None,
+        *,
+        logger: LoggerPort | None = None,
     ) -> None:
         self._config = inference_config
         self._llm_engine: ModelPort | None = None   # 由 Composition Root 在组装期注入。
         self._assets = asset_reader
+        self._logger = logger or _NullLogger()
 
     def set_llm_engine(self, llm_engine: ModelPort) -> None:
         """注入 LLMEngine 实例（避免构造时循环依赖）。"""
@@ -974,7 +989,7 @@ class MultimodalRouter:
                     else:
                         self._assets.verify(ref)
                 except (OSError, ValueError, TypeError) as exc:
-                    multimodal_logger.warning("资产读取降级", asset_id=ref.get("asset_id"), error=str(exc))
+                    self._logger.warning("资产读取降级", asset_id=ref.get("asset_id"), error=str(exc))
                 if kind == "file":
                     file_descriptions.append(
                         f"[文件] {semantic.get('text') or '用户提供了文件，但当前没有文件理解能力'}"
@@ -1064,7 +1079,7 @@ class MultimodalRouter:
             video_provider=mm_config.video_model,
         )
 
-        multimodal_logger.debug(
+        self._logger.debug(
             "多模态路由完成(specialist_then_core)",
             image_count=len(image_items),
             video_count=len(video_items),
@@ -1104,7 +1119,7 @@ class MultimodalRouter:
         API 调用失败时只保留已有可信语义或明确的能力不可用状态，不伪造媒体内容。
         """
         if self._llm_engine is None:
-            multimodal_logger.warning("LLMEngine 未注入，多模态专家只保留已有语义")
+            self._logger.warning("LLMEngine 未注入，多模态专家只保留已有语义")
             return self._fallback_description(image_items, video_items)
 
         desc_parts: list[str] = []
@@ -1117,7 +1132,7 @@ class MultimodalRouter:
             # semantic.resolved=true 时，说明 Cortex 已给出可直接消费结果，跳过视觉 API
             if semantic_text and semantic_resolved:
                 desc_parts.append(f"[{label}{idx}] {semantic_text}")
-                multimodal_logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
+                self._logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
                 continue
             if not img.uri:
                 desc_parts.append(f"[{label}{idx}] {semantic_text or '用户发送了图片，但视觉能力当前不可用'}")
@@ -1134,14 +1149,14 @@ class MultimodalRouter:
                 ])
                 description = self._llm_engine.generate(req, provider_key=image_provider)
                 desc_parts.append(f"[{label}{idx}] {description.strip()}")
-                multimodal_logger.debug(
+                self._logger.debug(
                     "视觉专家模型描述完成",
                     index=idx, kind=kind, provider=image_provider,
                 )
             except Exception as e:
                 fallback = semantic_text or f"用户发送了{label}，但视觉能力当前不可用"
                 desc_parts.append(f"[{label}{idx}] {fallback}")
-                multimodal_logger.warning("专家视觉调用失败", index=idx, error=str(e))
+                self._logger.warning("专家视觉调用失败", index=idx, error=str(e))
 
         for idx, vid in enumerate(video_items, 1):
             semantic_text = vid.semantic.text.strip() if vid.semantic and vid.semantic.text else ""
@@ -1149,7 +1164,7 @@ class MultimodalRouter:
             # semantic.resolved=true 时，说明 Cortex 已给出可直接消费结果，跳过视觉 API
             if semantic_text and semantic_resolved:
                 desc_parts.append(f"[视频{idx}] {semantic_text}")
-                multimodal_logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
+                self._logger.debug("跳过视觉专家，使用 Cortex 预解析描述", index=idx, semantic_text=semantic_text)
                 continue
             # 当前 provider 仅有 image_url 输入契约，视频按能力降级。
             desc_parts.append(f"[视频{idx}] {semantic_text or '用户发送了视频，但视觉能力当前不可用'}")

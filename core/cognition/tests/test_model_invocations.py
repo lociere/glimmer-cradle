@@ -4,6 +4,9 @@ from pathlib import Path
 import pytest
 
 import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
+from glimmer_cradle.cognition.adapters.observability.model_invocations import (
+    record_model_invocation,
+)
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     LLMApiResult,
     LLMEngine,
@@ -43,7 +46,6 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, capture_mo
     }))
     monkeypatch.setenv("GLIMMER_CRADLE_OBSERVABILITY_DIR", str(tmp_path))
     fake_logger = _LoggerCapture()
-    monkeypatch.setattr(llm_module, "logger", fake_logger)
     return LLMEngine(
         ModelConfig(),
         LLMSettings(
@@ -52,6 +54,8 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, capture_mo
             base_url="https://example.com",
             models={"chat": "test-model"},
         ),
+        logger=fake_logger,
+        invocation_recorder=record_model_invocation,
     )
 
 
@@ -93,7 +97,7 @@ def test_model_invocation_summary_mode_records_hash_not_prompt(monkeypatch: pyte
     assert row["prompt_text_ref"] is None
     assert row["provider_payload_ref"] is None
     assert "secret prompt" not in json.dumps(row, ensure_ascii=False)
-    assert all("secret prompt" not in message for message in llm_module.logger.messages)
+    assert all("secret prompt" not in message for message in engine._logger.messages)
 
 
 def test_model_invocation_full_mode_writes_captures_and_redacts_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

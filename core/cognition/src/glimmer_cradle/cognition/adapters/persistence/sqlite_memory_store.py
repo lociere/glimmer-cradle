@@ -13,8 +13,8 @@ import uuid
 import aiosqlite
 import numpy as np
 
-from glimmer_cradle.cognition.adapters.observability.logger import get_logger
 from glimmer_cradle.cognition.adapters.paths import resolve_cognition_db_path, resolve_repo_root
+from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.cognition.memory import (
     ConsolidationJob,
     Episode,
@@ -22,7 +22,6 @@ from glimmer_cradle.cognition.memory import (
 )
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
-logger = get_logger("sqlite_memory_store")
 SCHEMA_VERSION = 3
 _VECTOR_DTYPE = np.float32
 
@@ -51,12 +50,14 @@ class SqliteMemoryStore:
         db_path: Path | None = None,
         *,
         migration_path: Path | None = None,
+        logger: LoggerPort | None = None,
     ) -> None:
         self._db_path = db_path or resolve_cognition_db_path()
         self._migration_path = migration_path or (
             resolve_repo_root() / "core" / "cognition" / "migrations" / "002-memory.sql"
         )
         self._conn: aiosqlite.Connection | None = None
+        self._logger = logger
 
     async def connect(self) -> None:
         if self._conn is not None:
@@ -85,11 +86,12 @@ class SqliteMemoryStore:
                 await connection.close()
                 raise RuntimeError("检测到非当前记忆架构数据库；须先执行受控数据迁移")
         self._conn = connection
-        logger.info(
-            "记忆事实库已就绪",
-            db_path=str(self._db_path),
-            schema_version=SCHEMA_VERSION,
-        )
+        if self._logger is not None:
+            self._logger.info(
+                "记忆事实库已就绪",
+                db_path=str(self._db_path),
+                schema_version=SCHEMA_VERSION,
+            )
 
     async def close(self) -> None:
         connection, self._conn = self._conn, None

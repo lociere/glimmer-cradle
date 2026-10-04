@@ -584,6 +584,12 @@ Worker 可观测性装配倒置切片让 `compose_cognition()` 显式接收 `Obs
 创建点，测试也显式注入；composition deep-import 基线由 `2` 收紧为 `1`。该调整
 为后续将 logger/metrics/tracer/trace-context concrete 整体归入 Worker 生命周期建立单一边界。
 
+Worker adapter 可观测性注入切片移除 model client 与 Memory SQLite store 对 Core logger/model
+invocation concrete 的直接依赖。Composition 按职责注入 `LoggerPort`，并把模型调用记录器
+作为 callback 传入 `LLMEngine`；未装配记录器时不写伪造观测数据。Model client
+deep-import 基线由 `3` 收紧为 `1`，剩余一处仅为待归位的模型路径 helper；生产
+recorder 暂由 RPC 唯一进程 owner 注入。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
