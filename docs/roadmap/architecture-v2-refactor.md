@@ -574,6 +574,11 @@ Kernel 消费方 Port 公共面收束切片把 Agent/Knowledge/Conversation requ
 outbound/kernel_event_port.py}` 三个清单外文件 consumer-zero 后物理删除，不保留嵌套
 namespace 或兼容导出。
 
+Telemetry 重导出门面清理切片确认 `adapters/observability/telemetry.py` 没有生产消费者，
+只重复暴露 logger/metrics/tracer/trace-context API，且不在 v2.1 物理清单。该门面与只验证重导出的
+`test_telemetry_facade.py` 一并物理删除；metrics、tracer 与 trace context 的行为测试仍保留，
+不改变生产可观测性链路。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
