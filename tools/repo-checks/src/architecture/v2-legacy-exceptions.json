@@ -3,7 +3,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 2,
+    "count": 1,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Cognition Worker composition 暂时装配迁移中的 Core concrete；随目标 adapters 迁入 App 和 Core public API 收束逐项清零。"
@@ -21,7 +21,7 @@
     "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
     "rule": "deep-import",
     "detail": "glimmer_cradle.cognition.*",
-    "count": 5,
+    "count": 6,
     "owner": "architecture-v2-refactor",
     "removeBy": "phase-12",
     "reason": "Worker RPC 已拥有 gRPC transport，仍读取待迁出的 Core observability concrete 与路径 helper；随 Worker 生命周期 adapter 归位清零。"

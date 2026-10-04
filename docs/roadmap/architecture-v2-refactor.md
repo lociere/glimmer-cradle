@@ -579,6 +579,11 @@ Telemetry 重导出门面清理切片确认 `adapters/observability/telemetry.py
 `test_telemetry_facade.py` 一并物理删除；metrics、tracer 与 trace context 的行为测试仍保留，
 不改变生产可观测性链路。
 
+Worker 可观测性装配倒置切片让 `compose_cognition()` 显式接收 `ObservabilityPort`，
+不再在组装函数内创建文件型 concrete。RPC 进程入口成为 `FileObservability` 的唯一生产
+创建点，测试也显式注入；composition deep-import 基线由 `2` 收紧为 `1`。该调整
+为后续将 logger/metrics/tracer/trace-context concrete 整体归入 Worker 生命周期建立单一边界。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

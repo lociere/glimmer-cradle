@@ -118,7 +118,6 @@ from glimmer_cradle.cognition.persona import (
     PersonaCompiler,
     SafetySettings,
 )
-from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
 
 
 class ConfigException(ValueError):
@@ -294,9 +293,9 @@ def compose_cognition(
     config: CharacterRuntimeSettings,
     *,
     action_sink: Callable[[dict], Awaitable[None]],
+    observability: ObservabilityPort,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
-    observability = FileObservability()
     logger = observability.logger("cognition_composition")
     logger.info("Cognition Composition 开始组装")
     memory_config = config.memory

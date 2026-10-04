@@ -39,6 +39,7 @@ from glimmer_cradle.cognition.ports import (
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition.adapters.observability.logger import get_logger
+from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
 from glimmer_cradle.cognition.adapters.observability.trace_context import (
     TraceContext,
     new_boot_id,
@@ -678,6 +679,7 @@ class CognitionHost:
             self.components = compose_cognition(
                 self.config,
                 action_sink=self.kernel_client.send_action_command,
+                observability=FileObservability(),
             )
             components = self._require_components()
             self.cognition_grpc_host = CognitionGrpcHost(

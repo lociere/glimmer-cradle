@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from glimmer_cradle.cognition.adapters.observability import binding
+from glimmer_cradle.cognition.adapters.observability.binding import FileObservability
 from glimmer_cradle.cognition_worker.composition import (
     compose_cognition,
     map_character_runtime_document,
@@ -23,6 +24,7 @@ def test_production_composition_injects_reachable_logger_sink(monkeypatch, tmp_p
     components = compose_cognition(
         map_character_runtime_document(normalized_document()),
         action_sink=lambda _command: shutdown(),
+        observability=FileObservability(),
     )
     components.cycle_controller.logger.info("production-sink-probe", marker="reachable")
 
