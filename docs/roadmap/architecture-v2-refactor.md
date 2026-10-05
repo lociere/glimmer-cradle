@@ -634,6 +634,10 @@ Loop Provider 契约测试归位切片把五类 Sense provider 的继承、名�
 抽象基类失败闭合并入目标 `test_loop_native_tools.py`，删除清单外
 `test_provider_contracts.py`，不再把已归位 provider 描述成 stub。
 
+Inference 路由测试归位切片把禁止推理、local-only、cloud 优先、本地降级、双后端失败与公开默认值
+并入目标 `test_realtime_cancellation.py`，删除清单外 `test_reasoning_service.py`。实时 session 与
+请求级后端策略由同一 Inference owner 验证，未引入 provider concrete。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
