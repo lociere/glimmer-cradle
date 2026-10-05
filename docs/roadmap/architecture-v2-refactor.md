@@ -646,6 +646,10 @@ Memory 向量持久测试归位切片把 BLOB roundtrip、模型隔离、覆盖�
 `test_memory_correction.py`，删除清单外 `test_vector_repo.py`。可重建向量仍由 Memory store
 事务边界管理，模型切换不会误读旧模型向量。
 
+Content/Multimodal adapter 测试归位切片把资产跨重启摘要校验、四类 Content 路由、损坏降级与
+旧 URI-only 媒体兼容并入 Worker 目标 `test_rpc_roundtrip.py`，删除 Cognition Core 下清单外
+`test_content_asset.py`。平台文件 IO 与历史 wire 兼容由 Worker edge 验证。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
