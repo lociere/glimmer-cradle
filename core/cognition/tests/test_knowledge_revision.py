@@ -4,6 +4,42 @@ from pathlib import Path
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import (
     SqliteKnowledgeStore,
 )
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+from tests.conftest import OBSERVABILITY
+
+
+def _fresh_knowledge_index() -> KnowledgeIndex:
+    return KnowledgeIndex(observability=OBSERVABILITY)
+
+
+async def test_knowledge_index_loads_enabled_entries_by_priority(
+    tmp_path: Path,
+) -> None:
+    store = SqliteKnowledgeStore(tmp_path / "knowledge.sqlite")
+    await store.connect()
+    await store.replace_config_entries([
+        {"entry_id": "k1", "content": "月见的世界观", "priority": 5, "enabled": True},
+        {"entry_id": "k2", "content": "用户的生日", "priority": 1, "enabled": True},
+    ])
+    knowledge = _fresh_knowledge_index()
+    knowledge.bind_repository(store)
+    await knowledge.load_persisted()
+
+    entries = await knowledge.get_knowledge()
+    assert [entry.entry_id for entry in entries] == ["k1", "k2"]
+    assert {entry.content for entry in entries} == {"月见的世界观", "用户的生日"}
+    await store.close()
+
+
+async def test_knowledge_index_loads_empty_store(tmp_path: Path) -> None:
+    store = SqliteKnowledgeStore(tmp_path / "knowledge.sqlite")
+    await store.connect()
+    knowledge = _fresh_knowledge_index()
+    knowledge.bind_repository(store)
+    await knowledge.load_persisted()
+
+    assert knowledge.get_all_entries() == []
+    await store.close()
 
 
 async def test_legacy_memory_knowledge_is_imported_once(tmp_path: Path) -> None:

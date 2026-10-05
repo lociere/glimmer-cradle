@@ -638,6 +638,10 @@ Inference 路由测试归位切片把禁止推理、local-only、cloud 优先、
 并入目标 `test_realtime_cancellation.py`，删除清单外 `test_reasoning_service.py`。实时 session 与
 请求级后端策略由同一 Inference owner 验证，未引入 provider concrete。
 
+Knowledge 持久加载测试归位切片把空库与按优先级加载已启用条目的断言并入目标
+`test_knowledge_revision.py`，删除清单外 `test_knowledge_base_persist.py`。KnowledgeIndex 仍通过
+独立 store 绑定，不把 Memory 旧库恢复入口重新提升为常态 owner。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
