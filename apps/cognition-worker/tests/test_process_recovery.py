@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from glimmer_cradle.cognition_worker import rpc_service as process
 
 
@@ -23,3 +26,96 @@ def test_main_returns_failure_for_invalid_config(monkeypatch) -> None:
             "not-json",
         ]
     ) == 1
+
+
+def _reset_trace_state() -> None:
+    process._boot_id = None
+    process._synthetic_counters.clear()
+    process._boot_synthetic_counter = 0
+    process._span_id_var.set(None)
+    process._trace_id_var.set(None)
+
+
+def test_trace_processor_injects_boot_trace_and_span_without_session_terms() -> None:
+    _reset_trace_state()
+    process.set_boot_id("boot-1")
+    process.set_current_span_id("span-1")
+    with process.TraceContext("trace-1"):
+        event = process.trace_context_processor(None, "info", {"event": "hi"})
+    assert event["boot_id"] == "boot-1"
+    assert event["trace_id"] == "trace-1"
+    assert event["span_id"] == "span-1"
+    assert "epoch_id" not in event and "session_id" not in event
+
+
+def test_trace_processor_synthesizes_stable_process_scoped_ids() -> None:
+    _reset_trace_state()
+    process.set_boot_id("bootABC")
+    first = process.trace_context_processor(
+        None, "info", {"event": "x", "module": "app-root"}
+    )
+    second = process.trace_context_processor(
+        None, "info", {"event": "y", "module": "memory"}
+    )
+    assert (first["trace_id"], second["trace_id"]) == (
+        "run-bootABC-1", "run-bootABC-2"
+    )
+
+    _reset_trace_state()
+    synthetic = process.trace_context_processor(
+        None, "info", {"event": "x", "module": "app-root"}
+    )
+    assert synthetic["trace_id"] == "synthetic-app-root-1"
+
+
+def test_trace_processor_preserves_explicit_trace_and_omits_absent_span() -> None:
+    _reset_trace_state()
+    process.set_boot_id("boot")
+    with process.TraceContext("context"):
+        event = process.trace_context_processor(
+            None, "info", {"event": "x", "trace_id": "explicit"}
+        )
+    assert event["trace_id"] == "explicit"
+    assert "span_id" not in event
+
+
+async def test_metrics_write_jsonl_with_trace_and_sanitized_labels(
+    tmp_path: Path,
+) -> None:
+    _reset_trace_state()
+    process.set_boot_id("boot-m")
+    await process.start_metrics(tmp_path, proc="test")
+    try:
+        with process.TraceContext("trace-m"):
+            process.counter("calls", 1)
+            process.gauge(
+                "emotion.intensity", 0.7, labels={"emotion": "happy"}
+            )
+            process.histogram("chat.duration_ms", 123.4)
+        await process.stop_metrics()
+    finally:
+        await process.stop_metrics()
+        process._boot_id = None
+
+    lines = [
+        json.loads(line)
+        for line in (tmp_path / "test.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    by_name = {line["name"]: line for line in lines}
+    assert by_name["calls"]["kind"] == "counter"
+    assert by_name["emotion.intensity"]["labels"] == {"emotion": "happy"}
+    assert by_name["chat.duration_ms"]["value"] == 123.4
+    assert all(line["trace_id"] == "trace-m" for line in lines)
+    assert all(line["boot_id"] == "boot-m" for line in lines)
+
+    assert process.sanitize_metric_labels("reasoning.request", {
+        "tier": "cloud_allowed",
+        "trace_id": "trace-1",
+        "prompt_hash": "hash-1",
+    }) == {"tier": "cloud_allowed"}
+
+
+def test_metrics_are_noop_before_start() -> None:
+    process.gauge("never.started", 1.0)
+    process.counter("never.started.count")

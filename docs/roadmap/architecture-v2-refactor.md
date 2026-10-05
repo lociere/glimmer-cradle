@@ -658,6 +658,10 @@ Worker Agent Plan 兼容测试归位切片把 Kernel skill/tool identity、参�
 并入目标 `test_rpc_roundtrip.py`，并在 Worker `conftest.py` 建立确定性 ID 与空观测测试 adapter。
 清单外 Cognition `test_agent_plan_use_case.py` 删除；兼容用例仍等待 native Loop 全链切换后的删除门。
 
+Worker trace/metrics 测试归位切片把 boot/trace/span 三层注入、合成 trace、显式 trace 保持、JSONL
+落盘、trace 关联与高基数 label 清理并入目标 `test_process_recovery.py`。两个 Cognition 下清单外
+可观测性测试删除，未启动 metrics 仍保持安全 no-op。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
