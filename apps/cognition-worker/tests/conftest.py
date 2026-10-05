@@ -1,8 +1,12 @@
+import asyncio
 import json
+import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from glimmer_cradle.conversation import build_conversation_recorder as build_recorder
 
 
 class DeterministicIds:
@@ -15,6 +19,23 @@ class DeterministicIds:
 
     def stable(self, namespace: str, value: str) -> str:
         return f"{namespace}:{value}"
+
+
+class FixedClock:
+    def __init__(self) -> None:
+        self.value = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+    def now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def now_iso(self) -> str:
+        return self.now().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+    def monotonic(self) -> float:
+        return time.monotonic()
+
+    async def wait(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
 
 
 class _NullLogger:
@@ -47,6 +68,16 @@ class NullObservability:
 
     def current_trace_id(self) -> str | None:
         return None
+
+
+def build_test_recorder(base_dir, **kwargs):
+    return build_recorder(
+        base_dir,
+        clock=FixedClock(),
+        ids=DeterministicIds(),
+        observability=NullObservability(),
+        **kwargs,
+    )
 
 
 @pytest.fixture

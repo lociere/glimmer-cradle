@@ -678,6 +678,11 @@ Cognitive Activity 测试归位切片把状态转换表、最短驻留、affect 
 持久恢复与 Conversation 事实投影断言并入目标 `test_state_decay.py`，删除清单外
 `test_cognitive_activity.py`。活动状态转换本身仍不得伪造 Conversation Moment。
 
+Worker Agent Synthesis 兼容测试归位切片把 Persona prompt、外部错误诚实表达、ToolCall →
+ToolResult → Reply 因果顺序、来源元数据、Turn 完成与幂等 replay 并入目标
+`test_rpc_roundtrip.py`。Worker `conftest.py` 补齐确定性时钟和 Conversation recorder adapter，
+清单外 Cognition `test_agent_synthesis_use_case.py` 删除。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
