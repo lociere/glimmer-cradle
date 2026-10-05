@@ -26,7 +26,14 @@ from glimmer_cradle.cognition_worker.adapters import (
     ModelClient,
     FileAssetReader,
 )
-from glimmer_cradle.cognition_worker.adapters.model_client import MultimodalRouter
+from glimmer_cradle.cognition_worker.adapters.model_client import (
+    InferenceException,
+    LLMEngine,
+    LLMSettings,
+    ModelMessage,
+    ModelRequest,
+    MultimodalRouter,
+)
 from glimmer_cradle.cognition_worker.composition import AgentPlanUseCase
 from conftest import DeterministicIds, NullObservability
 
@@ -229,3 +236,88 @@ async def test_agent_plan_preserves_kernel_skill_identity() -> None:
     prompt = llm.requests[0].messages[1].content
     assert "skill_id=core.settings" in prompt
     assert "tool_name=read" in prompt
+
+
+def _model_settings() -> ModelSettings:
+    return ModelSettings(
+        max_tokens=1024, temperature=0.8, top_p=0.9, frequency_penalty=0.0
+    )
+
+
+def test_llm_provider_resolution_uses_models_contract() -> None:
+    engine = LLMEngine(_model_settings(), LLMSettings(
+        api_type="deepseek",
+        api_key="test-key",
+        base_url="https://api.deepseek.com",
+        models={"chat": "deepseek-chat"},
+        providers={
+            "qwen": {
+                "api_type": "openai",
+                "api_key": "provider-key",
+                "base_url": "https://dashscope.aliyuncs.com",
+                "models": {"vision": "qwen-vl-plus", "chat": "qwen-plus"},
+            }
+        },
+    ))
+
+    root = engine._resolve_provider_config(None)
+    vision = engine._resolve_provider_config("qwen/vision")
+    assert root is not None and root.models == {"default": "deepseek-chat"}
+    assert not hasattr(root, "model")
+    assert vision is not None and vision.models == {"default": "qwen-vl-plus"}
+    assert vision.api_key == "provider-key"
+
+
+def test_llm_gateway_fails_closed_without_or_for_unknown_provider() -> None:
+    with pytest.raises(InferenceException, match="真实 LLM provider"):
+        LLMEngine(_model_settings(), None).generate(ModelRequest(
+            messages=[ModelMessage(role="user", content="你好")]
+        ))
+
+    configured = LLMEngine(_model_settings(), LLMSettings(
+        api_type="openai", api_key="test-key", models={"chat": "test-model"}
+    ))
+    with pytest.raises(InferenceException, match="未知 LLM provider"):
+        configured.generate(
+            ModelRequest(messages=[ModelMessage(role="user", content="你好")]),
+            provider_key="missing/chat",
+        )
+
+
+def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() -> None:
+    settings = InferenceSettings(
+        model=_model_settings(),
+        life_clock=LifeClockSettings(
+            heartbeat_enabled=False, heartbeat_interval_ms=45000,
+            focus_duration_ms=20000, ingress_debounce_ms=1400,
+            ingress_focused_debounce_ms=700, ingress_max_batch_messages=4,
+            ingress_max_batch_items=24, summon_keywords=[], focus_on_any_chat=False,
+        ),
+        multimodal=MultimodalSettings(
+            enabled=True, strategy="core_direct", max_items=6,
+            core_model="vision", image_model="", video_model="",
+        ),
+    )
+    router = MultimodalRouter(settings)
+    text = router.route({"text": "你好", "modality": ["text"], "items": None})
+    assert text.primary_text == "你好" and text.vision_messages == []
+
+    route = router.route({"text": "听一下", "items": [
+        {"modality": "audio", "uri": "https://example.test/new.wav", "mime_type": "audio/wav"},
+        {"modality": "video", "uri": "https://example.test/old.wav", "mime_type": "audio/wav"},
+        {"modality": "audio", "semantic": {"text": "你好", "resolved": True}},
+    ]})
+    assert route.vision_messages == []
+    assert len(route.audio_items) == 3
+    assert route.semantic_text.count("当前没有可用的转写文本") == 2
+    assert "[语音3] 你好" in route.semantic_text
+    assert "new.wav" not in route.semantic_text and "old.wav" not in route.semantic_text
+
+    disabled = settings.model_copy(update={
+        "multimodal": settings.multimodal.model_copy(update={"enabled": False})
+    })
+    disabled_route = MultimodalRouter(disabled).route({"items": [
+        {"modality": "audio", "semantic": {"text": "准确转写", "resolved": True}}
+    ]})
+    assert disabled_route.semantic_text == "[语音1] 准确转写"
+    assert disabled_route.vision_messages == []

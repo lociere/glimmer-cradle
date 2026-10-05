@@ -670,6 +670,10 @@ Worker 模型调用留痕测试归位切片把 summary hash、full capture 分�
 provider payload 与错误脱敏并入目标 `test_process_recovery.py`，删除 Cognition 下清单外
 `test_model_invocations.py`。prompt 正文只在 full 模式落盘，summary 与日志均不泄漏正文。
 
+Worker inference gateway 测试归位切片把 models contract、缺失/未知 provider 失败闭合、空媒体与
+音频不进入视觉 provider 的断言并入目标 `test_rpc_roundtrip.py`，删除 Cognition 下清单外
+`test_inference_gateway.py`。历史 audio 分类与禁用时可信转写继续保留。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
