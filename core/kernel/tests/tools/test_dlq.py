@@ -133,6 +133,40 @@ class DlqToolTest(unittest.TestCase):
         self.assertTrue(resolution.startswith("receipt:receipt-1:dlq_replay_"))
         connection.close()
 
+    def test_query_reads_kernel_and_legacy_cognition_sources(self) -> None:
+        cognition_db = Path(self.temp.name) / "cognition.db"
+        connection = sqlite3.connect(cognition_db)
+        connection.execute(
+            """
+            CREATE TABLE dead_letters (
+              id INTEGER PRIMARY KEY, trace_id TEXT NOT NULL,
+              event_type TEXT NOT NULL, payload TEXT NOT NULL,
+              exception TEXT NOT NULL, stack_trace TEXT,
+              created_at TEXT NOT NULL, replayed INTEGER DEFAULT 0
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO dead_letters VALUES "
+            "(1, 'trace-c', 'CognitionEvent', '{}', 'cognition failed', '', "
+            "'2026-06-03T10:00:00', 0)"
+        )
+        connection.commit()
+        connection.close()
+        dlq.SOURCES = {
+            "cognition": dlq.DlqSource(
+                "cognition", cognition_db, "dead_letters", "exception"
+            ),
+            "kernel": dlq.DlqSource(
+                "kernel", self.db, "dead_letters_ts", "error_message"
+            ),
+        }
+
+        records = dlq.query_recent(10)
+
+        self.assertEqual([record["source"] for record in records], ["kernel", "cognition"])
+        self.assertEqual(records[1]["exception"], "cognition failed")
+
     def test_registered_kernel_dispatcher_delivers_payload_to_durable_ingress(self) -> None:
         node = shutil.which("node")
         self.assertIsNotNone(node)

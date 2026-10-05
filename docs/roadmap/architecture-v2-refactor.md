@@ -611,6 +611,10 @@ Cognition Experience CLI 清理切片确认 `core/cognition/tools/experience.py`
 生产消费者，且会绕过 Conversation owner 直接读取持久事实。按 v2.1 精确清单物理删除该工具，
 交互事实检视与恢复继续通过 Conversation owner API、fixtures 与恢复门完成，不建立替代旁路。
 
+DLQ 工具测试归位切片把 Kernel DLQ 对 legacy Cognition source 的只读兼容断言并入工具 owner
+`core/kernel/tests/tools/test_dlq.py`，删除 Cognition 下跨 owner 加载 Kernel CLI 的测试文件。
+真实 dispatcher receipt、owner mismatch 与 replay 失败闭合仍由同一目标测试入口覆盖。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
