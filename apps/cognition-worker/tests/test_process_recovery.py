@@ -1,7 +1,18 @@
 import json
 from pathlib import Path
 
+import pytest
+
+import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
+from glimmer_cradle.cognition.inference import ModelSettings
 from glimmer_cradle.cognition_worker import rpc_service as process
+from glimmer_cradle.cognition_worker.adapters.model_client import (
+    LLMApiResult,
+    LLMEngine,
+    LLMSettings,
+    ModelMessage,
+    ModelRequest,
+)
 
 
 def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:
@@ -188,3 +199,181 @@ def test_span_is_safe_noop_before_tracer_start() -> None:
     _reset_trace_state()
     with process.span("not-started"):
         pass
+
+
+class _LoggerCapture:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def _record(self, event: str, values: dict) -> None:
+        self.messages.append(event + json.dumps(values, ensure_ascii=False, default=str))
+
+    def info(self, event: str, **values) -> None:
+        self._record(event, values)
+
+    def debug(self, event: str, **values) -> None:
+        self._record(event, values)
+
+    def warning(self, event: str, **values) -> None:
+        self._record(event, values)
+
+
+def _build_llm_engine(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    capture_mode: str,
+) -> LLMEngine:
+    monkeypatch.setenv("GLIMMER_CRADLE_OBSERVABILITY", json.dumps({
+        "model_invocations": {
+            "capture_mode": capture_mode,
+            "redact_secrets": True,
+            "full_retention_days": 3,
+        }
+    }))
+    monkeypatch.setenv("GLIMMER_CRADLE_OBSERVABILITY_DIR", str(tmp_path))
+    return LLMEngine(
+        ModelSettings(
+            max_tokens=1024, temperature=0.8, top_p=0.9, frequency_penalty=0.0
+        ),
+        LLMSettings(
+            api_type="openai",
+            api_key="sk-top-secret",
+            base_url="https://example.com",
+            models={"chat": "test-model"},
+        ),
+        logger=_LoggerCapture(),
+        invocation_recorder=process.record_model_invocation,
+    )
+
+
+def test_model_invocation_summary_records_hash_without_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = _build_llm_engine(monkeypatch, tmp_path, capture_mode="summary")
+    monkeypatch.setattr(
+        engine,
+        "_generate_via_api",
+        lambda _request, _config, provider_id: LLMApiResult(
+            text="provider reply",
+            payload={"messages": [{"role": "user", "content": "secret prompt"}]},
+            response_data={"choices": [{"message": {"content": "provider reply"}}]},
+            provider_id=provider_id,
+            model_id="test-model",
+        ),
+    )
+    reply = engine.generate(ModelRequest(
+        messages=[
+            ModelMessage(role="system", content="system prompt"),
+            ModelMessage(role="user", content="secret prompt"),
+        ],
+        metadata={
+            "purpose": "reply", "capture_category": "response",
+            "scene_id": "scene-1", "trace_id": "trace-1",
+        },
+    ))
+    assert reply == "provider reply"
+
+    row = json.loads(
+        (tmp_path / "model-invocations" / "records" / "cognition.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert row["capture_mode"] == "summary"
+    assert row["schema_version"] == "2.0.0"
+    assert row["prompt_hash"]
+    assert row["prompt_text_ref"] is None
+    assert row["provider_payload_ref"] is None
+    assert "secret prompt" not in json.dumps(row, ensure_ascii=False)
+    assert all("secret prompt" not in message for message in engine._logger.messages)
+
+
+def test_model_invocation_full_capture_is_ordered_and_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = _build_llm_engine(monkeypatch, tmp_path, capture_mode="full")
+    monkeypatch.setattr(
+        engine,
+        "_generate_via_api",
+        lambda _request, _config, provider_id: LLMApiResult(
+            text="full reply",
+            payload={
+                "headers": {"Authorization": "Bearer sk-top-secret"},
+                "messages": [{"role": "user", "content": "full prompt"}],
+            },
+            response_data={"choices": [{"message": {"content": "full reply"}}]},
+            provider_id=provider_id,
+            model_id="test-model",
+        ),
+    )
+    for purpose, category, prompt in (
+        ("cognitive_action_plan", "decision", "full prompt"),
+        ("agent_plan", "skill", "plan a skill"),
+        ("reply", "response", "second prompt"),
+    ):
+        engine.generate(ModelRequest(
+            messages=[ModelMessage(role="user", content=prompt)],
+            metadata={
+                "purpose": purpose,
+                "capture_category": category,
+                "trace_id": "trace-full",
+            },
+        ))
+
+    invocation_root = tmp_path / "model-invocations"
+    rows = [
+        json.loads(line)
+        for line in (invocation_root / "records" / "cognition.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert "/trace-trace-full/01-action-decision/001_" in rows[0]["prompt_text_ref"]
+    assert "/trace-trace-full/02-skill-planning/002_" in rows[1]["prompt_text_ref"]
+    assert "/trace-trace-full/03-final-response/003_" in rows[2]["prompt_text_ref"]
+    invocation_dir = (invocation_root / rows[0]["prompt_text_ref"]).parent
+    payload = (invocation_root / rows[0]["provider_payload_ref"]).read_text(
+        encoding="utf-8"
+    )
+    assert "sk-top-secret" not in payload
+    assert "[REDACTED]" in payload or "[REDACTED_API_KEY]" in payload
+    manifest = json.loads(
+        (invocation_dir / "00-manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["sequence"] == 1
+    assert manifest["files"]["prompt"] == "10-prompt.txt"
+    timeline = (invocation_dir.parent.parent / "timeline.md").read_text(
+        encoding="utf-8"
+    )
+    assert timeline.index("cognitive_action_plan") < timeline.index("agent_plan")
+    assert timeline.index("agent_plan") < timeline.index("reply")
+
+
+def test_model_invocation_redacts_provider_error(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = _build_llm_engine(monkeypatch, tmp_path, capture_mode="summary")
+
+    def raise_provider_error(*_args):
+        raise llm_module.InferenceException(
+            "LLM API 请求失败: 401, Bearer sk-top-secret"
+        )
+
+    monkeypatch.setattr(engine, "_generate_via_api", raise_provider_error)
+    with pytest.raises(llm_module.InferenceException, match="401"):
+        engine.generate(ModelRequest(
+            messages=[ModelMessage(role="user", content="hello")],
+            metadata={"purpose": "reply"},
+        ))
+
+    row = json.loads(
+        (tmp_path / "model-invocations" / "records" / "cognition.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert row["outcome"] == "failed"
+    assert row["capture_category"] == "other"
+    assert "sk-top-secret" not in (row["error_summary"] or "")
+    assert "Bearer [REDACTED]" in (row["error_summary"] or "")
