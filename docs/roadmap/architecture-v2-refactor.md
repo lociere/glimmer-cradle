@@ -626,6 +626,10 @@ Cognition 测试配置 helper 归位切片把 Kernel 规范化 Character Documen
 Loop 回复投影测试归位切片把展示注解清理、对话分段与结构化代码块保持断言并入目标
 `test_public_api.py`，删除清单外 `test_reply_text.py`；回复正文仍由 Loop 公共入口唯一暴露。
 
+Embedding provider 测试归位切片把禁用基线、DashScope query/document 语义与本地 provider
+路径注入失败闭合迁入 Worker 目标 `test_public_api.py`。清单外 Cognition
+`test_embedding_engine.py` 删除，模型/缓存根由 Worker 注入的边界获得直接反例覆盖。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
