@@ -601,6 +601,12 @@ Worker owner，旧 Core `adapters/observability/{binding,logger,metrics,trace_co
 五个清单外文件物理删除。RPC deep-import 基线由 `6` 收紧为 `1`，剩余债务仅为
 路径 helper。
 
+Worker 路径装配归位切片新增 `composition.py` 内的 `WorkerPaths`，由进程环境唯一解析安装根与
+Local Data Domain，并向 SQLite adapters、模型 provider、资产读取和可观测性显式注入具体路径。
+Core persistence 不再解析进程环境，`model_client.py` 不再决定模型/缓存根；旧 Core
+`adapters/paths.py` 与只验证该旧 owner 的测试 consumer-zero 后物理删除，路径契约转由 Worker
+公共行为测试覆盖。Composition、model client 与 RPC 的最后三条 deep-import 迁移例外同步清零。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

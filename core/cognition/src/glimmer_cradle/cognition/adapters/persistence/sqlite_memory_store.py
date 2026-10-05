@@ -13,7 +13,6 @@ import uuid
 import aiosqlite
 import numpy as np
 
-from glimmer_cradle.cognition.adapters.paths import resolve_cognition_db_path, resolve_repo_root
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.cognition.memory import (
     ConsolidationJob,
@@ -47,14 +46,14 @@ class SqliteMemoryStore:
 
     def __init__(
         self,
-        db_path: Path | None = None,
+        db_path: Path,
         *,
         migration_path: Path | None = None,
         logger: LoggerPort | None = None,
     ) -> None:
-        self._db_path = db_path or resolve_cognition_db_path()
+        self._db_path = db_path
         self._migration_path = migration_path or (
-            resolve_repo_root() / "core" / "cognition" / "migrations" / "002-memory.sql"
+            Path(__file__).resolve().parents[5] / "migrations" / "002-memory.sql"
         )
         self._conn: aiosqlite.Connection | None = None
         self._logger = logger

@@ -52,13 +52,12 @@ from glimmer_cradle.cognition.ports import (
     SkillToolDescriptor,
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
-from glimmer_cradle.cognition.adapters.paths import (
-    ensure_dir,
-    resolve_global_log_dir,
-    resolve_model_invocations_dir,
-    resolve_metrics_dir,
-    resolve_traces_dir,
-)
+from glimmer_cradle.cognition_worker.composition import WorkerPaths
+
+
+def ensure_dir(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 _trace_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "cognition_trace_id", default=None
@@ -354,7 +353,7 @@ def _resolve_log_dir() -> Path:
     env_dir = os.environ.get("LOG_DIR")
     if env_dir:
         return ensure_dir(Path(env_dir))
-    return ensure_dir(resolve_global_log_dir())
+    return ensure_dir(WorkerPaths.from_environment().observability_dir / "logs")
 
 
 def _configure_std_logging() -> None:
@@ -1047,7 +1046,7 @@ def _resolve_model_invocations_dir() -> Path:
     configured = os.environ.get("GLIMMER_CRADLE_OBSERVABILITY_DIR")
     if configured:
         return Path(configured) / "model-invocations"
-    return resolve_model_invocations_dir()
+    return WorkerPaths.from_environment().observability_dir / "model-invocations"
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
@@ -1935,8 +1934,9 @@ class CognitionHost:
 
             # 先启动 metrics 与 tracer，保留启动期诊断。
             #     须在记忆/知识加载之前 —— 启动期的 gauge / span 才不会丢。
-            await start_metrics(resolve_metrics_dir())
-            await start_tracer(resolve_traces_dir())
+            worker_paths = WorkerPaths.from_environment()
+            await start_metrics(worker_paths.observability_dir / "metrics")
+            await start_tracer(worker_paths.observability_dir / "traces")
 
             # 状态库先于认知活动恢复，保证首拍可读取持久状态与完整 policy。
             await components.state_store.connect()

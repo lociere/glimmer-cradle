@@ -6,27 +6,19 @@ from pathlib import Path
 
 import aiosqlite
 
-from glimmer_cradle.cognition.adapters.paths import (
-    resolve_cognition_checkpoint_db_path,
-    resolve_repo_root,
-)
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint
 
 
 class SqliteCheckpointStore:
     def __init__(
         self,
-        path: Path | None = None,
+        path: Path,
         *,
         migration_path: Path | None = None,
     ) -> None:
-        self._path = path or resolve_cognition_checkpoint_db_path()
+        self._path = path
         self._migration_path = migration_path or (
-            resolve_repo_root()
-            / "core"
-            / "cognition"
-            / "migrations"
-            / "005-checkpoints.sql"
+            Path(__file__).resolve().parents[5] / "migrations" / "005-checkpoints.sql"
         )
         self._connection: aiosqlite.Connection | None = None
 

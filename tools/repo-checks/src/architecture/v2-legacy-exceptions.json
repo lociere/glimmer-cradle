@@ -1,32 +1,5 @@
 [
   {
-    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
-    "rule": "deep-import",
-    "detail": "glimmer_cradle.cognition.*",
-    "count": 1,
-    "owner": "architecture-v2-refactor",
-    "removeBy": "phase-12",
-    "reason": "Cognition Worker composition 暂时装配迁移中的 Core concrete；随目标 adapters 迁入 App 和 Core public API 收束逐项清零。"
-  },
-  {
-    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
-    "rule": "deep-import",
-    "detail": "glimmer_cradle.cognition.*",
-    "count": 1,
-    "owner": "architecture-v2-refactor",
-    "removeBy": "phase-12",
-    "reason": "Worker model/embedding provider 已归位，仍临时消费待迁出的 Core observability concrete 与路径 helper；随 App adapter 接线清零。"
-  },
-  {
-    "file": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
-    "rule": "deep-import",
-    "detail": "glimmer_cradle.cognition.*",
-    "count": 1,
-    "owner": "architecture-v2-refactor",
-    "removeBy": "phase-12",
-    "reason": "Worker RPC 已拥有 gRPC transport 与 observability concrete，仅余待归位的 Core 路径 helper；随 Worker 路径装配归位清零。"
-  },
-  {
     "file": "core/avatar/scripts/avatar-package-catalog.mjs",
     "rule": "vendor-core",
     "detail": "live2d",

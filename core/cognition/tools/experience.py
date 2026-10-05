@@ -9,6 +9,7 @@ Conversation Log CLI — 当前角色交互 Moment 查询与检视工具
   python core/cognition/tools/experience.py verify
 """
 import sys
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -18,8 +19,22 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from glimmer_cradle.cognition.adapters.paths import resolve_experience_dir
 from glimmer_cradle.conversation import ConversationLog, Moment
+
+
+def resolve_experience_dir() -> Path:
+    """CLI 显式解析现行 Local Data Domain，不向 Cognition Core 注入进程路径。"""
+    configured_data = os.environ.get("GLIMMER_CRADLE_DATA_ROOT")
+    if configured_data:
+        candidate = Path(configured_data)
+        if not candidate.is_absolute():
+            configured_root = os.environ.get("GLIMMER_CRADLE_APP_ROOT")
+            candidate = Path(configured_root).resolve() / candidate if configured_root else Path.cwd() / candidate
+        data_root = candidate
+    else:
+        configured_root = os.environ.get("GLIMMER_CRADLE_APP_ROOT")
+        data_root = (Path(configured_root).resolve() if configured_root else Path(__file__).resolve().parents[3]) / "data"
+    return data_root / "state" / "cognition" / "experience"
 
 
 def iter_moments(base_dir: Path) -> list[Moment]:

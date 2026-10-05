@@ -8,6 +8,8 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
+import os
+from pathlib import Path
 import time
 from typing import Any, ClassVar, Generic, List, TypeVar
 import uuid
@@ -50,17 +52,6 @@ from glimmer_cradle.cognition.loop import (
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
 from glimmer_cradle.conversation import build_conversation_recorder
-from glimmer_cradle.cognition.adapters.paths import (
-    resolve_cognition_checkpoint_db_path,
-    resolve_cognition_knowledge_db_path,
-    resolve_cognition_planning_db_path,
-    resolve_cognition_state_db_path,
-    resolve_conversation_db_path,
-    resolve_episode_projection_path,
-    resolve_experience_dir,
-    resolve_state_dir,
-    resolve_work_dir,
-)
 from glimmer_cradle.cognition.adapters.persistence import (
     ConsolidationJobRepository,
     EpisodeProjection,
@@ -118,6 +109,70 @@ from glimmer_cradle.cognition.persona import (
     PersonaCompiler,
     SafetySettings,
 )
+
+
+@dataclass(frozen=True)
+class WorkerPaths:
+    """Worker 进程拥有的安装根、Local Data Domain 与迁移输入。"""
+
+    repo_root: Path
+    data_root: Path
+
+    @classmethod
+    def from_environment(cls, *, start: Path | None = None) -> "WorkerPaths":
+        configured_root = os.environ.get("GLIMMER_CRADLE_APP_ROOT")
+        if configured_root:
+            repo_root = Path(configured_root).resolve()
+        else:
+            current = (start or Path(__file__)).resolve()
+            if current.is_file():
+                current = current.parent
+            while not (
+                (current / "pnpm-workspace.yaml").exists()
+                or (current / ".git").exists()
+            ):
+                parent = current.parent
+                if parent == current:
+                    current = Path.cwd().resolve()
+                    break
+                current = parent
+            repo_root = current
+
+        configured_data = os.environ.get("GLIMMER_CRADLE_DATA_ROOT")
+        if configured_data:
+            candidate = Path(configured_data)
+            data_root = candidate if candidate.is_absolute() else repo_root / candidate
+        else:
+            data_root = repo_root / "data"
+        return cls(repo_root=repo_root, data_root=data_root)
+
+    @property
+    def state_dir(self) -> Path:
+        return self.data_root / "state"
+
+    @property
+    def work_dir(self) -> Path:
+        return self.data_root / "work"
+
+    @property
+    def models_dir(self) -> Path:
+        return self.data_root / "models"
+
+    @property
+    def cache_dir(self) -> Path:
+        return self.data_root / "cache"
+
+    @property
+    def observability_dir(self) -> Path:
+        return self.data_root / "observability"
+
+    @property
+    def migrations_dir(self) -> Path:
+        return self.repo_root / "core" / "cognition" / "migrations"
+
+    @property
+    def cognition_state_dir(self) -> Path:
+        return self.state_dir / "cognition"
 
 
 class ConfigException(ValueError):
@@ -295,6 +350,7 @@ def compose_cognition(
     action_sink: Callable[[dict], Awaitable[None]],
     observability: ObservabilityPort,
     model_invocation_recorder: Callable[..., None] | None = None,
+    paths: WorkerPaths | None = None,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     logger = observability.logger("cognition_composition")
@@ -302,11 +358,14 @@ def compose_cognition(
     memory_config = config.memory
     experience_config = memory_config.experience
     cognition_config = config.cognition
+    paths = paths or WorkerPaths.from_environment()
+    cognition_state_dir = paths.cognition_state_dir
+    migrations_dir = paths.migrations_dir
 
     clock = SystemClock()
     ids = SystemIdGenerator()
     conversation_recorder = build_conversation_recorder(
-        resolve_experience_dir(),
+        cognition_state_dir / "experience",
         enabled=experience_config.enabled,
         pack_max_size_mb=experience_config.pack_max_size_mb,
         flush_interval_ms=experience_config.flush_interval_ms,
@@ -316,24 +375,40 @@ def compose_cognition(
         observability=observability,
     )
     cognition_database = SqliteMemoryStore(
+        cognition_state_dir / "memory.sqlite",
+        migration_path=migrations_dir / "002-memory.sql",
         logger=observability.logger("sqlite_memory_store")
     )
-    state_store = SqliteStateStore(resolve_cognition_state_db_path())
-    planning_store = SqlitePlanningStore(resolve_cognition_planning_db_path())
-    knowledge_store = SqliteKnowledgeStore(resolve_cognition_knowledge_db_path())
-    checkpoint_store = SqliteCheckpointStore(resolve_cognition_checkpoint_db_path())
+    state_store = SqliteStateStore(
+        cognition_state_dir / "state.sqlite",
+        migration_path=migrations_dir / "001-state.sql",
+    )
+    planning_store = SqlitePlanningStore(
+        cognition_state_dir / "planning.sqlite",
+        migration_path=migrations_dir / "004-planning.sql",
+    )
+    knowledge_store = SqliteKnowledgeStore(
+        cognition_state_dir / "knowledge.sqlite",
+        migration_path=migrations_dir / "003-knowledge.sql",
+        legacy_memory_path=cognition_state_dir / "memory.sqlite",
+    )
+    checkpoint_store = SqliteCheckpointStore(
+        cognition_state_dir / "checkpoints.sqlite",
+        migration_path=migrations_dir / "005-checkpoints.sql",
+    )
     memory_repository = MemoryRepository(cognition_database)
     vector_repository = VectorRepository(cognition_database)
     relationship_repository = RelationshipRepository(cognition_database)
     conversation_controller = ConversationController(
         store=ConversationStore(
-            resolve_conversation_db_path(), config=memory_config.conversation
+            cognition_state_dir / "conversations" / "conversations.db",
+            config=memory_config.conversation,
         ),
         recorder=conversation_recorder,
         working_config=memory_config.working,
     )
     turn_controller = TurnController(
-        SqliteTurnStore(resolve_conversation_db_path()),
+        SqliteTurnStore(cognition_state_dir / "conversations" / "conversations.db"),
         clock=clock,
     )
 
@@ -376,13 +451,15 @@ def compose_cognition(
     multimodal_router = MultimodalRouter(
         inference_config=config.inference,
         asset_reader=FileAssetReader(
-            resolve_state_dir() / "content" / "assets",
-            resolve_work_dir() / "content" / "transient" / "assets",
+            paths.state_dir / "content" / "assets",
+            paths.work_dir / "content" / "transient" / "assets",
         ),
         logger=observability.logger("multimodal_router"),
     )
     multimodal_router.set_llm_engine(llm_engine)
-    embedding_engine = _build_embedding_engine(config, knowledge_base, observability)
+    embedding_engine = _build_embedding_engine(
+        config, knowledge_base, observability, paths=paths
+    )
     memory_substrate.bind_vector_search(
         engine=embedding_engine,
         repository=vector_repository,
@@ -434,7 +511,7 @@ def compose_cognition(
     )
 
     episode_projection = EpisodeProjection(
-        resolve_episode_projection_path(),
+        cognition_state_dir / "projections" / "episodes.db",
         conversation_recorder,
         idle_seconds=experience_config.episode_idle_seconds,
         integrity_check=experience_config.seal_integrity_check,
@@ -532,10 +609,14 @@ def _build_embedding_engine(
     config: CharacterRuntimeSettings,
     knowledge_base: KnowledgeIndex,
     observability: ObservabilityPort,
+    *,
+    paths: WorkerPaths,
 ) -> EmbeddingEngine:
     engine = EmbeddingEngine(
         config.embedding,
         logger=observability.logger("embedding_engine"),
+        models_dir=paths.models_dir,
+        cache_dir=paths.cache_dir,
     )
     knowledge_base.set_embedding_engine(engine)
     return engine

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import aiosqlite
 
-from glimmer_cradle.cognition.adapters.paths import resolve_repo_root
 from glimmer_cradle.cognition.state import StateStore, StoredCognitiveState
 
 
@@ -15,7 +14,7 @@ class SqliteStateStore(StateStore):
     def __init__(self, db_path: Path, *, migration_path: Path | None = None) -> None:
         self._db_path = db_path
         self._migration_path = migration_path or (
-            resolve_repo_root() / "core" / "cognition" / "migrations" / "001-state.sql"
+            Path(__file__).resolve().parents[5] / "migrations" / "001-state.sql"
         )
         self._connection: aiosqlite.Connection | None = None
 

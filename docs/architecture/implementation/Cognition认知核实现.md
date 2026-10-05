@@ -20,13 +20,11 @@
 
 | 入口 | 职责 |
 |---|---|
-| `host/process.py` | Python 进程入口、配置加载、Cognition Service host、生命周期监督 |
-| `host/composition.py` | 唯一组装点，绑定 external Ports、persistence、memory、inference、cycle 与 adapters |
-| `adapters/kernel/inbound_adapter.py` | Cognition Service DTO 到应用端口的入站映射 |
-| `adapters/kernel/outbound_adapter.py` | 行动、状态和日志经 Kernel Control Service 回传 |
-| `adapters/kernel/grpc_transport.py` | 动态回环 gRPC host/client、deadline、取消、typed detail、generation 与 Content `parts` 映射 |
-| `adapters/content/asset_reader.py` | 只读按 ID 校验媒体类型、大小与 SHA-256；图片构造临时 provider 输入 |
-| `ports/kernel/models.py` | 不依赖 generated DTO 的进程内边界模型 |
+| `apps/cognition-worker/.../__main__.py` | Python Worker 进程入口 |
+| `apps/cognition-worker/.../rpc_service.py` | Cognition Service host、Kernel client、wire mapper、可观测性与生命周期监督 |
+| `apps/cognition-worker/.../composition.py` | 唯一组装点；配置投影、路径输入及 Core/Adapter concrete graph owner |
+| `apps/cognition-worker/.../adapters/` | Capability、Content、Conversation、Job、Model 与 Resource 的进程边界实现 |
+| `core/cognition/.../ports/` | 不依赖 generated DTO 的消费方契约与进程内边界模型 |
 
 Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 Electron、平台 payload、Extension handler 或 Kernel 内部对象。v5 Perception Moment 写引用与语义，v4 记录继续读取；`transient` 不写 Moment。旧 URI 媒体只做当拍兼容，不保证恢复；视频和音频不冒充视觉图片输入。参见 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
@@ -42,37 +40,28 @@ core/cognition/
 ├── uv.lock
 ├── src/glimmer_cradle/cognition/
 │   ├── __init__.py
-│   ├── domain/                         # 心智模型、不变量与内部模块 API
-│   │   ├── conversation/ experience/ identity/ volition/
-│   │   └── configuration.py, memory.py
-│   ├── attention/           # 候选、竞争、内部 focus lease
-│   ├── state/               # 情绪/活动状态、纯衰减、控制器与持久化 Port
-│   ├── application/                    # 认知循环、查询、维护与本地事务编排
-│   │   ├── context/ conversation/ cycle/
-│   │   ├── experience/ maintenance/ memory/
-│   │   └── *_use_case.py
-│   ├── inference/           # 通用请求/事件、模型 Port、选择/故障与 realtime session
-│   ├── planning/            # 目标、计划、承诺、规划控制器与持久化 Port
-│   ├── ports/                          # 仅 Cognition 真实外部能力边界
-│   │   ├── kernel/
-│   │   └── clock.py, observability.py,
-│   │       persistence.py, trace_context.py
-│   ├── adapters/                       # 外部能力与 contract edge 的具体实现
-│   │   ├── kernel/ content/ inference/ observability/ persistence/
-│   │   └── clock.py, configuration.py, paths.py
-│   └── host/
-│       ├── process.py                  # 唯一 Python 进程入口与生命周期接入
-│       └── composition.py              # 唯一 Composition Root
+│   ├── attention/ perception/          # 感知规范化、候选竞争与 focus lease
+│   ├── context/                        # 来源、预算、压缩与信任
+│   ├── state/ planning/ loop/          # 状态、计划与唯一迭代 Loop
+│   ├── memory/ knowledge/ persona/     # 记忆、知识与人格 owner
+│   ├── inference/                      # 通用请求/事件、模型 Port 与策略
+│   ├── ports/                          # Cognition 消费方能力边界
+│   └── adapters/persistence/           # Core-owned SQLite adapters
+└── migrations/                         # 版本化 Cognition 数据迁移
+apps/cognition-worker/src/glimmer_cradle/cognition_worker/
+├── composition.py                      # 唯一 Composition Root 与 WorkerPaths
+├── rpc_service.py                      # transport、观测与进程生命周期
+├── readiness.py shutdown.py
+└── adapters/                           # 外部能力 concrete 与 mapper
 └── tests/
     └── test_architecture_layout.py     # 真实 import/dynamic-import 分层门
 ```
 
-`host/process.py` 接受 Kernel 注入且已校验的原始配置 Document，再由
-`adapters/configuration.py` 映射为 `domain/configuration.py` 的 immutable settings；
-Character/Config/Memory canonical JSON Schema 仍由现有跨 owner consumer 持有，本切片没有
-复制或迁移它们。provider、SQLite/file persistence、clock、path 与 observability concrete
-全部在 Adapter；Host 只绑定 concrete、启动组件并执行 `start/ready/degraded/failed/restart/
-stop/dispose` 生命周期。
+Worker `rpc_service.py` 接受 Kernel 注入且已校验的原始配置 Document，`composition.py` 将其
+映射为 immutable settings，并由 `WorkerPaths` 解析安装根与 Local Data Domain 后向 Core
+SQLite adapter、模型 provider、资产读取和可观测性注入具体路径。Core 不读取进程环境或
+generated wire 类型；Worker 绑定 concrete、启动组件并执行
+`start/ready/degraded/failed/restart/stop/dispose` 生命周期。
 
 旧平级领域/技术目录、`foundation/`、Cognition `protocol/generated/`、旧 import/re-export
 与兼容入口均已删除。内部 identity/persona/affect/experience/memory/conversation/context/
@@ -81,11 +70,10 @@ deliberation/volition 仍是同一进程、同一一致性边界中的领域模�
 
 | 层 | 职责 | 依赖约束 |
 |---|---|---|
-| `domain/` | 心智模型、不变量、内部模块 API 与领域事件 | 不依赖 generated、transport、Adapter、Host 或 IO concrete |
-| `application/` | Cycle、维护、查询、跨领域 use case 与本地事务 | 依赖 Domain 与 Ports，不依赖 generated、transport 或 concrete |
+| Cognition owner roots | Attention、Context、Inference、Knowledge、Loop、Memory、Perception、Persona、Planning 与 State | 不依赖 generated、transport、Worker 或平台 IO concrete |
 | `ports/` | Kernel、推理、持久化、时钟、观测等真实外部能力 | 不为内部模块造 Port，不暴露 concrete |
-| `adapters/` | gRPC、provider、persistence、config/path、clock、observability | 映射外部 DTO/Document 后再调用 Application/Domain |
-| `host/` | 进程入口、composition 与受监督生命周期 | 唯一 concrete graph owner，不承载心智判断 |
+| Core `adapters/persistence/` | Cognition 自有 SQLite persistence | 接收显式数据库与迁移路径，不解析进程环境 |
+| Cognition Worker | gRPC、provider、路径、时钟、标识与 observability concrete | 唯一进程 concrete graph owner，不承载心智判断 |
 
 ## 入站链路
 

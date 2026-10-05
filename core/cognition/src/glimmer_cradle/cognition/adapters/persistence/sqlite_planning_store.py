@@ -7,14 +7,16 @@ from typing import cast
 
 import aiosqlite
 
-from glimmer_cradle.cognition.adapters.paths import resolve_repo_root
 from glimmer_cradle.cognition.planning.goal import Goal
 from glimmer_cradle.cognition.planning.plan import ActionPlan, CapabilityKind, CognitiveAction
 
 
 class SqlitePlanningStore:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, migration_path: Path | None = None) -> None:
         self._path = path
+        self._migration_path = migration_path or (
+            Path(__file__).resolve().parents[5] / "migrations" / "004-planning.sql"
+        )
         self._connection: aiosqlite.Connection | None = None
 
     async def connect(self) -> None:
@@ -23,13 +25,7 @@ class SqlitePlanningStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         connection = await aiosqlite.connect(self._path)
         connection.row_factory = aiosqlite.Row
-        migration = (
-            resolve_repo_root()
-            / "core"
-            / "cognition"
-            / "migrations"
-            / "004-planning.sql"
-        ).read_text(encoding="utf-8")
+        migration = self._migration_path.read_text(encoding="utf-8")
         await connection.executescript(migration)
         await connection.commit()
         self._connection = connection

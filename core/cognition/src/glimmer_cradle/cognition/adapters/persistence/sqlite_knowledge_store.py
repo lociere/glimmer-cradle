@@ -9,11 +9,6 @@ from typing import Any
 import aiosqlite
 import numpy as np
 
-from glimmer_cradle.cognition.adapters.paths import (
-    resolve_cognition_db_path,
-    resolve_cognition_knowledge_db_path,
-    resolve_repo_root,
-)
 from glimmer_cradle.cognition.knowledge.invalidation import require_authorized_source
 from glimmer_cradle.cognition.knowledge.transformation import content_digest
 
@@ -21,16 +16,16 @@ from glimmer_cradle.cognition.knowledge.transformation import content_digest
 class SqliteKnowledgeStore:
     def __init__(
         self,
-        path: Path | None = None,
+        path: Path,
         *,
         migration_path: Path | None = None,
         legacy_memory_path: Path | None = None,
     ) -> None:
-        self._path = path or resolve_cognition_knowledge_db_path()
+        self._path = path
         self._migration_path = migration_path or (
-            resolve_repo_root() / "core" / "cognition" / "migrations" / "003-knowledge.sql"
+            Path(__file__).resolve().parents[5] / "migrations" / "003-knowledge.sql"
         )
-        self._legacy_memory_path = legacy_memory_path or resolve_cognition_db_path()
+        self._legacy_memory_path = legacy_memory_path or path.with_name("memory.sqlite")
         self._connection: aiosqlite.Connection | None = None
 
     async def connect(self) -> None:

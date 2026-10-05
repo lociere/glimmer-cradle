@@ -34,7 +34,6 @@ from glimmer_cradle.cognition.inference import (
     ModelSettings,
     InferenceResponse,
 )
-from glimmer_cradle.cognition.adapters.paths import resolve_cache_dir, resolve_models_dir
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
@@ -110,7 +109,12 @@ class EmbeddingEngine:
     """把选定 provider 投影为 Cognition 使用的稳定向量 Port。"""
 
     def __init__(
-        self, config: EmbeddingSettings | None = None, *, logger: LoggerPort | None = None
+        self,
+        config: EmbeddingSettings | None = None,
+        *,
+        logger: LoggerPort | None = None,
+        models_dir: Path | None = None,
+        cache_dir: Path | None = None,
     ) -> None:
         self._logger = logger or _NullLogger()
         self._provider: EmbeddingProvider | None = None
@@ -125,7 +129,9 @@ class EmbeddingEngine:
             )
         elif provider_id == "local-sentence-transformers":
             self._provider = _LocalSentenceTransformersProvider(
-                config.providers.local_sentence_transformers
+                config.providers.local_sentence_transformers,
+                models_dir=models_dir,
+                cache_dir=cache_dir,
             )
         else:
             raise ValueError(f"未知 Embedding provider: {provider_id}")
@@ -262,11 +268,20 @@ class _DashScopeEmbeddingProvider:
 class _LocalSentenceTransformersProvider:
     provider_id = "local-sentence-transformers"
 
-    def __init__(self, config: LocalEmbeddingSettings) -> None:
+    def __init__(
+        self,
+        config: LocalEmbeddingSettings,
+        *,
+        models_dir: Path | None,
+        cache_dir: Path | None,
+    ) -> None:
         self._config = config
+        if models_dir is None or cache_dir is None:
+            raise ValueError("本地 Embedding provider 必须由 Worker 注入模型与缓存目录")
+        self._cache_dir = cache_dir
         self._model: SentenceTransformer | None = None
         self._load_lock = threading.Lock()
-        self._model_path = self._resolve_model_path(config.model_path)
+        self._model_path = self._resolve_model_path(config.model_path, models_dir)
         identity = (
             str(self._model_path) if self._model_path.exists() else config.model_id
         )
@@ -313,7 +328,7 @@ class _LocalSentenceTransformersProvider:
                 source,
                 device=self._config.device,
                 cache_folder=str(
-                    resolve_cache_dir() / "models" / "sentence-transformers"
+                    self._cache_dir / "models" / "sentence-transformers"
                 ),
             )
             if not self._model_path.exists() and self._config.auto_download:
@@ -323,9 +338,9 @@ class _LocalSentenceTransformersProvider:
             return model
 
     @staticmethod
-    def _resolve_model_path(model_path: str) -> Path:
+    def _resolve_model_path(model_path: str, models_dir: Path) -> Path:
         raw = Path(model_path)
-        return raw if raw.is_absolute() else resolve_models_dir() / raw
+        return raw if raw.is_absolute() else models_dir / raw
 
 
 class _GatewaySettings(BaseModel):
