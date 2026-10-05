@@ -650,6 +650,10 @@ Content/Multimodal adapter 测试归位切片把资产跨重启摘要校验、�
 旧 URI-only 媒体兼容并入 Worker 目标 `test_rpc_roundtrip.py`，删除 Cognition Core 下清单外
 `test_content_asset.py`。平台文件 IO 与历史 wire 兼容由 Worker edge 验证。
 
+Loop Sense provider 行为测试归位切片把 Affect、Memory、Drive 与 Social 的来源投影、空焦点、
+时间累积和关系证据断言并入目标 `test_loop_native_tools.py`，删除两个清单外 provider 测试文件。
+Provider 合同与实际来源行为由同一目标入口覆盖。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
