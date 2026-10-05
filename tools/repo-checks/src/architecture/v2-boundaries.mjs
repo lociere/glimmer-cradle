@@ -149,6 +149,9 @@ export function collectV2Violations(repositoryRoot) {
       for (const module of modules) {
         const coreOwner = coreModule(module.file);
         const owner = coreOwner ?? pythonPackageOwner(module.module);
+        for (const finding of module.architecture ?? []) {
+          add(module.file, finding.rule, finding.detail, finding.line);
+        }
         if (coreOwner) for (const match of module.vendors) add(module.file, 'vendor-core', match.value, match.line);
         for (const spec of module.imports) {
           const targetOwner = pythonPackageOwner(spec.value);

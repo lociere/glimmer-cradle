@@ -73,6 +73,24 @@ test('aggregates Python app-to-Core internal imports as counted migration debt',
   assert.deepEqual(new Set(findings.map(item => item.detail)), new Set(['glimmer_cradle.cognition.*']));
 });
 
+test('rejects Cognition direct system capabilities, internal Ports and mutable locators', t => {
+  const root = fixture(t, {
+    'core/cognition/src/glimmer_cradle/cognition/loop/unsafe.py': [
+      'import datetime as dt',
+      'from uuid import uuid4 as make_uuid',
+      '_registry = {}',
+      'class HiddenPort: pass',
+      'def bind(value): _registry["value"] = value',
+      'def create(): return dt.datetime.now(), make_uuid()',
+    ].join('\n'),
+  });
+  const findings = collectV2Violations(root);
+  assert(findings.some(item => item.rule === 'internal-port' && item.detail === 'HiddenPort'));
+  assert(findings.some(item => item.rule === 'module-mutable' && item.detail === '_registry'));
+  assert(findings.some(item => item.rule === 'direct-system-capability' && item.detail === 'datetime.datetime.now'));
+  assert(findings.some(item => item.rule === 'direct-system-capability' && item.detail === 'uuid.uuid4'));
+});
+
 test('detect source cycles and package cycles, including manifests without source imports', t => {
   const root = fixture(t, {
     'core/content/package.json': JSON.stringify({ name: '@glimmer-cradle/content', exports: { '.': './src/index.ts' }, dependencies: { '@glimmer-cradle/cognition': '*' } }),

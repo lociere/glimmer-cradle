@@ -615,6 +615,10 @@ DLQ 工具测试归位切片把 Kernel DLQ 对 legacy Cognition source 的只读
 `core/kernel/tests/tools/test_dlq.py`，删除 Cognition 下跨 owner 加载 Kernel CLI 的测试文件。
 真实 dispatcher receipt、owner mismatch 与 replay 失败闭合仍由同一目标测试入口覆盖。
 
+Cognition 架构测试归位切片把 owner Schema 的确定性投影断言并入目标 `test_public_api.py`，并将
+直接系统时钟/UUID、内部 `*Port`、模块级可变 locator/global 禁令迁入仓库级 Python AST 架构门。
+repo-checks 新增负向 fixture 固定四类反例，旧 `test_architecture_layout.py` 删除后不丢失约束。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
