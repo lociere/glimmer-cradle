@@ -623,6 +623,9 @@ Cognition 测试配置 helper 归位切片把 Kernel 规范化 Character Documen
 `tests/conftest.py`，配置映射与生产可观测性组装测试切换到单一共享入口；清单外
 `tests/config_fixture.py` consumer-zero 后删除。
 
+Loop 回复投影测试归位切片把展示注解清理、对话分段与结构化代码块保持断言并入目标
+`test_public_api.py`，删除清单外 `test_reply_text.py`；回复正文仍由 Loop 公共入口唯一暴露。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -6,6 +6,7 @@ from glimmer_cradle.cognition import ports
 from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.knowledge import KnowledgeSourceRecord
 from glimmer_cradle.cognition.loop import CognitionSettings
+from glimmer_cradle.cognition.loop.step import build_reply_messages, normalize_reply_text
 from glimmer_cradle.cognition.memory import MemorySettings
 from glimmer_cradle.cognition.persona import CharacterManifestSettings
 
@@ -113,3 +114,27 @@ def test_owner_schemas_are_deterministic_model_projections() -> None:
         fixture.read_text(encoding="utf-8")
     )
     assert record.entry_id == "fixture-knowledge-1"
+
+
+def test_reply_text_normalization_removes_presentation_annotations() -> None:
+    reply = "[开心]（轻轻叹气）我知道啦（摸摸头）不过这件事还是先慢一点"
+
+    assert normalize_reply_text(reply) == "我知道啦不过这件事还是先慢一点"
+
+
+def test_reply_messages_split_conversation_and_preserve_structured_code() -> None:
+    conversational = (
+        "我觉得可以先停一下，别急着开阶段十。"
+        "先把工具调用和说话节奏收好，然后再继续往发布形态推进会更稳。"
+    )
+    messages = build_reply_messages(conversational)
+
+    assert len(messages) >= 2
+    assert [message["sequence"] for message in messages] == list(range(len(messages)))
+    assert all(message["content_type"] == "text" for message in messages)
+    assert "".join(message["text"] for message in messages) == conversational
+
+    structured = '这里是代码：\n\n```ts\nconst name = "Selrena";\n```\n'
+    assert build_reply_messages(structured) == [
+        {"sequence": 0, "content_type": "text", "text": structured.strip()}
+    ]
