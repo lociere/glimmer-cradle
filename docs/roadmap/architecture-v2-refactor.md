@@ -607,6 +607,10 @@ Core persistence 不再解析进程环境，`model_client.py` 不再决定模型
 `adapters/paths.py` 与只验证该旧 owner 的测试 consumer-zero 后物理删除，路径契约转由 Worker
 公共行为测试覆盖。Composition、model client 与 RPC 的最后三条 deep-import 迁移例外同步清零。
 
+Cognition Experience CLI 清理切片确认 `core/cognition/tools/experience.py` 没有脚本入口、测试或
+生产消费者，且会绕过 Conversation owner 直接读取持久事实。按 v2.1 精确清单物理删除该工具，
+交互事实检视与恢复继续通过 Conversation owner API、fixtures 与恢复门完成，不建立替代旁路。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
