@@ -630,6 +630,10 @@ Embedding provider 测试归位切片把禁用基线、DashScope query/document 
 路径注入失败闭合迁入 Worker 目标 `test_public_api.py`。清单外 Cognition
 `test_embedding_engine.py` 删除，模型/缓存根由 Worker 注入的边界获得直接反例覆盖。
 
+Loop Provider 契约测试归位切片把五类 Sense provider 的继承、名称集合、唯一性、稳定装配次序与
+抽象基类失败闭合并入目标 `test_loop_native_tools.py`，删除清单外
+`test_provider_contracts.py`，不再把已归位 provider 描述成 stub。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

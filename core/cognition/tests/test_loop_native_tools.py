@@ -1,15 +1,55 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.inference import InferenceRequest, ModelEvent, ModelEventKind
-from glimmer_cradle.cognition.loop import LoopController, StopPolicy
+from glimmer_cradle.cognition.loop import (
+    AffectProvider,
+    DriveProvider,
+    LoopController,
+    MemoryProvider,
+    PerceptionProvider,
+    Provider,
+    SocialProvider,
+    StopPolicy,
+)
 from glimmer_cradle.cognition.ports import (
     CapabilityDescriptor,
     CapabilityInvocation,
     CapabilityResult,
 )
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
+
+
+PROVIDER_CLASSES = (
+    PerceptionProvider,
+    AffectProvider,
+    MemoryProvider,
+    DriveProvider,
+    SocialProvider,
+)
+
+
+def test_builtin_providers_implement_stable_sense_contract() -> None:
+    assert all(issubclass(provider, Provider) for provider in PROVIDER_CLASSES)
+    assert {provider.name for provider in PROVIDER_CLASSES} == {
+        "perception", "affect", "memory", "drive", "social"
+    }
+    assert len(set(PROVIDER_CLASSES)) == 5
+    assert PROVIDER_CLASSES == (
+        PerceptionProvider,
+        AffectProvider,
+        MemoryProvider,
+        DriveProvider,
+        SocialProvider,
+    )
+
+
+def test_provider_contract_is_abstract() -> None:
+    with pytest.raises(TypeError):
+        Provider()  # type: ignore[abstract]
 
 
 class NativeModel:
