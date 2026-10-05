@@ -683,6 +683,11 @@ ToolResult → Reply 因果顺序、来源元数据、Turn 完成与幂等 repla
 `test_rpc_roundtrip.py`。Worker `conftest.py` 补齐确定性时钟和 Conversation recorder adapter，
 清单外 Cognition `test_agent_synthesis_use_case.py` 删除。
 
+Worker 配置与生产组装测试归位切片把规范化 Character Document fixture、严格字段/范围失败闭合、
+非 canonical provider key 反例和生产 logger sink 可达性迁入 Worker 目标测试入口。Cognition 下
+`test_configuration_adapter.py` 与 `test_production_observability_composition.py` 删除，配置投影和
+进程 concrete graph 由真实 owner 验证。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

@@ -6,11 +6,16 @@ import json
 import numpy as np
 import pytest
 from glimmer_cradle.cognition_worker.composition import WorkerPaths
+from glimmer_cradle.cognition_worker.composition import (
+    ConfigException,
+    map_character_runtime_document,
+)
 from glimmer_cradle.cognition_worker.adapters import model_client as embedding_module
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     EmbeddingEngine,
     EmbeddingSettings,
 )
+from conftest import normalized_document
 
 
 def test_worker_public_api_is_explicit(worker_config: dict[str, int]) -> None:
@@ -130,3 +135,39 @@ async def test_dashscope_embedding_preserves_document_and_query_semantics(
         "document",
         "query",
     ]
+
+
+def test_normalized_character_document_maps_to_typed_settings() -> None:
+    settings = map_character_runtime_document(normalized_document())
+    assert settings.cognition.workspace_capacity == 7
+    assert settings.memory.retrieval.semantic_weight == 0.35
+
+
+@pytest.mark.parametrize("mutation", ["missing", "null", "unknown", "range", "wrong_type"])
+def test_character_document_mapping_fails_closed(mutation: str) -> None:
+    document = normalized_document()
+    if mutation == "missing":
+        del document["cognition"]
+    elif mutation == "null":
+        document["memory"]["retrieval"] = None
+    elif mutation == "unknown":
+        document["cognition"]["surprise"] = True
+    elif mutation == "range":
+        document["memory"]["retrieval"]["semantic_weight"] = 2.5
+    else:
+        document["cognition"]["workspace_capacity"] = "7"
+    with pytest.raises(ConfigException, match="Cognition 配置 Document 映射失败"):
+        map_character_runtime_document(document)
+
+
+def test_character_document_rejects_zero_capacity_and_noncanonical_provider() -> None:
+    zero = normalized_document()
+    zero["cognition"]["workspace_capacity"] = 0
+    with pytest.raises(ConfigException):
+        map_character_runtime_document(zero)
+
+    noncanonical = normalized_document()
+    provider = noncanonical["embedding"]["providers"].pop("dashscope-text-embedding")
+    noncanonical["embedding"]["providers"]["dashscope_text_embedding"] = provider
+    with pytest.raises(ConfigException):
+        map_character_runtime_document(noncanonical)

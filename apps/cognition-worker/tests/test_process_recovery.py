@@ -13,6 +13,11 @@ from glimmer_cradle.cognition_worker.adapters.model_client import (
     ModelMessage,
     ModelRequest,
 )
+from glimmer_cradle.cognition_worker.composition import (
+    compose_cognition,
+    map_character_runtime_document,
+)
+from conftest import normalized_document
 
 
 def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:
@@ -377,3 +382,46 @@ def test_model_invocation_redacts_provider_error(
     assert row["capture_category"] == "other"
     assert "sk-top-secret" not in (row["error_summary"] or "")
     assert "Bearer [REDACTED]" in (row["error_summary"] or "")
+
+
+def test_production_composition_injects_reachable_logger_sink(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    records: list[tuple[str, str, dict]] = []
+
+    class _RecordingLogger:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def _record(self, level: str, event: str, values: dict) -> None:
+            records.append((level, f"{self.name}:{event}", values))
+
+        def debug(self, event: str, **values) -> None: self._record("debug", event, values)
+        def info(self, event: str, **values) -> None: self._record("info", event, values)
+        def warning(self, event: str, **values) -> None: self._record("warning", event, values)
+        def error(self, event: str, **values) -> None: self._record("error", event, values)
+        def critical(self, event: str, **values) -> None: self._record("critical", event, values)
+
+    monkeypatch.setattr(process, "get_logger", lambda name: _RecordingLogger(name))
+    monkeypatch.setenv("GLIMMER_CRADLE_DATA_ROOT", str(tmp_path / "data"))
+    monkeypatch.setenv(
+        "GLIMMER_CRADLE_OBSERVABILITY_DIR", str(tmp_path / "observability")
+    )
+
+    async def action_sink(_command) -> None:
+        return None
+
+    components = compose_cognition(
+        map_character_runtime_document(normalized_document()),
+        action_sink=action_sink,
+        observability=process.FileObservability(),
+    )
+    components.cycle_controller.logger.info(
+        "production-sink-probe", marker="reachable"
+    )
+    assert any(
+        event.endswith(":production-sink-probe")
+        and values.get("marker") == "reachable"
+        for _, event, values in records
+    )
