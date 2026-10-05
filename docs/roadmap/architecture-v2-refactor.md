@@ -654,6 +654,10 @@ Loop Sense provider 行为测试归位切片把 Affect、Memory、Drive 与 Soci
 时间累积和关系证据断言并入目标 `test_loop_native_tools.py`，删除两个清单外 provider 测试文件。
 Provider 合同与实际来源行为由同一目标入口覆盖。
 
+Worker Agent Plan 兼容测试归位切片把 Kernel skill/tool identity、参数提示与 prompt exposure 断言
+并入目标 `test_rpc_roundtrip.py`，并在 Worker `conftest.py` 建立确定性 ID 与空观测测试 adapter。
+清单外 Cognition `test_agent_plan_use_case.py` 删除；兼容用例仍等待 native Loop 全链切换后的删除门。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

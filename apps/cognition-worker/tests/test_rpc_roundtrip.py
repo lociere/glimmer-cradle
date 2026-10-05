@@ -12,7 +12,13 @@ from glimmer_cradle.cognition.inference import (
     ModelSettings,
     MultimodalSettings,
 )
-from glimmer_cradle.cognition.ports import CapabilityInvocation, ContentReference, JobRequest
+from glimmer_cradle.cognition.ports import (
+    AgentPlanInput,
+    CapabilityInvocation,
+    ContentReference,
+    JobRequest,
+    SkillToolDescriptor,
+)
 from glimmer_cradle.cognition_worker.adapters import (
     CapabilityClient,
     ContentClient,
@@ -21,6 +27,8 @@ from glimmer_cradle.cognition_worker.adapters import (
     FileAssetReader,
 )
 from glimmer_cradle.cognition_worker.adapters.model_client import MultimodalRouter
+from glimmer_cradle.cognition_worker.composition import AgentPlanUseCase
+from conftest import DeterministicIds, NullObservability
 
 
 class RequestTransport:
@@ -178,3 +186,46 @@ def test_legacy_media_degrades_without_forged_asset(tmp_path: Path) -> None:
     assert len(route.video_items) == 1
     assert route.vision_messages == []
     assert "当前没有可用的转写文本" in route.semantic_text
+
+
+class _PlanningLLM:
+    def __init__(self) -> None:
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        return json.dumps({
+            "reasoning": "需要读取当前配置。",
+            "plan_summary": "读取配置",
+            "suggestions": [{
+                "skill_id": "core.settings",
+                "tool_name": "read",
+                "purpose": "读取配置状态",
+                "confidence": 0.9,
+                "arguments_hint": {"scope": "self"},
+            }],
+        })
+
+
+async def test_agent_plan_preserves_kernel_skill_identity() -> None:
+    llm = _PlanningLLM()
+    use_case = AgentPlanUseCase(
+        ids=DeterministicIds(), observability=NullObservability(), llm_engine=llm
+    )
+    result = await use_case.execute(AgentPlanInput(
+        user_goal="检查当前配置",
+        trace_id="trace-agent-plan",
+        available_tools=[SkillToolDescriptor(
+            skill_id="core.settings",
+            tool_name="read",
+            description="读取配置状态",
+            parameters={"type": "object"},
+        )],
+    ), "trace-agent-plan")
+
+    assert result.suggestions[0].skill_id == "core.settings"
+    assert result.suggestions[0].tool_name == "read"
+    assert result.suggestions[0].arguments_hint == {"scope": "self"}
+    prompt = llm.requests[0].messages[1].content
+    assert "skill_id=core.settings" in prompt
+    assert "tool_name=read" in prompt
