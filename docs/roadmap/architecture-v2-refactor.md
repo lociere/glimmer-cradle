@@ -642,6 +642,10 @@ Knowledge 持久加载测试归位切片把空库与按优先级加载已启用�
 `test_knowledge_revision.py`，删除清单外 `test_knowledge_base_persist.py`。KnowledgeIndex 仍通过
 独立 store 绑定，不把 Memory 旧库恢复入口重新提升为常态 owner。
 
+Memory 向量持久测试归位切片把 BLOB roundtrip、模型隔离、覆盖与删除断言并入目标
+`test_memory_correction.py`，删除清单外 `test_vector_repo.py`。可重建向量仍由 Memory store
+事务边界管理，模型切换不会误读旧模型向量。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
