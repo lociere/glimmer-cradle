@@ -662,6 +662,10 @@ Worker trace/metrics 测试归位切片把 boot/trace/span 三层注入、合成
 落盘、trace 关联与高基数 label 清理并入目标 `test_process_recovery.py`。两个 Cognition 下清单外
 可观测性测试删除，未启动 metrics 仍保持安全 no-op。
 
+Worker tracer 测试归位切片把属性、duration、异常状态、嵌套 parent、远端 parent 与 contextvar
+恢复断言并入目标 `test_process_recovery.py`，删除 Cognition 下清单外 `test_tracer.py`；未启动
+tracer 的 span 仍保持安全 no-op。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

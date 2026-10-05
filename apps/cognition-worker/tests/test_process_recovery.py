@@ -119,3 +119,72 @@ async def test_metrics_write_jsonl_with_trace_and_sanitized_labels(
 def test_metrics_are_noop_before_start() -> None:
     process.gauge("never.started", 1.0)
     process.counter("never.started.count")
+
+
+async def test_tracer_writes_attributes_error_and_remote_parent(
+    tmp_path: Path,
+) -> None:
+    _reset_trace_state()
+    process.set_boot_id("boot-x")
+    await process.start_tracer(tmp_path, proc="trace")
+    try:
+        with process.TraceContext("trace-1"):
+            with process.span("ok", attributes={"key": "value"}) as current:
+                current.set_attribute("extra", 42)
+            try:
+                with process.span("boom"):
+                    raise ValueError("explode")
+            except ValueError:
+                pass
+        with process.with_remote_parent_span("remote-trace", "remote-span"):
+            with process.span("remote-child"):
+                pass
+        await process.stop_tracer()
+    finally:
+        await process.stop_tracer()
+        process._boot_id = None
+
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "trace.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    by_name = {record["name"]: record for record in records}
+    assert by_name["ok"]["attributes"] == {"key": "value", "extra": 42}
+    assert by_name["ok"]["boot_id"] == "boot-x"
+    assert by_name["ok"]["status"] == "ok"
+    assert by_name["ok"]["duration_ms"] >= 0
+    assert by_name["boom"]["status"] == "error"
+    assert by_name["boom"]["error"] == "ValueError"
+    assert by_name["remote-child"]["trace_id"] == "remote-trace"
+    assert by_name["remote-child"]["parent_span_id"] == "remote-span"
+
+
+async def test_nested_spans_record_parent_and_restore_context(tmp_path: Path) -> None:
+    _reset_trace_state()
+    await process.start_tracer(tmp_path, proc="nested")
+    try:
+        with process.TraceContext("trace"):
+            with process.span("outer") as outer:
+                with process.span("inner") as inner:
+                    assert process.get_current_span_id() == inner.span_id
+                assert process.get_current_span_id() == outer.span_id
+            assert process.get_current_span_id() is None
+        await process.stop_tracer()
+    finally:
+        await process.stop_tracer()
+
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "nested.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    by_name = {record["name"]: record for record in records}
+    assert by_name["inner"]["parent_span_id"] == by_name["outer"]["span_id"]
+    assert by_name["outer"]["parent_span_id"] is None
+
+
+def test_span_is_safe_noop_before_tracer_start() -> None:
+    _reset_trace_state()
+    with process.span("not-started"):
+        pass
