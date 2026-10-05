@@ -6,7 +6,7 @@ from glimmer_cradle.cognition_worker.composition import (
     ConfigException,
     map_character_runtime_document,
 )
-from tests.config_fixture import normalized_document
+from tests.conftest import normalized_document
 
 
 def test_normalized_document_maps_to_typed_internal_settings() -> None:

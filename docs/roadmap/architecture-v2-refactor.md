@@ -619,6 +619,10 @@ Cognition 架构测试归位切片把 owner Schema 的确定性投影断言并�
 直接系统时钟/UUID、内部 `*Port`、模块级可变 locator/global 禁令迁入仓库级 Python AST 架构门。
 repo-checks 新增负向 fixture 固定四类反例，旧 `test_architecture_layout.py` 删除后不丢失约束。
 
+Cognition 测试配置 helper 归位切片把 Kernel 规范化 Character Document fixture 并入目标
+`tests/conftest.py`，配置映射与生产可观测性组装测试切换到单一共享入口；清单外
+`tests/config_fixture.py` consumer-zero 后删除。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

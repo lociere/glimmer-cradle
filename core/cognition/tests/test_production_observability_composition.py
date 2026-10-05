@@ -6,8 +6,7 @@ from glimmer_cradle.cognition_worker.composition import (
     compose_cognition,
     map_character_runtime_document,
 )
-from tests.config_fixture import normalized_document
-from tests.conftest import RecordingLogger
+from tests.conftest import RecordingLogger, normalized_document
 
 
 def test_production_composition_injects_reachable_logger_sink(monkeypatch, tmp_path) -> None:
