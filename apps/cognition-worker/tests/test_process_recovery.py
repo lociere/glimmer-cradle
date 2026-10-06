@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-import pytest
-
 import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
+import pytest
+from conftest import normalized_document
 from glimmer_cradle.cognition.inference import ModelSettings
 from glimmer_cradle.cognition_worker import rpc_service as process
 from glimmer_cradle.cognition_worker.adapters.model_client import (
@@ -17,7 +17,7 @@ from glimmer_cradle.cognition_worker.composition import (
     compose_cognition,
     map_character_runtime_document,
 )
-from conftest import normalized_document
+from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
 
 
 def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:
@@ -152,9 +152,8 @@ async def test_tracer_writes_attributes_error_and_remote_parent(
                     raise ValueError("explode")
             except ValueError:
                 pass
-        with process.with_remote_parent_span("remote-trace", "remote-span"):
-            with process.span("remote-child"):
-                pass
+        with process.with_remote_parent_span("remote-trace", "remote-span"), process.span("remote-child"):
+            pass
         await process.stop_tracer()
     finally:
         await process.stop_tracer()
@@ -425,3 +424,21 @@ def test_production_composition_injects_reachable_logger_sink(
         and values.get("marker") == "reachable"
         for _, event, values in records
     )
+
+
+@pytest.mark.asyncio
+async def test_registration_secret_is_zeroed_on_client_registration_failure() -> None:
+    secret = bytearray(b"registration-capability")
+    client = KernelGrpcClient("generation-1", "nonce", secret)
+
+    async def reject_registration(*_args, **_kwargs):
+        raise RuntimeError("registration rejected")
+
+    client._call = reject_registration  # type: ignore[method-assign]
+    try:
+        with pytest.raises(RuntimeError, match="registration rejected"):
+            await client.start("grpc://127.0.0.1:1", "grpc://127.0.0.1:2")
+        assert secret == bytearray(len(secret))
+        assert client._registration_nonce == ""
+    finally:
+        await client.stop()

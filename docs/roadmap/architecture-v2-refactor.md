@@ -693,6 +693,14 @@ Context 装配测试归位切片把来源激活、记忆相关度/近时度、�
 并入目标 `test_context_trust.py`。清单外 `test_context_assembly.py` consumer-zero 删除，Cognition
 225 项与 Worker 38 项均 PASS，测试项数量和原有断言保持，最终物理差距进一步降为 1,568 项。
 
+Worker gRPC 测试归位切片把真实 Service 感知去重、输入绑定、代次拒绝、队列溢出终态、deadline、
+取消传播、Loop 中断、readiness/Shutdown 及 typed error/recovery metadata 并入目标
+`test_rpc_roundtrip.py`；注册失败后 capability secret 与 nonce 清零归入 `test_process_recovery.py`。
+清单外 Cognition `test_kernel_cognition_grpc_transport.py` 删除，测试资源使用 Worker 的时钟、ID、
+observability 与 recorder adapter；Core 中无消费者的规范化配置夹具同步删除。Core 214 项与
+Worker 49 项 PASS，总覆盖项不变；Ruff、docs、encoding、architecture 与 diff 检查 PASS 后固定提交。
+最终物理差距为 1,567 项。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
