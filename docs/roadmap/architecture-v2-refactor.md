@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 源业务 request outbox、生产接收 fencing/receipt、consumer 与 Host/Worker broker 接线待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 领域结果 receipt 已接真实巩固 consumer；源 request outbox、生产 Jobs 身份绑定与接收 fencing、Host/Worker broker 接线待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -230,6 +230,28 @@ Memory 定向 20 项、Cognition 全量 224 项、Worker 全量 62 项、真实 
 architecture、目标清单规格（非最终实物）、docs/encoding/diff PASS。Data Layout 的 Memory 路径旧误写已按
 真实 composition 修正为 `data/state/cognition/memory.sqlite`，不是运行数据迁移。
 Memory schema 3、wire、依赖和生产路径不变，未执行用户数据迁移或删除旧巩固队列；独立审查留最终候选。
+
+Memory receipt 切片计划：Memory owner 将修订/evidence、批次结果 receipt 与每个 Episode/version 的
+scope/input 摘要索引在同一事务提交。恢复按每个 Episode 查询，而非仅按重试时可能变化的分批 ID；
+已提交结果先对账，不重新调用模型，noop 也有持久结果。相同 operation/input 重复幂等，变更 scope/
+version/输入或同 operation 的不同输出拒绝；receipt 不存在不构成 not-applied 或自动重放的证明。
+现行真实巩固 consumer 立即接入，旧队列完成/失败只接受对应 claimed attempt，完成后投影确认丢失可
+从 receipt 修复。schema 升到 4，仅测试新库与旧 schema 拒绝路径，不自动改写用户 v3 数据；迁移/备份
+仍归阶段 14。Jobs 原 attempt 的生产 fencing/封口、源 request outbox 与跨进程 broker 继续待接线。
+
+Memory receipt 候选（2026-10-06）：真实 Memory 修订/evidence、批次结果与 Episode/version 输入索引
+同事务提交；scope/input/output 冲突拒绝，noop 也保存结果。相同 operation/input/output 重复返回原
+receipt；重复 Memory 修订和没有原子 receipt 的既有同批修订不冒充成功。真实巩固 consumer 在推理前
+查询结果，已提交批次即使重启改为单 Episode 分批、模型不可用、缓存刷新或队列/投影 ACK 丢失也不再推理。
+旧队列 complete/fail 绑定 claimed attempt；完成中任一旧 attempt 冲突回滚整个批次，晚到 fail 不重开已完成项。
+Memory 定向 46 项 PASS（含三个 SQLite 提交点故障、输入索引第二项失败、两独立连接竞争、提交确认取消、
+真实 consumer 三种 ACK/缓存丢失重开恢复与旧 attempt 反例）；Cognition 全量 250 项、Worker 62 项、
+真实 Kernel→Worker 5 项、根 typecheck/build PASS。Ruff I/F、architecture、目标清单规格（非最终实物）、
+docs/encoding/diff PASS；独立审查继续留固定最终候选。Memory schema 4 仅创建测试新库，旧 v3 拒绝隐式
+升级且数据保留；wire、公开 SDK、依赖与生产路径未变，未执行用户数据迁移。
+此 receipt 仍是 Memory 领域结果，不是绑定 Jobs 原 epoch/owner/token 的生产接收证明。下一切片继续
+将 request outbox、接收端原 attempt 封口/提交 fencing、Host→Worker handler/query 和 Jobs 配置装配
+接入实际调用链；旧巩固队列在 consumer-zero、旧样本迁移与恢复门通过后删除，阶段 7 不提前完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

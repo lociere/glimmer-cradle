@@ -1,5 +1,7 @@
 import asyncio
 import json
+import sqlite3
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,8 +20,12 @@ from glimmer_cradle.cognition.memory import (
 from glimmer_cradle.cognition.memory import (
     MaintenanceScheduler as _MaintenanceScheduler,
 )
+from glimmer_cradle.cognition.memory import (
+    MemoryConsolidationConflictError,
+    MemoryConsolidationInput,
+    MemoryKind,
+)
 from glimmer_cradle.cognition.memory import MemoryController as _MemoryController
-from glimmer_cradle.cognition.memory import MemoryKind
 from glimmer_cradle.conversation.log import Moment, MomentKind
 from tests.conftest import (
     CLOCK,
@@ -107,6 +113,185 @@ async def test_memory_batch_is_atomic_and_retry_idempotent(memory_stack) -> None
     cursor = await database.connection.execute(
         "SELECT COUNT(*) FROM memory_revisions WHERE memory_id='stable-memory'")
     assert (await cursor.fetchone())[0] == 1
+
+
+def _receipt_draft(operation_id="receipt-op", memory_id="receipt-memory"):
+    return {"memory_id": memory_id, "kind": MemoryKind.SEMANTIC,
+            "content": "持久且可验证的事实", "evidence": [{"moment_id": "receipt-evidence"}],
+            "consolidation_id": operation_id, "attributes": {"a": 1, "b": 2}}
+
+
+def _receipt_input(episode_id="receipt-episode"):
+    return MemoryConsolidationInput(episode_id, 1, "scope:private", "a" * 64)
+
+
+async def test_receipt_reopens_original_result_and_canonical_retry(memory_stack):
+    database, repository, memory = memory_stack
+    inputs = (_receipt_input("second"), _receipt_input("first"))
+    receipt = await memory.commit_consolidation("receipt-op", inputs, [_receipt_draft()])
+    assert not receipt.duplicate and receipt.memory_ids == ("receipt-memory",)
+    await database.close()
+    await database.connect()
+    recovered = await memory.find_consolidation(inputs[0])
+    assert recovered == replace(receipt, duplicate=True)
+    draft = {**_receipt_draft(), "attributes": {"b": 2, "a": 1}}
+    assert await memory.commit_consolidation("receipt-op", tuple(reversed(inputs)), [draft]) == recovered
+    assert await repository.count() == 1
+    async with database.read() as conn:
+        assert (await (await conn.execute("SELECT COUNT(*) FROM memory_revisions")).fetchone())[0] == 1
+        assert (await (await conn.execute("SELECT COUNT(*) FROM memory_evidence")).fetchone())[0] == 1
+        row = await (await conn.execute("SELECT * FROM memory_consolidation_receipts")).fetchone()
+        assert _receipt_draft()["content"] not in str(row)
+
+
+@pytest.mark.parametrize("table", ["memory_evidence", "memory_consolidation_receipts", "memory_consolidation_inputs"])
+async def test_receipt_fault_rolls_back_business_evidence_and_all_inputs(memory_stack, table):
+    database, _, memory = memory_stack
+    async with database.transaction() as conn:
+        condition = "WHEN NEW.episode_id='second' " if table == "memory_consolidation_inputs" else ""
+        await conn.execute(f"CREATE TRIGGER receipt_fault BEFORE INSERT ON {table} {condition}BEGIN SELECT RAISE(ABORT,'receipt fault'); END")
+    with pytest.raises(sqlite3.IntegrityError, match="receipt fault"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(), _receipt_input("second")), [_receipt_draft()])
+    async with database.read() as conn:
+        for target in ("memory_items", "memory_revisions", "memory_evidence", "memory_consolidation_receipts", "memory_consolidation_inputs"):
+            assert (await (await conn.execute(f"SELECT COUNT(*) FROM {target}")).fetchone())[0] == 0
+    assert await memory.find_consolidation(_receipt_input()) is None
+
+
+async def test_receipt_noop_is_durable_and_conflicting_identity_is_rejected(memory_stack):
+    _, _, memory = memory_stack
+    item = _receipt_input()
+    receipt = await memory.commit_consolidation("receipt-op", (item,), [])
+    assert receipt.memory_ids == ()
+    assert await memory.find_consolidation(item) == replace(receipt, duplicate=True)
+    for candidate in (replace(item, scope_id="other"), replace(item, input_digest="b" * 64)):
+        with pytest.raises(MemoryConsolidationConflictError, match="scope/digest"):
+            await memory.find_consolidation(candidate)
+        with pytest.raises(MemoryConsolidationConflictError):
+            await memory.commit_consolidation("receipt-op", (candidate,), [])
+    assert await memory.find_consolidation(replace(item, episode_version=2)) is None
+    with pytest.raises(MemoryConsolidationConflictError, match="其他 operation"):
+        await memory.commit_consolidation("other-op", (item,), [])
+    with pytest.raises(MemoryConsolidationConflictError, match="内容冲突"):
+        await memory.commit_consolidation("receipt-op", (item,), [_receipt_draft()])
+
+
+@pytest.mark.parametrize("change", [{"episode_id": " "}, {"scope_id": ""}, {"episode_version": True},
+                                   {"episode_version": 0}, {"input_digest": "A" * 64}, {"input_digest": "short"}])
+async def test_receipt_rejects_invalid_input_before_writing(memory_stack, change):
+    _, repository, memory = memory_stack
+    item = replace(_receipt_input(), **change)
+    with pytest.raises(MemoryConsolidationConflictError):
+        await memory.commit_consolidation("receipt-op", (item,), [_receipt_draft()])
+    with pytest.raises(MemoryConsolidationConflictError):
+        await memory.find_consolidation(item)
+    assert await repository.count() == 0
+
+
+async def test_receipt_rejects_duplicate_drafts_and_unreceipted_revision(memory_stack):
+    _, repository, memory = memory_stack
+    with pytest.raises(MemoryConsolidationConflictError, match="重复修订"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),),
+                                          [_receipt_draft(), {**_receipt_draft(), "content": "different"}])
+    await memory.remember_batch([_receipt_draft()])
+    with pytest.raises(MemoryConsolidationConflictError, match="缺少原子 receipt"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()])
+    assert await memory.find_consolidation(_receipt_input()) is None
+    assert await repository.count() == 1
+
+
+@pytest.mark.parametrize("after_commit", [False, True])
+async def test_cancelled_receipt_confirmation_queries_actual_commit_not_assumed_failure(memory_stack, after_commit):
+    database, repository, memory = memory_stack
+    original_commit = database.connection.commit
+    entered = asyncio.Event()
+
+    async def interrupted_commit():
+        if after_commit:
+            await original_commit()
+        entered.set()
+        await asyncio.Event().wait()
+
+    database.connection.commit = interrupted_commit
+    pending = asyncio.create_task(memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()]))
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending
+        database.connection.commit = original_commit
+        await database.close()
+        await database.connect()
+        receipt = await memory.find_consolidation(_receipt_input())
+        assert (receipt is not None) is after_commit
+        assert await repository.count() == int(after_commit)
+        if receipt is not None:
+            assert receipt.memory_ids == ("receipt-memory",)
+    finally:
+        pending.cancel()
+        await asyncio.gather(pending, return_exceptions=True)
+
+
+@pytest.mark.parametrize("case", ["empty_operation", "empty_input", "duplicate_input", "mixed_scope", "unstable_draft"])
+async def test_receipt_rejects_ambiguous_batch_identity(memory_stack, case):
+    _, repository, memory = memory_stack
+    item = _receipt_input()
+    operation, inputs, drafts = "receipt-op", (item,), [_receipt_draft()]
+    if case == "empty_operation":
+        operation = " "
+    elif case == "empty_input":
+        inputs = ()
+    elif case == "duplicate_input":
+        inputs = (item, item)
+    elif case == "mixed_scope":
+        inputs = (item, replace(item, episode_id="other", scope_id="other"))
+    else:
+        drafts = [{**_receipt_draft(), "memory_id": ""}]
+    with pytest.raises(MemoryConsolidationConflictError):
+        await memory.commit_consolidation(operation, inputs, drafts)
+    assert await repository.count() == 0
+
+
+@pytest.mark.parametrize("same_operation", [True, False])
+async def test_two_real_connections_commit_only_one_episode_result(memory_stack, same_operation):
+    database, _, memory = memory_stack
+    other = SqliteMemoryStore(database._db_path)
+    await other.connect()
+    candidate = MemoryController()
+    candidate.bind_repository(MemoryRepository(other))
+    operation = "receipt-op" if same_operation else "competing-op"
+    try:
+        results = await asyncio.gather(
+            memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()]),
+            candidate.commit_consolidation(operation, (_receipt_input(),), [_receipt_draft(operation)]),
+            return_exceptions=True,
+        )
+        if same_operation:
+            assert sorted(result.duplicate for result in results) == [False, True]
+            assert results[0].receipt_id == results[1].receipt_id
+        else:
+            assert sum(isinstance(result, MemoryConsolidationConflictError) for result in results) == 1
+        async with database.read() as conn:
+            assert (await (await conn.execute("SELECT COUNT(*) FROM memory_consolidation_receipts")).fetchone())[0] == 1
+            assert (await (await conn.execute("SELECT COUNT(*) FROM memory_revisions")).fetchone())[0] == 1
+    finally:
+        await other.close()
+
+
+async def test_memory_v3_rejected_without_upgrading_or_losing_existing_data(memory_stack):
+    database, _, memory = memory_stack
+    await memory.remember_batch([_receipt_draft()])
+    async with database.transaction() as conn:
+        await conn.execute("DROP TABLE memory_consolidation_inputs")
+        await conn.execute("DROP TABLE memory_consolidation_receipts")
+        await conn.execute("UPDATE schema_meta SET value='3' WHERE key='schema_version'")
+    await database.close()
+    with pytest.raises(RuntimeError, match="受控数据迁移"):
+        await database.connect()
+    assert database._conn is None
+    with sqlite3.connect(database._db_path) as observer:
+        assert observer.execute("SELECT value FROM schema_meta").fetchone() == ("3",)
+        assert observer.execute("SELECT COUNT(*) FROM memory_revisions").fetchone() == (1,)
 
 
 async def test_shared_vector_writer_cannot_commit_an_unfinished_memory_batch(memory_stack) -> None:
@@ -444,6 +629,105 @@ class _ConsolidationLlm:
     async def generate(self, request) -> str:
         self.requests.append(request)
         return self.response
+
+
+@pytest.fixture
+async def consolidation_stack(tmp_path, memory_stack):
+    database, repository, memory = memory_stack
+    recorder = build_experience_recorder(tmp_path / "experience-receipt")
+    await recorder.start()
+    moments = [recorder.record(
+        MomentKind.PERCEPTION, {"text": f"持久事实 {index}"}, scene_id="desktop",
+        conversation_id="conversation:receipt", interaction_id=f"turn-{index}", actor_id="user:1",
+        retention_ceiling="memory_candidate", importance=0.9,
+    ) for index in range(2)]
+    episodes = EpisodeProjection(tmp_path / "receipt-episodes.db", recorder)
+    llm = _ConsolidationLlm(json.dumps({"decisions": [{
+        "operation": "add", "kind": "semantic", "content": "已经提交的事实",
+        "summary": "持久事实", "evidence_moment_ids": [moments[0].moment_id],
+    }]}))
+    jobs = ConsolidationJobRepository(database)
+    coordinator = ConsolidationCoordinator(
+        episodes=episodes, memory=memory, jobs=jobs, llm=llm, clock=_TestClock(),
+        minimum_salience=0.1, debounce_seconds=0, retry_base_seconds=0,
+    )
+    await coordinator.start()
+    try:
+        yield database, repository, memory, episodes, jobs, llm, coordinator
+    finally:
+        await recorder.stop()
+
+
+@pytest.mark.parametrize("phase", ["queue_ack", "cache_load", "projection_ack"])
+async def test_real_consolidation_recovers_committed_batch_without_model_even_after_rebatch(
+    consolidation_stack, monkeypatch, phase,
+):
+    database, repository, memory, episodes, jobs, llm, coordinator = consolidation_stack
+
+    async def lost_ack(*args, **kwargs):
+        raise RuntimeError("injected confirmation loss")
+
+    def lost_projection(*args, **kwargs):
+        raise RuntimeError("injected projection confirmation loss")
+
+    with monkeypatch.context() as fault:
+        if phase == "queue_ack":
+            fault.setattr(jobs, "complete", lost_ack)
+        elif phase == "cache_load":
+            fault.setattr(memory, "load", lost_ack)
+        else:
+            fault.setattr(episodes, "mark_consolidated", lost_projection)
+        assert await coordinator.consolidate(force_seal=True) == 0
+    assert len(llm.requests) == 1
+    assert await repository.count() == 1
+    async with database.read() as conn:
+        states = await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall()
+        expected = "completed" if phase == "projection_ack" else "failed"
+        assert states == [(expected,), (expected,)]
+    assert len(episodes.pending_consolidation()) == 2
+    # 重开真实 Memory 连接且改变 batch size；没有模型也必须能恢复原结果。
+    await database.close()
+    await database.connect()
+    replacement = MemoryController()
+    replacement.bind_repository(MemoryRepository(database))
+    await replacement.load()
+    restarted = ConsolidationCoordinator(
+        episodes=episodes, memory=replacement, jobs=ConsolidationJobRepository(database), llm=None,
+        clock=_TestClock(), minimum_salience=0.1, debounce_seconds=0, batch_size=1,
+    )
+    await restarted.start()
+    assert await restarted.consolidate() == 0
+    assert await restarted.consolidate() == 0
+    assert not episodes.pending_consolidation()
+    assert len(llm.requests) == 1 and replacement.count() == 1
+    async with database.read() as conn:
+        assert (await (await conn.execute("SELECT COUNT(*) FROM memory_revisions")).fetchone())[0] == 1
+        assert (await (await conn.execute("SELECT COUNT(*) FROM memory_consolidation_receipts")).fetchone())[0] == 1
+        assert (await (await conn.execute("SELECT COUNT(*) FROM memory_consolidation_inputs")).fetchone())[0] == 2
+        assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",), ("completed",)]
+
+
+async def test_old_claim_cannot_complete_new_attempt_or_partially_complete_batch(consolidation_stack):
+    database, _, _, episodes, jobs, _, _ = consolidation_stack
+    await episodes.project_pending(seal=True)
+    for episode in episodes.pending_consolidation():
+        await jobs.enqueue(episode, debounce_seconds=0, max_wait_seconds=0)
+    old = await jobs.claim_due(limit=2, lease_seconds=60)
+    assert len(old) == 2
+    async with database.transaction() as conn:
+        await conn.execute("UPDATE consolidation_jobs SET lease_until='2000-01-01T00:00:00Z' WHERE job_id=?", (old[1].job_id,))
+    await jobs.recover_expired()
+    current = await jobs.claim_due(limit=2, lease_seconds=60)
+    assert len(current) == 1 and current[0].attempt_count == old[1].attempt_count + 1
+    with pytest.raises(MemoryConsolidationConflictError, match="attempt 已失效"):
+        await jobs.complete(old)
+    await jobs.fail([old[1]], error_code="stale", retry_base_seconds=0)
+    async with database.read() as conn:
+        assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("claimed",), ("claimed",)]
+    await jobs.complete([old[0], current[0]])
+    await jobs.fail([old[0]], error_code="late", retry_base_seconds=0)
+    async with database.read() as conn:
+        assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",), ("completed",)]
 
 
 class _SchedulingProjection:

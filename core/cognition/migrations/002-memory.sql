@@ -73,3 +73,15 @@ CREATE INDEX idx_memory_actor ON memory_items(actor_id,status);
 CREATE INDEX idx_relationship_recent ON relationship_actors(last_seen_at);
 CREATE INDEX idx_relationship_observation_actor ON relationship_observations(actor_id,observed_at);
 CREATE INDEX idx_consolidation_jobs_due ON consolidation_jobs(state,available_at,priority);
+-- 业务结果和修订同事务提交；它不是 Jobs 调度状态，不能用 receipt 缺失证明未执行。
+CREATE TABLE memory_consolidation_receipts(
+  receipt_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL UNIQUE, scope_id TEXT NOT NULL,
+  request_digest TEXT NOT NULL, draft_digest TEXT NOT NULL,
+  memory_ids_json TEXT NOT NULL, committed_at TEXT NOT NULL
+);
+CREATE TABLE memory_consolidation_inputs(
+  episode_id TEXT NOT NULL, episode_version INTEGER NOT NULL CHECK(episode_version>0),
+  scope_id TEXT NOT NULL, input_digest TEXT NOT NULL,
+  receipt_id TEXT NOT NULL REFERENCES memory_consolidation_receipts(receipt_id),
+  PRIMARY KEY(episode_id,episode_version)
+);

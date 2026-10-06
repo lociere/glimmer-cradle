@@ -203,8 +203,19 @@ Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL
 Relationship、关系 checkpoint 与旧巩固队列不再各自 commit。写事务使用 IMMEDIATE，BEGIN/业务写入/
 commit 取消均等待回滚收尾再允许连接复用，回滚失败撤销并关闭连接；关闭本身被取消也先完成资源释放。
 新库 DDL 与 schema metadata 在同一初始化事务，失败/取消不留下半初始化表。关系 checkpoint 只向前推进。
-模型推理、向量编码和跨进程调用不在这些事务内；已提交但确认被取消不能推断未写入，Jobs 的生产 receipt
-和提交点 fencing 仍需后续接线。Memory schema 仍为 3，不自动迁移用户旧库。
+模型推理、向量编码和跨进程调用不在这些事务内；已提交但确认被取消不能推断未写入。
+
+Memory schema 4 将修订/evidence、`memory_consolidation_receipts` 与每个 Episode/version 的
+`memory_consolidation_inputs` 索引同事务提交；receipt 保存 operation、scope、输入/输出摘要、结果
+Memory ID 与提交时间，不保存模型原文。noop 也形成结果 receipt。相同 operation/input/output 重复返回
+原结果；输入 scope/digest 漂移、同 operation 输出冲突、重复修订同一 Memory 或无 receipt 的既有同批修订
+均拒绝，不以 revision 去重伪装完整提交。
+
+真实 `ConsolidationCoordinator` 先按 Episode/version 查询结果，再推理未确认项；重启后即使分批大小改变、
+模型不可用或派生缓存刷新失败，也可从原结果修复缓存、队列与 Episode 投影，不重复推理已提交项。
+旧巩固队列的 complete/fail 只接受对应 claimed attempt，完成批次中任一 attempt 失效则全部回滚。
+这不是生产 Jobs 接收端 fencing：receipt 缺失仍不证明未提交或允许盲重试，源 request outbox、原 attempt
+封口与 Host/Worker broker 尚待接线。不自动升级用户 v3 库；受控迁移、备份与恢复归阶段 14。
 
 长期交互连续性由 Conversation 拥有；Cognition 拥有 Experience、Memory、Persona 与推理语义。Kernel 可以收到投影或行动结果，但不直接写 Cognition/Conversation DB。
 

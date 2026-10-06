@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import asdict
@@ -15,6 +16,8 @@ from glimmer_cradle.cognition.memory.memory_store import (
     ConsolidationJob,
     ConsolidationJobStore,
     EpisodeProjectionStore,
+    MemoryConsolidationConflictError,
+    MemoryConsolidationInput,
     RelationshipProjectionStore,
 )
 from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
@@ -144,6 +147,10 @@ class ConsolidationCoordinator:
             if episode.salience < self._minimum_salience or not eligible:
                 self._episodes.mark_consolidated(episode.episode_id, self._clock.now_iso())
                 continue
+            receipt = await self._memory.find_consolidation(self._receipt_input(episode))
+            if receipt is not None:
+                self._episodes.mark_consolidated(episode.episode_id, receipt.committed_at)
+                continue
             await self._jobs.enqueue(
                 episode,
                 debounce_seconds=self._debounce_seconds,
@@ -151,12 +158,6 @@ class ConsolidationCoordinator:
             )
 
     async def _consolidate_batch(self, jobs: list[ConsolidationJob]) -> int:
-        if self._llm is None:
-            await self._jobs.fail(
-                jobs, error_code="provider_unavailable",
-                retry_base_seconds=self._retry_base_seconds,
-            )
-            return 0
         episodes = [self._episodes.get_episode(job.episode_id) for job in jobs]
         valid_episodes = [episode for episode in episodes if episode is not None]
         if len(valid_episodes) != len(jobs):
@@ -165,9 +166,36 @@ class ConsolidationCoordinator:
                 retry_base_seconds=self._retry_base_seconds,
             )
             return 0
+        if any(job.episode_version != episode.version for job, episode in zip(jobs, valid_episodes, strict=True)):
+            await self._jobs.fail(jobs, error_code="episode_version_conflict", retry_base_seconds=self._retry_base_seconds)
+            return 0
+        try:
+            inputs = tuple(self._receipt_input(episode) for episode in valid_episodes)
+            receipts = [await self._memory.find_consolidation(item) for item in inputs]
+            recovered = [job for job, receipt in zip(jobs, receipts, strict=True) if receipt is not None]
+            if recovered:
+                await self._memory.load()
+                await self._finish_jobs(recovered)
+            remaining = [(job, episode, item) for job, episode, item, receipt in
+                         zip(jobs, valid_episodes, inputs, receipts, strict=True) if receipt is None]
+            if not remaining:
+                return 0
+            return await self._infer_and_commit(
+                [item[0] for item in remaining], [item[1] for item in remaining], tuple(item[2] for item in remaining)
+            )
+        except Exception:
+            # 不输出模型原文、输入 JSON 或底层异常文本；失败后先查询持久结果。
+            self._logger.warning("长期记忆批量巩固失败，等待持久结果对账", jobs=[job.job_id for job in jobs],
+                                 error_code="consolidation_failed")
+            await self._jobs.fail(jobs, error_code="consolidation_failed", retry_base_seconds=self._retry_base_seconds)
+            return 0
+
+    async def _infer_and_commit(
+        self, jobs: list[ConsolidationJob], episodes: list[Episode], inputs: tuple[MemoryConsolidationInput, ...]
+    ) -> int:
         eligible = [
             moment
-            for episode in valid_episodes
+            for episode in episodes
             for moment in episode.moments
             if moment.retention_ceiling == "memory_candidate"
         ][-self._max_batch_moments:]
@@ -178,8 +206,13 @@ class ConsolidationCoordinator:
             )
             return 0
         allowed = {item.moment_id: item for item in eligible}
+        batch_id = self._ids.stable("memory-batch", ":".join(sorted(job.job_id for job in jobs)))
         if not allowed:
+            await self._memory.commit_consolidation(batch_id, inputs, [])
             await self._finish_jobs(jobs)
+            return 0
+        if self._llm is None:
+            await self._jobs.fail(jobs, error_code="provider_unavailable", retry_base_seconds=self._retry_base_seconds)
             return 0
         query = "\n".join(str(item.content) for item in eligible)
         domain = eligible[-1]
@@ -192,29 +225,25 @@ class ConsolidationCoordinator:
             limit=12,
             token_budget=1400,
         )
-        batch_id = self._ids.stable(
-            "memory-batch", ":".join(sorted(job.job_id for job in jobs))
+        output = await self._infer(episodes, eligible, existing)
+        drafts = self._build_drafts(
+            output, existing=existing, allowed=allowed, consolidation_id=batch_id,
         )
-        try:
-            output = await self._infer(valid_episodes, eligible, existing)
-            drafts = self._build_drafts(
-                output, existing=existing, allowed=allowed,
-                consolidation_id=batch_id,
-            )
-            if drafts:
-                await self._memory.remember_batch(drafts)
-            await self._finish_jobs(jobs)
-            return len(drafts)
-        except Exception as exc:
-            self._logger.warning(
-                "长期记忆批量巩固失败，任务等待重试",
-                jobs=[job.job_id for job in jobs], error=str(exc),
-            )
-            await self._jobs.fail(
-                jobs, error_code=type(exc).__name__,
-                retry_base_seconds=self._retry_base_seconds,
-            )
-            return 0
+        receipt = await self._memory.commit_consolidation(batch_id, inputs, drafts)
+        await self._finish_jobs(jobs)
+        return 0 if receipt.duplicate else len(receipt.memory_ids)
+
+    def _receipt_input(self, episode: Episode) -> MemoryConsolidationInput:
+        eligible = [moment for moment in episode.moments if moment.retention_ceiling == "memory_candidate"]
+        domains = {self._moment_domain_key(moment) for moment in eligible or episode.moments}
+        if len(domains) != 1:
+            raise MemoryConsolidationConflictError("Memory 巩固 Episode 权限域不唯一或证据丢失")
+        scope_id = hashlib.sha256(json.dumps(next(iter(domains)), separators=(",", ":")).encode("utf-8")).hexdigest()
+        document = {"episode_id": episode.episode_id, "version": episode.version, "scope_id": scope_id,
+                    "moments": [asdict(moment) for moment in episode.moments]}
+        digest = hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                                         allow_nan=False).encode("utf-8")).hexdigest()
+        return MemoryConsolidationInput(episode.episode_id, episode.version, scope_id, digest)
 
     def _build_drafts(
         self, output: ConsolidationOutput, *, existing: list[MemoryRecord],

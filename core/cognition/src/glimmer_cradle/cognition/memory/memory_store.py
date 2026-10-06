@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
-
 from glimmer_cradle.cognition.memory.memory import Episode
 
 
@@ -18,6 +17,28 @@ class ConsolidationJob:
     scene_id: str
     actor_id: str | None
     attempt_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryConsolidationInput:
+    episode_id: str
+    episode_version: int
+    scope_id: str
+    input_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryConsolidationReceipt:
+    receipt_id: str
+    operation_id: str
+    scope_id: str
+    memory_ids: tuple[str, ...]
+    committed_at: str
+    duplicate: bool = False
+
+
+class MemoryConsolidationConflictError(ValueError):
+    """持久巩固身份或输入发生冲突，不允许当新工作重放。"""
 
 
 class EpisodeProjectionStore(Protocol):
@@ -62,6 +83,12 @@ class MemoryStore(Protocol):
     async def all_current(self) -> list[dict]: ...
 
     async def create_revisions(self, drafts: list[dict]) -> list[str]: ...
+
+    async def find_consolidation(self, item: MemoryConsolidationInput) -> MemoryConsolidationReceipt | None: ...
+
+    async def commit_consolidation(
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict]
+    ) -> MemoryConsolidationReceipt: ...
 
 
 class VectorIndexStore(Protocol):

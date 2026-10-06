@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 import sqlite3
 import uuid
 from collections.abc import AsyncIterator, Awaitable
@@ -17,12 +19,15 @@ import numpy as np
 from glimmer_cradle.cognition.memory import (
     ConsolidationJob,
     Episode,
+    MemoryConsolidationConflictError,
+    MemoryConsolidationInput,
+    MemoryConsolidationReceipt,
     RelationshipRecord,
 )
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _VECTOR_DTYPE = np.float32
 
 
@@ -92,6 +97,8 @@ class SqliteMemoryStore:
                 version = int(row[0]) if row is not None else 0
                 if version != SCHEMA_VERSION:
                     raise RuntimeError("检测到非当前记忆架构数据库；须先执行受控数据迁移")
+            await connection.execute("SELECT receipt_id,operation_id,request_digest,draft_digest FROM memory_consolidation_receipts LIMIT 0")
+            await connection.execute("SELECT episode_id,episode_version,scope_id,input_digest,receipt_id FROM memory_consolidation_inputs LIMIT 0")
         except BaseException:
             await self._drain_cleanup(connection.close())
             raise
@@ -216,6 +223,93 @@ class MemoryRepository:
         async with self._db.transaction() as conn:
             result = [await self._create_revision(conn, draft) for draft in drafts]
         return result
+
+    @staticmethod
+    def _input_document(item: MemoryConsolidationInput) -> dict[str, Any]:
+        if (not isinstance(item.episode_id, str) or not item.episode_id.strip()
+            or not isinstance(item.scope_id, str) or not item.scope_id.strip()
+            or type(item.episode_version) is not int or item.episode_version < 1
+            or not isinstance(item.input_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", item.input_digest)):
+            raise MemoryConsolidationConflictError("Memory 巩固输入身份无效")
+        return {"episode_id": item.episode_id, "episode_version": item.episode_version,
+                "scope_id": item.scope_id, "input_digest": item.input_digest}
+
+    @staticmethod
+    def _digest(document: Any) -> str:
+        return hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False,
+                                          separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _receipt(row: Any, *, duplicate: bool) -> MemoryConsolidationReceipt:
+        return MemoryConsolidationReceipt(row[0], row[1], row[2], tuple(json.loads(row[3])), row[4], duplicate)
+
+    async def find_consolidation(self, item: MemoryConsolidationInput) -> MemoryConsolidationReceipt | None:
+        self._input_document(item)
+        async with self._db.read() as conn:
+            cursor = await conn.execute("""
+                SELECT r.receipt_id,r.operation_id,r.scope_id,r.memory_ids_json,r.committed_at,i.scope_id,i.input_digest
+                FROM memory_consolidation_inputs i JOIN memory_consolidation_receipts r ON r.receipt_id=i.receipt_id
+                WHERE i.episode_id=? AND i.episode_version=?
+                """, (item.episode_id, item.episode_version))
+            row = await cursor.fetchone()
+            if row is None:
+                return None
+            if row[5] != item.scope_id or row[6] != item.input_digest:
+                raise MemoryConsolidationConflictError("Memory 巩固输入 scope/digest 冲突")
+            return self._receipt(row, duplicate=True)
+
+    async def commit_consolidation(
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]]
+    ) -> MemoryConsolidationReceipt:
+        if not isinstance(operation_id, str) or not operation_id.strip() or not inputs:
+            raise MemoryConsolidationConflictError("Memory 巩固 operation/input 不得为空")
+        documents = sorted((self._input_document(item) for item in inputs),
+                           key=lambda item: (item["episode_id"], item["episode_version"]))
+        if len({(item.episode_id, item.episode_version) for item in inputs}) != len(inputs):
+            raise MemoryConsolidationConflictError("Memory 巩固输入重复")
+        scopes = {item.scope_id for item in inputs}
+        if len(scopes) != 1:
+            raise MemoryConsolidationConflictError("Memory 巩固不得跨 scope")
+        scope_id = inputs[0].scope_id
+        for draft in drafts:
+            if (not isinstance(draft.get("memory_id"), str) or not draft["memory_id"].strip()
+                or draft.get("consolidation_id") != operation_id):
+                raise MemoryConsolidationConflictError("Memory 巩固修订必须绑定稳定 operation/memory identity")
+        if len({draft["memory_id"] for draft in drafts}) != len(drafts):
+            raise MemoryConsolidationConflictError("Memory 巩固批次不得重复修订同一 memory identity")
+        request_digest, draft_digest = self._digest(documents), self._digest(drafts)
+        async with self._db.transaction() as conn:
+            cursor = await conn.execute("""
+                SELECT receipt_id,operation_id,scope_id,memory_ids_json,committed_at,request_digest,draft_digest
+                FROM memory_consolidation_receipts WHERE operation_id=?
+                """, (operation_id,))
+            row = await cursor.fetchone()
+            if row is not None:
+                if row[5] != request_digest or row[6] != draft_digest:
+                    raise MemoryConsolidationConflictError("Memory 巩固 operation 内容冲突")
+                return self._receipt(row, duplicate=True)
+            for item in inputs:
+                cursor = await conn.execute("SELECT receipt_id FROM memory_consolidation_inputs WHERE episode_id=? AND episode_version=?",
+                                            (item.episode_id, item.episode_version))
+                if await cursor.fetchone() is not None:
+                    raise MemoryConsolidationConflictError("Memory Episode 已由其他 operation 确认；须先查询原结果")
+            # 无 receipt 的旧写入不能通过 revision 去重伪装为本次完整提交。
+            for draft in drafts:
+                cursor = await conn.execute(
+                    "SELECT revision_id FROM memory_revisions WHERE memory_id=? AND consolidation_id=?",
+                    (draft["memory_id"], operation_id),
+                )
+                if await cursor.fetchone() is not None:
+                    raise MemoryConsolidationConflictError("Memory 巩固修订存在但缺少原子 receipt；须先对账")
+            memory_ids = [await self._create_revision(conn, draft) for draft in drafts]
+            receipt_id, timestamp = uuid.uuid4().hex, _now_iso()
+            await conn.execute("INSERT INTO memory_consolidation_receipts VALUES(?,?,?,?,?,?,?)",
+                               (receipt_id, operation_id, scope_id, request_digest, draft_digest,
+                                json.dumps(memory_ids), timestamp))
+            await conn.executemany("INSERT INTO memory_consolidation_inputs VALUES(?,?,?,?,?)", [
+                (item.episode_id, item.episode_version, item.scope_id, item.input_digest, receipt_id) for item in inputs
+            ])
+            return MemoryConsolidationReceipt(receipt_id, operation_id, scope_id, tuple(memory_ids), timestamp)
 
     @staticmethod
     async def _create_revision(conn: Any, draft: dict[str, Any]) -> str:
@@ -673,14 +767,16 @@ class ConsolidationJobRepository:
             return
         timestamp = _now_iso()
         async with self._db.transaction() as conn:
-            await conn.executemany(
+            cursor = await conn.executemany(
                 """
                 UPDATE consolidation_jobs
                 SET state='completed',lease_until=NULL,completed_at=?,error_code=NULL
-                WHERE job_id=?
+                WHERE job_id=? AND state='claimed' AND attempt_count=?
                 """,
-                [(timestamp, job.job_id) for job in jobs],
+                [(timestamp, job.job_id, job.attempt_count + 1) for job in jobs],
             )
+            if cursor.rowcount != len(jobs):
+                raise MemoryConsolidationConflictError("旧巩固 claimed attempt 已失效")
 
     async def fail(
         self,
@@ -695,12 +791,12 @@ class ConsolidationJobRepository:
         values = []
         for job in jobs:
             delay = retry_base_seconds * (2 ** min(job.attempt_count, 6))
-            values.append((_iso(now + timedelta(seconds=delay)), error_code, job.job_id))
+            values.append((_iso(now + timedelta(seconds=delay)), error_code, job.job_id, job.attempt_count + 1))
         async with self._db.transaction() as conn:
             await conn.executemany(
                 """
                 UPDATE consolidation_jobs
-                SET state='failed',available_at=?,lease_until=NULL,error_code=? WHERE job_id=?
+                SET state='failed',available_at=?,lease_until=NULL,error_code=? WHERE job_id=? AND state='claimed' AND attempt_count=?
                 """,
                 values,
             )

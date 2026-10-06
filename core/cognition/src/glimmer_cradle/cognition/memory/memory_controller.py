@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 import re
-import numpy as np
 from datetime import datetime
 from typing import Any
 
-from glimmer_cradle.cognition.memory.memory import MemoryKind, MemoryRecord
-from glimmer_cradle.cognition.memory.memory_store import MemoryStore, VectorIndexStore
-from glimmer_cradle.cognition.memory.provenance import normalize_evidence
+import numpy as np
 from glimmer_cradle.cognition.inference import EmbeddingPort
+from glimmer_cradle.cognition.memory.memory import MemoryKind, MemoryRecord
+from glimmer_cradle.cognition.memory.memory_store import (
+    MemoryConsolidationInput,
+    MemoryConsolidationReceipt,
+    MemoryStore,
+    VectorIndexStore,
+)
+from glimmer_cradle.cognition.memory.provenance import normalize_evidence
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 
 _TOKEN_RE = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]")
@@ -93,6 +98,27 @@ class MemoryController:
     async def remember_batch(self, drafts: list[dict[str, Any]]) -> list[str]:
         if self._repo is None:
             raise RuntimeError("MemoryController 未绑定 store")
+        memory_ids = await self._repo.create_revisions(self._normalize_drafts(drafts))
+        await self.load()
+        return memory_ids
+
+    async def find_consolidation(self, item: MemoryConsolidationInput) -> MemoryConsolidationReceipt | None:
+        if self._repo is None:
+            raise RuntimeError("MemoryController 未绑定 store")
+        return await self._repo.find_consolidation(item)
+
+    async def commit_consolidation(
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]]
+    ) -> MemoryConsolidationReceipt:
+        if self._repo is None:
+            raise RuntimeError("MemoryController 未绑定 store")
+        receipt = await self._repo.commit_consolidation(operation_id, inputs, self._normalize_drafts(drafts))
+        # 这一步失败不撤销已经提交的 receipt；下次查询可修复投影而不重新推理。
+        await self.load()
+        return receipt
+
+    @staticmethod
+    def _normalize_drafts(drafts: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for draft in drafts:
             evidence = normalize_evidence(draft.get("evidence", []))
@@ -112,9 +138,7 @@ class MemoryController:
                 "disclosure_scope": str(draft.get("disclosure_scope") or "conversation_private"),
                 "evidence": evidence,
             })
-        memory_ids = await self._repo.create_revisions(normalized)
-        await self.load()
-        return memory_ids
+        return normalized
 
     async def retrieve(self, query: str, *, actor_id: str | None = None,
                        scene_id: str | None = None, limit: int | None = None,

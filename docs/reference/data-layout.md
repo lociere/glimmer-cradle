@@ -31,16 +31,18 @@ Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚�
 unknown，清理终态后仍保留最小身份/审计。旧候选 v1/v2 拒绝隐式升级，不能对旧 Memory 数据库直接应用 Jobs migration。生产路径、备份切点和
 跨库提交须随后续 broker/handler 接线确定，参见[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
 
-现行 Memory schema 3 与数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
-由 `SqliteMemoryStore` 统一持有，详见[认知核持久化实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
-此提交边界不代替跨库 receipt/outbox，也不意味着旧 `consolidation_jobs` 已迁入 Jobs。
+现行 Memory 新库 schema 为 4，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
+由 `SqliteMemoryStore` 统一持有。业务结果 receipt 与修订/evidence 同事务持久化，详见
+[认知核持久化实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
+旧 v3 库拒绝隐式升级，必须保留迁移前备份并按阶段 14 受控迁移；本切片没有改写用户库。
+此提交边界不代替跨库 request outbox 或接收端 fencing，也不意味着旧 `consolidation_jobs` 已迁入 Jobs。
 
 | 路径 | owner | 说明 |
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
-| `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
+| `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition | 可从 Conversation Log 删除重建的 Episode 投影和巩固 checkpoint |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |
