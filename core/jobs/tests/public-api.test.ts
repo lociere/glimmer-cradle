@@ -6,6 +6,27 @@ import * as jobs from '../src/index.js';
 import type { JobRequest } from '../src/index.js';
 
 describe('Jobs public API', () => {
+  it('App 取消调度 signal 后不再 claim；kind 过滤不提前判死其他 owner 的工作', async () => {
+    const store = new jobs.SqliteJobStore(path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-jobs-scheduler-stop-')), 'jobs.sqlite'));
+    const controller = new jobs.JobController(store, { now: () => 1000 }, { base_delay_ms: 1, max_delay_ms: 10 });
+    const request = JSON.parse(readFileSync(path.resolve(__dirname, 'fixtures/job.json'), 'utf8')) as JobRequest;
+    const stop = new AbortController();
+    try {
+      store.activateAuthority(1, 1000);
+      for (const id of ['a', 'b', 'foreign']) store.enqueue({ ...request, job_id: id, idempotency_key: id,
+        kind: id === 'foreign' ? 'other.owner' : request.kind }, 1, 1000);
+      controller.register({ kind: request.kind, retry_mode: request.retry_mode, async execute() {
+        stop.abort(); return { status: 'succeeded', result: {} };
+      } });
+      const scheduler = new jobs.JobScheduler(store, controller, { now: () => 1000 }, 1, 'host', 100, request.kind);
+      await expect(scheduler.runDue(10, stop.signal)).rejects.toMatchObject({ name: 'AbortError' });
+      expect(store.load('a')?.status).toBe('succeeded');
+      expect(store.load('b')).toMatchObject({ status: 'queued', attempt: 0 });
+      expect(store.load('foreign')).toMatchObject({ status: 'queued', attempt: 0 });
+      await expect(scheduler.runDue(10, stop.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    } finally { await controller.stop(); store.close(); }
+  });
+
   it('从公开入口接通 trigger → SQLite → due scheduler → handler → durable result', async () => {
     const store = new jobs.SqliteJobStore(path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-jobs-')), 'jobs.sqlite'));
     let now = 999;

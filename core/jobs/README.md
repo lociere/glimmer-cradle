@@ -38,10 +38,12 @@ retention 仅清理已无待 ACK outbox 的 succeeded/cancelled/dead-letter 大�
 schema version 3 不兼容时拒绝打开，旧候选 v1/v2 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
 本切片不会创建生产数据库或迁移 Memory 库。
 
-已用独立目标 SQLite 验证结果提交/确认丢失与状态 outbox/inbox；真实 Memory 源业务→Job request
-outbox、接收 owner 的生产 fencing/receipt 和跨进程恢复尚未接线。
-尚待实现：Memory producer/handler、Host/Worker
-broker、Jobs 配置 Document 的唯一 catalog/Schema 原子切换以及安装恢复主链。目录存在不代表阶段 7 完成。
+`listUnknown` 按已注册 kind、稳定 Job ID 与有界 cursor 扫描持久恢复集合，旧 authority 拒读。
+Scheduler 可限定已装配的 kind，避免提前判死其他 owner 的工作；App 的 signal 取消后不再 claim。
+真实 Memory 源 outbox、fencing/receipt、App handler/query 与持续调度已通过跨 Worker/Jobs 的临时库验证，
+当前进度和生产 cutover 门见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
+尚待实现：产品 Host/Worker 监督、authority/config 加载、状态事件接收、Jobs 配置 Document 的唯一
+catalog/Schema 原子切换及安装恢复主链；默认生产仍使用旧巩固队列。目录存在不代表阶段 7 完成。
 
 ```powershell
 pnpm --filter @glimmer-cradle/jobs test

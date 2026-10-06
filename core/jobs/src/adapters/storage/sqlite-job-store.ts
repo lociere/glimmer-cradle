@@ -134,6 +134,18 @@ export class SqliteJobStore implements JobStorePort {
     }).deferred();
   }
 
+  public listUnknown(epoch: number, kind: string, limit: number, afterJobId = ''): Job[] {
+    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+      throw new JobConflictError('Job unknown 扫描范围无效');
+    }
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const rows = this.database.prepare(`SELECT * FROM jobs WHERE status='unknown' AND kind=? AND job_id>?
+        ORDER BY job_id LIMIT ?`).all(kind, afterJobId, limit) as JobRow[];
+      return rows.map(row => this.decode(row));
+    }).deferred();
+  }
+
   public acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean {
     assertTimestamp(now);
     return this.database.transaction(() => {
@@ -205,13 +217,15 @@ export class SqliteJobStore implements JobStorePort {
     }).immediate();
   }
 
-  public claim(epoch: number, ownerId: string, now: number, leaseMs: number): JobClaim | null {
+  public claim(epoch: number, ownerId: string, now: number, leaseMs: number, kind?: string): JobClaim | null {
     validateLeaseWindow(now, leaseMs);
     if (!ownerId.trim()) throw new Error('Job lease owner 不得为空');
+    if (kind !== undefined && !kind.trim()) throw new JobConflictError('Job claim kind 无效');
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
       const row = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait') AND due_at<=?
-        AND attempt<max_attempts ORDER BY due_at,created_at,job_id LIMIT 1`).get(now) as JobRow | undefined;
+        AND attempt<max_attempts AND (? IS NULL OR kind=?) ORDER BY due_at,created_at,job_id LIMIT 1`)
+        .get(now, kind ?? null, kind ?? null) as JobRow | undefined;
       if (!row) return null;
       this.database.prepare(`UPDATE jobs SET status='running',revision=revision+1,attempt=attempt+1,
         fencing_token=fencing_token+1,authority_epoch=?,lease_owner=?,lease_until=?,updated_at=? WHERE job_id=?`)

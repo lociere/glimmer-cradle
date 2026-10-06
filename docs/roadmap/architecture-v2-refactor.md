@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox 与目标 Host 源投递/handler/query 已落位并通过真实跨进程验证；生产监督/scheduler/config、状态事件接纳与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query 与持续单循环调度已落位并通过真实跨进程验证；生产进程监督/config/authority、状态事件接纳与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -332,6 +332,27 @@ Contract Spine 完整 22 gate、兼容门、TS/Python/C# source ACK round-trip�
 不代表最终物理目录已完成。独立审查仍归最终固定候选。
 下一步接实际产品监督、Jobs schema/catalog/scheduler 与状态事件接纳，贯通配置选择外部 owner、旧数据
 受控迁移与 consumer-zero 后删除旧巩固队列；阶段 7、整体 Host 迁移与完整重构仍未完成。
+
+### 阶段 7 Host 持续调度生命周期（2026-10-06 当前候选）
+
+上一轮 `d4c7ee44` 已接通 App client/mapper/handler。本轮由当前会话唯一写入 owner 接入
+目标 `apps/host/src/composition/host.ts` 的 Memory Jobs 持续驱动：有界源投递、持久 unknown
+分页对账、到期执行以及可注入的持久状态接收方；不伪造整个 Host readiness 或状态事件 ACK。
+停止先撤销接纳和 timer/RPC，再等待执行封口与循环，最后关闭当前 generation client；Store
+仍由注入它的装配 owner 拥有。authority epoch 由权威 owner 注入，不在循环中生成。
+Core 只增加通用 kind 过滤、分页查询及 signal 截止，不依赖 Cognition 或 App。
+
+已验证真实 Worker 自动执行/响应丢失后的自动对账、重复启动与无重叠循环、取消模型与 drain、
+读源期间停机、跨 authority 拒旧主、非法源失败关闭、unknown 扫描公平性、未知 kind 不被 Memory
+切片提前 dead-letter；Node timer 超限直接拒绝，避免变成 1ms 热循环。Core Jobs 33 项 PASS；
+Host 22 项 PASS。固定输入为 `d4c7ee44` 上本轮 Host composition/公开入口/测试、Core Jobs
+StorePort/SQLite/Scheduler/测试、两包 README 与相关 Current/Implementation/执行记录；未改
+Python、wire、生成物、锁文件或 SQLite schema，上一候选 Cognition/Worker 与契约全量证据可复用。
+根 `pnpm typecheck`、`pnpm build`、架构、111 页文档、编码与 diff 检查 PASS；target-layout
+仍为 spec-only PASS，不代表最终实物完成。本轮未启动生产数据库、迁移真实用户数据或发布产品；
+旧队列因默认生产 consumer 未切换而保留。独立审查仍归整体最终固定候选。
+生产监督/authority 持久配置、配置 schema/catalog、状态事件 wire/inbox、
+未确认源政策快照/retention、旧数据迁移与队列删除仍须继续，不能以此切片声明阶段 7 完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

@@ -6,14 +6,16 @@ import type { JobStorePort } from '../ports/job-store-port.js';
 export class JobScheduler {
   public constructor(private readonly store: JobStorePort, private readonly controller: JobController,
     private readonly clock: JobClockPort, private readonly epoch: number,
-    private readonly ownerId: string, private readonly leaseMs: number) {}
+    private readonly ownerId: string, private readonly leaseMs: number, private readonly kind?: string) {}
 
-  public async runDue(limit: number): Promise<number> {
+  public async runDue(limit: number, signal?: AbortSignal): Promise<number> {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Job tick limit 无效');
+    signal?.throwIfAborted();
     if (this.controller.isAccepting) this.store.materializeDue(this.epoch, this.clock.now(), limit);
     let count = 0;
     while (count < limit && this.controller.isAccepting) {
-      const claim = this.store.claim(this.epoch, this.ownerId, this.clock.now(), this.leaseMs);
+      signal?.throwIfAborted();
+      const claim = this.store.claim(this.epoch, this.ownerId, this.clock.now(), this.leaseMs, this.kind);
       if (!claim) break;
       await this.controller.execute(claim);
       count += 1;

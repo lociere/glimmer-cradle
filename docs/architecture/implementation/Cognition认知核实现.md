@@ -238,7 +238,16 @@ App 将生成 `JobExecutionIdentity` 映射到 `ExecuteMemoryJob`，由 `Reconci
 封口不可用或业务已先提交时不得解释为回滚。`cancelled` 是撤销请求状态，不是未产生 Memory 副作用证明，
 最终生产状态事件接纳仍须呈现真实业务结果/不确定性。`CognitionClient` 不发现或自造监督身份，端点/generation 由监督 owner 注入并在切代时关闭。
 该 App 边界已纳入 workspace 与根 build/typecheck/test，真实跨进程验收使用 Worker Service、Memory/Log
-与 Jobs SQLite；生产 supervisor、配置加载、持续调度、状态事件接纳与旧队列/旧数据切换仍待完成。
+与 Jobs SQLite。
+`apps/host/src/composition/host.ts` 的 `HostJobsController` 以一个可取消 timer 连续驱动源投递、
+到期恢复、有界 unknown 分页、Memory kind 的到期执行和可注入的状态接收方。前一轮完全结束才开始
+下一轮；首个 unknown 暂不可查询不阻塞后续页。重复 start 共用同一启动 Promise；停机先撤销循环
+signal 与执行接纳，等待在途封口和循环后关闭当前 generation client，注入 Store 则由装配方随后关闭。
+快照只描述 Memory Jobs：源 RPC 未 ready/暂不可用时 degraded，unknown 未解决时
+`jobs_recovery_pending`，authority 失效或非法 source/evidence 则 failed 并撤销 client；不得借此宣称
+整个产品 ready。未注入持久状态 receiver 时 outbox 保持待确认，不能假 ACK。实例持有政策副本，
+跨重启的未确认源原政策恢复仍须补齐。生产进程 supervisor、配置/authority 加载、状态事件 wire/inbox
+与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

@@ -21,13 +21,15 @@ export interface JobStorePort {
   activateAuthority(epoch: number, now: number): void;
   enqueue(request: JobRequest, epoch: number, now: number): JobSubmission;
   load(jobId: string): Job | null;
+  /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */
+  listUnknown(epoch: number, kind: string, limit: number, afterJobId?: string): Job[];
   listAttempts(jobId: string): JobAttempt[];
   reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
     policy: RetryPolicy): JobReconciliationReceipt;
   readOutbox(epoch: number, limit: number): JobStateEvent[];
   /** 只有接收方已原子提交业务变化与 event_id inbox 后才能确认。 */
   acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean;
-  claim(epoch: number, ownerId: string, now: number, leaseMs: number): JobClaim | null;
+  claim(epoch: number, ownerId: string, now: number, leaseMs: number, kind?: string): JobClaim | null;
   renew(lease: JobLease, now: number, leaseMs: number): boolean;
   isLeaseCurrent(lease: JobLease, now: number): boolean;
   finish(lease: JobLease, now: number, outcome: JobFinish): boolean;

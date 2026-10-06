@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
@@ -10,7 +10,9 @@ import { create } from '@bufbuild/protobuf';
 import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobController, JobRecoveryController, SqliteJobStore, type Job } from '@glimmer-cradle/jobs';
-import { CognitionClient, CognitionJobAdapter, HostCognitionError, memoryJobIdentity, memoryJobEvidence } from '../src/index.js';
+import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController,
+  memoryJobIdentity, memoryJobEvidence, memoryJobRequest } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
@@ -50,6 +52,183 @@ function memoryCounts(root: string) {
     (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count); }
   finally { db.close(); }
 }
+
+function hostJobs(store: SqliteJobStore, client: CognitionClient, epoch = 1, batch = 8) {
+  return new HostJobsController({ store, clock, epoch, owner_id: `host-${epoch}`, cognition: client,
+    poll_interval_ms: 10, batch_size: batch, lease_ms: 60_000,
+    submission_policy: submissionPolicy, retry_policy: policy });
+}
+async function eventually(predicate: () => boolean) {
+  const deadline = Date.now() + 3000;
+  while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+  expect(predicate()).toBe(true);
+}
+
+describe('Host Memory Jobs 持续驱动与资源归属', () => {
+  it('真实 Worker 自动投递、执行一次；重复 start 共用循环，停机关闭 client 而不关闭注入 Store', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    let activeReads = 0, maxActiveReads = 0;
+    const actualRead = service.client.readRequests.bind(service.client);
+    const reads = vi.spyOn(service.client, 'readRequests').mockImplementation(async (...args: Parameters<CognitionClient['readRequests']>) => {
+      activeReads += 1; maxActiveReads = Math.max(maxActiveReads, activeReads);
+      try { await new Promise(resolve => setTimeout(resolve, 25)); return await actualRead(...args); }
+      finally { activeReads -= 1; }
+    });
+    try {
+      store.activateAuthority(1, clock.now());
+      store.enqueue({ job_id: 'other', scope_id: 'scope', goal_id: 'goal', kind: 'other.owner',
+        idempotency_key: 'other', payload: {}, due_at: 0, retry_mode: 'idempotent', max_attempts: 1 }, 1, clock.now());
+      const first = host.start();
+      expect(host.start()).toBe(first);
+      expect(await first).toMatchObject({ status: 'ready', completed_cycles: 1, error_code: null });
+      await eventually(() => host.snapshot.completed_cycles >= 3);
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+      expect(store.load('other')).toMatchObject({ status: 'queued', attempt: 0 });
+      expect(host.stop()).toBe(host.stop());
+      await host.stop();
+      expect(host.snapshot.status).toBe('stopped');
+      const completedReads = reads.mock.calls.length;
+      await new Promise(resolve => setTimeout(resolve, 40));
+      expect(reads.mock.calls.length).toBe(completedReads);
+      expect(maxActiveReads).toBe(1);
+      expect(activeReads).toBe(0);
+      expect(store.readOutbox(1, 100).length).toBeGreaterThan(0); // 无持久 receiver 不伪造 ACK。
+      await expect(service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 1 }))).rejects.toBeInstanceOf(HostCognitionError);
+      await expect(host.start()).rejects.toThrow('撤销');
+    } finally { await host.stop(); reads.mockRestore(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('真实 Memory 已提交但响应丢失，后续循环从持久 unknown 自动对账，不重复执行', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-recovery-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    const execute = service.client.execute.bind(service.client);
+    const calls = vi.spyOn(service.client, 'execute').mockImplementationOnce(async (...args: Parameters<CognitionClient['execute']>) => {
+      await execute(...args); throw new HostCognitionError(ServiceErrorCode.UNAVAILABLE);
+    });
+    try {
+      expect(await host.start()).toMatchObject({ status: 'degraded', error_code: 'jobs_recovery_pending' });
+      const original = store.listUnknown(1, 'memory.consolidate', 8)[0];
+      expect(original).toBeTruthy();
+      await eventually(() => store.load(original.job_id)?.status === 'succeeded');
+      expect(calls).toHaveBeenCalledTimes(1);
+      expect(store.load(original.job_id)?.attempt).toBe(1);
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+      expect(host.snapshot.status).toBe('ready');
+    } finally { await host.stop(); calls.mockRestore(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('真实模型执行中 stop：先取消并封口，再撤销 client，回收完毕才允许关闭 Store', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-stop-'));
+    const service = await worker(root, 'waiting-model');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    const memory = new Database(path.join(root, 'memory.sqlite'), { readonly: true });
+    try {
+      const starting = host.start();
+      const observed = starting.catch(error => error);
+      await eventually(() => !!memory.prepare("SELECT job_id FROM memory_job_attempts WHERE state='active'").get());
+      await host.stop();
+      expect(await observed).toBeInstanceOf(Error);
+      expect(memory.prepare('SELECT state FROM memory_job_attempts').get()).toEqual({ state: 'sealed' });
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+      expect(store.listUnknown(1, 'memory.consolidate', 8)).toHaveLength(1);
+      expect(host.snapshot.status).toBe('stopped');
+    } finally { await host.stop(); memory.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('源 RPC 等待期间 stop 取消当前 signal，停机后没有 enqueue 或延迟回调', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-read-stop-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    let entered = false, aborted = false;
+    const read = vi.spyOn(service.client, 'readRequests').mockImplementation((_request, signal) => new Promise((_resolve, reject) => {
+      entered = true;
+      signal!.addEventListener('abort', () => { aborted = true; reject(signal!.reason); }, { once: true });
+    }));
+    try {
+      const observed = host.start().catch(error => error);
+      await eventually(() => entered);
+      await host.stop();
+      expect(await observed).toBeInstanceOf(Error);
+      expect(aborted).toBe(true);
+      expect(store.claim(1, 'check', clock.now(), 100)).toBeNull();
+      expect(host.snapshot.completed_cycles).toBe(0);
+    } finally { await host.stop(); read.mockRestore(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('暂未 ready 不冒充 ready；随后恢复，而持久分页不被首个 unavailable unknown 阻塞', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-pagination-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client, 2, 1);
+    const read = vi.spyOn(service.client, 'readRequests').mockRejectedValueOnce(new HostCognitionError(ServiceErrorCode.NOT_READY));
+    const query = service.client.reconcile.bind(service.client);
+    const queries = vi.spyOn(service.client, 'reconcile').mockImplementation((request, signal) => {
+      if (request.identity?.jobId === 'a') return Promise.reject(new HostCognitionError(ServiceErrorCode.UNAVAILABLE));
+      return query(request, signal);
+    });
+    try {
+      // 用真正源输入创建两个在途原身份，转移后分别成为未知；所有查询仍走真实接收 owner。
+      const actualRead = CognitionClient.prototype.readRequests.bind(service.client);
+      const request = memoryJobRequest((await actualRead(create(ReadMemoryJobRequestsRequestSchema, { limit: 1 }))).requests[0], submissionPolicy);
+      store.activateAuthority(1, clock.now());
+      for (const id of ['a', 'b']) {
+        store.enqueue({ ...request, job_id: id, idempotency_key: id, max_attempts: 1 }, 1, clock.now());
+        expect(store.claim(1, 'old', clock.now(), 60_000, 'memory.consolidate')?.job.job_id).toBe(id);
+      }
+      expect(await host.start()).toMatchObject({ status: 'degraded', error_code: 'cognition_unavailable' });
+      await eventually(() => store.load('b')?.status === 'dead_letter');
+      expect(store.load('a')?.status).toBe('unknown');
+      expect(queries.mock.calls.map(([request]) => request.identity?.jobId)).toContain('b');
+      expect(host.snapshot.status).toBe('degraded');
+    } finally { await host.stop(); read.mockRestore(); queries.mockRestore(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('authority 切换后旧循环失败关闭，不重新激活旧主或继续投递', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-fenced-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const other = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    try {
+      await host.start();
+      other.activateAuthority(2, clock.now());
+      await eventually(() => host.snapshot.status === 'failed');
+      expect(host.snapshot.error_code).toBe('jobs_cycle_failed');
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+      await expect(service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 1 }))).rejects.toBeInstanceOf(HostCognitionError);
+      expect(other.claim(2, 'new', clock.now(), 100)).toBeNull();
+      await expect(host.start()).rejects.toThrow('撤销');
+    } finally { await host.stop(); other.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('非法源摘要导致失败关闭，而不是后台重复吞错或将源 ACK', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-loop-bad-source-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = hostJobs(store, service.client);
+    const actualRead = service.client.readRequests.bind(service.client);
+    const reads = vi.spyOn(service.client, 'readRequests').mockImplementation(async (...args: Parameters<CognitionClient['readRequests']>) => {
+      const response = await actualRead(...args); response.requests[0].inputDigest = 'invalid'; return response;
+    });
+    const acks = vi.spyOn(service.client, 'acknowledge');
+    try {
+      await expect(host.start()).rejects.toThrow('摘要');
+      expect(host.snapshot).toMatchObject({ status: 'failed', error_code: 'jobs_cycle_failed', completed_cycles: 0 });
+      expect(acks).not.toHaveBeenCalled();
+      expect(store.claim(1, 'check', clock.now(), 100)).toBeNull();
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+      await new Promise(resolve => setTimeout(resolve, 40));
+      expect(reads).toHaveBeenCalledTimes(1);
+    } finally { await host.stop(); reads.mockRestore(); acks.mockRestore(); store.close(); await service.stop(); }
+  }, 30_000);
+});
 
 describe('Host Jobs 消费真实 Worker Memory owner', () => {
   it('源 enqueue 已提交而 ACK 丢失：重开 Jobs 原请求重放并完成一次 Memory', async () => {
