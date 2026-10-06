@@ -25,6 +25,11 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 ## 用户状态与记忆
 
+Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚未由产品 Host 装配创建生产库，
+因此本表不提前声明新的已运行数据路径。其 schema version/owner 标记、Job/lease/attempt 与去重
+tombstone 独立于 Memory；不能对旧 Memory 数据库直接应用 Jobs migration。生产路径、备份切点和
+跨库提交须随后续 broker/handler 接线确定，参见[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
+
 | 路径 | owner | 说明 |
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |

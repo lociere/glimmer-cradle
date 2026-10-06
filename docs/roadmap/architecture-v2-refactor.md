@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 待执行 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等触发、due/attempt、lease/fencing、authority 拒旧写、handler、取消、恢复与 retention 基础已实现；持久周期 trigger、跨库提交、Memory consumer 与 Host/Worker broker 接线待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -139,6 +139,33 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | Kernel composition、Surface history 与 skill action 接线 | `apps/host/src/adapters/protocol/conversation-mapper.ts`、`composition/{domain-owners.ts,turn-processor-adapter.ts}`、`gateway/conversation-routes.ts` | 阶段 12/15 消费者切换并通过本地/headless 共用 Host 验收后删除旧 Kernel 业务接线 |
 
 ## 兼容窗口与删除门
+
+### 阶段 7 Jobs 基础切片计划（2026-10-06）
+
+阶段 5 的 Memory 巩固仍持有私有 durable queue，不能把该队列改名后认作 Jobs。
+先补目标 `core/jobs` 的真实独立执行 owner：SQLite 单写者、scope 内幂等触发、due time、
+持久 attempt、单调 fencing token、租约续期/失效、authority epoch 拒旧写、取消与 retention。
+JobController 通过 App 注册 handler 执行；Scheduler 只处理调度，不理解 Memory 或认知目标。
+默认无法证明幂等的工作在执行中断后进入 unknown，只有显式 idempotent 工作可自动重试。
+验证重复/冲突触发、双连接 claim、过期与旧代拒写、重启恢复、取消后的晚到结果和保留窗口。
+此切片只创建独立库，不读取或迁移用户 Memory 数据；Memory producer/handler、跨库提交协议、
+Host/Worker broker 和 Jobs 配置 Schema/catalog 的原子切换继续留待后续接线，阶段 7 不提前完成。
+
+实现候选：`core/jobs` 的独立 SQLite adapter/消费方 Port、JobController、Scheduler、TriggerController、
+Recovery/Retention controller 及五份目标测试已落位，根 build/test 纳入私有 `0.1.0` 包，pnpm 锁只增加
+该 importer，未升级第三方依赖。库使用 owner/application ID 与 schema version 拒绝误用旧库；claim、
+续期、完成、authority 切换和去重均为独立 IMMEDIATE 事务，不跨 await 持有 SQLite 写锁。
+完成与续期要求 live lease、当前 epoch/owner/token；取消持久撤销后才传播 AbortSignal，晚到成功不改写
+取消事实。执行只读取持久 Job，不信调用方 claim snapshot；重复同 attempt 共用执行 Promise。
+handler 异常只记录稳定错误码；非幂等副作用不明进入 unknown，明确幂等且未耗尽 attempt 才退避重试。
+retention 不删除 unknown，终态清理保留 scope/key/digest 的 tombstone，不能因清理重新触发。
+
+当前候选验证：Jobs 15 项 PASS（真实 SQLite 双连接、关闭/重开、过期边界、旧 authority/owner/token、
+续期不缩短、重复/冲突触发、claim 内容伪造、handler 策略/失败、取消/收尾及 retention）；Jobs typecheck/build、
+offline frozen install、根 typecheck/build、architecture、目标清单规格、docs/encoding/diff PASS。
+根验证之后新增的 Jobs 反例/收尾策略已由同包 typecheck/build 重验，其余根构建输入不变。
+未完成项仍为上文持久周期/事件 trigger、cross-store commit/unknown 对账、真实 Memory 与 broker 消费方、
+安装/恢复和固定候选独立审查；未创建生产库、迁移运行数据或宣称阶段 7 完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

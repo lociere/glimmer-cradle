@@ -100,6 +100,25 @@ importers:
         specifier: ^0.34.6
         version: 0.34.6(playwright@1.61.0)
 
+  core/jobs:
+    dependencies:
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: ^0.34.6
+        version: 0.34.6(playwright@1.61.0)
+
   core/kernel:
     dependencies:
       '@bufbuild/protobuf':

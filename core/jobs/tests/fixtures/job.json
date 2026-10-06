@@ -1,0 +1,5 @@
+{
+  "job_id": "job-1", "scope_id": "scope-1", "goal_id": "goal-1", "kind": "test.reconcile",
+  "idempotency_key": "event-1", "payload": { "evidence_id": "evidence-1" },
+  "due_at": 1000, "retry_mode": "reconcile", "max_attempts": 3
+}
