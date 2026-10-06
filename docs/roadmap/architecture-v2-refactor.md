@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等触发、due/attempt、lease/fencing、authority 拒旧写、handler、取消、恢复与 retention 基础已实现；持久周期 trigger、跨库提交、Memory consumer 与 Host/Worker broker 接线待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久事件/周期 trigger、due/attempt、lease/fencing、authority 拒旧写、handler、取消、恢复与 retention 已实现；跨库提交、unknown 对账、Memory consumer 与 Host/Worker broker 接线待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -166,6 +166,24 @@ offline frozen install、根 typecheck/build、architecture、目标清单规格
 根验证之后新增的 Jobs 反例/收尾策略已由同包 typecheck/build 重验，其余根构建输入不变。
 未完成项仍为上文持久周期/事件 trigger、cross-store commit/unknown 对账、真实 Memory 与 broker 消费方、
 安装/恢复和固定候选独立审查；未创建生产库、迁移运行数据或宣称阶段 7 完成。
+
+后续持久触发切片：事件 occurrence 与 Job 入队在同一 Jobs SQLite 事务确认；周期触发的 occurrence、
+next due 与入队也在同一事务提交。定义保持不可变，同 trigger ID 的内容冲突失败关闭；启停使用 revision CAS，
+已确认 occurrence 保留稳定身份，重复 tick 或重启不重放。UTC 固定间隔显式选择 all/latest 补偿政策，
+每次 materialize 有界；禁用不取消已生成 Job。测试覆盖断点回滚、双连接竞争、停用/旧 revision、
+晚到/重复事件、周期 backlog 与重启恢复。新库 schema version 升为 2，旧候选 v1 库拒绝自动改写，
+生产库尚未创建；配置 Schema/catalog、产品接线及跨库提交不在这个触发切片中伪造完成。
+
+持久触发实现候选（2026-10-06）：目标 `schedule.ts`/`trigger.ts` 与实际 SQLite/Scheduler 已接通；
+事件 occurrence 与固定 input 分区，事件不能覆盖模板；已确认事件在停用后仍可返回 duplicate，
+新的事件被拒绝。周期 next due、occurrence 与 Job 在同一 IMMEDIATE 事务确认，all/latest 明确区分
+逐项补偿与只取最近到期项，最多 1000 项/批。两真实 Node 进程同时触发同一 SQLite 周期只生成
+一组身份；在第二个 occurrence INSERT 注入 SQLite ABORT 时，第一项 Job/receipt 与 checkpoint
+全部回滚，移除 fixture 故障后从原 due 完整恢复。一次性 trigger 经真实 Scheduler 调用 handler
+后 checkpoint 终结，重复 tick 不执行。旧候选 v1 库拒绝隐式升级并保留原 Job/版本。
+Jobs 22 项、根 typecheck/build PASS；architecture、目标清单规格、docs/encoding/diff PASS。
+运行库路径/用户数据、跨进程 wire 与第三方依赖均未改变；仍不宣称 broker/Memory 接线、
+跨库提交、unknown 对账或阶段 7 的完整安装恢复门已完成，独立审查留待固定最终候选。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

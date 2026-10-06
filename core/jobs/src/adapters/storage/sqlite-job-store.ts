@@ -6,9 +6,15 @@ import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type
 import type { JobClaim, JobFinish, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
+import { initialScheduleDue, scheduledOccurrence } from '../../scheduling/schedule.js';
+import { validateTriggerDefinition, type JobTrigger, type JobTriggerDefinition, type JobTriggerEvent } from '../../triggers/trigger.js';
 
 type JobRow = Omit<Job, 'payload' | 'result'> & { payload_json: string; result_json: string | null; request_digest: string };
 type Tombstone = { job_id: string; scope_id: string; idempotency_key: string; request_digest: string; revision: number };
+type TriggerRow = Omit<JobTrigger, 'definition' | 'enabled'> & {
+  trigger_id: string; definition_json: string; definition_digest: string; enabled: number;
+};
+type OccurrenceRow = { occurrence_digest: string; job_id: string };
 
 function canonicalJson(value: unknown, seen = new Set<object>()): string {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
@@ -41,12 +47,14 @@ export class SqliteJobStore implements JobStorePort {
           throw new Error('未知 Jobs 数据库；须先执行受控迁移');
         }
         this.database.transaction(() => this.database.exec(readFileSync(migrationPath, 'utf8'))).immediate();
-      } else if (version !== 1) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
+      } else if (version !== 2) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
       if (this.database.pragma('application_id', { simple: true }) !== 0x47434a42) {
         throw new Error('Jobs 数据库 owner 标记无效');
       }
       this.database.prepare('SELECT epoch FROM job_authority').all();
       this.database.prepare('SELECT job_id,request_digest,status,fencing_token FROM jobs LIMIT 0').all();
+      this.database.prepare('SELECT definition_json,next_due_at FROM job_triggers LIMIT 0').all();
+      this.database.pragma('foreign_keys = ON');
       this.database.pragma('journal_mode = WAL');
     } catch (error) { this.database.close(); throw error; }
   }
@@ -204,6 +212,110 @@ export class SqliteJobStore implements JobStorePort {
   }
 
   public close(): void { if (this.database.open) this.database.close(); }
+
+  public registerTrigger(definition: JobTriggerDefinition, epoch: number, now: number): JobTrigger {
+    validateTriggerDefinition(definition);
+    assertTimestamp(now);
+    const document = canonicalJson(definition);
+    const digest = createHash('sha256').update(document).digest('hex');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const current = this.database.prepare('SELECT * FROM job_triggers WHERE trigger_id=?')
+        .get(definition.trigger_id) as TriggerRow | undefined;
+      if (current) {
+        if (current.definition_digest !== digest) throw new JobConflictError('Job trigger definition 冲突');
+        return this.decodeTrigger(current);
+      }
+      const due = definition.schedule === null ? null : initialScheduleDue(definition.schedule);
+      this.database.prepare(`INSERT INTO job_triggers(trigger_id,definition_json,definition_digest,revision,enabled,
+        next_due_at,last_due_at,created_at,updated_at) VALUES(?,?,?,1,1,?,NULL,?,?)`)
+        .run(definition.trigger_id, document, digest, due, now, now);
+      return this.loadTrigger(definition.trigger_id)!;
+    }).immediate();
+  }
+
+  public loadTrigger(triggerId: string): JobTrigger | null {
+    const row = this.database.prepare('SELECT * FROM job_triggers WHERE trigger_id=?').get(triggerId) as TriggerRow | undefined;
+    return row ? this.decodeTrigger(row) : null;
+  }
+
+  public setTriggerEnabled(triggerId: string, epoch: number, expectedRevision: number, enabled: boolean, now: number): JobTrigger | null {
+    assertTimestamp(now);
+    if (typeof enabled !== 'boolean') throw new Error('Job trigger enabled 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const changed = this.database.prepare(`UPDATE job_triggers SET enabled=?,revision=revision+1,updated_at=?
+        WHERE trigger_id=? AND revision=?`).run(enabled ? 1 : 0, now, triggerId, expectedRevision).changes;
+      return changed ? this.loadTrigger(triggerId) : null;
+    }).immediate();
+  }
+
+  public emitEvent(triggerId: string, event: JobTriggerEvent, epoch: number, now: number): JobSubmission {
+    assertTimestamp(now);
+    assertTimestamp(event.occurred_at);
+    if (!event.event_id?.trim() || event.occurred_at > now) throw new Error('Job event identity/time 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const trigger = this.loadTrigger(triggerId);
+      if (!trigger || trigger.definition.schedule !== null) throw new Error('Job event trigger 不存在或类型错误');
+      validateJobRequest({ ...trigger.definition, job_id: triggerId, idempotency_key: event.event_id,
+        payload: event.payload, due_at: event.occurred_at });
+      return this.materializeOccurrence(trigger, `event:${event.event_id}`, event.occurred_at, event.payload, epoch, now);
+    }).immediate();
+  }
+
+  public materializeDue(epoch: number, now: number, limit: number): JobSubmission[] {
+    assertTimestamp(now);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Job trigger batch limit 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const submissions: JobSubmission[] = [];
+      while (submissions.length < limit) {
+        const row = this.database.prepare(`SELECT * FROM job_triggers WHERE enabled=1 AND next_due_at<=?
+          ORDER BY next_due_at,trigger_id LIMIT 1`).get(now) as TriggerRow | undefined;
+        if (!row) break;
+        const trigger = this.decodeTrigger(row);
+        if (trigger.definition.schedule === null || trigger.next_due_at === null) throw new Error('Job schedule checkpoint 损坏');
+        const occurrence = scheduledOccurrence(trigger.definition.schedule, trigger.next_due_at, now);
+        submissions.push(this.materializeOccurrence(trigger, `schedule:${occurrence.due_at}`, occurrence.due_at, {}, epoch, now));
+        this.database.prepare(`UPDATE job_triggers SET next_due_at=?,last_due_at=?,revision=revision+1,updated_at=? WHERE trigger_id=?`)
+          .run(occurrence.next_due_at, occurrence.due_at, now, trigger.definition.trigger_id);
+      }
+      return submissions;
+    }).immediate();
+  }
+
+  private materializeOccurrence(trigger: JobTrigger, occurrenceId: string, dueAt: number,
+    eventPayload: Readonly<Record<string, unknown>>, epoch: number, now: number): JobSubmission {
+    const definition = trigger.definition;
+    const digest = createHash('sha256').update(canonicalJson({ due_at: dueAt, payload: eventPayload })).digest('hex');
+    const existing = this.database.prepare('SELECT occurrence_digest,job_id FROM job_trigger_occurrences WHERE trigger_id=? AND occurrence_id=?')
+      .get(definition.trigger_id, occurrenceId) as OccurrenceRow | undefined;
+    if (existing) {
+      if (existing.occurrence_digest !== digest) throw new JobConflictError('Job occurrence 内容冲突');
+      const job = this.load(existing.job_id);
+      const retired = this.database.prepare('SELECT revision FROM job_tombstones WHERE job_id=?')
+        .get(existing.job_id) as { revision: number } | undefined;
+      if (!job && !retired) throw new Error('Job occurrence 对应的持久身份丢失');
+      return { job, job_id: existing.job_id, revision: job?.revision ?? retired!.revision, duplicate: true };
+    }
+    if (!trigger.enabled) throw new Error('Job trigger 已停用');
+    const key = createHash('sha256').update(canonicalJson([definition.scope_id, definition.trigger_id, occurrenceId])).digest('hex');
+    const submission = this.enqueue({
+      job_id: `job-${key}`, scope_id: definition.scope_id, goal_id: definition.goal_id,
+      kind: definition.kind, idempotency_key: `trigger:${key}`,
+      payload: { input: definition.payload, occurrence: { occurrence_id: occurrenceId, occurred_at: dueAt, payload: eventPayload } },
+      due_at: dueAt, retry_mode: definition.retry_mode, max_attempts: definition.max_attempts,
+    }, epoch, now);
+    this.database.prepare('INSERT INTO job_trigger_occurrences VALUES(?,?,?,?,?)')
+      .run(definition.trigger_id, occurrenceId, digest, submission.job_id, now);
+    return submission;
+  }
+
+  private decodeTrigger(row: TriggerRow): JobTrigger {
+    const { trigger_id: id, definition_json, definition_digest: digest, enabled, ...state } = row;
+    return { ...state, definition: JSON.parse(definition_json), enabled: enabled === 1 };
+  }
 
   private currentEpoch(): number | null {
     const row = this.database.prepare('SELECT epoch FROM job_authority WHERE singleton=1').get() as { epoch: number } | undefined;

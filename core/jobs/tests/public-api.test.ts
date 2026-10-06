@@ -96,4 +96,32 @@ describe('Jobs public API', () => {
       if (scenario.expected === 'retry_wait') expect(store.load(base.job_id)?.due_at).toBe(1025);
     } finally { await controller.stop(); store.close(); }
   });
+
+  it('真实 Scheduler 把一次性 trigger 持久入队并交给受控 handler，仅执行一次', async () => {
+    const store = new jobs.SqliteJobStore(path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-jobs-trigger-chain-')), 'jobs.sqlite'));
+    let now = 999;
+    const clock = { now: () => now };
+    const controller = new jobs.JobController(store, clock, { base_delay_ms: 25, max_delay_ms: 100 });
+    const received: unknown[] = [];
+    try {
+      store.activateAuthority(1, now);
+      const trigger = new jobs.JobTriggerController(store, clock, 1);
+      trigger.register({ trigger_id: 'once', scope_id: 'scope', goal_id: 'goal', kind: 'test.once',
+        payload: { evidence_id: 'fact' }, retry_mode: 'reconcile', max_attempts: 1, schedule: { kind: 'once', due_at: 1000 } });
+      controller.register({ kind: 'test.once', retry_mode: 'reconcile', async execute(context, payload) {
+        context.assertLease();
+        received.push(payload);
+        return { status: 'succeeded', result: { done: true } };
+      } });
+      const scheduler = new jobs.JobScheduler(store, controller, clock, 1, 'worker', 100);
+      expect(await scheduler.runDue(10)).toBe(0);
+      now = 1000;
+      expect(await scheduler.runDue(10)).toBe(1);
+      expect(received).toEqual([{ input: { evidence_id: 'fact' }, occurrence: {
+        occurrence_id: 'schedule:1000', occurred_at: 1000, payload: {},
+      } }]);
+      expect(store.loadTrigger('once')).toMatchObject({ next_due_at: null, last_due_at: 1000 });
+      expect(await scheduler.runDue(10)).toBe(0);
+    } finally { await controller.stop(); store.close(); }
+  });
 });

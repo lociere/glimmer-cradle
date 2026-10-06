@@ -20,5 +20,16 @@ CREATE TABLE job_tombstones(
   request_digest TEXT NOT NULL, terminal_status TEXT NOT NULL, revision INTEGER NOT NULL,
   UNIQUE(scope_id,idempotency_key)
 );
-PRAGMA user_version=1;
+CREATE TABLE job_triggers(
+  trigger_id TEXT PRIMARY KEY, definition_json TEXT NOT NULL, definition_digest TEXT NOT NULL,
+  revision INTEGER NOT NULL CHECK(revision>0), enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+  next_due_at INTEGER, last_due_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+);
+CREATE INDEX job_triggers_due ON job_triggers(enabled,next_due_at);
+CREATE TABLE job_trigger_occurrences(
+  trigger_id TEXT NOT NULL REFERENCES job_triggers(trigger_id), occurrence_id TEXT NOT NULL,
+  occurrence_digest TEXT NOT NULL, job_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+  PRIMARY KEY(trigger_id,occurrence_id)
+);
+PRAGMA user_version=2;
 PRAGMA application_id=0x47434a42;

@@ -10,6 +10,7 @@ export class JobScheduler {
 
   public async runDue(limit: number): Promise<number> {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Job tick limit 无效');
+    if (this.controller.isAccepting) this.store.materializeDue(this.epoch, this.clock.now(), limit);
     let count = 0;
     while (count < limit && this.controller.isAccepting) {
       const claim = this.store.claim(this.epoch, this.ownerId, this.clock.now(), this.leaseMs);

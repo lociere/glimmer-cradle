@@ -1,6 +1,7 @@
 import type { Job, JobRequest } from '../execution/job.js';
 import type { JobLease } from '../scheduling/job-lease.js';
 import type { RetryPolicy } from '../recovery/retry-policy.js';
+import type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from '../triggers/trigger.js';
 
 export interface JobClaim { readonly job: Job; readonly lease: JobLease; }
 export interface JobSubmission {
@@ -27,4 +28,9 @@ export interface JobStorePort {
   cancel(jobId: string, epoch: number, expectedRevision: number, now: number): Job | null;
   recoverExpired(epoch: number, now: number, policy: RetryPolicy): number;
   pruneTerminal(epoch: number, before: number): number;
+  registerTrigger(definition: JobTriggerDefinition, epoch: number, now: number): JobTrigger;
+  loadTrigger(triggerId: string): JobTrigger | null;
+  setTriggerEnabled(triggerId: string, epoch: number, expectedRevision: number, enabled: boolean, now: number): JobTrigger | null;
+  emitEvent(triggerId: string, event: JobTriggerEvent, epoch: number, now: number): JobSubmission;
+  materializeDue(epoch: number, now: number, limit: number): JobSubmission[];
 }

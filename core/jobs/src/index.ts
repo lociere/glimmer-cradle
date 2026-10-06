@@ -13,3 +13,5 @@ export type { RetryPolicy } from './recovery/retry-policy.js';
 export type { JobLease } from './scheduling/job-lease.js';
 export { JobScheduler } from './scheduling/scheduler.js';
 export { JobTriggerController } from './triggers/trigger-controller.js';
+export type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from './triggers/trigger.js';
+export type { JobSchedule } from './scheduling/schedule.js';
