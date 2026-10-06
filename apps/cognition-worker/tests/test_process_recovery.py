@@ -1,5 +1,7 @@
+import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
 import pytest
@@ -17,6 +19,10 @@ from glimmer_cradle.cognition_worker.composition import (
     compose_cognition,
     map_character_runtime_document,
 )
+from glimmer_cradle.cognition_worker.readiness import (
+    WORKER_READY_COMPONENTS,
+    ReadinessTracker,
+)
 from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
 
 
@@ -25,6 +31,124 @@ def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:
     monkeypatch.setattr(process, "_read_supervisor_bootstrap", lambda: (_ for _ in ()).throw(ValueError("missing")))
 
     assert process.main([]) == 1
+
+
+def test_readiness_requires_every_component_and_cannot_reopen_during_stop() -> None:
+    readiness = ReadinessTracker(WORKER_READY_COMPONENTS)
+    readiness.begin_startup()
+    for component in WORKER_READY_COMPONENTS - {"initial_state_sync"}:
+        readiness.mark_ready(component)
+    assert not readiness.is_ready
+    assert readiness.missing == frozenset({"initial_state_sync"})
+    readiness.mark_degraded("loop", "checkpoint recovery failed")
+    assert readiness.state == "degraded"
+    readiness.mark_ready("initial_state_sync")
+    assert not readiness.is_ready
+    readiness.mark_ready("loop")
+    assert readiness.state == "ready"
+    readiness.begin_shutdown()
+    assert readiness.state == "stopping" and not readiness.is_ready
+    with pytest.raises(RuntimeError, match="停机"):
+        readiness.mark_ready("loop")
+    readiness.mark_stopped()
+    assert readiness.state == "stopped"
+    with pytest.raises(ValueError, match="unknown"):
+        readiness.mark_ready("unregistered")
+
+
+@pytest.mark.parametrize("projection_fails", [False, True])
+async def test_production_worker_waits_for_first_state_projection_before_ready(
+    monkeypatch, projection_fails: bool,
+) -> None:
+    import grpc
+    from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+    from glimmer.common.v1 import service_contract_pb2 as common_pb
+    from glimmer_cradle.cognition_worker import composition
+
+    projection_entered, projection_release = asyncio.Event(), asyncio.Event()
+
+    async def nothing(*_args) -> None:
+        pass
+
+    def component():
+        return SimpleNamespace(connect=nothing, start=nothing, stop=nothing, close=nothing,
+                               load=nothing, load_persisted=nothing)
+
+    components = SimpleNamespace(
+        conversation_recorder=component(), state_store=component(), planning_store=component(),
+        knowledge_store=component(), checkpoint_store=component(), cognition_database=component(),
+        turn_controller=component(), conversation_controller=component(), memory_substrate=component(),
+        knowledge_base=component(), maintenance_scheduler=component(),
+        activity_controller=SimpleNamespace(start=nothing, stop=nothing, on_transition=lambda _f: None),
+        cycle_controller=component(), inbound_adapter=None, observation_queue=None,
+        perception_operations=None, workspace=None,
+        character_session=SimpleNamespace(wake_up=lambda: None, sleep=lambda: None,
+                                          get_state=lambda: {"name": "test", "is_awake": True}),
+    )
+    monkeypatch.setattr(composition, "compose_cognition", lambda *_args, **_kwargs: components)
+    for method in ("start_metrics", "start_tracer", "stop_metrics", "stop_tracer"):
+        monkeypatch.setattr(process, method, nothing)
+
+    class KernelClient:
+        def __init__(self, *_args) -> None:
+            pass
+
+        start = stop = nothing
+        send_action_command = nothing
+
+        async def send_state_sync(self, _state) -> None:
+            projection_entered.set()
+            await projection_release.wait()
+            if projection_fails:
+                raise RuntimeError("injected initial projection failure")
+
+    monkeypatch.setattr(process, "KernelGrpcClient", KernelClient)
+    host = process.CognitionHost(
+        config=SimpleNamespace(manifest=SimpleNamespace(base=SimpleNamespace(name="test"))),
+        kernel_endpoint="grpc://127.0.0.1:1", generation="test", registration_nonce="test",
+        registration_secret=bytearray(b"test"),
+    )
+    startup = asyncio.create_task(host.start())
+    channel = None
+    try:
+        await asyncio.wait_for(projection_entered.wait(), timeout=1)
+        channel = grpc.aio.insecure_channel(host.cognition_grpc_host.endpoint.removeprefix("grpc://"))
+        readiness = channel.unary_unary(
+            "/glimmer.cognition.v1.CognitionService/GetReadiness",
+            request_serializer=cognition_pb.GetReadinessRequest.SerializeToString,
+            response_deserializer=cognition_pb.GetReadinessResponse.FromString,
+        )
+        request = cognition_pb.GetReadinessRequest(call=common_pb.CallMetadata(
+            trace_id="readiness-test", generation="test"))
+        before = await readiness(request, timeout=1)
+        assert (before.state, before.phase) == ("starting", "domain_starting")
+        assert host.readiness.missing == frozenset({"initial_state_sync"})
+        submit = channel.unary_unary(
+            "/glimmer.cognition.v1.CognitionService/SubmitPerception",
+            request_serializer=cognition_pb.SubmitPerceptionRequest.SerializeToString,
+            response_deserializer=cognition_pb.SubmitPerceptionResponse.FromString,
+        )
+        with pytest.raises(grpc.aio.AioRpcError) as rejected:
+            await submit(cognition_pb.SubmitPerceptionRequest(call=common_pb.CallMetadata(
+                trace_id="early-input", generation="test")), timeout=1)
+        assert rejected.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+        projection_release.set()
+        if projection_fails:
+            with pytest.raises(RuntimeError, match="initial projection failure"):
+                await asyncio.wait_for(startup, timeout=3)
+            assert host.readiness.state == "stopped"
+            assert host.cognition_grpc_host is None and host.kernel_client is None
+        else:
+            await asyncio.wait_for(startup, timeout=1)
+            after = await readiness(request, timeout=1)
+            assert (after.state, after.phase, after.generation) == ("ready", "ready", "test")
+    finally:
+        projection_release.set()
+        await asyncio.wait_for(asyncio.gather(startup, return_exceptions=True), timeout=3)
+        if channel is not None:
+            await channel.close()
+        await host.stop()
+        process._boot_id = None
 
 
 def test_main_returns_failure_for_invalid_config(monkeypatch) -> None:

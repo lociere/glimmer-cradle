@@ -56,6 +56,8 @@ from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
     history_query_from_wire,
     history_result_to_wire,
 )
+from glimmer_cradle.cognition_worker.readiness import ReadinessTracker, WORKER_READY_COMPONENTS
+from glimmer_cradle.cognition_worker.shutdown import ShutdownCoordinator, cancel_task, worker_shutdown_steps
 
 
 def ensure_dir(path: Path) -> Path:
@@ -1363,6 +1365,7 @@ class CognitionGrpcHost:
         shutdown: Callable[[], Awaitable[None]],
         operations: PerceptionOperationRegistry,
         workspace: AttentionController,
+        readiness: ReadinessTracker | None = None,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -1374,8 +1377,7 @@ class CognitionGrpcHost:
         self._workspace = workspace
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
-        self._phase = "binding"
-        self._ready = False
+        self._readiness_tracker = readiness or ReadinessTracker(frozenset({"domain"}))
         self._inflight: dict[str, asyncio.Task[Any]] = {}
         self._completed: OrderedDict[str, None] = OrderedDict()
 
@@ -1408,26 +1410,27 @@ class CognitionGrpcHost:
         await server.start()
         self._server = server
         self._endpoint = f"grpc://127.0.0.1:{port}"
-        self._phase = "domain_starting"
+        self._readiness_tracker.phase = "domain_starting"
         transport_logger.info("Cognition gRPC Service 已绑定动态回环端点")
 
     def mark_ready(self) -> None:
-        self._ready = True
-        self._phase = "ready"
+        self._readiness_tracker.mark_ready("domain")
 
     async def stop(self) -> None:
-        self._ready = False
-        self._phase = "stopping"
-        for task in tuple(self._inflight.values()):
+        self._readiness_tracker.begin_shutdown()
+        inflight = tuple(self._inflight.values())
+        for task in inflight:
             if not task.done():
                 task.cancel()
+        if inflight:
+            await asyncio.gather(*inflight, return_exceptions=True)
         self._inflight.clear()
         if self._server is not None:
             await self._server.stop(grace=1.0)
             await self._server.wait_for_termination(timeout=2.0)
             self._server = None
         self._endpoint = None
-        self._phase = "stopped"
+        self._readiness_tracker.mark_stopped()
 
     @staticmethod
     def _method(handler: Callable[..., Awaitable[Any]], request_type: Any, response_type: Any) -> Any:
@@ -1444,9 +1447,13 @@ class CognitionGrpcHost:
             raise ServiceFault(common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH, "Kernel 调用世代已失效")
         return call.trace_id
 
-    async def _invoke(self, request: Any, context: grpc.aio.ServicerContext, operation: Callable[[str], Awaitable[Any]], *, track: bool = False) -> Any:
+    async def _invoke(self, request: Any, context: grpc.aio.ServicerContext, operation: Callable[[str], Awaitable[Any]], *, track: bool = False, require_ready: bool = False, allow_stopping: bool = False) -> Any:
         try:
             trace_id = self._assert_call(request.call)
+            if not allow_stopping and self._readiness_tracker.phase in {"stopping", "stopped"}:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Worker 已停止接纳请求")
+            if require_ready and not self._readiness_tracker.is_ready:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Worker 尚未业务就绪", retryable=True)
             with TraceContext(trace_id):
                 task = asyncio.current_task()
                 if track and task is not None:
@@ -1509,7 +1516,7 @@ class CognitionGrpcHost:
                 state=_perception_state(perception_operation.state),
                 duplicate=duplicate,
             )
-        return await self._invoke(request, context, operation)
+        return await self._invoke(request, context, operation, require_ready=True)
 
     async def _cancel_perception(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
@@ -1524,7 +1531,7 @@ class CognitionGrpcHost:
                 state=_perception_state(perception_operation.state),
                 terminal=perception_operation.terminal,
             )
-        return await self._invoke(request, context, operation)
+        return await self._invoke(request, context, operation, allow_stopping=True)
 
     async def _get_perception_operation(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
@@ -1537,7 +1544,7 @@ class CognitionGrpcHost:
                 terminal=perception_operation.terminal,
                 safe_message=perception_operation.safe_message,
             )
-        return await self._invoke(request, context, operation)
+        return await self._invoke(request, context, operation, allow_stopping=True)
 
     async def _initialize_knowledge(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
@@ -1546,40 +1553,41 @@ class CognitionGrpcHost:
                 await self._inbound.on_knowledge_init(knowledge_initialization_from_wire(request))
                 self._mark_completed(request.call)
             return cognition_pb.InitializeKnowledgeResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "initialized", duplicate=duplicate)
-        return await self._invoke(request, context, operation)
+        return await self._invoke(request, context, operation, track=True)
 
     async def _plan(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             output = await self._inbound.on_agent_plan(agent_plan_from_wire(request, trace_id=trace_id))
             return agent_plan_to_wire(output)
-        return await self._invoke(request, context, operation, track=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _synthesize(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             output = await self._inbound.on_agent_synthesis(agent_synthesis_from_wire(request, trace_id=trace_id))
             return agent_synthesis_to_wire(output)
-        return await self._invoke(request, context, operation, track=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _history(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
             output = await self._inbound.on_conversation_history(history_query_from_wire(request))
             return history_result_to_wire(output)
-        return await self._invoke(request, context, operation, track=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _heartbeat(self, request: Any, context: Any) -> Any:
-        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.HeartbeatResponse(status="alive", generation=self.generation)))
+        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.HeartbeatResponse(status="alive", generation=self.generation)), allow_stopping=True)
 
     async def _readiness(self, request: Any, context: Any) -> Any:
-        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.GetReadinessResponse(state="ready" if self._ready else "starting", phase=self._phase, generation=self.generation)))
+        return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.GetReadinessResponse(state=self._readiness_tracker.state, phase=self._readiness_tracker.phase, generation=self.generation)), allow_stopping=True)
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             duplicate = self._is_completed(request.call)
             if not duplicate:
+                self._readiness_tracker.begin_shutdown()
                 asyncio.ensure_future(self._shutdown())
                 self._mark_completed(request.call)
             return cognition_pb.ShutdownResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "accepted", duplicate=duplicate)
-        return await self._invoke(request, context, operation)
+        return await self._invoke(request, context, operation, allow_stopping=True)
 
 
 async def _return(value: Any) -> Any:
@@ -1781,7 +1789,9 @@ class CognitionHost:
         self._last_state_sync_fingerprint: str | None = None
         self._last_state_sync_at: float = 0.0
         self._shutdown_task: asyncio.Task | None = None
-        self._stop_task: asyncio.Task | None = None
+        self.readiness = ReadinessTracker(WORKER_READY_COMPONENTS)
+        self._shutdown_coordinator: ShutdownCoordinator | None = None
+        self._shutdown_reported = False
 
         logger.info("Cognition 认知核初始化完成", name=config.manifest.base.name)
 
@@ -1793,8 +1803,9 @@ class CognitionHost:
         if self._is_running:
             logger.warning("Cognition 认知核已在运行中，无需重复启动")
             return
-        if self._stop_task is not None and self._stop_task.done():
-            self._stop_task = None
+        self._shutdown_coordinator = None
+        self._shutdown_reported = False
+        self.readiness.begin_startup()
 
         try:
             logger.info("Cognition 认知核开始启动")
@@ -1825,6 +1836,7 @@ class CognitionHost:
                 shutdown=self._accept_shutdown_request,
                 operations=components.perception_operations,
                 workspace=components.workspace,
+                readiness=self.readiness,
             )
 
             # 1.5 启动 Conversation Log 单写者。
@@ -1833,6 +1845,7 @@ class CognitionHost:
             set_boot_id(new_boot_id())
             conversation_recorder = components.conversation_recorder
             await conversation_recorder.start()
+            self.readiness.mark_ready("conversation_log")
 
             # 先启动 metrics 与 tracer，保留启动期诊断。
             #     须在记忆/知识加载之前 —— 启动期的 gauge / span 才不会丢。
@@ -1845,6 +1858,7 @@ class CognitionHost:
             await components.planning_store.connect()
             await components.knowledge_store.connect()
             await components.checkpoint_store.connect()
+            self.readiness.mark_ready("state_stores")
             activity_controller = components.activity_controller
             activity_controller.on_transition(self._request_state_sync)
             await activity_controller.start()
@@ -1857,9 +1871,11 @@ class CognitionHost:
             await components.memory_substrate.load()
             await components.knowledge_base.load_persisted()
             await components.maintenance_scheduler.start()
+            self.readiness.mark_ready("projections")
 
             # 1.67 启动认知循环。
             await components.cycle_controller.start()
+            self.readiness.mark_ready("loop")
 
             # 2. 先绑定受监督入站 Service，再向 Kernel 注册动态端点。
             await self.cognition_grpc_host.start()
@@ -1867,15 +1883,17 @@ class CognitionHost:
                 self.kernel_endpoint,
                 self.cognition_grpc_host.endpoint,
             )
+            self.readiness.mark_ready("kernel_registration")
 
             # 3. 唤醒当前角色
             character_session = components.character_session
             character_session.wake_up()
-            self.cognition_grpc_host.mark_ready()
+            self.readiness.mark_ready("character")
 
             # 4. 发出首条状态同步消息。启动快照用于建立 Kernel/Renderer 投影，
             # 不代表一次认知活动状态转换。
             await self._send_state_sync_if_needed(force=True)
+            self.readiness.mark_ready("initial_state_sync")
 
             # 5. 标记为运行中
             self._is_running = True
@@ -1895,124 +1913,45 @@ class CognitionHost:
                 self.registration_secret = None
 
     async def stop(self) -> None:
-        """并发停机请求共享同一收尾任务，避免信号与 RPC 重复释放资源。"""
-        if self._stop_task is None:
-            self._stop_task = asyncio.create_task(self._stop_components())
-        await asyncio.shield(self._stop_task)
+        """停机图由唯一 coordinator 持有；取消一个等待者不取消资源回收。"""
+        if self._shutdown_coordinator is None:
+            self.readiness.begin_shutdown()
+            self._is_running = False
+            self._shutdown_coordinator = ShutdownCoordinator(*worker_shutdown_steps(
+                self.components,
+                stop_main=self._stop_main_loop,
+                stop_rpc=self._stop_rpc_service,
+                stop_kernel=self._stop_kernel_client,
+                stop_metrics=stop_metrics,
+                stop_tracer=stop_tracer,
+            ))
+        failures = await self._shutdown_coordinator.run()
+        self.readiness.mark_stopped()
+        if not self._shutdown_reported:
+            self._shutdown_reported = True
+            for component, error in failures:
+                logger.error("Worker 组件停机失败", component=component, error=str(error))
+            logger.info("Cognition 认知核已停止，当前角色已进入休眠")
 
-    async def _stop_components(self) -> None:
-        """
-        停止AI核心，优雅关闭所有资源
-        规范：幂等性，重复调用不会报错，必须释放所有资源
-        """
-        logger.info("Cognition 认知核开始停止")
-        self._is_running = False
+    async def _stop_main_loop(self) -> None:
+        try:
+            await cancel_task(self._main_task)
+        finally:
+            self._main_task = None
 
-        # 1. 停止主运行循环
-        if self._main_task and not self._main_task.done():
-            self._main_task.cancel()
-            try:
-                await self._main_task
-            except asyncio.CancelledError:
-                pass
-
-        # 2. 依次停止入站、认知生产者与持久化消费者。
-        if self.cognition_grpc_host is not None:
-            try:
+    async def _stop_rpc_service(self) -> None:
+        try:
+            if self.cognition_grpc_host is not None:
                 await self.cognition_grpc_host.stop()
-            except Exception as e:
-                logger.error(f"Error stopping Cognition gRPC host: {e}")
-            finally:
-                self.cognition_grpc_host = None
+        finally:
+            self.cognition_grpc_host = None
 
-        if self.components is not None:
-            components = self.components
-            # 停止认知循环后，Experience 不再产生新的对话 Moment。
-            try:
-                await components.cycle_controller.stop()
-            except Exception as e:
-                logger.error(f"Error stopping cognitive loop: {e}")
-
-            try:
-                character_session = components.character_session
-                character_session.sleep()
-            except Exception as e:
-                logger.error(f"Error during entity sleep: {e}")
-
-            # 再停认知活动控制器，避免状态 tick 读取已关闭的认知组件。
-            try:
-                await components.activity_controller.stop()
-            except Exception as e:
-                logger.error(f"Error stopping cognitive activity controller: {e}")
-
-            # Conversation Log 仍可读时刷新并封口 Episode；未巩固 Episode 会在下次启动后重试。
-            try:
-                await components.maintenance_scheduler.stop()
-            except Exception as e:
-                logger.error(f"Error sealing episode projection: {e}")
-
-            # Conversation Log 仍可读时先把 History 投影推进到最终 checkpoint。
-            try:
-                await components.conversation_controller.close()
-            except Exception as e:
-                logger.error(f"Error closing conversation store: {e}")
-
-            try:
-                await components.turn_controller.close()
-            except Exception as e:
-                logger.error(f"Error closing conversation turn store: {e}")
-
-            # 最后停止 Conversation Log 单写者。进程关闭属于 telemetry，不写伪造 Moment。
-            try:
-                conversation_recorder = components.conversation_recorder
-                await conversation_recorder.stop()
-            except Exception as e:
-                logger.error(f"Error stopping conversation recorder: {e}")
-
-            try:
-                await components.cognition_database.close()
-            except Exception as e:
-                logger.error(f"Error closing cognition database: {e}")
-
-            try:
-                await components.checkpoint_store.close()
-            except Exception as e:
-                logger.error(f"Error closing cognition checkpoint store: {e}")
-
-            try:
-                await components.knowledge_store.close()
-            except Exception as e:
-                logger.error(f"Error closing cognition knowledge store: {e}")
-
-            try:
-                await components.planning_store.close()
-            except Exception as e:
-                logger.error(f"Error closing cognition planning store: {e}")
-
-            try:
-                await components.state_store.close()
-            except Exception as e:
-                logger.error(f"Error closing cognition state store: {e}")
-
+    async def _stop_kernel_client(self) -> None:
+        try:
             if self.kernel_client is not None:
-                try:
-                    await self.kernel_client.stop()
-                except Exception as e:
-                    logger.error(f"Error stopping Kernel gRPC client: {e}")
-                finally:
-                    self.kernel_client = None
-
-            # 最后刷新遥测，确保上述停机错误仍可被记录。
-            try:
-                await stop_metrics()
-            except Exception as e:
-                logger.error(f"Error stopping metrics writer: {e}")
-            try:
-                await stop_tracer()
-            except Exception as e:
-                logger.error(f"Error stopping span writer: {e}")
-
-        logger.info("Cognition 认知核已停止，当前角色已进入休眠")
+                await self.kernel_client.stop()
+        finally:
+            self.kernel_client = None
 
     async def _accept_shutdown_request(self) -> None:
         if self._shutdown_task is None or self._shutdown_task.done():

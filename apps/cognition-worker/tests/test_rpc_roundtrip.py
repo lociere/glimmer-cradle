@@ -978,7 +978,7 @@ def _perception_request(generation: str, trace_id: str, operation_id: str, text:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["cancel", "deadline"])
+@pytest.mark.parametrize("mode", ["cancel", "deadline", "shutdown"])
 async def test_synthesis_cancellation_reaches_the_running_use_case(mode: str) -> None:
     started = asyncio.Event()
     cancelled = asyncio.Event()
@@ -989,6 +989,7 @@ async def test_synthesis_cancellation_reaches_the_running_use_case(mode: str) ->
             try:
                 await asyncio.Future()
             finally:
+                await asyncio.sleep(0.02)
                 cancelled.set()
 
     host = CognitionGrpcHost(
@@ -1013,6 +1014,10 @@ async def test_synthesis_cancellation_reaches_the_running_use_case(mode: str) ->
         await asyncio.wait_for(started.wait(), timeout=1)
         if mode == "cancel":
             pending.cancel()
+        elif mode == "shutdown":
+            await host.stop()
+            assert cancelled.is_set()
+            assert host._inflight == {}
         with pytest.raises((asyncio.CancelledError, grpc.aio.AioRpcError)):
             await pending
         await asyncio.wait_for(cancelled.wait(), timeout=1)
@@ -1031,6 +1036,19 @@ async def test_readiness_and_shutdown_are_generation_bound(service):
     result = await shutdown(cognition_pb.ShutdownRequest(call=_metadata("generation-1", "shutdown-trace", "shutdown-1"), reason="test"), timeout=1)
     assert result.status == "accepted"
     await asyncio.wait_for(stopped.wait(), timeout=1)
+    draining = await readiness(cognition_pb.GetReadinessRequest(call=_metadata("generation-1", "drain-trace")), timeout=1)
+    assert (draining.state, draining.phase) == ("stopping", "stopping")
+    repeated = await shutdown(cognition_pb.ShutdownRequest(call=_metadata("generation-1", "shutdown-trace", "shutdown-1")), timeout=1)
+    assert repeated.duplicate and repeated.status == "duplicate"
+    submit = _call(channel, "SubmitPerception", cognition_pb.SubmitPerceptionRequest, cognition_pb.SubmitPerceptionResponse)
+    with pytest.raises(grpc.aio.AioRpcError) as rejected:
+        await submit(cognition_pb.SubmitPerceptionRequest(
+            call=_metadata("generation-1", "late-input", "late-input"),
+            conversation=_conversation("late-input"), content=cognition_pb.PerceptionContent(text="late"),
+        ), timeout=1)
+    assert rejected.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+    assert _host._operations.get("late-input") is None
+    assert not _queue.entries
 
 
 @pytest.mark.asyncio

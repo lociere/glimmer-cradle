@@ -715,6 +715,23 @@ Worker 50 项、Core 214 项、真实 Kernel/Worker 生命周期 4 项、完整 
 typecheck/build 均 PASS；首次契约生成一致性检查失败后单独复验及完整重跑通过，未修改生成物或降低门禁。
 本切片不新增协议源，不宣称 capability/model/job/resource broker、readiness/shutdown 或阶段 5 已完成。
 
+Worker 生命周期接线切片将真实启动条件交给目标 `readiness.py`，Conversation 单写者、状态库、
+投影、Loop、Kernel 注册、角色唤醒及首条状态投影全部成功后才 ready；Shutdown ACK 前撤销 ready，
+普通感知/Plan/Synthesis/History 在未就绪或停机时失败关闭，启动窗口保留 Knowledge 初始化。
+Kernel 在同一 deadline 内等待本代 starting → ready，旧代、停机、降级和超时不开放 ingress。
+目标 `shutdown.py` 持有有序组件关闭图，生产 Host 调用唯一幂等 coordinator：先停止主循环和 RPC，
+再停生产者、封口投影和 Conversation 单写者，最后关闭领域库、Kernel client 与遥测。RPC 在途任务
+取消后等待收尾，防止其继续写已关闭的库；主循环异常或单个组件失败不跳过后续回收。即使 composition
+未产生组件图，也关闭 transport 和启动期遥测。并发 stop 与取消等待不会重复或中断回收。
+定向反例覆盖首投影阻塞/失败前不 ready、未就绪拒绝感知、Shutdown 后拒绝新输入、重复 ACK、在途
+Synthesis 取消收尾、部分启动、主循环故障、History 关闭失败及继续回收。Worker 57 项、Core 214 项、
+Kernel 209 项（7 项条件跳过）、Ruff、architecture/docs/encoding/diff 与根 typecheck/build PASS。
+实际 Kernel/Worker 进程的启动/停止/新代恢复、崩溃撤销 ingress、失败恢复链 4 项 PASS；Windows
+仍偶发进入既有超时进程树回收，不将这一证据写成每次均优雅退出。该现象及固定候选的生命周期
+独立审查、最终主链门仍须收尾。诊断日志显示领域组件约 0.2 秒内已经记录停止，但进程随后仍未退出；
+下一步核查事件循环收尾和遗留线程/任务，而非扩大超时或把 fallback 当作优雅停止。
+本切片不改变进程或数据 owner，不宣称阶段 5 完成。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

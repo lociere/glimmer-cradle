@@ -1,3 +1,8 @@
+import asyncio
+from types import SimpleNamespace
+
+import pytest
+from glimmer_cradle.cognition_worker import rpc_service as process
 from glimmer_cradle.cognition_worker.shutdown import ShutdownCoordinator
 
 
@@ -18,3 +23,108 @@ async def test_shutdown_runs_every_step_once_and_reports_failures() -> None:
     assert calls == ["first", "second"]
     assert failures == repeated
     assert failures[0][0] == "flush"
+
+
+async def test_shutdown_continues_after_one_waiter_is_cancelled() -> None:
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls: list[str] = []
+
+    async def flush() -> None:
+        calls.append("flush")
+        entered.set()
+        await release.wait()
+
+    async def close() -> None:
+        calls.append("close")
+
+    coordinator = ShutdownCoordinator(("flush", flush), ("close", close))
+    cancelled = asyncio.create_task(coordinator.run())
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    remaining = asyncio.create_task(coordinator.run())
+    cancelled.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await cancelled
+    release.set()
+    assert await asyncio.wait_for(remaining, timeout=1) == ()
+    assert await coordinator.run() == ()
+    assert calls == ["flush", "close"]
+
+
+@pytest.mark.parametrize("partial", [False, True])
+async def test_production_host_uses_ordered_shutdown_and_closes_partial_startup(
+    monkeypatch,
+    partial: bool,
+) -> None:
+    calls: list[str] = []
+
+    def component(name: str, *, fail: bool = False):
+        async def shutdown() -> None:
+            calls.append(name)
+            if fail:
+                raise RuntimeError("injected close failure")
+
+        return SimpleNamespace(stop=shutdown, close=shutdown)
+
+    kernel = component("kernel_client")
+    metrics, tracer = component("metrics"), component("tracer")
+    monkeypatch.setattr(process, "stop_metrics", metrics.stop)
+    monkeypatch.setattr(process, "stop_tracer", tracer.stop)
+    host = process.CognitionHost(
+        config=SimpleNamespace(
+            manifest=SimpleNamespace(base=SimpleNamespace(name="test"))
+        ),
+        kernel_endpoint="grpc://127.0.0.1:1",
+        generation="test",
+        registration_nonce="test",
+        registration_secret=bytearray(b"test"),
+    )
+    host.kernel_client = kernel
+    host.cognition_grpc_host = component("rpc_service")
+    if not partial:
+        host.components = SimpleNamespace(
+            cycle_controller=component("loop"),
+            character_session=SimpleNamespace(sleep=lambda: calls.append("character")),
+            activity_controller=component("activity"),
+            maintenance_scheduler=component("maintenance"),
+            conversation_controller=component("history", fail=True),
+            turn_controller=component("turns"),
+            conversation_recorder=component("log"),
+            cognition_database=component("memory"),
+            checkpoint_store=component("checkpoint"),
+            knowledge_store=component("knowledge"),
+            planning_store=component("planning"),
+            state_store=component("state"),
+        )
+
+    async def failed_main() -> None:
+        raise RuntimeError("injected main loop failure")
+
+    host._main_task = asyncio.create_task(failed_main())
+    await asyncio.sleep(0)
+    await asyncio.gather(host.stop(), host.stop())
+    await host.stop()
+    domain = (
+        []
+        if partial
+        else [
+            "loop",
+            "character",
+            "activity",
+            "maintenance",
+            "history",
+            "turns",
+            "log",
+            "memory",
+            "checkpoint",
+            "knowledge",
+            "planning",
+            "state",
+        ]
+    )
+    assert calls == ["rpc_service", *domain, "kernel_client", "metrics", "tracer"]
+    assert host.readiness.state == "stopped"
+    assert host.kernel_client is None and host.cognition_grpc_host is None
+    failures = await host._shutdown_coordinator.run()
+    assert [name for name, _error in failures] == (
+        ["main_loop"] if partial else ["main_loop", "conversation_history"]
+    )

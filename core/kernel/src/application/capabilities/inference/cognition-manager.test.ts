@@ -141,16 +141,74 @@ describe('CognitionManager process capability invalidation', () => {
     expect(preparedSecret.every((value) => value === 0)).toBe(true);
     expect(manager.isReady).toBe(false);
   });
+
+  it('waits for initial projection after registration without prematurely opening ingress', async () => {
+    const transport = new FakeTransport();
+    transport.isRegistered = true;
+    const observer = vi.fn();
+    let releaseReady!: () => void;
+    const readyBarrier = new Promise<void>((resolve) => { releaseReady = resolve; });
+    const readiness = vi.fn()
+      .mockResolvedValueOnce({ state: 'starting', phase: 'domain_starting', generation: 'generation-test' })
+      .mockImplementation(async () => {
+        await readyBarrier;
+        return { state: 'ready', phase: 'ready', generation: 'generation-test' };
+      });
+    const manager = configureManager(transport, observer, {
+      initializeKnowledge: async () => undefined, readiness,
+    });
+    const child = Object.assign(new FakeChild(4040), {
+      stdio: [null, null, null, { write: () => true, end: () => undefined }],
+    });
+    vi.mocked(spawn).mockReturnValue(child as never);
+    process.env.GLIMMER_CRADLE_PYTHON_RUNTIME = 'test-runtime';
+    const startup = manager.start();
+    await vi.waitFor(() => expect(readiness).toHaveBeenCalledTimes(2));
+    expect(manager.isReady).toBe(false);
+    expect(observer.mock.calls.some(([state]) => state === 'ready')).toBe(false);
+    releaseReady();
+    await startup;
+    expect(readiness).toHaveBeenCalledTimes(2);
+    expect(observer.mock.calls.filter(([state]) => state === 'ready')).toHaveLength(1);
+    expect(manager.isReady).toBe(true);
+    await manager.stop();
+  });
+
+  it.each(['wrong-generation', 'stopping', 'deadline'])('keeps ingress closed for %s readiness', async (failure) => {
+    const transport = new FakeTransport();
+    transport.isRegistered = true;
+    const observer = vi.fn();
+    const readiness = vi.fn(async () => ({
+      state: failure === 'stopping' ? 'stopping' : failure === 'deadline' ? 'starting' : 'ready',
+      phase: 'domain_starting',
+      generation: failure === 'wrong-generation' ? 'old-generation' : 'generation-test',
+    }));
+    const manager = configureManager(transport, observer, {
+      initializeKnowledge: async () => undefined, readiness,
+    });
+    const child = Object.assign(new FakeChild(4040), {
+      stdio: [null, null, null, { write: () => true, end: () => undefined }],
+    });
+    vi.mocked(spawn).mockReturnValue(child as never);
+    process.env.GLIMMER_CRADLE_PYTHON_RUNTIME = 'test-runtime';
+    await expect(manager.start()).rejects.toThrow(/ready|readiness/);
+    expect(manager.isReady).toBe(false);
+    expect(observer.mock.calls.some(([state]) => state === 'ready')).toBe(false);
+    expect(observer).toHaveBeenCalledWith('failed', expect.any(String));
+    expect(transport.activeSecret).toBeNull();
+  });
 });
 
 function configureManager(
   transport: FakeTransport,
   observer: CognitionLifecycleObserver,
+  client: Partial<CognitionRequestPort> = {},
 ): CognitionManager {
   return new CognitionManager(
     transport,
     {
       shutdown: async () => undefined,
+      ...client,
     } as unknown as CognitionRequestPort,
     observer,
   );

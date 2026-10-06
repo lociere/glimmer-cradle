@@ -8,7 +8,8 @@ Cognition Worker 是 Python 进程装配边界：它承载 Cognition 与 Convers
 Knowledge、Plan、Synthesis 与历史查询已调用 Cognition/Conversation mapper。感知在 operation 接纳前校验，
 非法重复请求不会获得 accepted 确认。原生模型事件、幂等键、scope、revision 和 Content digest 均在边界验证。
 后续切片把其余 client 接入真实 Host broker，
-并继续从兼容 RPC service 收束 readiness/shutdown 主体。
+继续收束兼容 RPC service 的其余主体。生产 Host 已使用 `readiness.py` 的逐项业务 ready 条件和
+`shutdown.py` 的有序幂等停机图；首条状态投影成功前不 ready，Shutdown ACK 后不再接纳新业务请求。
 
 ```powershell
 uv run --project apps/cognition-worker --extra dev pytest -q apps/cognition-worker/tests

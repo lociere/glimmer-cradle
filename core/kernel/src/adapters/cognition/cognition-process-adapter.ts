@@ -96,10 +96,7 @@ export class CognitionManager {
       logger.info('Cognition 认知核启动：等待 gRPC 注册与真实 readiness');
       await this.transport.waitForRegistration(config.system.cognition_service.registration_timeout_ms);
       await this.client.initializeKnowledge(await ConfigManager.instance.loadKnowledgeBaseConfig(), this.requestTimeoutMs);
-      const readiness = await this.client.readiness(this.requestTimeoutMs);
-      if (readiness.state !== 'ready' || readiness.generation !== bootstrap.generation) {
-        throw new CoreException('Cognition 未达到本代业务 ready', 'INFERENCE_ERROR');
-      }
+      const readiness = await this.waitForBusinessReadiness(bootstrap.generation, this.requestTimeoutMs);
       this.ready = true;
       this.starting = false;
       this.lifecycleObserver('ready', 'Cognition 已完成本代注册、初始化与 readiness');
@@ -122,6 +119,25 @@ export class CognitionManager {
       ? Promise.resolve(operation)
       : this.observePerceptionTerminal(resolvedTraceId, operation.operation_id);
     return { ...operation, trace_id: resolvedTraceId, completion };
+  }
+
+  private async waitForBusinessReadiness(generation: string, timeoutMs: number): Promise<{ readonly phase: string }> {
+    const deadline = Date.now() + timeoutMs;
+    while (this.running && !this.stopping) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const readiness = await this.client.readiness(remaining);
+      if (!this.running || this.stopping || readiness.generation !== generation) {
+        throw new CoreException('Cognition readiness 世代或生命周期已失效', 'INFERENCE_ERROR');
+      }
+      if (readiness.state === 'ready') return readiness;
+      if (readiness.state !== 'starting') {
+        throw new CoreException('Cognition 未达到本代业务 ready', 'INFERENCE_ERROR');
+      }
+      // 注册 ACK 不代表首条状态投影已完成；只在同一 deadline 内等待 starting。
+      await new Promise((resolve) => setTimeout(resolve, Math.min(25, Math.max(1, deadline - Date.now()))));
+    }
+    throw new CoreException('Cognition 等待业务 ready 超时或已停止', 'INFERENCE_ERROR');
   }
 
   public async cancelPerception(request: PerceptionCancelRequest): Promise<void> {

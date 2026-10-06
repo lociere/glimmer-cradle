@@ -26,6 +26,8 @@
 | `apps/cognition-worker/.../adapters/` | Capability、Content、Conversation、Job、Model 与 Resource 的进程边界实现 |
 | `apps/cognition-worker/.../adapters/cognition_mapper.py` | 感知规范化、Knowledge、Plan/Synthesis 及模型事件的 wire/Port 映射 |
 | `apps/cognition-worker/.../adapters/conversation_mapper.py` | Conversation Moment 与历史查询/结果的 wire/Port 映射 |
+| `apps/cognition-worker/.../readiness.py` | Conversation/状态库/投影/Loop/注册/唤醒/首条状态同步的业务 ready 条件与 stopping/stopped 状态 |
+| `apps/cognition-worker/.../shutdown.py` | 生产组件的有序停机图、幂等共享收尾任务与取消等待隔离 |
 | `core/cognition/.../ports/` | 不依赖 generated DTO 的消费方契约与进程内边界模型 |
 
 Cognition 只依赖规范化感知、配置投影和生成契约。它不读取 Electron、平台 payload、Extension handler 或 Kernel 内部对象。v5 Perception Moment 写引用与语义，v4 记录继续读取；`transient` 不写 Moment。旧 URI 媒体只做当拍兼容，不保证恢复；视频和音频不冒充视觉图片输入。参见 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
@@ -67,6 +69,13 @@ generated wire 类型；Worker 绑定 concrete、启动组件并执行
 RPC Service 通过两个 mapper 转换现行 Contract Spine DTO，调用 Core/Conversation 的消费方 Port。
 感知请求先映射与校验，再接纳 operation identity；非法请求重试不能产生 accepted 确认或污染 registry。
 生成 wire、代次、trace、权限域、恢复 metadata 与兼容 Plan/Synthesis 字段继续采用唯一 Contract Spine。
+
+Worker 启动逐项记录实际完成条件，首条状态同步成功前仍为 starting；Kernel 在同一请求 deadline 内
+等待本代 ready，拒绝旧代、停机、降级与超时。Knowledge 初始化可在启动窗口进行，但普通感知、规划、
+合成和历史查询须业务 ready。Shutdown ACK 前撤销 ready，拒绝新业务请求，保留控制查询与取消入口。
+生产 Host 通过 shutdown coordinator 按主循环、RPC、认知生产者、投影、Conversation 单写者、领域库、
+Kernel client、遥测的顺序收尾；RPC 取消的在途任务完成后才关闭领域库。并发停止共用一次回收，取消等待者
+不取消收尾，单步异常不跳过后续组件；局部启动失败也回收 transport 与启动期遥测。
 
 Python 主仓库通过根 uv workspace/lock 统一解析依赖。开发启动在共享根 `.venv` 中以 inexact sync
 准备 Worker，保留 Audio 已安装 extras；安装态由产品显式注入独立解释器路径。
