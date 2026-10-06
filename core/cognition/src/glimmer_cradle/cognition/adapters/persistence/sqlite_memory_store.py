@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
 import sqlite3
-from contextlib import closing
-from typing import Any
 import uuid
+from collections.abc import AsyncIterator, Awaitable
+from contextlib import asynccontextmanager, closing
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 import aiosqlite
 import numpy as np
-
-from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.cognition.memory import (
     ConsolidationJob,
     Episode,
     RelationshipRecord,
 )
+from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
 SCHEMA_VERSION = 3
@@ -57,33 +58,43 @@ class SqliteMemoryStore:
         )
         self._conn: aiosqlite.Connection | None = None
         self._logger = logger
+        self._connection_lock = asyncio.Lock()
 
     async def connect(self) -> None:
+        async with self._connection_lock:
+            await self._connect()
+
+    async def _connect(self) -> None:
         if self._conn is not None:
             return
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = await aiosqlite.connect(str(self._db_path))
-        await connection.execute("PRAGMA journal_mode=WAL")
-        await connection.execute("PRAGMA foreign_keys=ON")
-        cursor = await connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'"
-        )
-        if await cursor.fetchone() is None:
-            await connection.executescript(self._migration_path.read_text(encoding="utf-8"))
-            await connection.execute(
-                "INSERT INTO schema_meta VALUES('schema_version', ?)",
-                (str(SCHEMA_VERSION),),
-            )
-            await connection.commit()
-        else:
+        connection = aiosqlite.connect(str(self._db_path))
+        try:
+            await connection
+            await connection.execute("PRAGMA journal_mode=WAL")
+            await connection.execute("PRAGMA foreign_keys=ON")
             cursor = await connection.execute(
-                "SELECT value FROM schema_meta WHERE key='schema_version'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'"
             )
-            row = await cursor.fetchone()
-            version = int(row[0]) if row is not None else 0
-            if version != SCHEMA_VERSION:
-                await connection.close()
-                raise RuntimeError("检测到非当前记忆架构数据库；须先执行受控数据迁移")
+            if await cursor.fetchone() is None:
+                # executescript 本身不保证多个 DDL 原子；初始化也绑定一个明确事务。
+                await connection.executescript("BEGIN IMMEDIATE;\n" + self._migration_path.read_text(encoding="utf-8"))
+                await connection.execute(
+                    "INSERT INTO schema_meta VALUES('schema_version', ?)",
+                    (str(SCHEMA_VERSION),),
+                )
+                await connection.commit()
+            else:
+                cursor = await connection.execute(
+                    "SELECT value FROM schema_meta WHERE key='schema_version'"
+                )
+                row = await cursor.fetchone()
+                version = int(row[0]) if row is not None else 0
+                if version != SCHEMA_VERSION:
+                    raise RuntimeError("检测到非当前记忆架构数据库；须先执行受控数据迁移")
+        except BaseException:
+            await self._drain_cleanup(connection.close())
+            raise
         self._conn = connection
         if self._logger is not None:
             self._logger.info(
@@ -93,9 +104,54 @@ class SqliteMemoryStore:
             )
 
     async def close(self) -> None:
-        connection, self._conn = self._conn, None
-        if connection is not None:
-            await connection.close()
+        async with self._connection_lock:
+            connection, self._conn = self._conn, None
+            if connection is not None:
+                await self._drain_cleanup(connection.close(), propagate_cancel=True)
+
+    @asynccontextmanager
+    async def read(self) -> AsyncIterator[aiosqlite.Connection]:
+        # 同连接读取能看到自身未提交写入；必须与完整写事务一起串行化。
+        async with self._connection_lock:
+            yield self.connection
+
+    @asynccontextmanager
+    async def transaction(self) -> AsyncIterator[aiosqlite.Connection]:
+        async with self._connection_lock:
+            conn = self.connection
+            try:
+                # BEGIN 也在取消保护范围：aiosqlite 已排队的 SQL 不随 await 取消撤销。
+                await conn.execute("BEGIN IMMEDIATE")
+                yield conn
+                await conn.commit()
+            except BaseException as error:
+                try:
+                    await self._drain_cleanup(conn.rollback())
+                except BaseException as rollback_error:
+                    # 回滚失败后的连接不再可信；不得向下个 reader 暴露半写事务。
+                    self._conn = None
+                    failures = [error, rollback_error]
+                    try:
+                        await self._drain_cleanup(conn.close())
+                    except BaseException as close_error:
+                        failures.append(close_error)
+                    raise BaseExceptionGroup("Memory transaction 清理失败；连接已撤销", failures) from None
+                raise
+
+    @staticmethod
+    async def _drain_cleanup(operation: Awaitable[None], *, propagate_cancel: bool = False) -> None:
+        cleanup = asyncio.ensure_future(operation)
+        cancelled: asyncio.CancelledError | None = None
+        # 再次取消不能使连接在清理仍排队时被下一个 owner 复用。
+        while not cleanup.done():
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError as error:
+                cancelled = error
+                continue
+        cleanup.result()
+        if propagate_cancel and cancelled is not None:
+            raise cancelled
 
     @property
     def connection(self) -> aiosqlite.Connection:
@@ -157,14 +213,8 @@ class MemoryRepository:
         return result[0]
 
     async def create_revisions(self, drafts: list[dict[str, Any]]) -> list[str]:
-        conn = self._db.connection
-        await conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self._db.transaction() as conn:
             result = [await self._create_revision(conn, draft) for draft in drafts]
-            await conn.commit()
-        except Exception:
-            await conn.rollback()
-            raise
         return result
 
     @staticmethod
@@ -265,36 +315,39 @@ class MemoryRepository:
         return memory_id
 
     async def all_current(self) -> list[dict[str, Any]]:
-        cursor = await self._db.connection.execute(
-            """
-            SELECT i.memory_id,i.kind,i.status,i.actor_id,i.scene_id,i.conversation_id,
-                   i.continuity_id,i.recall_scope,i.disclosure_scope,i.confidence,i.salience,
-                   i.created_at,i.updated_at,r.revision_id,r.content,r.summary,r.attributes_json,
-                   r.valid_from,r.valid_to
-            FROM memory_items i JOIN memory_revisions r ON r.revision_id=i.current_revision_id
-            ORDER BY i.updated_at
-            """
-        )
-        return [self._row(row) for row in await cursor.fetchall()]
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                """
+                SELECT i.memory_id,i.kind,i.status,i.actor_id,i.scene_id,i.conversation_id,
+                       i.continuity_id,i.recall_scope,i.disclosure_scope,i.confidence,i.salience,
+                       i.created_at,i.updated_at,r.revision_id,r.content,r.summary,r.attributes_json,
+                       r.valid_from,r.valid_to
+                FROM memory_items i JOIN memory_revisions r ON r.revision_id=i.current_revision_id
+                ORDER BY i.updated_at
+                """
+            )
+            return [self._row(row) for row in await cursor.fetchall()]
 
     async def count(self) -> int:
-        cursor = await self._db.connection.execute(
-            "SELECT COUNT(*) FROM memory_items WHERE status IN ('active','disputed')"
-        )
-        row = await cursor.fetchone()
-        return int(row[0]) if row else 0
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM memory_items WHERE status IN ('active','disputed')"
+            )
+            row = await cursor.fetchone()
+            return int(row[0]) if row else 0
 
     async def evidence_for(
         self, revision_id: str, *, limit: int = 3
     ) -> list[dict[str, Any]]:
-        cursor = await self._db.connection.execute(
-            "SELECT moment_id,evidence_role,source_json FROM memory_evidence WHERE revision_id=? LIMIT ?",
-            (revision_id, limit),
-        )
-        return [
-            {"moment_id": row[0], "role": row[1], "source": json.loads(row[2])}
-            for row in await cursor.fetchall()
-        ]
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                "SELECT moment_id,evidence_role,source_json FROM memory_evidence WHERE revision_id=? LIMIT ?",
+                (revision_id, limit),
+            )
+            return [
+                {"moment_id": row[0], "role": row[1], "source": json.loads(row[2])}
+                for row in await cursor.fetchall()
+            ]
 
     @staticmethod
     def _row(row: Any) -> dict[str, Any]:
@@ -336,41 +389,43 @@ class VectorRepository:
         vector: np.ndarray,
     ) -> None:
         vec = np.asarray(vector, dtype=_VECTOR_DTYPE).reshape(-1)
-        await self._db.connection.execute(
-            """
-            INSERT INTO embedding (owner_kind, owner_id, model, dim, vector)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(owner_kind, owner_id) DO UPDATE SET
-                model=excluded.model, dim=excluded.dim, vector=excluded.vector,
-                updated_at=CURRENT_TIMESTAMP
-            """,
-            (owner_kind, owner_id, model, int(vec.shape[0]), vec.tobytes()),
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.execute(
+                """
+                INSERT INTO embedding (owner_kind, owner_id, model, dim, vector)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(owner_kind, owner_id) DO UPDATE SET
+                    model=excluded.model, dim=excluded.dim, vector=excluded.vector,
+                    updated_at=CURRENT_TIMESTAMP
+                """,
+                (owner_kind, owner_id, model, int(vec.shape[0]), vec.tobytes()),
+            )
 
     async def get_vectors(self, owner_kind: str, model: str) -> dict[str, np.ndarray]:
-        cursor = await self._db.connection.execute(
-            "SELECT owner_id, vector FROM embedding WHERE owner_kind = ? AND model = ?",
-            (owner_kind, model),
-        )
-        return {
-            row[0]: np.frombuffer(row[1], dtype=_VECTOR_DTYPE)
-            for row in await cursor.fetchall()
-        }
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                "SELECT owner_id, vector FROM embedding WHERE owner_kind = ? AND model = ?",
+                (owner_kind, model),
+            )
+            return {
+                row[0]: np.frombuffer(row[1], dtype=_VECTOR_DTYPE)
+                for row in await cursor.fetchall()
+            }
 
     async def delete_vector(self, owner_kind: str, owner_id: str) -> None:
-        await self._db.connection.execute(
-            "DELETE FROM embedding WHERE owner_kind = ? AND owner_id = ?",
-            (owner_kind, owner_id),
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.execute(
+                "DELETE FROM embedding WHERE owner_kind = ? AND owner_id = ?",
+                (owner_kind, owner_id),
+            )
 
     async def count(self, owner_kind: str) -> int:
-        cursor = await self._db.connection.execute(
-            "SELECT COUNT(1) FROM embedding WHERE owner_kind = ?", (owner_kind,)
-        )
-        row = await cursor.fetchone()
-        return int(row[0]) if row else 0
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                "SELECT COUNT(1) FROM embedding WHERE owner_kind = ?", (owner_kind,)
+            )
+            row = await cursor.fetchone()
+            return int(row[0]) if row else 0
 
 
 class RelationshipRepository:
@@ -395,9 +450,7 @@ class RelationshipRepository:
         direct = int(kind == "direct")
         ambient = int(kind == "ambient")
         replies = int(kind == "reply")
-        conn = self._db.connection
-        await conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self._db.transaction() as conn:
             cursor = await conn.execute(
                 "SELECT 1 FROM relationship_observations WHERE moment_id=?",
                 (evidence_moment_id,),
@@ -430,10 +483,6 @@ class RelationshipRepository:
                     "INSERT INTO relationship_observations VALUES(?,?,?,?)",
                     (evidence_moment_id, actor_id, kind, now),
                 )
-            await conn.commit()
-        except Exception:
-            await conn.rollback()
-            raise
         record = await self.get(actor_id)
         assert record is not None
         return record
@@ -450,18 +499,16 @@ class RelationshipRepository:
     ) -> str:
         if not evidence_moment_ids:
             raise ValueError("关系修订必须携带 Moment 证据")
-        conn = self._db.connection
         revision_id = uuid.uuid4().hex
         now = _now_iso()
-        cursor = await conn.execute(
-            "SELECT current_revision_id FROM relationship_actors WHERE actor_id=?",
-            (actor_id,),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            raise ValueError(f"关系 actor 尚未观察: {actor_id}")
-        await conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self._db.transaction() as conn:
+            cursor = await conn.execute(
+                "SELECT current_revision_id FROM relationship_actors WHERE actor_id=?",
+                (actor_id,),
+            )
+            row = await cursor.fetchone()
+            if row is None:
+                raise ValueError(f"关系 actor 尚未观察: {actor_id}")
             if row[0]:
                 await conn.execute(
                     "UPDATE relationship_revisions SET valid_to=? WHERE revision_id=?",
@@ -489,14 +536,15 @@ class RelationshipRepository:
                 "UPDATE relationship_actors SET current_revision_id=?,updated_at=? WHERE actor_id=?",
                 (revision_id, now, actor_id),
             )
-            await conn.commit()
-        except Exception:
-            await conn.rollback()
-            raise
         return revision_id
 
     async def get(self, actor_id: str) -> RelationshipRecord | None:
-        cursor = await self._db.connection.execute(
+        async with self._db.read() as conn:
+            return await self._get(conn, actor_id)
+
+    @staticmethod
+    async def _get(conn: aiosqlite.Connection, actor_id: str) -> RelationshipRecord | None:
+        cursor = await conn.execute(
             """
             SELECT a.actor_id,a.display_name,a.first_seen_at,a.last_seen_at,
                    a.direct_interactions,a.ambient_observations,a.replies,
@@ -524,16 +572,17 @@ class RelationshipRepository:
         )
 
     async def all_recent(self, *, limit: int = 50) -> list[RelationshipRecord]:
-        cursor = await self._db.connection.execute(
-            "SELECT actor_id FROM relationship_actors ORDER BY last_seen_at DESC LIMIT ?",
-            (limit,),
-        )
-        result = []
-        for row in await cursor.fetchall():
-            record = await self.get(row[0])
-            if record:
-                result.append(record)
-        return result
+        async with self._db.read() as conn:
+            cursor = await conn.execute(
+                "SELECT actor_id FROM relationship_actors ORDER BY last_seen_at DESC LIMIT ?",
+                (limit,),
+            )
+            result = []
+            for row in await cursor.fetchall():
+                record = await self._get(conn, row[0])
+                if record:
+                    result.append(record)
+            return result
 
 
 class ConsolidationJobRepository:
@@ -543,14 +592,14 @@ class ConsolidationJobRepository:
         self._db = database
 
     async def recover_expired(self) -> None:
-        await self._db.connection.execute(
-            """
-            UPDATE consolidation_jobs SET state='pending',lease_until=NULL
-            WHERE state='claimed' AND lease_until<?
-            """,
-            (_now_iso(),),
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.execute(
+                """
+                UPDATE consolidation_jobs SET state='pending',lease_until=NULL
+                WHERE state='claimed' AND lease_until<?
+                """,
+                (_now_iso(),),
+            )
 
     async def enqueue(
         self, episode: Episode, *, debounce_seconds: int, max_wait_seconds: int
@@ -564,42 +613,40 @@ class ConsolidationJobRepository:
             f"glimmer:memory-job:{episode.episode_id}:{episode.version}",
         ).hex
         timestamp = _iso(now)
-        await self._db.connection.execute(
-            """
-            INSERT INTO consolidation_jobs(
-              job_id,episode_id,episode_version,scene_id,actor_id,state,priority,
-              available_at,policy_version,created_at
-            ) VALUES(?,?,?,?,?,'pending',?,?,?,?)
-            ON CONFLICT(episode_id) DO UPDATE SET
-              episode_version=excluded.episode_version,
-              scene_id=excluded.scene_id,
-              actor_id=excluded.actor_id,
-              priority=MAX(consolidation_jobs.priority,excluded.priority),
-              available_at=MIN(consolidation_jobs.available_at,excluded.available_at),
-              state=CASE WHEN consolidation_jobs.state='completed' THEN 'completed' ELSE 'pending' END
-            """,
-            (
-                job_id,
-                episode.episode_id,
-                episode.version,
-                episode.scene_id,
-                episode.actor_id,
-                episode.salience,
-                available_at,
-                "memory-policy-v2",
-                timestamp,
-            ),
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.execute(
+                """
+                INSERT INTO consolidation_jobs(
+                  job_id,episode_id,episode_version,scene_id,actor_id,state,priority,
+                  available_at,policy_version,created_at
+                ) VALUES(?,?,?,?,?,'pending',?,?,?,?)
+                ON CONFLICT(episode_id) DO UPDATE SET
+                  episode_version=excluded.episode_version,
+                  scene_id=excluded.scene_id,
+                  actor_id=excluded.actor_id,
+                  priority=MAX(consolidation_jobs.priority,excluded.priority),
+                  available_at=MIN(consolidation_jobs.available_at,excluded.available_at),
+                  state=CASE WHEN consolidation_jobs.state='completed' THEN 'completed' ELSE 'pending' END
+                """,
+                (
+                    job_id,
+                    episode.episode_id,
+                    episode.version,
+                    episode.scene_id,
+                    episode.actor_id,
+                    episode.salience,
+                    available_at,
+                    "memory-policy-v2",
+                    timestamp,
+                ),
+            )
 
     async def claim_due(
         self, *, limit: int, lease_seconds: int
     ) -> list[ConsolidationJob]:
-        conn = self._db.connection
         now = datetime.now(timezone.utc)
         lease_until = _iso(now + timedelta(seconds=lease_seconds))
-        await conn.execute("BEGIN IMMEDIATE")
-        try:
+        async with self._db.transaction() as conn:
             cursor = await conn.execute(
                 """
                 SELECT job_id,episode_id,episode_version,scene_id,actor_id,attempt_count
@@ -619,25 +666,21 @@ class ConsolidationJobRepository:
                     """,
                     [(lease_until, _iso(now), row[0]) for row in rows],
                 )
-            await conn.commit()
-        except Exception:
-            await conn.rollback()
-            raise
         return [ConsolidationJob(*row) for row in rows]
 
     async def complete(self, jobs: list[ConsolidationJob]) -> None:
         if not jobs:
             return
         timestamp = _now_iso()
-        await self._db.connection.executemany(
-            """
-            UPDATE consolidation_jobs
-            SET state='completed',lease_until=NULL,completed_at=?,error_code=NULL
-            WHERE job_id=?
-            """,
-            [(timestamp, job.job_id) for job in jobs],
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.executemany(
+                """
+                UPDATE consolidation_jobs
+                SET state='completed',lease_until=NULL,completed_at=?,error_code=NULL
+                WHERE job_id=?
+                """,
+                [(timestamp, job.job_id) for job in jobs],
+            )
 
     async def fail(
         self,
@@ -653,14 +696,14 @@ class ConsolidationJobRepository:
         for job in jobs:
             delay = retry_base_seconds * (2 ** min(job.attempt_count, 6))
             values.append((_iso(now + timedelta(seconds=delay)), error_code, job.job_id))
-        await self._db.connection.executemany(
-            """
-            UPDATE consolidation_jobs
-            SET state='failed',available_at=?,lease_until=NULL,error_code=? WHERE job_id=?
-            """,
-            values,
-        )
-        await self._db.connection.commit()
+        async with self._db.transaction() as conn:
+            await conn.executemany(
+                """
+                UPDATE consolidation_jobs
+                SET state='failed',available_at=?,lease_until=NULL,error_code=? WHERE job_id=?
+                """,
+                values,
+            )
 
 
 class RelationshipProjection:
@@ -679,10 +722,11 @@ class RelationshipProjection:
 
     async def project_pending(self) -> int:
         await self._recorder.flush()
-        cursor = await self._database.connection.execute(
-            "SELECT position FROM projection_checkpoints WHERE projection_name='relationship'"
-        )
-        row = await cursor.fetchone()
+        async with self._database.read() as conn:
+            cursor = await conn.execute(
+                "SELECT position FROM projection_checkpoints WHERE projection_name='relationship'"
+            )
+            row = await cursor.fetchone()
         checkpoint = int(row[0]) if row else 0
         moments = self._recorder.moments_after(checkpoint)
         for moment in moments:
@@ -703,15 +747,15 @@ class RelationshipProjection:
                     display_name=moment.actor_name,
                 )
         if moments:
-            await self._database.connection.execute(
-                """
-                INSERT INTO projection_checkpoints VALUES('relationship',?,?)
-                ON CONFLICT(projection_name) DO UPDATE SET
-                  position=excluded.position,updated_at=excluded.updated_at
-                """,
-                (moments[-1].seq, _now_iso()),
-            )
-            await self._database.connection.commit()
+            async with self._database.transaction() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO projection_checkpoints VALUES('relationship',?,?)
+                    ON CONFLICT(projection_name) DO UPDATE SET
+                      position=MAX(projection_checkpoints.position,excluded.position),updated_at=excluded.updated_at
+                    """,
+                    (moments[-1].seq, _now_iso()),
+                )
         return len(moments)
 
 

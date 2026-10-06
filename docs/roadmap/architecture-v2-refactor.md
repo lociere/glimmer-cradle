@@ -212,6 +212,25 @@ typecheck/build PASS；architecture、目标清单规格（非最终实物）、
 以生产调用链的幂等 receipt、提交点 fencing 和恢复证明替换私有巩固队列；旧 owner 只有在 consumer-zero、
 旧样本迁移和验证通过后才删除，不用本地目标库 fixture 代替生产接收端。
 
+Memory 接收端前置切片：真实 Memory/Vector/Relationship/旧巩固队列共享一条 aiosqlite 连接，
+分散的 BEGIN/commit 在 await 间可交叉；Jobs 生产 receipt/fencing 不能建立在这个提交边界上。
+先由 `SqliteMemoryStore` 唯一拥有进程内读写串行化和 IMMEDIATE 事务提交/回滚，所有消费者统一使用；
+取消涵盖 BEGIN、业务写入与 commit，回滚完成前不释放连接。验证并发向量写不提交未完成 Memory batch、
+取消后数据库无半写且连接可复用、读取不暴露未提交记录、独立连接锁竞争与异常恢复。
+此项不改变 Memory schema 或用户数据，不把旧巩固队列认作 Jobs；完成后继续 production broker/receipt 接线。
+
+Memory 共享连接候选（2026-10-06）：独立 SQLite reader 复现向量 writer 误提交未完成 Memory batch；
+统一事务 owner 后向量必须等 Memory 回滚才提交，所有生产 repository 的读写与关系 checkpoint 均使用
+store 的串行边界。BEGIN、业务写入和 commit 取消都等待清理；重复取消不提前释放 owner，回滚失败
+撤销连接，关闭取消保留取消语义但先收完资源。新库 DDL/schema metadata 初始化失败原子回滚，
+两独立连接竞争仍由 SQLite IMMEDIATE 锁裁决。commit 已发生而确认丢失的反例如实保留已写记录，
+不能推断未提交；真实 Memory receipt/fencing 与 Jobs broker 仍为下一必需步骤。
+Memory 定向 20 项、Cognition 全量 224 项、Worker 全量 62 项、真实 Kernel→Worker 集成 5 项 PASS；
+正常停机 exitCode 0 / signal null，崩溃恢复中的 SIGTERM 为主动注入。根 typecheck/build、Ruff I/F、
+architecture、目标清单规格（非最终实物）、docs/encoding/diff PASS。Data Layout 的 Memory 路径旧误写已按
+真实 composition 修正为 `data/state/cognition/memory.sqlite`，不是运行数据迁移。
+Memory schema 3、wire、依赖和生产路径不变，未执行用户数据迁移或删除旧巩固队列；独立审查留最终候选。
+
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 
 本切片完成 Content/AssetRef 的真实 producer→Contract Spine→Cognition→Experience 链路；阶段 4 的
