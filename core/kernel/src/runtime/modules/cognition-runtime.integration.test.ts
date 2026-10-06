@@ -1,4 +1,9 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
+import { createServer, type Server } from 'node:http';
+import { mkdtemp } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
 import { CognitionClient } from '../../adapters/cognition/cognition-client';
 import { ConfigManager } from '../../adapters/config/config-manager';
@@ -32,8 +37,35 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
   const projection = new RuntimeReadinessProjectionMapper();
   const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined };
   let manager: CognitionManager;
+  let provider: Server;
+  const previousDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
+  let providerRequests = 0;
+  let providerDisconnects = 0;
   beforeAll(async () => {
+    process.env.GLIMMER_CRADLE_DATA_ROOT = await mkdtemp(path.join(os.tmpdir(), 'glimmer-worker-lifecycle-'));
+    provider = createServer((request, response) => {
+      // 故意不返回响应，验证 Shutdown 取消真实网络请求而非只取消等待者。
+      let body = '';
+      let isCancellationFixture = false;
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => { body += chunk; });
+      request.on('end', () => {
+        isCancellationFixture = body.includes('shutdown cancellation fixture');
+        if (isCancellationFixture) providerRequests += 1;
+      });
+      response.on('close', () => { if (isCancellationFixture) providerDisconnects += 1; });
+    });
+    await new Promise<void>((resolve) => provider.listen(0, '127.0.0.1', resolve));
     await ConfigManager.instance.init();
+    const config = structuredClone(ConfigManager.instance.getConfig());
+    const address = provider.address();
+    if (!address || typeof address === 'string') throw new Error('本地 provider fixture 未绑定');
+    config.character.llm = {
+      api_type: 'openai', api_key: 'test-only-key',
+      base_url: `http://127.0.0.1:${address.port}`, models: { chat: 'test-model' },
+    };
+    vi.spyOn(ConfigManager.instance, 'getConfig').mockReturnValue(config);
+    vi.spyOn(ConfigManager.instance, 'loadDashScopeSecretEnvironment').mockResolvedValue({});
     transportRuntime = new KernelTransportRuntime(
       ConfigManager.instance.getConfig() as unknown as KernelConfiguration,
       transport,
@@ -58,6 +90,11 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     await manager.stop();
     await transportRuntime.stop(createTraceContext());
     await EndpointRegistry.instance.close();
+    provider.closeAllConnections();
+    await new Promise<void>((resolve) => provider.close(() => resolve()));
+    vi.restoreAllMocks();
+    if (previousDataRoot === undefined) delete process.env.GLIMMER_CRADLE_DATA_ROOT;
+    else process.env.GLIMMER_CRADLE_DATA_ROOT = previousDataRoot;
   });
 
   it('starts, reaches readiness, stops and recovers with a fresh supervised generation', async () => {
@@ -65,15 +102,36 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     expect(manager.isReady).toBe(true);
     expect(await manager.sendLifeHeartbeat({})).toEqual({ status: 'alive' });
     const firstGeneration = transport.generation;
+    const firstChild = (manager as unknown as { child: ChildProcess }).child;
 
     await manager.stop();
+    expect(firstChild.exitCode).toBe(0);
+    expect(firstChild.signalCode).toBeNull();
     expect(manager.isReady).toBe(false);
     expect(EndpointRegistry.instance.get('cognition-rpc')).toBeUndefined();
 
     await manager.start();
     expect(manager.isReady).toBe(true);
     expect(transport.generation).not.toBe(firstGeneration);
+    const secondChild = (manager as unknown as { child: ChildProcess }).child;
     await manager.stop();
+    expect(secondChild.exitCode).toBe(0);
+    expect(secondChild.signalCode).toBeNull();
+  }, 60_000);
+
+  it('cancels an in-flight provider request and exits gracefully on shutdown', async () => {
+    await manager.start();
+    const child = (manager as unknown as { child: ChildProcess }).child;
+    const requestsBefore = providerRequests;
+    const disconnectsBefore = providerDisconnects;
+    const pending = manager.sendAgentPlan({ user_goal: 'shutdown cancellation fixture', available_tools: [] })
+      .then(() => 'completed', () => 'cancelled');
+    await waitUntil(() => providerRequests > requestsBefore);
+    await manager.stop();
+    expect(await pending).toBe('cancelled');
+    await waitUntil(() => providerDisconnects > disconnectsBefore);
+    expect(child.exitCode).toBe(0);
+    expect(child.signalCode).toBeNull();
   }, 60_000);
 
   it('revokes required ingress on crash and restores it only after a fresh generation is ready', async () => {

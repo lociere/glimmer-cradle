@@ -163,7 +163,7 @@ class _ConsolidationLlm:
         self.response = response
         self.requests = []
 
-    def generate(self, request) -> str:
+    async def generate(self, request) -> str:
         self.requests.append(request)
         return self.response
 

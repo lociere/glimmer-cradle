@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import glimmer_cradle.cognition_worker.adapters.model_client as llm_module
 import pytest
@@ -375,7 +376,7 @@ def _build_llm_engine(
     )
 
 
-def test_model_invocation_summary_records_hash_without_prompt(
+async def test_model_invocation_summary_records_hash_without_prompt(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -383,15 +384,15 @@ def test_model_invocation_summary_records_hash_without_prompt(
     monkeypatch.setattr(
         engine,
         "_generate_via_api",
-        lambda _request, _config, provider_id: LLMApiResult(
+        AsyncMock(side_effect=lambda _request, _config, provider_id: LLMApiResult(
             text="provider reply",
             payload={"messages": [{"role": "user", "content": "secret prompt"}]},
             response_data={"choices": [{"message": {"content": "provider reply"}}]},
             provider_id=provider_id,
             model_id="test-model",
-        ),
+        )),
     )
-    reply = engine.generate(ModelRequest(
+    reply = await engine.generate(ModelRequest(
         messages=[
             ModelMessage(role="system", content="system prompt"),
             ModelMessage(role="user", content="secret prompt"),
@@ -417,7 +418,7 @@ def test_model_invocation_summary_records_hash_without_prompt(
     assert all("secret prompt" not in message for message in engine._logger.messages)
 
 
-def test_model_invocation_full_capture_is_ordered_and_redacted(
+async def test_model_invocation_full_capture_is_ordered_and_redacted(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -425,7 +426,7 @@ def test_model_invocation_full_capture_is_ordered_and_redacted(
     monkeypatch.setattr(
         engine,
         "_generate_via_api",
-        lambda _request, _config, provider_id: LLMApiResult(
+        AsyncMock(side_effect=lambda _request, _config, provider_id: LLMApiResult(
             text="full reply",
             payload={
                 "headers": {"Authorization": "Bearer sk-top-secret"},
@@ -434,14 +435,14 @@ def test_model_invocation_full_capture_is_ordered_and_redacted(
             response_data={"choices": [{"message": {"content": "full reply"}}]},
             provider_id=provider_id,
             model_id="test-model",
-        ),
+        )),
     )
     for purpose, category, prompt in (
         ("cognitive_action_plan", "decision", "full prompt"),
         ("agent_plan", "skill", "plan a skill"),
         ("reply", "response", "second prompt"),
     ):
-        engine.generate(ModelRequest(
+        await engine.generate(ModelRequest(
             messages=[ModelMessage(role="user", content=prompt)],
             metadata={
                 "purpose": purpose,
@@ -478,20 +479,20 @@ def test_model_invocation_full_capture_is_ordered_and_redacted(
     assert timeline.index("agent_plan") < timeline.index("reply")
 
 
-def test_model_invocation_redacts_provider_error(
+async def test_model_invocation_redacts_provider_error(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     engine = _build_llm_engine(monkeypatch, tmp_path, capture_mode="summary")
 
-    def raise_provider_error(*_args):
+    async def raise_provider_error(*_args):
         raise llm_module.InferenceException(
             "LLM API 请求失败: 401, Bearer sk-top-secret"
         )
 
     monkeypatch.setattr(engine, "_generate_via_api", raise_provider_error)
     with pytest.raises(llm_module.InferenceException, match="401"):
-        engine.generate(ModelRequest(
+        await engine.generate(ModelRequest(
             messages=[ModelMessage(role="user", content="hello")],
             metadata={"purpose": "reply"},
         ))

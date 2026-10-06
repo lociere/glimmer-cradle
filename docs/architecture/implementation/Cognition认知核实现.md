@@ -163,8 +163,12 @@ Context 是注意力预算控制器，不是字符串拼接器。`context/` 已�
 
 `inference/` 是 provider-neutral 推理 owner：`request.py` / `event.py` 定义文本、多模态及流事件，
 `model_port.py` 定义模型与 realtime 外部能力边界，`InferenceController` 按 Cognitive Activity model tier
-执行禁止、本地限定或 cloud→local 显式 fallback。供应商 HTTP、密钥、payload 与响应提取仍只在
-`adapters/inference/`；`RealtimeSession` 用 generation、单调 sequence 和 terminal 状态拒绝陈旧取消及晚到帧。
+执行禁止、本地限定或 cloud→local 显式 fallback。供应商 HTTP、密钥、payload 与响应提取只在
+Worker `adapters/model_client.py`；Core `ModelPort.generate` 为异步消费契约，CloudReasoning、
+视觉专家、兼容 Plan/Synthesis 与 Memory 巩固直接 await。模型与云 Embedding 使用 HTTPX 异步
+连接，取消不再遗留同步网络线程；Embedding 重试等待可取消，不重试已取消请求。
+Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL；本地 CPU Embedding 线程计算仍需
+后续独立生命周期收束。`RealtimeSession` 用 generation、单调 sequence 和 terminal 状态拒绝陈旧取消及晚到帧。
 
 `ReplyContextBuilder` 按固定分区装配 system prompt：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、近期 Experience 和多模态描述。`ConversationController` 在查询前补投影并从 SQLite 恢复有界 Working Set；近期 Experience 排除当前 trace。所有来源在排序前先按 `recall_scope` 与 conversation/actor/scene owner 过滤，私聊不会因词项相似而召回群聊的 `space_local` 内容。`observe_only` 召回实际 perception，不把策略性 silence 渲染成角色主动沉默。
 

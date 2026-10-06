@@ -273,14 +273,14 @@ def _multimodal_router(reader: FileAssetReader) -> MultimodalRouter:
     ), reader)
 
 
-def test_restarted_asset_reader_verifies_and_routes_media(tmp_path: Path) -> None:
+async def test_restarted_asset_reader_verifies_and_routes_media(tmp_path: Path) -> None:
     state = tmp_path / "state"
     image = _write_asset(state, "00000000-0000-4000-8000-000000000001", "image/png", b"png")
     audio = _write_asset(state, "00000000-0000-4000-8000-000000000002", "audio/wav", b"wav")
     video = _write_asset(state, "00000000-0000-4000-8000-000000000003", "video/mp4", b"mp4")
     document = _write_asset(state, "00000000-0000-4000-8000-000000000004", "application/pdf", b"pdf")
     reader = FileAssetReader(state, tmp_path / "work")
-    route = _multimodal_router(reader).route({"text": "看和听", "parts": [
+    route = await _multimodal_router(reader).route({"text": "看和听", "parts": [
         {"content": {"image": image}},
         {"content": {"audio": audio}, "semantic": {"text": "你好", "resolved": True}},
         {"content": {"video": video}},
@@ -297,15 +297,15 @@ def test_restarted_asset_reader_verifies_and_routes_media(tmp_path: Path) -> Non
     (state / image["asset_id"] / "blob").write_bytes(b"bad")
     with pytest.raises(ValueError, match="损坏"):
         FileAssetReader(state, tmp_path / "work").verify(image)
-    degraded = _multimodal_router(FileAssetReader(state, tmp_path / "work")).route({
+    degraded = await _multimodal_router(FileAssetReader(state, tmp_path / "work")).route({
         "parts": [{"content": {"image": image}}]
     })
     assert degraded.vision_messages == []
     assert "视觉能力当前不可用" in degraded.semantic_text
 
 
-def test_legacy_media_degrades_without_forged_asset(tmp_path: Path) -> None:
-    route = _multimodal_router(
+async def test_legacy_media_degrades_without_forged_asset(tmp_path: Path) -> None:
+    route = await _multimodal_router(
         FileAssetReader(tmp_path / "missing", tmp_path / "work")
     ).route({"items": [
         {"modality": "video", "uri": "https://expired.example/voice", "mime_type": "audio/wav"},
@@ -321,7 +321,7 @@ class _PlanningLLM:
     def __init__(self) -> None:
         self.requests = []
 
-    def generate(self, request):
+    async def generate(self, request):
         self.requests.append(request)
         return json.dumps({
             "reasoning": "需要读取当前配置。",
@@ -390,9 +390,9 @@ def test_llm_provider_resolution_uses_models_contract() -> None:
     assert vision.api_key == "provider-key"
 
 
-def test_llm_gateway_fails_closed_without_or_for_unknown_provider() -> None:
+async def test_llm_gateway_fails_closed_without_or_for_unknown_provider() -> None:
     with pytest.raises(InferenceException, match="真实 LLM provider"):
-        LLMEngine(_model_settings(), None).generate(ModelRequest(
+        await LLMEngine(_model_settings(), None).generate(ModelRequest(
             messages=[ModelMessage(role="user", content="你好")]
         ))
 
@@ -400,13 +400,13 @@ def test_llm_gateway_fails_closed_without_or_for_unknown_provider() -> None:
         api_type="openai", api_key="test-key", models={"chat": "test-model"}
     ))
     with pytest.raises(InferenceException, match="未知 LLM provider"):
-        configured.generate(
+        await configured.generate(
             ModelRequest(messages=[ModelMessage(role="user", content="你好")]),
             provider_key="missing/chat",
         )
 
 
-def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() -> None:
+async def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() -> None:
     settings = InferenceSettings(
         model=_model_settings(),
         life_clock=LifeClockSettings(
@@ -421,10 +421,10 @@ def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() 
         ),
     )
     router = MultimodalRouter(settings)
-    text = router.route({"text": "你好", "modality": ["text"], "items": None})
+    text = await router.route({"text": "你好", "modality": ["text"], "items": None})
     assert text.primary_text == "你好" and text.vision_messages == []
 
-    route = router.route({"text": "听一下", "items": [
+    route = await router.route({"text": "听一下", "items": [
         {"modality": "audio", "uri": "https://example.test/new.wav", "mime_type": "audio/wav"},
         {"modality": "video", "uri": "https://example.test/old.wav", "mime_type": "audio/wav"},
         {"modality": "audio", "semantic": {"text": "你好", "resolved": True}},
@@ -438,7 +438,7 @@ def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() 
     disabled = settings.model_copy(update={
         "multimodal": settings.multimodal.model_copy(update={"enabled": False})
     })
-    disabled_route = MultimodalRouter(disabled).route({"items": [
+    disabled_route = await MultimodalRouter(disabled).route({"items": [
         {"modality": "audio", "semantic": {"text": "准确转写", "resolved": True}}
     ]})
     assert disabled_route.semantic_text == "[语音1] 准确转写"
@@ -462,7 +462,7 @@ class _SynthesisLLM:
         self.text = text
         self.requests = []
 
-    def generate(self, request):
+    async def generate(self, request):
         self.requests.append(request)
         return self.text
 

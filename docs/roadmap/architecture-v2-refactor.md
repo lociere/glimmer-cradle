@@ -732,6 +732,24 @@ Kernel 209 项（7 项条件跳过）、Ruff、architecture/docs/encoding/diff �
 下一步核查事件循环收尾和遗留线程/任务，而非扩大超时或把 fallback 当作优雅停止。
 本切片不改变进程或数据 owner，不宣称阶段 5 完成。
 
+Worker 取消传输切片：停机诊断在循环关闭时确认无遗留 async task，残余非守护线程正在
+`urllib` 模型 HTTP 的 DNS/TLS 调用中。取消 `asyncio.to_thread` 的等待者没有终止底层请求。
+Worker 模型与云 Embedding HTTP 已改为 HTTPX 可取消异步传输，ModelPort 与全部生产消费者
+同时切换；视觉专家路由不再把网络请求藏入线程，Embedding 重试等待也可取消。Provider 失败只记录
+安全状态/类型，HTTPX/httpcore 的请求 URL 日志关闭，避免地址中的凭据进入日志。
+回环慢响应反例验证 CloudReasoning、视觉专家与 Embedding 取消关闭连接且无后台重试；真实
+Kernel→Worker 测试使用隔离数据目录、本地慢响应 provider 和测试密钥，断言双代正常停止及在途
+Plan 网络请求取消后均为 exit 0 / 无 signal，而非接受进程树强制回收。未扩大 stop 超时或降低门禁。
+本地 CPU Embedding 线程计算不在该网络修复范围；该切片不代表全部平台/生产场景已证明优雅退出，
+最终生命周期独立审查和完整主链验收仍需完成。
+
+本切片证据（2026-10-06，当前 dirty 源码/根 uv 锁候选）：Worker 62 项、Core 214 项、
+Kernel 209 项（8 项条件跳过，真实 Worker 进程 5 项另行启用并通过）、Desktop 打包契约 5 项 PASS。
+Contracts 全量验证含 22 项 gates、根锁 inventory/toolchain、TS/Python/C# round-trip 与 generated-clean
+PASS；根 typecheck/build、architecture/docs/encoding/diff PASS。改动测试的 Ruff 与模型边界源码
+import/unused 检查 PASS；未宣称旧大型迁移文件的全部 lint 已收束。取消链路无持久数据迁移、公开 wire
+变更或版本递增；仍未执行最终 OCI/安装制品及完整产品主链验收。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

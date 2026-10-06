@@ -2,20 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from glimmer_cradle.conversation import (
-    ConversationTurn,
-    MomentKind,
-    SourceDescriptor,
-)
 from glimmer_cradle.cognition.attention import Attention, make_attention
 from glimmer_cradle.cognition.context import (
     ContextAssembler,
@@ -30,10 +24,14 @@ from glimmer_cradle.cognition.inference import (
     ModelTier,
 )
 from glimmer_cradle.cognition.planning import ActionPlan, PlanningController
+from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports import IdGeneratorPort
-from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.state import EmotionSystem
+from glimmer_cradle.conversation import (
+    ConversationTurn,
+    MomentKind,
+    SourceDescriptor,
+)
 
 if TYPE_CHECKING:
     from glimmer_cradle.cognition.state import CognitiveActivityController
@@ -829,7 +827,7 @@ class PerceptionAppraiser:
         if self._router is None or not model_input:
             return text, "", (), None
         try:
-            route = await asyncio.to_thread(self._router.route, model_input)
+            route = await self._router.route(model_input)
         except Exception as exc:
             self._logger.warning("多模态路由失败，回落纯文本", error=str(exc))
             return text, "", (), None

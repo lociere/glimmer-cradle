@@ -748,7 +748,7 @@ class AgentPlanUseCase(BaseUseCase[AgentPlanInput, AgentPlanOutput]):
         summary = ""
 
         try:
-            raw = await asyncio.to_thread(self.llm_engine.generate, llm_request)
+            raw = await self.llm_engine.generate(llm_request)
             text = raw.strip()
             fence = chr(96) * 3  # ```
             if fence + "json" in text:
@@ -841,8 +841,8 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         emotion_state: dict[str, Any] = {"name": "平静", "intensity": 0.5}
 
         try:
-            # generate() 是同步方法，用 to_thread 避免阻塞事件循环
-            reply_content = await asyncio.to_thread(self.llm_engine.generate, llm_request)
+            # 异步 ModelPort 保留 RPC 取消到 provider transport 的传播。
+            reply_content = await self.llm_engine.generate(llm_request)
             reply_content = reply_content.strip()
             self._logger.debug("工具结果合成成功", goal_len=len(input_data.original_goal))
         except Exception as exc:

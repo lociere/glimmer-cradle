@@ -6,13 +6,12 @@ from collections.abc import AsyncIterator
 from typing import Literal, Protocol
 
 import numpy as np
-
 from glimmer_cradle.cognition.inference.event import InferenceResponse, ModelEvent
 from glimmer_cradle.cognition.inference.request import InferenceRequest, ModelRequest
 
 
 class ModelPort(Protocol):
-    def generate(self, request: ModelRequest, provider_key: str | None = None) -> str: ...
+    async def generate(self, request: ModelRequest, provider_key: str | None = None) -> str: ...
 
 
 class InferenceBackendPort(Protocol):

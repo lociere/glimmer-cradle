@@ -376,6 +376,10 @@ def _configure_std_logging() -> None:
     root.setLevel(level)
     root.handlers.clear()
 
+    # Provider URL 可含凭据；请求状态由安全的 invocation 记录，不输出第三方 wire 日志。
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     # ── 控制台 handler（写入 stdout，被 Kernel 内核捕获）
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(level)

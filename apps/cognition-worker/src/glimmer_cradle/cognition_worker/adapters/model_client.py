@@ -9,37 +9,38 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass, field
 import importlib.util
 import json
 import os
-from pathlib import Path
 import threading
 import time
 import uuid
-from typing import List, Literal, Optional, Protocol, TYPE_CHECKING
-from urllib import error, request
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, List, Literal, Optional, Protocol
 from urllib.parse import urljoin
 
+import httpx
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
-
 from glimmer_cradle.cognition.inference import (
-    InferenceSettings,
     InferenceRequest,
-    ModelEvent,
-    ModelPort,
-    ModelTier,
-    ModelSettings,
     InferenceResponse,
+    InferenceSettings,
+    ModelEvent,
+    ModelMessage,
+    ModelPort,
+    ModelRequest,
+    ModelSettings,
+    ModelTier,
 )
 from glimmer_cradle.cognition.ports import LoggerPort
-from glimmer_cradle.cognition.inference import ModelMessage, ModelRequest
 from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
     inference_request_to_wire,
     model_event_from_wire,
 )
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class _NullLogger:
     def debug(self, _event: str, **_values: object) -> None: pass
@@ -199,12 +200,10 @@ class _DashScopeEmbeddingProvider:
         ]
         results: list[np.ndarray] = []
         for batch in batches:
-            results.extend(
-                await asyncio.to_thread(self._request_batch, batch, text_type)
-            )
+            results.extend(await self._request_batch(batch, text_type))
         return np.asarray(results, dtype=np.float32)
 
-    def _request_batch(
+    async def _request_batch(
         self, texts: list[str], text_type: EmbeddingTextType
     ) -> list[np.ndarray]:
         payload = {
@@ -216,29 +215,25 @@ class _DashScopeEmbeddingProvider:
                 "output_type": "dense",
             },
         }
-        req = request.Request(
-            str(self._config.endpoint),
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
         attempts = int(self._config.max_retries) + 1
         for attempt in range(attempts):
             try:
-                with request.urlopen(
-                    req, timeout=int(self._config.request_timeout_ms) / 1000
-                ) as response:
-                    body = json.load(response)
+                async with httpx.AsyncClient(
+                    timeout=int(self._config.request_timeout_ms) / 1000, follow_redirects=True,
+                ) as client:
+                    response = await client.post(
+                        str(self._config.endpoint), json=payload,
+                        headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+                    )
+                    response.raise_for_status()
+                    body = response.json()
                 return self._parse_response(body, expected=len(texts))
-            except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
+            except (httpx.HTTPError, TimeoutError, ValueError) as exc:
                 if attempt + 1 >= attempts:
                     raise RuntimeError(
                         f"DashScope Embedding 请求失败: {type(exc).__name__}"
-                    ) from exc
-                time.sleep(0.25 * (attempt + 1))
+                    ) from None
+                await asyncio.sleep(0.25 * (attempt + 1))
         raise RuntimeError("DashScope Embedding 请求失败")
 
     def _parse_response(self, body: object, *, expected: int) -> list[np.ndarray]:
@@ -418,7 +413,7 @@ class ModelClient:
 
 
 class CloudReasoning:
-    """将同步 provider 调用包装为不阻塞事件循环的云推理后端。"""
+    """将通用推理请求映射到可取消的异步 provider 边界。"""
 
     def __init__(self, llm_engine: LLMEngine) -> None:
         self._llm = llm_engine
@@ -437,7 +432,7 @@ class CloudReasoning:
         messages.append(ModelMessage(role="user", content=req.user))
         llm_req = ModelRequest(messages=messages, metadata=dict(req.metadata))
         started = time.monotonic()
-        text = await asyncio.to_thread(self._llm.generate, llm_req, req.provider_key)
+        text = await self._llm.generate(llm_req, req.provider_key)
         duration_ms = (time.monotonic() - started) * 1000.0
         return InferenceResponse(
             text=text,
@@ -609,7 +604,7 @@ class LLMEngine:
 
         return _build(self.llm_config, resolved_model, prov)
 
-    def _generate_via_api(self, llm_request: ModelRequest, cfg: LLMSettings, provider_id: str) -> LLMApiResult:
+    async def _generate_via_api(self, llm_request: ModelRequest, cfg: LLMSettings, provider_id: str) -> LLMApiResult:
         """通过指定的 LLMSettings（可为 provider 子配置）调用 API 生成回复。"""
         api_type = cfg.api_type.lower().strip()
         api_key = cfg.api_key
@@ -672,14 +667,11 @@ class LLMEngine:
             headers.update(cfg.request_headers)
 
         try:
-            req = request.Request(
-                endpoint,
-                data=json.dumps(payload).encode("utf-8"),
-                headers=headers,
-                method=request_method,
-            )
-            with request.urlopen(req, timeout=60) as resp:
-                resp_data = json.load(resp)
+            # 请求与连接随协程取消而关闭，不把不可终止的 HTTP 调用遗留在线程池中。
+            async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+                response = await client.request(request_method, endpoint, json=payload, headers=headers)
+                response.raise_for_status()
+                resp_data = response.json()
 
             if isinstance(resp_data, dict):
                 if cfg.response_extract:
@@ -720,14 +712,16 @@ class LLMEngine:
                     )
 
             raise InferenceException("无法从LLM响应中提取文本")
-        except error.HTTPError as e:
-            try:
-                body = e.read().decode("utf-8")
-            except Exception:
-                body = "<无法读取响应体>"
-            raise InferenceException(f"LLM API 请求失败: {e.code}, {body}")
+        except httpx.HTTPStatusError as e:
+            raise InferenceException(f"LLM API 请求失败: HTTP {e.response.status_code}") from None
+        except httpx.TimeoutException:
+            raise InferenceException("LLM API 请求超时") from None
+        except httpx.RequestError as e:
+            raise InferenceException(f"LLM API 传输失败: {type(e).__name__}") from None
         except Exception as e:
-            raise InferenceException(f"LLM API 调用失败: {str(e)}")
+            if isinstance(e, InferenceException):
+                raise
+            raise InferenceException(f"LLM API 响应无效: {type(e).__name__}") from None
 
     def _extract_response_field(self, data: dict, path: str) -> str:
         """按照点分隔路径提取响应字段，路径示例：choices.0.text"""
@@ -749,7 +743,7 @@ class LLMEngine:
             return current.strip()
         return str(current)
 
-    def generate(self, llm_request: ModelRequest, provider_key: str | None = None) -> str:
+    async def generate(self, llm_request: ModelRequest, provider_key: str | None = None) -> str:
         """生成回复。
 
         Args:
@@ -781,7 +775,7 @@ class LLMEngine:
             if cfg is None or not cfg.api_type or cfg.api_type.lower() == "local":
                 raise InferenceException("未配置可用的真实 LLM provider")
             model_id = _first_model(cfg.models) or model_id
-            api_result = self._generate_via_api(
+            api_result = await self._generate_via_api(
                 llm_request, cfg, provider_key or "default"
             )
             reply = api_result.text
@@ -797,6 +791,10 @@ class LLMEngine:
             final_outcome = "succeeded"
             return reply.strip()
 
+        except asyncio.CancelledError:
+            error_code = "cancelled"
+            error_summary = "模型请求已取消"
+            raise
         except Exception as e:
             error_code = error_code or "inference_error"
             error_summary = str(e)
@@ -950,16 +948,12 @@ class MultimodalRouter:
         """注入 LLMEngine 实例（避免构造时循环依赖）。"""
         self._llm_engine = llm_engine
 
-    # 同步入口由 PerceptionAppraiser 放入工作线程，避免阻塞认知循环。
-
-    def route(
+    async def route(
         self, model_input: PerceptionContent | dict | None
     ) -> MultimodalRouteResult:
         """执行多模态路由，返回结构化结果。
 
-        specialist_then_core 策略下会同步调用专家视觉 API（通过 asyncio.run 或
-        已有事件循环下的 run_until_complete），因此调用方必须将本方法放在线程执行器中
-        （asyncio.to_thread）而非直接 await。
+        specialist_then_core 策略直接等待可取消的专家 API，不创建网络工作线程。
         """
         mm_config = self._config.multimodal
         empty = MultimodalRouteResult(strategy=mm_config.strategy, primary_text="", semantic_text="")
@@ -1087,7 +1081,7 @@ class MultimodalRouter:
             )
 
         # ── specialist_then_core：专家模型先描述，再注入主模型 ──
-        semantic_text = self._run_specialist(
+        semantic_text = await self._run_specialist(
             image_items=image_items,
             video_items=video_items,
             image_provider=mm_config.image_model,
@@ -1121,7 +1115,7 @@ class MultimodalRouter:
             )
         return descriptions
 
-    def _run_specialist(
+    async def _run_specialist(
         self,
         image_items: List[PerceptionModalityItem],
         video_items: List[PerceptionModalityItem],
@@ -1162,7 +1156,7 @@ class MultimodalRouter:
                         vision_mime=img.mime_type or "image/jpeg",
                     )
                 ])
-                description = self._llm_engine.generate(req, provider_key=image_provider)
+                description = await self._llm_engine.generate(req, provider_key=image_provider)
                 desc_parts.append(f"[{label}{idx}] {description.strip()}")
                 self._logger.debug(
                     "视觉专家模型描述完成",

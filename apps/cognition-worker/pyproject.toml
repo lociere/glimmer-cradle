@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "glimmer-cradle-cognition==0.2.6",
     "glimmer-cradle-conversation==0.1.0",
+    "httpx==0.28.1",
 ]
 
 [tool.uv.sources]

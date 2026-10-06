@@ -11,6 +11,11 @@ Knowledge、Plan、Synthesis 与历史查询已调用 Cognition/Conversation map
 继续收束兼容 RPC service 的其余主体。生产 Host 已使用 `readiness.py` 的逐项业务 ready 条件和
 `shutdown.py` 的有序幂等停机图；首条状态投影成功前不 ready，Shutdown ACK 后不再接纳新业务请求。
 
+模型与云 Embedding HTTP 由 Worker 的异步 HTTPX adapter 承担；Core `ModelPort.generate`、
+CloudReasoning、视觉专家、Plan/Synthesis 与 Memory 巩固均直接 await，不在线程中发网络请求。
+取消传播到连接关闭，Embedding 的重试等待也可取消；错误不暴露响应正文或 URL，第三方 wire 日志
+不输出请求地址。本地 sentence-transformers CPU 计算仍在线程执行，不属于网络取消链路。
+
 ```powershell
 uv run --project apps/cognition-worker --extra dev pytest -q apps/cognition-worker/tests
 python -m glimmer_cradle.cognition_worker --help

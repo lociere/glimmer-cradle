@@ -4,26 +4,24 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import asdict
 from collections.abc import Callable
+from dataclasses import asdict
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-
-from glimmer_cradle.cognition.memory.memory import Episode, MemoryRecord
-from glimmer_cradle.cognition.memory.memory_controller import MemoryController
-from glimmer_cradle.cognition.ports import ObservabilityPort
-from glimmer_cradle.cognition.memory.memory import MemoryKind
 from glimmer_cradle.cognition.inference import ModelMessage, ModelPort, ModelRequest
+from glimmer_cradle.cognition.memory.memory import Episode, MemoryKind, MemoryRecord
+from glimmer_cradle.cognition.memory.memory_controller import MemoryController
 from glimmer_cradle.cognition.memory.memory_store import (
     ConsolidationJob,
     ConsolidationJobStore,
     EpisodeProjectionStore,
     RelationshipProjectionStore,
 )
+from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports import IdGeneratorPort
 from glimmer_cradle.conversation import Moment, MomentKind
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
 
 class MemoryDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -397,7 +395,7 @@ class ConsolidationCoordinator:
         )
         llm = self._llm
         assert llm is not None
-        text = (await asyncio.to_thread(llm.generate, request)).strip()
+        text = (await llm.generate(request)).strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0]
         try:

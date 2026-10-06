@@ -1,21 +1,21 @@
+import json
 from pathlib import Path
 
 import glimmer_cradle.cognition_worker as worker
-import io
-import json
+import httpx
 import numpy as np
 import pytest
-from glimmer_cradle.cognition_worker.composition import WorkerPaths
-from glimmer_cradle.cognition_worker.composition import (
-    ConfigException,
-    map_character_runtime_document,
-)
+from conftest import normalized_document
 from glimmer_cradle.cognition_worker.adapters import model_client as embedding_module
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     EmbeddingEngine,
     EmbeddingSettings,
 )
-from conftest import normalized_document
+from glimmer_cradle.cognition_worker.composition import (
+    ConfigException,
+    WorkerPaths,
+    map_character_runtime_document,
+)
 
 
 def test_worker_public_api_is_explicit(worker_config: dict[str, int]) -> None:
@@ -101,26 +101,19 @@ async def test_dashscope_embedding_preserves_document_and_query_semantics(
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-only-key")
     payloads: list[dict] = []
 
-    class _Response(io.BytesIO):
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            self.close()
-
-    def fake_urlopen(req, timeout):
-        assert timeout == 1.0
-        payload = json.loads(req.data.decode("utf-8"))
+    def respond(req):
+        assert req.extensions["timeout"]["read"] == 1.0
+        payload = json.loads(req.content)
         payloads.append(payload)
         embeddings = [
             {"text_index": index, "embedding": [float(index + 1)] * 64}
             for index, _ in enumerate(payload["input"]["texts"])
         ]
-        return _Response(
-            json.dumps({"output": {"embeddings": embeddings}}).encode("utf-8")
-        )
+        return httpx.Response(200, json={"output": {"embeddings": embeddings}})
 
-    monkeypatch.setattr(embedding_module.request, "urlopen", fake_urlopen)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(embedding_module.httpx, "AsyncClient", lambda **kwargs: original_client(
+        transport=httpx.MockTransport(respond), **kwargs))
     engine = EmbeddingEngine(_embedding_config())
 
     documents = await engine.encode(["第一条", "第二条"], text_type="document")

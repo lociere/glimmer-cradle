@@ -1731,7 +1731,7 @@ class _VM:
 
 class _FakeRouter:
     def __init__(self, route): self._route = route
-    def route(self, model_input): return self._route
+    async def route(self, model_input): return self._route
 
 
 async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> None:

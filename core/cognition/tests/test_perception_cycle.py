@@ -306,7 +306,7 @@ async def test_smoke_perception_to_action_command_production_wiring(tmp_path) ->
     captured: dict = {}
 
     class _StubLLM:
-        def generate(self, llm_request, provider_key=None):
+        async def generate(self, llm_request, provider_key=None):
             captured["messages"] = llm_request.messages
             return "今天挺好的，谢谢你问我。"
 
