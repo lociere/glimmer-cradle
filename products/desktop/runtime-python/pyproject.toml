@@ -11,10 +11,10 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-glimmer-cradle-contracts = { path = "../../../contracts" }
-glimmer-cradle-cognition = { path = "../../../core/cognition" }
-glimmer-cradle-cognition-worker = { path = "../../../apps/cognition-worker" }
-glimmer-cradle-audio-engine = { path = "../../../engines/audio" }
+glimmer-cradle-contracts = { workspace = true }
+glimmer-cradle-cognition = { workspace = true }
+glimmer-cradle-cognition-worker = { workspace = true }
+glimmer-cradle-audio-engine = { workspace = true }
 
 [build-system]
 requires = ["setuptools>=68.0"]

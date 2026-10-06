@@ -155,12 +155,16 @@ function lockDevDependencies(lock, projectName) {
 
 const cognitionProjectPath = resolve(workspace, 'core', 'cognition', 'pyproject.toml');
 const audioProjectPath = resolve(workspace, 'engines', 'audio', 'pyproject.toml');
-const cognitionLockPath = resolve(workspace, 'core', 'cognition', 'uv.lock');
-const audioLockPath = resolve(workspace, 'engines', 'audio', 'uv.lock');
+const workspaceLockPath = resolve(workspace, 'uv.lock');
 const cognitionProject = readToml(cognitionProjectPath, 'Cognition project');
 const audioProject = readToml(audioProjectPath, 'Audio project');
-const cognitionLock = readToml(cognitionLockPath, 'Cognition lock');
-const audioLock = readToml(audioLockPath, 'Audio lock');
+const workspaceLock = readToml(workspaceLockPath, 'Python workspace lock');
+
+for (const name of [COGNITION_PROJECT, AUDIO_PROJECT]) {
+  if (!lockPackage(workspaceLock, name)) {
+    throw new Error(`Python workspace lock is missing owner package: ${name}`);
+  }
+}
 
 if (projectDevDependencies(cognitionProject).includes(GENERATOR_PACKAGE)) {
   throw new Error('Cognition must not retain the Audio legacy generator tool dependency');
@@ -168,13 +172,10 @@ if (projectDevDependencies(cognitionProject).includes(GENERATOR_PACKAGE)) {
 if (projectDevDependencies(audioProject).includes(GENERATOR_PACKAGE)) {
   throw new Error('Audio must not retain the legacy generator tool dependency');
 }
-if (lockPackage(cognitionLock, GENERATOR_PACKAGE)
-  || lockDevDependencies(cognitionLock, COGNITION_PROJECT).includes(GENERATOR_PACKAGE)) {
-  throw new Error('Cognition lock must not retain the Audio legacy generator tool dependency');
-}
-if (lockPackage(audioLock, GENERATOR_PACKAGE)
-  || lockDevDependencies(audioLock, AUDIO_PROJECT).includes(GENERATOR_PACKAGE)) {
-  throw new Error('Audio lock must not retain the legacy generator tool dependency');
+if (lockPackage(workspaceLock, GENERATOR_PACKAGE)
+  || [COGNITION_PROJECT, AUDIO_PROJECT].some((name) =>
+    lockDevDependencies(workspaceLock, name).includes(GENERATOR_PACKAGE))) {
+  throw new Error('Python workspace lock must not retain the legacy generator tool dependency');
 }
 
 console.log('contracts inventory: ok');

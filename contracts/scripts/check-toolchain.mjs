@@ -125,7 +125,7 @@ for (const [name, evidence] of [
 }
 
 const pythonProject = readFileSync(resolve(root, 'tests/python/pyproject.toml'), 'utf8');
-const pythonLock = readFileSync(resolve(root, 'tests/python/uv.lock'), 'utf8');
+const pythonLock = readFileSync(resolve(workspace, 'uv.lock'), 'utf8');
 const pythonVersion = manifest.language_packages.python_protobuf.version;
 if (
   !pythonProject.includes(`protobuf==${pythonVersion}`)

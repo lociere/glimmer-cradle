@@ -59,11 +59,16 @@ COPY --from=uv-runtime /uv /uvx /usr/local/bin/
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 WORKDIR /opt/glimmer-cradle/app
+COPY pyproject.toml uv.lock ./
 COPY contracts contracts
 COPY core/cognition core/cognition
+COPY core/conversation core/conversation
+COPY apps/cognition-worker apps/cognition-worker
 COPY engines/audio engines/audio
-RUN uv sync --project core/cognition --frozen --no-dev --no-editable \
-    && uv sync --project engines/audio --frozen --no-dev --no-editable --extra tts
+COPY products/desktop/runtime-python/pyproject.toml products/desktop/runtime-python/pyproject.toml
+RUN uv sync --package glimmer-cradle-cognition-worker --package glimmer-cradle-audio-engine \
+    --frozen --no-dev --no-editable --extra tts \
+    && .venv/bin/python -I -c "import glimmer.cognition.v1.cognition_service_pb2; import glimmer_cradle.cognition_worker; import glimmer_cradle.audio.main"
 
 FROM ${PYTHON_IMAGE} AS personal-server
 ARG APP_UID=10001
@@ -82,8 +87,7 @@ WORKDIR /opt/glimmer-cradle/app
 COPY --from=node-builder --chown=glimmer:glimmer /release/kernel core/kernel
 COPY --from=node-builder --chown=glimmer:glimmer /release/personal-server products/personal-server
 COPY --from=node-builder --chown=glimmer:glimmer /release/extension-host extension-host
-COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/core/cognition core/cognition
-COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/engines/audio engines/audio
+COPY --from=python-builder --chown=glimmer:glimmer /opt/glimmer-cradle/app/.venv .venv
 COPY --chown=glimmer:glimmer products/personal-server/product.json products/personal-server/product.json
 COPY --chown=glimmer:glimmer configs /opt/glimmer-cradle/default-config
 COPY --chown=glimmer:glimmer deploy/personal-server/container /usr/local/lib/glimmer-cradle-personal-server
@@ -100,6 +104,7 @@ ENV NODE_ENV=production \
     UV_NO_SYNC=1 \
     UV_CACHE_DIR=/var/lib/glimmer-cradle/data/cache/uv \
     GLIMMER_CRADLE_APP_ROOT=/opt/glimmer-cradle/app \
+    GLIMMER_CRADLE_PYTHON_RUNTIME=/opt/glimmer-cradle/app/.venv/bin/python \
     GLIMMER_CRADLE_CONFIG_ROOT=/var/lib/glimmer-cradle/config \
     GLIMMER_CRADLE_DATA_ROOT=/var/lib/glimmer-cradle/data \
     GLIMMER_CRADLE_RUN_ROOT=/run/glimmer-cradle \

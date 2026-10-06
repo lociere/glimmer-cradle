@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-glimmer-cradle-contracts = { path = "../../contracts" }
+glimmer-cradle-contracts = { workspace = true }
 
 [project.optional-dependencies]
 asr = [

@@ -43,20 +43,24 @@ function project(name, devDependencies = ['pytest>=8']) {
   ].join('\n');
 }
 
-function lockFile(projectName, devDependencies = ['pytest'], lockedPackages = ['pytest']) {
+function lockFile(projects, lockedPackages = ['pytest']) {
   const sections = [
     'version = 1',
     'revision = 3',
     'requires-python = ">=3.11"',
-    '',
-    '[[package]]',
-    `name = "${projectName}"`,
-    'version = "0.0.0"',
-    'source = { editable = "." }',
-    '',
-    '[package.optional-dependencies]',
-    `dev = [${devDependencies.map((name) => `{ name = "${name}" }`).join(', ')}]`,
   ];
+  for (const { name, devDependencies = ['pytest'] } of projects) {
+    sections.push(
+      '',
+      '[[package]]',
+      `name = "${name}"`,
+      'version = "0.0.0"',
+      'source = { editable = "." }',
+      '',
+      '[package.optional-dependencies]',
+      `dev = [${devDependencies.map((dependency) => `{ name = "${dependency}" }`).join(', ')}]`,
+    );
+  }
   for (const name of lockedPackages) {
     sections.push('', '[[package]]', `name = "${name}"`, 'version = "1.0.0"', 'source = { registry = "https://pypi.org/simple" }');
   }
@@ -73,9 +77,11 @@ function workspaceFixture() {
   }
   cpSync(resolve(contractsRoot, 'inventory.md'), resolve(fixtureContracts, 'inventory.md'));
   write(workspace, 'engines/audio/pyproject.toml', project('glimmer-cradle-audio-engine'));
-  write(workspace, 'engines/audio/uv.lock', lockFile('glimmer-cradle-audio-engine'));
   write(workspace, 'core/cognition/pyproject.toml', project('glimmer-cradle-cognition'));
-  write(workspace, 'core/cognition/uv.lock', lockFile('glimmer-cradle-cognition'));
+  write(workspace, 'uv.lock', lockFile([
+    { name: 'glimmer-cradle-audio-engine' },
+    { name: 'glimmer-cradle-cognition' },
+  ]));
   return { workspace, contracts: fixtureContracts };
 }
 
@@ -113,6 +119,14 @@ test('structured workspace after legacy protocol closure passes', () => {
   const fixture = workspaceFixture();
   const result = check(fixture.contracts, fixture.workspace);
   assert.equal(result.status, 0, result.stderr);
+});
+
+test('workspace lock missing an owner package fails closed', () => {
+  const fixture = workspaceFixture();
+  write(fixture.workspace, 'uv.lock', lockFile([{ name: 'glimmer-cradle-cognition' }]));
+  const result = check(fixture.contracts, fixture.workspace);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing owner package: glimmer-cradle-audio-engine/);
 });
 
 test('legacy Audio generated projection fails closed', () => {
@@ -169,16 +183,22 @@ test('Audio dev dependency retaining the generator fails closed', () => {
 
 test('Audio lock retaining the generator fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'engines/audio/uv.lock', lockFile('glimmer-cradle-audio-engine', ['datamodel-code-generator'], ['datamodel-code-generator']));
+  write(fixture.workspace, 'uv.lock', lockFile([
+    { name: 'glimmer-cradle-audio-engine', devDependencies: ['datamodel-code-generator'] },
+    { name: 'glimmer-cradle-cognition' },
+  ], ['datamodel-code-generator']));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Audio lock must not retain/);
+  assert.match(result.stderr, /workspace lock must not retain/);
 });
 
 test('Cognition lock retaining the generator fails closed', () => {
   const fixture = workspaceFixture();
-  write(fixture.workspace, 'core/cognition/uv.lock', lockFile('glimmer-cradle-cognition', ['datamodel-code-generator'], ['datamodel-code-generator']));
+  write(fixture.workspace, 'uv.lock', lockFile([
+    { name: 'glimmer-cradle-audio-engine' },
+    { name: 'glimmer-cradle-cognition', devDependencies: ['datamodel-code-generator'] },
+  ], ['datamodel-code-generator']));
   const result = check(fixture.contracts, fixture.workspace);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Cognition lock must not retain/);
+  assert.match(result.stderr, /workspace lock must not retain/);
 });

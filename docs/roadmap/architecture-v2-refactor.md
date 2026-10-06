@@ -268,8 +268,8 @@ Python 职责拆分切片进一步删除 `events/fact/factory/ledger/recorder`�
 checkpoint/projection/reader/working set、复数 Messages 和 persistence adapters 均按 v2.1 文件契约归位。
 writer guard 从 SQLite adapter 中独立并保持跨进程 fencing；History/Turn 新库由
 `migrations/python/{001-history,002-turns}.sql` 作为唯一 fresh-schema 来源，wheel 明确携带且隔离安装读取通过。
-Conversation 精确清单已无缺失文件；仅现行 `core/conversation/uv.lock` 在根 uv workspace 尚未建立前作为
-迁移保护继续保留。新增公开 API、投影缓存失效、writer fencing 与固定 v4/v5/playout fixture 反例后，
+Conversation 精确清单已无缺失文件；Python 主仓库依赖现由根 uv workspace/lock 统一解析，Conversation
+不再保留子项目锁。新增公开 API、投影缓存失效、writer fencing 与固定 v4/v5/playout fixture 反例后，
 Conversation Python 18 项、TS 9 项、Cognition 全量 258 项和 Kernel 全量 204 项（另 7 项跳过）PASS；
 clean wheel 与 npm tarball 均只携带目标入口和四份 migration，隔离 wheel 安装可读取 Python SQL。
 docs、architecture、encoding、根 typecheck/build 与 `git diff --check` 均 PASS。Surface receipt 与跨重启
@@ -496,8 +496,8 @@ Core 继续只消费 `ClockPort`；`IdGeneratorPort` 收入目标 `ports/__init_
 
 Cognition 工具元数据清理切片删除已被 Ruff 调用链替代的 `.flake8`，以及无内容的
 `tests/__init__.py`；pytest 以 `pythonpath = ["src", ".", ...]` 显式支持 PEP 420 测试命名空间。
-`setup.py` 仍负责 wheel 构建前清除 stale `build/lib`，子项目
-`uv.lock` 仍是当前 Python 解析锁；二者需先建立等价目标入口再删除，本切片保留。
+`setup.py` 仍负责 wheel 构建前清除 stale `build/lib`，需先建立等价的现代构建入口再删除。Python 主仓库
+依赖已经由根 uv workspace/lock 统一解析，旧子项目锁已删除。
 
 Worker 配置投影归位切片把完整运行配置、Action Stream 进程设置与 fail-closed Document mapper
 移入目标 `cognition_worker/composition.py`。这些类型描述 Kernel 注入给 Worker 的进程配置聚合，不是
@@ -814,6 +814,29 @@ exit 0。`contracts/generated` 与 compatibility 无 tracked 改动，`pnpm chec
 不同于 runtime compatibility，已发布历史制品与 tag 永远保持真实，不删除或覆写。
 
 ## 验证证据
+
+### 根 Python workspace 收敛（2026-10-06）
+
+根 `pyproject.toml` 明确纳入 Contracts、Python round-trip、Conversation、Cognition、Cognition Worker、
+Audio 与 Desktop runtime 七个成员，根 `uv.lock` 是主仓库唯一 Python 解析锁。成员依赖统一声明
+`workspace = true`；五份旧子项目锁已在 consumer-zero 后删除，独立 Extension 模板锁仍属于模板后续迁移。
+Inventory/Toolchain、离线 round-trip、Desktop runtime manifest 与打包导出均切换根锁。
+Worker 根测试脚本改为使用 Worker 自己的项目元数据。
+
+开发 Cognition 从根 `.venv` 启动，按 Worker 成员执行 inexact sync，防止共享环境卸载 Audio extras。
+Desktop 显式安装 Contracts、Conversation、Cognition、Worker 和 Audio 五个本地 distribution，并核验
+Worker/Conversation 的安装产物。Personal Server Python builder 一次选择 Worker 与 Audio（tts），
+最终镜像只复制非 editable 根环境并注入解释器路径；不复制 Python 源码树或依赖运行时 uv sync。
+
+当前候选证据：根锁检查、Contracts 工具链和离线 Python round-trip PASS；Inventory 13 项、Desktop
+打包契约 5 项、Deploy/供应链契约 13 项 PASS；Conversation 19 项、Cognition 225 项、Worker 38 项、
+Audio 11 项 PASS。隔离目录非 editable 安装五个本地 distribution、`-I` imports 与 Worker `--help`
+PASS；Contracts 全量 gates 22 项、Kernel 全量 205 项（7 项条件跳过），以及真实 Kernel→Worker
+启动、双代 ready、崩溃恢复、失败关闭和显式恢复 4 项 PASS。Windows 停机
+部分场景仍使用已有强制进程树回收路径；本切片未改变该策略。Linux 目标 dry-run PASS；本机没有 Docker，
+实际 OCI 构建仍须在最终产品候选执行。根 typecheck/build、docs、encoding、architecture 和
+`git diff --check` PASS；最终物理差距为 1,569 项，整体重构继续进行。
+
 
 - 2026-09-20 文档整理：保留现有分类；旧蓝图、旧目标树、旧母路线与 now 快照归入 History，
   重建 v2 迁移地图、补齐 Platform 实现和里程碑索引。新增 `check:docs` 并接入 `check:pr`，

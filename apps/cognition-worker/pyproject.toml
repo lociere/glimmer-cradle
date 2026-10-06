@@ -9,8 +9,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-glimmer-cradle-cognition = { path = "../../core/cognition" }
-glimmer-cradle-conversation = { path = "../../core/conversation" }
+glimmer-cradle-cognition = { workspace = true }
+glimmer-cradle-conversation = { workspace = true }
 
 [project.optional-dependencies]
 dev = [

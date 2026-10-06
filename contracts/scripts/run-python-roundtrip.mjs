@@ -7,15 +7,15 @@ const uv = verifyUv(root);
 
 const result = spawnSync(uv, [
   'run',
-  '--project',
-  'tests/python',
+  '--package',
+  'glimmer-cradle-contracts-python-roundtrip',
   '--locked',
   '--offline',
   '--no-python-downloads',
   'python',
-  'tests/roundtrip/roundtrip.py',
+  resolve(root, 'tests/roundtrip/roundtrip.py'),
 ], {
-  cwd: root,
+  cwd: resolve(root, '..'),
   stdio: 'inherit',
   shell: false,
 });

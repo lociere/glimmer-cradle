@@ -92,8 +92,7 @@ Cognition ── Context / Attention / Memory / Experience / Reasoning
 ```powershell
 corepack enable
 pnpm install --frozen-lockfile
-uv sync --project core/cognition --extra dev
-uv sync --project engines/audio --extra tts --extra asr --extra dev
+uv sync --package glimmer-cradle-cognition-worker --package glimmer-cradle-audio-engine --extra tts --extra asr --extra dev
 ```
 
 复制 `configs/secrets/secrets.example.yaml` 为 `configs/secrets/secrets.yaml`，并仅填写实际需要的 Provider 凭据。真实密钥不得进入 Git、日志、文档或发布物。

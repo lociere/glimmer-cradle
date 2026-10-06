@@ -37,7 +37,6 @@ Cognition 只保留五个源码职责根。Contract Spine 生成物位于仓库�
 ```text
 core/cognition/
 ├── pyproject.toml
-├── uv.lock
 ├── src/glimmer_cradle/cognition/
 │   ├── __init__.py
 │   ├── attention/ perception/          # 感知规范化、候选竞争与 focus lease
@@ -62,6 +61,9 @@ Worker `rpc_service.py` 接受 Kernel 注入且已校验的原始配置 Document
 SQLite adapter、模型 provider、资产读取和可观测性注入具体路径。Core 不读取进程环境或
 generated wire 类型；Worker 绑定 concrete、启动组件并执行
 `start/ready/degraded/failed/restart/stop/dispose` 生命周期。
+
+Python 主仓库通过根 uv workspace/lock 统一解析依赖。开发启动在共享根 `.venv` 中以 inexact sync
+准备 Worker，保留 Audio 已安装 extras；安装态由产品显式注入独立解释器路径。
 
 旧平级领域/技术目录、`foundation/`、Cognition `protocol/generated/`、旧 import/re-export
 与兼容入口均已删除。内部 identity/persona/affect/experience/memory/conversation/context/

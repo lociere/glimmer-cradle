@@ -46,9 +46,8 @@ export class CognitionManager {
     const config = ConfigManager.instance.getConfig();
     const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
     const repoRoot = resolveRepoRoot();
-    const cognitionDir = path.resolve(repoRoot, 'core', 'cognition');
     const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
-    const command = packagedPython || await ensureDevelopmentPython(cognitionDir);
+    const command = packagedPython || await ensureDevelopmentPython(repoRoot);
     const args = ['-m', 'glimmer_cradle.cognition_worker'];
     this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
     this.transport.configureActionDeadline(this.requestTimeoutMs);
@@ -372,17 +371,15 @@ function normalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function ensureDevelopmentPython(cognitionDir: string): Promise<string> {
+async function ensureDevelopmentPython(repoRoot: string): Promise<string> {
   const python = process.platform === 'win32'
-    ? path.join(cognitionDir, '.venv', 'Scripts', 'python.exe')
-    : path.join(cognitionDir, '.venv', 'bin', 'python');
-  if (!await fs.pathExists(python)) {
-    const uv = process.platform === 'win32' ? 'uv.exe' : 'uv';
-    await execFileAsync(uv, ['sync', '--project', cognitionDir, '--frozen'], {
-      cwd: resolveRepoRoot(),
-      windowsHide: true,
-    });
-  }
+    ? path.join(repoRoot, '.venv', 'Scripts', 'python.exe')
+    : path.join(repoRoot, '.venv', 'bin', 'python');
+  const uv = process.platform === 'win32' ? 'uv.exe' : 'uv';
+  // 根环境也供 Audio 使用；安装 Worker 时保留已安装的语音 extras。
+  await execFileAsync(uv, [
+    'sync', '--project', path.join(repoRoot, 'apps', 'cognition-worker'), '--frozen', '--inexact',
+  ], { cwd: repoRoot, windowsHide: true });
   if (!await fs.pathExists(python)) {
     throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
   }

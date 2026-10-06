@@ -24,7 +24,7 @@ if (process.argv.includes('--dry-run')) {
     platform: 'windows-x64',
     node_runtime: process.execPath,
     python_version: pythonVersion,
-    lock_inputs: ['pnpm-lock.yaml', 'products/desktop/runtime-python/uv.lock', 'contracts/pyproject.toml'],
+    lock_inputs: ['pnpm-lock.yaml', 'uv.lock', 'contracts/pyproject.toml'],
     commands,
     output: path.relative(repoRoot, runtimeRoot).replaceAll('\\', '/'),
   }, null, 2)}\n`);
@@ -84,7 +84,9 @@ try {
   await run('uv', [
     'pip', 'install', '--python', python, '--strict', '--no-deps',
     path.join(repoRoot, 'contracts'),
+    path.join(repoRoot, 'core', 'conversation'),
     path.join(repoRoot, 'core', 'cognition'),
+    path.join(repoRoot, 'apps', 'cognition-worker'),
     path.join(repoRoot, 'engines', 'audio'),
   ]);
   await fs.rm(pythonRequirements, { force: true });
@@ -96,7 +98,9 @@ try {
     kernelContracts,
     extensionHostEntry,
     python,
+    path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'conversation'),
     path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'cognition'),
+    path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'cognition_worker'),
     path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer_cradle', 'audio'),
     path.join(temporaryRoot, 'python', 'Lib', 'site-packages', 'glimmer', 'cognition', 'v1', 'cognition_service_pb2.py'),
   ]) {
@@ -123,7 +127,7 @@ try {
       typescript_module: 'kernel/node_modules/@glimmer-cradle/contracts/dist/glimmer/cognition/v1/cognition_service_pb.js',
       python_module: 'glimmer.cognition.v1.cognition_service_pb2',
     },
-    lock_inputs: ['pnpm-lock.yaml', 'products/desktop/runtime-python/uv.lock', 'contracts/pyproject.toml'],
+    lock_inputs: ['pnpm-lock.yaml', 'uv.lock', 'contracts/pyproject.toml'],
   }, null, 2)}\n`);
   await fs.rm(runtimeRoot, { recursive: true, force: true });
   await fs.mkdir(path.dirname(runtimeRoot), { recursive: true });

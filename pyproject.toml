@@ -1,0 +1,10 @@
+[tool.uv.workspace]
+members = [
+    "apps/cognition-worker",
+    "contracts",
+    "contracts/tests/python",
+    "core/cognition",
+    "core/conversation",
+    "engines/audio",
+    "products/desktop/runtime-python",
+]

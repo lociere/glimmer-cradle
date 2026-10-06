@@ -77,8 +77,8 @@ products/desktop/product.json
 component-manifest.json
 ```
 
-Python 固定为 3.12.13，`products/desktop/runtime-python/uv.lock` 把 Contracts、Cognition 与
-Audio 的兼容依赖解析为单一安装态环境；三个本地 distribution 再以 `--no-deps` 显式安装，
+Python 固定为 3.12.13，根 `uv.lock` 中的 Desktop runtime workspace member 把 Contracts、Cognition、
+Conversation、Worker 与 Audio 的兼容依赖解析为单一安装态环境；五个本地 distribution 再以 `--no-deps` 显式安装，
 避免依赖源码树 `PYTHONPATH` 或拼接两份互相冲突的 lock。Kernel 由
 pnpm production deploy 以 hoisted 实体布局产生 resolved dependency tree，避免 Windows
 junction 绑定随后被重命名的 staging 目录；打包门会在最终安装树用 bundled Node 隔离加载
@@ -108,7 +108,7 @@ electron-builder native dependency rebuild，并分别在实际 Electron 与 bun
 
 ## Personal Server OCI 投影
 
-`deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；builder 显式复制并构建 Contracts TS workspace，同时把 `contracts/` 作为 Cognition 的 Python 本地 distribution 安装，Cognition 与 Audio 使用 uv 锁文件创建非 editable 环境。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移，也不依赖源码树路径注入。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。
+`deploy/personal-server/Dockerfile` 使用 Node/Python 多阶段构建。pnpm 通过 `injectWorkspacePackages` 与 `pnpm deploy` 生成只含生产依赖的 Kernel 和 Personal Server 投影；builder 显式复制并构建 Contracts TS workspace。Python builder 使用根 uv workspace/lock 一次选择 Worker 与 Audio（tts）成员创建非 editable 环境，包含 Contracts、Conversation 与 Cognition；最终镜像只复制根 `.venv` 并显式注入解释器路径。构建阶段和最终镜像都使用 `/opt/glimmer-cradle/app`，因此虚拟环境没有跨绝对路径搬移，也不依赖源码树路径注入。Caddy 可执行文件从上游固定版本的 GitHub Release 取得，构建时同时校验发行归档 SHA-512 与许可证 SHA-256，再进入最终 OCI。
 
 tag workflow 的 build job 先执行仓库门禁，再生成带 BuildKit provenance/SBOM 的
 `linux/amd64` OCI 与确定性部署包，并附加 artifact manifest、provenance、SPDX SBOM 和

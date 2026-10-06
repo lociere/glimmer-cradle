@@ -19,8 +19,8 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-glimmer-cradle-contracts = { path = "../../contracts" }
-glimmer-cradle-conversation = { path = "../conversation" }
+glimmer-cradle-contracts = { workspace = true }
+glimmer-cradle-conversation = { workspace = true }
 
 [project.optional-dependencies]
 local-embedding = [
