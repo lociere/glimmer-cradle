@@ -19,6 +19,7 @@ export interface JobFinish {
 
 export interface JobStorePort {
   activateAuthority(epoch: number, now: number): void;
+  loadAuthorityEpoch(): number | null;
   enqueue(request: JobRequest, epoch: number, now: number): JobSubmission;
   load(jobId: string): Job | null;
   /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */

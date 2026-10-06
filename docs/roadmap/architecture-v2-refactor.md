@@ -102,7 +102,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 |---|---|---|
 | 0 | 审计表、依赖环、state conflicts、vendor list、迁移顺序 | 已完成初始基线；后续阶段继续收窄 owner 调查 |
 | 1 | v2 权威入口、ADR、增量边界检查与显式 legacy debt | 已完成：51 条例外、68 处起始命中；CI 接入 contract architecture gate |
-| 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events 与 Configuration 校验机制已切入 `core/platform`；Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
+| 2 | platform primitive 提取；业务装配留 composition | 进行中：Clock/Identity/Observability/Lifecycle/Events、Configuration 校验和 authority lease/handover 机制已切入 `core/platform`；具体 authority SQLite/Jobs 装配归 Host，Kernel 保留 Schema 装配、readiness、领域事件、durable replay 与 DLQ policy |
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
@@ -113,7 +113,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
 | 11 | protocol 单一 wire source、mapper、兼容基线 | 待执行 |
 | 12 | apps 启动入口与 topology-driven composition | 待执行 |
-| 13 | Conversation/Memory/Persona/Job/Config Authority 矩阵 | 待执行 |
+| 13 | Conversation/Memory/Persona/Job/Config Authority 矩阵 | 进行中：通用本地租约/handover 与 Jobs 实际 owner 接纳/撤销已验证；其他 aggregate 的生产矩阵、跨机认证/wire、离线 proposal 与冲突回连仍待完成 |
 | 14 | 带版本数据迁移、fixtures、恢复、幂等 | 待执行 |
 | 15 | legacy consumer-zero 删除、CI 严格门和六条主链验收 | 待执行 |
 
@@ -353,6 +353,33 @@ Python、wire、生成物、锁文件或 SQLite schema，上一候选 Cognition/
 旧队列因默认生产 consumer 未切换而保留。独立审查仍归整体最终固定候选。
 生产监督/authority 持久配置、配置 schema/catalog、状态事件 wire/inbox、
 未确认源政策快照/retention、旧数据迁移与队列删除仍须继续，不能以此切片声明阶段 7 完成。
+
+### 阶段 2/7/13 authority 与 Jobs 装配（2026-10-06 当前候选）
+
+输入 `31c019db`；当前会话是唯一写入 owner。本轮在清单中的 Platform topology 三文件建立
+通用 AuthorityLease/StorePort/HandoverController，在 Host authority SQLite Adapter/迁移和
+`composition/domain-owners.ts` 接真实 Jobs 生命周期。持久 epoch 不回退，只有 active、未过期且
+身份匹配的租约可续期/新增工作；受控 drain 只收尾旧执行元数据，不再接纳/claim。
+handover 先持久撤销，再等待真实 drain，最后原子确认新 owner。
+强制过期接管不宣称业务回滚，仍经 Jobs 原 attempt unknown 对账。数据路径由装配方注入，不创建生产库。
+
+实现还拒绝缺失/落后的 authority 库与不领先 Jobs 的新租约，不用重复启动追赶已有业务 epoch。
+正常 drain 保持续期到真实封口结束，更高 epoch 接管时旧资源回收不能释放新主。
+SQLite 双连接/真实进程竞争、重开序列、不兼容库拒绝、续期/失效、handover 持久准备/确认、
+拒伪确认/重复确认和 SQL 提交故障回滚 PASS；真实 Worker 正常/在途转移、失租回收、原 unknown
+恢复与慢封口续期 PASS。Host 36 项、Platform 8 项、Jobs 33 项 PASS。
+一次回归发现源创建时间领先 Host 首次 enqueue 约 1 秒，旧 fixture 把已发布误作已到期；
+验收 helper 现等真实源 due time，不改业务时间、政策或断言。Platform 测试类型检查使用
+TS 6 的显式 `--ignoreConfig`/`--types node`，不跳过新增测试类型。
+固定验证输入是 `31c019db` 上本轮 Platform topology/README/入口/类型与测试、Host authority
+SQLite/迁移/Jobs owner 装配及测试、Jobs epoch 只读 Port、根 test façade/两包依赖/锁与相关文档。
+根 `pnpm typecheck`、`pnpm build`、Kernel 6 项真实进程、repo-checks 27 项、架构、111 页文档、
+编码和 diff 检查 PASS；target-layout 是 spec-only PASS，未证明最终物理树完成。
+离线安装 PASS，锁仅调整既有版本的 importer，未改 wire、生成树、Cognition/Worker 源码或既有
+业务库 schema。新增 authority schema 只用于临时测试；未迁移生产数据、发布/推送或删除旧 owner。
+旧 Kernel/巩固队列 consumer 仍在，必须到 consumer-zero 与恢复门成立后删除；独立审查仍留整体最终候选。
+产品进程监督、配置 Document/catalog、未确认源政策快照、状态事件接收与旧数据迁移仍继续，
+不将本候选等同完整 authority/hybrid 或整个重构完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

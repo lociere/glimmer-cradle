@@ -25,6 +25,15 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 ## 用户状态与记忆
 
+Host `SqliteAuthorityStore` 接受显式 authority 数据库路径，schema version 1、owner 标记
+`0x47434155`，保存按 aggregate 的 epoch/token、owner、expiry/revision/status 和完整 handover
+准备/确认记录。未知库、其他 owner 或不兼容版本拒绝打开，不删除或重建；确认和新租约同事务提交。
+该状态由 Platform 机制拥有、Host Adapter 持久化，不是 RunRoot 锁或可重建缓存。
+目标路径是 `${DataRoot}/state/platform/authority.sqlite`，产品 resolver 尚未接入，当前仅临时测试库，
+不将其登记为已运行生产路径。备份/恢复必须保持 authority、Jobs/Memory 与待确认事实的一致切点；
+禁止单独丢弃/回滚 authority 后用重复启动重算序列，Host 已拒绝 authority 缺失或落后既有 Jobs 的情况。
+完整跨 owner 恢复验证仍归阶段 14，不能仅凭新库初始化宣称恢复可用。
+
 Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚未由产品 Host 装配创建生产库，
 因此本表不提前声明新的已运行数据路径。其 schema version 3/owner 标记、Job/lease/原 attempt、
 对账证据摘要、待 ACK 状态 outbox 与去重 tombstone 独立于 Memory；retention 不删除未投递事件或

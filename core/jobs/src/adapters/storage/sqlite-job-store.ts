@@ -63,6 +63,12 @@ export class SqliteJobStore implements JobStorePort {
     } catch (error) { this.database.close(); throw error; }
   }
 
+  public loadAuthorityEpoch(): number | null {
+    const epoch = this.currentEpoch();
+    if (epoch !== null && (!Number.isSafeInteger(epoch) || epoch < 1)) throw new JobAuthorityError('Job authority 持久序列无效');
+    return epoch;
+  }
+
   public activateAuthority(epoch: number, now: number): void {
     assertTimestamp(now);
     if (!Number.isSafeInteger(epoch) || epoch < 1) throw new JobAuthorityError('Job authority epoch 无效');

@@ -49,9 +49,15 @@ importers:
       '@glimmer-cradle/jobs':
         specifier: workspace:*
         version: link:../../core/jobs
+      '@glimmer-cradle/platform':
+        specifier: workspace:*
+        version: link:../../core/platform
       '@grpc/grpc-js':
         specifier: 1.14.0
         version: 1.14.0
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -59,9 +65,6 @@ importers:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
-      better-sqlite3:
-        specifier: 13.0.3
-        version: 13.0.3
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
@@ -244,6 +247,9 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.20.0)
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
       typescript:
         specifier: ^6.0.2
         version: 6.0.2

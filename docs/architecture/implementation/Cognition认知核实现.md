@@ -246,7 +246,9 @@ signal 与执行接纳，等待在途封口和循环后关闭当前 generation c
 快照只描述 Memory Jobs：源 RPC 未 ready/暂不可用时 degraded，unknown 未解决时
 `jobs_recovery_pending`，authority 失效或非法 source/evidence 则 failed 并撤销 client；不得借此宣称
 整个产品 ready。未注入持久状态 receiver 时 outbox 保持待确认，不能假 ACK。实例持有政策副本，
-跨重启的未确认源原政策恢复仍须补齐。生产进程 supervisor、配置/authority 加载、状态事件 wire/inbox
+跨重启的未确认源原政策恢复仍须补齐。Host 已通过 `HostJobsOwner` 注入实际持久 authority 并接通
+续期/撤销/drain 确认，具体机制见 [Platform authority](./Platform原语实现.md#authority-与受控转移)。
+生产进程 supervisor、配置/authority 路径加载、状态事件 wire/inbox
 与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

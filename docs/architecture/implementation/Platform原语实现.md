@@ -16,8 +16,10 @@
 | `/observability` | TraceContext、Logger、Span、Observability | Kernel application/runtime；KernelObservabilityAdapter |
 | `/lifecycle` | RuntimeModule、LifecyclePhase、Observer、LifecycleCoordinator | Kernel runtime modules 与 LifecycleOrchestrator |
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
+| root 的 topology exports | AuthorityLease/StorePort、fencing 判定、HandoverController | Host `SqliteAuthorityStore` 与 `HostJobsOwner`；无数据库依赖 |
 
-契约提取不表示具体 IO 实现已迁入 Platform。Scope、Topology、Configuration、Security 等仍按执行记录调查。
+契约提取不表示具体 IO 实现已迁入 Platform。Scope、完整 Topology/hybrid、Configuration 装配和
+Security 等仍按执行记录推进。
 
 ## 组合与生命周期
 
@@ -38,7 +40,26 @@ Live-event contract 表达进程内通知，不承诺持久化、重试或 exact
 [Kernel event-bus port](../../../core/kernel/src/ports/event-bus.port.ts) 保留 replay 注册和 ack；
 [EventBus adapter](../../../core/kernel/src/adapters/events/event-bus.ts) 仍拥有 dispatch、DLQ、inventory 和 receipt 校验。
 Conversation log、PCM/token 流不因接口提取而并入此总线。
-Platform 当前没有独立配置文件或持久 store，logger/trace 与 clock 由 owner 注入。
+Platform 不直接执行持久 IO；authority 状态由 Host Adapter 写入，logger/trace 与 clock 由 owner 注入，
+当前没有独立 Platform 配置文件。
+
+## Authority 与受控转移
+
+`topology/authority-lease.ts` 固定 aggregate/owner/epoch/token/expiry/revision 和有效性判定；
+合法续期只推进 expiry/revision，不替换承载身份。`authority.ts` 定义 StorePort 与可信 DrainPort，
+`handover.ts` 先持久撤销，再等待实际资源 drain 并核验确认身份，最后接纳新租约。
+失败保留 revoking；过期接管只 fencing，领域仍须恢复 unknown，不能宣称旧副作用未发生。
+
+Host `adapters/platform/authority-store.ts` 在 SQLite IMMEDIATE 事务中更新序列、撤销/确认和
+转移审计；重复确认返回原持久 receipt，不刷新新租约。schema 与恢复边界见
+[数据目录](../../reference/data-layout.md#用户状态与记忆)。
+`composition/domain-owners.ts` 的 `HostJobsOwner` 对固定 jobs aggregate 获取/接纳租约并注入
+真实 Jobs epoch，后台续期和每次 Jobs 时钟访问都核验权威身份。正常 drain 期间保持续期，
+完成在途封口后才释放；handover 先停止续期和旧接纳、等待同一实际 Jobs drain，确认后接纳者
+从原 attempt unknown 对账。更高 epoch 撤销旧循环，旧实例不能释放新主。
+authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒绝启动，不靠重复获取 epoch
+绕过恢复门。phase active 仅表示租约已持有，不表示 Jobs/整个产品 ready。
+当前验证是本地临时库与真实 Worker；生产进程监督、跨机 wire/认证、离线 proposal 和恢复安装仍待完成。
 
 ## 调试与验证
 

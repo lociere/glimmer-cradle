@@ -9,9 +9,11 @@ import Database from 'better-sqlite3';
 import { create } from '@bufbuild/protobuf';
 import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { JobController, JobRecoveryController, SqliteJobStore, type Job } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
-import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController,
+import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
   memoryJobIdentity, memoryJobEvidence, memoryJobRequest } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
@@ -43,6 +45,10 @@ async function worker(root: string, generation: string) {
       });
     });
     client = new CognitionClient(endpoint, generation, 5_000);
+    // 源与 Host 都使用真实墙钟；系统校时时源可能稍领先，不能把“已发布”误作“已到期”。
+    const sources = await client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 1000 }));
+    const due = Math.max(0, ...sources.requests.map(source => Date.parse(source.createdAt)));
+    await eventually(() => Date.now() >= due);
     return { client, endpoint, child, async stop() { client!.close(); child.stdin!.end('stop\n'); await stopped; } };
   } catch (error) { client?.close(); if (child.exitCode === null) child.kill(); await stopped.catch(() => undefined); throw error; }
 }
@@ -63,6 +69,150 @@ async function eventually(predicate: () => boolean) {
   while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
   expect(predicate()).toBe(true);
 }
+
+function ownedJobs(store: SqliteJobStore, client: CognitionClient, authority: SqliteAuthorityStore, owner: string, initial?: AuthorityLease) {
+  return new HostJobsOwner({ store, clock, owner_id: owner, cognition: client, authority,
+    authority_lease_ms: 2000, renewal_interval_ms: 25, poll_interval_ms: 10, batch_size: 8,
+    lease_ms: 60_000, submission_policy: submissionPolicy, retry_policy: { base_delay_ms: 500, max_delay_ms: 500 },
+    initial_lease: initial });
+}
+describe('Host authority 装配真实 Jobs/Worker', () => {
+  it('正常停机的封口 RPC 超过原 authority 窗口时仍续期，直到真实资源 drain 完成才释放', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-owned-drain-'));
+    const service = await worker(root, 'waiting-model');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const owner = new HostJobsOwner({ store, clock, owner_id: 'old', cognition: service.client, authority,
+      authority_lease_ms: 500, renewal_interval_ms: 25, poll_interval_ms: 10, batch_size: 8,
+      lease_ms: 60_000, submission_policy: submissionPolicy, retry_policy: policy });
+    const memory = new Database(path.join(root, 'memory.sqlite'), { readonly: true });
+    const query = service.client.reconcile.bind(service.client);
+    const seal = vi.spyOn(service.client, 'reconcile').mockImplementation(async (...args: Parameters<CognitionClient['reconcile']>) => {
+      await new Promise(resolve => setTimeout(resolve, 700)); return query(...args);
+    });
+    try {
+      const observed = owner.start().catch(error => error);
+      await eventually(() => !!memory.prepare("SELECT job_id FROM memory_job_attempts WHERE state='active'").get());
+      const stopping = owner.stop();
+      await new Promise(resolve => setTimeout(resolve, 550));
+      expect(authority.load('jobs')).toMatchObject({ owner_id: 'old', status: 'active' });
+      expect(() => authority.acquire('jobs', 'premature', clock.now(), 500)).toThrow('仍被承载');
+      await stopping;
+      expect(await observed).toBeInstanceOf(Error);
+      expect(memory.prepare('SELECT state FROM memory_job_attempts').get()).toEqual({ state: 'sealed' });
+      expect(authority.load('jobs')?.status).toBe('released');
+      expect(authority.acquire('jobs', 'next', clock.now(), 500).epoch).toBe(2);
+    } finally { await owner.stop(); seal.mockRestore(); memory.close(); authority.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('持久 authority 注入执行并持续续期；第二 owner 拒绝，drain 后释放，重开单调接管', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-owned-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const owner = ownedJobs(store, service.client, authority, 'one');
+    const secondClient = new CognitionClient(service.endpoint, 'one', 5000);
+    const second = ownedJobs(store, secondClient, authority, 'two');
+    try {
+      const start = owner.start(); expect(owner.start()).toBe(start);
+      expect(await start).toMatchObject({ phase: 'active', lease: { owner_id: 'one', epoch: 1 }, jobs: { status: 'ready' } });
+      await eventually(() => (authority.load('jobs')?.revision ?? 0) >= 3);
+      await expect(second.start()).rejects.toThrow('仍被承载');
+      expect(authority.load('jobs')?.owner_id).toBe('one');
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+      const result = store.readOutbox(1, 100).find(event => event.status === 'succeeded')!;
+      expect(store.load(result.job_id)?.authority_epoch).toBe(1);
+      expect(owner.stop()).toBe(owner.stop()); await owner.stop();
+      expect(authority.load('jobs')?.status).toBe('released');
+      authority.close(); authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+      expect(authority.acquire('jobs', 'new-process', clock.now(), 1000).epoch).toBe(2);
+    } finally { await owner.stop(); await second.stop(); authority.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('handover 先取消并持久封口真实模型，再确认新 epoch；接纳者从原 unknown 对账', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-owned-transfer-'));
+    const service = await worker(root, 'waiting-model');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const old = ownedJobs(store, service.client, authority, 'old');
+    const read = vi.spyOn(service.client, 'readRequests').mockResolvedValueOnce(create(ReadMemoryJobRequestsResponseSchema));
+    const memory = new Database(path.join(root, 'memory.sqlite'), { readonly: true });
+    let next: HostJobsOwner | undefined;
+    try {
+      await old.start();
+      await eventually(() => !!memory.prepare("SELECT job_id FROM memory_job_attempts WHERE state='active'").get());
+      const pending = old.handover('next', 'transfer');
+      expect(authority.load('jobs')?.status).toBe('revoking');
+      expect(old.handover('next', 'transfer')).toBe(pending);
+      await expect(old.handover('different', 'transfer')).rejects.toThrow('内容冲突');
+      const accepted = await pending;
+      expect(accepted).toMatchObject({ owner_id: 'next', epoch: 2 });
+      expect(memory.prepare('SELECT state FROM memory_job_attempts').get()).toEqual({ state: 'sealed' });
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+      expect(old.snapshot.phase).toBe('transferred');
+      const job = store.listUnknown(1, 'memory.consolidate', 8)[0];
+      expect(job.attempt).toBe(1);
+      const client = new CognitionClient(service.endpoint, 'waiting-model', 5000);
+      next = ownedJobs(store, client, authority, 'next', accepted);
+      expect(await next.start()).toMatchObject({ phase: 'active', lease: { epoch: 2 } });
+      expect(store.load(job.job_id)).toMatchObject({ status: 'retry_wait', attempt: 1, authority_epoch: 2 });
+      expect(store.listAttempts(job.job_id)[0]).toMatchObject({ authority_epoch: 1, owner_id: 'old' });
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+      await old.stop(); // 不能撤销已经接纳的新主。
+      expect(authority.load('jobs')?.owner_id).toBe('next');
+    } finally { await old.stop(); await next?.stop(); read.mockRestore(); memory.close(); authority.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('外部更高 authority 撤销旧循环，丢失租约时回收资源，不释放新主', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-owned-fenced-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const other = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const old = ownedJobs(store, service.client, authority, 'old');
+    try {
+      await old.start();
+      other.release(old.snapshot.lease!, clock.now());
+      const next = other.acquire('jobs', 'new', clock.now(), 2000);
+      await eventually(() => ['lease_lost', 'failed'].includes(old.snapshot.phase));
+      await old.stop();
+      expect(other.load('jobs')).toMatchObject({ owner_id: 'new', epoch: next.epoch, status: 'active' });
+      await expect(service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 1 }))).rejects.toBeInstanceOf(HostCognitionError);
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    } finally { await old.stop(); other.close(); authority.close(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('更高 authority 接管真实在途模型：旧回调不能写新主，原 unknown 经接收端封口恢复', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-owned-inflight-fenced-'));
+    const service = await worker(root, 'waiting-model');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const other = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const old = ownedJobs(store, service.client, authority, 'old');
+    const read = vi.spyOn(service.client, 'readRequests').mockResolvedValueOnce(create(ReadMemoryJobRequestsResponseSchema));
+    const memory = new Database(path.join(root, 'memory.sqlite'), { readonly: true });
+    let next: HostJobsOwner | undefined;
+    try {
+      await old.start();
+      await eventually(() => !!memory.prepare("SELECT job_id FROM memory_job_attempts WHERE state='active'").get());
+      expect(other.release(old.snapshot.lease!, clock.now())).toBe(true);
+      const acquired = other.acquire('jobs', 'new', clock.now(), 2000);
+      next = ownedJobs(store, new CognitionClient(service.endpoint, 'waiting-model', 5000), authority, 'new', acquired);
+      await next.start();
+      await eventually(() => ['lease_lost', 'failed'].includes(old.snapshot.phase));
+      // 陈旧完成 CAS 可能报告失败；必须观察并 drain，不能据此释放新 owner。
+      await old.stop().catch(error => { expect(error).toBeInstanceOf(Error); });
+      expect(authority.load('jobs')).toMatchObject({ owner_id: 'new', epoch: 2, status: 'active' });
+      const jobId = (memory.prepare('SELECT job_id FROM memory_job_attempts').get() as { job_id: string }).job_id;
+      expect(store.load(jobId)).toMatchObject({ status: 'retry_wait', attempt: 1, authority_epoch: 2 });
+      expect(memory.prepare('SELECT state FROM memory_job_attempts').get()).toEqual({ state: 'sealed' });
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+    } finally {
+      await old.stop().catch(() => undefined); await next?.stop(); read.mockRestore(); memory.close();
+      other.close(); authority.close(); store.close(); await service.stop();
+    }
+  }, 30_000);
+});
 
 describe('Host Memory Jobs 持续驱动与资源归属', () => {
   it('真实 Worker 自动投递、执行一次；重复 start 共用循环，停机关闭 client 而不关闭注入 Store', async () => {

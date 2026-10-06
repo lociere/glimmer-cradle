@@ -23,3 +23,7 @@ export type {
 export { LifecycleCoordinator } from './lifecycle/index.js';
 export { ConfigurationValidator } from './configuration/index.js';
 export type { ConfigurationValidation } from './configuration/index.js';
+export { AuthorityConflictError, isAuthorityCurrent, validateAuthorityLease, validateAuthorityWindow } from './topology/authority-lease.js';
+export type { AuthorityLease, AuthorityRecord } from './topology/authority-lease.js';
+export type { AuthorityStorePort, AuthorityHandover, AuthorityDrainReceipt, AuthorityDrainPort } from './topology/authority.js';
+export { HandoverController, validateDrainReceipt } from './topology/handover.js';
