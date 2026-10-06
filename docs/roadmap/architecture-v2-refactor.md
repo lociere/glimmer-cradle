@@ -701,6 +701,11 @@ observability 与 recorder adapter；Core 中无消费者的规范化配置夹�
 Worker 49 项 PASS，总覆盖项不变；Ruff、docs、encoding、architecture 与 diff 检查 PASS 后固定提交。
 最终物理差距为 1,567 项。
 
+Loop 感知/仲裁测试归位切片把注意力容量、竞争/衰减、focus lease、感知 FIFO/容量/规范化、
+PerceptionProvider 投影、willingness 阈值及行动仲裁并入目标 `test_loop_native_tools.py`。
+旧 `test_global_workspace.py`、`test_perception_provider.py` 与 `test_volition.py` consumer-zero 删除；
+全部 Core 214 项 PASS，覆盖数量和断言保持，最终物理差距为 1,564 项。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。
