@@ -28,6 +28,15 @@ class MemoryConsolidationInput:
 
 
 @dataclass(frozen=True, slots=True)
+class MemoryConsolidationRequest:
+    """源投递身份；接纳回执不表示巩固结果或 Jobs 终态。"""
+
+    request_id: str
+    input: MemoryConsolidationInput
+    created_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class MemoryConsolidationReceipt:
     receipt_id: str
     operation_id: str
@@ -72,6 +81,8 @@ class EpisodeProjectionStore(Protocol):
         self, *, since_iso: str | None = None, limit: int = 100
     ) -> list[Episode]: ...
     def mark_consolidated(self, episode_id: str, consolidated_at: str) -> None: ...
+    def pending_job_requests(self, *, limit: int = 64) -> list[MemoryConsolidationRequest]: ...
+    def acknowledge_job_request(self, request: MemoryConsolidationRequest, job_id: str) -> None: ...
 
 
 class ConsolidationJobStore(Protocol):

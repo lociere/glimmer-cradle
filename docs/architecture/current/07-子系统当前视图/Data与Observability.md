@@ -14,7 +14,7 @@ Data 是角色连续性的物理投影，Observability 是多进程系统的工�
 | `data/state/cognition/memory.sqlite` | 版本化 Memory、Relationship、Intention 与迁移期 Job/checkpoint 表 | Cognition Memory |
 | `data/state/cognition/knowledge.sqlite` | 版本化 Knowledge、tombstone 与可重建向量索引 | Cognition Knowledge |
 | `data/state/cognition/conversations/` | 从 Log 可重建的 Conversation、Chapter、Segment 与 State 投影；旧路径名待阶段 14 迁移 | Conversation |
-| `data/state/cognition/projections/` | 可从事实源重建的 Episode 等投影 | Cognition |
+| `data/state/cognition/projections/` | Episode 派生投影；`episodes.db` 同存持久源请求，不能整体删除 | Cognition Memory |
 | `data/state/kernel/` | Kernel 基础设施状态、扩展宿主数据、TS DLQ | Kernel |
 | `data/state/desktop/` | Desktop 窗口、界面偏好与 Avatar 呈现状态 | Desktop main |
 | `data/state/extensions/` | 扩展私有业务状态，不承载角色会话或认知事实 | Extension Host / 扩展 |
@@ -25,7 +25,10 @@ Data 是角色连续性的物理投影，Observability 是多进程系统的工�
 | `data/work/` | ASR 输入、临时音频、导出中间产物 | 产生方 |
 | `data/backups/` | 迁移与用户主动备份 | 迁移 / 恢复流程 |
 
-Conversation Log 和 Memory DB 是不可再生 state；History、Episode、索引、缓存、工作材料和 observability 是可重建或可清理材料。清理 observability 不是清理交互事实或记忆。
+Conversation Log、Memory DB 与源请求身份是不可再生 state；逻辑 History、Episode 和索引可派生重建，
+但当前 `episodes.db` 同存源请求 outbox，必须备份并保持原身份，不能按投影缓存整体删除。
+具体窗口与恢复边界以 [Data Layout Reference](../../../reference/data-layout.md) 为准。
+缓存、工作材料和 observability 可按 owner 规则清理；清理 observability 不是清理交互事实或记忆。
 
 ## 当前可观测性平面
 

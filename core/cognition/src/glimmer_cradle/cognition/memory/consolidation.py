@@ -261,16 +261,7 @@ class ConsolidationCoordinator:
         return await self._memory.commit_consolidation(operation_id, inputs, drafts, execution=execution)
 
     def _receipt_input(self, episode: Episode) -> MemoryConsolidationInput:
-        eligible = [moment for moment in episode.moments if moment.retention_ceiling == "memory_candidate"]
-        domains = {self._moment_domain_key(moment) for moment in eligible or episode.moments}
-        if len(domains) != 1:
-            raise MemoryConsolidationConflictError("Memory 巩固 Episode 权限域不唯一或证据丢失")
-        scope_id = hashlib.sha256(json.dumps(next(iter(domains)), separators=(",", ":")).encode("utf-8")).hexdigest()
-        document = {"episode_id": episode.episode_id, "version": episode.version, "scope_id": scope_id,
-                    "moments": [asdict(moment) for moment in episode.moments]}
-        digest = hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
-                                         allow_nan=False).encode("utf-8")).hexdigest()
-        return MemoryConsolidationInput(episode.episode_id, episode.version, scope_id, digest)
+        return consolidation_input(episode)
 
     def _build_drafts(
         self, output: ConsolidationOutput, *, existing: list[MemoryRecord],
@@ -376,13 +367,7 @@ class ConsolidationCoordinator:
 
     @staticmethod
     def _moment_domain_key(item) -> tuple[str, ...]:
-        owner = {
-            "conversation_private": item.conversation_id,
-            "actor_private": item.actor_id or "",
-            "space_local": item.scene_id or "",
-            "character_internal": item.continuity_id,
-        }.get(item.recall_scope, item.recall_scope)
-        return item.recall_scope, item.disclosure_scope, owner
+        return moment_domain_key(item)
 
     @staticmethod
     def _same_memory_domain(
@@ -464,6 +449,32 @@ class ConsolidationCoordinator:
         timestamp = self._clock.now_iso()
         for job in jobs:
             self._episodes.mark_consolidated(job.episode_id, timestamp)
+
+
+def moment_domain_key(item: Moment) -> tuple[str, ...]:
+    owner = {
+        "conversation_private": item.conversation_id,
+        "actor_private": item.actor_id or "",
+        "space_local": item.scene_id or "",
+        "character_internal": item.continuity_id,
+    }.get(item.recall_scope, item.recall_scope)
+    return item.recall_scope, item.disclosure_scope, owner
+
+
+def consolidation_input(episode: Episode) -> MemoryConsolidationInput:
+    """源请求与接收校验共用不可变证据摘要；不包含可修复的封口原因。"""
+    if not episode.moments or len(episode.moments) != episode.version:
+        raise MemoryConsolidationConflictError("Memory 巩固 Episode 证据不完整")
+    eligible = [moment for moment in episode.moments if moment.retention_ceiling == "memory_candidate"]
+    domains = {moment_domain_key(moment) for moment in eligible or episode.moments}
+    if len(domains) != 1:
+        raise MemoryConsolidationConflictError("Memory 巩固 Episode 权限域不唯一或证据丢失")
+    scope_id = hashlib.sha256(json.dumps(next(iter(domains)), separators=(",", ":")).encode("utf-8")).hexdigest()
+    document = {"episode_id": episode.episode_id, "version": episode.version, "scope_id": scope_id,
+                "moments": [asdict(moment) for moment in episode.moments]}
+    digest = hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                                     allow_nan=False).encode("utf-8")).hexdigest()
+    return MemoryConsolidationInput(episode.episode_id, episode.version, scope_id, digest)
 
 
 class MaintenanceScheduler:

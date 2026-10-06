@@ -1,12 +1,14 @@
-from pathlib import Path
 import sqlite3
 from dataclasses import replace
+from pathlib import Path
 
 import glimmer_cradle.cognition_worker.rpc_service as trace_context
+import pytest
 from glimmer_cradle.cognition.adapters.persistence import EpisodeProjection
+from glimmer_cradle.cognition.memory import MemoryConsolidationConflictError
+from glimmer_cradle.cognition.memory.consolidation import consolidation_input
+from glimmer_cradle.conversation.log import Moment, MomentKind, SourceDescriptor
 from tests.conftest import build_experience_recorder
-from glimmer_cradle.conversation.log import MomentKind
-from glimmer_cradle.conversation.log import Moment, SourceDescriptor
 
 
 async def test_ledger_restart_causation_and_episode_projection(tmp_path: Path) -> None:
@@ -255,3 +257,197 @@ async def test_v4_text_moment_reads_beside_v5_reference_and_transient_is_not_rec
     assert moments[0].schema_version == 4 and moments[0].content["text"] == "历史纯文本"
     assert moments[1].schema_version == 5
     assert moments[1].content["parts"][0]["asset"]["asset_id"]
+
+
+async def _request_projection(tmp_path: Path, *, seal: bool = True):
+    recorder = build_experience_recorder(tmp_path / "request-log")
+    await recorder.start()
+    recorder.record(MomentKind.PERCEPTION, {"text": "需要保留的约定"},
+                    interaction_id="request-turn", retention_ceiling="memory_candidate")
+    projection = EpisodeProjection(tmp_path / "request-episodes.db", recorder)
+    await projection.start()
+    await projection.project_pending(seal=seal)
+    return recorder, projection
+
+
+async def test_memory_request_survives_restart_and_lost_acceptance_ack(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    request, = projection.pending_job_requests()
+    episode, = projection.pending_consolidation()
+    assert request.input == consolidation_input(episode)
+    await projection.project_pending(seal=True)
+    restarted = EpisodeProjection(tmp_path / "request-episodes.db", recorder)
+    await restarted.start()
+    assert restarted.pending_job_requests() == [request]
+    # 远端已接纳而本地没有 ACK 时，重放保留 request_id 与完全相同的输入。
+    restarted.acknowledge_job_request(request, "accepted-job")
+    assert restarted.pending_job_requests() == []
+    assert len(restarted.pending_consolidation()) == 1  # 接纳不伪装业务完成。
+    await restarted.start()
+    restarted.acknowledge_job_request(request, "accepted-job")
+    assert restarted.pending_job_requests() == []
+    await recorder.stop()
+
+
+async def test_memory_request_acceptance_rejects_identity_and_payload_conflicts(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    request, = projection.pending_job_requests()
+    for wrong in [replace(request, request_id="unseen"), replace(request, created_at="different"),
+                  replace(request, input=replace(request.input, input_digest="different")),
+                  replace(request, input=replace(request.input, scope_id="different")),
+                  replace(request, input=replace(request.input, episode_version=999))]:
+        with pytest.raises(MemoryConsolidationConflictError):
+            projection.acknowledge_job_request(wrong, "job")
+    for invalid in ["", " ", None]:
+        with pytest.raises(MemoryConsolidationConflictError):
+            projection.acknowledge_job_request(request, invalid)
+    assert projection.pending_job_requests() == [request]
+    projection.acknowledge_job_request(request, "job")
+    with pytest.raises(MemoryConsolidationConflictError):
+        projection.acknowledge_job_request(request, "different-job")
+    await recorder.stop()
+
+
+def _fail_request_insert(path: Path) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.execute("""CREATE TRIGGER fail_request BEFORE INSERT ON memory_request_outbox
+            BEGIN SELECT RAISE(ABORT,'injected request failure'); END""")
+
+
+async def test_memory_request_failure_rolls_back_episode_and_projection_checkpoint(tmp_path: Path) -> None:
+    recorder = build_experience_recorder(tmp_path / "request-log")
+    await recorder.start()
+    recorder.record(MomentKind.PERCEPTION, {"text": "原子提交"}, interaction_id="turn",
+                    retention_ceiling="memory_candidate")
+    recorder.record(MomentKind.REPLY, {"text": "确认"}, interaction_id="turn")
+    path = tmp_path / "request-episodes.db"
+    projection = EpisodeProjection(path, recorder)
+    await projection.start()
+    _fail_request_insert(path)
+    with pytest.raises(sqlite3.IntegrityError):
+        await projection.project_pending()
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM episodes").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM episode_moments").fetchone()[0] == 0
+        assert conn.execute("SELECT value FROM projection_meta WHERE key='position'").fetchone() is None
+        assert conn.execute("SELECT COUNT(*) FROM memory_request_outbox").fetchone()[0] == 0
+        conn.execute("DROP TRIGGER fail_request")
+    assert await projection.project_pending() == 2
+    assert len(projection.pending_job_requests()) == 1
+    await recorder.stop()
+
+
+@pytest.mark.parametrize("boundary", ["forced", "idle", "interrupted"])
+async def test_memory_request_failure_rolls_back_no_new_moment_sealing(tmp_path: Path, boundary: str) -> None:
+    recorder, projection = await _request_projection(tmp_path, seal=False)
+    path = tmp_path / "request-episodes.db"
+    if boundary == "idle":
+        with sqlite3.connect(path) as conn:
+            conn.execute("UPDATE episodes SET ended_at='2000-01-01T00:00:00.000Z'")
+    _fail_request_insert(path)
+    with pytest.raises(sqlite3.IntegrityError):
+        if boundary == "interrupted":
+            projection.recover_interrupted()
+        else:
+            await projection.project_pending(seal=boundary == "forced")
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT status FROM episodes").fetchone()[0] == "open"
+        assert conn.execute("SELECT value FROM projection_meta WHERE key='position'").fetchone()[0] == "1"
+        conn.execute("DROP TRIGGER fail_request")
+    if boundary == "interrupted":
+        projection.recover_interrupted()
+    else:
+        await projection.project_pending(seal=boundary == "forced")
+    assert len(projection.pending_job_requests()) == 1
+    await recorder.stop()
+
+
+async def test_memory_request_resolution_and_ack_remain_independent_and_protect_rebuild(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    request, = projection.pending_job_requests()
+    projection.mark_consolidated(request.input.episode_id, "2026-10-06T00:00:00Z")
+    assert projection.pending_job_requests() == []
+    # Memory 已落库后迟到的接纳 ACK 仍可绑定，但不能丢失源 identity。
+    projection.acknowledge_job_request(request, "accepted-job")
+    with pytest.raises(MemoryConsolidationConflictError):
+        projection.rebuild()
+    await projection.start()
+    assert projection.get_episode(request.input.episode_id) is not None
+    projection.acknowledge_job_request(request, "accepted-job")
+    assert projection.pending_job_requests() == []
+    await recorder.stop()
+
+
+async def test_memory_request_upgrade_backfills_old_sealed_identity_without_rekey(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    request, = projection.pending_job_requests()
+    # 合成还没有源 outbox 的旧投影；仅测试目录，不触及用户数据库。
+    with sqlite3.connect(tmp_path / "request-episodes.db") as conn:
+        conn.execute("DROP TABLE memory_request_outbox")
+    await projection.start()
+    backfilled, = projection.pending_job_requests()
+    assert backfilled.request_id == request.request_id
+    assert backfilled.input == request.input
+    assert projection.get_episode(request.input.episode_id) is not None
+    await recorder.stop()
+
+
+async def test_memory_request_missing_evidence_does_not_commit_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    recorder, projection = await _request_projection(tmp_path, seal=False)
+    monkeypatch.setattr(recorder.log, "query", lambda **kwargs: [])
+    with pytest.raises(MemoryConsolidationConflictError):
+        await projection.project_pending(seal=True)
+    assert projection.pending_job_requests() == []
+    with sqlite3.connect(tmp_path / "request-episodes.db") as conn:
+        assert conn.execute("SELECT status FROM episodes").fetchone()[0] == "open"
+    await recorder.stop()
+
+
+async def test_memory_request_non_candidate_allows_unpinned_projection_rebuild(tmp_path: Path) -> None:
+    recorder = build_experience_recorder(tmp_path / "request-log")
+    await recorder.start()
+    recorder.record(MomentKind.PERCEPTION, {"text": "仅记录"}, retention_ceiling="ledger_only")
+    projection = EpisodeProjection(tmp_path / "request-episodes.db", recorder)
+    await projection.start()
+    await projection.project_pending(seal=True)
+    assert projection.pending_job_requests() == []
+    projection.rebuild()
+    assert await projection.project_pending(seal=True) == 1
+    assert projection.pending_job_requests() == []
+    await recorder.stop()
+
+
+async def test_memory_request_late_moment_has_a_new_source_identity(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    first, = projection.pending_job_requests()
+    recorder.record(MomentKind.ACTION_RESULT, {"text": "迟到的证据"}, interaction_id="request-turn",
+                    retention_ceiling="memory_candidate")
+    await projection.project_pending(seal=True)
+    requests = projection.pending_job_requests()
+    assert len(requests) == 2
+    assert len({item.request_id for item in requests}) == 2
+    assert len({item.input.episode_id for item in requests}) == 2
+    assert first in requests
+    await recorder.stop()
+
+
+async def test_memory_request_resolution_failure_rolls_back_consolidated_marker(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    request, = projection.pending_job_requests()
+    with sqlite3.connect(tmp_path / "request-episodes.db") as conn:
+        conn.execute("""CREATE TRIGGER fail_resolution BEFORE UPDATE OF resolved_at ON memory_request_outbox
+            BEGIN SELECT RAISE(ABORT,'injected resolution failure'); END""")
+    with pytest.raises(sqlite3.IntegrityError):
+        projection.mark_consolidated(request.input.episode_id, "2026-10-06T00:00:00Z")
+    assert projection.pending_job_requests() == [request]
+    assert len(projection.pending_consolidation()) == 1
+    await recorder.stop()
+
+
+async def test_memory_request_scan_rejects_unbounded_or_boolean_limit(tmp_path: Path) -> None:
+    recorder, projection = await _request_projection(tmp_path)
+    for invalid in [0, -1, 1001, True, "64"]:
+        with pytest.raises(ValueError):
+            projection.pending_job_requests(limit=invalid)
+    assert len(projection.pending_job_requests(limit=1)) == 1
+    await recorder.stop()

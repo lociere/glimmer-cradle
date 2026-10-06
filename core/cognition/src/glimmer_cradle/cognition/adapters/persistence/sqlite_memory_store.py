@@ -22,10 +22,12 @@ from glimmer_cradle.cognition.memory import (
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
+    MemoryConsolidationRequest,
     MemoryJobIdentity,
     MemoryJobResult,
     RelationshipRecord,
 )
+from glimmer_cradle.cognition.memory.consolidation import consolidation_input
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
@@ -1018,7 +1020,7 @@ class RelationshipProjection:
 
 
 class EpisodeProjection:
-    """从 Conversation Log 派生、可重建的持久 Episode 投影。"""
+    """Episode 派生投影及其源请求；持久请求钉住原 Episode 身份。"""
 
     def __init__(
         self,
@@ -1064,6 +1066,16 @@ class EpisodeProjection:
                 );
                 CREATE INDEX IF NOT EXISTS idx_episode_status
                   ON episodes(status,last_position);
+                CREATE TABLE IF NOT EXISTS memory_request_outbox(
+                  request_id TEXT PRIMARY KEY,
+                  episode_id TEXT NOT NULL REFERENCES episodes(episode_id),
+                  episode_version INTEGER NOT NULL CHECK(episode_version>0),
+                  scope_id TEXT NOT NULL, input_digest TEXT NOT NULL,
+                  created_at TEXT NOT NULL, accepted_job_id TEXT, resolved_at TEXT,
+                  UNIQUE(episode_id,episode_version)
+                );
+                CREATE INDEX IF NOT EXISTS idx_memory_request_pending
+                  ON memory_request_outbox(accepted_job_id,resolved_at,created_at,request_id);
                 """
             )
             columns = {
@@ -1077,6 +1089,9 @@ class EpisodeProjection:
                 result = conn.execute("PRAGMA integrity_check").fetchone()
                 if result is None or result[0] != "ok":
                     raise RuntimeError(f"Episode 投影完整性检查失败: {result}")
+            conn.execute("BEGIN IMMEDIATE")
+            # 旧投影只有可重扫的 sealed 待办；升级首次扫描补齐源请求，不重算已有身份。
+            self._record_sealed_requests(conn)
             conn.commit()
 
     async def project_pending(self, *, seal: bool = False) -> int:
@@ -1113,6 +1128,7 @@ class EpisodeProjection:
                 )
             else:
                 self._seal_idle(conn)
+            self._record_sealed_requests(conn)
             conn.commit()
         return len(moments)
 
@@ -1160,14 +1176,74 @@ class EpisodeProjection:
 
     def mark_consolidated(self, episode_id: str, consolidated_at: str) -> None:
         with closing(sqlite3.connect(self._path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
             conn.execute(
                 "UPDATE episodes SET consolidated_at=? WHERE episode_id=?",
                 (consolidated_at, episode_id),
             )
+            conn.execute(
+                "UPDATE memory_request_outbox SET resolved_at=COALESCE(resolved_at,?) WHERE episode_id=?",
+                (consolidated_at, episode_id),
+            )
             conn.commit()
+
+    def pending_job_requests(self, *, limit: int = 64) -> list[MemoryConsolidationRequest]:
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 1000:
+            raise ValueError("Memory 源请求扫描上限无效")
+        with closing(sqlite3.connect(self._path)) as conn:
+            rows = conn.execute(
+                """SELECT request_id,episode_id,episode_version,scope_id,input_digest,created_at
+                FROM memory_request_outbox WHERE accepted_job_id IS NULL AND resolved_at IS NULL
+                ORDER BY created_at,request_id LIMIT ?""", (limit,),
+            ).fetchall()
+        return [self._hydrate_request(row) for row in rows]
+
+    def acknowledge_job_request(self, request: MemoryConsolidationRequest, job_id: str) -> None:
+        if not isinstance(job_id, str) or not job_id.strip():
+            raise MemoryConsolidationConflictError("Memory 源请求接纳 Job 身份无效")
+        with closing(sqlite3.connect(self._path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """SELECT request_id,episode_id,episode_version,scope_id,input_digest,created_at,accepted_job_id
+                FROM memory_request_outbox WHERE request_id=?""", (request.request_id,),
+            ).fetchone()
+            if row is None or self._hydrate_request(row) != request or row[6] not in (None, job_id):
+                raise MemoryConsolidationConflictError("Memory 源请求接纳身份或 payload 冲突")
+            conn.execute("UPDATE memory_request_outbox SET accepted_job_id=? WHERE request_id=?",
+                         (job_id, request.request_id))
+            conn.commit()
+
+    @staticmethod
+    def _hydrate_request(row: tuple[Any, ...]) -> MemoryConsolidationRequest:
+        return MemoryConsolidationRequest(row[0], MemoryConsolidationInput(*row[1:5]), row[5])
+
+    def _record_sealed_requests(self, conn: sqlite3.Connection) -> None:
+        rows = conn.execute("""SELECT * FROM episodes AS episode
+            WHERE status='sealed' AND consolidated_at IS NULL AND NOT EXISTS (
+              SELECT 1 FROM memory_request_outbox AS request
+              WHERE request.episode_id=episode.episode_id AND request.episode_version=episode.version
+            )""").fetchall()
+        for row in rows:
+            episode = self._hydrate(conn, row)
+            if len(episode.moments) != episode.version:
+                raise MemoryConsolidationConflictError("Memory 源请求缺少已提交 Episode 证据")
+            if not any(moment.retention_ceiling == "memory_candidate" for moment in episode.moments):
+                continue
+            item = consolidation_input(episode)
+            identity = json.dumps([item.episode_id, item.episode_version, item.scope_id, item.input_digest],
+                                  separators=(",", ":"))
+            request_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            conn.execute(
+                "INSERT INTO memory_request_outbox VALUES(?,?,?,?,?,?,NULL,?)",
+                (request_id, item.episode_id, item.episode_version, item.scope_id, item.input_digest,
+                 _now_iso(), row[15]),
+            )
 
     def rebuild(self) -> None:
         with closing(sqlite3.connect(self._path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM memory_request_outbox LIMIT 1").fetchone() is not None:
+                raise MemoryConsolidationConflictError("Episode 含持久源请求；必须保留原身份并经显式迁移重建")
             conn.execute("DELETE FROM episode_moments")
             conn.execute("DELETE FROM episodes")
             conn.execute("DELETE FROM projection_meta")
@@ -1244,10 +1320,12 @@ class EpisodeProjection:
 
     def _seal_open(self, reason: str) -> None:
         with closing(sqlite3.connect(self._path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
             conn.execute(
                 "UPDATE episodes SET status='sealed',boundary_reason=? WHERE status='open'",
                 (reason,),
             )
+            self._record_sealed_requests(conn)
             conn.commit()
 
     def _seal_idle(self, conn: sqlite3.Connection | None = None) -> None:
@@ -1263,7 +1341,9 @@ class EpisodeProjection:
             )
             return
         with closing(sqlite3.connect(self._path)) as connection:
+            connection.execute("BEGIN IMMEDIATE")
             self._seal_idle(connection)
+            self._record_sealed_requests(connection)
             connection.commit()
 
     def _hydrate(self, conn: sqlite3.Connection, row: tuple[Any, ...]) -> Episode:

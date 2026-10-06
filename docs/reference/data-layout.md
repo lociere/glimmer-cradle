@@ -45,7 +45,7 @@ unknown，清理终态后仍保留最小身份/审计。旧候选 v1/v2 拒绝�
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
-| `data/state/cognition/projections/episodes.db` | Cognition | 可从 Conversation Log 删除重建的 Episode 投影和巩固 checkpoint |
+| `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |
 | `data/state/avatar/action-state.json` | Avatar/Desktop main | 手动动作的最后接受状态；唯一磁盘字段为 `active_action_ids: string[]`，Desktop 启动时读取，Avatar Host 上报后校正 |
 | `data/state/desktop/avatar-presentation.json` | Desktop/Electron main | Avatar 模型选择、显示倍率和 Desktop Surface 呈现偏好 |
@@ -72,7 +72,7 @@ Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Convers
 | `configs/characters/<character-id>/voice.yaml` | Character voice | 稳定声音身份和 provider 声线绑定；不含密钥与系统路由 |
 | `configs/characters/<character-id>/knowledge/index.yaml` | Cognition knowledge | Knowledge Vault 索引，正文来自同目录 `*.md` |
 
-Character Package、Conversation Log、Knowledge Vault、Memory Substrate 与 Vector Index 分工不同。Log 是持久交互事实源，`memory.db` 保存版本化认知状态，Episode/embedding 是可重建投影；任何一层都不能反向改写 `profile.yaml` 或 `dialogue.yaml`。
+Character Package、Conversation Log、Knowledge Vault、Memory Substrate 与 Vector Index 分工不同。Log 是持久交互事实源，Memory 保存版本化认知状态，逻辑 Episode/embedding 是派生投影；当前 `episodes.db` 同库保存不可再生的源 request ID、输入摘要与接纳身份，不能整体删除。其重建/迁移必须保持原 Episode/version 与 outbox 身份，备份要包含该库；窗口归 Cognition Memory，阶段 14 通过原身份重建、outbox 恢复和 consumer-zero 门后切换最终状态布局。任何一层都不能反向改写 `profile.yaml` 或 `dialogue.yaml`。
 
 ## 模型与官方 Engine
 

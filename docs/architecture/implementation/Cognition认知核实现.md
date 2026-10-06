@@ -191,7 +191,7 @@ Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL
 |---|---|---|
 | Conversation Log | `core/conversation/src/glimmer_cradle/conversation/log/` | 交互事实的不可变 Moment、月度 SQLite pack、全局 position、来源与因果；Cognition 只读消费 |
 | Conversation Projection | `core/conversation/src/glimmer_cradle/conversation/{message,history}/` | Conversation owner 的可重建消息、Chapter、Segment、Conversation State 与进程 Working Set；Cognition Worker 只负责组合与消费 |
-| Episode Projection | `adapters/persistence/sqlite_memory_store.py` 的 `EpisodeProjection` | interaction/scene 分段、封口、待巩固队列与独立 SQLite 可重建投影 |
+| Episode Projection | `adapters/persistence/sqlite_memory_store.py` 的 `EpisodeProjection` | 分段、封口与派生 checkpoint；同库持久源请求钉住 Episode 身份，不能整体删除重建 |
 | Memory Controller | `memory/{memory,memory_controller,memory_store,provenance,correction}.py`、`adapters/persistence/sqlite_memory_store.py` | 版本化记忆、证据、时间有效修订、纠错与有预算召回 |
 | Consolidation | `memory/consolidation.py`、`adapters/persistence/sqlite_memory_store.py` 的 `ConsolidationJobRepository` | 持久任务、权限域分批、结构化推理、证据校验、lease 与重试；Job adapter 待迁入 Jobs owner |
 | Relationship | `adapters/persistence/sqlite_memory_store.py` 的 `RelationshipProjection` / `RelationshipRepository` | 从 Conversation Log 幂等派生互动计数、熟悉度与证据修订 |
@@ -223,8 +223,19 @@ Memory 的 Jobs 接收边界由 `memory_job_attempts` / `memory_job_authority` �
 Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监督 `CognitionGrpcHost`，由
 `ExecuteMemoryJob` / `ReconcileMemoryJob` 映射生成契约；Kernel 迁移期 transport 暴露同一 RPC。
 对账是会持久封口的命令，不是无副作用的查询；generation 鉴权、readiness、取消和停机继续使用原 Service
-边界。源 request outbox、Host Jobs handler/query adapter、scheduler 与配置装配仍待接线，旧队列仍保留
+边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire、Jobs handler/query adapter、scheduler 与配置装配仍待接线，旧队列仍保留
 既定退出门。不自动升级用户 v3/v4 库；受控迁移、备份与恢复归阶段 14。
+
+`episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
+稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，
+不保存模型原文或复制 Moment 内容。摘要由源发布与接收执行共用的 `consolidation_input()` 生成，
+证据不完整则拒绝提交；没有 `memory_candidate` 的 Episode 不发布请求。
+`pending_job_requests()` 有界扫描未接纳且未解决项；`acknowledge_job_request()` 验证原请求完整身份，
+重复同 Job 确认幂等，不同 Job 或 payload 拒绝。接纳不标记 Memory 完成；巩固/跳过结果与源解决标记
+在同一投影事务更新，业务完成后迟到的接纳 ACK 仍可保存。旧 sealed 待办启动时增量补齐，不重算 Episode ID。
+逻辑 Episode 仍由 Log 派生，但本物理库已含不可再生投递身份；只要存在源请求，普通 `rebuild()` 就拒绝。
+该同库迁移窗口由 Cognition Memory 持有，阶段 14 在备份、原身份保持、outbox 恢复与 consumer-zero
+验证后切换最终状态布局，不能把删除整个库当作索引维护。
 
 长期交互连续性由 Conversation 拥有；Cognition 拥有 Experience、Memory、Persona 与推理语义。Kernel 可以收到投影或行动结果，但不直接写 Cognition/Conversation DB。
 
@@ -256,7 +267,7 @@ Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监�
 - 本地和外部感知会进入统一 `PerceptionProvider`，由 `LoopController` 写入 PERCEPTION、EMOTION、REPLY 或 SILENCE Moment。
 - `CycleContinuity` 只写本轮真实发生的 user/assistant Moment；`core/conversation` 的 `ConversationController` 从 canonical Conversation Log 增量投影并为下一轮恢复上下文。Cognition 只通过 Conversation Port 消费，不拥有日志写入与历史投影实现。
 - Conversation `ConversationRecorder` 会把 Moment 写入兼容路径 `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db`；`catalog.db` 维护全局 position 和 pack 范围。路径迁移留阶段 14，不改变当前 owner。
-- `EpisodeProjection` 按 interaction、scene、conversation 与 recall/disclosure 权限域形成可重建 Episode；同一个 Episode 在物理表和查询键上都不能跨域。`reply` / `silence` 立即形成 `interaction_completed` 边界，`episode_idle_seconds`、`quiescent` 与停机只补充收口开放批次。启动时按 `seal_integrity_check` 校验投影数据库，先补投影所有已提交 Moment，再将遗留开放批次标记为 `process_interrupted`；封口后同 interaction 的迟到 Moment 会进入新 Episode，不改写已封口批次。
+- `EpisodeProjection` 按 interaction、scene、conversation 与 recall/disclosure 权限域形成派生 Episode；同一个 Episode 在物理表和查询键上都不能跨域。`reply` / `silence` 立即形成 `interaction_completed` 边界，`episode_idle_seconds`、`quiescent` 与停机只补充收口开放批次。所有封口入口同事务发布源请求，失败不推进 checkpoint 或封口状态。启动时按 `seal_integrity_check` 校验投影数据库，先补投影所有已提交 Moment，再将遗留开放批次标记为 `process_interrupted`；封口后同 interaction 的迟到 Moment 会进入新 Episode，不改写已封口批次。源请求存在时禁止整体删除重建。
 - `MaintenanceScheduler` 在正常运行中由终结 Moment 唤醒，并按 `schedule_interval_seconds` 对持久待办补偿扫描；`ConsolidationCoordinator` 只处理 `memory_candidate`，先写 `consolidation_jobs`，再按 scope/owner 分批 claim。停机只投影、封口和入队，不执行模型巩固。输出必须通过结构、evidence id 与目标权限域校验后才可写入 Memory。
 - `KnowledgeIndex` 启动时通过 Cognition Service `InitializeKnowledge` 注入角色知识，`knowledge_entry` 可被活动上下文检索；首次独立库启动会从旧 Memory 表一次性导入，随后不双写。
 - 工具结果通过 `agent_synthesis` 写入 `action_result` Moment；成功结果最多成为记忆候选，失败结果只保留为 Experience。

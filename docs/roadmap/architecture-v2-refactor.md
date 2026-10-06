@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 领域 receipt、原 attempt 接收 fencing 与受监督执行/对账 RPC 已接线；源 request outbox、Host Jobs handler/query adapter、scheduler 与配置装配待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory receipt、原 attempt 接收 fencing、执行/对账 RPC 与 Episode 封口原子源 request outbox 已接线；源请求跨进程投递、Host Jobs handler/query adapter、scheduler 与配置装配待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -280,6 +280,29 @@ docs/encoding/diff PASS，独立审查仍留固定最终候选。
 不得与这些任务并发。本候选在确认 ModuleNotFoundError / SDK entry 缺失属于该竞争后，固定产物串行重验通过，
 未放宽断言或超时。Memory schema 为 5，未迁移用户库、创建生产 Jobs 库或切换旧巩固队列；下一步仍为
 源 request outbox、Host handler/query 与 scheduler/config 的实际消费装配，再满足旧 owner 删除门。
+
+Memory 源请求切片计划（2026-10-06）：在 Episode 封口与 projection checkpoint 的同一 SQLite 提交中
+记录具有 Episode/version/scope/input digest 的稳定请求；没有可接受 Memory 证据的 Episode 不产生请求。
+重启扫描、重复确认与 ACK 丢失均保留同一请求身份，拒绝不同 payload 或不同 Job 的确认。
+请求接纳只结束源投递，不代表 Memory 结果或 Jobs 终态；已持久请求约束 Episode 的删除/重建，不能
+继续把该数据库整体视为可随意删除缓存。当前执行 owner 独占写入；不修改用户数据，不切换旧执行队列，
+Host wire/handler/scheduler 的真实消费接线紧随其后。验证封口/请求/checkpoint 原子回滚、重启重放、
+确认冲突、已接受请求的重建保护及原有投影/巩固链路，再执行根基线和文档门禁。
+
+源请求候选（`a3b4f154` 上本轮 Memory/投影与相关文档 dirty 范围）：所有实际封口入口均在同一
+SQLite 事务中写入 `memory_request_outbox`，终结 Moment、强制/闲置封口和进程中断恢复不会留下
+“Episode 已封口或 checkpoint 已推进但请求未保存”的半提交。request ID、scope/input digest 与首次时间
+跨重启重放保持不变；有界扫描只返回未接纳、未解决项。完整源请求与原 Job 绑定确认幂等，冲突拒绝；
+接纳不完成 Memory，业务/跳过结果与源解决标记同事务更新，迟到 ACK 仍可持久绑定。
+原证据缺失失败关闭；已有源记录（含已解决记录）禁止普通重建，以免原随机 Episode ID 和 Job 幂等身份丢失。
+同库窗口由 Cognition Memory 持有，退出门为阶段 14 的备份、原身份保留/outbox 恢复与 consumer-zero。
+
+13 项新增反例及 Cognition 全量 278 项、Worker 69 项 PASS；真实 Kernel→Worker 启停、重启对账、
+取消、崩溃后失败关闭与显式恢复共 6 项 PASS。根 `pnpm typecheck`、`pnpm build`、Ruff I/F、
+architecture、目标清单规格（非最终实物）、docs（111 页）、encoding 和 diff 检查 PASS。
+本切片未改变 wire、Schema 事实源、生成物或依赖；复用 `a3b4f154` 的完整 Contract Spine 22 gate 证据。
+没有迁移用户数据或创建生产 Jobs 库，独立审查仍归固定最终候选；下一步接源投递 wire 与 App 层
+`cognition-job-adapter`，贯通 Host Jobs handler/query、scheduler/config，旧巩固队列继续保留到删除门。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

@@ -84,7 +84,7 @@ Perception
 | Conversation Working Set | `core/conversation` `ConversationController` | 从持久 History Store 恢复的有界进程缓存；不是事实源，重启后可恢复 |
 | Conversation History | `core/conversation/src/glimmer_cradle/conversation/history/`、`data/state/cognition/conversations/conversations.db` | 从 Log 幂等派生的消息、Chapter、Segment 与 Conversation State 查询投影；可删除重建，数据路径待阶段 14 迁移 |
 | Conversation Log | `ConversationRecorder` / `ConversationLog` | 月度 SQLite pack 中只追加的 Moment；保存全局 position、来源、因果、角色、保留上限和内容 |
-| Episode Projection | `EpisodeProjection` | Cognition 按 turn + scene 从 Log 派生的经历边界；可删除、可重建、可封口 |
+| Episode Projection | `EpisodeProjection` | 从 Log 派生的经历边界与封口；物理库同存持久源请求，禁止整体删除重建 |
 | Memory | `MemoryController` / `MemoryStore` | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其版本、证据与纠错状态 |
 | 记忆修订与证据 | `memory_revisions` / `memory_evidence` | 当前有效修订、历史有效期、来源 Moment 和 consolidation id |
 | 关系投影 | `RelationshipProjection` / `relationship_*` | 按 checkpoint 从 Moment 幂等派生直接互动、环境观察、回复计数和有证据修订 |
@@ -115,8 +115,9 @@ Memory 采用 `candidate / active / disputed / superseded / redacted` 状态和�
 
 真实巩固 consumer 已查询 Memory 持久结果 receipt；业务修订与结果同事务提交，确认丢失后的恢复不会
 再次推理已提交 Episode/version。Worker 的 Memory Job 执行/封口 RPC 已接同一接收 owner，并持久
-核验原 attempt 与提交资格；旧巩固队列仍是迁移窗口，不能认作 Jobs 生产接线完成。request outbox、
-Host handler/query adapter 与 scheduler 继续按执行记录推进。实现与 schema 升级边界见
+核验原 attempt 与提交资格。源 request outbox 已与实际 Episode 封口/checkpoint 原子提交，重启保留
+同一请求；接纳 ACK 不等于业务完成，已解决源记录也必须保留原身份。旧巩固队列仍是迁移窗口，
+不能认作 Jobs 生产接线完成；Host 投递 wire、handler/query adapter 与 scheduler 继续按执行记录推进。实现与 schema 升级边界见
 [记忆持久化](../../implementation/Cognition认知核实现.md#记忆经历与持久化)。
 
 上下文按固定分区装配：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、受作用域约束的近期 Experience。所有来源都在候选排序前按 `recall_scope` 以及 conversation/actor/scene owner 过滤；基础排序使用词项、时间、显著度、置信度和 token budget。系统显式启用 Embedding 后才附加语义相似度，未启用不是降级。桌面只读预览区分 Conversation 消息、Ledger Moment、Episode、活动 Memory、revision、evidence 和角色知识，不把预览条数冒充实际 Prompt 命中。
