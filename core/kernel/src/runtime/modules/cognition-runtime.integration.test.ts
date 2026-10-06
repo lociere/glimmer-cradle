@@ -4,6 +4,9 @@ import { createServer, type Server } from 'node:http';
 import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { create } from '@bufbuild/protobuf';
+import { JobExecutionIdentitySchema } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
+import { ReconcileMemoryJobRequestSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { KernelCognitionTransport } from '../../adapters/cognition/kernel-cognition-transport';
 import { CognitionClient } from '../../adapters/cognition/cognition-client';
 import { ConfigManager } from '../../adapters/config/config-manager';
@@ -117,6 +120,31 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     await manager.stop();
     expect(secondChild.exitCode).toBe(0);
     expect(secondChild.signalCode).toBeNull();
+  }, 60_000);
+
+  it('persists original Memory Job sealed evidence across a real Worker restart', async () => {
+    await manager.start();
+    const identity = create(JobExecutionIdentitySchema, { jobId: 'integration:memory-job', scopeId: 'scope:integration',
+      attempt: 1n, authorityEpoch: 10n, fencingToken: 20n, ownerId: 'host:integration', leaseUntilMs: BigInt(Date.now() + 60_000) });
+    const reconcile = () => transport.call(transport.methods.ReconcileMemoryJob,
+      create(ReconcileMemoryJobRequestSchema, { call: transport.makeCallMetadata({ traceId: 'memory-job-reconcile' }), identity }),
+      { timeoutMs: 5000, traceId: 'memory-job-reconcile' });
+    const first = (await reconcile()).result!;
+    expect(first.identity).toEqual(identity);
+    expect(first.resolution).toBe(MemoryJobResolution.NOT_APPLIED);
+    expect(first.receiverFenced).toBe(true);
+    expect(first.sourceId).toBe('cognition.memory');
+    expect(first.evidenceId).not.toBe('');
+    expect(first.receiptId).toBe('');
+    await manager.stop();
+    await manager.start();
+    const recovered = (await reconcile()).result!;
+    expect(recovered.identity).toEqual(identity);
+    expect(recovered.evidenceId).toBe(first.evidenceId);
+    expect(recovered.observedAtMs).toBe(first.observedAtMs);
+    expect(recovered.receiverFenced).toBe(true);
+    expect(recovered.resolution).toBe(MemoryJobResolution.NOT_APPLIED);
+    await manager.stop();
   }, 60_000);
 
   it('cancels an in-flight provider request and exits gracefully on shutdown', async () => {

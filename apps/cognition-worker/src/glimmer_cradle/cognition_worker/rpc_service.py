@@ -1,39 +1,44 @@
 """Cognition Worker RPC process and lifecycle supervision."""
 from __future__ import annotations
 
-import asyncio
 import argparse
+import asyncio
 import base64
-from collections import OrderedDict
-from collections.abc import Awaitable, Callable
 import contextvars
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from enum import StrEnum
 import hashlib
 import hmac
 import json
 import logging
-from logging.handlers import RotatingFileHandler
 import os
-from pathlib import Path
 import re
 import sys
 import threading
 import time
-from typing import Any, Final, Optional
 import uuid
+from collections import OrderedDict
+from collections.abc import Awaitable, Callable
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from enum import StrEnum
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Any, Final, Optional
 
 import grpc
-from google.protobuf.json_format import ParseDict
 import structlog
-from structlog.stdlib import ProcessorFormatter
-
-from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.loop import LoopController
+from glimmer_cradle.cognition.memory import (
+    ConsolidationCoordinator,
+    MemoryConsolidationConflictError,
+    MemoryConsolidationInput,
+    MemoryConsolidationReceipt,
+    MemoryJobIdentity,
+    MemoryJobResult,
+)
 from glimmer_cradle.cognition.perception import (
     ObservationQueue,
     PerceptionOperationConflict,
@@ -43,7 +48,6 @@ from glimmer_cradle.cognition.ports import (
     KernelRequestPort,
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
-from glimmer_cradle.cognition_worker.composition import WorkerPaths
 from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
     agent_plan_from_wire,
     agent_plan_to_wire,
@@ -56,8 +60,18 @@ from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
     history_query_from_wire,
     history_result_to_wire,
 )
-from glimmer_cradle.cognition_worker.readiness import ReadinessTracker, WORKER_READY_COMPONENTS
-from glimmer_cradle.cognition_worker.shutdown import ShutdownCoordinator, cancel_task, worker_shutdown_steps
+from glimmer_cradle.cognition_worker.composition import WorkerPaths
+from glimmer_cradle.cognition_worker.readiness import (
+    WORKER_READY_COMPONENTS,
+    ReadinessTracker,
+)
+from glimmer_cradle.cognition_worker.shutdown import (
+    ShutdownCoordinator,
+    cancel_task,
+    worker_shutdown_steps,
+)
+from google.protobuf.json_format import ParseDict
+from structlog.stdlib import ProcessorFormatter
 
 
 def ensure_dir(path: Path) -> Path:
@@ -1370,6 +1384,7 @@ class CognitionGrpcHost:
         operations: PerceptionOperationRegistry,
         workspace: AttentionController,
         readiness: ReadinessTracker | None = None,
+        consolidation: ConsolidationCoordinator | None = None,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -1379,10 +1394,11 @@ class CognitionGrpcHost:
         self._shutdown = shutdown
         self._operations = operations
         self._workspace = workspace
+        self._consolidation = consolidation
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._readiness_tracker = readiness or ReadinessTracker(frozenset({"domain"}))
-        self._inflight: dict[str, asyncio.Task[Any]] = {}
+        self._inflight: dict[int, asyncio.Task[Any]] = {}
         self._completed: OrderedDict[str, None] = OrderedDict()
 
     @property
@@ -1406,6 +1422,8 @@ class CognitionGrpcHost:
             "Heartbeat": self._method(self._heartbeat, cognition_pb.HeartbeatRequest, cognition_pb.HeartbeatResponse),
             "GetReadiness": self._method(self._readiness, cognition_pb.GetReadinessRequest, cognition_pb.GetReadinessResponse),
             "Shutdown": self._method(self._shutdown_rpc, cognition_pb.ShutdownRequest, cognition_pb.ShutdownResponse),
+            "ExecuteMemoryJob": self._method(self._execute_memory_job, cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse),
+            "ReconcileMemoryJob": self._method(self._reconcile_memory_job, cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         port = server.add_insecure_port("127.0.0.1:0")
@@ -1461,12 +1479,13 @@ class CognitionGrpcHost:
             with TraceContext(trace_id):
                 task = asyncio.current_task()
                 if track and task is not None:
-                    self._inflight[trace_id] = task
+                    # 同一 Job 的重试/对账可沿用 trace；trace 不能充当资源所有权 key。
+                    self._inflight[id(task)] = task
                 try:
                     return await operation(trace_id)
                 finally:
                     if track:
-                        self._inflight.pop(trace_id, None)
+                        self._inflight.pop(id(task), None)
         except asyncio.CancelledError:
             await self._abort(context, common_pb.SERVICE_ERROR_CODE_CANCELLED, "请求已取消", getattr(request, "call", None))
             raise
@@ -1480,6 +1499,8 @@ class CognitionGrpcHost:
     @staticmethod
     async def _abort(context: grpc.aio.ServicerContext, code: int, message: str, call: Any, retryable: bool = False) -> None:
         detail = common_pb.ServiceErrorDetail(code=code, safe_message=message, retryable=retryable)
+        if code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED:
+            detail.recovery_actions.append(common_pb.SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE)
         if call is not None:
             detail.call.CopyFrom(call)
         context.set_trailing_metadata(((_ERROR_KEY, detail.SerializeToString()),))
@@ -1582,6 +1603,60 @@ class CognitionGrpcHost:
 
     async def _readiness(self, request: Any, context: Any) -> Any:
         return await self._invoke(request, context, lambda _trace_id: _return(cognition_pb.GetReadinessResponse(state=self._readiness_tracker.state, phase=self._readiness_tracker.phase, generation=self.generation)), allow_stopping=True)
+
+    @staticmethod
+    def _memory_job_identity(request: Any) -> MemoryJobIdentity:
+        if not request.HasField("identity"):
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "缺少原 Job attempt identity")
+        identity = request.identity
+        return MemoryJobIdentity(identity.job_id, identity.scope_id, identity.attempt, identity.authority_epoch,
+                                 identity.fencing_token, identity.owner_id, identity.lease_until_ms)
+
+    @staticmethod
+    def _memory_job_result(identity: Any, receipt: MemoryConsolidationReceipt | None, fenced: bool, observed_at: int) -> Any:
+        resolution = "applied" if receipt is not None else "not_applied"
+        document = [identity.job_id, identity.scope_id, identity.attempt, identity.authority_epoch,
+                    identity.fencing_token, identity.owner_id, resolution, receipt.receipt_id if receipt else "sealed"]
+        evidence_id = hashlib.sha256(json.dumps(document, separators=(",", ":")).encode("utf-8")).hexdigest()
+        result = cognition_pb.MemoryJobResult(
+            resolution=cognition_pb.MEMORY_JOB_RESOLUTION_APPLIED if receipt else cognition_pb.MEMORY_JOB_RESOLUTION_NOT_APPLIED,
+            source_id="cognition.memory", receiver_fenced=fenced, evidence_id=evidence_id,
+            observed_at_ms=observed_at,
+        )
+        result.identity.CopyFrom(identity)
+        if receipt is not None:
+            result.receipt_id = receipt.receipt_id
+            result.operation_id = receipt.operation_id
+            result.memory_ids.extend(receipt.memory_ids)
+            result.committed_at = receipt.committed_at
+            result.duplicate = receipt.duplicate
+        return result
+
+    async def _execute_memory_job(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            if self._consolidation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Memory Job receiver 尚未装配")
+            identity = self._memory_job_identity(request)
+            item = MemoryConsolidationInput(request.episode_id, request.episode_version, identity.scope_id, request.input_digest)
+            try:
+                receipt = await self._consolidation.execute_job(identity, item)
+                proof = await self._consolidation.reconcile_job(identity)
+            except MemoryConsolidationConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 身份/输入/提交资格冲突；须对账原 attempt") from error
+            return cognition_pb.ExecuteMemoryJobResponse(result=self._memory_job_result(request.identity, receipt, proof.receiver_fenced, proof.observed_at))
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _reconcile_memory_job(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            if self._consolidation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Memory Job receiver 尚未装配")
+            identity = self._memory_job_identity(request)
+            try:
+                result: MemoryJobResult = await self._consolidation.reconcile_job(identity)
+            except MemoryConsolidationConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 原 attempt 对账冲突") from error
+            return cognition_pb.ReconcileMemoryJobResponse(result=self._memory_job_result(request.identity, result.receipt, result.receiver_fenced, result.observed_at))
+        return await self._invoke(request, context, operation, track=True, allow_stopping=True)
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
@@ -1841,6 +1916,7 @@ class CognitionHost:
                 operations=components.perception_operations,
                 workspace=components.workspace,
                 readiness=self.readiness,
+                consolidation=components.consolidation_coordinator,
             )
 
             # 1.5 启动 Conversation Log 单写者。

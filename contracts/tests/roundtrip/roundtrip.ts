@@ -10,6 +10,7 @@ import {
   AvatarDownstreamFrameSchema,
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
+import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -19,6 +20,20 @@ const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
 const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version: string; tool_id: string };
 const digest = createHash('sha256').update(documentBytes).digest();
+
+const jobIdentity = { jobId: 'job:one', scopeId: 'scope:one', attempt: 2n, authorityEpoch: 7n,
+  fencingToken: 9007199254740991n, ownerId: 'host:one', leaseUntilMs: 1900000000000n };
+const memoryRequest = create(ExecuteMemoryJobRequestSchema, { identity: jobIdentity,
+  episodeId: 'episode:one', episodeVersion: 3n, inputDigest: 'a'.repeat(64) });
+const restoredMemoryRequest = fromBinary(ExecuteMemoryJobRequestSchema, toBinary(ExecuteMemoryJobRequestSchema, memoryRequest));
+if (restoredMemoryRequest.identity?.fencingToken !== jobIdentity.fencingToken || restoredMemoryRequest.episodeVersion !== 3n) {
+  throw new Error('Memory Job original identity round-trip lost precision');
+}
+const sealedJob = create(ReconcileMemoryJobResponseSchema, { result: { identity: jobIdentity,
+  resolution: MemoryJobResolution.NOT_APPLIED, receiverFenced: true, evidenceId: 'sealed', sourceId: 'cognition.memory' } });
+if (!fromBinary(ReconcileMemoryJobResponseSchema, toBinary(ReconcileMemoryJobResponseSchema, sealedJob)).result?.receiverFenced) {
+  throw new Error('Memory Job sealed proof round-trip lost fencing');
+}
 
 const asset = { assetId: '00000000-0000-4000-8000-000000000001', mediaType: 'image/png',
   sizeBytes: 3n, sha256: 'a'.repeat(64) };

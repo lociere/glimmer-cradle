@@ -41,6 +41,27 @@ class MemoryConsolidationConflictError(ValueError):
     """持久巩固身份或输入发生冲突，不允许当新工作重放。"""
 
 
+@dataclass(frozen=True, slots=True)
+class MemoryJobIdentity:
+    """消费方所需的原执行身份；App 从唯一 wire 契约映射，不引入 Jobs 内部对象。"""
+
+    job_id: str
+    scope_id: str
+    attempt: int
+    authority_epoch: int
+    fencing_token: int
+    owner_id: str
+    lease_until: int
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryJobResult:
+    identity: MemoryJobIdentity
+    receipt: MemoryConsolidationReceipt | None
+    receiver_fenced: bool
+    observed_at: int
+
+
 class EpisodeProjectionStore(Protocol):
     async def start(self) -> None: ...
     async def project_pending(self, *, seal: bool = False) -> int: ...
@@ -87,8 +108,14 @@ class MemoryStore(Protocol):
     async def find_consolidation(self, item: MemoryConsolidationInput) -> MemoryConsolidationReceipt | None: ...
 
     async def commit_consolidation(
-        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict]
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict],
+        *, execution: MemoryJobIdentity | None = None,
     ) -> MemoryConsolidationReceipt: ...
+
+    async def prepare_job(self, identity: MemoryJobIdentity, operation_id: str,
+                          inputs: tuple[MemoryConsolidationInput, ...]) -> MemoryConsolidationReceipt | None: ...
+
+    async def reconcile_job(self, identity: MemoryJobIdentity) -> MemoryJobResult: ...
 
 
 class VectorIndexStore(Protocol):

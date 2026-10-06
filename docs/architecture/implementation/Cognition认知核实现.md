@@ -205,7 +205,7 @@ commit 取消均等待回滚收尾再允许连接复用，回滚失败撤销并�
 新库 DDL 与 schema metadata 在同一初始化事务，失败/取消不留下半初始化表。关系 checkpoint 只向前推进。
 模型推理、向量编码和跨进程调用不在这些事务内；已提交但确认被取消不能推断未写入。
 
-Memory schema 4 将修订/evidence、`memory_consolidation_receipts` 与每个 Episode/version 的
+Memory schema 5 将修订/evidence、`memory_consolidation_receipts` 与每个 Episode/version 的
 `memory_consolidation_inputs` 索引同事务提交；receipt 保存 operation、scope、输入/输出摘要、结果
 Memory ID 与提交时间，不保存模型原文。noop 也形成结果 receipt。相同 operation/input/output 重复返回
 原结果；输入 scope/digest 漂移、同 operation 输出冲突、重复修订同一 Memory 或无 receipt 的既有同批修订
@@ -214,8 +214,17 @@ Memory ID 与提交时间，不保存模型原文。noop 也形成结果 receipt
 真实 `ConsolidationCoordinator` 先按 Episode/version 查询结果，再推理未确认项；重启后即使分批大小改变、
 模型不可用或派生缓存刷新失败，也可从原结果修复缓存、队列与 Episode 投影，不重复推理已提交项。
 旧巩固队列的 complete/fail 只接受对应 claimed attempt，完成批次中任一 attempt 失效则全部回滚。
-这不是生产 Jobs 接收端 fencing：receipt 缺失仍不证明未提交或允许盲重试，源 request outbox、原 attempt
-封口与 Host/Worker broker 尚待接线。不自动升级用户 v3 库；受控迁移、备份与恢复归阶段 14。
+Memory 的 Jobs 接收边界由 `memory_job_attempts` / `memory_job_authority` 持有：App 从 Contract Spine
+映射原 job/scope/attempt/epoch/token/owner/deadline；登记与封口持久化，推理返回后的 IMMEDIATE 提交
+重新检查身份、authority 和 lease，最终结果接纳 SQL 再检查数据库时钟。attempt applied、业务修订与 receipt
+同事务提交；新 attempt/authority 和对账封口均拒绝旧提交。对账未知 attempt 先保存 sealed tombstone，
+不能只查空结果就返回 not-applied；错误身份不封口真实 attempt。证据 ID 与观测时间跨重启保持稳定。
+
+Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监督 `CognitionGrpcHost`，由
+`ExecuteMemoryJob` / `ReconcileMemoryJob` 映射生成契约；Kernel 迁移期 transport 暴露同一 RPC。
+对账是会持久封口的命令，不是无副作用的查询；generation 鉴权、readiness、取消和停机继续使用原 Service
+边界。源 request outbox、Host Jobs handler/query adapter、scheduler 与配置装配仍待接线，旧队列仍保留
+既定退出门。不自动升级用户 v3/v4 库；受控迁移、备份与恢复归阶段 14。
 
 长期交互连续性由 Conversation 拥有；Cognition 拥有 Experience、Memory、Persona 与推理语义。Kernel 可以收到投影或行动结果，但不直接写 Cognition/Conversation DB。
 

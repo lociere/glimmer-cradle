@@ -18,6 +18,9 @@ from glimmer_cradle.cognition.memory.memory_store import (
     EpisodeProjectionStore,
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
+    MemoryConsolidationReceipt,
+    MemoryJobIdentity,
+    MemoryJobResult,
     RelationshipProjectionStore,
 )
 from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
@@ -193,6 +196,40 @@ class ConsolidationCoordinator:
     async def _infer_and_commit(
         self, jobs: list[ConsolidationJob], episodes: list[Episode], inputs: tuple[MemoryConsolidationInput, ...]
     ) -> int:
+        batch_id = self._ids.stable("memory-batch", ":".join(sorted(job.job_id for job in jobs)))
+        if self._llm is None and any(moment.retention_ceiling == "memory_candidate" for episode in episodes for moment in episode.moments):
+            await self._jobs.fail(jobs, error_code="provider_unavailable", retry_base_seconds=self._retry_base_seconds)
+            return 0
+        receipt = await self._infer_memory_result(batch_id, episodes, inputs)
+        await self._finish_jobs(jobs)
+        return 0 if receipt.duplicate else len(receipt.memory_ids)
+
+    async def execute_job(self, identity: MemoryJobIdentity, item: MemoryConsolidationInput) -> MemoryConsolidationReceipt:
+        episode = self._episodes.get_episode(item.episode_id)
+        if episode is None or self._receipt_input(episode) != item or identity.scope_id != item.scope_id:
+            raise MemoryConsolidationConflictError("Memory Job Episode/version/scope/digest 冲突")
+        operation_id = self._ids.stable("memory-job-result", identity.job_id)
+        # 登记先于推理锁，新的 fencing 必须能立即使正在推理的旧 attempt 失效。
+        receipt = await self._memory.prepare_job(identity, operation_id, (item,))
+        if receipt is not None:
+            await self._memory.load()
+            self._episodes.mark_consolidated(item.episode_id, receipt.committed_at)
+            return receipt
+        async with self._lock:
+            receipt = await self._memory.prepare_job(identity, operation_id, (item,))
+            if receipt is None:
+                receipt = await self._infer_memory_result(operation_id, [episode], (item,), execution=identity)
+            self._episodes.mark_consolidated(item.episode_id, receipt.committed_at)
+            return receipt
+
+    async def reconcile_job(self, identity: MemoryJobIdentity) -> MemoryJobResult:
+        # 不取推理锁：封口必须能与在途模型并发，并在提交锁上决定先后。
+        return await self._memory.reconcile_job(identity)
+
+    async def _infer_memory_result(
+        self, operation_id: str, episodes: list[Episode], inputs: tuple[MemoryConsolidationInput, ...],
+        *, execution: MemoryJobIdentity | None = None,
+    ) -> MemoryConsolidationReceipt:
         eligible = [
             moment
             for episode in episodes
@@ -200,20 +237,12 @@ class ConsolidationCoordinator:
             if moment.retention_ceiling == "memory_candidate"
         ][-self._max_batch_moments:]
         if len({self._moment_domain_key(item) for item in eligible}) > 1:
-            await self._jobs.fail(
-                jobs, error_code="mixed_permission_domain",
-                retry_base_seconds=self._retry_base_seconds,
-            )
-            return 0
+            raise MemoryConsolidationConflictError("Memory Job 不得跨权限域推理")
         allowed = {item.moment_id: item for item in eligible}
-        batch_id = self._ids.stable("memory-batch", ":".join(sorted(job.job_id for job in jobs)))
         if not allowed:
-            await self._memory.commit_consolidation(batch_id, inputs, [])
-            await self._finish_jobs(jobs)
-            return 0
+            return await self._memory.commit_consolidation(operation_id, inputs, [], execution=execution)
         if self._llm is None:
-            await self._jobs.fail(jobs, error_code="provider_unavailable", retry_base_seconds=self._retry_base_seconds)
-            return 0
+            raise MemoryConsolidationConflictError("Memory Job 推理 provider 不可用")
         query = "\n".join(str(item.content) for item in eligible)
         domain = eligible[-1]
         existing = await self._memory.retrieve(
@@ -227,11 +256,9 @@ class ConsolidationCoordinator:
         )
         output = await self._infer(episodes, eligible, existing)
         drafts = self._build_drafts(
-            output, existing=existing, allowed=allowed, consolidation_id=batch_id,
+            output, existing=existing, allowed=allowed, consolidation_id=operation_id,
         )
-        receipt = await self._memory.commit_consolidation(batch_id, inputs, drafts)
-        await self._finish_jobs(jobs)
-        return 0 if receipt.duplicate else len(receipt.memory_ids)
+        return await self._memory.commit_consolidation(operation_id, inputs, drafts, execution=execution)
 
     def _receipt_input(self, episode: Episode) -> MemoryConsolidationInput:
         eligible = [moment for moment in episode.moments if moment.retention_ceiling == "memory_candidate"]

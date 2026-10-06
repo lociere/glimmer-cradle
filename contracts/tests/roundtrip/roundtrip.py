@@ -15,6 +15,10 @@ from glimmer.common.v1.contract_probe_pb2 import (  # noqa: E402
     TraceMetadata,
 )
 from glimmer.content.v1.content_pb2 import AssetRef, ContentPart, FileContent  # noqa: E402
+from glimmer.jobs.v1.jobs_pb2 import JobExecutionIdentity  # noqa: E402
+from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
+    ExecuteMemoryJobRequest, ReconcileMemoryJobResponse, MemoryJobResult, MEMORY_JOB_RESOLUTION_NOT_APPLIED,
+)
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
     AudioPlayEvent,
     DeliveryReceiptCommand,
@@ -24,6 +28,15 @@ fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
+
+job_identity = JobExecutionIdentity(job_id="job:one", scope_id="scope:one", attempt=2, authority_epoch=7,
+                                   fencing_token=9007199254740991, owner_id="host:one", lease_until_ms=1900000000000)
+memory_request = ExecuteMemoryJobRequest(identity=job_identity, episode_id="episode:one", episode_version=3, input_digest="a" * 64)
+restored_memory = ExecuteMemoryJobRequest.FromString(memory_request.SerializeToString())
+assert restored_memory.identity.fencing_token == 9007199254740991 and restored_memory.episode_version == 3
+sealed_job = ReconcileMemoryJobResponse(result=MemoryJobResult(identity=job_identity,
+    resolution=MEMORY_JOB_RESOLUTION_NOT_APPLIED, receiver_fenced=True, evidence_id="sealed", source_id="cognition.memory"))
+assert ReconcileMemoryJobResponse.FromString(sealed_job.SerializeToString()).result.receiver_fenced
 
 asset = AssetRef(asset_id="00000000-0000-4000-8000-000000000001", media_type="image/png",
                  size_bytes=3, sha256="a" * 64)

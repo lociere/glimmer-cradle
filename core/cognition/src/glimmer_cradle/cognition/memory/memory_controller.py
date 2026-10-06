@@ -11,6 +11,8 @@ from glimmer_cradle.cognition.memory.memory import MemoryKind, MemoryRecord
 from glimmer_cradle.cognition.memory.memory_store import (
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
+    MemoryJobIdentity,
+    MemoryJobResult,
     MemoryStore,
     VectorIndexStore,
 )
@@ -108,14 +110,26 @@ class MemoryController:
         return await self._repo.find_consolidation(item)
 
     async def commit_consolidation(
-        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]]
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]],
+        *, execution: MemoryJobIdentity | None = None,
     ) -> MemoryConsolidationReceipt:
         if self._repo is None:
             raise RuntimeError("MemoryController 未绑定 store")
-        receipt = await self._repo.commit_consolidation(operation_id, inputs, self._normalize_drafts(drafts))
+        receipt = await self._repo.commit_consolidation(operation_id, inputs, self._normalize_drafts(drafts), execution=execution)
         # 这一步失败不撤销已经提交的 receipt；下次查询可修复投影而不重新推理。
         await self.load()
         return receipt
+
+    async def prepare_job(self, identity: MemoryJobIdentity, operation_id: str,
+                          inputs: tuple[MemoryConsolidationInput, ...]) -> MemoryConsolidationReceipt | None:
+        if self._repo is None:
+            raise RuntimeError("MemoryController 未绑定 store")
+        return await self._repo.prepare_job(identity, operation_id, inputs)
+
+    async def reconcile_job(self, identity: MemoryJobIdentity) -> MemoryJobResult:
+        if self._repo is None:
+            raise RuntimeError("MemoryController 未绑定 store")
+        return await self._repo.reconcile_job(identity)
 
     @staticmethod
     def _normalize_drafts(drafts: list[dict[str, Any]]) -> list[dict[str, Any]]:

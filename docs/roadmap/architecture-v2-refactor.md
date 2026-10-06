@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 领域结果 receipt 已接真实巩固 consumer；源 request outbox、生产 Jobs 身份绑定与接收 fencing、Host/Worker broker 接线待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 领域 receipt、原 attempt 接收 fencing 与受监督执行/对账 RPC 已接线；源 request outbox、Host Jobs handler/query adapter、scheduler 与配置装配待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -252,6 +252,34 @@ docs/encoding/diff PASS；独立审查继续留固定最终候选。Memory schem
 此 receipt 仍是 Memory 领域结果，不是绑定 Jobs 原 epoch/owner/token 的生产接收证明。下一切片继续
 将 request outbox、接收端原 attempt 封口/提交 fencing、Host→Worker handler/query 和 Jobs 配置装配
 接入实际调用链；旧巩固队列在 consumer-zero、旧样本迁移与恢复门通过后删除，阶段 7 不提前完成。
+
+Memory Jobs 接收切片计划：Memory 保存原 job/scope/attempt/epoch/token/owner 和 lease deadline，
+登记/封口与业务提交共享同一个 IMMEDIATE 边界。新 authority 拒绝旧提交；对账先持久封口再读取结果，
+未知 attempt 也保存拒绝晚到执行的 tombstone，不把空查询当 not-applied。结果 receipt 与 attempt 接纳
+同事务提交；推理不持有事务，提交前再次核验原身份和 deadline。跨进程定义归现行 Contract Spine，
+Worker 的真实 composition 接入该接收 owner；Kernel 迁移期 transport 消费同一生成契约。此切片不
+宣称 source request outbox、生产 Jobs scheduler 装配或旧队列 consumer-zero 完成；这些紧随接收边界接线。
+
+Memory Jobs 接收候选（2026-10-06）：原 job/scope/attempt/epoch/token/owner/deadline 登记到 Memory
+owner；新 attempt/authority、租约失效或显式对账封口均拒绝旧提交，结果接纳 SQL 最后核验数据库时钟。
+未到达的 attempt 先持久 sealed tombstone 再返回 not-applied，错误身份不能封口真实执行；业务 receipt、
+attempt applied 与观测时间同事务提交。同一证据 ID/观测时间在重复确认和重启后保持稳定。
+真实 Worker composition 将同一 ConsolidationCoordinator 接到 `ExecuteMemoryJob` /
+`ReconcileMemoryJob`，Kernel transport 使用唯一生成契约；generation、readiness、typed recovery action、
+取消/停机仍走受监督 Service。并发 RPC 即使共用 trace 也按实际 task 持有资源，不覆盖在途收尾 owner。
+
+Memory 定向 61 项、Cognition 全量 265 项、Worker 全量 69 项 PASS；真实 SQLite 覆盖未知 attempt
+封口、原 identity 冲突、新 attempt/authority、推理中封口、提交末端 deadline、applied/receipt 故障回滚及
+旧 v3/v4 拒绝隐式升级并保留业务数据。Worker RPC 覆盖真实提交/重开/重复、封口晚到执行、非法 generation/
+scope/整数，以及相同 trace 的并发停机收尾。Kernel→Worker 定向集成 6 项 PASS，新增真实进程重启对账
+并保持原 epoch/token 与稳定证据；正常停机 exitCode 0 / signal null。
+Contract Spine generate/verify PASS：22 项护栏、兼容门、TS/Python/C# roundtrip、确定性生成及 clean 检查；
+未刷新 Proto 兼容基线。根 typecheck/build、Ruff I/F、architecture、目标清单规格（非最终实物）、
+docs/encoding/diff PASS，独立审查仍留固定最终候选。
+验证资源纪律：contracts 生成会重建 Python projection，SDK build 会短暂清理 dist；实际 Worker 重启/集成
+不得与这些任务并发。本候选在确认 ModuleNotFoundError / SDK entry 缺失属于该竞争后，固定产物串行重验通过，
+未放宽断言或超时。Memory schema 为 5，未迁移用户库、创建生产 Jobs 库或切换旧巩固队列；下一步仍为
+源 request outbox、Host handler/query 与 scheduler/config 的实际消费装配，再满足旧 owner 删除门。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

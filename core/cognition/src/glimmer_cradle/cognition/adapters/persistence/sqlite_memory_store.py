@@ -22,13 +22,19 @@ from glimmer_cradle.cognition.memory import (
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
+    MemoryJobIdentity,
+    MemoryJobResult,
     RelationshipRecord,
 )
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _VECTOR_DTYPE = np.float32
+
+
+def _now_ms() -> int:
+    return int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
 def _now_iso() -> str:
@@ -99,6 +105,8 @@ class SqliteMemoryStore:
                     raise RuntimeError("检测到非当前记忆架构数据库；须先执行受控数据迁移")
             await connection.execute("SELECT receipt_id,operation_id,request_digest,draft_digest FROM memory_consolidation_receipts LIMIT 0")
             await connection.execute("SELECT episode_id,episode_version,scope_id,input_digest,receipt_id FROM memory_consolidation_inputs LIMIT 0")
+            await connection.execute("SELECT epoch FROM memory_job_authority LIMIT 0")
+            await connection.execute("SELECT job_id,attempt,state,receipt_id,observed_at FROM memory_job_attempts LIMIT 0")
         except BaseException:
             await self._drain_cleanup(connection.close())
             raise
@@ -259,7 +267,8 @@ class MemoryRepository:
             return self._receipt(row, duplicate=True)
 
     async def commit_consolidation(
-        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]]
+        self, operation_id: str, inputs: tuple[MemoryConsolidationInput, ...], drafts: list[dict[str, Any]],
+        *, execution: MemoryJobIdentity | None = None,
     ) -> MemoryConsolidationReceipt:
         if not isinstance(operation_id, str) or not operation_id.strip() or not inputs:
             raise MemoryConsolidationConflictError("Memory 巩固 operation/input 不得为空")
@@ -279,6 +288,8 @@ class MemoryRepository:
             raise MemoryConsolidationConflictError("Memory 巩固批次不得重复修订同一 memory identity")
         request_digest, draft_digest = self._digest(documents), self._digest(drafts)
         async with self._db.transaction() as conn:
+            if execution is not None:
+                await self._assert_job_commit(conn, execution, operation_id, request_digest)
             cursor = await conn.execute("""
                 SELECT receipt_id,operation_id,scope_id,memory_ids_json,committed_at,request_digest,draft_digest
                 FROM memory_consolidation_receipts WHERE operation_id=?
@@ -287,6 +298,8 @@ class MemoryRepository:
             if row is not None:
                 if row[5] != request_digest or row[6] != draft_digest:
                     raise MemoryConsolidationConflictError("Memory 巩固 operation 内容冲突")
+                if execution is not None:
+                    await self._accept_job(conn, execution, row[0])
                 return self._receipt(row, duplicate=True)
             for item in inputs:
                 cursor = await conn.execute("SELECT receipt_id FROM memory_consolidation_inputs WHERE episode_id=? AND episode_version=?",
@@ -309,7 +322,156 @@ class MemoryRepository:
             await conn.executemany("INSERT INTO memory_consolidation_inputs VALUES(?,?,?,?,?)", [
                 (item.episode_id, item.episode_version, item.scope_id, item.input_digest, receipt_id) for item in inputs
             ])
+            if execution is not None:
+                await self._accept_job(conn, execution, receipt_id)
             return MemoryConsolidationReceipt(receipt_id, operation_id, scope_id, tuple(memory_ids), timestamp)
+
+    @staticmethod
+    def _validate_job_identity(identity: MemoryJobIdentity) -> None:
+        for value in (identity.job_id, identity.scope_id, identity.owner_id):
+            if not isinstance(value, str) or not value.strip():
+                raise MemoryConsolidationConflictError("Memory Job identity 无效")
+        for value in (identity.attempt, identity.authority_epoch, identity.fencing_token, identity.lease_until):
+            if type(value) is not int or not 0 < value <= 9007199254740991:
+                raise MemoryConsolidationConflictError("Memory Job epoch/attempt/token/deadline 无效")
+
+    @staticmethod
+    def _assert_job_identity(row: Any, identity: MemoryJobIdentity) -> None:
+        if tuple(row[:4]) != (identity.scope_id, identity.authority_epoch, identity.fencing_token, identity.owner_id):
+            raise MemoryConsolidationConflictError("Memory Job 原 attempt identity 冲突")
+
+    @staticmethod
+    async def _job_row(conn: Any, identity: MemoryJobIdentity) -> Any:
+        cursor = await conn.execute("""
+            SELECT scope_id,authority_epoch,fencing_token,owner_id,lease_until,operation_id,request_digest,state,receipt_id,observed_at
+            FROM memory_job_attempts WHERE job_id=? AND attempt=?
+            """, (identity.job_id, identity.attempt))
+        return await cursor.fetchone()
+
+    @staticmethod
+    async def _receipt_by_id(conn: Any, receipt_id: str) -> MemoryConsolidationReceipt:
+        cursor = await conn.execute("""
+            SELECT receipt_id,operation_id,scope_id,memory_ids_json,committed_at
+            FROM memory_consolidation_receipts WHERE receipt_id=?
+            """, (receipt_id,))
+        row = await cursor.fetchone()
+        if row is None:
+            raise MemoryConsolidationConflictError("Memory Job receipt 丢失，不能证明未提交")
+        return MemoryRepository._receipt(row, duplicate=True)
+
+    async def prepare_job(self, identity: MemoryJobIdentity, operation_id: str,
+                          inputs: tuple[MemoryConsolidationInput, ...]) -> MemoryConsolidationReceipt | None:
+        self._validate_job_identity(identity)
+        if not isinstance(operation_id, str) or not operation_id.strip() or not inputs:
+            raise MemoryConsolidationConflictError("Memory Job operation/input 无效")
+        documents = sorted((self._input_document(item) for item in inputs),
+                           key=lambda item: (item["episode_id"], item["episode_version"]))
+        if (any(item.scope_id != identity.scope_id for item in inputs)
+            or len({(item.episode_id, item.episode_version) for item in inputs}) != len(inputs)):
+            raise MemoryConsolidationConflictError("Memory Job 输入 scope/identity 冲突")
+        digest = self._digest(documents)
+        async with self._db.transaction() as conn:
+            epoch = (await (await conn.execute("SELECT epoch FROM memory_job_authority")).fetchone())[0]
+            if identity.authority_epoch < epoch or identity.lease_until <= _now_ms():
+                raise MemoryConsolidationConflictError("Memory Job authority/lease 已失效")
+            row = await self._job_row(conn, identity)
+            if row is not None:
+                self._assert_job_identity(row, identity)
+                if row[7] == "sealed":
+                    raise MemoryConsolidationConflictError("Memory Job 原 attempt 已封口")
+                if row[5:7] != (operation_id, digest):
+                    raise MemoryConsolidationConflictError("Memory Job 原 attempt 输入冲突")
+                if row[7] == "applied":
+                    return await self._receipt_by_id(conn, row[8])
+                if row[4] <= _now_ms():
+                    raise MemoryConsolidationConflictError("Memory Job 原 lease 已过期，不允许复活")
+                await conn.execute("UPDATE memory_job_attempts SET lease_until=MAX(lease_until,?) WHERE job_id=? AND attempt=?",
+                                   (identity.lease_until, identity.job_id, identity.attempt))
+                return None
+            cursor = await conn.execute("""
+                SELECT attempt,scope_id,authority_epoch,fencing_token,operation_id,request_digest,receipt_id
+                FROM memory_job_attempts WHERE job_id=? ORDER BY attempt DESC LIMIT 1
+                """, (identity.job_id,))
+            previous = await cursor.fetchone()
+            if previous is not None:
+                if (identity.attempt <= previous[0] or identity.fencing_token <= previous[3]
+                    or identity.authority_epoch < previous[2] or identity.scope_id != previous[1]):
+                    raise MemoryConsolidationConflictError("Memory Job 旧 attempt/fencing 不可登记")
+                cursor = await conn.execute("SELECT operation_id,request_digest FROM memory_job_attempts WHERE job_id=? AND operation_id IS NOT NULL LIMIT 1",
+                                            (identity.job_id,))
+                original = await cursor.fetchone()
+                if original is not None and original != (operation_id, digest):
+                    raise MemoryConsolidationConflictError("Memory Job 跨 attempt 输入冲突")
+            if identity.authority_epoch > epoch:
+                await conn.execute("UPDATE memory_job_authority SET epoch=?", (identity.authority_epoch,))
+                await conn.execute("UPDATE memory_job_attempts SET state='sealed',observed_at=? WHERE state='active' AND authority_epoch<?",
+                                   (_now_ms(), identity.authority_epoch))
+            await conn.execute("UPDATE memory_job_attempts SET state='sealed',observed_at=? WHERE job_id=? AND state='active'", (_now_ms(), identity.job_id))
+            # 新 attempt 不重新执行同一 Job 已提交的业务结果。
+            cursor = await conn.execute("SELECT receipt_id FROM memory_job_attempts WHERE job_id=? AND state='applied' LIMIT 1", (identity.job_id,))
+            applied = await cursor.fetchone()
+            receipt_id = applied[0] if applied is not None else None
+            await conn.execute("INSERT INTO memory_job_attempts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (
+                identity.job_id, identity.attempt, identity.scope_id, identity.authority_epoch, identity.fencing_token,
+                identity.owner_id, identity.lease_until, operation_id, digest,
+                "applied" if receipt_id is not None else "active", receipt_id, _now_ms() if receipt_id is not None else None,
+            ))
+            return await self._receipt_by_id(conn, receipt_id) if receipt_id is not None else None
+
+    async def reconcile_job(self, identity: MemoryJobIdentity) -> MemoryJobResult:
+        self._validate_job_identity(identity)
+        async with self._db.transaction() as conn:
+            row = await self._job_row(conn, identity)
+            if row is None:
+                cursor = await conn.execute("SELECT attempt,scope_id,authority_epoch,fencing_token FROM memory_job_attempts WHERE job_id=? ORDER BY attempt DESC LIMIT 1",
+                                            (identity.job_id,))
+                known = await cursor.fetchone()
+                if known is not None:
+                    if identity.scope_id != known[1]:
+                        raise MemoryConsolidationConflictError("Memory Job 对账 scope 冲突")
+                    if identity.attempt > known[0]:
+                        if identity.authority_epoch < known[2] or identity.fencing_token <= known[3]:
+                            raise MemoryConsolidationConflictError("Memory Job 对账 attempt/fencing 倒退")
+                        await conn.execute("UPDATE memory_job_attempts SET state='sealed',observed_at=? WHERE job_id=? AND attempt<? AND state='active'",
+                                           (_now_ms(), identity.job_id, identity.attempt))
+                    elif identity.authority_epoch > known[2] or identity.fencing_token >= known[3]:
+                        raise MemoryConsolidationConflictError("Memory Job 原 attempt 对账身份顺序冲突")
+                # 空查询不是证明：同一提交锁下先持久拒绝原身份的未来执行。
+                observed_at = _now_ms()
+                await conn.execute("INSERT INTO memory_job_attempts VALUES(?,?,?,?,?,?,?,NULL,NULL,'sealed',NULL,?)", (
+                    identity.job_id, identity.attempt, identity.scope_id, identity.authority_epoch,
+                    identity.fencing_token, identity.owner_id, identity.lease_until, observed_at,
+                ))
+                return MemoryJobResult(identity, None, True, observed_at)
+            self._assert_job_identity(row, identity)
+            if row[7] == "applied":
+                return MemoryJobResult(identity, await self._receipt_by_id(conn, row[8]), True, row[9])
+            observed_at = row[9] if row[9] is not None else _now_ms()
+            await conn.execute("UPDATE memory_job_attempts SET state='sealed',observed_at=? WHERE job_id=? AND attempt=?", (observed_at, identity.job_id, identity.attempt))
+            return MemoryJobResult(identity, None, True, observed_at)
+
+    async def _assert_job_commit(self, conn: Any, identity: MemoryJobIdentity, operation_id: str, digest: str) -> None:
+        self._validate_job_identity(identity)
+        row = await self._job_row(conn, identity)
+        if row is None:
+            raise MemoryConsolidationConflictError("Memory Job attempt 未登记")
+        self._assert_job_identity(row, identity)
+        epoch = (await (await conn.execute("SELECT epoch FROM memory_job_authority")).fetchone())[0]
+        if (row[5:7] != (operation_id, digest) or row[7] != "active"
+            or identity.authority_epoch != epoch or row[4] <= _now_ms()):
+            raise MemoryConsolidationConflictError("Memory Job 提交 fencing/lease/输入校验失败")
+
+    @staticmethod
+    async def _accept_job(conn: Any, identity: MemoryJobIdentity, receipt_id: str) -> None:
+        # SQLite 执行时再次判 deadline，不能仅依赖业务写入前的 Python 时钟采样。
+        cursor = await conn.execute("""
+            UPDATE memory_job_attempts SET state='applied',receipt_id=?,
+            observed_at=CAST(ROUND((julianday('now')-2440587.5)*86400000) AS INTEGER) WHERE job_id=? AND attempt=?
+            AND state='active' AND authority_epoch=(SELECT epoch FROM memory_job_authority)
+            AND lease_until>CAST(ROUND((julianday('now')-2440587.5)*86400000) AS INTEGER)
+            """, (receipt_id, identity.job_id, identity.attempt))
+        if cursor.rowcount != 1:
+            raise MemoryConsolidationConflictError("Memory Job 结果接纳 fencing/deadline 已失效")
 
     @staticmethod
     async def _create_revision(conn: Any, draft: dict[str, Any]) -> str:

@@ -31,11 +31,12 @@ Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚�
 unknown，清理终态后仍保留最小身份/审计。旧候选 v1/v2 拒绝隐式升级，不能对旧 Memory 数据库直接应用 Jobs migration。生产路径、备份切点和
 跨库提交须随后续 broker/handler 接线确定，参见[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
 
-现行 Memory 新库 schema 为 4，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
+现行 Memory 新库 schema 为 5，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
 由 `SqliteMemoryStore` 统一持有。业务结果 receipt 与修订/evidence 同事务持久化，详见
 [认知核持久化实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
-旧 v3 库拒绝隐式升级，必须保留迁移前备份并按阶段 14 受控迁移；本切片没有改写用户库。
-此提交边界不代替跨库 request outbox 或接收端 fencing，也不意味着旧 `consolidation_jobs` 已迁入 Jobs。
+原 Jobs attempt 的接收资格、authority 和封口证据也在此库持久化，结果接纳与业务 receipt 原子提交。
+旧 v3/v4 库拒绝隐式升级，必须保留迁移前备份并按阶段 14 受控迁移；本切片没有改写用户库。
+此接收边界不代替跨库 request outbox，也不意味着旧 `consolidation_jobs` 已迁入 Jobs。
 
 | 路径 | owner | 说明 |
 |---|---|---|

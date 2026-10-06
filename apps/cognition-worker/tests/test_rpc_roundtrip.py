@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import grpc
@@ -14,7 +15,14 @@ from conftest import (
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.content.v1 import content_pb2 as content_pb
+from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
+from glimmer_cradle.cognition.adapters.persistence import (
+    ConsolidationJobRepository,
+    EpisodeProjection,
+    MemoryRepository,
+    SqliteMemoryStore,
+)
 from glimmer_cradle.cognition.attention import (
     AttentionController as _AttentionController,
 )
@@ -29,6 +37,7 @@ from glimmer_cradle.cognition.inference import (
 from glimmer_cradle.cognition.loop import LoopController as _CycleController
 from glimmer_cradle.cognition.loop import PerceptionProvider as _PerceptionProvider
 from glimmer_cradle.cognition.loop import WillingnessConfig
+from glimmer_cradle.cognition.memory import ConsolidationCoordinator, MemoryController
 from glimmer_cradle.cognition.perception import (
     ObservationQueue,
     PerceptionOperationRegistry,
@@ -726,6 +735,124 @@ async def service():
     finally:
         await channel.close()
         await host.stop()
+
+
+@pytest.fixture
+async def memory_job_service(service, tmp_path):
+    host, channel, _, _ = service
+    recorder = build_test_recorder(tmp_path / "job-log")
+    await recorder.start()
+    moment = recorder.record(MomentKind.PERCEPTION, {"text": "持久事实"}, interaction_id="job-turn",
+                             conversation_id="job-conversation", retention_ceiling="memory_candidate", importance=0.9)
+    database = SqliteMemoryStore(tmp_path / "job-memory.sqlite")
+    await database.connect()
+    memory = MemoryController(clock=FixedClock())
+    memory.bind_repository(MemoryRepository(database))
+    await memory.load()
+    episodes = EpisodeProjection(tmp_path / "job-episodes.db", recorder)
+
+    class Llm:
+        calls = 0
+
+        async def generate(self, _request):
+            self.calls += 1
+            return json.dumps({"decisions": [{"operation": "add", "kind": "semantic",
+                "content": "持久事实", "summary": "事实", "evidence_moment_ids": [moment.moment_id]}]})
+
+    llm = Llm()
+    coordinator = ConsolidationCoordinator(episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
+        llm=llm, clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
+    await coordinator.start()
+    await episodes.project_pending(seal=True)
+    item = coordinator._receipt_input(episodes.pending_consolidation()[0])
+    host._consolidation = coordinator
+    identity = jobs_pb.JobExecutionIdentity(job_id="memory-job", scope_id=item.scope_id, attempt=1,
+        authority_epoch=1, fencing_token=1, owner_id="host-one", lease_until_ms=int(time.time() * 1000) + 60000)
+    request = cognition_pb.ExecuteMemoryJobRequest(call=_metadata("generation-1", "job-execute"), identity=identity,
+        episode_id=item.episode_id, episode_version=item.episode_version, input_digest=item.input_digest)
+    execute = _call(channel, "ExecuteMemoryJob", cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse)
+    reconcile = _call(channel, "ReconcileMemoryJob", cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse)
+    try:
+        yield database, memory, coordinator, llm, request, execute, reconcile
+    finally:
+        await host.stop()
+        await recorder.stop()
+        await database.close()
+
+
+async def test_memory_job_rpc_persists_original_identity_and_reconciles_after_reopen(memory_job_service):
+    database, memory, _, llm, request, execute, reconcile = memory_job_service
+    applied = (await execute(request, timeout=2)).result
+    assert applied.resolution == cognition_pb.MEMORY_JOB_RESOLUTION_APPLIED
+    assert applied.identity == request.identity and applied.source_id == "cognition.memory"
+    assert len(applied.memory_ids) == 1 and applied.evidence_id
+    duplicate = (await execute(request, timeout=2)).result
+    assert duplicate.duplicate and duplicate.receipt_id == applied.receipt_id
+    assert llm.calls == 1
+    await database.close()
+    await database.connect()
+    recovered = (await reconcile(cognition_pb.ReconcileMemoryJobRequest(
+        call=_metadata("generation-1", "job-reconcile"), identity=request.identity), timeout=2)).result
+    assert recovered.receiver_fenced and recovered.receipt_id == applied.receipt_id
+    assert recovered.identity == request.identity and recovered.evidence_id == applied.evidence_id
+    assert recovered.observed_at_ms == applied.observed_at_ms
+    assert memory.count() == 1
+
+
+async def test_memory_job_rpc_absent_query_seals_late_execute(memory_job_service):
+    _, memory, _, llm, request, execute, reconcile = memory_job_service
+    proof = (await reconcile(cognition_pb.ReconcileMemoryJobRequest(
+        call=_metadata("generation-1", "seal-before-arrival"), identity=request.identity), timeout=2)).result
+    assert proof.resolution == cognition_pb.MEMORY_JOB_RESOLUTION_NOT_APPLIED
+    assert proof.receiver_fenced and not proof.receipt_id
+    with pytest.raises(grpc.aio.AioRpcError) as rejected:
+        await execute(request, timeout=2)
+    assert rejected.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+    detail = common_pb.ServiceErrorDetail()
+    detail.ParseFromString(dict(rejected.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED
+    assert list(detail.recovery_actions) == [common_pb.SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE]
+    assert memory.count() == 0 and llm.calls == 0
+
+
+async def test_memory_job_rpc_shutdown_cancels_every_task_even_with_same_trace(memory_job_service, service, monkeypatch):
+    _, memory, _, llm, request, execute, _ = memory_job_service
+    host, _, _, _ = service
+    entered = asyncio.Event()
+
+    async def delayed(_request):
+        entered.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(llm, "generate", delayed)
+    first = execute(request, timeout=5)
+    await asyncio.wait_for(entered.wait(), 2)
+    second = execute(request, timeout=5)
+    for _ in range(100):
+        if len(host._inflight) == 2:
+            break
+        await asyncio.sleep(0.01)
+    assert len(host._inflight) == 2
+    await host.stop()
+    results = await asyncio.gather(first, second, return_exceptions=True)
+    assert all(isinstance(result, BaseException) for result in results)
+    assert host._inflight == {} and memory.count() == 0
+
+
+@pytest.mark.parametrize("mode", ["generation", "scope", "unsafe_integer", "missing_identity"])
+async def test_memory_job_rpc_invalid_identity_never_infers(memory_job_service, mode):
+    _, memory, _, llm, request, execute, _ = memory_job_service
+    if mode == "generation":
+        request.call.generation = "old"
+    elif mode == "scope":
+        request.identity.scope_id = "wrong"
+    elif mode == "unsafe_integer":
+        request.identity.fencing_token = 9007199254740992
+    else:
+        request.ClearField("identity")
+    with pytest.raises(grpc.aio.AioRpcError):
+        await execute(request, timeout=2)
+    assert memory.count() == 0 and llm.calls == 0
 
 
 @pytest.mark.asyncio

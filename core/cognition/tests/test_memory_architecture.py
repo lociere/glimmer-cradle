@@ -1,6 +1,7 @@
 import asyncio
 import json
 import sqlite3
+import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from glimmer_cradle.cognition.memory import (
 from glimmer_cradle.cognition.memory import (
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
+    MemoryJobIdentity,
     MemoryKind,
 )
 from glimmer_cradle.cognition.memory import MemoryController as _MemoryController
@@ -278,20 +280,140 @@ async def test_two_real_connections_commit_only_one_episode_result(memory_stack,
         await other.close()
 
 
-async def test_memory_v3_rejected_without_upgrading_or_losing_existing_data(memory_stack):
+@pytest.mark.parametrize("old_version", [3, 4])
+async def test_memory_old_schema_rejected_without_upgrading_or_losing_existing_data(memory_stack, old_version):
     database, _, memory = memory_stack
-    await memory.remember_batch([_receipt_draft()])
+    if old_version == 4:
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()])
+    else:
+        await memory.remember_batch([_receipt_draft()])
     async with database.transaction() as conn:
-        await conn.execute("DROP TABLE memory_consolidation_inputs")
-        await conn.execute("DROP TABLE memory_consolidation_receipts")
-        await conn.execute("UPDATE schema_meta SET value='3' WHERE key='schema_version'")
+        await conn.execute("DROP TABLE memory_job_attempts")
+        await conn.execute("DROP TABLE memory_job_authority")
+        if old_version == 3:
+            await conn.execute("DROP TABLE memory_consolidation_inputs")
+            await conn.execute("DROP TABLE memory_consolidation_receipts")
+        await conn.execute("UPDATE schema_meta SET value=? WHERE key='schema_version'", (str(old_version),))
     await database.close()
     with pytest.raises(RuntimeError, match="受控数据迁移"):
         await database.connect()
     assert database._conn is None
     with sqlite3.connect(database._db_path) as observer:
-        assert observer.execute("SELECT value FROM schema_meta").fetchone() == ("3",)
+        assert observer.execute("SELECT value FROM schema_meta").fetchone() == (str(old_version),)
         assert observer.execute("SELECT COUNT(*) FROM memory_revisions").fetchone() == (1,)
+        if old_version == 4:
+            assert observer.execute("SELECT COUNT(*) FROM memory_consolidation_receipts").fetchone() == (1,)
+
+
+def _job_identity(**changes):
+    identity = MemoryJobIdentity("job:receipt", "scope:private", 1, 1, 1, "host:one", int(time.time() * 1000) + 60000)
+    return replace(identity, **changes)
+
+
+async def test_receiver_attempt_and_business_receipt_commit_together_and_reopen(memory_stack):
+    database, _, memory = memory_stack
+    identity = _job_identity()
+    assert await memory.prepare_job(identity, "receipt-op", (_receipt_input(),)) is None
+    receipt = await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    await database.close()
+    await database.connect()
+    result = await memory.reconcile_job(identity)
+    assert result.identity == identity and result.receiver_fenced
+    assert result.receipt == replace(receipt, duplicate=True)
+    newer = replace(identity, attempt=2, fencing_token=2)
+    assert await memory.prepare_job(newer, "receipt-op", (_receipt_input(),)) == result.receipt
+    assert (await memory.reconcile_job(newer)).receipt == result.receipt
+
+
+async def test_receiver_seals_absent_attempt_before_returning_not_applied(memory_stack):
+    database, repository, memory = memory_stack
+    identity = _job_identity()
+    sealed = await memory.reconcile_job(identity)
+    assert sealed.receipt is None and sealed.receiver_fenced
+    await database.close()
+    await database.connect()
+    with pytest.raises(MemoryConsolidationConflictError, match="已封口"):
+        await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    with pytest.raises(MemoryConsolidationConflictError):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    assert await repository.count() == 0
+
+
+async def test_receiver_unseen_newer_attempt_query_cannot_leave_old_writer_active(memory_stack):
+    _, repository, memory = memory_stack
+    identity = _job_identity()
+    await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    newer = replace(identity, attempt=2, fencing_token=2)
+    with pytest.raises(MemoryConsolidationConflictError, match="scope 冲突"):
+        await memory.reconcile_job(replace(newer, scope_id="wrong"))
+    assert await memory.prepare_job(identity, "receipt-op", (_receipt_input(),)) is None
+    assert (await memory.reconcile_job(newer)).receiver_fenced
+    with pytest.raises(MemoryConsolidationConflictError):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    assert await repository.count() == 0
+
+
+@pytest.mark.parametrize("mode", ["new_attempt", "new_authority", "deadline", "seal"])
+async def test_receiver_rechecks_fencing_at_business_commit(memory_stack, monkeypatch, mode):
+    _, repository, memory = memory_stack
+    identity = _job_identity()
+    await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    if mode == "new_attempt":
+        await memory.prepare_job(replace(identity, attempt=2, fencing_token=2), "receipt-op", (_receipt_input(),))
+    elif mode == "new_authority":
+        await memory.prepare_job(replace(identity, job_id="other-job", authority_epoch=2), "other-op", (_receipt_input("other-episode"),))
+    elif mode == "deadline":
+        from glimmer_cradle.cognition.adapters.persistence import sqlite_memory_store
+        monkeypatch.setattr(sqlite_memory_store, "_now_ms", lambda: identity.lease_until)
+    else:
+        assert (await memory.reconcile_job(identity)).receiver_fenced
+    with pytest.raises(MemoryConsolidationConflictError, match="提交 fencing"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    assert await repository.count() == 0
+    assert (await memory.reconcile_job(identity)).receipt is None
+
+
+async def test_receiver_accept_fault_rolls_back_receipt_and_memory(memory_stack):
+    database, repository, memory = memory_stack
+    identity = _job_identity()
+    await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    async with database.transaction() as conn:
+        await conn.execute("CREATE TRIGGER accept_fault BEFORE UPDATE OF state ON memory_job_attempts WHEN NEW.state='applied' BEGIN SELECT RAISE(ABORT,'accept fault'); END")
+    with pytest.raises(sqlite3.IntegrityError, match="accept fault"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    assert await repository.count() == 0
+    assert await memory.find_consolidation(_receipt_input()) is None
+    assert (await memory.reconcile_job(identity)).receipt is None
+
+
+async def test_receiver_final_sql_accept_rechecks_deadline_after_business_write(memory_stack, monkeypatch):
+    database, repository, memory = memory_stack
+    identity = _job_identity()
+    await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    original = repository._create_revision
+
+    async def expired_after_write(conn, draft):
+        memory_id = await original(conn, draft)
+        await conn.execute("UPDATE memory_job_attempts SET lease_until=1 WHERE job_id=?", (identity.job_id,))
+        return memory_id
+
+    monkeypatch.setattr(repository, "_create_revision", expired_after_write)
+    with pytest.raises(MemoryConsolidationConflictError, match="结果接纳 fencing/deadline"):
+        await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
+    assert await repository.count() == 0
+    assert await memory.find_consolidation(_receipt_input()) is None
+    assert (await memory.reconcile_job(identity)).receipt is None
+
+
+@pytest.mark.parametrize("change", [{"scope_id": "wrong"}, {"owner_id": "wrong"}, {"fencing_token": 2}, {"authority_epoch": 2}])
+async def test_receiver_wrong_identity_query_cannot_seal_real_attempt(memory_stack, change):
+    _, _, memory = memory_stack
+    identity = _job_identity()
+    await memory.prepare_job(identity, "receipt-op", (_receipt_input(),))
+    with pytest.raises(MemoryConsolidationConflictError, match="identity 冲突"):
+        await memory.reconcile_job(replace(identity, **change))
+    assert await memory.prepare_job(identity, "receipt-op", (_receipt_input(),)) is None
+    await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()], execution=identity)
 
 
 async def test_shared_vector_writer_cannot_commit_an_unfinished_memory_batch(memory_stack) -> None:
@@ -728,6 +850,36 @@ async def test_old_claim_cannot_complete_new_attempt_or_partially_complete_batch
     await jobs.fail([old[0]], error_code="late", retry_base_seconds=0)
     async with database.read() as conn:
         assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",), ("completed",)]
+
+
+async def test_real_job_receiver_seal_during_inference_rejects_old_commit(consolidation_stack, monkeypatch):
+    _, repository, _, episodes, _, llm, coordinator = consolidation_stack
+    await episodes.project_pending(seal=True)
+    item = coordinator._receipt_input(episodes.pending_consolidation()[0])
+    identity = _job_identity(scope_id=item.scope_id)
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = llm.generate
+
+    async def delayed(request):
+        entered.set()
+        await release.wait()
+        return await original(request)
+
+    monkeypatch.setattr(llm, "generate", delayed)
+    pending = asyncio.create_task(coordinator.execute_job(identity, item))
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        proof = await coordinator.reconcile_job(identity)
+        assert proof.receipt is None and proof.receiver_fenced
+        release.set()
+        with pytest.raises(MemoryConsolidationConflictError, match="提交 fencing"):
+            await pending
+        assert await repository.count() == 0
+        receipt = await coordinator.execute_job(replace(identity, attempt=2, fencing_token=2), item)
+        assert len(receipt.memory_ids) == 1 and await repository.count() == 1
+    finally:
+        release.set()
+        await asyncio.gather(pending, return_exceptions=True)
 
 
 class _SchedulingProjection:

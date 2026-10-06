@@ -4,6 +4,7 @@ package glimmer.cognition.v1;
 
 import "glimmer/common/v1/service_contract.proto";
 import "glimmer/content/v1/content.proto";
+import "glimmer/jobs/v1/jobs.proto";
 import "google/protobuf/struct.proto";
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Cognition.V1";
@@ -297,6 +298,47 @@ message ShutdownResponse {
   bool duplicate = 3;
 }
 
+message ExecuteMemoryJobRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobExecutionIdentity identity = 2;
+  string episode_id = 3;
+  uint64 episode_version = 4;
+  string input_digest = 5;
+}
+
+message ReconcileMemoryJobRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobExecutionIdentity identity = 2;
+}
+
+enum MemoryJobResolution {
+  MEMORY_JOB_RESOLUTION_UNSPECIFIED = 0;
+  MEMORY_JOB_RESOLUTION_APPLIED = 1;
+  MEMORY_JOB_RESOLUTION_NOT_APPLIED = 2;
+}
+
+message MemoryJobResult {
+  glimmer.jobs.v1.JobExecutionIdentity identity = 1;
+  MemoryJobResolution resolution = 2;
+  string receipt_id = 3;
+  string operation_id = 4;
+  repeated string memory_ids = 5;
+  string committed_at = 6;
+  string source_id = 7;
+  bool receiver_fenced = 8;
+  string evidence_id = 9;
+  uint64 observed_at_ms = 10;
+  bool duplicate = 11;
+}
+
+message ExecuteMemoryJobResponse {
+  MemoryJobResult result = 1;
+}
+
+message ReconcileMemoryJobResponse {
+  MemoryJobResult result = 1;
+}
+
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -308,4 +350,7 @@ service CognitionService {
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc GetReadiness(GetReadinessRequest) returns (GetReadinessResponse);
   rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+  rpc ExecuteMemoryJob(ExecuteMemoryJobRequest) returns (ExecuteMemoryJobResponse);
+  // 此调用会持久封口原 attempt；不是只读查询。空结果不得返回 not-applied。
+  rpc ReconcileMemoryJob(ReconcileMemoryJobRequest) returns (ReconcileMemoryJobResponse);
 }

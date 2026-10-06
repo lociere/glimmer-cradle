@@ -39,6 +39,10 @@ import {
   InitializeKnowledgeResponseSchema,
   GetPerceptionOperationRequestSchema,
   GetPerceptionOperationResponseSchema,
+  ExecuteMemoryJobRequestSchema,
+  ExecuteMemoryJobResponseSchema,
+  ReconcileMemoryJobRequestSchema,
+  ReconcileMemoryJobResponseSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { ActionCommand } from '../../ports/application-models';
 import { EventBus } from '../../adapters/events/event-bus';
@@ -81,6 +85,8 @@ const cognitionMethods = {
   Heartbeat: unaryMethod('/glimmer.cognition.v1.CognitionService/Heartbeat', HeartbeatRequestSchema, HeartbeatResponseSchema),
   GetReadiness: unaryMethod('/glimmer.cognition.v1.CognitionService/GetReadiness', GetReadinessRequestSchema, GetReadinessResponseSchema),
   Shutdown: unaryMethod('/glimmer.cognition.v1.CognitionService/Shutdown', ShutdownRequestSchema, ShutdownResponseSchema),
+  ExecuteMemoryJob: unaryMethod('/glimmer.cognition.v1.CognitionService/ExecuteMemoryJob', ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema),
+  ReconcileMemoryJob: unaryMethod('/glimmer.cognition.v1.CognitionService/ReconcileMemoryJob', ReconcileMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema),
 } as const;
 
 export class CognitionTransportError extends Error {

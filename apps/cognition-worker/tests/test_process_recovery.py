@@ -80,6 +80,7 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
         knowledge_store=component(), checkpoint_store=component(), cognition_database=component(),
         turn_controller=component(), conversation_controller=component(), memory_substrate=component(),
         knowledge_base=component(), maintenance_scheduler=component(),
+        consolidation_coordinator=component(),
         activity_controller=SimpleNamespace(start=nothing, stop=nothing, on_transition=lambda _f: None),
         cycle_controller=component(), inbound_adapter=None, observation_queue=None,
         perception_operations=None, workspace=None,
@@ -113,6 +114,7 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
     channel = None
     try:
         await asyncio.wait_for(projection_entered.wait(), timeout=1)
+        assert host.cognition_grpc_host._consolidation is components.consolidation_coordinator
         channel = grpc.aio.insecure_channel(host.cognition_grpc_host.endpoint.removeprefix("grpc://"))
         readiness = channel.unary_unary(
             "/glimmer.cognition.v1.CognitionService/GetReadiness",

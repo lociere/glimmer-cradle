@@ -9,6 +9,7 @@ using GlimmerCradle.Contracts.Glimmer.Kernel.V1;
 using AvatarV1 = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 using ContentV1 = GlimmerCradle.Contracts.Glimmer.Content.V1;
 using SurfaceV1 = GlimmerCradle.Contracts.Glimmer.Surface.V1;
+using JobsV1 = GlimmerCradle.Contracts.Glimmer.Jobs.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -17,6 +18,18 @@ var fixtureBytes = File.ReadAllBytes(fixturePath);
 using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
+
+var jobIdentity = new JobsV1.JobExecutionIdentity { JobId = "job:one", ScopeId = "scope:one", Attempt = 2,
+    AuthorityEpoch = 7, FencingToken = 9007199254740991, OwnerId = "host:one", LeaseUntilMs = 1900000000000 };
+var memoryRequest = new ExecuteMemoryJobRequest { Identity = jobIdentity, EpisodeId = "episode:one",
+    EpisodeVersion = 3, InputDigest = new string('a', 64) };
+var restoredMemory = ExecuteMemoryJobRequest.Parser.ParseFrom(memoryRequest.ToByteArray());
+if (restoredMemory.Identity.FencingToken != jobIdentity.FencingToken || restoredMemory.EpisodeVersion != 3)
+    throw new InvalidOperationException("Memory Job original identity round-trip lost precision");
+var sealedJob = new ReconcileMemoryJobResponse { Result = new MemoryJobResult { Identity = jobIdentity,
+    Resolution = MemoryJobResolution.NotApplied, ReceiverFenced = true, EvidenceId = "sealed", SourceId = "cognition.memory" } };
+if (!ReconcileMemoryJobResponse.Parser.ParseFrom(sealedJob.ToByteArray()).Result.ReceiverFenced)
+    throw new InvalidOperationException("Memory Job sealed proof round-trip lost fencing");
 
 var contentAsset = new ContentV1.AssetRef
 {

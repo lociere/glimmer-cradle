@@ -114,8 +114,9 @@ Episode 是巩固、叙事和回忆的批次，不是第二事实源。`reply` /
 Memory 采用 `candidate / active / disputed / superseded / redacted` 状态和时间有效修订。新观察不会静默覆盖过去；它关闭旧修订的 `valid_to`，写入新修订并保留证据。关系熟悉度从直接互动、环境观察和回复计数确定性派生，LLM 只能补充带证据的关系摘要，不能任意累加亲密度。
 
 真实巩固 consumer 已查询 Memory 持久结果 receipt；业务修订与结果同事务提交，确认丢失后的恢复不会
-再次推理已提交 Episode/version。旧巩固队列仍是迁移窗口，不能认作 Jobs 生产接线完成；接收 fencing、
-request outbox 与 broker 继续按执行记录推进。实现与 schema 升级边界见
+再次推理已提交 Episode/version。Worker 的 Memory Job 执行/封口 RPC 已接同一接收 owner，并持久
+核验原 attempt 与提交资格；旧巩固队列仍是迁移窗口，不能认作 Jobs 生产接线完成。request outbox、
+Host handler/query adapter 与 scheduler 继续按执行记录推进。实现与 schema 升级边界见
 [记忆持久化](../../implementation/Cognition认知核实现.md#记忆经历与持久化)。
 
 上下文按固定分区装配：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、受作用域约束的近期 Experience。所有来源都在候选排序前按 `recall_scope` 以及 conversation/actor/scene owner 过滤；基础排序使用词项、时间、显著度、置信度和 token budget。系统显式启用 Embedding 后才附加语义相似度，未启用不是降级。桌面只读预览区分 Conversation 消息、Ledger Moment、Episode、活动 Memory、revision、evidence 和角色知识，不把预览条数冒充实际 Prompt 命中。

@@ -3,55 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+import time
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import json
-import os
 from pathlib import Path
-import time
 from typing import Any, ClassVar, Generic, List, TypeVar
-import uuid
 
-from pydantic import BaseModel, ConfigDict, ValidationError
-
-from glimmer_cradle.cognition_worker.adapters import FileAssetReader
-
-from glimmer_cradle.cognition.state import (
-    CognitiveActivityController,
-    EmotionSystem,
-    EmotionType,
-)
-from glimmer_cradle.cognition.context import (
-    ContextAssembler,
-    EpisodicMemorySource,
-    KnowledgeSource,
-    RecentExperienceSource,
-    RelationshipSource,
-)
-from glimmer_cradle.conversation import (
-    ConversationController,
-    ConversationRecorder,
-    ConversationStore,
-    MomentKind,
-    SourceDescriptor,
-    SqliteTurnStore,
-    TurnController,
-)
-from glimmer_cradle.cognition.loop import (
-    AffectProvider,
-    CognitionSettings,
-    DriveProvider,
-    LoopController,
-    MemoryProvider,
-    PerceptionProvider,
-    SocialProvider,
-    normalize_reply_text,
-)
-from glimmer_cradle.cognition.attention import AttentionController
-from glimmer_cradle.cognition.perception import ObservationQueue, PerceptionOperationRegistry
-from glimmer_cradle.conversation import build_conversation_recorder
 from glimmer_cradle.cognition.adapters.persistence import (
     ConsolidationJobRepository,
     EpisodeProjection,
@@ -65,13 +27,13 @@ from glimmer_cradle.cognition.adapters.persistence import (
     SqliteStateStore,
     VectorRepository,
 )
-from glimmer_cradle.cognition_worker.adapters.model_client import (
-    CloudReasoning,
-    EmbeddingEngine,
-    EmbeddingSettings,
-    LLMEngine,
-    LLMSettings,
-    MultimodalRouter,
+from glimmer_cradle.cognition.attention import AttentionController
+from glimmer_cradle.cognition.context import (
+    ContextAssembler,
+    EpisodicMemorySource,
+    KnowledgeSource,
+    RecentExperienceSource,
+    RelationshipSource,
 )
 from glimmer_cradle.cognition.inference import (
     InferenceController,
@@ -80,6 +42,35 @@ from glimmer_cradle.cognition.inference import (
     ModelPort,
     ModelRequest,
 )
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+from glimmer_cradle.cognition.loop import (
+    AffectProvider,
+    CognitionSettings,
+    DriveProvider,
+    LoopController,
+    MemoryProvider,
+    PerceptionProvider,
+    SocialProvider,
+    normalize_reply_text,
+)
+from glimmer_cradle.cognition.memory import (
+    ConsolidationCoordinator,
+    MaintenanceScheduler,
+    MemoryController,
+    MemorySettings,
+)
+from glimmer_cradle.cognition.perception import (
+    ObservationQueue,
+    PerceptionOperationRegistry,
+)
+from glimmer_cradle.cognition.persona import (
+    CharacterManifestSettings,
+    CharacterProfileSettings,
+    DialoguePolicySettings,
+    PersonaCompiler,
+    SafetySettings,
+)
+from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
     AgentPlanOutput,
@@ -94,21 +85,31 @@ from glimmer_cradle.cognition.ports import (
     ObservabilityPort,
     SkillToolSuggestion,
 )
-from glimmer_cradle.cognition.planning import PlanningController
-from glimmer_cradle.cognition.knowledge import KnowledgeIndex
-from glimmer_cradle.cognition.memory import (
-    ConsolidationCoordinator,
-    MaintenanceScheduler,
-    MemoryController,
-    MemorySettings,
+from glimmer_cradle.cognition.state import (
+    CognitiveActivityController,
+    EmotionSystem,
+    EmotionType,
 )
-from glimmer_cradle.cognition.persona import (
-    CharacterManifestSettings,
-    CharacterProfileSettings,
-    DialoguePolicySettings,
-    PersonaCompiler,
-    SafetySettings,
+from glimmer_cradle.cognition_worker.adapters import FileAssetReader
+from glimmer_cradle.cognition_worker.adapters.model_client import (
+    CloudReasoning,
+    EmbeddingEngine,
+    EmbeddingSettings,
+    LLMEngine,
+    LLMSettings,
+    MultimodalRouter,
 )
+from glimmer_cradle.conversation import (
+    ConversationController,
+    ConversationRecorder,
+    ConversationStore,
+    MomentKind,
+    SourceDescriptor,
+    SqliteTurnStore,
+    TurnController,
+    build_conversation_recorder,
+)
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 
 @dataclass(frozen=True)
@@ -341,6 +342,7 @@ class CognitionComponents:
     conversation_controller: ConversationController
     turn_controller: TurnController
     maintenance_scheduler: MaintenanceScheduler
+    consolidation_coordinator: ConsolidationCoordinator
     cycle_controller: LoopController
 
 
@@ -601,6 +603,7 @@ def compose_cognition(
         conversation_controller=conversation_controller,
         turn_controller=turn_controller,
         maintenance_scheduler=maintenance_scheduler,
+        consolidation_coordinator=consolidation_coordinator,
         cycle_controller=cycle_controller,
     )
 

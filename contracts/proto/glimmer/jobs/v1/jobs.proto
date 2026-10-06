@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package glimmer.jobs.v1;
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Jobs.V1";
+
+// 原执行身份在失效/切代后仍用于接收端对账；不以当前 Job identity 替代。
+// 整数字段在跨语言消费端限制为正数且不超过 JavaScript safe integer。
+message JobExecutionIdentity {
+  string job_id = 1;
+  string scope_id = 2;
+  uint64 attempt = 3;
+  uint64 authority_epoch = 4;
+  uint64 fencing_token = 5;
+  string owner_id = 6;
+  uint64 lease_until_ms = 7;
+}

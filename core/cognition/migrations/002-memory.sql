@@ -85,3 +85,16 @@ CREATE TABLE memory_consolidation_inputs(
   receipt_id TEXT NOT NULL REFERENCES memory_consolidation_receipts(receipt_id),
   PRIMARY KEY(episode_id,episode_version)
 );
+-- 仅保存接收端提交资格，不承担 Jobs 调度、退避或终态 owner。
+CREATE TABLE memory_job_authority(epoch INTEGER NOT NULL);
+INSERT INTO memory_job_authority VALUES(0);
+CREATE TABLE memory_job_attempts(
+  job_id TEXT NOT NULL, attempt INTEGER NOT NULL,
+  scope_id TEXT NOT NULL, authority_epoch INTEGER NOT NULL,
+  fencing_token INTEGER NOT NULL, owner_id TEXT NOT NULL, lease_until INTEGER NOT NULL,
+  operation_id TEXT, request_digest TEXT,
+  state TEXT NOT NULL CHECK(state IN ('active','sealed','applied')),
+  receipt_id TEXT REFERENCES memory_consolidation_receipts(receipt_id),
+  observed_at INTEGER,
+  PRIMARY KEY(job_id,attempt)
+);
