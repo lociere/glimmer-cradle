@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory receipt、原 attempt 接收 fencing、执行/对账 RPC 与 Episode 封口原子源 request outbox 已接线；源请求跨进程投递、Host Jobs handler/query adapter、scheduler 与配置装配待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox 与目标 Host 源投递/handler/query 已落位并通过真实跨进程验证；生产监督/scheduler/config、状态事件接纳与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -303,6 +303,35 @@ architecture、目标清单规格（非最终实物）、docs（111 页）、enc
 本切片未改变 wire、Schema 事实源、生成物或依赖；复用 `a3b4f154` 的完整 Contract Spine 22 gate 证据。
 没有迁移用户数据或创建生产 Jobs 库，独立审查仍归固定最终候选；下一步接源投递 wire 与 App 层
 `cognition-job-adapter`，贯通 Host Jobs handler/query、scheduler/config，旧巩固队列继续保留到删除门。
+
+Host Memory Jobs 消费切片计划（2026-10-06）：在唯一 Cognition Service 增量定义源请求扫描/接纳 ACK，
+Worker 只在显式外部 Jobs 模式暴露待投递请求，禁止与旧队列同时消费。目标 `apps/host` 首先落真实
+`cognition-job-adapter` 与生成契约 client/mapper；依赖仅 Contracts/Jobs，不把旧 Kernel 整体搬入 App。
+源接纳先持久 Jobs enqueue 再 ACK，同一请求重放保持 Job 身份；执行与对账严格核验原 attempt/scope/
+epoch/token/owner，丢失结果 ACK 只通过 Memory 原持久 receipt 恢复，不因 RPC 超时猜测无副作用。
+完成实际跨进程 Worker→Host SQLite→Memory 执行/unknown 对账及拒旧证据测试，更新 build/workspace
+消费和事实文档。生产 scheduler/config、最终 Host 启动与旧数据切换仍未完成，不提前删除旧 owner。
+
+本候选实现：外部 Jobs 模式的维护只发布/整理源请求，启用、salience 和已有业务 receipt 仍由 Memory
+判断；旧队列模式的源 RPC 明确 NOT_READY。目标 Host workspace 新增实际生成契约 client、job mapper
+与 CognitionJobAdapter，只有 Contracts/Jobs 依赖，不移动旧 Kernel 业务或建立空启动入口。源 enqueue
+提交后再 ACK，响应取消/丢失不撤销 Jobs；execute/query 绑定原 attempt 并验证可信 owner、持久封口、
+原 identity、结果/证据摘要与安全整数。本地取消另外发送有界封口 RPC，晚到原 attempt 不再提交 Memory。
+源投递政策需保持原快照直到 ACK，政策漂移失败关闭；生产配置变更/retention 必须补齐未确认源的原政策
+恢复。`cancelled` 不承诺业务回滚，状态事件接纳与观测须保留已提交结果或不确定性，不能只凭本地取消清理。
+
+Host 14 项（含真实跨进程源 ACK 丢失、Worker/Jobs 重启后的原 receipt 对账、未到达原 attempt 封口与
+新 attempt、非法 generation、真实在途模型取消/拒晚到重放及证据漂移）PASS；Cognition 全量 279 项、
+Worker 72 项 PASS。新增 Host App 的 legacy package/tool 依赖护栏反例通过，并补齐 side-effect import
+检查。新增依赖复用仓库锁定版本，pnpm 离线安装成功，锁文件仅增加 Host importer。
+Contract Spine 完整 22 gate、兼容门、TS/Python/C# source ACK round-trip、确定性生成与 clean PASS；
+首次 inventory 缩写和生成归一化文件写入失败已分别补全/重新生成后串行复验，未刷新兼容基线或降低断言。
+固定输入为 `2e070b85` 上本轮 Worker/Memory/Contracts、Host workspace、根构建测试/锁、护栏与相关文档
+候选；根 `pnpm typecheck`、`pnpm build`、Kernel 6 项真实进程测试、repo-checks 27 项、
+文档 111 页链接检查、编码、架构护栏与 diff 检查均 PASS；target-layout 为 spec-only PASS，
+不代表最终物理目录已完成。独立审查仍归最终固定候选。
+下一步接实际产品监督、Jobs schema/catalog/scheduler 与状态事件接纳，贯通配置选择外部 owner、旧数据
+受控迁移与 consumer-zero 后删除旧巩固队列；阶段 7、整体 Host 迁移与完整重构仍未完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

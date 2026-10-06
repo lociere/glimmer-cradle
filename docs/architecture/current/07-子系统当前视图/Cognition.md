@@ -117,7 +117,9 @@ Memory 采用 `candidate / active / disputed / superseded / redacted` 状态和�
 再次推理已提交 Episode/version。Worker 的 Memory Job 执行/封口 RPC 已接同一接收 owner，并持久
 核验原 attempt 与提交资格。源 request outbox 已与实际 Episode 封口/checkpoint 原子提交，重启保留
 同一请求；接纳 ACK 不等于业务完成，已解决源记录也必须保留原身份。旧巩固队列仍是迁移窗口，
-不能认作 Jobs 生产接线完成；Host 投递 wire、handler/query adapter 与 scheduler 继续按执行记录推进。实现与 schema 升级边界见
+不能认作 Jobs 生产接线完成；Host 源投递与 handler/query adapter 已在目标 App owner 落位并通过真实
+跨进程验证，默认生产 Worker 仍拒绝外部源投递，防止旧队列双消费。持续 scheduler、配置与监督装配
+继续按执行记录推进。实现与 schema 升级边界见
 [记忆持久化](../../implementation/Cognition认知核实现.md#记忆经历与持久化)。
 
 上下文按固定分区装配：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、受作用域约束的近期 Experience。所有来源都在候选排序前按 `recall_scope` 以及 conversation/actor/scene owner 过滤；基础排序使用词项、时间、显著度、置信度和 token budget。系统显式启用 Embedding 后才附加语义相似度，未启用不是降级。桌面只读预览区分 Conversation 消息、Ledger Moment、Episode、活动 Memory、revision、evidence 和角色知识，不把预览条数冒充实际 Prompt 命中。

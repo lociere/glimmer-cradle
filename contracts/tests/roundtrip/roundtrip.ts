@@ -10,7 +10,8 @@ import {
   AvatarDownstreamFrameSchema,
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
-import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
+  AcknowledgeMemoryJobRequestRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -23,6 +24,11 @@ const digest = createHash('sha256').update(documentBytes).digest();
 
 const jobIdentity = { jobId: 'job:one', scopeId: 'scope:one', attempt: 2n, authorityEpoch: 7n,
   fencingToken: 9007199254740991n, ownerId: 'host:one', leaseUntilMs: 1900000000000n };
+const sourceAck = create(AcknowledgeMemoryJobRequestRequestSchema, { jobId: 'job:one', request: {
+  requestId: 'source:one', episodeId: 'episode:one', episodeVersion: 9007199254740991n,
+  scopeId: 'scope:one', inputDigest: 'a'.repeat(64), createdAt: '2026-10-06T00:00:00Z' } });
+if (fromBinary(AcknowledgeMemoryJobRequestRequestSchema, toBinary(AcknowledgeMemoryJobRequestRequestSchema, sourceAck))
+  .request?.episodeVersion !== 9007199254740991n) throw new Error('Memory source request roundtrip failed');
 const memoryRequest = create(ExecuteMemoryJobRequestSchema, { identity: jobIdentity,
   episodeId: 'episode:one', episodeVersion: 3n, inputDigest: 'a'.repeat(64) });
 const restoredMemoryRequest = fromBinary(ExecuteMemoryJobRequestSchema, toBinary(ExecuteMemoryJobRequestSchema, memoryRequest));

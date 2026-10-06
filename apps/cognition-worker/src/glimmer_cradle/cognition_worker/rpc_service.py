@@ -36,6 +36,7 @@ from glimmer_cradle.cognition.memory import (
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
+    MemoryConsolidationRequest,
     MemoryJobIdentity,
     MemoryJobResult,
 )
@@ -1424,6 +1425,8 @@ class CognitionGrpcHost:
             "Shutdown": self._method(self._shutdown_rpc, cognition_pb.ShutdownRequest, cognition_pb.ShutdownResponse),
             "ExecuteMemoryJob": self._method(self._execute_memory_job, cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse),
             "ReconcileMemoryJob": self._method(self._reconcile_memory_job, cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
+            "ReadMemoryJobRequests": self._method(self._read_memory_job_requests, cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
+            "AcknowledgeMemoryJobRequest": self._method(self._acknowledge_memory_job_request, cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         port = server.add_insecure_port("127.0.0.1:0")
@@ -1657,6 +1660,41 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 原 attempt 对账冲突") from error
             return cognition_pb.ReconcileMemoryJobResponse(result=self._memory_job_result(request.identity, result.receipt, result.receiver_fenced, result.observed_at))
         return await self._invoke(request, context, operation, track=True, allow_stopping=True)
+
+    def _external_memory_jobs(self) -> ConsolidationCoordinator:
+        if self._consolidation is None or not self._consolidation.uses_external_jobs:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Memory 源投递尚未切换外部 Jobs owner")
+        return self._consolidation
+
+    async def _read_memory_job_requests(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            coordinator = self._external_memory_jobs()
+            if not 1 <= request.limit <= 1000:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 源请求扫描上限无效")
+            requests = await coordinator.source_job_requests(limit=request.limit)
+            return cognition_pb.ReadMemoryJobRequestsResponse(requests=[cognition_pb.MemoryJobSourceRequest(
+                request_id=item.request_id, episode_id=item.input.episode_id, episode_version=item.input.episode_version,
+                scope_id=item.input.scope_id, input_digest=item.input.input_digest, created_at=item.created_at,
+            ) for item in requests])
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _acknowledge_memory_job_request(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            coordinator = self._external_memory_jobs()
+            if not request.HasField("request"):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "缺少 Memory 源请求 identity")
+            item = request.request
+            if not 1 <= item.episode_version <= 9007199254740991:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 源请求版本无效")
+            source = MemoryConsolidationRequest(item.request_id, MemoryConsolidationInput(item.episode_id,
+                item.episode_version, item.scope_id, item.input_digest), item.created_at)
+            try:
+                coordinator.acknowledge_job_request(source, request.job_id)
+            except MemoryConsolidationConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory 源请求接纳冲突") from error
+            return cognition_pb.AcknowledgeMemoryJobRequestResponse(request_id=item.request_id,
+                job_id=request.job_id, accepted=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:

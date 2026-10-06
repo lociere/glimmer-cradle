@@ -18,6 +18,7 @@ from glimmer.content.v1.content_pb2 import AssetRef, ContentPart, FileContent  #
 from glimmer.jobs.v1.jobs_pb2 import JobExecutionIdentity  # noqa: E402
 from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
     ExecuteMemoryJobRequest, ReconcileMemoryJobResponse, MemoryJobResult, MEMORY_JOB_RESOLUTION_NOT_APPLIED,
+    AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest,
 )
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
     AudioPlayEvent,
@@ -29,6 +30,10 @@ fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
 
+source_ack = AcknowledgeMemoryJobRequestRequest(job_id="job:one", request=MemoryJobSourceRequest(
+    request_id="source:one", episode_id="episode:one", episode_version=9007199254740991,
+    scope_id="scope:one", input_digest="a" * 64, created_at="2026-10-06T00:00:00Z"))
+assert AcknowledgeMemoryJobRequestRequest.FromString(source_ack.SerializeToString()).request.episode_version == 9007199254740991
 job_identity = JobExecutionIdentity(job_id="job:one", scope_id="scope:one", attempt=2, authority_epoch=7,
                                    fencing_token=9007199254740991, owner_id="host:one", lease_until_ms=1900000000000)
 memory_request = ExecuteMemoryJobRequest(identity=job_identity, episode_id="episode:one", episode_version=3, input_digest="a" * 64)

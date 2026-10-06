@@ -19,6 +19,7 @@ from glimmer_cradle.cognition.memory.memory_store import (
     MemoryConsolidationConflictError,
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
+    MemoryConsolidationRequest,
     MemoryJobIdentity,
     MemoryJobResult,
     RelationshipProjectionStore,
@@ -63,7 +64,7 @@ class ConsolidationCoordinator:
 
     def __init__(
         self, *, episodes: EpisodeProjectionStore, memory: MemoryController,
-        jobs: ConsolidationJobStore, llm: ModelPort | None,
+        jobs: ConsolidationJobStore | None, llm: ModelPort | None,
         clock: ClockPort,
         ids: IdGeneratorPort,
         observability: ObservabilityPort,
@@ -97,7 +98,8 @@ class ConsolidationCoordinator:
         await self._episodes.start()
         await self._episodes.project_pending()
         self._episodes.recover_interrupted()
-        await self._jobs.recover_expired()
+        if self._jobs is not None:
+            await self._jobs.recover_expired()
         if self._relationship_projection is not None:
             await self._relationship_projection.project_pending()
 
@@ -116,6 +118,8 @@ class ConsolidationCoordinator:
             if self._relationship_projection is not None:
                 await self._relationship_projection.project_pending()
             await self._enqueue_pending()
+            if self._jobs is None:
+                return 0
             jobs = await self._jobs.claim_due(
                 limit=self._batch_size, lease_seconds=self._lease_seconds
             )
@@ -154,13 +158,45 @@ class ConsolidationCoordinator:
             if receipt is not None:
                 self._episodes.mark_consolidated(episode.episode_id, receipt.committed_at)
                 continue
-            await self._jobs.enqueue(
-                episode,
-                debounce_seconds=self._debounce_seconds,
-                max_wait_seconds=self._max_wait_seconds,
-            )
+            if self._jobs is not None:
+                await self._jobs.enqueue(
+                    episode,
+                    debounce_seconds=self._debounce_seconds,
+                    max_wait_seconds=self._max_wait_seconds,
+                )
+
+    @property
+    def uses_external_jobs(self) -> bool:
+        return self._jobs is None
+
+    async def source_job_requests(self, *, limit: int) -> list[MemoryConsolidationRequest]:
+        if not self.uses_external_jobs:
+            raise MemoryConsolidationConflictError("旧巩固队列尚未切换；禁止双消费")
+        if not self._enabled:
+            return []
+        requests = self._episodes.pending_job_requests(limit=limit)
+        eligible = []
+        for request in requests:
+            episode = self._episodes.get_episode(request.input.episode_id)
+            if episode is None or consolidation_input(episode) != request.input:
+                raise MemoryConsolidationConflictError("Memory 源请求原证据冲突")
+            if episode.salience < self._minimum_salience:
+                self._episodes.mark_consolidated(episode.episode_id, self._clock.now_iso())
+                continue
+            receipt = await self._memory.find_consolidation(request.input)
+            if receipt is not None:
+                self._episodes.mark_consolidated(episode.episode_id, receipt.committed_at)
+                continue
+            eligible.append(request)
+        return eligible
+
+    def acknowledge_job_request(self, request: MemoryConsolidationRequest, job_id: str) -> None:
+        if not self.uses_external_jobs:
+            raise MemoryConsolidationConflictError("旧巩固队列尚未切换；禁止双消费")
+        self._episodes.acknowledge_job_request(request, job_id)
 
     async def _consolidate_batch(self, jobs: list[ConsolidationJob]) -> int:
+        assert self._jobs is not None
         episodes = [self._episodes.get_episode(job.episode_id) for job in jobs]
         valid_episodes = [episode for episode in episodes if episode is not None]
         if len(valid_episodes) != len(jobs):
@@ -196,6 +232,7 @@ class ConsolidationCoordinator:
     async def _infer_and_commit(
         self, jobs: list[ConsolidationJob], episodes: list[Episode], inputs: tuple[MemoryConsolidationInput, ...]
     ) -> int:
+        assert self._jobs is not None
         batch_id = self._ids.stable("memory-batch", ":".join(sorted(job.job_id for job in jobs)))
         if self._llm is None and any(moment.retention_ceiling == "memory_candidate" for episode in episodes for moment in episode.moments):
             await self._jobs.fail(jobs, error_code="provider_unavailable", retry_base_seconds=self._retry_base_seconds)
@@ -445,6 +482,7 @@ class ConsolidationCoordinator:
             raise ValueError("巩固输出不符合结构契约") from exc
 
     async def _finish_jobs(self, jobs: list[ConsolidationJob]) -> None:
+        assert self._jobs is not None
         await self._jobs.complete(jobs)
         timestamp = self._clock.now_iso()
         for job in jobs:

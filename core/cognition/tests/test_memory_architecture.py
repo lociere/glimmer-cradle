@@ -852,6 +852,24 @@ async def test_old_claim_cannot_complete_new_attempt_or_partially_complete_batch
         assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",), ("completed",)]
 
 
+async def test_external_jobs_maintenance_only_publishes_and_applies_source_eligibility(consolidation_stack, monkeypatch):
+    database, _, _, episodes, _, llm, coordinator = consolidation_stack
+    monkeypatch.setattr(coordinator, "_jobs", None)
+    assert await coordinator.consolidate(force_seal=True) == 0
+    requests = await coordinator.source_job_requests(limit=64)
+    assert len(requests) == 2 and len(llm.requests) == 0
+    async with database.read() as conn:
+        assert (await (await conn.execute("SELECT COUNT(*) FROM consolidation_jobs")).fetchone())[0] == 0
+    monkeypatch.setattr(coordinator, "_enabled", False)
+    assert await coordinator.source_job_requests(limit=64) == []
+    assert episodes.pending_job_requests() == requests
+    monkeypatch.setattr(coordinator, "_enabled", True)
+    monkeypatch.setattr(coordinator, "_minimum_salience", 0.95)
+    assert await coordinator.source_job_requests(limit=64) == []
+    assert episodes.pending_job_requests() == []
+    assert not llm.requests
+
+
 async def test_real_job_receiver_seal_during_inference_rejects_old_commit(consolidation_stack, monkeypatch):
     _, repository, _, episodes, _, llm, coordinator = consolidation_stack
     await episodes.project_pending(seal=True)

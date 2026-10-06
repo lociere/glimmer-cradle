@@ -6,6 +6,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { checkArchitecture } from '../src/architecture/check-architecture.mjs';
 import { checkRepositoryTopology } from '../src/architecture/rules/repository-topology.mjs';
+import { checkWorkspaceBoundaries } from '../src/architecture/rules/workspace-boundaries.mjs';
 import {
   checkWorkspaceArtifactBoundaries,
   findCanonicalRepositoryReferences,
@@ -29,6 +30,23 @@ const validWorkspace = `packages:
 
 injectWorkspacePackages: true
 `;
+
+test('新增 Host App 不能绕过 legacy package 与仓库工具依赖门', () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-boundary-'));
+  try {
+    writeFixture(fixture, 'packages/extension-sdk/package.json', JSON.stringify({
+      dependencies: { '@glimmer-cradle/contracts': 'workspace:*' },
+    }));
+    writeFixture(fixture, 'apps/host/package.json', JSON.stringify({
+      dependencies: { '@glimmer-cradle/protocol': 'workspace:*', '@glimmer-cradle/repo-checks': 'workspace:*' },
+    }));
+    writeFixture(fixture, 'apps/host/src/index.ts', "import '@glimmer-cradle/extension-contracts';");
+    const violations = checkWorkspaceBoundaries(fixture);
+    assert.ok(violations.some(item => item.includes('apps/host/package.json') && item.includes('@glimmer-cradle/protocol')));
+    assert.ok(violations.some(item => item.includes('apps/host/package.json') && item.includes('@glimmer-cradle/repo-checks')));
+    assert.ok(violations.some(item => item.includes('apps/host/src/index.ts')));
+  } finally { fs.rmSync(fixture, { recursive: true, force: true }); }
+});
 
 test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/artifact consumer 删除门', () => {
   const leaf = path.join(repositoryRoot, 'tools', 'future-fixture-tool');

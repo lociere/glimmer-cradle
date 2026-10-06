@@ -223,8 +223,22 @@ Memory 的 Jobs 接收边界由 `memory_job_attempts` / `memory_job_authority` �
 Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监督 `CognitionGrpcHost`，由
 `ExecuteMemoryJob` / `ReconcileMemoryJob` 映射生成契约；Kernel 迁移期 transport 暴露同一 RPC。
 对账是会持久封口的命令，不是无副作用的查询；generation 鉴权、readiness、取消和停机继续使用原 Service
-边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire、Jobs handler/query adapter、scheduler 与配置装配仍待接线，旧队列仍保留
+边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire 与 Jobs handler/query adapter 已落位，生产 scheduler 与配置装配仍待接线，旧队列仍保留
 既定退出门。不自动升级用户 v3/v4 库；受控迁移、备份与恢复归阶段 14。
+
+`ReadMemoryJobRequests` / `AcknowledgeMemoryJobRequest` 只在 `ConsolidationCoordinator(jobs=None)` 的
+外部 Jobs 模式开放；默认 Worker composition 仍注入旧 repository，源投递 RPC 返回 NOT_READY，禁止
+两套 owner 双消费。外部模式的维护只投影、封口和整理源请求，不直接运行模型；启用策略、salience 与
+已提交结果由 Memory owner 判定，扫描源请求不会对已完成业务再次推理。
+`apps/host/src/composition/cognition-job-adapter.ts` 先持久 Jobs enqueue 再源 ACK；源 request/hash 与
+Job ID 稳定，投递政策快照必须保持一致直到请求确认，政策漂移由 Jobs 幂等校验拒绝，不能当新请求绕过。
+App 将生成 `JobExecutionIdentity` 映射到 `ExecuteMemoryJob`，由 `ReconcileMemoryJob` 获取原 attempt
+证据；只接受 `cognition.memory`、完全匹配的 identity、持久封口和有效证据摘要，业务结果排除易变 duplicate
+提示。本地 AbortSignal 中断 RPC 后，App 通过独立的有界对账调用封口原 attempt，不复用已取消 signal；
+封口不可用或业务已先提交时不得解释为回滚。`cancelled` 是撤销请求状态，不是未产生 Memory 副作用证明，
+最终生产状态事件接纳仍须呈现真实业务结果/不确定性。`CognitionClient` 不发现或自造监督身份，端点/generation 由监督 owner 注入并在切代时关闭。
+该 App 边界已纳入 workspace 与根 build/typecheck/test，真实跨进程验收使用 Worker Service、Memory/Log
+与 Jobs SQLite；生产 supervisor、配置加载、持续调度、状态事件接纳与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

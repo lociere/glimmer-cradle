@@ -3,7 +3,7 @@ import path from 'node:path';
 import { readJson, toRepoPath, walkFiles } from '../file-system.mjs';
 
 const packageRoots = [
-  'contracts', 'core', 'engines', 'hosts/extension-host', 'packages', 'products', 'templates', 'tools',
+  'apps', 'contracts', 'core', 'engines', 'hosts/extension-host', 'packages', 'products', 'templates', 'tools',
 ];
 const dependencyFields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
 const forbiddenPackages = ['@glimmer-cradle/protocol', '@glimmer-cradle/extension-contracts'];
@@ -49,12 +49,12 @@ export function checkWorkspaceBoundaries(repositoryRoot) {
     }
   }
 
-  const sourceRoots = ['core', 'hosts/extension-host', 'packages', 'products', 'templates'];
+  const sourceRoots = ['apps', 'core', 'hosts/extension-host', 'packages', 'products', 'templates'];
   for (const relativeRoot of sourceRoots) {
     for (const filePath of walkFiles(path.join(repositoryRoot, relativeRoot), { skip })) {
       if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(filePath) || /\.test\.[^.]+$/.test(filePath)) continue;
       const text = fs.readFileSync(filePath, 'utf8');
-      if (/(?:from\s+|import\s*\(|require\s*\()\s*['"]@glimmer-cradle\/(?:protocol|extension-contracts)(?:\/[^'"]*)?['"]/.test(text)) {
+      if (/(?:from\s+|import\s*\(|require\s*\(|import\s+)\s*['"]@glimmer-cradle\/(?:protocol|extension-contracts)(?:\/[^'"]*)?['"]/.test(text)) {
         violations.push(`${toRepoPath(repositoryRoot, filePath)}: production source 不得 import legacy package`);
       }
     }

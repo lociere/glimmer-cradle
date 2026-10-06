@@ -20,6 +20,7 @@
 | 契约族 | 路径/公开边缘 | 关键不变量 |
 |---|---|---|
 | Common / Kernel / Cognition | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` | deadline、cancellation、typed error、trace/causation/correlation、generation 与幂等。 |
+| Memory / Jobs App 接线 | `contracts/proto/glimmer/cognition/v1/cognition_service.proto` 与 `contracts/proto/glimmer/jobs/v1/jobs.proto` | `ReadMemoryJobRequests` / `AcknowledgeMemoryJobRequest` 只允许外部 Jobs 模式，源身份不带 Moment 正文；先持久入 Jobs 再 ACK。`ExecuteMemoryJob` / `ReconcileMemoryJob` 绑定原 attempt/epoch/token/owner/lease；对账会持久封口，空查询不是未执行证明。 |
 | Content | `contracts/proto/glimmer/content/v1/content.proto` | `ContentPart` 的 Text/Image/Audio/Video/File 联合体；媒体为 `AssetRef(asset_id,media_type,size_bytes,sha256)`，不含路径与字节。Cognition `PerceptionContent.parts = 6` 为新入口，`items = 5` 是阶段 9/14 删除门约束的旧 URI 读取入口。 |
 | Surface Gateway | `contracts/proto/glimmer/surface/v1/` | Desktop/Personal Server 只访问 Kernel Gateway；Query、Command、Event 使用有限 typed DTO，不接受 `string kind + Struct {frame}`；浏览器认证 WebSocket 是 Product ingress，不是内部器官协议。 |
 | Avatar Host | `contracts/proto/glimmer/avatar/v1/` | `AvatarHostService.Connect` 是唯一 control consumer；二进制 DTO 直接映射，不经 JSON round-trip。 |

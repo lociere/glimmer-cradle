@@ -339,6 +339,37 @@ message ReconcileMemoryJobResponse {
   MemoryJobResult result = 1;
 }
 
+// Memory 源投递身份；不包含 Moment 正文，也不表示业务完成。
+message MemoryJobSourceRequest {
+  string request_id = 1;
+  string episode_id = 2;
+  uint64 episode_version = 3;
+  string scope_id = 4;
+  string input_digest = 5;
+  string created_at = 6;
+}
+
+message ReadMemoryJobRequestsRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  uint32 limit = 2;
+}
+
+message ReadMemoryJobRequestsResponse {
+  repeated MemoryJobSourceRequest requests = 1;
+}
+
+message AcknowledgeMemoryJobRequestRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  MemoryJobSourceRequest request = 2;
+  string job_id = 3;
+}
+
+message AcknowledgeMemoryJobRequestResponse {
+  string request_id = 1;
+  string job_id = 2;
+  bool accepted = 3;
+}
+
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -353,4 +384,7 @@ service CognitionService {
   rpc ExecuteMemoryJob(ExecuteMemoryJobRequest) returns (ExecuteMemoryJobResponse);
   // 此调用会持久封口原 attempt；不是只读查询。空结果不得返回 not-applied。
   rpc ReconcileMemoryJob(ReconcileMemoryJobRequest) returns (ReconcileMemoryJobResponse);
+  // 仅在外部 Jobs owner 模式开放；不能与旧巩固队列双消费。
+  rpc ReadMemoryJobRequests(ReadMemoryJobRequestsRequest) returns (ReadMemoryJobRequestsResponse);
+  rpc AcknowledgeMemoryJobRequest(AcknowledgeMemoryJobRequestRequest) returns (AcknowledgeMemoryJobRequestResponse);
 }

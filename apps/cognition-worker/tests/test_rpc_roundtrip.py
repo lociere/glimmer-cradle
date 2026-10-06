@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -853,6 +854,92 @@ async def test_memory_job_rpc_invalid_identity_never_infers(memory_job_service, 
     with pytest.raises(grpc.aio.AioRpcError):
         await execute(request, timeout=2)
     assert memory.count() == 0 and llm.calls == 0
+
+
+async def test_memory_source_rpc_requires_external_owner_and_binds_durable_ack(memory_job_service, service, monkeypatch):
+    _, _, coordinator, llm, _, _, _ = memory_job_service
+    _, channel, _, _ = service
+    read = _call(channel, "ReadMemoryJobRequests", cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse)
+    ack = _call(channel, "AcknowledgeMemoryJobRequest", cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse)
+    request = cognition_pb.ReadMemoryJobRequestsRequest(call=_metadata("generation-1", "source-read"), limit=8)
+    with pytest.raises(grpc.aio.AioRpcError) as unavailable:
+        await read(request, timeout=2)
+    assert unavailable.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+    monkeypatch.setattr(coordinator, "_jobs", None)
+    sources = (await read(request, timeout=2)).requests
+    assert len(sources) == 1 and llm.calls == 0
+    assert (await read(request, timeout=2)).requests == sources
+    confirmation = cognition_pb.AcknowledgeMemoryJobRequestRequest(call=_metadata("generation-1", "source-ack"),
+        request=sources[0], job_id="accepted-job")
+    first = await ack(confirmation, timeout=2)
+    assert first.accepted and first.request_id == sources[0].request_id
+    assert await ack(confirmation, timeout=2) == first
+    assert (await read(request, timeout=2)).requests == []
+    confirmation.job_id = "other-job"
+    with pytest.raises(grpc.aio.AioRpcError) as conflict:
+        await ack(confirmation, timeout=2)
+    assert conflict.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+    assert coordinator._episodes.pending_consolidation() and llm.calls == 0
+
+
+@pytest.mark.parametrize("limit", [0, 1001])
+async def test_memory_source_rpc_rejects_unbounded_scan(memory_job_service, service, monkeypatch, limit):
+    _, _, coordinator, _, _, _, _ = memory_job_service
+    _, channel, _, _ = service
+    monkeypatch.setattr(coordinator, "_jobs", None)
+    read = _call(channel, "ReadMemoryJobRequests", cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse)
+    with pytest.raises(grpc.aio.AioRpcError) as conflict:
+        await read(cognition_pb.ReadMemoryJobRequestsRequest(call=_metadata("generation-1", "bad-scan"), limit=limit), timeout=2)
+    assert conflict.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+
+
+async def _host_memory_job_fixture(root: Path, generation: str) -> None:
+    """Host 跨语言验收入口；业务库/Log/RPC 都是真实 owner，模型为确定性 fixture。"""
+    recorder = build_test_recorder(root / "conversation")
+    await recorder.start()
+    if not recorder.log.query():
+        recorder.record(MomentKind.PERCEPTION, {"text": "跨进程持久事实"}, interaction_id="host-job-turn",
+            conversation_id="host-job-conversation", retention_ceiling="memory_candidate", importance=0.9)
+        await recorder.flush()
+    moment = recorder.log.query()[0]
+    database = SqliteMemoryStore(root / "memory.sqlite")
+    await database.connect()
+    memory = MemoryController(clock=FixedClock())
+    memory.bind_repository(MemoryRepository(database))
+    await memory.load()
+
+    class Llm:
+        async def generate(self, _request):
+            if generation == "waiting-model":
+                await asyncio.Event().wait()
+            return json.dumps({"decisions": [{"operation": "add", "kind": "semantic", "content": "跨进程事实",
+                "summary": "事实", "evidence_moment_ids": [moment.moment_id]}]})
+
+    coordinator = ConsolidationCoordinator(episodes=EpisodeProjection(root / "episodes.db", recorder),
+        memory=memory, jobs=None, llm=Llm(), clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
+    await coordinator.start()
+    await coordinator.consolidate(force_seal=True)
+
+    async def shutdown():
+        return None
+
+    # 非 Memory RPC 不在该 fixture 的验收范围；不构造第二套业务实现。
+    host = CognitionGrpcHost(generation=generation, inbound=None, queue=None, activity=None, cycle=None,
+        shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator)
+    await host.start()
+    host.mark_ready()
+    print(json.dumps({"endpoint": host.endpoint, "generation": generation}), flush=True)
+    try:
+        await asyncio.to_thread(sys.stdin.readline)
+    finally:
+        await host.stop()
+        await coordinator.stop()
+        await recorder.stop()
+        await database.close()
+
+
+if __name__ == "__main__" and len(sys.argv) == 4 and sys.argv[1] == "--host-job-fixture":
+    asyncio.run(_host_memory_job_fixture(Path(sys.argv[2]), sys.argv[3]))
 
 
 @pytest.mark.asyncio

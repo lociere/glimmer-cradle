@@ -19,6 +19,11 @@ using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
 
+var sourceAck = new AcknowledgeMemoryJobRequestRequest { JobId = "job:one", Request = new MemoryJobSourceRequest {
+    RequestId = "source:one", EpisodeId = "episode:one", EpisodeVersion = 9007199254740991,
+    ScopeId = "scope:one", InputDigest = new string('a', 64), CreatedAt = "2026-10-06T00:00:00Z" } };
+if (AcknowledgeMemoryJobRequestRequest.Parser.ParseFrom(sourceAck.ToByteArray()).Request.EpisodeVersion != 9007199254740991)
+    throw new InvalidOperationException("Memory source request roundtrip failed");
 var jobIdentity = new JobsV1.JobExecutionIdentity { JobId = "job:one", ScopeId = "scope:one", Attempt = 2,
     AuthorityEpoch = 7, FencingToken = 9007199254740991, OwnerId = "host:one", LeaseUntilMs = 1900000000000 };
 var memoryRequest = new ExecuteMemoryJobRequest { Identity = jobIdentity, EpisodeId = "episode:one",
