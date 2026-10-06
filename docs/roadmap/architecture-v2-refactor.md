@@ -688,6 +688,11 @@ Worker 配置与生产组装测试归位切片把规范化 Character Document fi
 `test_configuration_adapter.py` 与 `test_production_observability_composition.py` 删除，配置投影和
 进程 concrete graph 由真实 owner 验证。
 
+Context 装配测试归位切片把来源激活、记忆相关度/近时度、排序、预算裁剪、压缩 provenance、
+失败隔离、分组与候选上限并入目标 `test_context_budget.py`；伪造 instruction authority 的装配反例
+并入目标 `test_context_trust.py`。清单外 `test_context_assembly.py` consumer-zero 删除，Cognition
+225 项与 Worker 38 项均 PASS，测试项数量和原有断言保持，最终物理差距进一步降为 1,568 项。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

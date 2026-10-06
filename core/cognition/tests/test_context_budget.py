@@ -1,14 +1,27 @@
-"""Context retrieval 预算与压缩终止策略。"""
+"""Context 预算、候选排序、装配失败隔离与压缩终止策略。"""
 
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+
+from glimmer_cradle.cognition.context import (
+    ContextAssembler as _ContextAssembler,
+)
 from glimmer_cradle.cognition.context import (
     ContextBudget,
     ContextCompactor,
     ContextItem,
+    ContextQuery,
+    ContextSource,
+    EpisodicMemorySource,
+    estimate_tokens,
 )
+from tests.conftest import CLOCK, OBSERVABILITY
 
 
 def item(content: str, tokens: int) -> ContextItem:
-    return ContextItem(source="test", content=content, relevance=1.0, token_estimate=tokens)
+    return ContextItem(
+        source="test", content=content, relevance=1.0, token_estimate=tokens
+    )
 
 
 def test_budget_never_exceeds_scaled_limit() -> None:
@@ -22,9 +35,7 @@ def test_budget_never_exceeds_scaled_limit() -> None:
 
 
 def test_compaction_preserves_provenance_and_records_original_size() -> None:
-    compacted = ContextCompactor().compact(
-        item("abcdefghij" * 10, 40), max_tokens=10
-    )
+    compacted = ContextCompactor().compact(item("abcdefghij" * 10, 40), max_tokens=10)
     assert compacted is not None
     assert compacted.token_estimate <= 10
     assert compacted.metadata == {
@@ -35,3 +46,217 @@ def test_compaction_preserves_provenance_and_records_original_size() -> None:
 
 def test_zero_budget_terminates_without_fake_context() -> None:
     assert ContextCompactor().compact(item("important", 3), max_tokens=0) is None
+
+
+def ContextAssembler(*args, **kwargs):
+    kwargs.setdefault("observability", OBSERVABILITY)
+    return _ContextAssembler(*args, **kwargs)
+
+
+class _FixedSource(ContextSource):
+    """返回固定候选的测试 source。"""
+
+    def __init__(self, name: str, items: list[ContextItem]) -> None:
+        self.name = name
+        self._items = items
+        self.calls = 0
+
+    async def activate(self, query, *, max_items=10):
+        self.calls += 1
+        return list(self._items)[:max_items]
+
+
+class _CrashingSource(ContextSource):
+    name = "broken"
+
+    async def activate(self, query, *, max_items=10):
+        raise RuntimeError("intentional crash")
+
+
+class _MemorySourceStub:
+    def __init__(self, records: list[SimpleNamespace]) -> None:
+        self._records = records
+
+    async def retrieve(self, *args, **kwargs) -> list[SimpleNamespace]:
+        return self._records
+
+
+def _item(
+    source: str,
+    content: str,
+    relevance: float,
+    importance: float = 0.5,
+    recency: float = 0.5,
+) -> ContextItem:
+    return ContextItem(
+        source=source,
+        content=content,
+        relevance=relevance,
+        recency=recency,
+        importance=importance,
+        token_estimate=estimate_tokens(content),
+    )
+
+
+async def test_assembly_calls_all_sources_concurrently() -> None:
+    s1 = _FixedSource("episodic", [_item("episodic", "记忆A", 0.7)])
+    s2 = _FixedSource("knowledge", [_item("knowledge", "知识A", 0.6)])
+    asm = ContextAssembler([s1, s2], base_budget_tokens=10000)
+    result = await asm.assemble(ContextQuery(text="hi"))
+    assert s1.calls == 1
+    assert s2.calls == 1
+    assert result.sources_called == 2
+    assert result.sources_failed == 0
+    assert result.total_count() == 2
+
+
+async def test_episodic_memory_projects_real_relevance_and_recency() -> None:
+    now = datetime.now(UTC)
+    source = EpisodicMemorySource(
+        _MemorySourceStub(
+            [
+                SimpleNamespace(
+                    memory_id="recent-relevant",
+                    summary="喜欢草莓蛋糕",
+                    content="用户喜欢草莓蛋糕",
+                    salience=0.8,
+                    updated_at=now.isoformat(),
+                ),
+                SimpleNamespace(
+                    memory_id="old-unrelated",
+                    summary="天气记录",
+                    content="那天有阵雨",
+                    salience=0.8,
+                    updated_at=(now - timedelta(days=30)).isoformat(),
+                ),
+            ]
+        ),
+        clock=CLOCK,
+    )
+
+    items = await source.activate(ContextQuery(text="喜欢草莓"))
+
+    assert items[0].relevance > items[1].relevance
+    assert items[0].recency > items[1].recency
+
+
+async def test_items_sorted_by_combined_score_desc() -> None:
+    s = _FixedSource(
+        "episodic",
+        [
+            _item("episodic", "低分", relevance=0.2, importance=0.2, recency=0.2),
+            _item("episodic", "高分", relevance=0.9, importance=0.8, recency=0.8),
+            _item("episodic", "中分", relevance=0.5, importance=0.5, recency=0.5),
+        ],
+    )
+    asm = ContextAssembler([s], base_budget_tokens=10000)
+    result = await asm.assemble(ContextQuery(text="hi"))
+    # 排序后 content 顺序：高分→中分→低分
+    assert [it.content for it in result.items] == ["高分", "中分", "低分"]
+
+
+async def test_budget_factor_zero_truncates_all() -> None:
+    s = _FixedSource("knowledge", [_item("knowledge", "X" * 100, 0.9)])
+    asm = ContextAssembler([s], base_budget_tokens=10000)
+    result = await asm.assemble(ContextQuery(text="hi"), budget_factor=0.0)
+    assert result.budget_tokens == 0
+    assert result.total_count() == 0
+    assert result.was_truncated is True
+
+
+async def test_budget_cuts_low_priority_items() -> None:
+    # 每项 token ≈ 33（"X"*100 / 3）
+    s = _FixedSource(
+        "knowledge",
+        [
+            _item("knowledge", "X" * 100, relevance=0.9),  # ≈33 tokens
+            _item("knowledge", "Y" * 100, relevance=0.5),  # ≈33 tokens
+            _item("knowledge", "Z" * 100, relevance=0.1),  # ≈33 tokens
+        ],
+    )
+    asm = ContextAssembler([s], base_budget_tokens=70)  # 够 2 个不够 3 个
+    result = await asm.assemble(ContextQuery(text="hi"))
+    assert len(result.items) == 2
+    assert result.was_truncated is True
+    # 留下的是高分两个
+    contents = [it.content for it in result.items]
+    assert "X" * 100 in contents
+    assert "Y" * 100 in contents
+
+
+async def test_single_oversized_candidate_is_compacted_with_provenance() -> None:
+    source = _FixedSource("knowledge", [_item("knowledge", "X" * 300, 0.9)])
+    assembled = await ContextAssembler([source], base_budget_tokens=20).assemble(
+        ContextQuery(text="hi")
+    )
+    assert assembled.total_tokens <= 20
+    assert assembled.was_truncated is True
+    assert assembled.items[0].metadata == {
+        "compacted": True,
+        "original_token_estimate": 100,
+    }
+
+
+async def test_crashing_source_does_not_break_assembly() -> None:
+    good = _FixedSource("episodic", [_item("episodic", "OK", 0.7)])
+    bad = _CrashingSource()
+    asm = ContextAssembler([bad, good], base_budget_tokens=10000)
+    result = await asm.assemble(ContextQuery(text="hi"))
+    assert result.sources_called == 2
+    assert result.sources_failed == 1
+    assert result.total_count() == 1
+    assert result.items[0].content == "OK"
+
+
+async def test_grouped_by_source() -> None:
+    s1 = _FixedSource(
+        "episodic",
+        [
+            _item("episodic", "记忆1", 0.7),
+            _item("episodic", "记忆2", 0.6),
+        ],
+    )
+    s2 = _FixedSource(
+        "knowledge",
+        [
+            _item("knowledge", "知识A", 0.8),
+        ],
+    )
+    asm = ContextAssembler([s1, s2], base_budget_tokens=10000)
+    result = await asm.assemble(ContextQuery(text="hi"))
+    groups = result.grouped_by_source()
+    assert set(groups.keys()) == {"episodic", "knowledge"}
+    assert len(groups["episodic"]) == 2
+    assert len(groups["knowledge"]) == 1
+
+
+async def test_per_source_limit_passed_to_source() -> None:
+    items = [_item("episodic", f"m{i}", 0.5) for i in range(20)]
+    s = _FixedSource("episodic", items)
+    asm = ContextAssembler([s], base_budget_tokens=100000)
+    result = await asm.assemble(ContextQuery(text="hi"), per_source_limit=5)
+    assert result.total_count() == 5
+
+
+def test_context_item_score_weighted_sum() -> None:
+    import pytest as _pt
+
+    it = _item("episodic", "x", relevance=0.8, importance=0.6, recency=0.4)
+    # default weights: r=0.2, i=0.3, R=0.5
+    expected = 0.2 * 0.4 + 0.3 * 0.6 + 0.5 * 0.8
+    assert it.score() == _pt.approx(expected)
+
+
+async def test_assembly_with_no_sources_returns_empty() -> None:
+    asm = ContextAssembler([], base_budget_tokens=1000)
+    result = await asm.assemble(ContextQuery(text="hi"))
+    assert result.total_count() == 0
+    assert result.sources_called == 0
+
+
+def test_estimate_tokens_chinese_english_mix() -> None:
+    # 长度 / 3，最少 1
+    assert estimate_tokens("") == 1
+    assert estimate_tokens("abc") == 1
+    assert estimate_tokens("abcdef") == 2
+    assert estimate_tokens("a" * 30) == 10
