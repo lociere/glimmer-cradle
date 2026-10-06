@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobRequest } from '../../execution/job.js';
+import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobAttempt,
+  type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent } from '../../execution/job.js';
 import type { JobClaim, JobFinish, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
@@ -47,13 +48,16 @@ export class SqliteJobStore implements JobStorePort {
           throw new Error('未知 Jobs 数据库；须先执行受控迁移');
         }
         this.database.transaction(() => this.database.exec(readFileSync(migrationPath, 'utf8'))).immediate();
-      } else if (version !== 2) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
+      } else if (version !== 3) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
       if (this.database.pragma('application_id', { simple: true }) !== 0x47434a42) {
         throw new Error('Jobs 数据库 owner 标记无效');
       }
       this.database.prepare('SELECT epoch FROM job_authority').all();
       this.database.prepare('SELECT job_id,request_digest,status,fencing_token FROM jobs LIMIT 0').all();
       this.database.prepare('SELECT definition_json,next_due_at FROM job_triggers LIMIT 0').all();
+      this.database.prepare('SELECT job_id,attempt,authority_epoch,fencing_token FROM job_attempts LIMIT 0').all();
+      this.database.prepare('SELECT source_id,evidence_id,evidence_digest FROM job_reconciliations LIMIT 0').all();
+      this.database.prepare('SELECT event_id,event_json,acknowledged_at FROM job_outbox LIMIT 0').all();
       this.database.pragma('foreign_keys = ON');
       this.database.pragma('journal_mode = WAL');
     } catch (error) { this.database.close(); throw error; }
@@ -66,11 +70,15 @@ export class SqliteJobStore implements JobStorePort {
       const current = this.currentEpoch();
       if (current !== null && epoch < current) throw new JobAuthorityError('旧 Job authority 不得重新激活');
       if (epoch === current) return;
+      const changed = this.database.prepare("SELECT * FROM jobs WHERE status IN ('running','queued','retry_wait','unknown')").all() as JobRow[];
       this.database.prepare('INSERT INTO job_authority VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET epoch=excluded.epoch').run(epoch);
       // 旧 owner 可能已经产生外部副作用；handover 不能猜测成功或自动重复执行。
+      for (const job of changed) if (job.status === 'running') this.endAttempt(job, 'unknown', 'authority_changed', now);
       this.database.prepare(`UPDATE jobs SET status='unknown',authority_epoch=?,fencing_token=fencing_token+1,
         revision=revision+1,lease_owner=NULL,lease_until=NULL,error_code='authority_changed',updated_at=? WHERE status='running'`).run(epoch, now);
-      this.database.prepare(`UPDATE jobs SET authority_epoch=?,revision=revision+1,updated_at=? WHERE status IN ('queued','retry_wait')`).run(epoch, now);
+      this.database.prepare(`UPDATE jobs SET authority_epoch=?,revision=revision+1,updated_at=?
+        WHERE status IN ('queued','retry_wait','unknown') AND authority_epoch<>?`).run(epoch, now, epoch);
+      for (const job of changed) this.appendState(job.job_id);
     }).immediate();
   }
 
@@ -102,6 +110,7 @@ export class SqliteJobStore implements JobStorePort {
         due_at,retry_mode,max_attempts,status,revision,attempt,authority_epoch,fencing_token,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,'queued',1,0,?,0,?,?)`).run(request.job_id, request.scope_id, request.goal_id, request.kind,
           request.idempotency_key, payload, digest, request.due_at, request.retry_mode, request.max_attempts, epoch, now, now);
+      this.appendState(request.job_id);
       return { job: this.load(request.job_id)!, job_id: request.job_id, revision: 1, duplicate: false };
     }).immediate();
   }
@@ -109,6 +118,91 @@ export class SqliteJobStore implements JobStorePort {
   public load(jobId: string): Job | null {
     const row = this.database.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId) as JobRow | undefined;
     return row ? this.decode(row) : null;
+  }
+
+  public listAttempts(jobId: string): JobAttempt[] {
+    return this.database.prepare('SELECT * FROM job_attempts WHERE job_id=? ORDER BY attempt').all(jobId) as JobAttempt[];
+  }
+
+  public readOutbox(epoch: number, limit: number): JobStateEvent[] {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Job outbox batch limit 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const rows = this.database.prepare(`SELECT event_json FROM job_outbox WHERE acknowledged_at IS NULL
+        ORDER BY created_at,job_id,revision LIMIT ?`).all(limit) as { event_json: string }[];
+      return rows.map(row => JSON.parse(row.event_json) as JobStateEvent);
+    }).deferred();
+  }
+
+  public acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean {
+    assertTimestamp(now);
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const event = this.database.prepare('SELECT created_at FROM job_outbox WHERE event_id=?')
+        .get(eventId) as { created_at: number } | undefined;
+      if (!event) return false;
+      if (now < event.created_at) throw new Error('Job outbox ACK 时间无效');
+      this.database.prepare('UPDATE job_outbox SET acknowledged_at=COALESCE(acknowledged_at,?) WHERE event_id=?').run(now, eventId);
+      return true;
+    }).immediate();
+  }
+
+  public reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
+    policy: RetryPolicy): JobReconciliationReceipt {
+    assertTimestamp(now);
+    assertTimestamp(evidence.observed_at);
+    retryDelay(1, policy);
+    if (![evidence.source_id, evidence.evidence_id, evidence.job_id, evidence.scope_id, evidence.owner_id]
+      .every(value => typeof value === 'string' && !!value.trim())
+      || ![evidence.attempt, evidence.authority_epoch, evidence.fencing_token, expectedRevision]
+        .every(value => Number.isSafeInteger(value) && value > 0)
+      || evidence.observed_at > now
+      || !['applied', 'not_applied', 'failed'].includes(evidence.resolution)) {
+      throw new JobConflictError('Job reconciliation evidence 无效');
+    }
+    if (evidence.resolution === 'not_applied' && evidence.receiver_fenced !== true) {
+      throw new JobConflictError('Job not-applied 必须封口原 attempt');
+    }
+    if (evidence.resolution === 'failed' && !/^[a-z][a-z0-9_.:-]{0,127}$/.test(evidence.error_code)) {
+      throw new JobConflictError('Job reconciliation error code 无效');
+    }
+    if (evidence.resolution === 'applied' && (!evidence.result || typeof evidence.result !== 'object' || Array.isArray(evidence.result))) {
+      throw new JobConflictError('Job reconciliation result 必须是 JSON object');
+    }
+    const document = canonicalJson(evidence);
+    const digest = createHash('sha256').update(document).digest('hex');
+    return this.database.transaction((): JobReconciliationReceipt => {
+      this.assertAuthority(epoch);
+      const accepted = this.database.prepare('SELECT evidence_digest FROM job_reconciliations WHERE source_id=? AND evidence_id=?')
+        .get(evidence.source_id, evidence.evidence_id) as { evidence_digest: string } | undefined;
+      if (accepted) {
+        if (accepted.evidence_digest !== digest) throw new JobConflictError('Job evidence identity 内容冲突');
+        return { status: 'duplicate', job: this.load(evidence.job_id) };
+      }
+      const job = this.load(evidence.job_id);
+      if (!job || job.status !== 'unknown' || job.revision !== expectedRevision || job.authority_epoch !== epoch) {
+        return { status: 'stale', job };
+      }
+      const attempt = this.listAttempts(job.job_id).find(value => value.attempt === job.attempt);
+      if (!attempt || attempt.status !== 'unknown' || evidence.scope_id !== job.scope_id
+        || evidence.attempt !== attempt.attempt || evidence.authority_epoch !== attempt.authority_epoch
+        || evidence.fencing_token !== attempt.fencing_token || evidence.owner_id !== attempt.owner_id
+        || evidence.observed_at < attempt.started_at) throw new JobConflictError('Job evidence 不属于当前 unknown attempt');
+      const status = evidence.resolution === 'applied' ? 'succeeded'
+        : evidence.resolution === 'not_applied' && job.attempt < job.max_attempts ? 'retry_wait' : 'dead_letter';
+      const due = status === 'retry_wait' ? now + retryDelay(job.attempt, policy) : job.due_at;
+      assertTimestamp(due);
+      const error = evidence.resolution === 'failed' ? evidence.error_code
+        : evidence.resolution === 'not_applied' ? 'reconciled_not_applied' : null;
+      const result = evidence.resolution === 'applied' ? canonicalJson(evidence.result) : null;
+      this.database.prepare(`UPDATE jobs SET status=?,revision=revision+1,due_at=?,error_code=?,result_json=?,updated_at=? WHERE job_id=?`)
+        .run(status, due, error, result, now, job.job_id);
+      this.endAttempt(job, status, error, now);
+      this.database.prepare('INSERT INTO job_reconciliations VALUES(?,?,?,?,?,?,?)')
+        .run(evidence.source_id, evidence.evidence_id, digest, job.job_id, job.attempt, job.revision + 1, now);
+      this.appendState(job.job_id);
+      return { status: 'accepted', job: this.load(job.job_id) };
+    }).immediate();
   }
 
   public claim(epoch: number, ownerId: string, now: number, leaseMs: number): JobClaim | null {
@@ -123,6 +217,10 @@ export class SqliteJobStore implements JobStorePort {
         fencing_token=fencing_token+1,authority_epoch=?,lease_owner=?,lease_until=?,updated_at=? WHERE job_id=?`)
         .run(epoch, ownerId, now + leaseMs, now, row.job_id);
       const job = this.load(row.job_id)!;
+      this.database.prepare(`INSERT INTO job_attempts(job_id,attempt,authority_epoch,fencing_token,owner_id,
+        started_at,lease_until,status) VALUES(?,?,?,?,?,?,?,'running')`)
+        .run(job.job_id, job.attempt, epoch, job.fencing_token, ownerId, now, now + leaseMs);
+      this.appendState(job.job_id);
       return { job, lease: { job_id: job.job_id, authority_epoch: epoch, fencing_token: job.fencing_token, owner_id: ownerId } };
     }).immediate();
   }
@@ -140,6 +238,9 @@ export class SqliteJobStore implements JobStorePort {
       if (!this.isLeaseCurrent(lease, now)) return false;
       this.database.prepare('UPDATE jobs SET lease_until=MAX(lease_until,?),revision=revision+1,updated_at=? WHERE job_id=?')
         .run(now + leaseMs, now, lease.job_id);
+      const job = this.load(lease.job_id)!;
+      if (this.database.prepare('UPDATE job_attempts SET lease_until=? WHERE job_id=? AND attempt=?')
+        .run(job.lease_until, job.job_id, job.attempt).changes !== 1) throw new Error('Job attempt 持久依据丢失');
       return true;
     }).immediate();
   }
@@ -164,6 +265,8 @@ export class SqliteJobStore implements JobStorePort {
       this.database.prepare(`UPDATE jobs SET status=?,revision=revision+1,lease_owner=NULL,lease_until=NULL,
         due_at=?,error_code=?,result_json=?,updated_at=? WHERE job_id=?`).run(outcome.status,
           outcome.next_due_at ?? job.due_at, outcome.error_code ?? null, result, now, job.job_id);
+      this.endAttempt(job, outcome.status, outcome.error_code ?? null, now);
+      this.appendState(job.job_id);
       return true;
     }).immediate();
   }
@@ -172,9 +275,14 @@ export class SqliteJobStore implements JobStorePort {
     assertTimestamp(now);
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
+      const previous = this.load(jobId);
       const changes = this.database.prepare(`UPDATE jobs SET status='cancelled',revision=revision+1,
         fencing_token=fencing_token+1,lease_owner=NULL,lease_until=NULL,error_code='cancelled',updated_at=?
         WHERE job_id=? AND revision=? AND status IN ('queued','retry_wait','running')`).run(now, jobId, expectedRevision).changes;
+      if (changes) {
+        if (previous?.status === 'running') this.endAttempt(previous, 'cancelled', 'cancelled', now);
+        this.appendState(jobId);
+      }
       return changes ? this.load(jobId) : null;
     }).immediate();
   }
@@ -191,6 +299,8 @@ export class SqliteJobStore implements JobStorePort {
         assertTimestamp(due);
         this.database.prepare(`UPDATE jobs SET status=?,revision=revision+1,fencing_token=fencing_token+1,
           lease_owner=NULL,lease_until=NULL,error_code='lease_expired',due_at=?,updated_at=? WHERE job_id=?`).run(status, due, now, job.job_id);
+        this.endAttempt(job, status, 'lease_expired', now);
+        this.appendState(job.job_id);
       }
       return expired.length;
     }).immediate();
@@ -200,12 +310,14 @@ export class SqliteJobStore implements JobStorePort {
     assertTimestamp(before);
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
-      const rows = this.database.prepare("SELECT * FROM jobs WHERE status IN ('succeeded','cancelled','dead_letter') AND updated_at<?")
+      const rows = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('succeeded','cancelled','dead_letter') AND updated_at<?
+        AND NOT EXISTS(SELECT 1 FROM job_outbox WHERE job_outbox.job_id=jobs.job_id AND acknowledged_at IS NULL)`)
         .all(before) as JobRow[];
       for (const row of rows) {
         this.database.prepare('INSERT INTO job_tombstones VALUES(?,?,?,?,?,?)')
           .run(row.job_id, row.scope_id, row.idempotency_key, row.request_digest, row.status, row.revision);
         this.database.prepare('DELETE FROM jobs WHERE job_id=?').run(row.job_id);
+        this.database.prepare('DELETE FROM job_outbox WHERE job_id=? AND acknowledged_at IS NOT NULL').run(row.job_id);
       }
       return rows.length;
     }).immediate();
@@ -315,6 +427,23 @@ export class SqliteJobStore implements JobStorePort {
   private decodeTrigger(row: TriggerRow): JobTrigger {
     const { trigger_id: id, definition_json, definition_digest: digest, enabled, ...state } = row;
     return { ...state, definition: JSON.parse(definition_json), enabled: enabled === 1 };
+  }
+
+  private endAttempt(job: Pick<Job, 'job_id' | 'attempt'>, status: JobAttempt['status'], error: string | null, now: number): void {
+    if (this.database.prepare(`UPDATE job_attempts SET status=?,error_code=?,finished_at=? WHERE job_id=? AND attempt=?`)
+      .run(status, error, now, job.job_id, job.attempt).changes !== 1) throw new Error('Job attempt 持久依据丢失');
+  }
+
+  private appendState(jobId: string): void {
+    const job = this.load(jobId)!;
+    const event: JobStateEvent = {
+      event_id: createHash('sha256').update(canonicalJson([job.job_id, job.revision])).digest('hex'),
+      job_id: job.job_id, scope_id: job.scope_id, goal_id: job.goal_id, kind: job.kind,
+      revision: job.revision, status: job.status, attempt: job.attempt, authority_epoch: job.authority_epoch,
+      fencing_token: job.fencing_token, result: job.result, error_code: job.error_code, updated_at: job.updated_at,
+    };
+    this.database.prepare('INSERT INTO job_outbox(event_id,job_id,revision,event_json,created_at) VALUES(?,?,?,?,?)')
+      .run(event.event_id, jobId, job.revision, canonicalJson(event), job.updated_at);
   }
 
   private currentEpoch(): number | null {

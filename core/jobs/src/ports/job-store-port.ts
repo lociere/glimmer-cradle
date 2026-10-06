@@ -1,4 +1,4 @@
-import type { Job, JobRequest } from '../execution/job.js';
+import type { Job, JobAttempt, JobReconciliationEvidence, JobReconciliationReceipt, JobRequest, JobStateEvent } from '../execution/job.js';
 import type { JobLease } from '../scheduling/job-lease.js';
 import type { RetryPolicy } from '../recovery/retry-policy.js';
 import type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from '../triggers/trigger.js';
@@ -21,6 +21,12 @@ export interface JobStorePort {
   activateAuthority(epoch: number, now: number): void;
   enqueue(request: JobRequest, epoch: number, now: number): JobSubmission;
   load(jobId: string): Job | null;
+  listAttempts(jobId: string): JobAttempt[];
+  reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
+    policy: RetryPolicy): JobReconciliationReceipt;
+  readOutbox(epoch: number, limit: number): JobStateEvent[];
+  /** 只有接收方已原子提交业务变化与 event_id inbox 后才能确认。 */
+  acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean;
   claim(epoch: number, ownerId: string, now: number, leaseMs: number): JobClaim | null;
   renew(lease: JobLease, now: number, leaseMs: number): boolean;
   isLeaseCurrent(lease: JobLease, now: number): boolean;

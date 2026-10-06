@@ -1,4 +1,4 @@
-import type { Job } from './job.js';
+import type { Job, JobAttempt, JobReconciliationEvidence, JobStateEvent } from './job.js';
 import type { JobLease } from '../scheduling/job-lease.js';
 
 export interface JobExecutionContext {
@@ -19,4 +19,15 @@ export interface JobHandlerPort {
   readonly kind: string;
   readonly retry_mode: Job['retry_mode'];
   execute(context: JobExecutionContext, payload: Job['payload']): Promise<JobHandlerResult>;
+}
+
+/** App 注入可信结果查询；必须核验接收 owner 的持久 receipt，不接受模型自报结果。 */
+export interface JobReconciliationPort {
+  readonly kind: string;
+  query(job: Job, attempt: JobAttempt, signal?: AbortSignal): Promise<JobReconciliationEvidence | null>;
+}
+
+/** 接收 owner 在同一事务中应用业务变化与 event_id inbox 后返回持久确认。 */
+export interface JobStateReceiverPort {
+  accept(event: JobStateEvent, signal?: AbortSignal): Promise<{ readonly event_id: string; readonly accepted: true }>;
 }

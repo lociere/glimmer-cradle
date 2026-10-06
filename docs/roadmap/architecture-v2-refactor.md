@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久事件/周期 trigger、due/attempt、lease/fencing、authority 拒旧写、handler、取消、恢复与 retention 已实现；跨库提交、unknown 对账、Memory consumer 与 Host/Worker broker 接线待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、handler、取消、unknown 证据对账、状态 outbox/ACK 与 retention 已实现；Memory 源业务 request outbox、生产接收 fencing/receipt、consumer 与 Host/Worker broker 接线待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -184,6 +184,33 @@ next due 与入队也在同一事务提交。定义保持不可变，同 trigger
 Jobs 22 项、根 typecheck/build PASS；architecture、目标清单规格、docs/encoding/diff PASS。
 运行库路径/用户数据、跨进程 wire 与第三方依赖均未改变；仍不宣称 broker/Memory 接线、
 跨库提交、unknown 对账或阶段 7 的完整安装恢复门已完成，独立审查留待固定最终候选。
+
+下一 Jobs 恢复切片：持久保存每次 attempt 的原 epoch/owner/token，失效/切代后也保留对账依据。
+unknown 只能通过 App 注册的结果查询 Port 获取绑定 Job/scope/attempt/lease 的证据，再以 revision/epoch
+CAS 更新；查询失败、无证据、旧代或不匹配证据不允许重放。not-applied 证据还必须证明旧 attempt
+已被接收 owner 封口，不能把“暂时查不到”视为安全重试。状态转换与待发布 outbox 原子提交，接收方
+幂等接纳后才 ack；验证目标库已提交但 Jobs 完成 ACK 丢失、outbox 接收后 ACK 丢失、旧证据晚到及
+retention 不删除未投递事实。schema 升到 3，旧候选库只在受控迁移下升级；不改用户生产数据。
+本切片验证 Jobs 与独立目标 SQLite 的提交窗口，不冒充真实 Memory/Host/Worker broker 已切换。
+
+恢复实现候选（2026-10-06）：每次 claim 原子保存原 attempt epoch/owner/token，续期与结束状态持久记录；
+handover 只变更 Job 当前 authority/fence，原执行身份保持不变。App 结果查询 Port 返回绑定身份的证据，
+revision/epoch CAS 接纳 applied/failed，只有接收 owner 已封口且确认未提交的 not-applied 可在预算内重试。
+状态、最小证据身份/摘要和 outbox 同事务提交；同证据重复幂等、内容冲突拒绝，旧证据不解决新 attempt。
+投递由 RecoveryController 的有界 App receiver 调用完成，接收方业务/inbox 提交后才 ACK；失败、取消、
+错误确认身份或切代保留待投递事实。retention 等待全部 outbox ACK 后清理终态大记录与已确认事件，
+保留最小 attempt/证据、tombstone 和 occurrence；不删除 unknown。
+
+本地候选验证覆盖两个独立 SQLite 的目标业务/receipt 已提交、Jobs 完成 ACK 丢失并重开恢复；
+接收业务/inbox 回滚与提交后 ACK 丢失重投；旧 writer 被接收方 fence 拒绝；查询失败/取消/错证据、
+旧 revision/authority/attempt，以及 outbox/审计故障回滚 enqueue/claim/finish/cancel/recover/handover。
+schema 3 拒绝旧候选 v1/v2 隐式升级，原数据和版本保持。Jobs 31 项、包 typecheck/build、根
+typecheck/build PASS；architecture、目标清单规格（非最终实物）、docs/encoding/diff PASS。
+生产数据路径、wire、依赖和公开 SDK 未变化；真实 Memory 的源业务 request outbox、handler、生产
+接收 fencing/receipt、Host/Worker broker、配置 Schema/catalog、安装恢复及最终独立审查仍待完成。
+下一依赖切片接通真正的 Host→Worker Jobs handler/query 边界与 Memory 业务/request outbox，
+以生产调用链的幂等 receipt、提交点 fencing 和恢复证明替换私有巩固队列；旧 owner 只有在 consumer-zero、
+旧样本迁移和验证通过后才删除，不用本地目标库 fixture 代替生产接收端。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

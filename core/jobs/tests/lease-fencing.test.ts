@@ -24,6 +24,10 @@ it('双连接 claim 互斥，租约截止即失效，重试 token 拒绝旧完�
     expect(first.finish(claim.lease, 1126, { status: 'succeeded' })).toBe(false);
     expect(second.finish(replacement.lease, 1126, { status: 'succeeded', result: { ok: true } })).toBe(true);
     expect(first.load(request.job_id)?.result).toEqual({ ok: true });
+    expect(first.listAttempts(request.job_id)).toMatchObject([
+      { attempt: 1, owner_id: 'worker-a', fencing_token: claim.lease.fencing_token, status: 'retry_wait', finished_at: 1100 },
+      { attempt: 2, owner_id: 'worker-b', fencing_token: replacement.lease.fencing_token, status: 'succeeded', finished_at: 1126 },
+    ]);
   } finally { first.close(); second.close(); }
 });
 
@@ -56,6 +60,7 @@ it('续期不缩短已有 lease，不改 fencing identity；成功后租约不�
     expect(store.renew(claim.lease, 1050, 200)).toBe(true);
     expect(store.renew(claim.lease, 1060, 10)).toBe(true);
     expect(store.load(request.job_id)?.lease_until).toBe(1250);
+    expect(store.listAttempts(request.job_id)[0].lease_until).toBe(1250);
     expect(store.load(request.job_id)?.fencing_token).toBe(claim.lease.fencing_token);
     expect(store.finish(claim.lease, 1249, { status: 'succeeded' })).toBe(true);
     expect(store.finish(claim.lease, 1249, { status: 'succeeded' })).toBe(false);

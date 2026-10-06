@@ -31,5 +31,24 @@ CREATE TABLE job_trigger_occurrences(
   occurrence_digest TEXT NOT NULL, job_id TEXT NOT NULL, created_at INTEGER NOT NULL,
   PRIMARY KEY(trigger_id,occurrence_id)
 );
-PRAGMA user_version=2;
+-- 不关联 jobs FK：retention 后仍须保留最小 attempt 身份与对账审计。
+CREATE TABLE job_attempts(
+  job_id TEXT NOT NULL, attempt INTEGER NOT NULL CHECK(attempt>0),
+  authority_epoch INTEGER NOT NULL, fencing_token INTEGER NOT NULL, owner_id TEXT NOT NULL,
+  started_at INTEGER NOT NULL, lease_until INTEGER NOT NULL, finished_at INTEGER,
+  status TEXT NOT NULL CHECK(status IN ('running','retry_wait','succeeded','cancelled','dead_letter','unknown')),
+  error_code TEXT, PRIMARY KEY(job_id,attempt)
+);
+CREATE TABLE job_reconciliations(
+  source_id TEXT NOT NULL, evidence_id TEXT NOT NULL, evidence_digest TEXT NOT NULL,
+  job_id TEXT NOT NULL, attempt INTEGER NOT NULL, accepted_revision INTEGER NOT NULL, accepted_at INTEGER NOT NULL,
+  PRIMARY KEY(source_id,evidence_id)
+);
+CREATE TABLE job_outbox(
+  event_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, revision INTEGER NOT NULL,
+  event_json TEXT NOT NULL, created_at INTEGER NOT NULL, acknowledged_at INTEGER,
+  UNIQUE(job_id,revision)
+);
+CREATE INDEX job_outbox_pending ON job_outbox(acknowledged_at,created_at,job_id,revision);
+PRAGMA user_version=3;
 PRAGMA application_id=0x47434a42;
