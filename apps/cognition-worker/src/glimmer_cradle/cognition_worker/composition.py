@@ -353,8 +353,11 @@ def compose_cognition(
     observability: ObservabilityPort,
     model_invocation_recorder: Callable[..., None] | None = None,
     paths: WorkerPaths | None = None,
+    memory_jobs_owner: str = "legacy",
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
+    if memory_jobs_owner not in {"legacy", "external"}:
+        raise ValueError("Memory Jobs owner 无效")
     logger = observability.logger("cognition_composition")
     logger.info("Cognition Composition 开始组装")
     memory_config = config.memory
@@ -522,7 +525,7 @@ def compose_cognition(
     consolidation_coordinator = ConsolidationCoordinator(
         episodes=episode_projection,
         memory=memory_substrate,
-        jobs=ConsolidationJobRepository(cognition_database),
+        jobs=(ConsolidationJobRepository(cognition_database) if memory_jobs_owner == "legacy" else None),
         llm=llm_engine,
         clock=clock,
         ids=ids,

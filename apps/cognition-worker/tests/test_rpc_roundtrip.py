@@ -747,6 +747,7 @@ async def memory_job_service(service, tmp_path):
                              conversation_id="job-conversation", retention_ceiling="memory_candidate", importance=0.9)
     database = SqliteMemoryStore(tmp_path / "job-memory.sqlite")
     await database.connect()
+    await database.select_consolidation_dispatch("external")
     memory = MemoryController(clock=FixedClock())
     memory.bind_repository(MemoryRepository(database))
     await memory.load()
@@ -761,7 +762,7 @@ async def memory_job_service(service, tmp_path):
                 "content": "持久事实", "summary": "事实", "evidence_moment_ids": [moment.moment_id]}]})
 
     llm = Llm()
-    coordinator = ConsolidationCoordinator(episodes=episodes, memory=memory, jobs=ConsolidationJobRepository(database),
+    coordinator = ConsolidationCoordinator(episodes=episodes, memory=memory, jobs=None,
         llm=llm, clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
     await coordinator.start()
     await episodes.project_pending(seal=True)
@@ -857,11 +858,12 @@ async def test_memory_job_rpc_invalid_identity_never_infers(memory_job_service, 
 
 
 async def test_memory_source_rpc_requires_external_owner_and_binds_durable_ack(memory_job_service, service, monkeypatch):
-    _, _, coordinator, llm, _, _, _ = memory_job_service
+    database, _, coordinator, llm, _, _, _ = memory_job_service
     _, channel, _, _ = service
     read = _call(channel, "ReadMemoryJobRequests", cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse)
     ack = _call(channel, "AcknowledgeMemoryJobRequest", cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse)
     request = cognition_pb.ReadMemoryJobRequestsRequest(call=_metadata("generation-1", "source-read"), limit=8)
+    monkeypatch.setattr(coordinator, "_jobs", ConsolidationJobRepository(database))
     with pytest.raises(grpc.aio.AioRpcError) as unavailable:
         await read(request, timeout=2)
     assert unavailable.value.code() is grpc.StatusCode.FAILED_PRECONDITION
@@ -904,6 +906,7 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     moment = recorder.log.query()[0]
     database = SqliteMemoryStore(root / "memory.sqlite")
     await database.connect()
+    await database.select_consolidation_dispatch("external")
     memory = MemoryController(clock=FixedClock())
     memory.bind_repository(MemoryRepository(database))
     await memory.load()

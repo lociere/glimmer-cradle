@@ -25,6 +25,13 @@
 
 发行版本不是配置。当前产品版本只由不可变的 `products/<id>/product.json` 提供，Kernel 用它校验 Extension 的 `engines.glimmerCradle`；`identity.yaml` 不保存 `app_version`，升级也不需要改写用户配置。
 
+Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legacy`（现行默认）或 `external`，
+由 CLI 和 composition 显式校验，需要重启，不读取角色 Memory YAML 或环境变量覆盖。
+外部选择在 Memory schema 6 中持久绑定，未完成旧任务拒绝转交，外部绑定拒绝回退；
+这不是 Jobs 政策 Document，也不代表产品 Host 已切换。机制与临时窗口见
+[Worker 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化) 和
+[执行记录](../roadmap/architecture-v2-refactor.md)。
+
 ## 变更规则
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。

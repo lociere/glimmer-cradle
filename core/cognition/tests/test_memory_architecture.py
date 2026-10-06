@@ -68,6 +68,72 @@ async def memory_stack(tmp_path: Path):
     await database.close()
 
 
+@pytest.mark.parametrize("state", ["pending", "claimed", "failed", "unknown"])
+async def test_external_dispatch_rejects_unfinished_legacy_queue_without_mutation(memory_stack, state):
+    database, _, _ = memory_stack
+    await database.select_consolidation_dispatch("legacy")
+    async with database.transaction() as conn:
+        await conn.execute("INSERT INTO consolidation_jobs(job_id,episode_id,episode_version,scene_id,state,priority,"
+                           "available_at,policy_version,created_at) VALUES('old','episode',1,'scene',?,1,'now','old','now')", (state,))
+    with pytest.raises(MemoryConsolidationConflictError, match="旧巩固队列未完成"):
+        await database.select_consolidation_dispatch("external")
+    async with database.read() as conn:
+        assert await (await conn.execute("SELECT owner FROM memory_consolidation_dispatch")).fetchall() == [("legacy",)]
+        assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [(state,)]
+
+
+async def test_external_dispatch_is_persistent_and_revokes_every_old_queue_writer(memory_stack):
+    database, _, _ = memory_stack
+    from glimmer_cradle.cognition.memory import ConsolidationJob, Episode
+    other = SqliteMemoryStore(database._db_path)
+    await other.connect()
+    stale = ConsolidationJobRepository(other)
+    episode = Episode("episode", 1, "interaction", "scene", "conversation", "scene", "private", None,
+                      1, 1, "2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z", "explicit", 1, ())
+    try:
+        await database.select_consolidation_dispatch("legacy")
+        await stale.enqueue(episode, debounce_seconds=0, max_wait_seconds=1)
+        async with database.transaction() as conn:
+            await conn.execute("UPDATE consolidation_jobs SET state='completed'")
+        await database.select_consolidation_dispatch("external")
+        await database.select_consolidation_dispatch("external")
+        old_job = ConsolidationJob("old", "episode", 1, "scene", None, 0)
+        for operation in [stale.recover_expired(), stale.enqueue(episode, debounce_seconds=0, max_wait_seconds=1),
+                          stale.claim_due(limit=1, lease_seconds=60), stale.complete([old_job]),
+                          stale.fail([old_job], error_code="old", retry_base_seconds=1)]:
+            with pytest.raises(MemoryConsolidationConflictError, match="旧队列写入被撤销"):
+                await operation
+        await database.close(); await database.connect()
+        with pytest.raises(MemoryConsolidationConflictError, match="禁止恢复旧巩固队列"):
+            await database.select_consolidation_dispatch("legacy")
+        async with database.read() as conn:
+            assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",)]
+    finally:
+        await other.close()
+
+
+async def test_dispatch_selection_failure_rolls_back_and_invalid_owner_does_not_write(memory_stack):
+    database, _, _ = memory_stack
+    await database.select_consolidation_dispatch("legacy")
+    async with database.transaction() as conn:
+        await conn.execute("CREATE TRIGGER reject_dispatch BEFORE UPDATE ON memory_consolidation_dispatch "
+                           "BEGIN SELECT RAISE(ABORT,'injected dispatch failure'); END;")
+    with pytest.raises(sqlite3.IntegrityError, match="injected dispatch failure"):
+        await database.select_consolidation_dispatch("external")
+    with pytest.raises(ValueError, match="dispatch 无效"):
+        await database.select_consolidation_dispatch("typo")
+    async with database.read() as conn:
+        assert await (await conn.execute("SELECT owner FROM memory_consolidation_dispatch")).fetchall() == [("legacy",)]
+
+
+async def test_missing_dispatch_record_does_not_restore_legacy_over_external_attempt(memory_stack):
+    database, _, memory = memory_stack
+    await memory.prepare_job(_job_identity(), "receipt-op", (_receipt_input(),))
+    with pytest.raises(MemoryConsolidationConflictError, match="已有外部 Jobs attempt"):
+        await database.select_consolidation_dispatch("legacy")
+    await database.select_consolidation_dispatch("external")
+
+
 async def test_memory_requires_evidence_and_keeps_revision_history(memory_stack) -> None:
     database, repository, memory = memory_stack
     with pytest.raises(ValueError):
@@ -280,16 +346,18 @@ async def test_two_real_connections_commit_only_one_episode_result(memory_stack,
         await other.close()
 
 
-@pytest.mark.parametrize("old_version", [3, 4])
+@pytest.mark.parametrize("old_version", [3, 4, 5])
 async def test_memory_old_schema_rejected_without_upgrading_or_losing_existing_data(memory_stack, old_version):
     database, _, memory = memory_stack
-    if old_version == 4:
+    if old_version >= 4:
         await memory.commit_consolidation("receipt-op", (_receipt_input(),), [_receipt_draft()])
     else:
         await memory.remember_batch([_receipt_draft()])
     async with database.transaction() as conn:
-        await conn.execute("DROP TABLE memory_job_attempts")
-        await conn.execute("DROP TABLE memory_job_authority")
+        await conn.execute("DROP TABLE memory_consolidation_dispatch")
+        if old_version < 5:
+            await conn.execute("DROP TABLE memory_job_attempts")
+            await conn.execute("DROP TABLE memory_job_authority")
         if old_version == 3:
             await conn.execute("DROP TABLE memory_consolidation_inputs")
             await conn.execute("DROP TABLE memory_consolidation_receipts")
@@ -301,7 +369,7 @@ async def test_memory_old_schema_rejected_without_upgrading_or_losing_existing_d
     with sqlite3.connect(database._db_path) as observer:
         assert observer.execute("SELECT value FROM schema_meta").fetchone() == (str(old_version),)
         assert observer.execute("SELECT COUNT(*) FROM memory_revisions").fetchone() == (1,)
-        if old_version == 4:
+        if old_version >= 4:
             assert observer.execute("SELECT COUNT(*) FROM memory_consolidation_receipts").fetchone() == (1,)
 
 

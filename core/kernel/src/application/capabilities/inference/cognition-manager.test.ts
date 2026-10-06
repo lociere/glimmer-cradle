@@ -142,7 +142,7 @@ describe('CognitionManager process capability invalidation', () => {
     expect(manager.isReady).toBe(false);
   });
 
-  it('waits for initial projection after registration without prematurely opening ingress', async () => {
+  it.each(['legacy', 'external'] as const)('passes %s owner and waits for initial projection without prematurely opening ingress', async (owner) => {
     const transport = new FakeTransport();
     transport.isRegistered = true;
     const observer = vi.fn();
@@ -156,7 +156,7 @@ describe('CognitionManager process capability invalidation', () => {
       });
     const manager = configureManager(transport, observer, {
       initializeKnowledge: async () => undefined, readiness,
-    });
+    }, owner);
     const child = Object.assign(new FakeChild(4040), {
       stdio: [null, null, null, { write: () => true, end: () => undefined }],
     });
@@ -168,6 +168,7 @@ describe('CognitionManager process capability invalidation', () => {
     expect(observer.mock.calls.some(([state]) => state === 'ready')).toBe(false);
     releaseReady();
     await startup;
+    expect(vi.mocked(spawn).mock.calls[0][1]).toEqual(['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', owner]);
     expect(readiness).toHaveBeenCalledTimes(2);
     expect(observer.mock.calls.filter(([state]) => state === 'ready')).toHaveLength(1);
     expect(manager.isReady).toBe(true);
@@ -203,6 +204,7 @@ function configureManager(
   transport: FakeTransport,
   observer: CognitionLifecycleObserver,
   client: Partial<CognitionRequestPort> = {},
+  owner: 'legacy' | 'external' = 'legacy',
 ): CognitionManager {
   return new CognitionManager(
     transport,
@@ -211,5 +213,6 @@ function configureManager(
       ...client,
     } as unknown as CognitionRequestPort,
     observer,
+    owner,
   );
 }

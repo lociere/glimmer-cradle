@@ -39,7 +39,10 @@ export class CognitionManager {
     private transport: CognitionProcessTransportPort,
     private client: CognitionRequestPort,
     private lifecycleObserver: CognitionLifecycleObserver,
-  ) {}
+    private readonly memoryJobsOwner: 'legacy' | 'external' = 'legacy',
+  ) {
+    if (!['legacy', 'external'].includes(memoryJobsOwner)) throw new Error('Memory Jobs owner 无效');
+  }
 
   public async start(): Promise<void> {
     if (this.running) return;
@@ -48,7 +51,7 @@ export class CognitionManager {
     const repoRoot = resolveRepoRoot();
     const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
     const command = packagedPython || await ensureDevelopmentPython(repoRoot);
-    const args = ['-m', 'glimmer_cradle.cognition_worker'];
+    const args = ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', this.memoryJobsOwner];
     this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
     this.transport.configureActionDeadline(this.requestTimeoutMs);
     processLogDir = path.join(resolveLogDir(), 'application');

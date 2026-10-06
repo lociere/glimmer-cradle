@@ -205,7 +205,7 @@ commit 取消均等待回滚收尾再允许连接复用，回滚失败撤销并�
 新库 DDL 与 schema metadata 在同一初始化事务，失败/取消不留下半初始化表。关系 checkpoint 只向前推进。
 模型推理、向量编码和跨进程调用不在这些事务内；已提交但确认被取消不能推断未写入。
 
-Memory schema 5 将修订/evidence、`memory_consolidation_receipts` 与每个 Episode/version 的
+Memory schema 6 将修订/evidence、`memory_consolidation_receipts` 与每个 Episode/version 的
 `memory_consolidation_inputs` 索引同事务提交；receipt 保存 operation、scope、输入/输出摘要、结果
 Memory ID 与提交时间，不保存模型原文。noop 也形成结果 receipt。相同 operation/input/output 重复返回
 原结果；输入 scope/digest 漂移、同 operation 输出冲突、重复修订同一 Memory 或无 receipt 的既有同批修订
@@ -224,11 +224,14 @@ Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监�
 `ExecuteMemoryJob` / `ReconcileMemoryJob` 映射生成契约；Kernel 迁移期 transport 暴露同一 RPC。
 对账是会持久封口的命令，不是无副作用的查询；generation 鉴权、readiness、取消和停机继续使用原 Service
 边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire 与 Jobs handler/query adapter 已落位，生产 scheduler 与配置装配仍待接线，旧队列仍保留
-既定退出门。不自动升级用户 v3/v4 库；受控迁移、备份与恢复归阶段 14。
+既定退出门。不自动升级用户 v3/v4/v5 库；受控迁移、备份与恢复归阶段 14。
 
-`ReadMemoryJobRequests` / `AcknowledgeMemoryJobRequest` 只在 `ConsolidationCoordinator(jobs=None)` 的
-外部 Jobs 模式开放；默认 Worker composition 仍注入旧 repository，源投递 RPC 返回 NOT_READY，禁止
-两套 owner 双消费。外部模式的维护只投影、封口和整理源请求，不直接运行模型；启用策略、salience 与
+四个 Memory Jobs RPC 只在 `ConsolidationCoordinator(jobs=None)` 的外部 Jobs 模式开放。
+实际 Worker CLI/Host/composition 已接 `memory_jobs_owner` 显式选择；默认产品入口仍为 legacy，
+旧模式 RPC 返回 NOT_READY，禁止两套 owner 双消费。选择在 Log 单写者建立、Memory 连接后、维护
+启动前通过 `select_consolidation_dispatch()` 原子持久绑定。未完成旧任务拒绝转交；external 绑定或
+已有外部 attempt 拒绝 legacy 启动，旧 repository 的每个写事务检查该屏障。它仅为旧队列迁移窗口，
+不是第二 authority，删除条件归执行记录。外部模式的维护只投影、封口和整理源请求，不直接运行模型；启用策略、salience 与
 已提交结果由 Memory owner 判定，扫描源请求不会对已完成业务再次推理。
 `apps/host/src/composition/cognition-job-adapter.ts` 先持久 Jobs 源 inbox/enqueue 再源 ACK；App 映射
 完整源信封摘要（含首次 createdAt），Jobs 保持源 request/hash 与 Job ID 稳定，并恢复首次政策。

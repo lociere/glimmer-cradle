@@ -34,6 +34,140 @@ def test_main_returns_failure_for_missing_kernel_injection(monkeypatch) -> None:
     assert process.main([]) == 1
 
 
+def test_invalid_memory_jobs_owner_is_rejected_before_bootstrap_or_composition(monkeypatch, tmp_path):
+    bootstrap = AsyncMock()
+    monkeypatch.setattr(process, "_read_supervisor_bootstrap", bootstrap)
+    with pytest.raises(SystemExit) as error:
+        process.main(["--memory-jobs-owner", "typo"])
+    assert error.value.code == 2
+    bootstrap.assert_not_called()
+    monkeypatch.setenv("GLIMMER_CRADLE_DATA_ROOT", str(tmp_path / "not-created"))
+    with pytest.raises(ValueError, match="owner 无效"):
+        compose_cognition(map_character_runtime_document(normalized_document()), action_sink=AsyncMock(),
+                          observability=process.FileObservability(), memory_jobs_owner="typo")
+    assert not (tmp_path / "not-created").exists()
+
+
+@pytest.mark.parametrize("owner", ["legacy", "external"])
+async def test_real_worker_composition_selects_only_one_memory_jobs_owner(monkeypatch, tmp_path, owner):
+    import grpc
+    from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+    from glimmer.common.v1 import service_contract_pb2 as common_pb
+    from glimmer_cradle.conversation import MomentKind
+
+    monkeypatch.setenv("GLIMMER_CRADLE_DATA_ROOT", str(tmp_path / "data"))
+    components = compose_cognition(map_character_runtime_document(normalized_document()), action_sink=AsyncMock(),
+                                  observability=process.FileObservability(), memory_jobs_owner=owner)
+    recorder, database, coordinator = components.conversation_recorder, components.cognition_database, components.consolidation_coordinator
+    host = process.CognitionGrpcHost(generation="test", inbound=None, queue=None, activity=None, cycle=None,
+                                    shutdown=AsyncMock(), operations=None, workspace=None, consolidation=coordinator)
+    channel = None
+    try:
+        await recorder.start()
+        await database.connect()
+        await database.select_consolidation_dispatch(owner)
+        await components.memory_substrate.load()
+        await coordinator.start()
+        assert coordinator.uses_external_jobs == (owner == "external")
+        recorder.record(MomentKind.PERCEPTION, {"text": "装配事实"}, interaction_id="turn",
+                        conversation_id="conversation", retention_ceiling="memory_candidate", importance=0.9)
+        await recorder.flush()
+        # 维护只发布源请求，不在外部模式调用生产模型或创建旧任务。
+        if owner == "external":
+            assert await coordinator.consolidate(force_seal=True) == 0
+        await host.start(); host.mark_ready()
+        channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+        metadata = common_pb.CallMetadata(trace_id="probe", generation="test")
+        read = channel.unary_unary("/glimmer.cognition.v1.CognitionService/ReadMemoryJobRequests",
+                                  request_serializer=cognition_pb.ReadMemoryJobRequestsRequest.SerializeToString,
+                                  response_deserializer=cognition_pb.ReadMemoryJobRequestsResponse.FromString)
+        request = cognition_pb.ReadMemoryJobRequestsRequest(call=metadata, limit=8)
+        if owner == "external":
+            sources = (await read(request, timeout=2)).requests
+            assert len(sources) == 1
+            async with database.read() as conn:
+                assert await (await conn.execute("SELECT job_id FROM consolidation_jobs")).fetchall() == []
+            await database.close(); await database.connect()
+            with pytest.raises(ValueError, match="禁止恢复旧巩固队列"):
+                await database.select_consolidation_dispatch("legacy")
+        else:
+            for method, request_type, response_type in [
+                ("ReadMemoryJobRequests", cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
+                ("AcknowledgeMemoryJobRequest", cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
+                ("ExecuteMemoryJob", cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse),
+                ("ReconcileMemoryJob", cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
+            ]:
+                call = channel.unary_unary(f"/glimmer.cognition.v1.CognitionService/{method}",
+                                          request_serializer=request_type.SerializeToString, response_deserializer=response_type.FromString)
+                with pytest.raises(grpc.aio.AioRpcError) as failure:
+                    await call(request_type(call=metadata), timeout=2)
+                assert failure.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+        async with database.read() as conn:
+            assert await (await conn.execute("SELECT owner FROM memory_consolidation_dispatch")).fetchall() == [(owner,)]
+    finally:
+        if channel is not None: await channel.close()
+        await host.stop()
+        await coordinator.stop()
+        await recorder.stop()
+        await database.close()
+
+
+@pytest.mark.parametrize("owner", ["legacy", "external"])
+def test_cli_passes_memory_jobs_owner_to_production_host(monkeypatch, owner):
+    monkeypatch.setattr(process, "_read_supervisor_bootstrap", lambda: {
+        "kernelEndpoint": "grpc://127.0.0.1:1", "generation": "test", "registrationNonce": "nonce",
+        "registrationSecret": "dGVzdA",
+    })
+    arguments = {}
+    def host(**kwargs):
+        arguments.update(kwargs)
+        raise RuntimeError("constructor probe")
+    monkeypatch.setattr(process, "CognitionHost", host)
+    with pytest.raises(RuntimeError, match="constructor probe"):
+        process.main(["--config-json", json.dumps(normalized_document()), "--memory-jobs-owner", owner])
+    assert arguments["memory_jobs_owner"] == owner
+
+
+async def test_real_production_startup_refuses_legacy_pending_before_maintenance_and_drains(monkeypatch, tmp_path):
+    from glimmer_cradle.cognition.adapters.persistence import SqliteMemoryStore
+
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("GLIMMER_CRADLE_DATA_ROOT", str(data_root))
+    path = data_root / "state" / "cognition" / "memory.sqlite"
+    seed = SqliteMemoryStore(path)
+    await seed.connect(); await seed.select_consolidation_dispatch("legacy")
+    async with seed.transaction() as conn:
+        await conn.execute("INSERT INTO consolidation_jobs(job_id,episode_id,episode_version,scene_id,state,priority,"
+                           "available_at,policy_version,created_at) VALUES('old','episode',1,'scene','claimed',1,'now','old','now')")
+    await seed.close()
+    client = SimpleNamespace(send_action_command=AsyncMock(), start=AsyncMock(), stop=AsyncMock())
+    monkeypatch.setattr(process, "KernelGrpcClient", lambda *_args: client)
+    for method in ("start_metrics", "start_tracer", "stop_metrics", "stop_tracer"):
+        monkeypatch.setattr(process, method, AsyncMock())
+    config = map_character_runtime_document(normalized_document())
+    host = process.CognitionHost(config, "grpc://127.0.0.1:1", "test", "nonce", bytearray(b"test"), "external")
+    try:
+        with pytest.raises(ValueError, match="旧巩固队列未完成"):
+            await host.start()
+        assert host.readiness.state == "stopped" and not host.readiness.is_ready
+        assert host.cognition_grpc_host is None
+        assert host.components.cognition_database._conn is None
+        client.start.assert_not_awaited()
+        client.stop.assert_awaited_once()
+        assert host.registration_secret is None
+        # 启动失败保留原队列，不以恢复 expired 或模型执行代替数据迁移。
+        await seed.connect()
+        async with seed.read() as conn:
+            assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("claimed",)]
+            assert await (await conn.execute("SELECT owner FROM memory_consolidation_dispatch")).fetchall() == [("legacy",)]
+        # 证明 Conversation 单写者已释放，后续正确 legacy 装配可取得同一数据根。
+        following = compose_cognition(config, action_sink=AsyncMock(), observability=process.FileObservability())
+        await following.conversation_recorder.start()
+        await following.conversation_recorder.stop()
+    finally:
+        await host.stop(); await seed.close()
+
+
 def test_readiness_requires_every_component_and_cannot_reopen_during_stop() -> None:
     readiness = ReadinessTracker(WORKER_READY_COMPONENTS)
     readiness.begin_startup()
@@ -58,8 +192,9 @@ def test_readiness_requires_every_component_and_cannot_reopen_during_stop() -> N
 
 
 @pytest.mark.parametrize("projection_fails", [False, True])
+@pytest.mark.parametrize("owner", ["legacy", "external"])
 async def test_production_worker_waits_for_first_state_projection_before_ready(
-    monkeypatch, projection_fails: bool,
+    monkeypatch, projection_fails: bool, owner: str,
 ) -> None:
     import grpc
     from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
@@ -72,7 +207,7 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
         pass
 
     def component():
-        return SimpleNamespace(connect=nothing, start=nothing, stop=nothing, close=nothing,
+        return SimpleNamespace(connect=nothing, start=nothing, stop=nothing, close=nothing, select_consolidation_dispatch=nothing,
                                load=nothing, load_persisted=nothing)
 
     components = SimpleNamespace(
@@ -87,7 +222,16 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
         character_session=SimpleNamespace(wake_up=lambda: None, sleep=lambda: None,
                                           get_state=lambda: {"name": "test", "is_awake": True}),
     )
-    monkeypatch.setattr(composition, "compose_cognition", lambda *_args, **_kwargs: components)
+    compose_arguments = {}
+    def factory(*_args, **kwargs):
+        compose_arguments.update(kwargs)
+        return components
+    selected = []
+    async def select(value): selected.append(value)
+    async def start_maintenance(): assert selected == [owner]
+    components.cognition_database.select_consolidation_dispatch = select
+    components.maintenance_scheduler.start = start_maintenance
+    monkeypatch.setattr(composition, "compose_cognition", factory)
     for method in ("start_metrics", "start_tracer", "stop_metrics", "stop_tracer"):
         monkeypatch.setattr(process, method, nothing)
 
@@ -109,11 +253,14 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
         config=SimpleNamespace(manifest=SimpleNamespace(base=SimpleNamespace(name="test"))),
         kernel_endpoint="grpc://127.0.0.1:1", generation="test", registration_nonce="test",
         registration_secret=bytearray(b"test"),
+        memory_jobs_owner=owner,
     )
     startup = asyncio.create_task(host.start())
     channel = None
     try:
         await asyncio.wait_for(projection_entered.wait(), timeout=1)
+        assert compose_arguments["memory_jobs_owner"] == owner
+        assert selected == [owner]
         assert host.cognition_grpc_host._consolidation is components.consolidation_coordinator
         channel = grpc.aio.insecure_channel(host.cognition_grpc_host.endpoint.removeprefix("grpc://"))
         readiness = channel.unary_unary(

@@ -31,7 +31,7 @@ from glimmer_cradle.cognition.memory.consolidation import consolidation_input
 from glimmer_cradle.cognition.ports import LoggerPort
 from glimmer_cradle.conversation import ConversationLogReaderPort, Moment, MomentKind
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 _VECTOR_DTYPE = np.float32
 
 
@@ -108,6 +108,7 @@ class SqliteMemoryStore:
             await connection.execute("SELECT receipt_id,operation_id,request_digest,draft_digest FROM memory_consolidation_receipts LIMIT 0")
             await connection.execute("SELECT episode_id,episode_version,scope_id,input_digest,receipt_id FROM memory_consolidation_inputs LIMIT 0")
             await connection.execute("SELECT epoch FROM memory_job_authority LIMIT 0")
+            await connection.execute("SELECT singleton,owner FROM memory_consolidation_dispatch LIMIT 0")
             await connection.execute("SELECT job_id,attempt,state,receipt_id,observed_at FROM memory_job_attempts LIMIT 0")
         except BaseException:
             await self._drain_cleanup(connection.close())
@@ -119,6 +120,28 @@ class SqliteMemoryStore:
                 db_path=str(self._db_path),
                 schema_version=SCHEMA_VERSION,
             )
+
+    async def select_consolidation_dispatch(self, owner: str) -> None:
+        """App 在启动维护前绑定装配；旧队列未完成不能迁出，外部绑定不能回退。"""
+        if owner not in {"legacy", "external"}:
+            raise ValueError("Memory consolidation dispatch 无效")
+        async with self.transaction() as conn:
+            cursor = await conn.execute("SELECT owner FROM memory_consolidation_dispatch WHERE singleton=1")
+            selected = await cursor.fetchone()
+            if selected is not None and selected[0] not in {"legacy", "external"}:
+                raise MemoryConsolidationConflictError("Memory consolidation dispatch 持久记录无效")
+            if selected is not None and selected[0] == "external" and owner != "external":
+                raise MemoryConsolidationConflictError("Memory 已绑定外部 Jobs；禁止恢复旧巩固队列")
+            if owner == "legacy":
+                cursor = await conn.execute("SELECT 1 FROM memory_job_attempts LIMIT 1")
+                if await cursor.fetchone() is not None:
+                    raise MemoryConsolidationConflictError("Memory 已有外部 Jobs attempt；禁止恢复旧巩固队列")
+            if owner == "external":
+                cursor = await conn.execute("SELECT 1 FROM consolidation_jobs WHERE state<>'completed' LIMIT 1")
+                if await cursor.fetchone() is not None:
+                    raise MemoryConsolidationConflictError("旧巩固队列未完成；须先执行受控数据迁移")
+            await conn.execute("INSERT INTO memory_consolidation_dispatch VALUES(1,?) "
+                               "ON CONFLICT(singleton) DO UPDATE SET owner=excluded.owner", (owner,))
 
     async def close(self) -> None:
         async with self._connection_lock:
@@ -849,8 +872,16 @@ class ConsolidationJobRepository:
     def __init__(self, database: SqliteMemoryStore) -> None:
         self._db = database
 
+    @staticmethod
+    async def _assert_legacy_dispatch(conn: aiosqlite.Connection) -> None:
+        cursor = await conn.execute("SELECT owner FROM memory_consolidation_dispatch WHERE singleton=1")
+        selected = await cursor.fetchone()
+        if selected is not None and selected[0] != "legacy":
+            raise MemoryConsolidationConflictError("Memory 已绑定外部 Jobs；旧队列写入被撤销")
+
     async def recover_expired(self) -> None:
         async with self._db.transaction() as conn:
+            await self._assert_legacy_dispatch(conn)
             await conn.execute(
                 """
                 UPDATE consolidation_jobs SET state='pending',lease_until=NULL
@@ -872,6 +903,7 @@ class ConsolidationJobRepository:
         ).hex
         timestamp = _iso(now)
         async with self._db.transaction() as conn:
+            await self._assert_legacy_dispatch(conn)
             await conn.execute(
                 """
                 INSERT INTO consolidation_jobs(
@@ -905,6 +937,7 @@ class ConsolidationJobRepository:
         now = datetime.now(timezone.utc)
         lease_until = _iso(now + timedelta(seconds=lease_seconds))
         async with self._db.transaction() as conn:
+            await self._assert_legacy_dispatch(conn)
             cursor = await conn.execute(
                 """
                 SELECT job_id,episode_id,episode_version,scene_id,actor_id,attempt_count
@@ -931,6 +964,7 @@ class ConsolidationJobRepository:
             return
         timestamp = _now_iso()
         async with self._db.transaction() as conn:
+            await self._assert_legacy_dispatch(conn)
             cursor = await conn.executemany(
                 """
                 UPDATE consolidation_jobs
@@ -957,6 +991,7 @@ class ConsolidationJobRepository:
             delay = retry_base_seconds * (2 ** min(job.attempt_count, 6))
             values.append((_iso(now + timedelta(seconds=delay)), error_code, job.job_id, job.attempt_count + 1))
         async with self._db.transaction() as conn:
+            await self._assert_legacy_dispatch(conn)
             await conn.executemany(
                 """
                 UPDATE consolidation_jobs

@@ -88,6 +88,11 @@ CREATE TABLE memory_consolidation_inputs(
 -- 仅保存接收端提交资格，不承担 Jobs 调度、退避或终态 owner。
 CREATE TABLE memory_job_authority(epoch INTEGER NOT NULL);
 INSERT INTO memory_job_authority VALUES(0);
+-- 临时装配切换屏障；不是 authority/lease。旧队列删除时随受控数据迁移退出。
+CREATE TABLE memory_consolidation_dispatch(
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+  owner TEXT NOT NULL CHECK(owner IN ('legacy','external'))
+);
 CREATE TABLE memory_job_attempts(
   job_id TEXT NOT NULL, attempt INTEGER NOT NULL,
   scope_id TEXT NOT NULL, authority_epoch INTEGER NOT NULL,

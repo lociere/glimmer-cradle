@@ -11,6 +11,14 @@ Knowledge、Plan、Synthesis 与历史查询已调用 Cognition/Conversation map
 继续收束兼容 RPC service 的其余主体。生产 Host 已使用 `readiness.py` 的逐项业务 ready 条件和
 `shutdown.py` 的有序幂等停机图；首条状态投影成功前不 ready，Shutdown ACK 后不再接纳新业务请求。
 
+受监督启动可显式传 `--memory-jobs-owner external`；生产 factory 不再固定创建旧巩固队列。
+默认 `legacy` 仅用于尚未切换的产品入口，非法值在装配前拒绝。此参数需要重启，不是角色配置或热切换。
+Worker 在建立 Conversation 单写者并连接 Memory 后、启动维护前绑定持久 dispatch：旧队列有非终态
+任务时拒绝转交；external 绑定后拒绝 legacy 重启和旧队列写入。四个 Memory Jobs RPC 只在外部
+装配开放。Memory schema 6 拒绝旧 v3/v4/v5 隐式升级，详见 [数据布局](../../docs/reference/data-layout.md)。
+该切换窗口与旧 repository 的退出条件见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)；
+生产 Host supervisor/config、旧数据迁移和队列删除门仍未完成，当前产品入口不自动切到 external。
+
 模型与云 Embedding HTTP 由 Worker 的异步 HTTPX adapter 承担；Core `ModelPort.generate`、
 CloudReasoning、视觉专家、Plan/Synthesis 与 Memory 巩固均直接 await，不在线程中发网络请求。
 取消传播到连接关闭，Embedding 的重试等待也可取消；错误不暴露响应正文或 URL，第三方 wire 日志

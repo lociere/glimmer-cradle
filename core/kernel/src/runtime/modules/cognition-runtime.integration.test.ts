@@ -80,6 +80,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
       transport,
       new CognitionClient(transport),
       (state, summary) => cognitionRuntime.acceptLifecycleFact(state, summary),
+      'external',
     );
     cognitionRuntime = new CognitionRuntime(
       transportRuntime,

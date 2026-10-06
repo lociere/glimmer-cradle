@@ -1637,13 +1637,12 @@ class CognitionGrpcHost:
 
     async def _execute_memory_job(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
-            if self._consolidation is None:
-                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Memory Job receiver 尚未装配")
+            coordinator = self._external_memory_jobs()
             identity = self._memory_job_identity(request)
             item = MemoryConsolidationInput(request.episode_id, request.episode_version, identity.scope_id, request.input_digest)
             try:
-                receipt = await self._consolidation.execute_job(identity, item)
-                proof = await self._consolidation.reconcile_job(identity)
+                receipt = await coordinator.execute_job(identity, item)
+                proof = await coordinator.reconcile_job(identity)
             except MemoryConsolidationConflictError as error:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 身份/输入/提交资格冲突；须对账原 attempt") from error
             return cognition_pb.ExecuteMemoryJobResponse(result=self._memory_job_result(request.identity, receipt, proof.receiver_fenced, proof.observed_at))
@@ -1651,11 +1650,10 @@ class CognitionGrpcHost:
 
     async def _reconcile_memory_job(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
-            if self._consolidation is None:
-                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Memory Job receiver 尚未装配")
+            coordinator = self._external_memory_jobs()
             identity = self._memory_job_identity(request)
             try:
-                result: MemoryJobResult = await self._consolidation.reconcile_job(identity)
+                result: MemoryJobResult = await coordinator.reconcile_job(identity)
             except MemoryConsolidationConflictError as error:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 原 attempt 对账冲突") from error
             return cognition_pb.ReconcileMemoryJobResponse(result=self._memory_job_result(request.identity, result.receipt, result.receiver_fenced, result.observed_at))
@@ -1880,6 +1878,7 @@ class CognitionHost:
         generation: str,
         registration_nonce: str,
         registration_secret: bytearray,
+        memory_jobs_owner: str = "legacy",
     ):
         """
         初始化AI核心
@@ -1890,6 +1889,9 @@ class CognitionHost:
         异常：
             ConfigException: 配置校验失败时抛出
         """
+        if memory_jobs_owner not in {"legacy", "external"}:
+            raise ValueError("Memory Jobs owner 无效")
+        self.memory_jobs_owner: Final[str] = memory_jobs_owner
         # 全局冻结配置，会话期不可修改
         self.config: Final[Any] = config
         self.kernel_endpoint: Final[str] = kernel_endpoint
@@ -1942,6 +1944,7 @@ class CognitionHost:
                 action_sink=self.kernel_client.send_action_command,
                 observability=FileObservability(),
                 model_invocation_recorder=record_model_invocation,
+                memory_jobs_owner=self.memory_jobs_owner,
             )
             components = self._require_components()
             self.cognition_grpc_host = CognitionGrpcHost(
@@ -1984,6 +1987,7 @@ class CognitionHost:
             # 1.66 先连接事实库并恢复投影，认知循环不得在 repository ready 前消费输入。
             cognition_database = components.cognition_database
             await cognition_database.connect()
+            await cognition_database.select_consolidation_dispatch(self.memory_jobs_owner)
             await components.turn_controller.connect()
             await components.conversation_controller.connect()
             await components.memory_substrate.load()
@@ -2189,6 +2193,8 @@ def main(argv: list[str] | None = None) -> int:
         required=False,
         help="JSON格式的全局配置字符串，由Kernel 内核注入（优先）"
     )
+    parser.add_argument("--memory-jobs-owner", choices=("legacy", "external"), default="legacy",
+                        help="受监督装配的 Memory Jobs owner；external 不允许回退为旧队列")
     args = parser.parse_args(argv)
 
     # 角色配置可通过环境变量注入；endpoint/generation/challenge 不进入环境。
@@ -2230,6 +2236,7 @@ def main(argv: list[str] | None = None) -> int:
         generation=generation,
         registration_nonce=registration_nonce,
         registration_secret=registration_secret,
+        memory_jobs_owner=args.memory_jobs_owner,
     )
 
     loop = asyncio.new_event_loop()

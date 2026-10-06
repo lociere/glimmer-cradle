@@ -410,6 +410,40 @@ src/adapters/storage/sqlite-job-store.ts,src/index.ts}` 与 Host 现有 mapper/a
 复用已记录的 Contract Spine 22 gate、Cognition 279 项、Worker 72 项和父候选 Kernel 6 项证据。
 未创建生产数据库、迁移用户数据或切换默认旧巩固队列；独立审查仍留完整重构的固定最终候选。
 
+### 阶段 7 Worker 实际装配选择与切换屏障（2026-10-06 当前候选）
+
+输入 `158569fd`；当前会话唯一写入 owner。沿用清单已有 Worker `composition.py`、`rpc_service.py`、
+`tests/test_process_recovery.py` 与 Memory `migrations/002-memory.sql`、`adapters/persistence/sqlite_memory_store.py`
+和现有测试；迁移期 Kernel `adapters/cognition/cognition-process-adapter.ts` 与真实进程测试同步
+显式注入启动选择，该临时 consumer 随 Host supervisor 迁移归零删除。
+不新增第二 Document Schema 或空启动入口。受监督进程 CLI 显式选择 legacy/external
+装配，默认 legacy 直到生产 cutover；这不是角色 Memory 政策或可热切换的业务配置。
+选择必须在 Conversation 单写者建立、Memory 连接后、维护调度前持久绑定；旧队列非终态拒绝转交，
+external 绑定拒绝后续 legacy 启动及旧队列写入。此记录仅为临时队列删除门，不代替 Jobs authority。
+新库 schema 6 拒绝旧候选 v3/v4/v5 隐式升级；受控旧数据迁移归阶段 14。
+验收生产 factory 的真实 SQLite/Log/源 RPC、恢复/非法选择、未完成旧任务拒切换、旧 writer 拒写、
+切换失败回滚与外部绑定重启；旧 owner 在 consumer-zero 和迁移门通过后连同此选择窗口删除。
+
+候选成果：受监督 CLI → CognitionHost → 实际 factory → 单写者/Memory 绑定 → 维护启动已接通，
+非法选择在创建数据前拒绝；legacy 装配的四个 Memory Jobs RPC 均返回 NOT_READY。
+新库 schema 6 与五个旧队列写入口共享 IMMEDIATE 切换屏障，completed 历史保留；pending/claimed/
+failed/未知非终态阻止转交，外部 attempt 也阻止在缺少绑定记录时默认恢复旧队列。
+生产启动拒切换的验收确认原 claimed/绑定未变、Memory 与 RPC/注册能力/Log 单写者已回收。
+执行 RPC fixture 现显式选择 external；原源 RPC 的 legacy 反例断言保留，不能通过绕过装配屏障验收。
+
+验证：Cognition 全量 287 项、Worker 全量 80 项、Host 38 项，Kernel 定向 14 项（真实进程
+6 项和监督单测 8 项）PASS。两处新测试元数据名称/字段错误按唯一 proto 修正，旧执行 fixture
+的 legacy 装配按新真实模式改为 external 后重验；没有放宽业务断言或超时。
+Worker 改动测试 Ruff PASS；Core 两份改动文件 Ruff 报告 12 项既存问题，已用父提交原文 stdin
+核对规则/位置，仅行号随插入变化，本轮没有新增此类问题，不将该检查记为 PASS。
+未改跨语言 wire/Document/生成树或依赖，Contract Spine 完整 22 gate 复用既有未失效证据。
+产品 Host supervisor/config/catalog、状态事件接收、旧数据切换与删除仍须完成；没有迁移用户库、
+创建生产 Jobs 库或将产品默认入口改为 external，独立审查仍留固定最终候选。
+固定候选包含上述 16 份源码/测试/文档改动；根 `pnpm typecheck`、`pnpm build`、文档 111 页、
+编码、架构与 diff 门 PASS，target-layout 仅 spec-only PASS。下一步将受监督 Worker 与现有
+HostJobsOwner 贯通到目标 Host 的实际进程监督装配，再继续配置 Document/catalog 与状态事件接收；
+不把临时 Kernel 的 opt-in 验收当作目标 Host supervisor 已完成。
+
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 
 本切片完成 Content/AssetRef 的真实 producer→Contract Spine→Cognition→Experience 链路；阶段 4 的
