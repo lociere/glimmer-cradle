@@ -25,7 +25,7 @@ from typing import Any, Final, Optional
 import uuid
 
 import grpc
-from google.protobuf.json_format import MessageToDict, ParseDict
+from google.protobuf.json_format import ParseDict
 import structlog
 from structlog.stdlib import ProcessorFormatter
 
@@ -35,24 +35,27 @@ from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.perception import (
-    Observation,
-    ObservationNormalizer,
     ObservationQueue,
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )
 from glimmer_cradle.cognition.ports import (
-    AgentPlanInput,
-    AgentSynthesisInput,
-    ConversationHistoryQuery,
     KernelRequestPort,
-    KnowledgeEntryInput,
-    KnowledgeInitialization,
-    KnowledgeRetrievalInput,
-    SkillToolDescriptor,
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.cognition_worker.composition import WorkerPaths
+from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
+    agent_plan_from_wire,
+    agent_plan_to_wire,
+    agent_synthesis_from_wire,
+    agent_synthesis_to_wire,
+    knowledge_initialization_from_wire,
+    observation_from_wire,
+)
+from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
+    history_query_from_wire,
+    history_result_to_wire,
+)
 
 
 def ensure_dir(path: Path) -> Path:
@@ -1301,12 +1304,6 @@ def _perception_state(state: str) -> int:
     }.get(state, cognition_pb.PERCEPTION_OPERATION_STATE_UNSPECIFIED)
 
 
-def _struct_dict(value: Any) -> dict[str, Any]:
-    if value is None:
-        return {}
-    return MessageToDict(value, preserving_proto_field_name=True)
-
-
 def _parse_struct(value: dict[str, Any] | None, target: Any) -> None:
     ParseDict(value or {}, target)
 
@@ -1375,7 +1372,6 @@ class CognitionGrpcHost:
         self._shutdown = shutdown
         self._operations = operations
         self._workspace = workspace
-        self._observation_normalizer = ObservationNormalizer()
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._phase = "binding"
@@ -1494,58 +1490,16 @@ class CognitionGrpcHost:
         async def operation(trace_id: str) -> Any:
             operation_id = request.call.idempotency_key or trace_id
             try:
+                # 接纳前完成校验，防止非法重试得到 accepted 确认。
+                observation = observation_from_wire(request, trace_id=trace_id)
                 perception_operation, duplicate = self._operations.accept(operation_id, trace_id)
-            except PerceptionOperationConflict as error:
+            except (ValueError, PerceptionOperationConflict) as error:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)) from error
             if not duplicate:
-                content = request.content
-                payload_digest = request.origin.content_hash.strip() or hashlib.sha256(
-                    request.SerializeToString(deterministic=True)
-                ).hexdigest()
-                model_input = {
-                    "text": content.text,
-                    "actor_id": content.actor_id or None,
-                    "actor_name": content.actor_name or None,
-                    "modality": list(content.modality),
-                    "items": [MessageToDict(item, preserving_proto_field_name=True) for item in content.items],
-                    "parts": [MessageToDict(part, preserving_proto_field_name=True) for part in content.parts],
-                }
-                conversation = request.conversation
-                address_mode = "direct" if request.address_mode == cognition_pb.ADDRESS_MODE_DIRECT else "ambient"
-                response_policy = "observe_only" if request.response_policy == cognition_pb.RESPONSE_POLICY_OBSERVE_ONLY else "reply_allowed"
-                retention = {
-                    cognition_pb.RETENTION_CEILING_TRANSIENT: "transient",
-                    cognition_pb.RETENTION_CEILING_MEMORY_CANDIDATE: "memory_candidate",
-                }.get(request.retention_ceiling, "experience")
-                try:
-                    observation = self._observation_normalizer.normalize(Observation(
-                        scene_id=conversation.scene_id,
-                        conversation_id=conversation.conversation_id,
-                        continuity_id=conversation.continuity_id,
-                        thread_id=conversation.thread_id,
-                        recall_scope=conversation.recall_scope,
-                        disclosure_scope=conversation.disclosure_scope,
-                        address_mode=address_mode,
-                        familiarity=request.familiarity,
-                        response_policy=response_policy,
-                        text=content.text,
-                        trace_id=trace_id,
-                        actor_id=content.actor_id or None,
-                        actor_name=content.actor_name or None,
-                        model_input=model_input,
-                        origin=MessageToDict(request.origin, preserving_proto_field_name=True),
-                        retention_ceiling=retention,
-                        interaction_id=conversation.interaction_id,
-                        payload_digest=payload_digest,
-                    ))
-                except ValueError as error:
-                    raise ServiceFault(
-                        common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, str(error)
-                    ) from error
                 dropped = self._queue.put(observation)
                 if dropped is not None:
                     self._operations.finish(dropped.trace_id, "failed", "感知队列容量已满")
-                if address_mode == "direct":
+                if observation.address_mode == "direct":
                     self._activity.engage("direct_perception")
                 else:
                     self._activity.observe_activity("ambient_perception")
@@ -1589,79 +1543,27 @@ class CognitionGrpcHost:
         async def operation(trace_id: str) -> Any:
             duplicate = self._is_completed(request.call)
             if not duplicate:
-                await self._inbound.on_knowledge_init(KnowledgeInitialization(
-                    version=request.version,
-                    retrieval=KnowledgeRetrievalInput(
-                        mode=request.retrieval.mode or "full_injection",
-                        top_k=request.retrieval.top_k or 5,
-                        min_score=request.retrieval.min_score,
-                        semantic_weight=request.retrieval.semantic_weight,
-                    ),
-                    entries=[KnowledgeEntryInput(entry_id=e.entry_id, scope=e.scope, content=e.content, enabled=e.enabled, priority=e.priority) for e in request.entries],
-                ))
+                await self._inbound.on_knowledge_init(knowledge_initialization_from_wire(request))
                 self._mark_completed(request.call)
             return cognition_pb.InitializeKnowledgeResponse(operation_id=request.call.idempotency_key or trace_id, status="duplicate" if duplicate else "initialized", duplicate=duplicate)
         return await self._invoke(request, context, operation)
 
     async def _plan(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            output = await self._inbound.on_agent_plan(AgentPlanInput(
-                user_goal=request.user_goal,
-                scene_id=request.scene_id,
-                trace_id=trace_id,
-                available_tools=[SkillToolDescriptor(skill_id=t.skill_id, tool_name=t.tool_name, description=t.description, parameters=_struct_dict(t.parameters_schema)) for t in request.available_tools],
-            ))
-            response = cognition_pb.PlanResponse(summary=output.summary, reasoning=output.reasoning, trace_id=output.trace_id)
-            for suggestion in output.suggestions:
-                item = response.suggestions.add(skill_id=suggestion.skill_id, tool_name=suggestion.tool_name, purpose=suggestion.purpose, confidence=suggestion.confidence)
-                _parse_struct(suggestion.arguments_hint, item.arguments_hint)
-            return response
+            output = await self._inbound.on_agent_plan(agent_plan_from_wire(request, trace_id=trace_id))
+            return agent_plan_to_wire(output)
         return await self._invoke(request, context, operation, track=True)
 
     async def _synthesize(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            output = await self._inbound.on_agent_synthesis(AgentSynthesisInput(
-                original_goal=request.original_goal,
-                scene_id=request.scene_id,
-                conversation=MessageToDict(request.conversation, preserving_proto_field_name=True),
-                tool_results=[MessageToDict(item, preserving_proto_field_name=True) for item in request.tool_results],
-                trace_id=trace_id,
-            ))
-            response = cognition_pb.SynthesizeResponse(reply_content=output.reply_content, trace_id=output.trace_id)
-            _parse_struct(output.emotion_state, response.emotion_state)
-            return response
+            output = await self._inbound.on_agent_synthesis(agent_synthesis_from_wire(request, trace_id=trace_id))
+            return agent_synthesis_to_wire(output)
         return await self._invoke(request, context, operation, track=True)
 
     async def _history(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
-            output = await self._inbound.on_conversation_history(ConversationHistoryQuery(
-                request_id=request.request_id,
-                conversation_id=request.conversation_id,
-                scene_id=request.scene_id,
-                thread_id=request.thread_id,
-                actor_id=request.actor_id or None,
-                actor_name=request.actor_name or None,
-                source_provider_id=request.source_provider_id,
-                cursor=request.cursor or None,
-                limit=request.limit or 50,
-                allowed_scopes=list(request.allowed_scopes),
-            ))
-            response = cognition_pb.GetConversationHistoryResponse(request_id=output.request_id, status=output.status, next_cursor=output.next_cursor or "", has_more=output.has_more, message=output.message or "")
-            if output.conversation:
-                conversation = output.conversation
-                response.conversation.CopyFrom(cognition_pb.ConversationContext(
-                    source_provider_id=str(conversation.get("source_provider_id") or ""),
-                    scene_id=str(conversation.get("scene_id") or ""),
-                    conversation_id=str(conversation.get("conversation_id") or ""),
-                    continuity_id=str(conversation.get("continuity_id") or ""),
-                    thread_id=str(conversation.get("thread_id") or ""),
-                    interaction_id=str(conversation.get("interaction_id") or ""),
-                    recall_scope=str(conversation.get("recall_scope") or ""),
-                    disclosure_scope=str(conversation.get("disclosure_scope") or ""),
-                ))
-            for entry in output.items:
-                response.items.add(**entry.model_dump(exclude_none=True))
-            return response
+            output = await self._inbound.on_conversation_history(history_query_from_wire(request))
+            return history_result_to_wire(output)
         return await self._invoke(request, context, operation, track=True)
 
     async def _heartbeat(self, request: Any, context: Any) -> Any:

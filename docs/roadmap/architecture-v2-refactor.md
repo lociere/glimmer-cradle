@@ -706,6 +706,15 @@ PerceptionProvider 投影、willingness 阈值及行动仲裁并入目标 `test_
 旧 `test_global_workspace.py`、`test_perception_provider.py` 与 `test_volition.py` consumer-zero 删除；
 全部 Core 214 项 PASS，覆盖数量和断言保持，最终物理差距为 1,564 项。
 
+Worker 生产 wire 映射接线切片将感知、Knowledge、Plan、Synthesis 与历史查询从 RPC service 内联转换
+迁入目标 `adapters/cognition_mapper.py` 与 `conversation_mapper.py`，真实 RPC 调用唯一 mapper，保留
+默认值、scope、identity 和 protobuf Struct 语义。感知输入在 operation 接纳前校验，修复非法请求先
+占用 registry 后在重试中被误报 accepted 的缺陷；反例覆盖重复拒绝、无残留、修正后同 identity 接纳。
+真实 gRPC 测试覆盖 Knowledge 初始化、Plan 参数/结果、Synthesis 因果字段与历史 position/cursor 往返。
+Worker 50 项、Core 214 项、真实 Kernel/Worker 生命周期 4 项、完整 `pnpm contracts:verify`、根
+typecheck/build 均 PASS；首次契约生成一致性检查失败后单独复验及完整重跑通过，未修改生成物或降低门禁。
+本切片不新增协议源，不宣称 capability/model/job/resource broker、readiness/shutdown 或阶段 5 已完成。
+
 ### 阶段 2 后续候选审计与 Configuration 切片
 
 本轮基于 `cbb6c853`，由当前任务独占写入；不提交、不推送。

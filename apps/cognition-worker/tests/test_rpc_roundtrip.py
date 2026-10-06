@@ -37,10 +37,14 @@ from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
     AgentPlanResult,
     AgentSynthesisInput,
+    AgentSynthesisOutput,
     CapabilityInvocation,
     ContentReference,
+    ConversationHistoryEntry,
+    ConversationHistoryResult,
     JobRequest,
     SkillToolDescriptor,
+    SkillToolSuggestion,
 )
 from glimmer_cradle.cognition_worker.adapters import (
     CapabilityClient,
@@ -72,6 +76,88 @@ from glimmer_cradle.conversation import (
     TurnController,
 )
 from glimmer_cradle.conversation.log import MomentKind
+
+
+async def test_service_maps_knowledge_plan_synthesis_and_history(service) -> None:
+    from google.protobuf.json_format import MessageToDict, ParseDict
+
+    host, channel, _queue, _stopped = service
+
+    class Inbound(_Inbound):
+        async def on_knowledge_init(self, knowledge):
+            assert knowledge.version == "v1"
+            assert knowledge.retrieval.top_k == 5
+            assert knowledge.entries[0].content == "fact"
+
+        async def on_agent_plan(self, value):
+            assert value.trace_id == "plan-trace"
+            assert value.available_tools[0].parameters == {"type": "object"}
+            return AgentPlanResult(
+                summary="summary", reasoning="reason", trace_id=value.trace_id,
+                suggestions=[SkillToolSuggestion(
+                    skill_id="weather", tool_name="lookup", purpose="weather",
+                    confidence=0.8, arguments_hint={"city": "Shanghai"},
+                )],
+            )
+
+        async def on_agent_synthesis(self, value):
+            assert value.conversation["conversation_id"] == "conversation-1"
+            assert value.tool_results[0]["invocation_id"] == "invoke-1"
+            return AgentSynthesisOutput("sunny", {"emotion_type": "neutral"}, value.trace_id)
+
+        async def on_conversation_history(self, value):
+            assert value.actor_id is None and value.cursor is None
+            assert value.limit == 50 and value.allowed_scopes == ["conversation_private"]
+            return ConversationHistoryResult(
+                request_id=value.request_id, status="ok", next_cursor="next", has_more=True,
+                conversation={"conversation_id": value.conversation_id, "thread_id": "main"},
+                items=[ConversationHistoryEntry(
+                    entry_id="entry-1", source_kind="moment", role="user", status="committed",
+                    text="hello", occurred_at="2026-01-02T03:04:05Z", position=7,
+                    conversation_id=value.conversation_id, scene_id=value.scene_id,
+                    thread_id=value.thread_id, recall_scope="conversation_private",
+                    disclosure_scope="conversation_private",
+                )],
+            )
+
+    host._inbound = Inbound()
+    initialize = _call(channel, "InitializeKnowledge", cognition_pb.InitializeKnowledgeRequest, cognition_pb.InitializeKnowledgeResponse)
+    initialized = await initialize(cognition_pb.InitializeKnowledgeRequest(
+        call=_metadata("generation-1", "knowledge-trace", "knowledge-1"), version="v1",
+        entries=[cognition_pb.KnowledgeEntry(entry_id="fact-1", scope="knowledge", content="fact", enabled=True, priority=1)],
+    ), timeout=1)
+    assert initialized.status == "initialized"
+
+    plan = _call(channel, "Plan", cognition_pb.PlanRequest, cognition_pb.PlanResponse)
+    request = cognition_pb.PlanRequest(call=_metadata("generation-1", "plan-trace"), user_goal="weather")
+    tool = request.available_tools.add(skill_id="weather", tool_name="lookup")
+    ParseDict({"type": "object"}, tool.parameters_schema)
+    planned = await plan(request, timeout=1)
+    assert planned.trace_id == "plan-trace"
+    assert planned.suggestions[0].skill_id == "weather"
+    assert MessageToDict(planned.suggestions[0].arguments_hint) == {"city": "Shanghai"}
+
+    synthesize = _call(channel, "Synthesize", cognition_pb.SynthesizeRequest, cognition_pb.SynthesizeResponse)
+    synthesized = await synthesize(cognition_pb.SynthesizeRequest(
+        call=_metadata("generation-1", "synthesis-trace"), original_goal="weather",
+        conversation=_conversation("interaction-1"),
+        tool_results=[cognition_pb.ToolResult(tool_name="lookup", status="succeeded", invocation_id="invoke-1")],
+    ), timeout=1)
+    assert synthesized.reply_content == "sunny"
+    assert synthesized.trace_id == "synthesis-trace"
+    assert MessageToDict(synthesized.emotion_state) == {"emotion_type": "neutral"}
+
+    history = _call(channel, "GetConversationHistory", cognition_pb.GetConversationHistoryRequest, cognition_pb.GetConversationHistoryResponse)
+    result = await history(cognition_pb.GetConversationHistoryRequest(
+        call=_metadata("generation-1", "history-trace"), request_id="history-1",
+        conversation_id="conversation-1", scene_id="scene-1", thread_id="main",
+        allowed_scopes=["conversation_private"],
+    ), timeout=1)
+    assert result.request_id == "history-1"
+    assert result.conversation.conversation_id == "conversation-1"
+    assert result.next_cursor == "next" and result.has_more
+    assert result.items[0].position == 7
+    assert result.items[0].text == "hello"
 
 
 class RequestTransport:
@@ -753,19 +839,29 @@ async def test_queue_capacity_drop_closes_the_accepted_perception_operation() ->
 
 @pytest.mark.asyncio
 async def test_unbound_observation_is_rejected_as_invalid_request(service) -> None:
-    _host, channel, _queue, _stopped = service
+    host, channel, queue, _stopped = service
     submit = _call(
         channel,
         "SubmitPerception",
         cognition_pb.SubmitPerceptionRequest,
         cognition_pb.SubmitPerceptionResponse,
     )
-    with pytest.raises(grpc.aio.AioRpcError) as caught:
-        await submit(cognition_pb.SubmitPerceptionRequest(
-            call=_metadata("generation-1", "invalid-observation", "invalid-observation"),
-            content=cognition_pb.PerceptionContent(text="missing context"),
-        ), timeout=1)
-    assert caught.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    request = cognition_pb.SubmitPerceptionRequest(
+        call=_metadata("generation-1", "invalid-observation", "invalid-observation"),
+        content=cognition_pb.PerceptionContent(text="missing context"),
+    )
+    for _ in range(2):
+        with pytest.raises(grpc.aio.AioRpcError) as caught:
+            await submit(request, timeout=1)
+        assert caught.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    assert host._operations.get("invalid-observation") is None
+    assert queue.entries == []
+
+    request.conversation.CopyFrom(_conversation("invalid-observation"))
+    accepted = await submit(request, timeout=1)
+    assert accepted.state == cognition_pb.PERCEPTION_OPERATION_STATE_ACCEPTED
+    assert accepted.duplicate is False
+    assert len(queue.entries) == 1
 
 
 @pytest.mark.asyncio
