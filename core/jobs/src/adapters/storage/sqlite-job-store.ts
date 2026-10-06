@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobAttempt,
   type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent } from '../../execution/job.js';
-import type { JobClaim, JobFinish, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
+import type { JobClaim, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
 import { initialScheduleDue, scheduledOccurrence } from '../../scheduling/schedule.js';
@@ -16,6 +16,8 @@ type TriggerRow = Omit<JobTrigger, 'definition' | 'enabled'> & {
   trigger_id: string; definition_json: string; definition_digest: string; enabled: number;
 };
 type OccurrenceRow = { occurrence_digest: string; job_id: string };
+type SourceReceiptRow = { input_digest: string; job_id: string; request_identity_digest: string;
+  initial_due_at: number; max_attempts: number };
 
 function canonicalJson(value: unknown, seen = new Set<object>()): string {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
@@ -48,7 +50,7 @@ export class SqliteJobStore implements JobStorePort {
           throw new Error('未知 Jobs 数据库；须先执行受控迁移');
         }
         this.database.transaction(() => this.database.exec(readFileSync(migrationPath, 'utf8'))).immediate();
-      } else if (version !== 3) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
+      } else if (version !== 4) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
       if (this.database.pragma('application_id', { simple: true }) !== 0x47434a42) {
         throw new Error('Jobs 数据库 owner 标记无效');
       }
@@ -58,6 +60,7 @@ export class SqliteJobStore implements JobStorePort {
       this.database.prepare('SELECT job_id,attempt,authority_epoch,fencing_token FROM job_attempts LIMIT 0').all();
       this.database.prepare('SELECT source_id,evidence_id,evidence_digest FROM job_reconciliations LIMIT 0').all();
       this.database.prepare('SELECT event_id,event_json,acknowledged_at FROM job_outbox LIMIT 0').all();
+      this.database.prepare('SELECT source_id,source_request_id,input_digest,job_id,request_identity_digest,initial_due_at,max_attempts,accepted_at FROM job_source_receipts LIMIT 0').all();
       this.database.pragma('foreign_keys = ON');
       this.database.pragma('journal_mode = WAL');
     } catch (error) { this.database.close(); throw error; }
@@ -118,6 +121,36 @@ export class SqliteJobStore implements JobStorePort {
           request.idempotency_key, payload, digest, request.due_at, request.retry_mode, request.max_attempts, epoch, now, now);
       this.appendState(request.job_id);
       return { job: this.load(request.job_id)!, job_id: request.job_id, revision: 1, duplicate: false };
+    }).immediate();
+  }
+
+  public enqueueSource(source: JobSource, request: JobRequest, epoch: number, now: number): JobSubmission {
+    validateJobRequest(request); assertTimestamp(now);
+    if (![source.source_id, source.source_request_id].every(value => typeof value === 'string' && !!value.trim())
+      || typeof source.input_digest !== 'string' || !/^[a-f0-9]{64}$/.test(source.input_digest)) {
+      throw new JobConflictError('Job source identity/摘要无效');
+    }
+    const { due_at: _due, max_attempts: _attempts, ...business } = request;
+    const identity = createHash('sha256').update(canonicalJson(business)).digest('hex');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const accepted = this.database.prepare(`SELECT input_digest,job_id,request_identity_digest,initial_due_at,max_attempts
+        FROM job_source_receipts WHERE source_id=? AND source_request_id=?`)
+        .get(source.source_id, source.source_request_id) as SourceReceiptRow | undefined;
+      if (accepted && (accepted.input_digest !== source.input_digest || accepted.job_id !== request.job_id
+        || accepted.request_identity_digest !== identity)) throw new JobConflictError('Job source 原事实内容冲突');
+      if (accepted && !this.database.prepare(`SELECT job_id FROM jobs WHERE job_id=?
+        UNION ALL SELECT job_id FROM job_tombstones WHERE job_id=?`).get(request.job_id, request.job_id)) {
+        throw new JobConflictError('Job source 原接纳记录缺少 Job/tombstone');
+      }
+      const original = accepted ? { ...request, due_at: accepted.initial_due_at, max_attempts: accepted.max_attempts } : request;
+      const submission = this.enqueue(original, epoch, now);
+      if (submission.job_id !== request.job_id) throw new JobConflictError('Job source 稳定 Job identity 冲突');
+      if (!accepted) this.database.prepare('INSERT INTO job_source_receipts VALUES(?,?,?,?,?,?,?,?)')
+        .run(source.source_id, source.source_request_id, source.input_digest, submission.job_id, identity,
+          request.due_at, request.max_attempts, now);
+      // 最小 receipt 不关联 jobs FK、不随 payload 清理；源未知 ACK 状态不阻塞终态 body retention。
+      return submission;
     }).immediate();
   }
 

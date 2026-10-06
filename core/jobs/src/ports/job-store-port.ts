@@ -4,6 +4,8 @@ import type { RetryPolicy } from '../recovery/retry-policy.js';
 import type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from '../triggers/trigger.js';
 
 export interface JobClaim { readonly job: Job; readonly lease: JobLease; }
+/** producer 的不可变源信封摘要；Jobs 不解释其中的领域含义。 */
+export interface JobSource { readonly source_id: string; readonly source_request_id: string; readonly input_digest: string; }
 export interface JobSubmission {
   readonly job: Job | null;
   readonly job_id: string;
@@ -21,6 +23,8 @@ export interface JobStorePort {
   activateAuthority(epoch: number, now: number): void;
   loadAuthorityEpoch(): number | null;
   enqueue(request: JobRequest, epoch: number, now: number): JobSubmission;
+  /** 源 inbox 与 enqueue 同事务；重放沿用首次政策，不沿用可变 retry due。 */
+  enqueueSource(source: JobSource, request: JobRequest, epoch: number, now: number): JobSubmission;
   load(jobId: string): Job | null;
   /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */
   listUnknown(epoch: number, kind: string, limit: number, afterJobId?: string): Job[];

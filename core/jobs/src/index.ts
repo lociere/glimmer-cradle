@@ -5,7 +5,7 @@ export { JobAuthorityError, JobConflictError, JobLeaseLostError } from './execut
 export type { Job, JobAttempt, JobReconciliationEvidence, JobReconciliationReceipt, JobRequest, JobRetryMode, JobStateEvent, JobStatus } from './execution/job.js';
 export type { JobExecutionContext, JobHandlerPort, JobHandlerResult, JobReconciliationPort, JobStateReceiverPort } from './execution/job-handler-port.js';
 export type { JobClockPort } from './ports/clock-port.js';
-export type { JobClaim, JobFinish, JobStorePort, JobSubmission } from './ports/job-store-port.js';
+export type { JobClaim, JobFinish, JobStorePort, JobSubmission, JobSource } from './ports/job-store-port.js';
 export { JobRecoveryController } from './recovery/recovery-controller.js';
 export { JobRetentionController } from './recovery/retention.js';
 export { retryDelay } from './recovery/retry-policy.js';

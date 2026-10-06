@@ -381,7 +381,7 @@ describe('Host Memory Jobs 持续驱动与资源归属', () => {
 });
 
 describe('Host Jobs 消费真实 Worker Memory owner', () => {
-  it('源 enqueue 已提交而 ACK 丢失：重开 Jobs 原请求重放并完成一次 Memory', async () => {
+  it('源 enqueue 已提交而 ACK 未到达：重开 Jobs 政策变化仍沿用首次预算并完成一次 Memory', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-source-'));
     const service = await worker(root, 'one');
     let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
@@ -392,26 +392,82 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
         return service.client.acknowledge(...args);
       } };
     const adapter = new CognitionJobAdapter(port);
-    const controller = new JobController(store, clock, policy);
+    let controller = new JobController(store, clock, policy);
     try {
       store.activateAuthority(1, clock.now());
       await expect(adapter.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK loss');
       const sources = (await service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests;
       expect(sources).toHaveLength(1);
       const jobId = `memory:${sources[0].requestId}`;
-      expect(store.load(jobId)?.status).toBe('queued');
+      const original = store.load(jobId)!;
+      expect(original.status).toBe('queued');
+      await controller.stop();
       store.close(); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
       store.activateAuthority(2, clock.now());
-      expect(await adapter.deliverRequests(store, clock, 2, submissionPolicy, 8)).toBe(1);
+      expect(await adapter.deliverRequests(store, clock, 2, { debounce_ms: 60_000, max_attempts: 1 }, 8)).toBe(1);
       expect(await adapter.deliverRequests(store, clock, 2, submissionPolicy, 8)).toBe(0);
-      const actual = new JobController(store, clock, policy);
-      actual.register(adapter);
-      const result = await actual.execute(store.claim(2, 'host-two', clock.now(), 60_000)!);
+      expect(store.load(jobId)).toMatchObject({ due_at: original.due_at, max_attempts: original.max_attempts });
+      controller = new JobController(store, clock, policy);
+      controller.register(adapter);
+      const result = await controller.execute(store.claim(2, 'host-two', clock.now(), 60_000)!);
       expect(result).toMatchObject({ job_id: jobId, status: 'succeeded', attempt: 1 });
       expect(result?.result?.memory_ids).toHaveLength(1);
       expect(memoryCounts(root)).toEqual([1, 1, 1]);
-      await actual.stop();
     } finally { await controller.stop(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('源 ACK 在 Memory 已提交后响应丢失：源不再重投，Jobs 原接纳不回滚且只完成一次业务', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-source-committed-'));
+    const service = await worker(root, 'one');
+    let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let controller = new JobController(store, clock, policy);
+    const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+      reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
+      acknowledge: async (...args: Parameters<CognitionClient['acknowledge']>) => {
+        await service.client.acknowledge(...args); throw new Error('injected committed ACK response loss');
+      } });
+    try {
+      store.activateAuthority(1, clock.now());
+      const original = (await service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests[0];
+      const jobId = `memory:${original.requestId}`;
+      await expect(adapter.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK response loss');
+      expect((await service.client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests).toEqual([]);
+      expect(store.load(jobId)?.status).toBe('queued');
+      await controller.stop(); store.close(); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      store.activateAuthority(2, clock.now()); controller = new JobController(store, clock, policy);
+      const restarted = new CognitionJobAdapter(service.client);
+      expect(await restarted.deliverRequests(store, clock, 2, { debounce_ms: 60_000, max_attempts: 1 }, 8)).toBe(0);
+      controller.register(restarted);
+      expect(await controller.execute(store.claim(2, 'host-two', clock.now(), 60_000)!))
+        .toMatchObject({ job_id: jobId, status: 'succeeded', attempt: 1, max_attempts: 3 });
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+      expect(store.claim(2, 'host-two', clock.now(), 60_000)).toBeNull();
+    } finally { await controller.stop(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it('同源 request ID 的首次时间漂移不是配置变化：信封冲突拒绝 ACK', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-source-envelope-'));
+    const service = await worker(root, 'one');
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const actualRead = service.client.readRequests.bind(service.client);
+    let drift = false;
+    const acknowledge = vi.fn(async () => { throw new Error('injected ACK loss'); });
+    const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+      reconcile: service.client.reconcile.bind(service.client), acknowledge,
+      readRequests: async (...args: Parameters<CognitionClient['readRequests']>) => {
+        const response = await actualRead(...args);
+        if (drift) response.requests[0].createdAt = new Date(Date.parse(response.requests[0].createdAt) + 1000).toISOString();
+        return response;
+      } });
+    try {
+      store.activateAuthority(1, clock.now());
+      await expect(adapter.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK loss');
+      drift = true;
+      await expect(adapter.deliverRequests(store, clock, 1, { debounce_ms: 1000, max_attempts: 1 }, 8)).rejects.toThrow('原事实内容冲突');
+      expect(acknowledge).toHaveBeenCalledTimes(1);
+      expect((await actualRead(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+      expect(store.readOutbox(1, 100)).toHaveLength(1);
+    } finally { store.close(); await service.stop(); }
   }, 30_000);
 
   it('Memory 已提交而完成响应丢失：跨 Worker/Jobs 重启对账原 attempt，不再执行', async () => {
@@ -446,7 +502,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     } finally { await controller.stop(); store.close(); await service.stop(); }
   }, 30_000);
 
-  it('原执行未到达：对账持久封口后允许新 attempt，旧 epoch 不替代原证据', async () => {
+  it('源 ACK 与原执行均未到达：封口后重投不以新政策覆盖 retry due 或预算', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-not-applied-'));
     const service = await worker(root, 'one');
     const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
@@ -454,12 +510,18 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     try {
       store.activateAuthority(1, clock.now());
       const adapter = new CognitionJobAdapter(service.client);
-      await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8);
+      const lostAck = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+        reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
+        acknowledge: async () => { throw new Error('injected ACK loss'); } });
+      await expect(lostAck.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK loss');
       const claim = store.claim(1, 'old-host', clock.now(), 60_000)!;
       store.activateAuthority(2, clock.now());
       const recovery = new JobRecoveryController(store, clock, 2, policy);
       expect(await recovery.reconcile(claim.job.job_id, adapter)).toMatchObject({ status: 'accepted', job: { status: 'retry_wait' } });
       expect(memoryCounts(root)).toEqual([0, 0, 0]);
+      const retry = store.load(claim.job.job_id)!;
+      expect(await adapter.deliverRequests(store, clock, 2, { debounce_ms: 60_000, max_attempts: 1 }, 8)).toBe(1);
+      expect(store.load(claim.job.job_id)).toEqual(retry);
       await new Promise(resolve => setTimeout(resolve, 5));
       controller.register(adapter);
       const next = store.claim(2, 'new-host', clock.now(), 60_000)!;

@@ -14,6 +14,13 @@ CREATE TABLE jobs(
     OR (status<>'running' AND lease_owner IS NULL AND lease_until IS NULL))
 );
 CREATE INDEX jobs_due ON jobs(status,due_at,created_at);
+-- 源接纳与 Job 同事务；仅保留摘要/原政策，ACK 丢失及 retention 后不重新分配工作。
+CREATE TABLE job_source_receipts(
+  source_id TEXT NOT NULL, source_request_id TEXT NOT NULL, input_digest TEXT NOT NULL,
+  job_id TEXT NOT NULL, request_identity_digest TEXT NOT NULL,
+  initial_due_at INTEGER NOT NULL CHECK(initial_due_at>=0), max_attempts INTEGER NOT NULL CHECK(max_attempts>0),
+  accepted_at INTEGER NOT NULL, PRIMARY KEY(source_id,source_request_id)
+);
 -- 删除大 payload 后仍保留触发身份，避免 retention 后重新执行已完成副作用。
 CREATE TABLE job_tombstones(
   job_id TEXT PRIMARY KEY, scope_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
@@ -50,5 +57,5 @@ CREATE TABLE job_outbox(
   UNIQUE(job_id,revision)
 );
 CREATE INDEX job_outbox_pending ON job_outbox(acknowledged_at,created_at,job_id,revision);
-PRAGMA user_version=3;
+PRAGMA user_version=4;
 PRAGMA application_id=0x47434a42;

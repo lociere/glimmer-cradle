@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query 与持续单循环调度已落位并通过真实跨进程验证；生产进程监督/config/authority、状态事件接纳与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query、持续单循环调度与持久 authority 交接已通过真实跨进程验证；生产进程监督/config/authority 路径、状态事件接纳与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -317,8 +317,9 @@ epoch/token/owner，丢失结果 ACK 只通过 Memory 原持久 receipt 恢复�
 与 CognitionJobAdapter，只有 Contracts/Jobs 依赖，不移动旧 Kernel 业务或建立空启动入口。源 enqueue
 提交后再 ACK，响应取消/丢失不撤销 Jobs；execute/query 绑定原 attempt 并验证可信 owner、持久封口、
 原 identity、结果/证据摘要与安全整数。本地取消另外发送有界封口 RPC，晚到原 attempt 不再提交 Memory。
-源投递政策需保持原快照直到 ACK，政策漂移失败关闭；生产配置变更/retention 必须补齐未确认源的原政策
-恢复。`cancelled` 不承诺业务回滚，状态事件接纳与观测须保留已提交结果或不确定性，不能只凭本地取消清理。
+当时源投递政策需保持原快照直到 ACK，政策漂移失败关闭；跨重启恢复与 retention 缺口现由下文
+[源接纳政策持久快照](#阶段-7-源接纳政策持久快照2026-10-06-当前候选) 收束。
+`cancelled` 不承诺业务回滚，状态事件接纳与观测须保留已提交结果或不确定性，不能只凭本地取消清理。
 
 Host 14 项（含真实跨进程源 ACK 丢失、Worker/Jobs 重启后的原 receipt 对账、未到达原 attempt 封口与
 新 attempt、非法 generation、真实在途模型取消/拒晚到重放及证据漂移）PASS；Cognition 全量 279 项、
@@ -380,6 +381,34 @@ SQLite/迁移/Jobs owner 装配及测试、Jobs epoch 只读 Port、根 test fa�
 旧 Kernel/巩固队列 consumer 仍在，必须到 consumer-zero 与恢复门成立后删除；独立审查仍留整体最终候选。
 产品进程监督、配置 Document/catalog、未确认源政策快照、状态事件接收与旧数据迁移仍继续，
 不将本候选等同完整 authority/hybrid 或整个重构完成。
+
+### 阶段 7 源接纳政策持久快照（2026-10-06 当前候选）
+
+输入 `28a396e3`；当前会话唯一写入 owner。本轮在 Jobs 的同一 SQLite 事务保存源 identity/
+摘要、稳定 Job ID、业务绑定摘要与首次 due/max-attempts 政策，App 通过 generic source inbox 接纳。
+重放必须保持源与业务事实一致，但使用第一次的政策，不能用 Job 当前重试 due time 或新配置重算。
+记录只保留最小元数据，不复制 Memory 内容；retention 后仍凭该快照和 Job tombstone 安全重放/ACK。
+不将 ACK 响应丢失误作源未接纳，也不引入永远无法解除的 payload pin。新 schema 4 拒绝旧候选
+v1/v2/v3 的隐式升级，旧样本迁移/恢复归阶段 14。
+
+计划验收：入队与源 receipt 原子失败回滚、重开/政策漂移/重试 due 变化后的同 Job 重放、
+源/业务摘要冲突、旧 authority 拒绝、终态 retention 后仍稳定接纳及真实 Worker ACK 前后丢失。
+随后根基线/静态门；配置 Document/catalog、生产监督、状态事件与旧数据切换继续，整体目标不变。
+
+实现位于清单已有 `core/jobs/{migrations/001-jobs.sql,src/ports/job-store-port.ts,
+src/adapters/storage/sqlite-job-store.ts,src/index.ts}` 与 Host 现有 mapper/adapter；没有创建第二领域
+请求 owner、公开 wire 或不在清单的源码。`enqueueSource` 对源信封与业务身份/retry mode 校验，
+只允许新 due/预算恢复为第一次的合法政策；普通 `enqueue` 完整不可变摘要规则不变。
+最小 receipt 与 Job/outbox 通过同一 IMMEDIATE 事务提交，插入失败全部回滚；终态 payload 清理后
+由原 tombstone 去重，源快照缺少 Job/tombstone 或原政策被改写则拒绝重新执行。
+
+候选验收：Jobs 38 项、Host 38 项（其中真实 Worker/Memory/Log/Jobs 跨进程 27 项）、repo-checks
+27 项 PASS；新增覆盖原子回滚、双连接重投、切代/重开后政策变化、原封口后 retry due 保持、
+信封首次时间漂移拒绝 ACK，以及源 ACK 在实际提交前/后丢失的不同恢复路径。
+根 `pnpm typecheck`、`pnpm build`、文档 111 页、编码、架构护栏与 diff 检查 PASS；target-layout
+仅 spec-only PASS，不代表最终物理清单完成。本轮未改 wire/生成树、Cognition/Worker 源码与依赖，
+复用已记录的 Contract Spine 22 gate、Cognition 279 项、Worker 72 项和父候选 Kernel 6 项证据。
+未创建生产数据库、迁移用户数据或切换默认旧巩固队列；独立审查仍留完整重构的固定最终候选。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

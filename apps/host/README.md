@@ -7,6 +7,8 @@ Jobs handler，并核验原 attempt 的 Memory 持久封口/结果证据。Core 
 
 `pnpm build` 包含该 workspace，`pnpm test:host` 使用真实 Python Worker RPC、Memory/Log 和 Jobs
 SQLite 验证源 ACK 丢失、业务响应丢失、重启对账及未到达 attempt 封口后重试。
+源接纳使用 Jobs 持久快照，重启或政策变化保持首次 due/预算；完整源信封漂移仍拒绝 ACK。
+源 ACK 已提交但响应丢失时，源扫描不再返回该请求，已接纳 Jobs 继续执行，不将其回滚或重建。
 `composition/host.ts` 的 `HostJobsController` 持续驱动有界投递、持久 unknown 分页与到期执行，
 并提供仅覆盖 Memory Jobs 的 lifecycle snapshot；重复启动共享循环，停机先取消并 drain 后撤销
 当前 generation client。epoch、Store、时钟和政策必须显式注入；只有真实持久 receiver 才可确认

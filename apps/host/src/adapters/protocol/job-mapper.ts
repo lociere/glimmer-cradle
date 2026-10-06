@@ -2,10 +2,15 @@ import { createHash } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
 import { JobExecutionIdentitySchema, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { MemoryJobResolution, type MemoryJobSourceRequest, type MemoryJobResult } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { JobConflictError, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence } from '@glimmer-cradle/jobs';
+import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence } from '@glimmer-cradle/jobs';
 
 export const MEMORY_JOB_KIND = 'memory.consolidate';
 export interface MemoryJobSubmissionPolicy { readonly debounce_ms: number; readonly max_attempts: number; }
+export function memoryJobSource(source: MemoryJobSourceRequest): JobSource {
+  return { source_id: 'cognition.memory', source_request_id: source.requestId,
+    input_digest: createHash('sha256').update(JSON.stringify([source.requestId, source.episodeId,
+      source.episodeVersion.toString(), source.scopeId, source.inputDigest, source.createdAt])).digest('hex') };
+}
 function positive(value: number): number {
   if (!Number.isSafeInteger(value) || value < 1) throw new JobConflictError('Memory Job 原执行整数无效');
   return value;

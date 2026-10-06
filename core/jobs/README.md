@@ -9,6 +9,10 @@ canonical JSON 摘要；重复提交返回原身份，冲突失败关闭。claim
 authority epoch 只能单调前进；handover 的在途工作进入 unknown，旧 owner 不得继续写入。
 每次 claim 单独持久保存原 epoch/owner/token、续期与结束状态；失效或切代不改写原执行身份。
 
+`enqueueSource` 将 producer/request ID、不可变信封摘要、稳定 Job ID、业务绑定摘要和首次
+due/max-attempts 与 Job/outbox 同事务接纳。ACK 丢失后重投沿用首次政策，仍核验源事实、业务内容和
+retry mode；不会用当前 retry due 或新配置重算。普通 `enqueue` 的完整请求冲突规则不变。
+
 App 注册 handler 并显式驱动 `JobScheduler.runDue`；handler 接收 AbortSignal 和 lease。
 取消先持久撤销租约，再通知在途 handler，晚到结果无法覆写终态。停止 controller 时拒绝新执行并等待
 在途 handler 收尾，之后才能关闭 store。handler 必须合作响应取消；Host 的超时回收不属于本包。
@@ -34,8 +38,10 @@ UTC once/interval 调度显式选择 all/latest backlog 政策；每次最多 ma
 与入队原子提交，失败整批回滚，双进程竞争不会生成两套身份。Scheduler tick 先入队再执行 due Job。
 
 retention 仅清理已无待 ACK outbox 的 succeeded/cancelled/dead-letter 大记录和已 ACK 事件，
-保留去重 tombstone、occurrence、最小 attempt 与证据摘要；unknown 不自动删除。
-schema version 3 不兼容时拒绝打开，旧候选 v1/v2 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
+保留去重 tombstone、源接纳最小快照、occurrence、最小 attempt 与证据摘要；unknown 不自动删除。
+源快照不复制领域 payload，不要求源 ACK 确认来解除 body 清理；清理后重投仍返回原 tombstone。
+源快照存在但 Job/tombstone 缺失则拒绝重新生成工作。schema version 4 不兼容时拒绝打开，旧候选
+v1/v2/v3 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
 本切片不会创建生产数据库或迁移 Memory 库。
 
 `listUnknown` 按已注册 kind、稳定 Job ID 与有界 cursor 扫描持久恢复集合，旧 authority 拒读。

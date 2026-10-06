@@ -35,9 +35,12 @@ Host `SqliteAuthorityStore` 接受显式 authority 数据库路径，schema vers
 完整跨 owner 恢复验证仍归阶段 14，不能仅凭新库初始化宣称恢复可用。
 
 Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚未由产品 Host 装配创建生产库，
-因此本表不提前声明新的已运行数据路径。其 schema version 3/owner 标记、Job/lease/原 attempt、
+因此本表不提前声明新的已运行数据路径。其 schema version 4/owner 标记、Job/lease/原 attempt、
 对账证据摘要、待 ACK 状态 outbox 与去重 tombstone 独立于 Memory；retention 不删除未投递事件或
-unknown，清理终态后仍保留最小身份/审计。旧候选 v1/v2 拒绝隐式升级，不能对旧 Memory 数据库直接应用 Jobs migration。生产路径、备份切点和
+unknown，清理终态后仍保留最小身份/审计。`job_source_receipts` 同事务保存 producer/request ID、
+源与业务摘要、稳定 Job ID、首次 due/预算和接纳时间，不复制领域 payload；终态 body 清理不删除
+源快照，重投用首次政策验证原 tombstone。旧候选 v1/v2/v3 拒绝隐式升级，不能对旧 Memory 数据库
+直接应用 Jobs migration。生产路径、备份切点和
 跨库提交须随后续 broker/handler 接线确定，参见[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
 
 现行 Memory 新库 schema 为 5，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化

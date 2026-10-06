@@ -131,12 +131,12 @@ it('拒绝未知 schema 或其他 owner 的旧库，保留原表', () => {
   const unchanged = new Database(databasePath);
   try {
     expect(unchanged.prepare('SELECT value FROM original').get()).toEqual({ value: 'preserved' });
-    unchanged.pragma('user_version=4');
+    unchanged.pragma('user_version=99');
   } finally { unchanged.close(); }
   expect(() => new SqliteJobStore(databasePath)).toThrow('schema version');
 });
 
-it.each([1, 2])('旧候选 v%s Jobs 库拒绝隐式升级，保留原 Job 和版本', (version) => {
+it.each([1, 2, 3])('旧候选 v%s Jobs 库拒绝隐式升级，保留原 Job 和版本', (version) => {
   const databasePath = path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-job-v1-')), 'jobs.sqlite');
   const store = new SqliteJobStore(databasePath);
   const request = JSON.parse(readFileSync(path.resolve(__dirname, 'fixtures/job.json'), 'utf8')) as JobRequest;
@@ -145,7 +145,8 @@ it.each([1, 2])('旧候选 v%s Jobs 库拒绝隐式升级，保留原 Job 和版
   store.close();
   const legacy = new Database(databasePath);
   try {
-    legacy.exec('DROP TABLE job_outbox; DROP TABLE job_reconciliations; DROP TABLE job_attempts;');
+    legacy.exec('DROP TABLE job_source_receipts;');
+    if (version < 3) legacy.exec('DROP TABLE job_outbox; DROP TABLE job_reconciliations; DROP TABLE job_attempts;');
     if (version === 1) legacy.exec('DROP TABLE job_trigger_occurrences; DROP TABLE job_triggers;');
     legacy.pragma(`user_version=${version}`);
   } finally { legacy.close(); }

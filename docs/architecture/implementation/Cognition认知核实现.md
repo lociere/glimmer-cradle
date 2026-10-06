@@ -230,8 +230,11 @@ Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监�
 外部 Jobs 模式开放；默认 Worker composition 仍注入旧 repository，源投递 RPC 返回 NOT_READY，禁止
 两套 owner 双消费。外部模式的维护只投影、封口和整理源请求，不直接运行模型；启用策略、salience 与
 已提交结果由 Memory owner 判定，扫描源请求不会对已完成业务再次推理。
-`apps/host/src/composition/cognition-job-adapter.ts` 先持久 Jobs enqueue 再源 ACK；源 request/hash 与
-Job ID 稳定，投递政策快照必须保持一致直到请求确认，政策漂移由 Jobs 幂等校验拒绝，不能当新请求绕过。
+`apps/host/src/composition/cognition-job-adapter.ts` 先持久 Jobs 源 inbox/enqueue 再源 ACK；App 映射
+完整源信封摘要（含首次 createdAt），Jobs 保持源 request/hash 与 Job ID 稳定，并恢复首次政策。
+重投不以新配置或当前 retry due 替代首次 due/预算；事实/业务内容或 retry mode 漂移仍拒绝。
+源 ACK 已提交但响应丢失后，源扫描不再返回该请求，已接纳 Job 继续执行；不以本地响应判断源回滚。
+源最小快照与终态 tombstone 的保留规则见 [数据布局](../../reference/data-layout.md)。
 App 将生成 `JobExecutionIdentity` 映射到 `ExecuteMemoryJob`，由 `ReconcileMemoryJob` 获取原 attempt
 证据；只接受 `cognition.memory`、完全匹配的 identity、持久封口和有效证据摘要，业务结果排除易变 duplicate
 提示。本地 AbortSignal 中断 RPC 后，App 通过独立的有界对账调用封口原 attempt，不复用已取消 signal；
@@ -246,7 +249,7 @@ signal 与执行接纳，等待在途封口和循环后关闭当前 generation c
 快照只描述 Memory Jobs：源 RPC 未 ready/暂不可用时 degraded，unknown 未解决时
 `jobs_recovery_pending`，authority 失效或非法 source/evidence 则 failed 并撤销 client；不得借此宣称
 整个产品 ready。未注入持久状态 receiver 时 outbox 保持待确认，不能假 ACK。实例持有政策副本，
-跨重启的未确认源原政策恢复仍须补齐。Host 已通过 `HostJobsOwner` 注入实际持久 authority 并接通
+源已接纳工作跨重启恢复首次政策。Host 已通过 `HostJobsOwner` 注入实际持久 authority 并接通
 续期/撤销/drain 确认，具体机制见 [Platform authority](./Platform原语实现.md#authority-与受控转移)。
 生产进程 supervisor、配置/authority 路径加载、状态事件 wire/inbox
 与旧队列/旧数据切换仍待完成。
