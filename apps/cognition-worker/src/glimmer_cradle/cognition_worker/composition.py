@@ -93,12 +93,17 @@ from glimmer_cradle.cognition.state import (
     EmotionType,
 )
 from glimmer_cradle.cognition_worker.adapters import FileAssetReader
+from glimmer_cradle.cognition_worker.adapters.capability_client import (
+    CapabilityClient,
+    CapabilityRpcPort,
+)
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     CloudReasoning,
     EmbeddingEngine,
     EmbeddingSettings,
     LLMEngine,
     LLMSettings,
+    ModelClient,
     MultimodalRouter,
 )
 from glimmer_cradle.conversation import (
@@ -355,6 +360,7 @@ def compose_cognition(
     model_invocation_recorder: Callable[..., None] | None = None,
     paths: WorkerPaths | None = None,
     memory_jobs_owner: str = "legacy",
+    capability_rpc: CapabilityRpcPort | None = None,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     if memory_jobs_owner not in {"legacy", "external"}:
@@ -454,6 +460,10 @@ def compose_cognition(
         logger=observability.logger("llm_engine"),
         invocation_recorder=model_invocation_recorder,
     )
+    def capability_factory(content: dict) -> CapabilityClient:
+        if capability_rpc is None:
+            raise RuntimeError("native Capability Service is not bound")
+        return CapabilityClient(capability_rpc, content, conversation_recorder, content["trace_id"])
     multimodal_router = MultimodalRouter(
         inference_config=config.inference,
         asset_reader=FileAssetReader(
@@ -569,6 +579,8 @@ def compose_cognition(
         action_sink=action_sink,
         reasoning=reasoning,
         planning_controller=planning_controller,
+        native_model=ModelClient(llm_engine),
+        capability_factory=capability_factory,
         checkpoint_store=checkpoint_store,
         persona_compiler=character_session.persona,
         boundary_validator=character_session.validate_boundary,

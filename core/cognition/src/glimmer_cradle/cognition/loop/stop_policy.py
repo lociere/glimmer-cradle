@@ -1,5 +1,6 @@
 """Explicit stop policy for bounded or continuous loop runs."""
 
+import math
 from dataclasses import dataclass
 
 
@@ -8,6 +9,7 @@ class StopPolicy:
     max_steps: int = 8
     max_capability_calls: int = 8
     max_output_chars: int = 16_000
+    max_duration_seconds: float = 120.0
 
     def __post_init__(self) -> None:
         if self.max_steps < 1:
@@ -16,6 +18,8 @@ class StopPolicy:
             raise ValueError("max_capability_calls must be non-negative")
         if self.max_output_chars < 1:
             raise ValueError("max_output_chars must be positive")
+        if not math.isfinite(self.max_duration_seconds) or self.max_duration_seconds <= 0:
+            raise ValueError("max_duration_seconds must be finite and positive")
 
     def stop_reason(
         self,

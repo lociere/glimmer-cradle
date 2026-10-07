@@ -185,6 +185,7 @@ class CapabilityClient:
                 )
             },
             actor_id=context.get("actor_id"),
+            causation_ids=(context["experience_moment_id"],) if context.get("experience_moment_id") else (),
             trace_id=self._trace_id,
             idempotency_key=f"native-tool-action:{invocation.idempotency_key}",
         )
@@ -252,4 +253,5 @@ class CapabilityClient:
             state,
             output=moment.content.get("result") if state == "succeeded" else None,
             error=moment.content.get("error_code") or None,
+            result_fact_id=moment.moment_id,
         )

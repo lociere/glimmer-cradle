@@ -194,14 +194,12 @@ class RequestTransport:
         raise AssertionError(method)
 
 
-class ModelTransport:
-    async def stream(self, payload: dict[str, object]):
-        assert payload["user"] == "weather"
-        yield {"sequence": 0, "kind": "text_delta", "payload": {"text": "sunny"}}
-        yield {"sequence": 1, "kind": "completed", "payload": {}}
-
-    async def cancel(self, session_id: str) -> None:
-        return None
+class NativeEngineStub:
+    async def stream_native(self, request):
+        assert request.user == "weather"
+        from glimmer_cradle.cognition.inference import ModelEvent
+        yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": "sunny"})
+        yield ModelEvent(1, ModelEventKind.COMPLETED, {})
 
 
 class ContentTransport:
@@ -218,7 +216,7 @@ async def test_clients_preserve_ids_scopes_and_native_model_events() -> None:
         request_id="request-1", goal_id="goal-1", kind="reminder",
         idempotency_key="goal-1:request-1",
     ))
-    events = [event async for event in ModelClient(ModelTransport()).events(
+    events = [event async for event in ModelClient(NativeEngineStub()).events(
         InferenceRequest(system="system", user="weather")
     )]
 
@@ -781,6 +779,7 @@ def _metadata(generation: str, trace_id: str, key: str = ""):
 
 def _conversation(interaction_id: str) -> cognition_pb.ConversationContext:
     return cognition_pb.ConversationContext(
+        source_provider_id="canonical-provider",
         scene_id="scene-1",
         conversation_id="conversation-1",
         continuity_id="continuity-1",
@@ -1316,6 +1315,7 @@ async def test_perception_is_versioned_idempotent_and_generation_scoped(service)
         response_policy=cognition_pb.RESPONSE_POLICY_REPLY_ALLOWED,
         retention_ceiling=cognition_pb.RETENTION_CEILING_EXPERIENCE,
         conversation=cognition_pb.ConversationContext(
+            source_provider_id="canonical-provider",
             scene_id="scene-1",
             conversation_id="conversation-1",
             continuity_id="continuity-1",
@@ -1414,7 +1414,8 @@ async def test_queue_capacity_drop_closes_the_accepted_perception_operation() ->
 
 
 @pytest.mark.asyncio
-async def test_unbound_observation_is_rejected_as_invalid_request(service) -> None:
+@pytest.mark.parametrize("failure", ["context", "source_missing", "source_blank", "source_oversize"])
+async def test_unbound_observation_is_rejected_as_invalid_request(service, failure) -> None:
     host, channel, queue, _stopped = service
     submit = _call(
         channel,
@@ -1426,6 +1427,10 @@ async def test_unbound_observation_is_rejected_as_invalid_request(service) -> No
         call=_metadata("generation-1", "invalid-observation", "invalid-observation"),
         content=cognition_pb.PerceptionContent(text="missing context"),
     )
+    if failure != "context":
+        request.conversation.CopyFrom(_conversation("invalid-observation"))
+        request.conversation.source_provider_id = {"source_missing": "", "source_blank": " ",
+            "source_oversize": "界" * 1366}[failure]
     for _ in range(2):
         with pytest.raises(grpc.aio.AioRpcError) as caught:
             await submit(request, timeout=1)
@@ -1438,6 +1443,7 @@ async def test_unbound_observation_is_rejected_as_invalid_request(service) -> No
     assert accepted.state == cognition_pb.PERCEPTION_OPERATION_STATE_ACCEPTED
     assert accepted.duplicate is False
     assert len(queue.entries) == 1
+    assert queue.entries[0].source_provider_id == "canonical-provider"
 
 
 @pytest.mark.asyncio

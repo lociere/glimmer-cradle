@@ -128,36 +128,51 @@ Kernel CognitionService request
 `ObservationQueue`。队列满时明确返回被淘汰 Observation 以关闭对应 operation；非法未绑定输入返回
 `INVALID_REQUEST`，不能以内存默认值进入 Cycle。旧 `application/cycle/perception_queue.py` 已删除。
 
-单拍临时状态全部进入 `loop/step.py` 的 `LoopStep`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。循环以 expected revision 把拍数和运行终态写入独立 checkpoint；启动时先把遗留 `running` 状态落为 `interrupted`，再进入新一轮运行。
+单拍临时状态进入 `loop/step.py` 的 `LoopStep`，每拍重建；`context/assembler.py` 的
+`ReplyContextBuilder` 收集上下文与 prompt 分区；`loop/run.py` 的 `ActionEmitter` 映射 Intent，
+`CycleContinuity` 在仲裁后提交 REPLY/ACTION/SILENCE。原生 ToolCall 的 ACTION 与结果接纳沿
+Capability/Conversation adapter 单独落实，不伪造外显意图。当前通用循环不生产 Thought。
+循环以 expected revision 保存拍数和终态；启动将遗留 running 落为 interrupted，再启动新运行，
+这个周期 checkpoint 不是持久原生 Run 的恢复证明。
 
 原生模型/工具迭代由 `LoopController.run_native()` 承担。模型事件中的 `ToolCall` 不再先分类为
 `skill_request`；每个 Step 重新请求 `CapabilityPort.expose()`，校验 Run/Step 及唯一名称，调用绑定
 该 Step 的定义 ID/revision，而不是模型自报版本。Tool、Skill 摘要、Resource 是独立模型输入。
 使用 `run_id + call_id` 形成稳定幂等键，校验返回调用身份后把已接纳结果作为下一次模型请求的
-`capability_results`。`StopPolicy` 同时限制 Step、能力调用次数和输出字符数；未完成模型流中的
-ToolCall 不派发，非法调用/未曝光能力显式失败，不做关键词或静默降级。
+`InferenceRequest.history`：每项 `InferenceStep` 保留该次助手文本、完整 `ModelToolCall` 与真实结果，
+供应商 adapter 据此续接，不把结果伪装成用户消息。`capability_results` 只保留消费兼容元数据，
+不是另一历史 owner。最终回复只取最后无调用 Step，之前文本仍计入输出预算。
+`StopPolicy` 限制 Step、能力调用次数、输出字符和总时长；整个调用批次在首个副作用前验证身份、
+参数与预算。未完成流不派发，重复 ID、未知副作用、未曝光能力失败关闭；提前退出立即关闭流。
 
 Worker `CapabilityClient` 已删除虚构的字典 `capability.expose/invoke` transport，消费 typed
 `CapabilityService` 的真实 gRPC client。它绑定完整 Conversation/交互/隐私上下文，先写原生
 ToolCall ACTION 并刷盘，才携原事实引用派发。响应只定位真实 Log 接纳的结果事件；scope、
 交互、定义版本、调用身份或终态投影冲突、receipt 缺失均失败，wire result 不冒充经历或 Memory。
-该 adapter 与 Core 原生 Loop 已有真实 RPC/Log 回归；生产 App 已挂载服务，但默认普通聊天
-尚未装配原生模型 provider 与该 native caller，仍走下述 ActionPlan，不能据此宣称 native broker ready。
+生产 Worker composition 已把真实 `ModelClient` 和按完整当前感知创建的 `CapabilityClient` 注入
+同一 Loop；canonical `source_provider_id` 从 DTO 经 Observation 传递，不从 Actor/origin 猜测。
+ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终 REPLY 关联已接纳结果。
+默认普通聊天已经切换原生链，但完整 Host 权限/持久 Run broker 仍未完成，不能称整体 ready。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
 旧的“收到消息直接生成聊天回复”通路不得恢复。内部驱动只能通过 Provider 进入 Cycle；工具规划、记忆巩固和合成必须以主循环或明确请求型 use case 接入，且不能对同一感知重复产生互相冲突的 action。
 
-当前 `LoopController` 的 Deliberate 阶段以 `planning/PlanningController` 作为本拍行动语义源。内部结构化 ActionPlan prompt 输出 `reply`、`skill_request`、`ask_clarification` 或 `noop` 以及 `capability_kind`、`confidence`、`reason`：`reply` 才进入普通人设回复生成；高置信度且 `capability_kind != none` 的 `skill_request` 会停止普通回复并由 `ActionEmitter.to_command()` 发出 `ActionCommand{action_type:"skill_request"}`；`ask_clarification` 生成由 ActionPlan 显式触发的澄清 reply，不落入普通 reply fallback；`noop` 不发 reply/skill_request，并由 `CycleContinuity` 写 `reason=action_plan_noop` 的 `silence` Moment。每次真实规划或显式降级写入 `data/state/cognition/planning.sqlite`，供同一 trace 审计与恢复；Cognition 不读取 Skill catalog、不执行 handler，也不接触平台 IO。InferenceController 不可用、ActionPlan 非法或低置信度时不会用关键词兜底触发工具。
+生产 Deliberate 使用 persona/context 构造同一个原生推理请求，不再先用 ActionPlan 分类普通聊天。
+`observe_only` 不推理；只有当前 `cloud_allowed` 进入已装配云 stream，`local_only`/`none` 不提升为云。
+每次推理前重验 tier，每次曝光和实际工具派发前按 direct/reactive 或 ambient/proactive 意愿复验。
+最终回复仍经人格边界、Intent 仲裁与 ActionEmitter。模型/执行失败关闭真实 Turn，不冒充成功沉默。
+Core 的非原生测试/消费入口暂留 ActionPlan；其消费者转换、旧 journal 只读恢复与数据保护完成后删除，
+不是 production fallback。长程 Planning/承诺及下面明确请求型 Plan/Synthesis 不随聊天切换一起删除。
 
-`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`LoopController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Conversation 接纳结果 -> Synthesize -> ChannelReplyEvent`。工具使用决定由 Conversation 写入 `action` Moment 并刷盘，原 fact ID 随 Action call metadata 传播。实际执行状态/结果由 Capabilities 唯一拥有，独立 Conversation Service 从该 owner 的已提交 outbox 接纳 `action_result`；Synthesis 不再从请求写第二份执行事实，只用已接纳 body/state 并以其 Moment ID 作为 `reply` 原因。缺失或冲突引用不合成、不提交 fallback；结果是 experience/untrusted 观察，不直接成为记忆候选。接纳与重放规则见[Conversation 实现](Conversation实现.md#history-与恢复)。`Synthesize` 的 system prompt 由 `PersonaCompiler.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
+`AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务仍未迁移的 Kernel Skill 编排。保留链路是：`Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Conversation 接纳结果 -> Synthesize -> ChannelReplyEvent`，不再是生产普通聊天入口。原 ACTION 刷盘与已接纳结果引用保持，Synthesis 不写第二份执行事实；其人格主体仍由 Core 编译，不由 Kernel 拼接。缺失/冲突引用不合成，外部结果仍是 experience/untrusted 观察，不直接成为 Memory。接纳规则见[Conversation 实现](Conversation实现.md#history-与恢复)。
 
 现行 `Plan` 的方法目录、选择引用和正文独立于 Tool 建议：Core Port 使用 `SkillSummary`、
 `SkillReference`、`SkillMaterial`，Worker mapper 消费唯一生成 DTO。第一次模型输入只含目录，
 最多选择两份匹配定义 revision 的方法；App 复验后以不可信材料提供正文、保持原用户目标。
 模型输出不能扩大可用 Tool，方法正文及 allowed-tools 不授予权限、不作为执行结果或 Memory
 事实。引用/重复身份/正文预算在进入模型前校验；正文不拼入 system 人设。此接线仍服务
-上述 ActionPlan 兼容链，不表示普通聊天已切换 `run_native()` 或完整 CapabilityPort broker。
+上述请求型兼容编排，不表示完整 CapabilityPort broker 或原生方法/资源内容加载已经完成。
 
 `state/` 是情绪与认知资源状态的唯一 owner。`cognitive_state.py` 定义 affect/activity 状态和资源策略，`decay.py` 纯计算情绪衰减与 `engaged / ambient / quiescent` 迁移，`state_controller.py` 从真实 Perception、Reply、Action 重建最近活动并驱动生命周期。`SqliteStateStore` 使用 `001-state.sql` 和 expected revision 写入 `data/state/cognition/state.sqlite`；冷启动把快照与 Conversation Log 的更新事实合并。控制器不把自动迁移写成 Experience；Kernel 外部 Attention Lease 也不参与活动态计算。
 
@@ -214,11 +229,20 @@ Context 是注意力预算控制器，不是字符串拼接器。`context/` 已�
 `inference/` 是 provider-neutral 推理 owner：`request.py` / `event.py` 定义文本、多模态及流事件，
 `model_port.py` 定义模型与 realtime 外部能力边界，`InferenceController` 按 Cognitive Activity model tier
 执行禁止、本地限定或 cloud→local 显式 fallback。供应商 HTTP、密钥、payload 与响应提取只在
-Worker `adapters/model_client.py`；Core `ModelPort.generate` 为异步消费契约，CloudReasoning、
+Worker `adapters/model_client.py`（阶段 9 supplier Extension 迁移窗口）；Core `ModelPort.generate` 为异步消费契约，CloudReasoning、
 视觉专家、兼容 Plan/Synthesis 与 Memory 巩固直接 await。模型与云 Embedding 使用 HTTPX 异步
 连接，取消不再遗留同步网络线程；Embedding 重试等待可取消，不重试已取消请求。
 Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL；本地 CPU Embedding 线程计算仍需
 后续独立生命周期收束。`RealtimeSession` 用 generation、单调 sequence 和 terminal 状态拒绝陈旧取消及晚到帧。
+
+`ModelClient` 已删除无生产实现的字典 ModelTransport，直接连接同一 LLMEngine 的真实 SSE。
+原生流只支持现行 OpenAI-compatible `openai`/`deepseek` 路由，优先显式 provider key，否则
+使用配置的 default_route/根模型；自定义 body/extractor 或其他格式明确失败，不猜测供应商模型。
+保留实际 assistant tool_calls 与 role=tool 的 call ID 续接，格式依据
+[官方工具流说明](https://developers.openai.com/api/docs/guides/function-calling)。按 index 汇集交错参数，
+只有合法 finish_reason 与 DONE、完整 object JSON 才输出 ToolCall；截断/过滤/重复键或 ID 拒绝。
+请求 1 MiB、流 2 MiB、frame 256 KiB、单调用参数 64 KiB 有界；取消和输出提前退出关闭实际 socket。
+这不等于所有 provider、音频/realtime 或跨重启 Run/checkpoint 已实现。
 
 `ReplyContextBuilder` 按固定分区装配 system prompt：Conversation State、近期原始消息、相关历史 Segment、长期偏好、混合检索 Memory、角色知识、近期 Experience 和多模态描述。`ConversationController` 在查询前补投影并从 SQLite 恢复有界 Working Set；近期 Experience 排除当前 trace。所有来源在排序前先按 `recall_scope` 与 conversation/actor/scene owner 过滤，私聊不会因词项相似而召回群聊的 `space_local` 内容。`observe_only` 召回实际 perception，不把策略性 silence 渲染成角色主动沉默。
 

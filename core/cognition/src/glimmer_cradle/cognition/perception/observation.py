@@ -30,3 +30,4 @@ class Observation:
     retention_ceiling: RetentionCeiling = "experience"
     interaction_id: str = ""
     payload_digest: str = ""
+    source_provider_id: str = ""

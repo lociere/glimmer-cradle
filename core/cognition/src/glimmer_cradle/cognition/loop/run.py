@@ -3,14 +3,14 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from glimmer_cradle.cognition.ports.capability_port import CapabilityResult
-from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.loop.step import (
     ArbitrationResult,
     Intent,
     build_reply_messages,
     normalize_reply_text,
 )
+from glimmer_cradle.cognition.ports import ObservabilityPort
+from glimmer_cradle.cognition.ports.capability_port import CapabilityResult
 from glimmer_cradle.conversation import MomentKind
 
 
@@ -140,7 +140,7 @@ class CycleContinuity:
         payload = action.payload if isinstance(action.payload, dict) else {}
         causation = tuple(
             moment_id
-            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id)
+            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id, *turn.native_result_fact_ids)
             if moment_id
         )
         moment = self._recorder.record(
@@ -174,7 +174,7 @@ class CycleContinuity:
     def _write_outcome(self, turn: Any) -> str | None:
         causation = tuple(
             moment_id
-            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id)
+            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id, *turn.native_result_fact_ids)
             if moment_id
         )
         accepted = turn.arbitration.accepted if turn.arbitration is not None else ()

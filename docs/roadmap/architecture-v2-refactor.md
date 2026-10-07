@@ -620,7 +620,59 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 6 原生 Step Exposure 与 typed Capability 接线（2026-10-07 当前候选）
+### 阶段 5/6 原生模型流与默认聊天接线（2026-10-07 当前候选）
+
+输入 `2c9ab0d1`，本会话唯一写入 owner。沿现行 OpenAI-compatible provider 配置接真实
+HTTP/SSE；供应商消息与工具参数拼接只留 Worker adapter，Core 持有供应商无关的 Step 历史。
+完整参数、合法终止与曝光引用验证后才允许派发；截断、重复调用身份、流失败和未知副作用
+均失败关闭。每 Step/派发前复验认知意愿，保留 observe-only、模型 tier、人格边界和取消。
+
+生产 composition 注入现有 typed Capability client；实际 Perception canonical 来源与完整
+Conversation 上下文穿过 Observation，ACTION 刷盘和结果 Log receipt 沿用现行唯一 owner。
+默认聊天转原生 Loop，不再 ActionPlan 预分类；Plan/Synthesis RPC 和长程 Planning 仍有消费者，
+不能一起删除。无对应 native streaming provider 的配置明确不可用，不回退到旧预分类。
+供应商 adapter 随阶段 9 迁 Extension；App 接入随阶段 12 收束，不新增契约源或配置事实源。
+
+验收使用隔离本地 HTTP 流与真实 gRPC/Log：参数分片/多工具/续接、终止与预算、取消 socket、
+权限策略、默认聊天不调用旧规划及实际结果因果；再跑 Core/Worker/Kernel、根构建和文档门。
+不读取密钥原文、不调用收费线上模型、不迁用户库、不发布/推送。完整权限 broker、持久 Run
+恢复、realtime/audio、供应商 Extension 与独立总体验收仍是整个目标的未完成工作。
+
+实现：生产 Worker 已注入真实 ModelClient/CapabilityClient；默认 Perception→persona/context→
+原生 Step 曝光→完整 ToolCall→typed RPC→持久 Execution/Conversation receipt→模型续接→
+角色回复已经接通，不再先调用 ActionPlan。原无生产实现的 ModelTransport 和两个字典 mapper
+已删除。provider-neutral InferenceStep 保存原助手调用与已接纳结果，Worker 翻译供应商续接；
+参数按 index 聚合，整个批次在首个副作用前校验。Core 总时长/调用/输出有界，提前退出关闭流，
+未知结果不再续接。当前 tier、proactive 意愿在推理/曝光/派发各边界复验，observe-only 不推理。
+
+canonical 来源 ID 在 Worker 入站前校验，经 Observation 原样传递，不从 origin/Actor 推导。
+真实 Perception→ACTION→action_result→REPLY 引用已验证；模型中间说明不混入最终回复。
+供应商格式仅在 Worker，使用现行路由/配置，无新 SDK、第二契约源或模型选择变更。
+
+验证（`2c9ab0d1` 上本轮 22 文件固定实现候选，最后只追加文档证据）：Core Cognition 326、
+Worker 125、Kernel 256、repo-checks 27 PASS。Worker 新增 17 项真实本地 HTTP/SSE 场景，含
+交错/UTF-8 分片、原调用续接、截断/非法参数/重复身份、默认路由、任务/会话取消与输出提前
+退出断开实际 socket；入站来源缺失/空白/超长在 registry/队列前拒绝，修正后同身份可接纳。
+Kernel 常规运行 12 项条件跳过；以 `GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION=1` 跑完整
+真实 Worker 集成文件 9 项 PASS，覆盖默认聊天、observe-only、真实 Tool/SQLite outbox/Log/历史、
+实际因果引用以及旧 Plan/Synthesis/重启/停机回归；4 项外部安装条件仍未满足。
+
+根 `pnpm typecheck` / `pnpm build`、真实生产装配/Worker ready/有序停机冒烟、docs 111、编码、
+架构门与 target-layout specification-only PASS。Ruff I/F 对本轮触及 Python 源码/测试 PASS；
+不是全仓 lint 或最终物理清单验收。IDL/generated/依赖未改变，上一轮 Contracts 门证据复用，
+本轮不重新生成协议。隔离数据根，无付费线上请求、用户数据迁移、推送或发布。
+
+测试初次合并运行因两个 owner 的 conftest 名称碰撞无法收集，改为各项目独立运行；真实聊天
+新增断言最初误把 Act 回执当 Consolidate 终态，改为有界等待真正 terminal，不削弱成功断言。
+离线 Log fixture 曾误认为持久 kind 是 Enum，按公开 Moment.kind=str 修正后整文件重验通过。
+执行者完成策略撤销/未知结果/取消/身份/因果自查；独立审查仍留完整固定候选。
+
+下一依赖：原生 Skill 材料与 Resource 内容/Knowledge 接入、Host 权限事实和持久 Run 预算/恢复；
+转换 Core 非原生消费者并保护旧 ActionPlan journal，再按 consumer-zero 删除旧 classifier/入口。
+明确请求型 Plan/Synthesis、长程 Planning 与 SDK 旧分组继续按阶段 9/11/12 收束，不以本轮默认
+聊天切换宣称整个阶段或项目完成。
+
+### 阶段 6 原生 Step Exposure 与 typed Capability 接线（2026-10-07）
 
 输入 `4b965765`，本会话唯一写入 owner。先落实 Capabilities 的 StepSurface/ExposureController：
 三类定义分别曝光，目录不含正文，按 scope、来源就绪、明确授权事实、主体/用户、目标位置、

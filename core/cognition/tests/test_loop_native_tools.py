@@ -1,5 +1,6 @@
 """Loop 感知、注意力、意愿仲裁及原生工具迭代测试。"""
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -329,6 +330,125 @@ async def test_native_loop_stops_before_exceeding_capability_budget(
     assert run.status == "stopped"
     assert run.stop_reason == "capability_call_limit"
     assert capabilities.invocations == []
+
+
+@pytest.mark.parametrize("failure", ["duplicate", "late_invalid", "over_budget", "nan", "oversize", "order"])
+async def test_native_batch_is_validated_before_any_side_effect(tmp_path, failure):
+    class Model:
+        async def events(self, request):
+            first = {"call_id": "one", "name": "weather.lookup", "arguments": {}}
+            second = {**first, "call_id": "two"}
+            if failure == "duplicate":
+                second["call_id"] = "one"
+            elif failure == "late_invalid":
+                second["name"] = "not-exposed"
+            elif failure == "nan":
+                second["arguments"] = {"invalid": float("nan")}
+            elif failure == "oversize":
+                second["arguments"] = {"invalid": "a" * 65536}
+            yield ModelEvent(0, ModelEventKind.TOOL_CALL, first)
+            yield ModelEvent(0 if failure == "order" else 1, ModelEventKind.TOOL_CALL, second)
+            yield ModelEvent(2, ModelEventKind.COMPLETED, {})
+
+    capabilities = Capabilities()
+    controller = LoopController(workspace=AttentionController(clock=CLOCK), providers=[],
+        experience_recorder=build_experience_recorder(tmp_path), clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    if failure == "order":
+        with pytest.raises(ValueError, match="order"):
+            await controller.run_native(InferenceRequest("", ""), model=Model(), capabilities=capabilities, scope="conversation:test")
+    else:
+        run = await controller.run_native(InferenceRequest("", ""), model=Model(), capabilities=capabilities,
+            scope="conversation:test", stop_policy=StopPolicy(max_capability_calls=1 if failure == "over_budget" else 8))
+        assert run.status in {"failed", "stopped"}
+    assert capabilities.invocations == []
+
+
+async def test_native_loop_preserves_history_but_only_final_step_is_reply(tmp_path):
+    class Model:
+        def __init__(self): self.requests = []
+        async def events(self, request):
+            self.requests.append(request)
+            yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": "最终回复" if request.history else "中间说明"})
+            if not request.history:
+                yield ModelEvent(1, ModelEventKind.TOOL_CALL,
+                    {"call_id": "call", "name": "weather.lookup", "arguments": {"city": "上海"}})
+            yield ModelEvent(2, ModelEventKind.COMPLETED, {})
+
+    model, capabilities = Model(), Capabilities()
+    controller = LoopController(workspace=AttentionController(clock=CLOCK), providers=[],
+        experience_recorder=build_experience_recorder(tmp_path), clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    run = await controller.run_native(InferenceRequest("", ""), model=model, capabilities=capabilities, scope="conversation:test")
+    assert run.output == "最终回复"
+    step = model.requests[1].history[0]
+    assert step.text == "中间说明" and step.tool_calls[0].arguments == {"city": "上海"}
+    assert step.results == run.capability_results
+
+
+@pytest.mark.parametrize("failure", ["revoked", "unknown", "deadline", "output"])
+async def test_native_loop_revocation_recovery_deadline_and_stream_close(tmp_path, failure):
+    closed = []
+    allowed = True
+    class Model:
+        async def events(self, request):
+            nonlocal allowed
+            try:
+                if failure == "deadline":
+                    await asyncio.Event().wait()
+                if failure == "output":
+                    yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": "abcd"})
+                else:
+                    yield ModelEvent(0, ModelEventKind.TOOL_CALL,
+                        {"call_id": "call", "name": "weather.lookup", "arguments": {}})
+                if failure == "revoked": allowed = False
+                yield ModelEvent(1, ModelEventKind.COMPLETED, {})
+            finally:
+                closed.append(True)
+    class Capability(Capabilities):
+        async def invoke(self, invocation):
+            self.invocations.append(invocation)
+            return CapabilityResult(invocation.call_id, invocation.name, "unknown")
+    async def is_allowed(): return allowed
+    capabilities = Capability()
+    controller = LoopController(workspace=AttentionController(clock=CLOCK), providers=[],
+        experience_recorder=build_experience_recorder(tmp_path), clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    coroutine = controller.run_native(InferenceRequest("", ""), model=Model(), capabilities=capabilities,
+        scope="conversation:test", invocation_allowed=is_allowed,
+        stop_policy=StopPolicy(max_output_chars=3, max_duration_seconds=0.02 if failure == "deadline" else 1))
+    if failure == "deadline":
+        with pytest.raises(TimeoutError): await coroutine
+    else:
+        run = await coroutine
+        assert run.stop_reason == {"revoked": "volition_denied", "unknown": "recovery_required", "output": "output_limit"}[failure]
+    assert closed == [True]
+    assert len(capabilities.invocations) == (1 if failure == "unknown" else 0)
+
+
+@pytest.mark.parametrize("at", ["before_exposure", "after_exposure", "next_step"])
+async def test_native_model_tier_is_rechecked_before_every_inference(tmp_path, at):
+    allowed = at != "before_exposure"
+    class Capability(Capabilities):
+        async def expose(self, **kwargs):
+            nonlocal allowed
+            result = await super().expose(**kwargs)
+            if at == "after_exposure": allowed = False
+            return result
+        async def invoke(self, invocation):
+            nonlocal allowed
+            allowed = False
+            return await super().invoke(invocation)
+    class Model:
+        calls = 0
+        async def events(self, request):
+            self.calls += 1
+            yield ModelEvent(0, ModelEventKind.TOOL_CALL,
+                {"call_id": "call", "name": "weather.lookup", "arguments": {}})
+            yield ModelEvent(1, ModelEventKind.COMPLETED, {})
+    model, capabilities = Model(), Capability()
+    controller = LoopController(workspace=AttentionController(clock=CLOCK), providers=[],
+        experience_recorder=build_experience_recorder(tmp_path), clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    run = await controller.run_native(InferenceRequest("", ""), model=model, capabilities=capabilities,
+        scope="conversation:test", inference_allowed=lambda: allowed)
+    assert run.stop_reason == "model_tier_denied" and model.calls == (1 if at == "next_step" else 0)
 
 
 def _item(

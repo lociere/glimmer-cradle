@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Literal, Protocol
 
 import numpy as np
@@ -19,7 +19,7 @@ class InferenceBackendPort(Protocol):
 
 
 class RealtimeModelPort(Protocol):
-    def events(self, request: InferenceRequest) -> AsyncIterator[ModelEvent]: ...
+    def events(self, request: InferenceRequest) -> AsyncGenerator[ModelEvent, None]: ...
 
     async def cancel(self, session_id: str) -> None: ...
 

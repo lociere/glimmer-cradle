@@ -26,6 +26,11 @@ import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-
 import { UserSkillProvider } from '../../application/skill-plane/providers/user/user-skill-provider';
 import { SkillCatalogAppService } from '../../application/use-cases/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../../application/use-cases/skill-planning-app.service';
+import { NativeCapabilityAppService } from '../../application/use-cases/native-capability-app.service';
+import { SkillInvocationGateway } from '../../application/skill-plane/skill-invocation-gateway';
+import { SkillPolicyEngine } from '../../application/skill-plane/skill-policy-engine';
+import type { Observability } from '@glimmer-cradle/platform/observability';
+import type { ActionCommand } from '../../ports/application-models';
 
 const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === '1';
 
@@ -51,6 +56,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
   let providerRequests = 0;
   let providerDisconnects = 0;
   const methodPrompts: string[] = [];
+  const nativeRequests: Array<{ stream: boolean; messages: Array<{ role: string; content: string | null; tool_call_id?: string; tool_calls?: unknown[] }>; tools?: Array<{ function: { name: string } }> }> = [];
   beforeAll(async () => {
     process.env.GLIMMER_CRADLE_DATA_ROOT = await mkdtemp(path.join(os.tmpdir(), 'glimmer-worker-lifecycle-'));
     provider = createServer((request, response) => {
@@ -72,6 +78,16 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
             suggestions: refined ? [{ skill_id: 'core.method-proof', tool_name: 'read', purpose: 'fixture', confidence: 1, arguments_hint: {} }] : [] };
           response.writeHead(200, { 'content-type': 'application/json' });
           response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: 'stop' }] }));
+        }
+        if (body.includes('native loop integration fixture')) {
+          const payload = JSON.parse(body) as typeof nativeRequests[number]; nativeRequests.push(payload);
+          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          const frame = (delta: unknown, finish_reason: string | null = null) => response.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
+          if (!payload.messages.some(message => message.role === 'tool')) {
+            frame({ content: '查询中。', tool_calls: [{ index: 0, id: 'native-call', type: 'function', function: { name: payload.tools![0]!.function.name, arguments: '{"city":' } }] });
+            frame({ tool_calls: [{ index: 0, function: { arguments: '"上海"}' } }] }, 'tool_calls');
+          } else frame({ content: '实际工具结果：晴。' }, 'stop');
+          response.end('data: [DONE]\n\n');
         }
       });
       response.on('close', () => { if (isCancellationFixture) providerDisconnects += 1; });
@@ -189,6 +205,88 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
       expect(methodPrompts[before + 1]).toContain('【用户目标】\nmethod selection integration fixture');
       expect(adapter.tools.list()).toHaveLength(1); expect(invoked).not.toHaveBeenCalled();
     } finally { user.stop(catalog); await manager.stop(); }
+  }, 60_000);
+
+  it('默认感知直达原生模型、typed Tool、durable Log 与续接回复，不调用 ActionPlan', async () => {
+    const catalog = new CapabilityCatalogAdapter(); const policy = new SkillPolicyEngine();
+    const executed = vi.fn(async (_args: unknown) => ({ actual: '晴' })); const actions: ActionCommand[] = [];
+    catalog.registerSkill({ id: 'native-weather', name: '天气', description: '天气', provider: { kind: 'core', id: 'weather-owner' },
+      policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
+      tools: [{ name: 'lookup', description: '天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] }, handler: executed }] });
+    const journal = new SqliteExecutionJournal(path.join(process.env.GLIMMER_CRADLE_DATA_ROOT!, 'state/capabilities/native-chat.sqlite'));
+    const controller = new ExecutionController(journal); const client = new CognitionClient(transport);
+    const outbox = new ExecutionResultOutbox(journal, { accept: (event, signal) => client.acceptExecutionResult(event, signal) });
+    const observability: Observability = { logger: () => logger,
+      createTraceContext: traceId => ({ trace_id: traceId ?? 'native-trace' }), currentTraceId: () => undefined,
+      withTrace: async (_trace, operation) => operation(), span: async (_name, operation) => operation({ setAttribute() {}, setStatus() {} }),
+      histogram() {}, counter() {}, start() {}, stop() {}, close: async () => undefined };
+    const gateway = new SkillInvocationGateway(catalog, policy, { record() {} }, observability, { record() {} }, undefined, controller,
+      () => 'unused-native-invocation', outbox);
+    transport.setCapabilityService(new NativeCapabilityAppService(catalog, gateway, policy, 'host:integration'));
+    transport.setActionHandler(async command => { actions.push(command); });
+    const before = nativeRequests.length;
+    try {
+      await manager.start();
+      const perception = { id: 'native-perception', sensoryType: 'chat', source: 'fixture', timestamp: Date.now(), familiarity: 0,
+        address_mode: 'direct' as const, response_policy: 'reply_allowed' as const, retention_ceiling: 'experience' as const,
+        conversation: { source_provider_id: 'canonical-provider', scene_id: 'native-scene', conversation_id: 'native-conversation',
+          continuity_id: 'native-continuity', thread_id: 'main', interaction_id: 'native-interaction',
+          recall_scope: 'conversation_private' as const, disclosure_scope: 'conversation_private' as const },
+        origin: { provider_kind: 'core' as const, provider_id: 'different-origin', source_event_id: 'native-source', schema_ref: 'fixture',
+          trust_tier: 'host_verified' as const, privacy_class: 'private' as const, cognitive_effect: 'observation' as const },
+        content: { text: 'native loop integration fixture', modality: ['text'], actor_id: 'external-actor' } };
+      // observe-only 不进入模型或工具，不能因 direct 寻址越过该策略。
+      const observed = await client.submitPerception({ ...perception, id: 'native-observe', response_policy: 'observe_only',
+        conversation: { ...perception.conversation, interaction_id: 'native-observe-turn' } }, 'native-observe-trace', 5000);
+      let state = await waitForPerception(client, observed.operation_id);
+      expect(state.state).toBe('succeeded'); expect(nativeRequests.length).toBe(before); expect(executed).not.toHaveBeenCalled();
+      const accepted = await client.submitPerception(perception, 'native-trace', 5000);
+      await waitUntil(() => actions.length === 1, 10_000);
+      state = await waitForPerception(client, accepted.operation_id);
+      expect(state.state).toBe('succeeded');
+      expect(actions[0]).toMatchObject({ action_type: 'reply', target: { scene_id: 'native-scene' }, payload: { text: '实际工具结果：晴。' } });
+      expect(actions.some(action => action.action_type === 'skill_request')).toBe(false);
+      const requests = nativeRequests.slice(before); expect(requests).toHaveLength(2);
+      expect(requests.every(request => request.stream === true)).toBe(true);
+      const next = requests[1]!.messages; const tool = next.find(message => message.role === 'tool')!;
+      expect(tool.tool_call_id).toBe('native-call'); expect(JSON.parse(tool.content!)).toEqual({ status: 'succeeded', output: { actual: '晴' }, error: null });
+      expect(next.find(message => message.role === 'assistant')).toMatchObject({ content: '查询中。', tool_calls: [expect.objectContaining({ id: 'native-call' })] });
+      expect(executed).toHaveBeenCalledOnce(); expect(executed.mock.calls[0]![0]).toEqual({ city: '上海' });
+      expect(journal.readOutbox(10)).toEqual([]);
+      const history = await client.conversationHistory({ request_id: 'native-history', ...perception.conversation,
+        allowed_scopes: ['conversation_private'], limit: 10 }, 'native-history', 5000);
+      expect(history.items.some(item => item.text === '实际工具结果：晴。')).toBe(true);
+      await manager.stop();
+      // 活动单写者停止后，通过公开 owner 读取真实 Log；不碰用户数据或活动 Worker 的库。
+      const readLog = `
+import asyncio, json
+from types import SimpleNamespace
+from glimmer_cradle.conversation import build_conversation_recorder
+from glimmer_cradle.cognition_worker.composition import WorkerPaths, SystemClock, SystemIdGenerator
+noop = lambda *args, **kwargs: None
+async def read():
+    recorder = build_conversation_recorder(WorkerPaths.from_environment().cognition_state_dir / "experience",
+        clock=SystemClock(), ids=SystemIdGenerator(), observability=SimpleNamespace(logger=lambda _: SimpleNamespace(info=noop, warning=noop, error=noop), current_trace_id=lambda: None))
+    await recorder.start()
+    try:
+        print(json.dumps([{ "id": m.moment_id, "kind": m.kind, "causes": list(m.causation_ids), "content": m.content }
+            for m in recorder.iter_moments_since(None) if m.interaction_id == "native-interaction"], ensure_ascii=False))
+    finally: await recorder.stop()
+asyncio.run(read())
+`;
+      const moments = JSON.parse(execFileSync('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', readLog],
+        { cwd: resolveRepoRoot(), encoding: 'utf8', timeout: 30_000 })) as Array<{ id: string; kind: string; causes: string[]; content: Record<string, unknown> }>;
+      const perceptionFact = moments.find(moment => moment.kind === 'perception')!;
+      const actionFact = moments.find(moment => moment.kind === 'action')!;
+      const resultFact = moments.find(moment => moment.kind === 'action_result')!;
+      const replyFact = moments.find(moment => moment.kind === 'reply')!;
+      expect(actionFact.causes).toContain(perceptionFact.id);
+      expect(resultFact.content.source_fact_id).toBe(actionFact.id);
+      expect(replyFact.causes).toContain(resultFact.id);
+    } finally {
+      await manager.stop(); transport.setActionHandler(null); transport.setCapabilityService(null);
+      await outbox.stop(); await gateway.stop(); await controller.stop(); journal.close();
+    }
   }, 60_000);
 
   it('真实 Execution outbox 经 Conversation Service 接纳，ACK 丢失与 Worker 重启不重新执行', async () => {
@@ -325,4 +423,14 @@ async function waitUntil(predicate: () => boolean, timeoutMs = 5_000): Promise<v
   const deadline = Date.now() + timeoutMs;
   while (!predicate() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
   expect(predicate()).toBe(true);
+}
+
+async function waitForPerception(client: CognitionClient, operationId: string) {
+  const deadline = Date.now() + 5_000;
+  let state = await client.perceptionOperation(operationId, 5000);
+  while (!state.terminal && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 50)); state = await client.perceptionOperation(operationId, 5000);
+  }
+  expect(state.terminal).toBe(true);
+  return state;
 }

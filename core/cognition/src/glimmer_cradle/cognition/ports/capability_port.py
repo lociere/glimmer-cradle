@@ -85,6 +85,7 @@ class CapabilityResult:
     status: CapabilityResultStatus
     output: object | None = None
     error: str | None = None
+    result_fact_id: str | None = None
 
 
 class CapabilityPort(Protocol):

@@ -2074,6 +2074,7 @@ class CognitionHost:
             self.components = compose_cognition(
                 self.config,
                 action_sink=self.kernel_client.send_action_command,
+                capability_rpc=self.kernel_client,
                 observability=FileObservability(),
                 model_invocation_recorder=record_model_invocation,
                 memory_jobs_owner=self.memory_jobs_owner,

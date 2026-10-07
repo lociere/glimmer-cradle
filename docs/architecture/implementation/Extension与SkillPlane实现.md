@@ -117,8 +117,8 @@ Schema 源。现行 SDK/wire 的 `SkillDescriptor` 仍是旧分组投影，`tota
 应用只依赖 `CapabilityCatalogPort`，具体 adapter 只由 composition 注入；旧 SkillRegistry owner
 已经删除。接入映射随阶段 12 移到 App，旧 SDK 分组在阶段 9/11/12 原生消费者归零后删除。
 User Provider 已以 inline 方法接入独立 SkillCatalog，删除 `instructions.read` 假 Tool；现行两次
-Plan 分别消费方法目录与正文。原生 Step Exposure 接口已经实现，普通聊天与 Loop broker 仍待切换，
-不声称整条主链完成。
+Plan 分别消费方法目录与正文。原生 Step Exposure 已接默认聊天的 typed client/模型 Loop，
+原生方法正文与 Resource 内容加载、完整权限/持久预算 broker 仍未完成。
 
 `core/capabilities/src/exposure/{step-surface,exposure-controller}.ts` 分别投影 Tool、Skill 摘要、Resource，
 没有正文或 handler。显式授权事实必须匹配主体、可选平台用户、定义 ID/revision、实际目标位置和协议；
@@ -135,7 +135,8 @@ permission revision 暂绑定定义 revision，不等于完整 Host 粒度权限
 已提交的确认拒绝投影为已知 failed 结果，不伪造成功；派发后未知仍通过 typed recovery error
 要求可信对账，不能当 failed 重跑。协议和 Worker 接纳链见
 [Contract Spine 实现](Protocol契约层实现.md)及[Cognition 实现](Cognition认知核实现.md#唯一认知循环)。
-普通聊天仍消费 ActionPlan；App owner、旧 SDK 分组在阶段 9/11/12 consumer-zero 后迁移/删除。
+普通聊天已切原生模型/Tool 续接；ActionPlan 非生产入口和明确 Plan/Synthesis 请求仍留删除窗口。
+App owner、旧 SDK 分组在阶段 9/11/12 consumer-zero 后迁移/删除。
 
 User 来源整体 degraded 保留坏文件诊断；成功逐文件加载的静态方法由接入事实
 `ready_inline_method_groups` 明确记录并冻结，仍可通过定义/scope/revision 复验。该标记不

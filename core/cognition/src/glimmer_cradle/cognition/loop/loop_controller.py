@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Callable, Sequence
+import json
+from contextlib import aclosing
+from typing import Awaitable, Callable, Sequence
 
 from glimmer_cradle.cognition.attention import (
     Attention,
@@ -13,7 +15,11 @@ from glimmer_cradle.cognition.context import RecentExperienceSource
 from glimmer_cradle.cognition.inference import (
     InferenceController,
     InferenceRequest,
+    InferenceStep,
+    InferenceUnavailable,
     ModelEventKind,
+    ModelTier,
+    ModelToolCall,
     RealtimeModelPort,
 )
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
@@ -107,6 +113,7 @@ class PerceptionProvider(Provider):
                 "retention_ceiling": entry.retention_ceiling,
                 "interaction_id": entry.interaction_id,
                 "payload_digest": entry.payload_digest,
+                "source_provider_id": entry.source_provider_id,
             }
             if entry.actor_id:
                 content["actor_id"] = entry.actor_id
@@ -144,6 +151,8 @@ class LoopController:
         action_sink=None,
         reasoning: InferenceController | None = None,
         planning_controller: PlanningController | None = None,
+        native_model: RealtimeModelPort | None = None,
+        capability_factory: Callable[[dict], CapabilityPort] | None = None,
         checkpoint_store: LoopCheckpointStore | None = None,
         persona_compiler=None,
         boundary_validator: "Callable[[str], bool] | None" = None,
@@ -159,6 +168,10 @@ class LoopController:
         observability: ObservabilityPort,
     ) -> None:
         self._clock = clock
+        if (native_model is None) != (capability_factory is None):
+            raise ValueError("native model and capability factory must be paired")
+        self._native_model = native_model
+        self._capability_factory = capability_factory
         self._ids = ids
         self._observability = observability
         self.logger = observability.logger("loop_controller")
@@ -183,6 +196,7 @@ class LoopController:
         )
         self._deliberation = DeliberationController(
             reasoning=reasoning,
+            native_inference=self._deliberate_native if native_model is not None else None,
             planning_controller=planning_controller,
             memory=memory,
             knowledge_base=knowledge_base,
@@ -264,16 +278,33 @@ class LoopController:
         capabilities: CapabilityPort,
         scope: str,
         stop_policy: StopPolicy | None = None,
+        invocation_allowed: Callable[[], Awaitable[bool]] | None = None,
+        inference_allowed: Callable[[], bool] | None = None,
     ) -> LoopRun:
         """Run a bounded native model/tool loop without reclassifying tool calls."""
         policy = stop_policy or StopPolicy()
+        # Cancellation must reach the active model socket / RPC, not detach a side effect.
+        async with asyncio.timeout(policy.max_duration_seconds):
+            return await self._run_native(request, model=model, capabilities=capabilities,
+                scope=scope, policy=policy, invocation_allowed=invocation_allowed,
+                inference_allowed=inference_allowed)
+
+    async def _run_native(self, request: InferenceRequest, *, model: RealtimeModelPort,
+        capabilities: CapabilityPort, scope: str, policy: StopPolicy,
+        invocation_allowed: Callable[[], Awaitable[bool]] | None,
+        inference_allowed: Callable[[], bool] | None) -> LoopRun:
         run_id = self._ids.new()
         results: list[CapabilityResult] = []
         output_parts: list[str] = []
+        history = list(request.history)
+        seen_calls: set[str] = set()
         step_count = 0
         capability_calls = 0
 
         while True:
+            if inference_allowed is not None and not inference_allowed():
+                return LoopRun(run_id, "stopped", step_count, stop_reason="model_tier_denied",
+                    capability_results=tuple(results))
             reason = policy.stop_reason(
                 step_count=step_count,
                 capability_calls=capability_calls,
@@ -290,8 +321,9 @@ class LoopController:
                 )
 
             step_count += 1
+            can_invoke = invocation_allowed is None or await invocation_allowed()
             exposure = await capabilities.expose(scope=scope, run_id=run_id, step=step_count,
-                remaining_calls=policy.max_capability_calls - capability_calls)
+                remaining_calls=policy.max_capability_calls - capability_calls if can_invoke else 0)
             exposed = exposure.tools
             if exposure.run_id != run_id or exposure.step != step_count or len({item.name for item in exposed}) != len(exposed) \
                     or any(not item.name or not item.definition_id or not item.definition_revision for item in exposed):
@@ -299,40 +331,49 @@ class LoopController:
             exposed_by_name = {descriptor.name: descriptor for descriptor in exposed}
             current = InferenceRequest(system=request.system, user=request.user, max_tokens=request.max_tokens,
                 temperature=request.temperature, vision=request.vision, provider_key=request.provider_key,
+                history=tuple(history),
                 metadata={**request.metadata, "run_id": run_id, "step": step_count, "capabilities": tuple(exposed),
                     "skills": exposure.skills, "resources": exposure.resources, "capability_results": tuple(results)})
             step_calls: list[dict[str, object]] = []
             completed = False
-            async for event in model.events(current):
-                if event.kind == ModelEventKind.TEXT_DELTA:
-                    text = event.payload.get("text")
-                    if isinstance(text, str):
-                        remaining = policy.max_output_chars - sum(
-                            len(part) for part in output_parts
-                        )
-                        output_parts.append(text[:remaining])
-                        if len(text) > remaining:
-                            return LoopRun(
-                                run_id=run_id,
-                                status="stopped",
-                                step_count=step_count,
-                                output="".join(output_parts),
-                                stop_reason="output_limit",
-                                capability_results=tuple(results),
+            previous_sequence = -1
+            step_text: list[str] = []
+            if inference_allowed is not None and not inference_allowed():
+                return LoopRun(run_id, "stopped", step_count, stop_reason="model_tier_denied",
+                    capability_results=tuple(results))
+            async with aclosing(model.events(current)) as events:
+                async for event in events:
+                    if completed or event.sequence <= previous_sequence:
+                        raise ValueError("invalid model event order")
+                    previous_sequence = event.sequence
+                    if event.kind == ModelEventKind.TEXT_DELTA:
+                        text = event.payload.get("text")
+                        if isinstance(text, str):
+                            remaining = policy.max_output_chars - sum(
+                                len(part) for part in output_parts
                             )
-                elif event.kind == ModelEventKind.TOOL_CALL:
-                    step_calls.append(event.payload)
-                elif event.kind == ModelEventKind.FAILED:
-                    return LoopRun(
-                        run_id=run_id,
-                        status="failed",
-                        step_count=step_count,
-                        output="".join(output_parts),
-                        stop_reason=str(event.payload.get("error") or "model_failed"),
-                        capability_results=tuple(results),
-                    )
-                elif event.kind == ModelEventKind.COMPLETED:
-                    completed = True
+                            output_parts.append(text[:remaining])
+                            step_text.append(text[:remaining])
+                            if len(text) > remaining:
+                                return LoopRun(
+                                    run_id=run_id, status="stopped", step_count=step_count,
+                                    output="".join(output_parts), stop_reason="output_limit",
+                                    capability_results=tuple(results),
+                                )
+                    elif event.kind == ModelEventKind.TOOL_CALL:
+                        step_calls.append(event.payload)
+                        if len(step_calls) > policy.max_capability_calls:
+                            return LoopRun(run_id, "stopped", step_count, stop_reason="capability_call_limit",
+                                capability_results=tuple(results))
+                    elif event.kind == ModelEventKind.FAILED:
+                        return LoopRun(
+                            run_id=run_id, status="failed", step_count=step_count,
+                            output="".join(output_parts),
+                            stop_reason=str(event.payload.get("error") or "model_failed"),
+                            capability_results=tuple(results),
+                        )
+                    elif event.kind == ModelEventKind.COMPLETED:
+                        completed = True
 
             if not completed:
                 return LoopRun(run_id=run_id, status="failed", step_count=step_count, output="".join(output_parts),
@@ -342,11 +383,14 @@ class LoopController:
                     run_id=run_id,
                     status="completed" if completed else "failed",
                     step_count=step_count,
-                    output="".join(output_parts),
+                    output="".join(step_text),
                     stop_reason="" if completed else "model_stream_incomplete",
                     capability_results=tuple(results),
                 )
 
+            # Validate the entire batch before the first side effect, including call identity.
+            calls: list[ModelToolCall] = []
+            batch_ids: set[str] = set()
             for payload in step_calls:
                 if capability_calls >= policy.max_capability_calls:
                     return LoopRun(
@@ -378,6 +422,16 @@ class LoopController:
                         stop_reason="invalid_tool_arguments",
                         capability_results=tuple(results),
                     )
+                try:
+                    encoded = json.dumps(arguments, ensure_ascii=False, allow_nan=False)
+                    valid = len(encoded.encode("utf-8")) <= 64 * 1024 and all(
+                        len(value.encode("utf-8")) <= 4096 for value in (call_id, name))
+                    arguments = json.loads(encoded)
+                except (ValueError, TypeError, RecursionError):
+                    valid = False
+                if not valid:
+                    return LoopRun(run_id, "failed", step_count, stop_reason="invalid_tool_arguments",
+                        capability_results=tuple(results))
                 if name not in exposed_by_name:
                     return LoopRun(
                         run_id=run_id,
@@ -387,6 +441,23 @@ class LoopController:
                         stop_reason="capability_not_exposed",
                         capability_results=tuple(results),
                     )
+                if call_id in seen_calls or call_id in batch_ids:
+                    return LoopRun(run_id, "failed", step_count, stop_reason="duplicate_tool_call",
+                        capability_results=tuple(results))
+                batch_ids.add(call_id)
+                calls.append(ModelToolCall(call_id, name, arguments))
+            step_results: list[CapabilityResult] = []
+            if len(calls) > policy.max_capability_calls - capability_calls:
+                return LoopRun(run_id, "stopped", step_count, stop_reason="capability_call_limit",
+                    capability_results=tuple(results))
+            for call in calls:
+                if invocation_allowed is not None and not await invocation_allowed():
+                    return LoopRun(run_id, "stopped", step_count, stop_reason="volition_denied",
+                        capability_results=tuple(results))
+                if capability_calls >= policy.max_capability_calls:
+                    return LoopRun(run_id, "stopped", step_count, stop_reason="capability_call_limit",
+                        capability_results=tuple(results))
+                call_id, name, arguments = call.call_id, call.name, call.arguments
                 capability_calls += 1
                 result = await capabilities.invoke(
                     CapabilityInvocation(
@@ -403,6 +474,41 @@ class LoopController:
                 if result.call_id != call_id or result.name != name or result.status not in {"succeeded", "failed", "unknown"}:
                     raise ValueError("invalid capability result identity")
                 results.append(result)
+                step_results.append(result)
+                seen_calls.add(call_id)
+                if result.status == "unknown":
+                    return LoopRun(run_id, "failed", step_count, stop_reason="recovery_required",
+                        capability_results=tuple(results))
+            history.append(InferenceStep("".join(step_text), tuple(calls), tuple(step_results)))
+
+    async def _deliberate_native(self, request: InferenceRequest, content: dict,
+        tier: ModelTier) -> str | None:
+        if tier != ModelTier.CLOUD_ALLOWED:
+            # No local native streaming backend is configured; never promote a local-only request.
+            raise InferenceUnavailable("native model tier is unavailable")
+        assert self._native_model is not None and self._capability_factory is not None
+        run = await self.run_native(request, model=self._native_model,
+            capabilities=self._capability_factory(content), scope=content["conversation_id"],
+            invocation_allowed=lambda: self._native_invocation_allowed(content),
+            inference_allowed=lambda: self._deliberation.reasoning_tier() == ModelTier.CLOUD_ALLOWED)
+        if run.status != "completed":
+            raise RuntimeError(f"native inference did not complete: {run.stop_reason}")
+        self._turn.native_result_fact_ids = [item.result_fact_id for item in run.capability_results if item.result_fact_id]
+        return run.output
+
+    async def _native_invocation_allowed(self, content: dict) -> bool:
+        if content.get("response_policy") == "observe_only":
+            return False
+        if self._deliberation.reasoning_tier() != ModelTier.CLOUD_ALLOWED:
+            return False
+        if content.get("address_mode") == "direct":
+            return True
+        activity, proactive = self._read_activity_for_volition()
+        if not proactive or self._turn.broadcast is None:
+            return False
+        willingness = compute_willingness(self._gather_willingness_inputs(
+            self._turn.broadcast, await self._ws.snapshot()), self._willingness_cfg)
+        return willingness >= threshold_for(activity, self._willingness_cfg)
 
     # ── 循环本体 ──────────────────────────────────────────────────────────
 
@@ -574,7 +680,8 @@ class LoopController:
             if task is not None:
                 self._perception_operations.mark_running(trace_id, task)
 
-        # Deliberate：结构化规划后生成角色回复或能力请求。
+        self._turn.broadcast = broadcast_item
+        # Deliberate：角色上下文进入原生 Loop；未迁移消费者保留旧规划。
         with self._observability.span("deliberate") as s_delib:
             self._turn.skill_request = None
             self._turn.action_plan = None

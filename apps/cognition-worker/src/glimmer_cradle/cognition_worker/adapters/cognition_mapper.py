@@ -5,11 +5,6 @@ from __future__ import annotations
 import hashlib
 
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
-from glimmer_cradle.cognition.inference import (
-    InferenceRequest,
-    ModelEvent,
-    ModelEventKind,
-)
 from glimmer_cradle.cognition.perception import Observation, ObservationNormalizer
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
@@ -27,36 +22,13 @@ from glimmer_cradle.cognition.ports import (
 from google.protobuf.json_format import MessageToDict, ParseDict
 
 
-def inference_request_to_wire(request: InferenceRequest) -> dict[str, object]:
-    return {
-        "system": request.system,
-        "user": request.user,
-        "max_tokens": request.max_tokens,
-        "temperature": request.temperature,
-        "metadata": request.metadata,
-        "vision": [list(item) for item in request.vision],
-        "provider_key": request.provider_key,
-    }
-
-
-def model_event_from_wire(value: dict[str, object]) -> ModelEvent:
-    sequence = value.get("sequence")
-    kind = value.get("kind")
-    payload = value.get("payload", {})
-    if not isinstance(sequence, int) or sequence < 0:
-        raise ValueError("model event sequence must be a non-negative integer")
-    if not isinstance(kind, str):
-        raise ValueError("model event kind must be a string")  # noqa: TRY004 — wire 输入统一为 ValueError
-    if not isinstance(payload, dict):
-        raise ValueError("model event payload must be an object")  # noqa: TRY004 — wire 输入统一为 ValueError
-    return ModelEvent(sequence=sequence, kind=ModelEventKind(kind), payload=payload)
-
-
 def observation_from_wire(
     request: cognition_pb.SubmitPerceptionRequest, *, trace_id: str
 ) -> Observation:
     content = request.content
     conversation = request.conversation
+    if not conversation.source_provider_id.strip() or len(conversation.source_provider_id.encode("utf-8")) > 4096:
+        raise ValueError("canonical source_provider_id is invalid")
     payload_digest = (
         request.origin.content_hash.strip()
         or hashlib.sha256(request.SerializeToString(deterministic=True)).hexdigest()
@@ -64,6 +36,7 @@ def observation_from_wire(
     return ObservationNormalizer().normalize(
         Observation(
             scene_id=conversation.scene_id,
+            source_provider_id=conversation.source_provider_id,
             conversation_id=conversation.conversation_id,
             continuity_id=conversation.continuity_id,
             thread_id=conversation.thread_id,

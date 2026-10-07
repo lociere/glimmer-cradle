@@ -63,13 +63,18 @@ Perception
 
 这条主线保证同一感知不会被旧用例、UI 层或平台 Adapter 重复编排。`application/agent_plan_use_case.py`、`agent_synthesis_use_case.py` 等用例可以服务工具规划与结果综合，但不能重新成为独立聊天回复主线。
 
-`ports/` 已提供 v2.1 消费方契约：`ClockPort`、`ContentPort`、`ConversationPort`、`CapabilityPort`、`JobPort` 与 `ResourcePort`。这些类型只表达 Cognition 所需的读取、事实提交、能力执行和长期工作请求语义；具体跨进程 mapper 与 broker 仍由待迁移的 Cognition Worker 装配。
+`ports/` 已提供 v2.1 消费方契约：`ClockPort`、`ContentPort`、`ConversationPort`、`CapabilityPort`、`JobPort` 与 `ResourcePort`。这些类型只表达读取、事实提交、能力执行和长期工作请求语义；Worker 已装配 typed Capability/模型及其他具体 adapter，完整 broker 与剩余 consumer 迁移仍未完成。
 
-当前聊天主循环能生成 `reply` 并通过 `ActionCommand` 外发；Deliberate 先由 `planning/PlanningController` 生成结构化 ActionPlan，语义级判断当前目标应 `reply`、`skill_request`、`ask_clarification` 或 `noop`。`reply` 才继续普通 persona reply prompt；高置信度 `skill_request` 会停止普通回复并发出 `action_type=skill_request` 的 `ActionCommand`，携带 `original_goal`、`capability_kind`、`confidence`、`reason` 和可选 `planning_hint`；`ask_clarification` 生成 ActionPlan 驱动的澄清回复；`noop` 不发行动并记录 `action_plan_noop` 的 silence。真实规划和显式降级写入独立 `planning.sqlite` journal。Cognition 只表达行动语义，不读取 catalog、不执行 handler、不接触平台 IO；推理不可用或规划非法时不会用关键词规则兜底执行工具。Kernel 的 `SkillActionController` 接收该请求后暴露 character audience 的 ready catalog 给 `agent_plan` RPC，执行结果再通过 `agent_synthesis` RPC 回到 Cognition 合成角色回复。
+当前生产聊天由唯一 Loop 直接消费原生模型流：每 Step 曝光 Tool、方法摘要和 Resource，绑定实际
+定义后调用 typed Capability Service；ACTION 先刷盘，真实执行结果被 Conversation 接纳后才续接。
+最终 `reply` 经角色边界、Intent 仲裁和 `ActionCommand` 外发，不再经过 ActionPlan 预分类。
+未完成流、预算、重复调用、未知副作用、tier 与意愿拒绝均失败关闭；没有本地 stream 时不提升为云。
+具体接线和未完成窗口见[唯一认知循环](../../implementation/Cognition认知核实现.md#唯一认知循环)。
 
 `Intent.initiative` 区分响应性意图与主动意图。来自已准入、`address_mode=direct` 的 `PerceptionEvent` 且已经过 Deliberation 的回复、澄清或 Skill 请求属于 `reactive`，不再被用于角色自发行为的 willingness/activity 闸重复压制；ambient 感知以及 drive、affect 等角色自发行为属于 `proactive`，仍必须通过连续意愿阈值和 `CognitiveActivityPolicy.allows_proactive`。Skill 副作用无论来源都继续由 Kernel Skill Policy 与 Invocation Gateway 决定。
 
-这条闭环仍保持单一认知主线：普通闲聊直接生成 `reply`；需要能力时生成 `skill_request` 并记录 `action` Moment，避免把“等待工具结果”误写成沉默。`agent_synthesis` 复用 `PersonaCompiler` 的 persona/profile/dialogue/safety prompt 主体，只把外部能力结果作为不可信观察附加给模型；`agent_plan` / `agent_synthesis` 是 Cognition 给 Kernel 编排使用的辅助用例，不重新成为独立聊天回复主线。
+明确请求型 `agent_plan` / `agent_synthesis` 仍服务未迁移的 Kernel 编排，不能重新成为生产聊天旁路。
+ActionPlan 非生产消费者与旧 journal 恢复保留有删除条件的窗口；长程 Planning 不随其删除。
 
 感知进入 Cognition `AttentionController` 时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
 
