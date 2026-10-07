@@ -86,6 +86,10 @@ clock high-water 拒绝回拨复活；跨整个 Host 重启的持久时钟/autho
 修订/摘要；Host 配置写入仍由可信 App/用户管理，drain 后将明确审批配置装配到新实例。更新/停用
 通过 controller 先撤 IO/proof 再做来源 CAS，原审批不会追溯适配新声明。此管理入口不是模型或
 Renderer 直接写配置权限；Control Center 编辑、审批 UI、热更新和自动续期尚未实现。
+同 graph 的内容通知仅在原接纳和双 grant 仍有效、来源仍匹配时驱动重新采集，不补发或续期。
+定义替换/移除、撤权或刷新失败保持拒绝；重新授权须由明确 App collect 或配置重启进入既有
+审批校验。没有新增刷新配置、计时器或持久通知保证，机制与状态语义见
+[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。

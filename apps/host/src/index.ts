@@ -8,7 +8,7 @@ export { PermissionBroker } from './broker/permission-broker.js';
 export type { PermissionAudit } from './broker/permission-broker.js';
 export { HostResourceContributions, HostCapabilityRequestError, HostKnowledgeController } from './composition/extension-contributions.js';
 export type { HostResourceOptions, HostCapabilityServicePort, HostKnowledgeResourceAccess, ResourceReader } from './composition/extension-contributions.js';
-export type { HostKnowledgeApproval } from './composition/extension-contributions.js';
+export type { HostKnowledgeApproval, HostKnowledgeSnapshot, HostResourceChange } from './composition/extension-contributions.js';
 export type { WorkerSupervisorOptions, WorkerSupervisorSnapshot, WorkerSession } from './supervision/worker-supervisor.js';
 export type { ConfiguredHostCognitionJobsOptions, ConfiguredHostCognitionJobsSnapshot } from './composition/domain-owners.js';
 export { HostDataPaths } from './adapters/platform/data-paths.js';

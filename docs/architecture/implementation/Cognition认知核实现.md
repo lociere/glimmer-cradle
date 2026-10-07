@@ -163,7 +163,7 @@ ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终
 核验 reference/hash/media 后才续接。旧无实现的 `resource.read` 字典 transport 已删除；
 `resource_client.py` 分别拥有原生加载的内容解码和显式 Knowledge 采集/复验 Adapter，二者不提升
 彼此权限。受控来源的持久采集、live Context、可信 App 管理 RPC 与显式审批重启重采集已接通，
-详见下文；资源主动订阅、产品权限 UI 和持久 Run 恢复仍未完成，原生 Step 材料不会自动提升为 Knowledge。
+详见下文；供应商主动订阅、产品权限 UI 和持久 Run 恢复仍未完成，原生 Step 材料不会自动提升为 Knowledge。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
@@ -331,7 +331,7 @@ parser/chunk 版本，随正文不可变修订保留。text/plain 实施 `utf8-t
 
 检索只向 Worker 绑定主体提供当前 scope 可见的来源；private 不降级为 global，partial scope 拒绝。
 编码前、迟到向量接纳、查询后与最终 SQL 投影都重验来源。Host 返回不 current 或无法复验时，
-当前修订落 tombstone 并删除向量；恢复连通/墙钟回拨不自动复活，只有新的显式采集可建立新修订。
+当前修订落 tombstone 并删除向量；恢复连通/墙钟回拨不自动复活，只有新的获准采集可建立新修订。
 scope/主体不匹配只是不可见，不以别的会话查询删除来源。同步诊断快照不返回 Resource 正文。
 
 `KnowledgeSource` 与 `ReplyContextBuilder` 传递来源/Resource/hash、主体、权限 revision、时间及
@@ -358,7 +358,17 @@ HostKnowledgeController 通过这些生成 RPC 管理来源，不直接写 Knowl
 [配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)。没有审批默认拒绝；审批与
 当前来源不符、已到期或 Resource graph 未装配时明确失败，不忽略配置或自造假 ready。
 
-产品权限 UI、主动变更订阅、采集调度、安装态迁移与完整 Knowledge 生命周期尚未交付。
+Host 已将同 graph 的 owner 内容更新接入受监督重采集，原授权仍 current 时复用它，而非自动
+重新授权。实际机制与失败边界见上述采集边界。成功采集生成新 entry revision 并在同一 SQL
+事务失效旧向量；旧 Context 仍引用旧 revision，模型完成后的复验会终止该 Run，即使新材料
+已经接纳也不能继续旧 prompt 或产出 Reply。刷新失败时 Host 旧证明已失效，live 检索/Context
+拒绝；物理 tombstone 仍由实际复验/来源变更触发，不宣称 Host 通知同步删除远端 SQLite 历史。
+session.knowledge 是 Host-local 冻结投影：idle/refreshing/degraded/stopped 与每个审批来源的
+waiting/accepted/refreshing/blocked/failed、last_entry_revision、稳定 error_code。accepted 只表示
+最后真实 receipt，idle 只表示当前无刷新；都不是材料当前有效或完整产品 ready 的证明。它不包含
+正文、hash、proof 或 grant，也不是新增跨进程 Document，Context 继续独立 live 复验。
+
+产品权限 UI、供应商变更订阅、持久采集调度、安装态迁移与完整 Knowledge 生命周期尚未交付。
 上述局部 Host 入口不替代产品默认 Kernel，不是完整产品 ready 或跨机认证/安全发行证明。
 
 共享 Memory 连接的读写由 `SqliteMemoryStore.read()` / `transaction()` 串行化；Memory、Vector、

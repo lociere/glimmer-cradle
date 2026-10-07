@@ -106,7 +106,7 @@ handler 尚未装配，待办只排队、状态不假 ACK，Host 如实降级。
 | Memory | `MemoryController` / `MemoryStore` | episodic、semantic、social、autobiographical、prospective、procedural 记忆及其版本、证据与纠错状态 |
 | 记忆修订与证据 | `memory_revisions` / `memory_evidence` | 当前有效修订、历史有效期、来源 Moment 和 consolidation id |
 | 关系投影 | `RelationshipProjection` / `relationship_*` | 按 checkpoint 从 Moment 幂等派生直接互动、环境观察、回复计数和有证据修订 |
-| 知识库 | Cognition KnowledgeStore / KnowledgeIndex | 独立版本化配置 Vault；正文更新/删除原子失效，当前 Context 携修订/hash，不是角色经历或 Resource freshness 证明 |
+| 知识库 | Cognition KnowledgeStore / KnowledgeIndex | 独立版本化配置 Vault 与获准 Resource 采集；正文更新/删除原子失效，Resource 经 live 权限复验与受监督重采集，Context 携修订/hash，不是角色经历；边界见 [Knowledge 实现](../../implementation/Cognition认知核实现.md#knowledge-来源与持久化) |
 | 叙事投影 | Narrative journal | 从已持久化 Episode 派生的人类可读叙事，不替代 Ledger |
 
 连续性链路固定为：

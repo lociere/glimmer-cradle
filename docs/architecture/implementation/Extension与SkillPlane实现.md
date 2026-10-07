@@ -265,7 +265,7 @@ ConversationService.AcceptExecutionResult；验证 event/invocation/revision/Mom
 生产 Python Worker、实际 typed RPC/local HTTP SSE 和 SQLite Conversation Log 已覆盖授权
 读取→原 Action 引用→刷盘 result receipt→模型续接→Reply 因果链，以及读取中撤权时不续接。
 该链不是完整 SDK IO 沙箱、持久用户权限 UI、跨重启 outbox 驱动或持久 Run/budget；Tool/Skill
-迁移、Resource freshness/Knowledge ingest 及默认产品 Host 启动仍未完成。旧 Kernel owner
+迁移、完整 Resource freshness/Knowledge 生命周期及默认产品 Host 启动仍未完成。旧 Kernel owner
 待相应 consumer-zero/产品切换门后删除，不以新增 Host 模块冒充完整替代。
 
 ## Knowledge 显式资源采集边界
@@ -290,6 +290,9 @@ grant/主体/来源/资源撤销和定义替换取消在途采集、删除证明
 `invalidateResourceContent(resourceId, ownerId)` 独立失效，不强迫改写目录定义 revision；
 错误 owner 无权失效，正确通知取消等待并撤销旧证明，后续重新采集产生新证明/hash。
 定义替换仍按注册 revision 失效；TTL 是有限采集年龄，不冒充供应商主动更新订阅。
+同一 graph 的 `onResourceChanged` 在取消读取/使旧证明失效后发布冻结的内容更新、定义更新、移除
+或停止通知；通知只携定义引用、不携正文。重复登记同一定义/reader 保留绑定身份且不发通知。
+订阅上限 128，可解除；一个观察者失败仍通知其他观察者，再向调用方报告聚合错误，失效不回滚。
 RPC 复验比对完整证明 identity/revision/time、内容 hash 和作用域，不接受仅凭 id 或时间戳
 自报授权。未知、过期、被撤销证明为 current=false；不自动恢复或提升权限。
 实际 media_type 也绑定证明，不能在复验后自报另一 parser 输入类型。单来源最多两次在途采集，
@@ -308,7 +311,15 @@ Worker composition 已向 KnowledgeIndex 注入 ResourceClient 与本代主体�
 已验证知识正文进入模型，保存权限撤销后不再续接或产生 Reply。Host 不写 Knowledge 库。
 HostKnowledgeController 已通过 CognitionService 来源管理 RPC 接入真实持久 owner；唯一
 HostConfig 审批驱动新世代重验与重新采集，来源修订/摘要/enabled 不符或到期拒绝，详细字段与
-生命周期仍归上述 Knowledge 实现。主动订阅、权限 UI、采集调度和完整安装态迁移仍待落位；
+生命周期仍归上述 Knowledge 实现。controller 订阅本 graph 的内容更新，用单个 pump、每来源
+一个最新 ticket 合并通知；在途采集被较新通知取消，迟到 receipt 不替换新状态。刷新前查询真实
+来源，复验原接纳与双 grant，仍沿实际 CollectKnowledgeSource/SQL CAS 接纳链路，不重新批准、
+补发 grant 或延长审批到期。定义替换、移除、停止或原权限失效直接撤销，不自动改写声明/审批。
+失败撤销后投影稳定错误；清理审计失败单独标记 knowledge_refresh_cleanup_failed，不自动重试。
+停止解除订阅，撤销并 drain 所有在途请求与 pump，再关闭 client。新的明确 App collect 可按仍匹配
+且未到期的审批重建授权，不是内容通知的隐式恢复。Host 通知不是持久消息或供应商订阅；未发通知
+的外部更新只能靠既有 TTL/live 复验拒绝旧材料。失效后的旧 Context 不因新采集成功而复活。
+供应商主动订阅、权限 UI、持久采集调度和完整安装态迁移仍待落位；
 不能自动保存 Tool/Step 结果、把数据提升成 Memory 或宣称完整 Knowledge 生命周期已交付。
 
 ## Extension Adapter 链路

@@ -8,7 +8,7 @@ import { SqliteAuthorityStore } from '../adapters/platform/authority-store.js';
 import { HostDataPaths } from '../adapters/platform/data-paths.js';
 import { loadHostCognitionJobsConfiguration, type HostCognitionJobsConfiguration } from '../adapters/platform/host-configuration.js';
 import { CognitionJobAdapter } from './cognition-job-adapter.js';
-import { HostKnowledgeController, HostResourceContributions, type HostKnowledgeApproval } from './extension-contributions.js';
+import { HostKnowledgeController, HostResourceContributions, type HostKnowledgeApproval, type HostKnowledgeSnapshot } from './extension-contributions.js';
 
 export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly authority: AuthorityStorePort;
@@ -127,6 +127,7 @@ export interface HostCognitionJobsSnapshot {
   readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
   readonly worker: WorkerSupervisorSnapshot;
   readonly jobs: HostJobsOwnerSnapshot | null;
+  readonly knowledge: HostKnowledgeSnapshot | null;
 }
 
 /** 实际 Worker 与 Jobs 的局部生命周期；不替代整个产品的 ingress/readiness owner。 */
@@ -148,7 +149,8 @@ export class HostCognitionJobsOwner {
   public get snapshot(): HostCognitionJobsSnapshot {
     const jobs = this.jobs?.snapshot ?? null;
     const failed = jobs && (['failed', 'lease_lost'].includes(jobs.phase) || jobs.jobs?.status === 'failed');
-    return { phase: this.phase === 'active' && failed ? 'failed' : this.phase, worker: this.options.worker.snapshot, jobs };
+    return { phase: this.phase === 'active' && failed ? 'failed' : this.phase, worker: this.options.worker.snapshot, jobs,
+      knowledge: this.knowledgeController?.snapshot ?? null };
   }
   public get knowledge(): HostKnowledgeController {
     if (this.snapshot.phase !== 'active' || !this.knowledgeController) throw new Error('Knowledge 未装配或尚未激活');

@@ -97,6 +97,9 @@ Host 审批先由唯一 HostConfig 校验，再由同一 Resource/Broker graph �
 临时 grant，来源声明不是读取授权，采集材料不是 Memory。配置、重新装配和未交付 UI 边界见
 [配置参考](configuration.md#目标-host-与-jobs-配置) 与
 [Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+Host-local Resource 更新订阅与刷新状态不是新 wire；重采集仍复用上述查询/采集 RPC 和原授权，
+不以通知自动创建 grant、更新审批或恢复旧 Context。通知及有界监督机制归
+[Knowledge 采集边界](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 
 ## Memory Jobs 状态投递
 

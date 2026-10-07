@@ -620,6 +620,49 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/9 Resource 更新通知与受监督 Knowledge 重采集（2026-10-07）
+
+输入 `c3cc6d02`，当前会话唯一写入 owner，完整 v2.1 目标保持 active。本切片将已有 Resource
+owner 内容失效入口接入实际 Knowledge 重新采集，未创建第二契约/正文库，也不切换默认产品入口。
+
+同 graph 在旧证明失效/读取取消后发布冻结元数据通知，重复定义/reader 登记保持绑定身份；
+独立监听者错误汇总报告，不阻断其他 owner 的失效处理。HostKnowledgeController 用一个 pump、
+每来源一个最新 ticket 合并事件，刷新中较新事件取消旧任务。刷新查询实际来源修订/摘要/状态，
+复验原接纳、reader/定义与双 grant，再经原 CognitionService/Worker/Core SQL CAS 接纳；不补发
+grant、不续期、不按通知更新审批。定义替换、移除、失效原权限或 graph 停止保持拒绝，失败撤销
+后投影稳定错误，不自动重试；明确 App collect 才能重新进入原审批校验。停止解除订阅、取消并
+drain 请求和 pump，再关闭本实例 client。状态只反映最后真实 receipt 与刷新/拒绝结果，不宣称
+此刻所有材料 current。实现和剩余边界见
+[采集边界](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界) 与
+[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+
+真实生产 Worker/SQLite fixture 观察 100 次同拍通知仅增加一次读取、更新的实际 raw bytes/new proof
+沿用原 permission revision；刷新中再次更新取消忽略 AbortSignal 的旧 reader，最终接纳最新正文。
+失败不再自行读/授 grant，明确重试才产生新 grant；授权撤销、资源移除/重新登记、定义替换拒绝
+隐式恢复。停机取消在途刷新，迟到正文不在不可变采集历史中，停机后通知没有后台 IO，新世代
+再按配置审批实际采集。真实 HTTP SSE 模型已收到旧 Context 后发生更新，虽然新 entry revision
+接纳成功，旧 Run 仍 FAILED、无 Tool ACTION/执行 outbox/第二次模型请求或 Reply，不复活旧引用。
+已合法发出的模型输入不可撤回。
+
+固定候选为输入提交加 Host 三个实现/入口文件、broker 测试及关联权威文档（本条对应本地提交）。
+当前输入根 `pnpm typecheck` / `pnpm build` PASS；当前构建后的
+`pnpm --filter @glimmer-cradle/host exec vitest run --threads false` 4 文件/122 PASS（startup 50、
+broker 31、authority 9、public API 32），包含实际 Worker/SQLite/HTTP SSE 异常时序。
+`pnpm check:docs` 111 页、`pnpm check:encoding`、`pnpm check:architecture`、
+`pnpm check:target-layout` specification、`git diff --check` PASS；规格门不是 final 物理布局门。
+环境 Windows/Node 24.18.0/pnpm 11.13.0/项目 uv；root build 完成后才运行 runtime 集成，未运行
+契约生成。只操作临时库、本地回环与 fixture，无收费模型、用户库迁移、恢复材料删除或发布操作。
+本切片不改 Core/Worker、Schema、生成物、锁文件或配置定义；`c3cc6d02` 的 Core 402、Worker 143、
+契约完整门与 Kernel 271/14 条件跳过、实际 Worker 集成 11/production bootstrap smoke 输入未变，
+相关证据复用。Host/root 基线针对当前修改重新运行，不以历史结果代替。
+
+通知仍为本 Host 进程内提示，不是供应商订阅或持久队列；未通知的外部变化仍需 TTL/live 复验。
+刷新失败的旧 proof 立即失效，远端 SQLite tombstone 由实际复验/来源变更触发，不声称通知同步
+删除历史。供应商更新接入、持久调度、权限 UI、文件/媒体转换、安装态与用户库迁移、跨整个 Host
+重启的持久时钟反回拨、完整 Knowledge 生命周期仍待后续。高风险独立审查留待最终固定候选，
+本切片不是安全发行或 final 物理清单通过；下一依赖继续 Planning 受监督执行/完成评估及剩余
+物理清单，不缩小完整目标，不推送/发布。
+
 ### 阶段 5/9 Knowledge 来源管理与新世代重新授权（2026-10-07）
 
 输入 `1c0c7bcd`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。本切片将已存在

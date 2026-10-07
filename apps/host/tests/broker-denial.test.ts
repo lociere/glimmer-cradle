@@ -53,6 +53,35 @@ function harness(receiver?: ExecutionResultReceiverPort) {
 
 const knowledgePolicy = { source_id: 'source:document', reference: { id: 'document', revision: 'definition:1' },
   scope: { source_provider_id: 'provider', scene_id: 'scene', conversation_id: 'conversation' }, arguments: {}, max_age_ms: 50 };
+it('Resource 通知在证明撤销后发出，重复登记无更新，观察者异常不阻断其他订阅', async () => {
+  const h = harness(), delivered: unknown[] = [];
+  h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+  h.broker.grant(request, 300); h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+  const proof = await collectKnowledge(h);
+  const stopFailure = h.service.onResourceChanged(() => { throw new Error('fixture listener failure'); });
+  const dispose = h.service.onResourceChanged(event => { expect(Object.isFrozen(event)).toBe(true); delivered.push(event); });
+  try {
+    h.service.registerResource(resource, h.reader);
+    expect((await validateKnowledge(h, proof)).current).toBe(true); expect(delivered).toEqual([]);
+    expect(() => h.service.invalidateResourceContent('document', 'not-owner')).toThrow('owner');
+    expect(() => h.service.invalidateResourceContent('document', 'reader-owner')).toThrow('通知失败');
+    expect((await validateKnowledge(h, proof)).current).toBe(false);
+    expect(delivered).toEqual([{ kind: 'content_changed', reference: knowledgePolicy.reference }]);
+    stopFailure();
+    h.service.registerResource({ ...resource, revision: 'definition:2' }, h.reader);
+    expect(delivered.at(-1)).toEqual({ kind: 'definition_changed', reference: { id: 'document', revision: 'definition:2' } });
+    expect(h.service.revokeResource('document', 'reader-owner')).toBe(true);
+    expect(delivered.at(-1)).toEqual({ kind: 'removed', reference: { id: 'document', revision: 'definition:2' } });
+    h.service.registerResource(resource, h.reader); dispose();
+    h.service.invalidateResourceContent('document', 'reader-owner'); expect(delivered).toHaveLength(3);
+    const disposables = Array.from({ length: 128 }, () => h.service.onResourceChanged(() => {}));
+    expect(() => h.service.onResourceChanged(() => {})).toThrow('预算');
+    disposables.forEach(stop => stop());
+    const stopped = vi.fn(); h.service.onResourceChanged(stopped); await h.service.stop();
+    expect(stopped).toHaveBeenCalledWith({ kind: 'stopped' });
+    expect(() => h.service.onResourceChanged(() => {})).toThrow('停止');
+  } finally { stopFailure(); dispose(); await h.close(); }
+});
 it('来源审批核验摘要/到期/禁用；审计失败不留下部分授权', async () => {
   const h = harness();
   const digest = createHash('sha256').update(JSON.stringify(['knowledge-resource-source.v1', 'source:document', 'document',
@@ -250,10 +279,11 @@ describe('Host 显式授权而非调用者自报', () => {
 });
 
 it.each([
-  { revokeDuringRead: false, revokeKnowledgeDuringRead: false },
-  { revokeDuringRead: true, revokeKnowledgeDuringRead: false },
-  { revokeDuringRead: false, revokeKnowledgeDuringRead: true },
-])('实际 Host/生产 Worker/Resource/Knowledge/SSE/Log，全主体撤权=$revokeDuringRead，保存权限撤权=$revokeKnowledgeDuringRead', async ({ revokeDuringRead, revokeKnowledgeDuringRead }) => {
+  { revokeDuringRead: false, revokeKnowledgeDuringRead: false, invalidateContentDuringModel: false },
+  { revokeDuringRead: true, revokeKnowledgeDuringRead: false, invalidateContentDuringModel: false },
+  { revokeDuringRead: false, revokeKnowledgeDuringRead: true, invalidateContentDuringModel: false },
+  { revokeDuringRead: false, revokeKnowledgeDuringRead: false, invalidateContentDuringModel: true },
+])('实际 Host/生产 Worker/Resource/Knowledge/SSE/Log，全主体撤权=$revokeDuringRead，保存撤权=$revokeKnowledgeDuringRead，模型期间更新=$invalidateContentDuringModel', async ({ revokeDuringRead, revokeKnowledgeDuringRead, invalidateContentDuringModel }) => {
   const repository = path.resolve(__dirname, '../../..');
   const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-native-resource-'));
   const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
@@ -264,6 +294,7 @@ it.each([
     let body = ''; request.setEncoding('utf8'); request.on('data', chunk => { body += chunk; });
     request.on('end', () => {
       const payload = JSON.parse(body); requests.push(payload);
+      if (invalidateContentDuringModel && requests.length === 1) service.invalidateResourceContent('document', 'reader-owner');
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       const delta = payload.messages.some((message: { role: string }) => message.role === 'tool') ? { content: '已读取授权资料。' } : {
         tool_calls: [{ index: 0, id: 'resource-call', type: 'function', function: { name: 'glimmer_read_resource',
@@ -387,7 +418,8 @@ asyncio.run(run())
       if (state.terminal) break;
       await new Promise(resolve => setTimeout(resolve, 25));
     } while (Date.now() < deadline);
-    expect(state).toMatchObject({ state: revokeDuringRead || revokeKnowledgeDuringRead ? PerceptionOperationState.FAILED : PerceptionOperationState.SUCCEEDED, terminal: true });
+    expect(state).toMatchObject({ state: revokeDuringRead || revokeKnowledgeDuringRead || invalidateContentDuringModel
+      ? PerceptionOperationState.FAILED : PerceptionOperationState.SUCCEEDED, terminal: true });
     if (revokeDuringRead) {
       expect(reader).toHaveBeenCalledOnce(); expect(actions).toHaveLength(0); expect(requests).toHaveLength(1);
       expect(JSON.stringify(requests)).not.toContain('真正授权的资料正文');
@@ -408,6 +440,17 @@ with sqlite3.connect(${JSON.stringify(path.join(root, 'state/cognition/knowledge
 `;
       await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', inspectKnowledge],
         { cwd: repository, windowsHide: true, timeout: 30000 });
+      return;
+    }
+    if (invalidateContentDuringModel) {
+      const refreshDeadline = Date.now() + 5000;
+      while (knowledgeController!.snapshot.status === 'refreshing' && Date.now() < refreshDeadline) await new Promise(resolve => setTimeout(resolve, 25));
+      expect(knowledgeController!.snapshot.sources[0]).toMatchObject({ status: 'accepted', error_code: null });
+      expect(knowledgeController!.snapshot.sources[0].last_entry_revision).toBeGreaterThan(1);
+      expect(reader).toHaveBeenCalledTimes(2); expect(actions).toHaveLength(0); expect(requests).toHaveLength(1);
+      expect(JSON.stringify(requests[0])).toContain('真正授权的资料正文');
+      expect(grantSpy.mock.calls.filter(([value]) => value.permission === 'knowledge.ingest')).toHaveLength(1);
+      expect(journal.readOutbox(10)).toEqual([]);
       return;
     }
     expect(reader).toHaveBeenCalledTimes(2); expect(actions).toHaveLength(1); expect(requests).toHaveLength(2);
@@ -467,11 +510,15 @@ it('配置 Host 用实际 RPC 登记来源；重启重验审批并发新 grant/�
   const execution = new ExecutionController(journal);
   const outbox = new ExecutionResultOutbox(journal, { accept: async event => ({ event_id: event.event_id,
     invocation_id: event.invocation.invocation_id, revision: event.invocation.revision, accepted: true }) });
-  const granted: string[] = [];
-  const broker = new PermissionBroker(Date.now, event => { if (event.action === 'permission_granted') granted.push(event.permission_revision!); });
+  const granted: string[] = [], grantIds: string[] = [];
+  const broker = new PermissionBroker(Date.now, event => { if (event.action === 'permission_granted') {
+    granted.push(event.permission_revision!); grantIds.push(event.grant_id!);
+  } });
   const service = new HostResourceContributions({ host_id: 'host', target_location: 'host:local', permissions: broker,
     resources: new ResourceRegistry(), execution, outbox });
-  const reader = vi.fn(async () => '重新采集的来源资料'); service.registerResource(resource, reader);
+  let content = '重新采集的来源资料';
+  const reader = vi.fn(async (_arguments: Readonly<Record<string, unknown>>, _signal: AbortSignal) => content);
+  service.registerResource(resource, reader);
   const options = { paths, clock: { now: Date.now }, owner_id: 'knowledge-host', resources: service,
     worker: { python_executable: input.python_executable, runtime_document: input.runtime_document, capability_service: service,
       accept_state: async (value: Parameters<WorkerSupervisorOptions['accept_state']>[0]) =>
@@ -483,8 +530,8 @@ it('配置 Host 用实际 RPC 登记来源；重启重验审批并发新 grant/�
   const currentCapture = () => {
     const db = new Database(path.join(paths.data_root, 'state/cognition/knowledge.sqlite'), { readonly: true });
     try {
-      const value = db.prepare('SELECT snapshot_json FROM knowledge_resource_revision ORDER BY entry_revision DESC LIMIT 1').get() as { snapshot_json: string };
-      return JSON.parse(value.snapshot_json);
+      const value = db.prepare('SELECT snapshot_json,raw_content FROM knowledge_resource_revision ORDER BY entry_revision DESC LIMIT 1').get() as { snapshot_json: string; raw_content: Buffer };
+      return { ...JSON.parse(value.snapshot_json), raw_utf8: value.raw_content.toString('utf8') };
     } finally { db.close(); }
   };
   try {
@@ -513,21 +560,105 @@ it('配置 Host 用实际 RPC 登记来源；重启重验审批并发新 grant/�
     expect(nextCapture.access.access_id).not.toBe(firstCapture.access.access_id);
     expect(nextCapture.access.principal_id).not.toBe(firstCapture.access.principal_id);
     expect(granted.slice(2).some(value => firstGrants.includes(value))).toBe(false);
+    const waitKnowledge = async (predicate: () => boolean) => {
+      const deadline = Date.now() + 5000;
+      while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+      expect(predicate()).toBe(true);
+    };
+    content = '通知后重新采集的新资料';
+    for (let index = 0; index < 100; index++) service.invalidateResourceContent('document', 'reader-owner');
+    expect(owner.snapshot.session!.knowledge!.status).toBe('refreshing');
+    await waitKnowledge(() => owner!.snapshot.session!.knowledge!.sources[0].status === 'accepted');
+    expect(reader).toHaveBeenCalledTimes(3); expect(granted).toHaveLength(4);
+    const refreshed = currentCapture(); expect(refreshed.raw_utf8).toBe(content);
+    expect(refreshed.access.access_id).not.toBe(nextCapture.access.access_id);
+    expect(refreshed.access.permission_revision).toBe(nextCapture.access.permission_revision);
+    expect((await service.validateKnowledgeResource(create(ValidateKnowledgeResourceRequestSchema, {
+      call: { generation: owner.snapshot.session!.worker.generation!, traceId: 'old-capture-invalidated' },
+      access: { accessId: nextCapture.access.access_id, sourceId: source.sourceId, principalId: nextCapture.access.principal_id,
+        permissionRevision: nextCapture.access.permission_revision, collectedAtMs: BigInt(nextCapture.access.collected_at_ms), expiresAtMs: BigInt(nextCapture.access.expires_at_ms) },
+      reference: knowledgePolicy.reference, contentRevision: nextCapture.revision, mediaType: nextCapture.media_type, scope: source.scope,
+    }), nextCapture.access.principal_id, new AbortController().signal)).current).toBe(false);
+    let releaseRefresh!: () => void, refreshSignal!: AbortSignal;
+    const refreshGate = new Promise<void>(resolve => { releaseRefresh = resolve; });
+    reader.mockImplementationOnce(async (_arguments: Readonly<Record<string, unknown>>, signal: AbortSignal) => {
+      refreshSignal = signal; await refreshGate; return '不应持久化的迟到旧资料';
+    });
+    service.invalidateResourceContent('document', 'reader-owner');
+    try {
+      await waitKnowledge(() => reader.mock.calls.length === 4);
+      content = '刷新中再次更新的最终资料';
+      service.invalidateResourceContent('document', 'reader-owner');
+      expect(refreshSignal.aborted).toBe(true);
+    } finally { releaseRefresh(); }
+    await waitKnowledge(() => owner!.snapshot.session!.knowledge!.sources[0].status === 'accepted');
+    expect(reader).toHaveBeenCalledTimes(5); expect(granted).toHaveLength(4);
+    expect(currentCapture().raw_utf8).toBe(content);
+    reader.mockRejectedValueOnce(new Error('fixture collection failure'));
+    service.invalidateResourceContent('document', 'reader-owner');
+    await waitKnowledge(() => owner!.snapshot.session!.knowledge!.status === 'degraded');
+    expect(owner.snapshot.session!.knowledge!.sources[0]).toMatchObject({ status: 'failed', error_code: 'knowledge_refresh_failed' });
+    expect(reader).toHaveBeenCalledTimes(6); expect(granted).toHaveLength(4);
+    service.invalidateResourceContent('document', 'reader-owner');
+    await new Promise(resolve => setTimeout(resolve, 30)); expect(reader).toHaveBeenCalledTimes(6);
+    await owner.knowledge.collect(source.sourceId); expect(reader).toHaveBeenCalledTimes(7); expect(granted).toHaveLength(6);
+    broker.revokeGrant(grantIds.at(-1)!);
+    service.invalidateResourceContent('document', 'reader-owner');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(reader).toHaveBeenCalledTimes(7); expect(granted).toHaveLength(6);
+    expect(owner.snapshot.session!.knowledge!.sources[0].status).toBe('blocked');
+    await owner.knowledge.collect(source.sourceId);
+    expect(reader).toHaveBeenCalledTimes(8); expect(granted).toHaveLength(8);
+    let releaseStop!: () => void, stopSignal!: AbortSignal;
+    const stopGate = new Promise<void>(resolve => { releaseStop = resolve; });
+    reader.mockImplementationOnce(async (_arguments: Readonly<Record<string, unknown>>, signal: AbortSignal) => {
+      stopSignal = signal; await stopGate; return '停机后的迟到资料';
+    });
+    const stoppingController = owner.knowledge;
+    service.invalidateResourceContent('document', 'reader-owner');
+    try {
+      await waitKnowledge(() => reader.mock.calls.length === 9);
+      const stopping = owner.stop();
+      await waitKnowledge(() => stopSignal.aborted);
+      expect(stoppingController.snapshot.status).toBe('stopped');
+      releaseStop(); await stopping;
+    } finally { releaseStop(); }
+    service.invalidateResourceContent('document', 'reader-owner');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(reader).toHaveBeenCalledTimes(9); expect(granted).toHaveLength(8);
+    owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+    expect(reader).toHaveBeenCalledTimes(10); expect(granted).toHaveLength(10);
+    expect(service.revokeResource('document', 'reader-owner')).toBe(true);
+    expect(owner.snapshot.session!.knowledge!.sources[0].status).toBe('blocked');
+    service.registerResource(resource, reader);
+    service.invalidateResourceContent('document', 'reader-owner');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(reader).toHaveBeenCalledTimes(10); expect(granted).toHaveLength(10);
+    await owner.knowledge.collect(source.sourceId);
+    expect(reader).toHaveBeenCalledTimes(11); expect(granted).toHaveLength(12);
+    service.registerResource({ ...resource, revision: 'definition:2' }, reader);
+    expect(owner.snapshot.session!.knowledge!.sources[0].status).toBe('blocked');
+    service.invalidateResourceContent('document', 'reader-owner');
+    await expect(owner.knowledge.collect(source.sourceId)).rejects.toThrow('不可见');
+    expect(reader).toHaveBeenCalledTimes(11); expect(granted).toHaveLength(12);
     const disabled = await owner.knowledge.registerSource(create(RegisterKnowledgeResourceSourceRequestSchema, {
       source: { ...source, enabled: false }, expectedSourceRevision: 1n,
     }));
     expect(disabled.state!.sourceRevision).toBe(2n);
     await expect(owner.knowledge.collect(source.sourceId)).rejects.toThrow('审批冲突');
-    expect(reader).toHaveBeenCalledTimes(2);
+    expect(reader).toHaveBeenCalledTimes(11);
     await expect(owner.knowledge.registerSource(create(RegisterKnowledgeResourceSourceRequestSchema, { source, expectedSourceRevision: 1n })))
       .rejects.toMatchObject({ code: ServiceErrorCode.CONFLICT });
     await owner.stop(); owner = new ConfiguredHostCognitionJobsOwner(options);
-    await expect(owner.start()).rejects.toThrow('审批冲突'); expect(reader).toHaveBeenCalledTimes(2);
+    await expect(owner.start()).rejects.toThrow('审批冲突'); expect(reader).toHaveBeenCalledTimes(11);
     await owner.stop();
     const db = new Database(path.join(paths.data_root, 'state/cognition/knowledge.sqlite'), { readonly: true });
     try {
       expect(db.prepare('SELECT enabled,deleted_at IS NOT NULL AS deleted FROM knowledge_entry WHERE source=?').get('resource')).toEqual({ enabled: 0, deleted: 1 });
-      expect(db.prepare('SELECT COUNT(*) AS count FROM knowledge_resource_revision').get()).toEqual({ count: 2 });
+      expect(db.prepare('SELECT COUNT(*) AS count FROM knowledge_resource_revision').get()).toEqual({ count: 8 });
+      const bodies = db.prepare('SELECT raw_content FROM knowledge_resource_revision').all() as { raw_content: Buffer }[];
+      expect(bodies.map(value => value.raw_content.toString('utf8'))).not.toContain('不应持久化的迟到旧资料');
+      expect(bodies.map(value => value.raw_content.toString('utf8'))).not.toContain('停机后的迟到资料');
     } finally { db.close(); }
   } finally { await owner?.stop(); await service.stop(); journal.close(); }
 }, 60000);

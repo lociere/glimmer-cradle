@@ -53,7 +53,10 @@ Conversation Service 验证持久 receipt 后才返回正文。实际边界见
 Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 HostConfig 审批，按实际
 新世代重验来源 revision/digest/enabled 并新发双 grant、重新采集；未审批/失配/到期拒绝读取。
 管理更新先撤销原 IO/证明，停止取消并 drain 后关闭本实例 client；字段和 UI/默认入口边界见
-上述配置参考。实际测试已覆盖生产 Worker/SQLite 重启、停用与源冲突，非字典 transport。
+上述配置参考。Resource owner 的内容失效通知现已驱动有界重采集，复用仍有效的原 grant，
+不自动续期/重新授权；定义替换、移除或失败保持拒绝。session.knowledge 仅投影来源状态和
+最后实际接纳修订，不暴露正文/证明，也不代表全部材料此刻 current。详情见上述采集边界。
+实际测试覆盖生产 Worker/SQLite 重启、通知合并、刷新中再次更新、停机迟到读取、停用与源冲突。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

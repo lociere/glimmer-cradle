@@ -17,7 +17,7 @@ import type { Resource, ResourceContent, StepExposureRequest, StepSurface, Expos
 import type { Principal, PermissionGrant, PermissionRequest } from '@glimmer-cradle/platform';
 import { PermissionBroker } from '../broker/permission-broker.js';
 import { validateSecurityIdentity } from '@glimmer-cradle/platform';
-import type { KnowledgeResourceSourceState, RegisterKnowledgeResourceSourceRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import type { CollectKnowledgeSourceResponse, KnowledgeResourceSourceState, RegisterKnowledgeResourceSourceRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { RegisterKnowledgeResourceSourceRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { CognitionClient } from '../adapters/protocol/cognition-client.js';
 
@@ -60,6 +60,14 @@ export interface HostKnowledgeApproval {
   readonly max_age_ms: number;
   readonly expires_at_ms: number;
 }
+export type HostResourceChange = Readonly<{ kind: 'content_changed' | 'definition_changed' | 'removed';
+  reference: Readonly<{ id: string; revision: string }> } | { kind: 'stopped' }>;
+export interface HostKnowledgeSnapshot {
+  readonly status: 'idle' | 'refreshing' | 'degraded' | 'stopped';
+  /** accepted 仅指最后真实 receipt，不宣称此刻所有材料仍 current；Context 独立 live 复验。 */
+  readonly sources: readonly Readonly<{ source_id: string; status: 'waiting' | 'accepted' | 'refreshing' | 'blocked' | 'failed';
+    last_entry_revision: number | null; error_code: string | null }>[];
+}
 type KnowledgeAdmission = { readonly policy: HostKnowledgeResourceAccess; readonly principal: Principal; attempt: number };
 type KnowledgeProof = { readonly admission: KnowledgeAdmission; readonly binding: { definition: Resource; reader: ResourceReader };
   readonly read_grant: PermissionGrant; readonly ingest_grant: PermissionGrant;
@@ -77,6 +85,7 @@ export class HostResourceContributions implements HostCapabilityServicePort {
   private readonly tasks = new Set<Promise<unknown>>();
   private readonly knowledgeAdmissions = new Map<string, KnowledgeAdmission>();
   private readonly knowledgeProofs = new Map<string, KnowledgeProof>();
+  private readonly resourceListeners = new Set<(change: HostResourceChange) => void>();
   private lastCollectionTime = 0;
   private readonly unsubscribe: () => void;
   private stopped = false;
@@ -96,13 +105,21 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     const previous = this.readers.get(definition.id);
     if (previous?.definition.revision === definition.revision && previous.reader !== reader) throw new Error('同一 Resource revision 不能替换 reader');
     const registered = this.options.resources.register(definition);
+    if (previous?.definition === registered) return registered;
     this.readers.set(registered.id, { definition: registered, reader });
-    if (previous && previous.definition.revision !== registered.revision) this.abortResource(registered.id);
+    if (previous && previous.definition.revision !== registered.revision) {
+      this.abortResource(registered.id);
+      this.publishResourceChange({ kind: 'definition_changed', reference: { id: registered.id, revision: registered.revision } });
+    }
     return registered;
   }
   public revokeResource(resourceId: string, ownerId: string, revision?: string): boolean {
+    const previous = this.options.resources.get(resourceId);
     const revoked = this.options.resources.revoke(resourceId, ownerId, revision);
-    if (revoked) { this.readers.delete(resourceId); this.abortResource(resourceId); }
+    if (revoked) {
+      this.readers.delete(resourceId); this.abortResource(resourceId);
+      this.publishResourceChange({ kind: 'removed', reference: { id: resourceId, revision: previous!.revision } });
+    }
     return revoked;
   }
   public invalidateResourceContent(resourceId: string, ownerId: string): void {
@@ -110,6 +127,12 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     if (!resource || resource.owner_id !== ownerId) throw new HostCapabilityRequestError('Resource 内容失效 owner 不匹配');
     // 正文更新不必改变目录定义；资源 owner 通知独立失效，取消等待并撤销已有采集证明。
     this.abortResource(resourceId);
+    this.publishResourceChange({ kind: 'content_changed', reference: { id: resourceId, revision: resource.revision } });
+  }
+  public onResourceChanged(listener: (change: HostResourceChange) => void): () => void {
+    this.assertRunning();
+    if (typeof listener !== 'function' || this.resourceListeners.size >= 128) throw new HostCapabilityRequestError('Resource 订阅预算耗尽');
+    this.resourceListeners.add(listener); return () => this.resourceListeners.delete(listener);
   }
   public activatePrincipal(principalId: string, generation: string): void {
     this.assertRunning();
@@ -152,7 +175,9 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     for (const [id, proof] of this.knowledgeProofs) if (proof.admission === source) this.knowledgeProofs.delete(id);
     if (source) this.abortResource(source.policy.reference.id);
   }
-  public approveKnowledgeSource(principalId: string, state: KnowledgeResourceSourceState, approval: HostKnowledgeApproval): { revoke: () => void; current: () => boolean } {
+  public approveKnowledgeSource(principalId: string, state: KnowledgeResourceSourceState, approval: HostKnowledgeApproval): {
+    reference: Readonly<{ id: string; revision: string }>; revoke: () => void; current: () => boolean;
+  } {
     validateHostKnowledgeApprovals([approval]);
     this.assertRunning(); const principal = this.principal(principalId), source = state.source;
     if (!source?.reference || source.enabled !== true || source.sourceId !== approval.source_id
@@ -182,7 +207,14 @@ export class HostResourceContributions implements HostCapabilityServicePort {
           conversation_id: source.scope.conversationId } : undefined, arguments: approval.arguments, max_age_ms: approval.max_age_ms });
       grants.push(this.options.permissions.grant(request, approval.expires_at_ms));
       grants.push(this.options.permissions.grant({ ...request, permission: 'knowledge.ingest' }, approval.expires_at_ms));
-      return { revoke, current: () => !this.stopped && grants.every(grant => this.options.permissions.isCurrent(grant)) };
+      const admission = this.knowledgeAdmissions.get(JSON.stringify([principalId, sourceId]));
+      const binding = this.readers.get(request.resource_id);
+      return { reference: Object.freeze({ id: request.resource_id, revision: request.resource_revision }), revoke,
+        current: () => !this.stopped && this.knowledgeAdmissions.get(JSON.stringify([principalId, sourceId])) === admission
+          && this.readers.get(request.resource_id)?.definition === binding?.definition
+          && this.readers.get(request.resource_id)?.reader === binding?.reader
+          && this.options.resources.get(request.resource_id) === binding?.definition
+          && grants.every(grant => this.options.permissions.isCurrent(grant)) };
     } catch (error) { revoke(); throw error; }
   }
   public collectKnowledgeResource(wire: CollectKnowledgeResourceRequest, principalId: string, signal: AbortSignal): Promise<CollectKnowledgeResourceResponse> {
@@ -345,8 +377,10 @@ export class HostResourceContributions implements HostCapabilityServicePort {
   public async stop(): Promise<void> {
     this.stopped = true;
     for (const active of this.active) active.abort.abort();
-    await Promise.allSettled([...this.tasks]);
     const failures: unknown[] = [];
+    try { this.publishResourceChange({ kind: 'stopped' }); } catch (error) { failures.push(error); }
+    this.resourceListeners.clear();
+    await Promise.allSettled([...this.tasks]);
     for (const owner of [this.options.execution, this.options.outbox]) {
       try { await owner.stop(); } catch (error) { failures.push(error); }
     }
@@ -386,15 +420,28 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     for (const active of this.active) if (active.resource === id) active.abort.abort();
     for (const [key, proof] of this.knowledgeProofs) if (proof.binding.definition.id === id) this.knowledgeProofs.delete(key);
   }
+  private publishResourceChange(change: HostResourceChange): void {
+    if ('reference' in change) Object.freeze(change.reference);
+    Object.freeze(change);
+    const failures: unknown[] = [];
+    // 失效先于通知；单个观察者错误不能阻断其他 owner 撤权或重新采集。
+    for (const listener of [...this.resourceListeners]) try { listener(change); } catch (error) { failures.push(error); }
+    if (failures.length) throw new AggregateError(failures, 'Resource 失效通知失败');
+  }
   private assertRunning(): void { if (this.stopped) throw new Error('Host Resource 已停止'); }
 }
 
 /** 当前世代的可信 App controller；来源留在 Cognition，IO 审批留在 Host。 */
 export class HostKnowledgeController {
   private readonly approvals: ReadonlyMap<string, HostKnowledgeApproval>;
-  private readonly admissions = new Map<string, { revoke: () => void; current: () => boolean }>();
+  private readonly admissions = new Map<string, ReturnType<HostResourceContributions['approveKnowledgeSource']>>();
   private readonly pending = new Map<string, Promise<unknown>>();
   private readonly aborts = new Map<string, Set<AbortController>>();
+  private readonly sourceStates = new Map<string, HostKnowledgeSnapshot['sources'][number]>();
+  private readonly refreshQueue = new Map<string, { admission: ReturnType<HostResourceContributions['approveKnowledgeSource']>; ticket: object }>();
+  private readonly refreshTickets = new Map<string, object>();
+  private readonly unsubscribeResource: () => void;
+  private refreshTask?: Promise<void>;
   private stopped = false;
   private starting?: Promise<void>;
   private stopping?: Promise<void>;
@@ -406,8 +453,15 @@ export class HostKnowledgeController {
     for (const value of approvals) {
       const policy = { ...value, arguments: JSON.parse(JSON.stringify(value.arguments)) };
       freezeJson(policy); policies.set(value.source_id, policy);
+      this.sourceStates.set(value.source_id, { source_id: value.source_id, status: 'waiting', last_entry_revision: null, error_code: null });
     }
     this.approvals = policies;
+    this.unsubscribeResource = resources.onResourceChanged(change => this.resourceChanged(change));
+  }
+  public get snapshot(): HostKnowledgeSnapshot {
+    const sources = [...this.sourceStates.values()].map(value => Object.freeze({ ...value })).sort((a, b) => a.source_id.localeCompare(b.source_id));
+    return Object.freeze({ status: this.stopped ? 'stopped' : sources.some(value => ['blocked', 'failed'].includes(value.status))
+      ? 'degraded' : sources.some(value => value.status === 'refreshing') ? 'refreshing' : 'idle', sources: Object.freeze(sources) });
   }
   public start(): Promise<void> {
     if (this.stopped) return Promise.reject(new HostCapabilityRequestError('Knowledge controller 已停止'));
@@ -423,11 +477,13 @@ export class HostKnowledgeController {
     const sourceId = captured.source?.sourceId ?? '';
     // 先撤销正在使用的 IO/证明，再等待来源 CAS；丢失响应保持拒绝而非复活旧审批。
     this.revoke(sourceId);
+    this.markSource(sourceId, 'blocked', 'knowledge_source_changed');
     return this.run(sourceId, signal => this.cognition.registerKnowledgeSource(captured, signal));
   }
   public collect(sourceId: string) {
     this.revoke(sourceId);
-    return this.run(sourceId, async signal => {
+    this.markSource(sourceId, 'refreshing', null);
+    const task = this.run(sourceId, async signal => {
       const approval = this.approvals.get(sourceId);
       if (!approval) throw new HostCapabilityRequestError('Knowledge 未显式审批');
       const response = await this.cognition.getKnowledgeSource(sourceId, signal);
@@ -438,35 +494,101 @@ export class HostKnowledgeController {
       try {
         const receipt = await this.cognition.collectKnowledgeSource(sourceId, BigInt(approval.source_revision), signal);
         signal.throwIfAborted();
-        if (!admitted.current() || receipt.sourceId !== sourceId || receipt.sourceRevision !== BigInt(approval.source_revision)
-          || receipt.entryId !== `resource:${sourceId}` || receipt.entryRevision < 1n
-          || receipt.entryRevision > BigInt(Number.MAX_SAFE_INTEGER) || !/^[a-f0-9]{64}$/.test(receipt.contentDigest)) {
-          throw new HostCapabilityRequestError('Knowledge 采集确认无效或已撤销');
-        }
+        this.acceptReceipt(sourceId, receipt, admitted);
         return receipt;
       } catch (error) {
         if (this.admissions.get(sourceId) === admitted) { this.admissions.delete(sourceId); admitted.revoke(); }
         throw error;
       }
     });
+    return task.catch(error => { if (!this.stopped) this.markSource(sourceId, 'failed', 'knowledge_collect_failed'); throw error; });
   }
   public stop(): Promise<void> {
     if (this.stopping) return this.stopping;
     this.stopped = true;
+    this.unsubscribeResource(); this.refreshQueue.clear(); this.refreshTickets.clear();
     this.stopping = (async () => {
       const failures: unknown[] = [];
       for (const sourceId of new Set([...this.aborts.keys(), ...this.admissions.keys()])) {
         try { this.revoke(sourceId); } catch (error) { failures.push(error); }
       }
       await Promise.allSettled([...this.pending.values()]);
+      await this.refreshTask;
       this.cognition.close();
       if (failures.length) throw new AggregateError(failures, 'Knowledge 撤销审计失败');
     })();
     return this.stopping;
   }
   private revoke(sourceId: string): void {
+    this.refreshQueue.delete(sourceId); this.refreshTickets.delete(sourceId);
     for (const abort of this.aborts.get(sourceId) ?? []) abort.abort();
     const admitted = this.admissions.get(sourceId); this.admissions.delete(sourceId); admitted?.revoke();
+  }
+  private markSource(sourceId: string, status: HostKnowledgeSnapshot['sources'][number]['status'], errorCode: string | null, revision?: number): void {
+    const prior = this.sourceStates.get(sourceId);
+    if (prior) this.sourceStates.set(sourceId, { ...prior, status, error_code: errorCode, last_entry_revision: revision ?? prior.last_entry_revision });
+  }
+  private acceptReceipt(sourceId: string, receipt: CollectKnowledgeSourceResponse,
+    admitted: ReturnType<HostResourceContributions['approveKnowledgeSource']>): void {
+    if (!admitted.current() || receipt.sourceId !== sourceId || receipt.sourceRevision !== BigInt(this.approvals.get(sourceId)!.source_revision)
+      || receipt.entryId !== `resource:${sourceId}` || receipt.entryRevision < 1n
+      || receipt.entryRevision > BigInt(Number.MAX_SAFE_INTEGER) || !/^[a-f0-9]{64}$/.test(receipt.contentDigest)) {
+      throw new HostCapabilityRequestError('Knowledge 采集确认无效或已撤销');
+    }
+    this.markSource(sourceId, 'accepted', null, Number(receipt.entryRevision));
+  }
+  private resourceChanged(change: HostResourceChange): void {
+    if (this.stopped) return;
+    const failures: unknown[] = [];
+    for (const [sourceId, admission] of [...this.admissions]) {
+      if (change.kind !== 'stopped' && admission.reference.id !== change.reference.id) continue;
+      let current = false;
+      try { current = change.kind === 'content_changed' && admission.reference.revision === change.reference.revision && admission.current(); }
+      catch (error) { failures.push(error); }
+      if (!current) {
+        try { this.revoke(sourceId); } catch (error) { failures.push(error); }
+        this.markSource(sourceId, 'blocked', 'knowledge_resource_or_access_changed'); continue;
+      }
+      for (const abort of this.aborts.get(sourceId) ?? []) abort.abort();
+      const ticket = {};
+      this.refreshTickets.set(sourceId, ticket); this.refreshQueue.set(sourceId, { admission, ticket });
+      this.markSource(sourceId, 'refreshing', null);
+    }
+    this.scheduleRefresh();
+    if (failures.length) throw new AggregateError(failures, 'Knowledge 失效撤销失败');
+  }
+  private scheduleRefresh(): void {
+    if (this.stopped || this.refreshTask || !this.refreshQueue.size) return;
+    // 一个 pump、每来源一个最新 ticket；通知风暴不制造无界 Promise/计时器或重授授权。
+    this.refreshTask = Promise.resolve().then(async () => {
+      while (!this.stopped && this.refreshQueue.size) {
+        const [sourceId, target] = this.refreshQueue.entries().next().value!;
+        this.refreshQueue.delete(sourceId);
+        try {
+          await this.run(sourceId, async signal => {
+            if (this.admissions.get(sourceId) !== target.admission || this.refreshTickets.get(sourceId) !== target.ticket) return;
+            if (!target.admission.current()) throw new HostCapabilityRequestError('Knowledge 原授权失效');
+            const state = (await this.cognition.getKnowledgeSource(sourceId, signal)).state;
+            signal.throwIfAborted();
+            const policy = this.approvals.get(sourceId)!;
+            if (!state?.source?.enabled || state.sourceRevision !== BigInt(policy.source_revision)
+              || state.declarationDigest !== policy.declaration_digest || state.source.reference?.id !== target.admission.reference.id
+              || state.source.reference.revision !== target.admission.reference.revision || !target.admission.current()) {
+              throw new HostCapabilityRequestError('Knowledge 来源或审批已改变');
+            }
+            const receipt = await this.cognition.collectKnowledgeSource(sourceId, BigInt(policy.source_revision), signal);
+            signal.throwIfAborted();
+            if (this.refreshTickets.get(sourceId) !== target.ticket) return;
+            this.acceptReceipt(sourceId, receipt, target.admission);
+          });
+        } catch {
+          if (this.stopped || this.refreshTickets.get(sourceId) !== target.ticket) continue;
+          let errorCode = 'knowledge_refresh_failed';
+          try { this.revoke(sourceId); } catch { errorCode = 'knowledge_refresh_cleanup_failed'; }
+          this.markSource(sourceId, 'failed', errorCode);
+        }
+      }
+    }).finally(() => { this.refreshTask = undefined; this.scheduleRefresh(); });
   }
   private run<T>(sourceId: string, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
     if (this.stopped) return Promise.reject(new HostCapabilityRequestError('Knowledge controller 已停止'));
