@@ -162,7 +162,8 @@ ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终
 资源 UTF-8 内容限 32 KiB。资源定义 revision 与内容 SHA-256 分开，Worker 从已接纳 Log
 核验 reference/hash/media 后才续接。旧无实现的 `resource.read` 字典 transport 已删除；
 `resource_client.py` 现在是实际读取链使用的内容解码器，不冒充完整 ResourcePort/Knowledge 接入。
-Knowledge ingest、索引失效、资源订阅和持久 Run 恢复仍未完成。
+Knowledge 配置 Vault 的修订绑定/索引失效已接通；Resource ingest、资源权限与 freshness 失效、
+资源订阅和持久 Run 恢复仍未完成，原生资源材料不会自动提升为 Knowledge。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
@@ -287,6 +288,22 @@ Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL
 | Vector | `adapters/persistence/sqlite_memory_store.py` 的 `VectorRepository` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
 | Memory Database | `adapters/persistence/sqlite_memory_store.py`、`migrations/002-memory.sql` | `data/state/cognition/memory.sqlite`；Job/checkpoint 表仍处于拆库迁移窗口 |
 
+Knowledge 由独立 `KnowledgeStore` 拥有正文/修订与派生向量，不复用 Memory 的 VectorIndexStore。
+当前 `knowledge.sqlite` 的 application_id 是 `0x47434B4E`，user_version 是 1；初始化判定、DDL 与
+schema metadata 共用 IMMEDIATE 事务，双连接首次打开不会竞争建表。已存在的未版本化、foreign、
+未知版本或部分库只拒绝打开，不隐式建表/修复/导入旧 Memory。旧数据的受控迁移与备份归阶段 14。
+
+配置条目内容、priority、enabled 的实际变化才追加修订；相同输入重放不递增。配置删除/独立删除与
+对应向量失效同事务，editor 删除保留条目原来源 owner，历史修订记录实际操作来源。向量接纳绑定
+entry ID/revision/正文 SHA-256、模型身份和 `trim-text/whole-entry.v1` 转换版本；目前一条配置正文
+是一条索引单元，不宣称已实现 Resource parser/chunk pipeline。读写、回滚、关闭串行化，模型编码
+不持有 SQL 事务；迟到向量重验来源修订，回滚失败撤销连接，重复取消先完成清理。
+
+`KnowledgeIndex` 每次实际检索重读当前条目，编码后再次过滤更新/删除/禁用项；进程缓存只是最近
+诊断快照。有效向量可在重开后复用，损坏向量或部分编码失败降级基础检索，不丢弃未索引的有效正文，
+也不重写来源事实。`KnowledgeSource` 与默认 `ReplyContextBuilder` 传递当前修订/hash/转换版本；
+数据仍为 untrusted/data，配置来源和索引版本不提升人格、权限、指令 authority 或 Resource freshness。
+
 共享 Memory 连接的读写由 `SqliteMemoryStore.read()` / `transaction()` 串行化；Memory、Vector、
 Relationship、关系 checkpoint 与旧巩固队列不再各自 commit。写事务使用 IMMEDIATE，BEGIN/业务写入/
 commit 取消均等待回滚收尾再允许连接复用，回滚失败撤销并关闭连接；关闭本身被取消也先完成资源释放。
@@ -404,7 +421,7 @@ Planning 执行/完成评估与旧队列/旧数据切换仍待完成。
 - Conversation `ConversationRecorder` 会把 Moment 写入兼容路径 `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db`；`catalog.db` 维护全局 position 和 pack 范围。路径迁移留阶段 14，不改变当前 owner。
 - `EpisodeProjection` 按 interaction、scene、conversation 与 recall/disclosure 权限域形成派生 Episode；同一个 Episode 在物理表和查询键上都不能跨域。`reply` / `silence` 立即形成 `interaction_completed` 边界，`episode_idle_seconds`、`quiescent` 与停机只补充收口开放批次。所有封口入口同事务发布源请求，失败不推进 checkpoint 或封口状态。启动时按 `seal_integrity_check` 校验投影数据库，先补投影所有已提交 Moment，再将遗留开放批次标记为 `process_interrupted`；封口后同 interaction 的迟到 Moment 会进入新 Episode，不改写已封口批次。源请求存在时禁止整体删除重建。
 - `MaintenanceScheduler` 在正常运行中由终结 Moment 唤醒，并按 `schedule_interval_seconds` 对持久待办补偿扫描；`ConsolidationCoordinator` 只处理 `memory_candidate`，先写 `consolidation_jobs`，再按 scope/owner 分批 claim。停机只投影、封口和入队，不执行模型巩固。输出必须通过结构、evidence id 与目标权限域校验后才可写入 Memory。
-- `KnowledgeIndex` 启动时通过 Cognition Service `InitializeKnowledge` 注入角色知识，`knowledge_entry` 可被活动上下文检索；首次独立库启动会从旧 Memory 表一次性导入，随后不双写。
+- `KnowledgeIndex` 启动时通过 Cognition Service `InitializeKnowledge` 注入配置 Knowledge Vault；更新/删除原子失效，默认上下文只消费检索时仍匹配的修订。Knowledge 独立库不再自动导入旧 Memory，历史数据保留，迁移须通过阶段 14 的备份/恢复门。
 - 工具结果由 Conversation 接纳 Capabilities 已提交 outbox 后写入 `action_result` Moment，合成只读实际结果；成功/失败/unknown 均是 Experience/untrusted，不直接提升为记忆候选。Recent Experience 不能把结果标为 host_verified，也不以候选 Moment 的 scene 改写下一条的查询权限域。
 - provider 缺失、非法输出或证据越权会记录 failed consolidation run，并保留 Episode 供后续重试；没有 mock fallback。
 

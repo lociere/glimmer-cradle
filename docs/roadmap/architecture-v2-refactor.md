@@ -620,6 +620,50 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5 Knowledge 配置 Vault 版本化索引与失效（2026-10-07）
+
+输入 `fa3862ff`，当前会话唯一写入 owner。沿知识更新主链补 Knowledge 独立持久 owner：
+现有向量只绑定 entry ID/model，更新正文仍复用旧向量，配置删除不清派生向量，旧连接读写可
+互相 commit。目标是绑定条目 revision/正文 hash/转换版本，更新和删除原子失效，迟到编码不得
+覆盖新版本；生产 KnowledgeIndex 检索核验当前条目，重开只复用仍匹配的派生索引。
+
+移除 Knowledge 对 Memory VectorIndexStore 及自动旧 Memory 知识导入的依赖；唯一持久库
+明确 owner/schema，未版本化/foreign/部分库拒绝隐式修复。旧样本、历史正文与原库不删，
+受控迁移/备份仍归阶段 14。SQLite 初始化、读取、写入、取消回滚和关闭统一串行边界；
+模型编码不持有数据库事务。检索缓存不能令已删除或被更新正文再次进入当前 Context。
+
+验收包括版本/hash 不变重放、更新/删除/恢复、双连接及共享连接竞争、编码返回前修订、
+初始化与事务故障/重复取消、未知库重开保持原 dump，以及实际 Worker Knowledge 初始化/
+上下文消费。这不是完整 Resource ingest/订阅/权限 broker 的完成声明，也不把 Tool 结果
+自动转为 Knowledge 或 Memory。根构建、各 owner 和文档门按影响验证，完整目标保持 active。
+
+已落地：Knowledge 专属 Store/Index；新库 owner `0x47434B4E`/schema 1，初始化判定/DDL/metadata
+同事务，双首次连接串行建表，旧/foreign/未知/缺表缺列库拒绝打开且 SQL dump/header 不变。
+取消或建表验证失败后无半初始化表；不再从旧 Memory 导入，也不保留 Memory VectorIndexStore
+兼容绑定。历史正文与原库不删，阶段 14 的受控迁移/备份门未绕过。
+
+条目 revision/hash/转换版本/模型绑定派生向量；实际正文、priority、enabled 更新或删除与失效
+原子提交。重放不增修订，editor 删除保留原 config owner，恢复继续递增历史版本。接纳迟到编码
+复验来源修订/摘要/可用状态；检索在 document/query await 后再验当前条目，不凭旧缓存返回正文。
+索引损坏、非法批次/查询或部分编码失败降级基础检索，不丢弃有效未索引条目，不改写正文事实。
+配置正文目前采用 trim + whole-entry v1，不把转换版本冒充完整 parser/chunk/freshness 证明。
+
+真实 SQLite 故障门覆盖初始化失败/取消、每个源写入/索引失效故障、提交完成但确认取消、重复
+取消、回滚失败撤销连接、关闭排空及双连接更新。KnowledgeSource 与默认 ReplyContextBuilder
+携当前 revision/hash/来源，仍是 untrusted/data。实际受监督 Worker 的 InitializeKnowledge RPC
+连续更新、重开及删除进入四轮真实本地 HTTP/SSE 模型请求，不是仅 mock mapper；修订 1/2、
+摘要和删除均可在实际默认上下文观察。测试只用临时库和本地 provider，不调用收费模型。
+
+固定行为候选：Core Cognition 363、Worker 139、受监督 Worker 集成 11、repo-checks 27 PASS；
+production composition bootstrap smoke PASS。根 pnpm typecheck/build、Ruff I/F、docs 111、编码、
+架构与 target-layout specification-only PASS，不等于最终 1,098 项物理清单或完整产品验收。
+Kernel 常规全量 47 文件/271 项 PASS，14 项条件跳过；其中受监督 Worker 10 项已另行启用通过，
+其余 4 项外部安装条件尚未验证，不冒充发布/安装验收。
+IDL/生成产物未改变，复用未失效的 Contracts 证据，未运行生成器干扰活动 Worker。恢复测试归入
+清单已有 test_knowledge_revision.py，不新增清单外文件。没有用户库迁移、推送或发布。
+Resource intake/principal/freshness/权限撤销、订阅、持久 Run/Host broker 及完整独立审查仍待后续，
+整个架构重构保持 active，不把本切片通过解释为全目标完成。
+
 ### 阶段 5 短程 ActionPlan consumer-zero 与历史只读恢复（2026-10-07）
 
 输入 `510448af`，当前会话唯一写入 owner。沿已接通的生产 native chain 删除旧短程分类链：
@@ -1232,6 +1276,9 @@ Knowledge 切片把旧 `application/memory/knowledge_base.py` 与 Memory persist
 新库为空时读取旧 `memory.sqlite.knowledge_entry` 并形成 revision 1，随后只写新库、不双写；旧 Memory fresh
 schema 已删除 Knowledge 表。当前生产知识均来自 Character Package 配置；未来外部资料采集仍须通过明确
 Resource/Content Port 与授权 ingestion，不能绕过 Knowledge owner。
+
+上述初次自动导入是该早期切片的历史窗口，已由 2026-10-07 的 Knowledge 配置 Vault 版本化
+索引切片移除；当前不会导入或隐式修复既有库，旧历史数据保留到阶段 14 的受控迁移/恢复门。
 
 Loop/checkpoint 切片把旧 `application/cycle/controller.py` 与 `turn.py` 迁入目标
 `loop/{loop_controller,step}.py`，运行时与 gRPC adapter 只消费 `LoopController`；其余 Appraise、Deliberate、

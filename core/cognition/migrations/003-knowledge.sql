@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS knowledge_entry (
+CREATE TABLE knowledge_entry (
   entry_id TEXT PRIMARY KEY,
   revision INTEGER NOT NULL,
   content TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS knowledge_entry (
   deleted_at TEXT,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS knowledge_revision (
+CREATE TABLE knowledge_revision (
   entry_id TEXT NOT NULL,
   revision INTEGER NOT NULL,
   content TEXT NOT NULL,
@@ -23,13 +23,20 @@ CREATE TABLE IF NOT EXISTS knowledge_revision (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY(entry_id, revision)
 );
-CREATE TABLE IF NOT EXISTS knowledge_embedding (
+CREATE TABLE knowledge_embedding (
   owner_id TEXT NOT NULL,
   model TEXT NOT NULL,
-  dim INTEGER NOT NULL,
+  entry_revision INTEGER NOT NULL,
+  content_digest TEXT NOT NULL,
+  transformation_version TEXT NOT NULL,
+  dim INTEGER NOT NULL CHECK(dim > 0 AND dim <= 65536),
   vector BLOB NOT NULL,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY(owner_id, model)
+  PRIMARY KEY(owner_id, model),
+  FOREIGN KEY(owner_id, entry_revision) REFERENCES knowledge_revision(entry_id, revision)
 );
-CREATE INDEX IF NOT EXISTS idx_knowledge_active
+CREATE INDEX idx_knowledge_active
   ON knowledge_entry(enabled, deleted_at, priority DESC);
+
+PRAGMA application_id = 1195592526;
+PRAGMA user_version = 1;

@@ -1,213 +1,227 @@
-"""
-知识库模块 — 世界知识管理器
+"""Knowledge 版本化检索；持久正文是事实，embedding 和进程缓存只是派生物。"""
 
-职责：管理 scope=knowledge 的事实知识条目（天气、时间、食物等）。
-角色人格、对话呈现策略和安全边界由 Character Package 配置承载，不经过此模块。
-
-检索策略（由 retrieval.mode 决定）：
-- full_injection：全量注入所有已启用条目（条目 <50 时推荐）
-- semantic_rag ：向量语义检索 Top-K（条目 ≥50 时切换）
-  · 有向量引擎 → cosine similarity 排序
-  · 无向量引擎 → bigram 关键词退化
-"""
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import asyncio
+from dataclasses import replace
 
 import numpy as np
-
-from glimmer_cradle.cognition.ports import KnowledgeInitialization
-from glimmer_cradle.cognition.ports import ObservabilityPort
 from glimmer_cradle.cognition.inference import EmbeddingPort
 from glimmer_cradle.cognition.knowledge.ingestion import config_entries_from
-from glimmer_cradle.cognition.knowledge.knowledge_store import KnowledgeStore
+from glimmer_cradle.cognition.knowledge.knowledge_store import (
+    KnowledgeConflictError,
+    KnowledgeStore,
+)
 from glimmer_cradle.cognition.knowledge.retrieval import (
     KnowledgeRetrievalPolicy,
     bigram_retrieve,
 )
+from glimmer_cradle.cognition.knowledge.revision import KnowledgeRevision
 from glimmer_cradle.cognition.knowledge.source import KnowledgeEntry
-from glimmer_cradle.cognition.memory import VectorIndexStore
+from glimmer_cradle.cognition.knowledge.transformation import (
+    KNOWLEDGE_TRANSFORMATION_VERSION,
+)
+from glimmer_cradle.cognition.ports import KnowledgeInitialization, ObservabilityPort
+
+
+def _reference(entry: KnowledgeEntry) -> KnowledgeRevision:
+    return KnowledgeRevision(
+        entry.entry_id, entry.revision, entry.source, entry.content_digest
+    )
 
 
 class KnowledgeIndex:
-    """由 Worker composition 注入的世界知识管理器。
-
-    初始化流程：
-      1. Kernel 内核发送 knowledge_init IPC
-      2. adapter 将 KnowledgeInitPayload 交给此处
-      3. init_from_kernel() 注册 scope=knowledge 条目，按 mode 决定检索策略
-    """
+    """Worker 注入唯一 Knowledge store；配置 intake 不拥有人格或平台 IO。"""
 
     def __init__(self, *, observability: ObservabilityPort) -> None:
         self._logger = observability.logger("knowledge_base")
-        self._entries: Dict[str, KnowledgeEntry] = {}
+        self._entries: dict[str, KnowledgeEntry] = {}
         self._policy = KnowledgeRetrievalPolicy()
-        self._embedding_engine: Optional[EmbeddingPort] = None
-        # Repository 由 Composition Root 注入，领域对象不创建存储。
-        self._repo: Optional[KnowledgeStore] = None
-        # 向量持久化避免每次进程启动重新计算。
-        self._vec_repo: Optional[VectorIndexStore] = None
-        self._logger.info("世界知识库初始化完成")
+        self._embedding_engine: EmbeddingPort | None = None
+        self._repo: KnowledgeStore | None = None
+        self._index_lock = asyncio.Lock()
 
     def set_embedding_engine(self, engine: EmbeddingPort) -> None:
-        """接入由 Composition Root 创建的嵌入引擎。"""
         self._embedding_engine = engine if engine.is_available() else None
-        if self._embedding_engine:
-            self._logger.info("知识库已接入向量引擎，semantic_rag 模式可用")
 
     def bind_repository(self, repo: KnowledgeStore) -> None:
-        """绑定知识持久化仓库。"""
         self._repo = repo
 
-    def bind_vector_repository(self, vec_repo: VectorIndexStore) -> None:
-        """绑定可重建向量索引仓库。"""
-        self._vec_repo = vec_repo
-
     async def load_persisted(self) -> None:
-        """从 Cognition 记忆事实库加载知识条目。"""
+        async with self._index_lock:
+            await self._load_current()
+
+    async def _load_current(self) -> None:
         if self._repo is None:
+            self._entries = {}
             return
         rows = await self._repo.get_all_entries()
         self._entries = {
-            r["entry_id"]: KnowledgeEntry(
-                entry_id=r["entry_id"],
-                content=r["content"],
-                priority=r["priority"],
-                enabled=r["enabled"],
-                revision=r.get("revision", 1),
-                source=r.get("source", "config"),
-                attributes={"activation": r.get("activation", {})},
+            row["entry_id"]: KnowledgeEntry(
+                entry_id=row["entry_id"],
+                content=row["content"],
+                priority=row["priority"],
+                enabled=row["enabled"],
+                revision=row["revision"],
+                source=row["source"],
+                attributes={"activation": row["activation"]},
+                content_digest=row["content_digest"],
             )
-            for r in rows
+            for row in rows
         }
         await self._restore_or_compute_embeddings()
-        self._logger.info("知识库已从本地库加载", entry_count=len(self._entries))
 
     async def init_from_kernel(self, payload: KnowledgeInitialization) -> None:
-        """从内核 knowledge_init 载荷预填知识库。
-
-        knowledge_init 是知识库的配置预填入口，只接收
-        scope=knowledge 条目，以 source='config' 持久化到 knowledge.sqlite，再从库
-        重新加载。检索策略（policy）是运行时配置，不持久化。
-        """
+        """仅由受控配置入口替换 config 来源；模型与工具不能自行登记知识。"""
         retrieval = payload.retrieval
-        self._policy = KnowledgeRetrievalPolicy(
+        policy = KnowledgeRetrievalPolicy(
             mode=retrieval.mode,
             top_k=retrieval.top_k,
             min_score=retrieval.min_score,
             semantic_weight=retrieval.semantic_weight,
         )
-
-        config_entries = config_entries_from(payload)
-
         if self._repo is None:
-            self._logger.error("知识库未绑定持久化仓库，knowledge_init 已跳过")
-            return
-
-        await self._repo.replace_config_entries(config_entries)
-        await self.load_persisted()
+            raise RuntimeError("Knowledge 没有持久 owner，拒绝宣称初始化成功")
+        async with self._index_lock:
+            await self._repo.replace_config_entries(config_entries_from(payload))
+            self._policy = policy
+            await self._load_current()
         self._logger.info(
-            "知识库注入完成",
-            version=payload.version,
-            mode=self._policy.mode,
-            entry_count=len(self._entries),
+            "知识配置注入完成", version=payload.version, entry_count=len(self._entries)
         )
 
     async def _restore_or_compute_embeddings(self) -> None:
-        """semantic_rag 模式下恢复向量，缺失或模型变化时重算并回存。"""
-        if self._policy.mode != "semantic_rag":
+        engine = self._embedding_engine
+        if (
+            self._policy.mode != "semantic_rag"
+            or engine is None
+            or not engine.is_available()
+        ):
             return
-        if not (self._embedding_engine and self._embedding_engine.is_available()):
+        assert self._repo is not None
+        try:
+            stored = await self._repo.get_embeddings(
+                model=engine.model_id,
+                transformation_version=KNOWLEDGE_TRANSFORMATION_VERSION,
+            )
+        except KnowledgeConflictError:
+            # 派生索引损坏可以降级，不能用修复索引的名义重写来源/修订事实。
+            self._logger.warning("Knowledge 派生索引无效，降级为基础检索")
             return
-        model_id = self._embedding_engine.model_id
-        stored: dict = {}
-        if self._vec_repo is not None:
-            stored = await self._vec_repo.get_vectors("knowledge", model_id)
-
         missing: list[KnowledgeEntry] = []
         for entry in self._entries.values():
-            vec = stored.get(entry.entry_id)
-            if vec is not None:
-                entry._embedding = vec
-            else:
+            if not entry.enabled:
+                continue
+            vector = stored.get(_reference(entry))
+            if vector is None:
                 missing.append(entry)
-
-        if missing:
-            try:
-                vectors = await self._embedding_engine.encode(
-                    [e.content for e in missing], text_type="document"
+            else:
+                entry._embedding = vector
+        if not missing:
+            return
+        try:
+            vectors = np.asarray(
+                await engine.encode(
+                    [entry.content for entry in missing], text_type="document"
                 )
-                for entry, vec in zip(missing, vectors):
-                    entry._embedding = vec
-                if self._vec_repo is not None:
-                    for entry in missing:
-                        assert entry._embedding is not None
-                        await self._vec_repo.upsert_vector(
-                            owner_kind="knowledge", owner_id=entry.entry_id,
-                            model=model_id, vector=entry._embedding,
-                        )
-            except Exception as exc:
-                self._logger.warning("知识库语义索引更新失败，继续使用基础检索", error=str(exc))
-                return
-        self._logger.info(
-            "知识库向量就绪",
-            restored=len(self._entries) - len(missing),
-            recomputed=len(missing),
-        )
-
-    # ------------------------------------------------------------------
-    # 对外检索接口
-    # ------------------------------------------------------------------
-
-    async def get_knowledge(self, query: str = "") -> List[KnowledgeEntry]:
-        """统一对外接口。
-
-        full_injection 模式：返回所有已启用条目（按优先级排序）。
-        semantic_rag  模式：向量检索 Top-K，无引擎时 bigram 退化。
-        """
-        if self._policy.mode == "full_injection":
-            return sorted(
-                [e for e in self._entries.values() if e.enabled],
-                key=lambda e: e.priority,
-                reverse=True,
             )
-        return await self._retrieve(query)
+            if (
+                vectors.ndim != 2
+                or vectors.shape[0] != len(missing)
+                or not 1 <= vectors.shape[1] <= 65_536
+                or not np.isfinite(vectors).all()
+                or np.iscomplexobj(vectors)
+            ):
+                raise ValueError("Knowledge embedding 批次维度或数值非法")
+            for entry, vector in zip(missing, vectors, strict=True):
+                # 不跨模型 await 持有 SQL 事务；接纳时重验 revision/hash/来源。
+                await self._repo.upsert_embedding(
+                    _reference(entry),
+                    model=engine.model_id,
+                    transformation_version=KNOWLEDGE_TRANSFORMATION_VERSION,
+                    vector=vector,
+                )
+                entry._embedding = vector.copy()
+        except KnowledgeConflictError:
+            self._logger.debug("Knowledge 编码期间来源已修订，迟到索引未接纳")
+        except Exception:
+            self._logger.warning("Knowledge 向量生成失败，降级为基础检索")
 
-    def get_all_entries(self) -> List[KnowledgeEntry]:
-        """获取所有条目（用于调试/导出）。"""
-        return list(self._entries.values())
+    async def get_knowledge(self, query: str = "") -> list[KnowledgeEntry]:
+        async with self._index_lock:
+            # 不依赖进程通知；另一连接/重开后的更新、删除必须在当前检索中可观察。
+            await self._load_current()
+            if self._policy.mode == "full_injection":
+                selected = sorted(
+                    (entry for entry in self._entries.values() if entry.enabled),
+                    key=lambda entry: (-entry.priority, entry.entry_id),
+                )
+            else:
+                selected = await self._retrieve(query)
+            return await self._filter_current(selected)
 
-    # ------------------------------------------------------------------
-    # 内部检索实现（semantic_rag 模式）
-    # ------------------------------------------------------------------
+    async def _filter_current(
+        self, entries: list[KnowledgeEntry]
+    ) -> list[KnowledgeEntry]:
+        if self._repo is None:
+            return []
+        current = {
+            row["entry_id"]: (row["revision"], row["source"], row["content_digest"])
+            for row in await self._repo.get_all_entries()
+            if row["enabled"]
+        }
+        # query/document 编码期间也可能失效；旧正文不能凭已有向量继续进入 Context。
+        return [
+            replace(entry, _embedding=None)
+            for entry in entries
+            if current.get(entry.entry_id)
+            == (entry.revision, entry.source, entry.content_digest)
+        ]
 
-    async def _retrieve(self, query: str) -> List[KnowledgeEntry]:
-        """semantic_rag 模式下的检索。"""
-        entries = [e for e in self._entries.values() if e.enabled]
+    def get_all_entries(self) -> list[KnowledgeEntry]:
+        """只读诊断用的最近加载快照，不是实时检索授权入口。"""
+        return [replace(entry, _embedding=None) for entry in self._entries.values()]
+
+    async def _retrieve(self, query: str) -> list[KnowledgeEntry]:
+        entries = [entry for entry in self._entries.values() if entry.enabled]
         if not entries or not query.strip():
-            return entries[:self._policy.top_k]
-
-        # 尝试语义检索
-        if self._embedding_engine and self._embedding_engine.is_available():
-            has_embedding = [e for e in entries if e._embedding is not None]
-            if has_embedding:
+            return entries[: self._policy.top_k]
+        engine = self._embedding_engine
+        if engine is not None and engine.is_available():
+            indexed = [entry for entry in entries if entry._embedding is not None]
+            # 部分编码失败不能让有效但未索引的正文从检索中消失。
+            if indexed and len(indexed) == len(entries):
                 try:
-                    return await self._semantic_retrieve(query, has_embedding)
-                except Exception as exc:
-                    self._logger.warning("语义检索异常，继续使用基础检索", error=str(exc))
-
-        # 退化为 bigram
+                    return await self._semantic_retrieve(query, indexed)
+                except Exception:
+                    self._logger.warning("Knowledge 语义检索失败，降级为基础检索")
         return bigram_retrieve(query, entries, policy=self._policy)
 
     async def _semantic_retrieve(
-        self, query: str, entries: List[KnowledgeEntry]
-    ) -> List[KnowledgeEntry]:
-        """向量余弦相似度检索。"""
+        self, query: str, entries: list[KnowledgeEntry]
+    ) -> list[KnowledgeEntry]:
         assert self._embedding_engine is not None
-        query_vec = await self._embedding_engine.encode_single(query, text_type="query")
-        embeddings = [entry._embedding for entry in entries]
-        assert all(embedding is not None for embedding in embeddings)
-        matrix = np.stack([embedding for embedding in embeddings if embedding is not None])
-        sims = self._embedding_engine.cosine_similarities(query_vec, matrix)
-        scored = sorted(zip(sims, entries), key=lambda x: float(x[0]), reverse=True)
-        return [e for sim, e in scored[:self._policy.top_k] if float(sim) >= self._policy.min_score]
+        query_vector = np.asarray(
+            await self._embedding_engine.encode_single(query, text_type="query")
+        )
+        matrix = np.stack([entry._embedding for entry in entries])
+        if (
+            query_vector.ndim != 1
+            or query_vector.size != matrix.shape[1]
+            or not np.isfinite(query_vector).all()
+            or np.iscomplexobj(query_vector)
+        ):
+            raise ValueError("Knowledge 查询向量非法")
+        scores = self._embedding_engine.cosine_similarities(query_vector, matrix)
+        if len(scores) != len(entries) or not np.isfinite(scores).all():
+            raise ValueError("Knowledge 检索分数非法")
+        ranked = sorted(
+            zip(scores, entries, strict=True),
+            key=lambda item: float(item[0]),
+            reverse=True,
+        )
+        return [
+            entry
+            for score, entry in ranked[: self._policy.top_k]
+            if float(score) >= self._policy.min_score
+        ]

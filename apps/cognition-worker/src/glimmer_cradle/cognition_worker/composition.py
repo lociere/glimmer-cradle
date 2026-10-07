@@ -399,7 +399,6 @@ def compose_cognition(
     knowledge_store = SqliteKnowledgeStore(
         cognition_state_dir / "knowledge.sqlite",
         migration_path=migrations_dir / "003-knowledge.sql",
-        legacy_memory_path=cognition_state_dir / "memory.sqlite",
     )
     checkpoint_store = SqliteCheckpointStore(
         cognition_state_dir / "checkpoints.sqlite",
@@ -438,7 +437,6 @@ def compose_cognition(
     )
     memory_substrate.bind_repository(memory_repository)
     knowledge_base.bind_repository(knowledge_store)
-    knowledge_base.bind_vector_repository(knowledge_store)
 
     activity_controller = CognitiveActivityController(
         experience_recorder=conversation_recorder,

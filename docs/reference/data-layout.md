@@ -100,6 +100,7 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
+| `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 正文/不可变修订与按修订/hash/转换版本/模型绑定的派生向量；owner `0x47434B4E`、schema 1，旧库不能隐式修复或自动导入 |
 | `data/state/cognition/planning.sqlite` | Cognition Planning | 本拍行动 journal；显式长期承诺的目标/计划版本、完成条件、accepted 状态与 request outbox/接纳记录 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
@@ -112,6 +113,11 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 | `data/state/extensions/lociere.napcat-adapter/napcat/` | NapCat adapter | NapCat 工作目录；保存 NapCat 配置、日志、插件和 cache，程序包升级时不覆盖 |
 
 Cognition 进程内使用的 `ConversationWorkingSet` 是从 `conversations.db` 恢复的有界缓存，不拥有历史事实。长期聊天记录由 Conversation Log 派生到 History Store，Kernel 和 Renderer 都不维护平行对话事实源。Control Center 分开展示 Conversation 消息、Log Moment、Episode、活动 Memory、revision、evidence 和角色知识；Renderer 只消费 Desktop main 生成的只读投影。
+
+Knowledge 正文/修订不可整体删除重建，备份必须包含独立库。派生向量失效与正文修订同事务，
+具体持久与检索规则见 [Cognition 实现](../architecture/implementation/Cognition认知核实现.md)。
+既有未版本化 Knowledge/旧 Memory 知识表保持原状；新 owner 拒绝隐式迁移，不以空库或重新注入
+配置代替不可再生历史恢复。实际用户库迁移、跨库备份与最终路径切换仍归重构阶段 14。
 
 Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Conversation Log packs 聚合最近 Moment，从 Episode projection 读取分段状态，从 `memory.db` 读取当前 revision、evidence 与巩固结果统计。Control Center 必须区分待巩固、巩固完成但无长期记忆、巩固失败和活动记忆，也不能把预览结果解释为实际 Prompt 召回。
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { execFileSync, type ChildProcess } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
+import { createHash } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -56,6 +57,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
   let providerRequests = 0;
   let providerDisconnects = 0;
   const methodPrompts: string[] = [];
+  const knowledgePrompts: string[] = [];
   const nativeRequests: Array<{ stream: boolean; messages: Array<{ role: string; content: string | null; tool_call_id?: string; tool_calls?: unknown[] }>; tools?: Array<{ function: { name: string } }> }> = [];
   beforeAll(async () => {
     process.env.GLIMMER_CRADLE_DATA_ROOT = await mkdtemp(path.join(os.tmpdir(), 'glimmer-worker-lifecycle-'));
@@ -68,6 +70,12 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
       request.on('end', () => {
         isCancellationFixture = body.includes('shutdown cancellation fixture');
         if (isCancellationFixture) providerRequests += 1;
+        if (body.includes('knowledge revision integration fixture')) {
+          const payload = JSON.parse(body) as { messages: Array<{ role: string; content: string }> };
+          knowledgePrompts.push(payload.messages.filter(message => message.role === 'system').map(message => message.content).join('\n'));
+          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          response.end(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: '知识参考已读取。' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`);
+        }
         if (body.includes('method selection integration fixture')) {
           const payload = JSON.parse(body) as { messages: Array<{ role: string; content: string }> };
           const prompt = payload.messages.find(message => message.role === 'user')!.content;
@@ -189,6 +197,76 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     expect(recovered.receiverFenced).toBe(true);
     expect(recovered.resolution).toBe(MemoryJobResolution.NOT_APPLIED);
     await manager.stop();
+  }, 60_000);
+
+  it('实际 InitializeKnowledge RPC 更新/重启/删除后只把当前修订送入默认模型上下文', async () => {
+    let knowledge: Awaited<ReturnType<typeof ConfigManager.instance.loadKnowledgeBaseConfig>> = { version: 'knowledge-fixture-v1',
+      retrieval: { mode: 'full_injection', top_k: 5, min_score: 0, semantic_weight: 0.6 },
+      entries: [{ entry_id: 'knowledge-proof', scope: 'knowledge', content: 'knowledge unique old body', enabled: true, priority: 1 }] };
+    const loadKnowledge = vi.spyOn(ConfigManager.instance, 'loadKnowledgeBaseConfig').mockImplementation(async () => knowledge);
+    const actions: ActionCommand[] = [];
+    transport.setActionHandler(async command => { actions.push(command); });
+    const client = new CognitionClient(transport);
+    const catalog = new CapabilityCatalogAdapter();
+    const policy = new SkillPolicyEngine();
+    const journal = new SqliteExecutionJournal(path.join(process.env.GLIMMER_CRADLE_DATA_ROOT!, 'state/capabilities/knowledge-context.sqlite'));
+    const controller = new ExecutionController(journal);
+    const outbox = new ExecutionResultOutbox(journal, { accept: (event, signal) => client.acceptExecutionResult(event, signal) });
+    const observability: Observability = { logger: () => logger,
+      createTraceContext: traceId => ({ trace_id: traceId ?? 'knowledge-trace' }), currentTraceId: () => undefined,
+      withTrace: async (_trace, operation) => operation(), span: async (_name, operation) => operation({ setAttribute() {}, setStatus() {} }),
+      histogram() {}, counter() {}, start() {}, stop() {}, close: async () => undefined };
+    const gateway = new SkillInvocationGateway(catalog, policy, { record() {} }, observability, { record() {} }, undefined, controller,
+      () => 'unused-knowledge-invocation', outbox);
+    // 普通 native 聊天也需要真实当次曝光服务；空目录不是缺失服务的 fallback。
+    transport.setCapabilityService(new NativeCapabilityAppService(catalog, gateway, policy, 'host:knowledge-integration'));
+    const ask = async (step: string) => {
+      const before = knowledgePrompts.length;
+      const accepted = await client.submitPerception({ id: `knowledge-${step}`, sensoryType: 'chat', source: 'fixture', timestamp: Date.now(), familiarity: 0,
+        address_mode: 'direct', response_policy: 'reply_allowed', retention_ceiling: 'experience',
+        conversation: { source_provider_id: 'knowledge-provider', scene_id: 'knowledge-scene', conversation_id: `knowledge-conversation-${step}`,
+          continuity_id: 'knowledge-continuity', thread_id: 'main', interaction_id: `knowledge-interaction-${step}`,
+          recall_scope: 'conversation_private', disclosure_scope: 'conversation_private' },
+        origin: { provider_kind: 'core', provider_id: 'knowledge-provider', source_event_id: `knowledge-event-${step}`, schema_ref: 'fixture',
+          trust_tier: 'host_verified', privacy_class: 'private', cognitive_effect: 'observation' },
+        content: { text: 'knowledge revision integration fixture', modality: ['text'], actor_id: 'knowledge-actor' } }, `knowledge-trace-${step}`, 5000);
+      const state = await waitForPerception(client, accepted.operation_id);
+      expect(state, JSON.stringify(state)).toMatchObject({ state: 'succeeded' });
+      expect(knowledgePrompts.length).toBe(before + 1);
+      return knowledgePrompts[before]!;
+    };
+    const digest = (body: string) => createHash('sha256').update(body).digest('hex');
+    try {
+      await manager.start();
+      const first = await ask('first');
+      expect(first).toContain('knowledge unique old body');
+      expect(first).toContain('"revision": 1');
+      expect(first).toContain(digest('knowledge unique old body'));
+      knowledge = { ...knowledge, version: 'knowledge-fixture-v2', entries: [{ ...knowledge.entries[0]!, content: 'knowledge unique current body' }] };
+      await client.initializeKnowledge(knowledge, 5000);
+      const second = await ask('updated');
+      expect(second).toContain('knowledge unique current body');
+      expect(second).toContain('"revision": 2');
+      expect(second).not.toContain(digest('knowledge unique old body'));
+      await manager.stop();
+      await manager.start();
+      const reopened = await ask('reopened');
+      expect(reopened).toContain('"revision": 2');
+      expect(reopened).toContain(digest('knowledge unique current body'));
+      knowledge = { ...knowledge, version: 'knowledge-fixture-v3', entries: [] };
+      await client.initializeKnowledge(knowledge, 5000);
+      const deleted = await ask('deleted');
+      expect(deleted).not.toContain('knowledge unique current body');
+      expect(deleted).not.toContain('knowledge-proof');
+      expect(actions).toHaveLength(4);
+      expect(actions.every(action => action.action_type === 'reply')).toBe(true);
+    } finally {
+      await manager.stop();
+      transport.setActionHandler(null);
+      transport.setCapabilityService(null);
+      journal.close();
+      loadKnowledge.mockRestore();
+    }
   }, 60_000);
 
   it('真实 User 方法目录/选择/正文经 Plan RPC 往返，不执行假 Tool 或扩展工具权限', async () => {

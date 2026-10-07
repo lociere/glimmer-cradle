@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
 
-from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
-from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+from glimmer_cradle.cognition.knowledge import KnowledgeEntry, KnowledgeIndex
+from glimmer_cradle.cognition.knowledge.transformation import (
+    KNOWLEDGE_TRANSFORMATION_VERSION,
+)
 from glimmer_cradle.cognition.memory import MemoryController, RelationshipRecord
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
+from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 
 ContextTrustTier = Literal["untrusted", "user_asserted", "host_verified", "authoritative"]
 InstructionAuthority = Literal["data", "user", "system"]
@@ -306,6 +310,22 @@ def _moment_speaker(moment: Moment) -> str:
     return ""
 
 
+def knowledge_context_metadata(entry: KnowledgeEntry) -> dict[str, Any]:
+    """正文来源修订随投影传递；索引版本不等于来源权限或时效证明。"""
+    return {
+        "entry_id": entry.entry_id,
+        "revision": entry.revision,
+        "source": entry.source,
+        "content_digest": entry.content_digest,
+        "transformation_version": KNOWLEDGE_TRANSFORMATION_VERSION,
+    }
+
+
+def render_knowledge_entry(entry: KnowledgeEntry) -> str:
+    provenance = json.dumps(knowledge_context_metadata(entry), ensure_ascii=False, sort_keys=True)
+    return f"知识：[source=knowledge] [provenance={provenance}] {entry.content}"
+
+
 class KnowledgeSource(ContextSource):
     name = "knowledge"
 
@@ -320,18 +340,18 @@ class KnowledgeSource(ContextSource):
 
         items: list[ContextItem] = []
         for entry in entries[:max_items]:
-            content = f"知识：{entry.content}"
-            priority = float(getattr(entry, "priority", 1))
+            content = render_knowledge_entry(entry)
+            priority = float(entry.priority)
             # priority 通常 1~5，归一到 [0,1]
             importance = min(1.0, priority / 5.0)
             items.append(ContextItem(
                 source=self.name,
                 content=content,
                 relevance=0.6,  # KnowledgeIndex 命中即给中等相关度
-                recency=0.5,    # 知识无时效性概念
+                recency=0.5,    # 当前配置 Vault 未声明 freshness，不据此断言 Resource 时效。
                 importance=importance,
                 token_estimate=estimate_tokens(content),
-                metadata={"entry_id": getattr(entry, "entry_id", "")},
+                metadata=knowledge_context_metadata(entry),
             ))
         return items
 

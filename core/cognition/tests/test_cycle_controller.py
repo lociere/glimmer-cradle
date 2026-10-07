@@ -1356,7 +1356,9 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     class _Mem:
         def __init__(self, content): self.content = content
     class _KB:
-        async def get_knowledge(self, query): return [_Mem("天空是蓝的")]
+        async def get_knowledge(self, query):
+            from glimmer_cradle.cognition.knowledge import KnowledgeEntry
+            return [KnowledgeEntry("sky", "天空是蓝的")]
     class _Conversation:
         async def prompt_context(
             self, conversation_id, thread_id, query, *, allowed_scopes
