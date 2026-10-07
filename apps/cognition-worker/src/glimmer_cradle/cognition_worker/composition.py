@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 import uuid
 from abc import ABC, abstractmethod
@@ -104,7 +105,6 @@ from glimmer_cradle.conversation import (
     ConversationRecorder,
     ConversationStore,
     MomentKind,
-    SourceDescriptor,
     SqliteTurnStore,
     TurnController,
     build_conversation_recorder,
@@ -809,8 +809,9 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
     async def _execute(self, input_data: AgentSynthesisInput, trace_id: str) -> AgentSynthesisOutput:
         nickname = self.nickname
 
-        persisted_reply = self._persisted_reply(input_data.trace_id or trace_id)
+        persisted_reply = self._persisted_reply(input_data, input_data.trace_id or trace_id)
         if persisted_reply is not None:
+            await self.experience_recorder.flush()
             await self._complete_turn(input_data.trace_id or trace_id)
             return AgentSynthesisOutput(
                 reply_content=str(persisted_reply.content.get("text") or ""),
@@ -818,10 +819,10 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
                 trace_id=input_data.trace_id or trace_id,
             )
 
-        action_result_ids = self._record_tool_exchange(input_data, trace_id)
+        action_result_ids, tool_results = await self._resolve_tool_results(input_data, trace_id)
 
         # 格式化工具结果
-        results_text = self._format_tool_results(input_data.tool_results)
+        results_text = self._format_tool_results(tool_results)
 
         system_prompt = self._build_system_prompt(nickname)
         user_prompt = (
@@ -879,89 +880,46 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
             return
         await self.turn_controller.complete(turn_id, expected_revision=turn.revision)
 
-    def _record_tool_exchange(
+    async def _resolve_tool_results(
         self,
         input_data: AgentSynthesisInput,
         trace_id: str,
-    ) -> tuple[str, ...]:
-        if self.experience_recorder is None:
-            return ()
+    ) -> tuple[tuple[str, ...], list[dict]]:
         moment_ids: list[str] = []
+        results: list[dict] = []
+        accepted_context = None
         resolved_trace_id = input_data.trace_id or trace_id
-        request_moment_id = self._action_request_moment_id(resolved_trace_id)
+        if self.experience_recorder is not None:
+            await self.experience_recorder.flush()
         for result in input_data.tool_results:
-            provider_kind = str(result.get("provider_kind") or "core")
-            status = str(result.get("status") or "error")
-            invocation_id = str(result.get("invocation_id") or "")
-            result_origin = SourceDescriptor(
-                provider_kind=provider_kind,
-                provider_id=str(result.get("provider_id") or "kernel.skill-plane"),
-                provider_version=result.get("provider_version"),
-                source_event_id=str(result.get("source_event_id") or invocation_id or trace_id),
-                schema_ref=str(result.get("schema_ref") or "glimmer://skill/action-result/v1"),
-                trust_tier="host_verified" if provider_kind == "core" else "untrusted",
-                privacy_class="private",
-                cognitive_effect="action_result",
-            )
-            call_origin = SourceDescriptor(
-                provider_kind=provider_kind,
-                provider_id=result_origin.provider_id,
-                provider_version=result_origin.provider_version,
-                source_event_id=result_origin.source_event_id,
-                schema_ref="glimmer://capability/tool-call/v1",
-                trust_tier=result_origin.trust_tier,
-                privacy_class=result_origin.privacy_class,
-                cognitive_effect="context",
-            )
-            call = self.experience_recorder.record(
-                MomentKind.ACTION,
-                {
-                    "action_type": "tool_call",
-                    "skill_id": str(result.get("skill_id") or ""),
-                    "tool_name": str(result.get("tool_name") or "unknown"),
-                    "arguments_json": str(result.get("arguments_json") or "{}")[:4000],
-                    "invocation_id": invocation_id,
-                },
-                causation_ids=(request_moment_id,) if request_moment_id else (),
-                scene_id=input_data.scene_id or None,
-                conversation_id=str(input_data.conversation.get("conversation_id") or ""),
-                continuity_id=str(input_data.conversation.get("continuity_id") or ""),
-                thread_id=str(input_data.conversation.get("thread_id") or "main"),
-                interaction_id=resolved_trace_id,
-                trace_id=resolved_trace_id,
-                origin=call_origin,
-                retention_ceiling="experience",
-                recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
-                disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
-                importance=0.55,
-                idempotency_key=f"tool-call:{invocation_id}" if invocation_id else None,
-            )
-            moment = self.experience_recorder.record(
-                MomentKind.ACTION_RESULT,
-                {
-                    "skill_id": str(result.get("skill_id") or ""),
-                    "tool_name": str(result.get("tool_name") or "unknown"),
-                    "status": status,
-                    "result_json": str(result.get("result_json") or "{}")[:4000],
-                    "invocation_id": invocation_id,
-                },
-                causation_ids=(call.moment_id,) if call is not None else (),
-                scene_id=input_data.scene_id or None,
-                conversation_id=str(input_data.conversation.get("conversation_id") or ""),
-                continuity_id=str(input_data.conversation.get("continuity_id") or ""),
-                thread_id=str(input_data.conversation.get("thread_id") or "main"),
-                interaction_id=resolved_trace_id,
-                trace_id=resolved_trace_id,
-                origin=result_origin,
-                retention_ceiling="memory_candidate" if status == "success" else "experience",
-                recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
-                disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
-                importance=0.6 if status == "success" else 0.4,
-                idempotency_key=f"tool-result:{invocation_id}" if invocation_id else None,
-            )
-            if moment is not None:
-                moment_ids.append(moment.moment_id)
-        return tuple(moment_ids)
+            event_id = str(result.get("source_event_id") or "")
+            if not re.fullmatch(r"[a-f0-9]{64}", event_id):
+                # 规划失败/派发前拒绝及旧无 journal fixture 只是未验证观察，不制造执行事实。
+                results.append({**result, "status": "error" if result.get("status") == "error" else "unverified"})
+                continue
+            moment = self.experience_recorder.execution_result(event_id) if self.experience_recorder else None
+            if moment is None or moment.kind != MomentKind.ACTION_RESULT.value \
+                    or moment.content.get("invocation_id") != result.get("invocation_id") \
+                    or moment.conversation_id != input_data.conversation.get("conversation_id") \
+                    or moment.interaction_id != resolved_trace_id \
+                    or moment.scene_id != input_data.scene_id:
+                raise RuntimeError("Execution 交互结果尚未接纳或引用冲突")
+            for context_field in ("continuity_id", "thread_id", "recall_scope", "disclosure_scope"):
+                if context_field in input_data.conversation and input_data.conversation[context_field] != getattr(moment, context_field):
+                    raise RuntimeError("Execution 结果交互范围冲突")
+            context = tuple(getattr(moment, name) for name in ("conversation_id", "scene_id", "continuity_id", "thread_id",
+                "interaction_id", "actor_id", "actor_name", "recall_scope", "disclosure_scope"))
+            if accepted_context is not None and context != accepted_context:
+                raise RuntimeError("Execution 结果跨交互范围冲突")
+            accepted_context = context
+            content = moment.content
+            # wire request 的 result_json/status 不得覆盖已接纳事实；原工具输出仍是 untrusted。
+            results.append({"tool_name": content["capability_id"],
+                "status": "success" if content["state"] == "succeeded" else content["state"],
+                "result_json": json.dumps({"result": content["result"], "error_code": content["error_code"],
+                    "side_effects": content["side_effects"]}, ensure_ascii=False)})
+            moment_ids.append(moment.moment_id)
+        return tuple(moment_ids), results
 
     def _record_reply(
         self,
@@ -973,47 +931,38 @@ class AgentSynthesisUseCase(BaseUseCase[AgentSynthesisInput, AgentSynthesisOutpu
         if self.experience_recorder is None or not reply_content:
             return None
         resolved_trace_id = input_data.trace_id or trace_id
+        source = self.experience_recorder.log.get_moment(causation_ids[0]) if causation_ids else None
         moment = self.experience_recorder.record(
             MomentKind.REPLY,
             {"text": reply_content, "length": len(reply_content)},
             causation_ids=causation_ids,
-            scene_id=input_data.scene_id or None,
-            conversation_id=str(input_data.conversation.get("conversation_id") or ""),
-            continuity_id=str(input_data.conversation.get("continuity_id") or ""),
-            thread_id=str(input_data.conversation.get("thread_id") or "main"),
+            scene_id=source.scene_id if source else input_data.scene_id or None,
+            conversation_id=source.conversation_id if source else str(input_data.conversation.get("conversation_id") or ""),
+            continuity_id=source.continuity_id if source else str(input_data.conversation.get("continuity_id") or ""),
+            thread_id=source.thread_id if source else str(input_data.conversation.get("thread_id") or "main"),
             interaction_id=resolved_trace_id,
             trace_id=resolved_trace_id,
-            recall_scope=str(input_data.conversation.get("recall_scope") or "conversation_private"),
-            disclosure_scope=str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
+            actor_id=source.actor_id if source else None, actor_name=source.actor_name if source else None,
+            recall_scope=source.recall_scope if source else str(input_data.conversation.get("recall_scope") or "conversation_private"),
+            disclosure_scope=source.disclosure_scope if source else str(input_data.conversation.get("disclosure_scope") or "conversation_private"),
             importance=0.6,
             idempotency_key=f"skill-reply:{resolved_trace_id}" if resolved_trace_id else None,
         )
         return moment.moment_id if moment is not None else None
 
-    def _action_request_moment_id(self, interaction_id: str) -> str | None:
+    def _persisted_reply(self, input_data: AgentSynthesisInput, interaction_id: str):
         if self.experience_recorder is None or not interaction_id:
             return None
-        moments = self.experience_recorder.recent_moments(
-            limit=200, kinds={MomentKind.ACTION.value}
-        )
-        for moment in reversed(moments):
-            if (
-                moment.interaction_id == interaction_id
-                and moment.content.get("action_type") == "skill_request"
-            ):
-                return moment.moment_id
-        return None
-
-    def _persisted_reply(self, interaction_id: str):
-        if self.experience_recorder is None or not interaction_id:
-            return None
-        moments = self.experience_recorder.recent_moments(
-            limit=200, kinds={MomentKind.REPLY.value}
-        )
-        return next(
-            (moment for moment in reversed(moments) if moment.interaction_id == interaction_id),
-            None,
-        )
+        moment = self.experience_recorder.recorded_fact(f"skill-reply:{interaction_id}")
+        if moment is not None and (moment.kind != MomentKind.REPLY.value
+            or moment.conversation_id != str(input_data.conversation.get("conversation_id") or "")
+            or moment.scene_id != (input_data.scene_id or None)):
+            raise RuntimeError("Synthesis 持久回复交互 identity 冲突")
+        if moment is not None:
+            for context_field in ("continuity_id", "thread_id", "recall_scope", "disclosure_scope"):
+                if context_field in input_data.conversation and input_data.conversation[context_field] != getattr(moment, context_field):
+                    raise RuntimeError("Synthesis 持久回复交互范围冲突")
+        return moment
 
     def _build_system_prompt(self, nickname: str) -> str:
         compiler = self.persona_compiler

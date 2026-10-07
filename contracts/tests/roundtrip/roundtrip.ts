@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { create, fromBinary, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
+import { create, fromBinary, fromJson, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
+import { ValueSchema } from '@bufbuild/protobuf/wkt';
+import { ExecutionResultState, ExecutionSideEffects } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
+import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema } from '../../generated/ts/glimmer/conversation/v1/conversation_pb';
 import {
   EchoProbeRequestSchema,
   EchoProbeResponseSchema,
@@ -25,6 +28,30 @@ const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
 const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version: string; tool_id: string };
 const digest = createHash('sha256').update(documentBytes).digest();
+
+for (const state of [ExecutionResultState.SUCCEEDED, ExecutionResultState.FAILED, ExecutionResultState.UNKNOWN]) {
+  const request = create(AcceptExecutionResultRequestSchema, {
+    call: { traceId: 'trace:执行', generation: 'generation:1' },
+    event: { eventId: 'a'.repeat(64), invocationId: 'invoke:执行', revision: 9007199254740991n,
+      attempt: 1, scopeId: 'conversation:范围', conversationId: 'conversation:范围', sourceFactId: 'action:原事实',
+      executorId: 'executor', capabilityId: 'tool', definitionRevision: 'definition', requestDigest: 'b'.repeat(64),
+      state, sideEffects: state === ExecutionResultState.UNKNOWN ? ExecutionSideEffects.UNKNOWN : ExecutionSideEffects.NONE,
+      result: state === ExecutionResultState.SUCCEEDED ? fromJson(ValueSchema, null) : undefined,
+      errorCode: state === ExecutionResultState.SUCCEEDED ? '' : 'unconfirmed', updatedAtMs: 1900000000000n },
+  });
+  const restored = fromBinary(AcceptExecutionResultRequestSchema, toBinary(AcceptExecutionResultRequestSchema, request));
+  if (toJsonString(AcceptExecutionResultRequestSchema, restored) !== toJsonString(AcceptExecutionResultRequestSchema, request)
+    || (restored.event?.result !== undefined) !== (state === ExecutionResultState.SUCCEEDED)) {
+    throw new Error('Execution result identity/Unicode/null presence roundtrip failed');
+  }
+}
+const executionReceipt = create(AcceptExecutionResultResponseSchema, { eventId: 'a'.repeat(64), invocationId: 'invoke:执行',
+  revision: 9007199254740991n, momentId: 'moment:事实', logPosition: 9007199254740991n, accepted: true });
+if (toJsonString(AcceptExecutionResultResponseSchema, fromBinary(AcceptExecutionResultResponseSchema,
+  toBinary(AcceptExecutionResultResponseSchema, executionReceipt))) !== toJsonString(AcceptExecutionResultResponseSchema, executionReceipt)) {
+  throw new Error('Execution durable receipt precision roundtrip failed');
+}
+if (fromBinary(AcceptExecutionResultRequestSchema, new Uint8Array()).event !== undefined) throw new Error('Execution absent event gained presence');
 
 const planningSource = { requestId: createHash('sha256').update(JSON.stringify([
   'planning.evaluate', 'commitment:长期承诺', 'plan:评估', Number.MAX_SAFE_INTEGER,

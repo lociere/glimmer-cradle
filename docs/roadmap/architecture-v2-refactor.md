@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope 与持久 Tool Execution 已由 Capabilities 拥有，生产 Gateway 接线 journal/派发 CAS/原子结果 outbox/unknown 与确认后撤销复验；Step Exposure、三 Registry、外部 fencing/对账、Conversation receipt 与 broker 待完成 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope、持久 Tool Execution 与独立 Conversation 结果接纳/真实 receipt 已接生产 Gateway/App/Worker；ACK 丢失与重启不重新执行，Synthesis 只读实际结果；Step Exposure、三 Registry、外部 fencing/对账、完整行动恢复与 broker 待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,53 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 Execution → Conversation 结果接纳计划（2026-10-07）
+
+输入 `d67e231b`，本会话唯一写入 owner。交互引用只保存 Conversation ID 与原 ACTION fact ID，
+由 Conversation 从该原事实恢复线程、隐私范围与因果关系；不从 scope 猜测或复制拓扑 owner。
+Execution 新库 schema 2 保存该引用，旧 schema 1 拒绝隐式升级，迁移留阶段 14，不操作用户库。
+唯一 Contract Spine 增加 Capabilities 结果 DTO 与 Conversation 接收 Service，由 Worker 当前
+单写者承载；ACK 只在真实 Log flush 后返回。生产 App 接线即时/有界后台投递与排空，重启/
+ACK 丢失幂等重投，未路由结果保留。Synthesis 不再从请求伪造 execution ACTION_RESULT，
+新投递引用实际接纳事实。验收包括源 ACTION 到调用的引用、双库提交故障、取消/丢 ACK/
+generation/readiness、真实 gRPC、生成三语言与根门禁。独立审查留整体固定候选。
+
+本轮结果：唯一 `contracts/` 新增 Capabilities 结果 DTO 与独立 ConversationService，生成
+TS/Python/C#；未更改旧字段或刷新兼容基线，目标 `protocol/` 在阶段 11 原子迁移。
+原 Action 已刷盘的 fact ID 经现行 call metadata/Gateway 保存为不可变 interaction 引用。
+Conversation 拒绝错误/缺失父事实、非法状态/摘要/presence 与冲突内容，采用原线程/actor/隐私域，
+真正 flush 后返回原 Moment/position；同身份重投不新增结果。flush 取消屏障等实际线程退出，
+重复取消和 Host.stop 不提前释放写者。结果为 experience/untrusted，不直接成为 Memory candidate。
+Recent Experience 不将结果升为 host_verified；筛选保留原查询 scene，不能因前一条跨场景公开
+观察把下一条 space-local 私有结果带入。权限域回归反例已覆盖。
+
+App 装配即时发布与 ready 后的有界后台重投、非 blocking degraded、关闭 ingress 后的投递排空。
+未路由历史结果保留，不猜测上下文，也不阻塞可路由结果；投递只接受 journal 同内容的已提交结果。
+Synthesis 删除从请求制造 tool-call/action-result 的旧 writer，实际结果正文/state 从接纳事实恢复，
+Reply 因果/actor/隐私沿原事实，wire result/status 不能覆盖。持久结果接纳/合成失败不提交 fallback；
+原 Action 重试沿用结果不重跑 handler。无执行事实的规划/派发前拒绝和旧 fixture 为未验证观察，
+这个无 journal 分支随阶段 6/12 consumer-zero 删除。完整跨重启行动计划/调用序列恢复仍未完成。
+
+验证：Capabilities 23、Conversation Python 22、Cognition 307、Worker 88 项 PASS；Kernel 全量
+226 项 PASS、10 项条件跳过（236 项，新增真实结果链默认 gated）。单独显式开启新真实链 PASS：
+公开 Conversation owner 写合成原 Action 后启动真正受监督 Worker，真实 SQL Execution 提交/Service
+刷盘、接纳后 producer ACK 丢失、两库/Worker 重开/新 generation、原 identity 重投与 ACK，handler
+只执行一次。实际生产 App→Worker ready/结果模块先停/Worker exit 0/资源收束 smoke PASS。
+Kernel 对原 Action 引用传播与等待 receipt 时不提交 fallback 的反例 PASS；Worker RPC 覆盖
+not-ready、错误 generation/presence/enum/摘要、刷盘失败、真实取消与 Host.stop 排空、重投与 unknown。
+旧 schema 1/outbox 保留反例 PASS，本轮未改写用户库。
+
+根 `pnpm typecheck`、`pnpm build` PASS；本轮完整 `pnpm contracts:verify` PASS，包括 22 个 gates、
+lint/breaking、Document/toolchain、三语言状态/Unicode/null presence/JS-safe position round-trip 与
+generated-clean。C# round-trip 工程最初缺两个新 generated Compile 项，补入真实产物后全链通过。
+架构门最初发现 journal↔outbox source cycle，将事件/receipt 类型归 journal 后通过，未放宽门禁。
+repo-checks 27 项 PASS；Docs 111/encoding/architecture/target-layout 规格模式/diff 检查 PASS。
+改动 Python source 的 Ruff I/F 通过，不声称整个 legacy Worker 全量 lint 无债务。
+独立审查仍按用户要求留整体固定候选，真实 OCI、安装/跨 owner 一致备份恢复和完整物理验收未完成。
+
+阶段 6 下一步为独立 Tool/Skill/Resource Registry 与 Step Exposure 主链、接收方可信查询/fencing，
+之后移交共用 Host 与删除当前 Kernel/ActionPlan 装配窗口；不以这一结果切片宣称整体重构完成。
 
 ### 阶段 6 持久 Execution 接线计划（2026-10-07）
 

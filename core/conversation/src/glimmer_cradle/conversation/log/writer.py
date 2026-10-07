@@ -2,12 +2,22 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+import re
 import uuid
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol
 
-from glimmer_cradle.conversation.log.record import AffectSnapshot, Moment, MomentKind, SourceDescriptor
+from glimmer_cradle.conversation.log.record import (
+    AffectSnapshot,
+    ExecutionResultFact,
+    Moment,
+    MomentKind,
+    SourceDescriptor,
+)
 
 
 class ConversationLogPort(Protocol):
@@ -23,6 +33,8 @@ class ConversationLogPort(Protocol):
     def append(self, moment: Moment) -> Moment: ...
 
     def append_idempotent(self, moment: Moment) -> Moment: ...
+
+    def get_moment(self, moment_id: str) -> Moment | None: ...
 
     def query(
         self, *, after_position: int = 0, limit: int | None = None
@@ -87,6 +99,10 @@ class ConversationRecorder:
     @property
     def enabled(self) -> bool:
         return self._enabled
+
+    @property
+    def accepts_execution_results(self) -> bool:
+        return self._enabled and self._running
 
     @property
     def log(self) -> ConversationLogPort:
@@ -174,6 +190,60 @@ class ConversationRecorder:
             await self._log.flush()
             self._since_flush = 0
 
+    def execution_result(self, event_id: str) -> Moment | None:
+        return self.recorded_fact(f"execution-result:{event_id}")
+
+    def recorded_fact(self, idempotency_key: str) -> Moment | None:
+        moment_id = uuid.uuid5(uuid.NAMESPACE_URL, f"glimmer:conversation-fact:{idempotency_key}").hex
+        return self._log.get_moment(moment_id)
+
+    async def accept_execution_result(self, fact: ExecutionResultFact) -> Moment:
+        """同一 result identity 接纳同一交互事实；未跨过 durable barrier 不返回 receipt。"""
+        if not self._enabled or not self._running:
+            raise RuntimeError("Conversation 结果接收 owner 未 ready")
+        for value in (fact.invocation_id, fact.scope_id, fact.conversation_id, fact.source_fact_id,
+                      fact.executor_id, fact.capability_id, fact.definition_revision):
+            if not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096:
+                raise ValueError("Execution 结果 identity 无效")
+        if not isinstance(fact.revision, int) or isinstance(fact.revision, bool) or not 1 <= fact.revision <= 9007199254740991:
+            raise ValueError("Execution revision 无效")
+        identity = json.dumps([fact.invocation_id, fact.revision], ensure_ascii=False, separators=(",", ":"))
+        if fact.event_id != hashlib.sha256(identity.encode("utf-8")).hexdigest() or not isinstance(fact.request_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", fact.request_digest):
+            raise ValueError("Execution 结果摘要无效")
+        if fact.scope_id != fact.conversation_id or not isinstance(fact.attempt, int) or fact.attempt not in (0, 1) or isinstance(fact.attempt, bool):
+            raise ValueError("Execution 交互/attempt 无效")
+        if fact.state not in {"succeeded", "failed", "unknown"} or fact.side_effects not in {"none", "confirmed", "unknown"}:
+            raise ValueError("Execution 状态无效")
+        if (fact.state == "succeeded" and (fact.attempt != 1 or fact.side_effects == "unknown" or fact.error_code)) \
+                or (fact.state == "unknown" and (fact.attempt != 1 or fact.side_effects != "unknown")) \
+                or (fact.state == "failed" and fact.side_effects != "none"):
+            raise ValueError("Execution 结果证据组合无效")
+        if fact.state != "succeeded" and (fact.result is not None or not re.fullmatch(r"[a-z][a-z0-9_.:-]{0,127}", fact.error_code)):
+            raise ValueError("Execution 未确认状态不能携带成功结果")
+        if not isinstance(fact.updated_at_ms, int) or isinstance(fact.updated_at_ms, bool) or not 0 <= fact.updated_at_ms <= 253402300799999:
+            raise ValueError("Execution UTC 时间无效")
+        content = asdict(fact)
+        if len(json.dumps(content, ensure_ascii=False, allow_nan=False).encode("utf-8")) > 128 * 1024:
+            raise ValueError("Execution 结果超过接收上限")
+        source = self._log.get_moment(fact.source_fact_id)
+        if source is None or source.kind != MomentKind.ACTION.value or source.conversation_id != fact.conversation_id:
+            raise RuntimeError("Execution 原 ACTION 交互引用缺失或冲突")
+        # 记录“接收了外部输出”，不把输出变成 Knowledge/Memory 的权威断言。
+        moment = self.record(MomentKind.ACTION_RESULT, content, causation_ids=(source.moment_id,),
+            scene_id=source.scene_id, conversation_id=source.conversation_id, continuity_id=source.continuity_id,
+            thread_id=source.thread_id, interaction_id=source.interaction_id, trace_id=source.trace_id,
+            actor_id=source.actor_id, actor_name=source.actor_name,
+            recall_scope=source.recall_scope, disclosure_scope=source.disclosure_scope,
+            retention_ceiling="experience", importance=0.4,
+            origin=SourceDescriptor(provider_kind="capability", provider_id=fact.executor_id,
+                source_event_id=fact.event_id, schema_ref="glimmer://capabilities/execution-result/v1",
+                trust_tier="untrusted", privacy_class=source.origin.privacy_class, cognitive_effect="action_result"),
+            idempotency_key=f"execution-result:{fact.event_id}")
+        if moment is None:
+            raise RuntimeError("Conversation 未接纳持久结果")
+        await self.flush()
+        return moment
+
     def iter_moments_since(self, since_iso: str | None = None) -> list[Moment]:
         moments = self._log.query()
         if not since_iso:
@@ -237,7 +307,9 @@ def build_conversation_recorder(
     ids: IdGeneratorPort,
     observability: ObservabilityPort,
 ) -> ConversationRecorder:
-    from glimmer_cradle.conversation.adapters.persistence.log_store import ConversationLog
+    from glimmer_cradle.conversation.adapters.persistence.log_store import (
+        ConversationLog,
+    )
 
     log = ConversationLog(base_dir, pack_max_size_mb=pack_max_size_mb)
     return ConversationRecorder(

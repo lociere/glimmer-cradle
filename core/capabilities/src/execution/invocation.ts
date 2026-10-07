@@ -12,12 +12,15 @@ export interface InvocationRequest {
   readonly idempotency_key: string;
   readonly target: ExecutionTarget;
   readonly input: unknown;
+  /** 只引用交互事实；Conversation 独占线程/隐私/因果拓扑。 */
+  readonly interaction?: { readonly conversation_id: string; readonly source_fact_id: string };
 }
 export interface Invocation {
   readonly invocation_id: string;
   readonly scope_id: string;
   readonly idempotency_key: string;
   readonly target: ExecutionTarget;
+  readonly interaction: InvocationRequest['interaction'] | null;
   readonly request_digest: string;
   readonly state: ExecutionState;
   readonly revision: number;
@@ -73,5 +76,9 @@ export function assertExecutionTime(now: number): void {
 export function invocationDigest(request: InvocationRequest): string {
   for (const value of [request.invocation_id, request.scope_id, request.idempotency_key,
     request.target.executor_id, request.target.capability_id, request.target.definition_revision]) assertExecutionId(value);
+  if (request.interaction) {
+    assertExecutionId(request.interaction.conversation_id); assertExecutionId(request.interaction.source_fact_id);
+    if (request.scope_id !== request.interaction.conversation_id) throw new ExecutionConflictError('Execution 交互引用 scope 不匹配');
+  }
   return executionDigest(request);
 }

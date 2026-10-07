@@ -54,7 +54,7 @@ import { SkillPolicyEngine } from '../application/skill-plane/skill-policy-engin
 import { SkillPlanePolicy } from '../application/skill-plane/availability';
 import { createChannelReplyPublisher, SkillActionController } from '../application/skill-plane/skill-action-controller';
 import { LoggingSkillInvocationAuditSink, SkillInvocationGateway } from '../application/skill-plane/skill-invocation-gateway';
-import { ExecutionController, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
+import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 import { SkillPlanningAppService } from '../application/use-cases/skill-planning-app.service';
 import { CoreSkillProvider } from '../application/skill-plane/providers/core';
 import { UserSkillProvider } from '../application/skill-plane/providers/user';
@@ -85,6 +85,7 @@ interface OperationalRuntimePlan {
   readonly application: ApplicationRuntime;
   readonly presentation: readonly RuntimeModule[];
   readonly coreReadiness: readonly RuntimeModule[];
+  readonly executionResults?: RuntimeModule;
   readonly extension?: ExtensionRuntime;
   readonly organism: OrganismRuntime;
   readonly recovery: DlqReplayRuntime;
@@ -133,6 +134,7 @@ export class App {
       unstartedApplication = null;
       await orchestrator.startPhase({ name: 'presentation', modules: [...plan.presentation] }, context);
       await orchestrator.startPhase({ name: 'core-readiness', mode: 'parallel', modules: [...plan.coreReadiness] }, context);
+      if (plan.executionResults) await orchestrator.startPhase({ name: 'execution-results', modules: [plan.executionResults] }, context);
       plan.transport.openIngress();
       if (plan.extension) await orchestrator.startPhase({ name: 'extensions', modules: [plan.extension] }, context);
       await orchestrator.startPhase({ name: 'organism', modules: [plan.organism] }, context);
@@ -201,8 +203,9 @@ function createOperationalRuntimePlan(options: {
   const ingress = new IngressGateManager(observability.logger('ingress-gate'), clock);
   const transport = new KernelTransportRuntime(config, transportAdapter, ingress, projection);
   let cognitionRuntime: CognitionRuntime | null = null;
+  const cognitionClient = new CognitionClient(transportAdapter);
   const cognitionAdapter = new CognitionManager(
-    transportAdapter, new CognitionClient(transportAdapter),
+    transportAdapter, cognitionClient,
     (state, summary) => cognitionRuntime?.acceptLifecycleFact(state, summary),
   );
   cognitionRuntime = new CognitionRuntime(transport, new ManageCognitionLifecycle(cognitionAdapter), projection);
@@ -219,6 +222,9 @@ function createOperationalRuntimePlan(options: {
     const executionJournal = new SqliteExecutionJournal(resolveStatePath('capabilities/execution.sqlite'));
     constructionResources.push(executionJournal);
     const execution = new ExecutionController(executionJournal);
+    const resultOutbox = new ExecutionResultOutbox(executionJournal, {
+      accept: (event, signal) => cognitionClient.acceptExecutionResult(event, signal),
+    });
     const delivery = new DeliveryController(deliveryStore, stableIdentity.newId());
     const surface = new ControlSurfaceGateway(
       projection, avatar, audio, new FileAssetStore(), delivery,
@@ -245,7 +251,48 @@ function createOperationalRuntimePlan(options: {
       (request) => bridge.requestConfirmation(request),
       execution,
       () => stableIdentity.newId(),
+      resultOutbox,
     );
+    // 同一进程拥有计时器；批次不重叠，重启只重投 committed 结果，绝不重新调用 handler。
+    let resultTimer: ReturnType<typeof setTimeout> | undefined;
+    let publishing: Promise<void> | undefined;
+    let publishStopped = false;
+    const resultLogger = observability.logger('execution-results');
+    const publishResults = async (): Promise<void> => {
+      const outcome = await resultOutbox.deliverPending(10);
+      const pending = executionJournal.readOutbox(1, true).length > 0;
+      projection.replaceModuleSnapshots('execution-results', [{
+        runtime_id: 'execution-results', owner: 'kernel', phase: 'conversation_receipt',
+        state: pending ? 'degraded' : 'ready', blocking: false,
+        summary: pending ? 'Execution 已持久提交，交互结果等待 Conversation 接纳' : 'Execution 交互结果投递已排空',
+      }]);
+      if (outcome.failed > 0) resultLogger.warn('交互结果投递待重试', { failed_count: outcome.failed });
+    };
+    const scheduleResults = (): void => {
+      if (publishStopped) return;
+      resultTimer = setTimeout(() => {
+        publishing = publishResults().catch(() => {
+          projection.replaceModuleSnapshots('execution-results', [{ runtime_id: 'execution-results', owner: 'kernel',
+            phase: 'conversation_receipt', state: 'degraded', blocking: false, summary: 'Execution 结果投递失败，保留 outbox 等待恢复' }]);
+        }).finally(() => { publishing = undefined; scheduleResults(); });
+      }, 1000);
+    };
+    const drainResults = async (): Promise<void> => {
+      publishStopped = true;
+      if (resultTimer) clearTimeout(resultTimer);
+      await publishing;
+      await invocation.stop();
+    };
+    const executionResults: RuntimeModule = {
+      name: 'execution-results',
+      start: async () => { await publishResults(); scheduleResults(); return {}; },
+      stop: async () => {
+        await drainResults();
+        // Worker 仍 ready；最后一个有界批次失败只保留 outbox，不伪造 ACK。
+        await publishResults();
+        await resultOutbox.stop();
+      },
+    };
     const planning = new SkillPlanningAppService(
       catalog, invocation, (request, traceId) => cognition.requestAgentPlan(request, traceId),
     );
@@ -292,7 +339,7 @@ function createOperationalRuntimePlan(options: {
       providerReadiness: () => mcpProvider.getReadinessSnapshots(), extensionHostService: extensionHost,
       skillCatalog: catalog, skillPlanning: planning, skillAction: action, perception,
       ownedResources: [bindingStore, deliveryStore, executionJournal],
-      drainExecution: () => execution.stop(),
+      drainExecution: async () => { await drainResults(); await resultOutbox.stop(); },
     });
     const configApplication = new ConfigApplicationService({ configManager: ConfigManager.instance, cognition: cognitionAdapter });
     const presentationAdapter = new KernelPresentationAdapter(
@@ -315,7 +362,7 @@ function createOperationalRuntimePlan(options: {
       )] : []),
     ];
     return {
-      transport, application, presentation, coreReadiness,
+      transport, application, presentation, coreReadiness, executionResults,
       extension: product.features.extensions ? new ExtensionRuntime(extensionAdapter, product.id) : undefined,
       organism: new OrganismRuntime(new KernelOrganismAdapter(attention, lifeClock, cognition, actionStream, eventBus)),
       recovery: new DlqReplayRuntime(new DlqReplayIngress()),

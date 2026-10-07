@@ -4,12 +4,33 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from glimmer.capabilities.v1 import capabilities_pb2 as capabilities_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer_cradle.cognition.ports import (
     ConversationHistoryQuery,
     ConversationHistoryResult,
 )
-from glimmer_cradle.conversation import Moment
+from glimmer_cradle.conversation import ExecutionResultFact, Moment
+from google.protobuf.json_format import MessageToDict
+
+
+def execution_result_from_wire(event: capabilities_pb.ExecutionResultEvent) -> ExecutionResultFact:
+    states = {1: "succeeded", 2: "failed", 3: "unknown"}
+    effects = {1: "none", 2: "confirmed", 3: "unknown"}
+    if event.ByteSize() > 128 * 1024 or event.state not in states or event.side_effects not in effects:
+        raise ValueError("Execution wire 状态或大小无效")
+    if event.HasField("result") != (event.state == capabilities_pb.EXECUTION_RESULT_STATE_SUCCEEDED):
+        raise ValueError("Execution wire result presence 无效")
+    return ExecutionResultFact(
+        event_id=event.event_id, invocation_id=event.invocation_id,
+        revision=event.revision, attempt=event.attempt, scope_id=event.scope_id,
+        conversation_id=event.conversation_id, source_fact_id=event.source_fact_id,
+        executor_id=event.executor_id, capability_id=event.capability_id,
+        definition_revision=event.definition_revision, request_digest=event.request_digest,
+        state=states[event.state], side_effects=effects[event.side_effects],
+        result=MessageToDict(event.result) if event.HasField("result") else None,
+        error_code=event.error_code, updated_at_ms=event.updated_at_ms,
+    )
 
 
 def moment_to_wire(moment: Moment) -> dict[str, object]:

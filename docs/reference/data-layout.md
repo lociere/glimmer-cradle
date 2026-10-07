@@ -26,12 +26,16 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 ## 用户状态与记忆
 
 生产 Kernel composition 通过 resolver 打开 `${DataRoot}/state/capabilities/execution.sqlite`，由
-Capabilities 持久化，schema version 1、owner `0x47434558`。稳定 invocation/scope/key、请求摘要、
+Capabilities 持久化，schema version 2、owner `0x47434558`。稳定 invocation/scope/key、请求摘要、
 实际目标定义、授权、派发 owner/attempt、结果/副作用状态与未 ACK outbox 都是不可再生执行事实；
 不保存原始输入正文。unknown 和 dispatched 不能解释为未执行，禁止删库/换 ID 后重跑。
 第二连接打开不重置或接管旧派发；未知版本/foreign owner/部分表拒绝自动修复。备份须先 drain
 实际接收方调用，再与 Conversation/Planning 等相关事实保持一致切点，包含 WAL 的一致快照。
-Conversation 结果 receipt 尚未接线，不得把 pending outbox 当缓存清理。完整跨 owner 恢复、
+schema 2 保存 Conversation ID/原 Action fact ID 引用；schema 1 拒绝隐式升级，阶段 14 受控迁移前
+必须保存原结果及 outbox，不能为历史无引用结果猜测路由。Conversation durable receipt 已接线，
+实际接受与刷盘后才 ACK；即使接收方已提交而 RPC/ACK 丢失，也按原 identity 重投，不得清理
+pending outbox 或重新调用工具。备份还需包含原 Action 和已接纳结果的 Conversation Log。
+完整跨 owner 恢复、
 外部对账与产品安装验收留阶段 14/15；本候选只操作临时测试根，未迁移用户原库。
 
 Host `SqliteAuthorityStore` 接受显式 authority 数据库路径，schema version 1、owner 标记

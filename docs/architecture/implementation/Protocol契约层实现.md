@@ -8,7 +8,7 @@
 
 ```text
 contracts/
-├── proto/glimmer/{common,kernel,cognition,content,surface,avatar,engine/audio,extension}/v1/
+├── proto/glimmer/{common,kernel,cognition,capabilities,conversation,jobs,content,surface,avatar,engine/audio,extension}/v1/
 ├── json-schema/{common,config,extension,presentation,product,skill}/v1/
 ├── generated/{ts,python,csharp}/
 ├── compatibility/{proto-image.binpb,json-schema-baseline.json}
@@ -24,7 +24,8 @@ contracts/
 
 `contracts/buf.gen.yaml` 从 `contracts/proto/` 生成 TS/Python/C# DTO 与 service stub。生成输出只在边缘消费：
 
-- Kernel Cognition Adapter ↔ Python Cognition `adapters/kernel/grpc_transport.py`；
+- Kernel Cognition Adapter ↔ `apps/cognition-worker` Service Host/mapper；
+- Capabilities committed result → Kernel producer Adapter → 独立 Conversation Service → Conversation Recorder；
 - Kernel Content mapper ↔ Python Cognition 只读资产 adapter；`parts = 6` 传引用，`items = 5` 限期读取；
 - Kernel Surface Adapter ↔ Desktop/Personal Server gateway client；
 - Kernel Avatar Adapter ↔ Unity Host `Adapters` assembly；
@@ -32,6 +33,11 @@ contracts/
 - Kernel Extension supervision ↔ 独立 Extension Host Adapter。
 
 Domain/Application/Port 使用 owner-local model；Adapter 显式映射 generated DTO。Avatar C# Adapter 直接读写二进制 generated DTO，不做 JSON formatter/parser round-trip。Python Contracts 通过 `glimmer-cradle-contracts` distribution 进入 Cognition、Audio、Desktop runtime 与 Personal Server OCI build，不依赖源码树 `PYTHONPATH`。
+
+`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有结果 wire；
+`proto/glimmer/conversation/v1/conversation.proto` 拥有接纳 Service 和 durable receipt。
+二者不写入 CognitionService，也不把平台执行状态移入 Conversation。现行唯一源仍是 `contracts/`，
+目标 `protocol/proto/` 路径在阶段 11 原子迁移，迁移前禁止创建第二契约源。
 
 ## Document registry 与校验
 

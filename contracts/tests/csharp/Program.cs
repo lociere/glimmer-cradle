@@ -10,6 +10,8 @@ using AvatarV1 = GlimmerCradle.Contracts.Glimmer.Avatar.V1;
 using ContentV1 = GlimmerCradle.Contracts.Glimmer.Content.V1;
 using SurfaceV1 = GlimmerCradle.Contracts.Glimmer.Surface.V1;
 using JobsV1 = GlimmerCradle.Contracts.Glimmer.Jobs.V1;
+using CapabilitiesV1 = GlimmerCradle.Contracts.Glimmer.Capabilities.V1;
+using ConversationV1 = GlimmerCradle.Contracts.Glimmer.Conversation.V1;
 
 var root = Environment.GetEnvironmentVariable("CONTRACTS_ROOT")
     ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -18,6 +20,28 @@ var fixtureBytes = File.ReadAllBytes(fixturePath);
 using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
+
+foreach (var executionState in new[] { CapabilitiesV1.ExecutionResultState.Succeeded,
+    CapabilitiesV1.ExecutionResultState.Failed, CapabilitiesV1.ExecutionResultState.Unknown }) {
+    var execution = new ConversationV1.AcceptExecutionResultRequest {
+        Call = new CallMetadata { TraceId = "trace:执行", Generation = "generation:1" },
+        Event = new CapabilitiesV1.ExecutionResultEvent { EventId = new string('a', 64), InvocationId = "invoke:执行",
+            Revision = 9007199254740991, Attempt = 1, ScopeId = "conversation:范围", ConversationId = "conversation:范围",
+            SourceFactId = "action:原事实", ExecutorId = "executor", CapabilityId = "tool", DefinitionRevision = "definition",
+            RequestDigest = new string('b', 64), State = executionState,
+            SideEffects = executionState == CapabilitiesV1.ExecutionResultState.Unknown ? CapabilitiesV1.ExecutionSideEffects.Unknown : CapabilitiesV1.ExecutionSideEffects.None,
+            Result = executionState == CapabilitiesV1.ExecutionResultState.Succeeded ? Google.Protobuf.WellKnownTypes.Value.ForNull() : null,
+            ErrorCode = executionState == CapabilitiesV1.ExecutionResultState.Succeeded ? "" : "unconfirmed", UpdatedAtMs = 1900000000000 } };
+    var restoredExecution = ConversationV1.AcceptExecutionResultRequest.Parser.ParseFrom(execution.ToByteArray());
+    if (!restoredExecution.Equals(execution) || (restoredExecution.Event.Result != null) != (executionState == CapabilitiesV1.ExecutionResultState.Succeeded))
+        throw new InvalidOperationException("Execution result identity/Unicode/null presence roundtrip failed");
+}
+var executionReceipt = new ConversationV1.AcceptExecutionResultResponse { EventId = new string('a', 64), InvocationId = "invoke:执行",
+    Revision = 9007199254740991, MomentId = "moment:事实", LogPosition = 9007199254740991, Accepted = true };
+if (!ConversationV1.AcceptExecutionResultResponse.Parser.ParseFrom(executionReceipt.ToByteArray()).Equals(executionReceipt))
+    throw new InvalidOperationException("Execution durable receipt precision roundtrip failed");
+if (ConversationV1.AcceptExecutionResultRequest.Parser.ParseFrom(Array.Empty<byte>()).Event != null)
+    throw new InvalidOperationException("Execution absent event gained presence");
 
 var planningSource = new PlanningJobSourceRequest {
     RequestId = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(

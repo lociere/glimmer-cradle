@@ -13,7 +13,11 @@ from pathlib import Path
 
 from glimmer_cradle.conversation.adapters.persistence.writer_guard import WriterGuard
 from glimmer_cradle.conversation.log.position import as_log_position
-from glimmer_cradle.conversation.log.record import AffectSnapshot, Moment, SourceDescriptor
+from glimmer_cradle.conversation.log.record import (
+    AffectSnapshot,
+    Moment,
+    SourceDescriptor,
+)
 
 _PACK_DDL = """
 CREATE TABLE IF NOT EXISTS moments (
@@ -135,6 +139,10 @@ class ConversationLog:
                 return self._row_to_moment(row, causes.get(moment_id, ()))
         return None
 
+    def get_moment(self, moment_id: str) -> Moment | None:
+        with self._lock:
+            return self._find_moment_by_id(moment_id)
+
     async def flush(self) -> None:
         async with self._flush_lock:
             with self._lock:
@@ -142,15 +150,27 @@ class ConversationLog:
                 self._inflight = pending
             if not pending:
                 return
+            write_task = asyncio.create_task(asyncio.to_thread(self._write_batch, pending))
+            cancelled: asyncio.CancelledError | None = None
+            # to_thread 的线程不会随等待者取消；必须等实际提交结束再释放 flush lock。
+            while not write_task.done():
+                try:
+                    await asyncio.shield(write_task)
+                except asyncio.CancelledError as error:
+                    cancelled = error
+                except Exception:
+                    break
             try:
-                await asyncio.to_thread(self._write_batch, pending)
-            except Exception:
+                write_task.result()
+            except BaseException:
                 with self._lock:
                     self._pending = pending + self._pending
                     self._inflight = []
                 raise
             with self._lock:
                 self._inflight = []
+            if cancelled is not None:
+                raise cancelled
 
     def recent(self, *, limit: int, kinds: set[str] | None = None,
                scene_id: str | None = None, exclude_trace_id: str | None = None) -> list[Moment]:

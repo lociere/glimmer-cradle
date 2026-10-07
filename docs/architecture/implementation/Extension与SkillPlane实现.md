@@ -123,17 +123,24 @@ invocation 或 scope/key 冲突失败关闭。输入只持久保存摘要，传�
 记 unknown；进程崩溃或事务失败留下 dispatched/side_effects=unknown，重开同样要求恢复，
 不标失败也不自动派发。取消后接收方能实际确认成功时仍提交成功，不擦除已知事实。
 
-结果与 outbox 同事务提交；日志/audit 不拥有执行事实，诊断故障不改写结果。Conversation
-接收端尚未装配，此候选不投递/假 ACK，pending outbox 保留。Store 的 receipt API 绑定 event ID、
-invocation ID/revision 与真实 accepted 接纳；重复 receipt 幂等。Controller instance owner 不是
+结果与 outbox 同事务提交；日志/audit 不拥有执行事实，诊断故障不改写结果。schema 2 将
+Conversation ID/原 Action fact ID 纳入不可变请求摘要；旧 schema 1 不隐式升级，无原引用的历史
+结果不能猜测路由。Gateway 提交后立即尝试经独立 Conversation Service 投递，App 在 Worker ready
+后启动每批最多 10 个、批次结束 1 秒后再调度的重投链；单次实际 RPC deadline 为 5 秒。
+只发布 journal 已提交且内容完全一致的事件，不重跑 handler。实际接纳与刷盘完成才 ACK；断线、
+取消、错误 receipt 或未 ready 保留 outbox，跨 Worker 新 generation 重投仍用原 identity。
+pending 路由结果如实投影非 blocking degraded；无交互引用的 outbox 保留且不阻塞可路由结果。
+Store 的 receipt API 绑定 event ID、invocation ID/revision 与真实 accepted 接纳；重复 receipt 幂等。
+Conversation 接纳/合成规则见[Conversation 实现](Conversation实现.md#history-与恢复)。Controller instance owner 不是
 Platform authority，未实施外部 fencing/证据对账或自动接管；人工恢复必须待可信接收方证据，
 不得删库或换 invocation ID 重跑。备份约束见[数据布局](../../reference/data-layout.md)。
 
-停机先断开 Cognition handler、停止 Tool 接纳并取消/等待实际 handler 完成，再卸载 provider 和
-关闭 journal；没有把 cancellation 等同进程已停止。装配失败逆序关闭已打开的库。Core tests 使用
+停机关闭 ingress 后停止结果计时器、Tool 接纳并取消/等待实际 handler 与结果 RPC，Worker 仍 ready
+时完成最后一个有界投递批次；再停止 Worker、卸载 provider、关闭 journal。启动失败的 Application
+也排空计时器/调用再释放资源；没有把 cancellation 等同进程已停止。装配失败逆序关闭已打开的库。Core tests 使用
 真实 SQLite 重开、双连接、事务故障；Gateway tests 验证真实撤销与稳定 ID 重放。仅 fixture
 可不注入 controller；生产组装始终注入，旧无 journal 分支在三 Registry/入口切换后 consumer-zero
-删除。resource/prompt、完整 Step Exposure、三 Registry、native broker 与 Conversation receipt
+删除。resource/prompt、完整 Step Exposure、三 Registry、native broker 与完整行动恢复
 仍待完成。目标与证据见[执行记录](../../roadmap/architecture-v2-refactor.md)。
 
 Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/prompt 统一执行：

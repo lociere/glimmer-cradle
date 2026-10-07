@@ -137,3 +137,25 @@ class ConversationFact(Protocol):
     importance: float
     recall_scope: str
     disclosure_scope: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionResultFact:
+    """来自 Execution 的不可变投递引用；不拥有授权/重试/执行器状态。"""
+
+    event_id: str
+    invocation_id: str
+    revision: int
+    attempt: int
+    scope_id: str
+    conversation_id: str
+    source_fact_id: str
+    executor_id: str
+    capability_id: str
+    definition_revision: str
+    request_digest: str
+    state: str
+    side_effects: str
+    result: object | None
+    error_code: str
+    updated_at_ms: int

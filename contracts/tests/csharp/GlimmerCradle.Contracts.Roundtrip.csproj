@@ -10,6 +10,8 @@
     <Compile Include="..\..\generated\csharp\ServiceContract.cs" Link="Generated\ServiceContract.cs" />
     <Compile Include="..\..\generated\csharp\CognitionService.cs" Link="Generated\CognitionService.cs" />
     <Compile Include="..\..\generated\csharp\Jobs.cs" Link="Generated\Jobs.cs" />
+    <Compile Include="..\..\generated\csharp\Capabilities.cs" Link="Generated\Capabilities.cs" />
+    <Compile Include="..\..\generated\csharp\Conversation.cs" Link="Generated\Conversation.cs" />
     <Compile Include="..\..\generated\csharp\Content.cs" Link="Generated\Content.cs" />
     <Compile Include="..\..\generated\csharp\KernelControlService.cs" Link="Generated\KernelControlService.cs" />
     <Compile Include="..\..\generated\csharp\SurfaceGateway.cs" Link="Generated\SurfaceGateway.cs" />

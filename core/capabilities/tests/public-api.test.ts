@@ -8,7 +8,7 @@ describe('Capabilities 构建公开入口', () => {
   it('只公开真实实现的 scope/execution，不暴露空 Registry 或内部路径', () => {
     const built = require('../dist/index.js');
     expect(Object.keys(built).sort()).toEqual(['ExecutionConflictError', 'ExecutionController',
-      'ExecutionRecoveryRequiredError', 'GLOBAL_CAPABILITY_SCOPE', 'SqliteExecutionJournal',
+      'ExecutionRecoveryRequiredError', 'ExecutionResultOutbox', 'GLOBAL_CAPABILITY_SCOPE', 'SqliteExecutionJournal',
       'executionDigest', 'isCapabilityScopeVisible']);
     expect(built.isCapabilityScopeVisible(undefined, undefined)).toBe(true);
     const manifest = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8'));

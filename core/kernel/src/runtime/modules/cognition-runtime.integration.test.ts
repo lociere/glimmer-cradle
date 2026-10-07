@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { ChildProcess } from 'node:child_process';
+import { execFileSync, type ChildProcess } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
 import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
@@ -20,6 +20,8 @@ import { createTraceContext } from '../../adapters/observability/trace-context';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { KernelConfiguration } from '../../ports/configuration.port';
 import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { resolveRepoRoot } from '../../adapters/filesystem/path-utils';
+import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 
 const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === '1';
 
@@ -146,6 +148,64 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     expect(recovered.receiverFenced).toBe(true);
     expect(recovered.resolution).toBe(MemoryJobResolution.NOT_APPLIED);
     await manager.stop();
+  }, 60_000);
+
+  it('真实 Execution outbox 经 Conversation Service 接纳，ACK 丢失与 Worker 重启不重新执行', async () => {
+    // Worker 停止时由公开 Conversation owner 写 synthetic 原事实；不绕过活动单写者。
+    const seed = `
+import asyncio, json
+from types import SimpleNamespace
+from glimmer_cradle.conversation import build_conversation_recorder, MomentKind
+from glimmer_cradle.cognition_worker.composition import WorkerPaths, SystemClock, SystemIdGenerator
+noop = lambda *args, **kwargs: None
+logger = SimpleNamespace(info=noop, warning=noop, error=noop)
+async def seed():
+    recorder = build_conversation_recorder(WorkerPaths.from_environment().cognition_state_dir / "experience",
+        clock=SystemClock(), ids=SystemIdGenerator(), observability=SimpleNamespace(logger=lambda _: logger, current_trace_id=lambda: None))
+    await recorder.start()
+    try:
+        fact = recorder.record(MomentKind.ACTION, {"action_type": "skill_request"},
+            conversation_id="integration:conversation", scene_id="integration:scene", interaction_id="integration:turn",
+            trace_id="integration:turn", idempotency_key="integration:execution-source")
+        await recorder.flush()
+        print(json.dumps({"source_fact_id": fact.moment_id}))
+    finally:
+        await recorder.stop()
+asyncio.run(seed())
+`;
+    const source = JSON.parse(execFileSync('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', seed],
+      { cwd: resolveRepoRoot(), encoding: 'utf8', timeout: 30_000 }));
+    const file = path.join(process.env.GLIMMER_CRADLE_DATA_ROOT!, 'state/capabilities/execution-proof.sqlite');
+    let journal = new SqliteExecutionJournal(file);
+    const executed = vi.fn(async () => ({ state: 'succeeded' as const, side_effects: 'confirmed' as const, result: { text: '真实结果' } }));
+    const request = { invocation_id: 'integration:invocation', idempotency_key: 'integration:invocation', scope_id: 'integration:conversation',
+      target: { executor_id: 'integration:executor', capability_id: 'integration:tool', definition_revision: 'actual' }, input: null,
+      interaction: { conversation_id: 'integration:conversation', source_fact_id: source.source_fact_id } };
+    const executor = { authorize: async () => ({ allowed: true, decision: {} }), validateBeforeDispatch: () => true, execute: executed };
+    try {
+      await manager.start();
+      const client = new CognitionClient(transport);
+      const controller = new ExecutionController(journal);
+      await controller.execute(request, executor);
+      const event = journal.readOutbox(1)[0];
+      const abort = new AbortController();
+      const lost = new ExecutionResultOutbox(journal, { accept: async actual => {
+        const receipt = await client.acceptExecutionResult(actual); abort.abort(); return receipt;
+      } });
+      await expect(lost.publish(event, abort.signal)).rejects.toThrow();
+      expect(journal.readOutbox(1)).toHaveLength(1);
+      const first = await client.acceptExecutionResult(event);
+      const generation = transport.generation;
+      await manager.stop(); journal.close(); journal = new SqliteExecutionJournal(file);
+      await manager.start(); expect(transport.generation).not.toBe(generation);
+      const replay = new ExecutionController(journal);
+      expect((await replay.execute(request, executor)).state).toBe('succeeded');
+      expect(await client.acceptExecutionResult(event)).toEqual(first);
+      const publisher = new ExecutionResultOutbox(journal, { accept: (actual, signal) => client.acceptExecutionResult(actual, signal) });
+      expect(await publisher.deliverPending(10)).toEqual({ delivered: 1, failed: 0 });
+      expect(journal.readOutbox(1)).toEqual([]); expect(executed).toHaveBeenCalledOnce();
+      await publisher.stop(); await replay.stop(); await controller.stop();
+    } finally { await manager.stop(); journal.close(); }
   }, 60_000);
 
   it('cancels an in-flight provider request and exits gracefully on shutdown', async () => {

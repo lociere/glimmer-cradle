@@ -5,10 +5,10 @@ import { assertExecutionId, assertExecutionTime, executionDigest, executionJson,
   ExecutionConflictError, type Invocation, type InvocationRequest } from '../../execution/invocation.js';
 import type { ExecutionJournal } from '../../execution/execution-journal.js';
 import type { ExecutionOutcome } from '../../execution/executor-port.js';
-import type { ExecutionResultEvent, ExecutionResultReceipt } from '../../execution/result-outbox.js';
+import type { ExecutionResultEvent, ExecutionResultReceipt } from '../../execution/execution-journal.js';
 
-type Row = Omit<Invocation, 'target' | 'authorization' | 'result'> & {
-  target_json: string; authorization_json: string | null; result_json: string | null;
+type Row = Omit<Invocation, 'target' | 'interaction' | 'authorization' | 'result'> & {
+  target_json: string; interaction_json: string | null; authorization_json: string | null; result_json: string | null;
 };
 const OWNER = 0x47434558;
 function code(value: string): void {
@@ -30,9 +30,9 @@ export class SqliteExecutionJournal implements ExecutionJournal {
           throw new ExecutionConflictError('未知 Execution 数据库；须先受控迁移');
         }
         this.database.transaction(() => this.database.exec(readFileSync(migrationPath, 'utf8'))).immediate();
-      } else if (version !== 1) throw new ExecutionConflictError('Execution schema version 不兼容');
+      } else if (version !== 2) throw new ExecutionConflictError('Execution schema version 不兼容；须受控迁移');
       if (this.database.pragma('application_id', { simple: true }) !== OWNER) throw new ExecutionConflictError('Execution 数据库 owner 无效');
-      this.database.prepare(`SELECT invocation_id,scope_id,idempotency_key,target_json,request_digest,state,revision,
+      this.database.prepare(`SELECT invocation_id,scope_id,idempotency_key,target_json,interaction_json,request_digest,state,revision,
         attempt,owner_id,authorization_json,result_json,error_code,side_effects,created_at,updated_at FROM executions LIMIT 0`).all();
       this.database.prepare('SELECT event_id,invocation_id,revision,event_json,created_at,acknowledged_at FROM execution_outbox LIMIT 0').all();
       this.database.pragma('foreign_keys = ON');
@@ -43,8 +43,9 @@ export class SqliteExecutionJournal implements ExecutionJournal {
     assertExecutionId(id);
     const row = this.database.prepare('SELECT * FROM executions WHERE invocation_id=?').get(id) as Row | undefined;
     if (!row) return null;
-    const { target_json, authorization_json, result_json, ...rest } = row;
+    const { target_json, interaction_json, authorization_json, result_json, ...rest } = row;
     return { ...rest, target: JSON.parse(target_json), authorization: authorization_json === null ? null : JSON.parse(authorization_json),
+      interaction: interaction_json === null ? null : JSON.parse(interaction_json),
       result: result_json === null ? null : JSON.parse(result_json) };
   }
   public prepare(request: InvocationRequest, now: number): Invocation {
@@ -58,9 +59,10 @@ export class SqliteExecutionJournal implements ExecutionJournal {
         }
         return this.load(request.invocation_id)!;
       }
-      this.database.prepare(`INSERT INTO executions(invocation_id,scope_id,idempotency_key,target_json,request_digest,
-        state,revision,attempt,side_effects,created_at,updated_at) VALUES(?,?,?,?,?,'prepared',1,0,'not_dispatched',?,?)`)
-        .run(request.invocation_id, request.scope_id, request.idempotency_key, executionJson(request.target), digest, now, now);
+      this.database.prepare(`INSERT INTO executions(invocation_id,scope_id,idempotency_key,target_json,interaction_json,request_digest,
+        state,revision,attempt,side_effects,created_at,updated_at) VALUES(?,?,?,?,?,?,'prepared',1,0,'not_dispatched',?,?)`)
+        .run(request.invocation_id, request.scope_id, request.idempotency_key, executionJson(request.target),
+          request.interaction ? executionJson(request.interaction) : null, digest, now, now);
       return this.load(request.invocation_id)!;
     }).immediate();
   }
@@ -91,9 +93,10 @@ export class SqliteExecutionJournal implements ExecutionJournal {
     if (outcome.state === 'succeeded') executionDigest(outcome.result); else code(outcome.error_code);
     return this.change(invocation, ['dispatched'], now, () => this.writeOutcome(invocation, outcome, now));
   }
-  public readOutbox(limit: number): ExecutionResultEvent[] {
+  public readOutbox(limit: number, interactionOnly = false): ExecutionResultEvent[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new ExecutionConflictError('Execution outbox limit 无效');
-    return (this.database.prepare(`SELECT event_json FROM execution_outbox WHERE acknowledged_at IS NULL
+    const filter = interactionOnly ? "AND json_extract(event_json,'$.invocation.interaction.source_fact_id') IS NOT NULL" : '';
+    return (this.database.prepare(`SELECT event_json FROM execution_outbox WHERE acknowledged_at IS NULL ${filter}
       ORDER BY created_at,invocation_id,revision LIMIT ?`).all(limit) as { event_json: string }[]).map(row => JSON.parse(row.event_json));
   }
   public acknowledgeOutbox(receipt: ExecutionResultReceipt, now: number): boolean {

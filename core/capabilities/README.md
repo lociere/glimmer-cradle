@@ -14,8 +14,10 @@ Execution 已有真实 SQLite journal/controller，现行生产 Kernel Tool Gate
 平台接收方和用户确认仍由 App adapter 提供，Core 不直接调用设备。详细调用/排空语义见
 [实现地图](../../docs/architecture/implementation/Extension与SkillPlane实现.md)。
 
-完整 Tool/Skill/Resource 分离、Step 权限/预算/readiness、外部 fencing/对账、Conversation 结果
-接收确认与 Speech 尚未完成，不能将当前切片当作完整授权或 native broker ready。
+结果 outbox 已经独立 Conversation Service 获得刷盘后的幂等 receipt；App 有界重投仅发布结果，不
+重跑 handler。schema 2 保存 Conversation/原 ACTION 最小引用；旧 schema 1 拒绝隐式迁移。
+完整 Tool/Skill/Resource 分离、Step 权限/预算/readiness、外部 fencing/对账与 Speech 尚未完成，
+不能将当前切片当作完整授权或 native broker ready。
 进度见[执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
 
 ```powershell

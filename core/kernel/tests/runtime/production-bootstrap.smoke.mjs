@@ -36,7 +36,7 @@ try {
   const execution = new Database(path.join(dataRoot, 'state/capabilities/execution.sqlite'), { readonly: true });
   try {
     assert.equal(execution.pragma('application_id', { simple: true }), 0x47434558);
-    assert.equal(execution.pragma('user_version', { simple: true }), 1);
+    assert.equal(execution.pragma('user_version', { simple: true }), 2);
     assert.equal(execution.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('executions','execution_outbox')").get().n, 2);
   } finally { execution.close(); }
   await app.stop(0);

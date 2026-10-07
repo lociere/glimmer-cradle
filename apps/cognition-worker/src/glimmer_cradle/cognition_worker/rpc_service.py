@@ -28,6 +28,7 @@ import grpc
 import structlog
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
+from glimmer.conversation.v1 import conversation_pb2 as conversation_pb
 from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
@@ -62,6 +63,7 @@ from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
     observation_from_wire,
 )
 from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
+    execution_result_from_wire,
     history_query_from_wire,
     history_result_to_wire,
 )
@@ -79,6 +81,7 @@ from glimmer_cradle.cognition_worker.shutdown import (
     cancel_task,
     worker_shutdown_steps,
 )
+from glimmer_cradle.conversation import ConversationRecorder
 from google.protobuf.json_format import MessageToDict, ParseDict
 from structlog.stdlib import ProcessorFormatter
 
@@ -1395,6 +1398,7 @@ class CognitionGrpcHost:
         readiness: ReadinessTracker | None = None,
         consolidation: ConsolidationCoordinator | None = None,
         planning: PlanningStore | None = None,
+        conversation: ConversationRecorder | None = None,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -1406,6 +1410,7 @@ class CognitionGrpcHost:
         self._workspace = workspace
         self._consolidation = consolidation
         self._planning = planning
+        self._conversation = conversation
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._readiness_tracker = readiness or ReadinessTracker(frozenset({"domain"}))
@@ -1442,6 +1447,11 @@ class CognitionGrpcHost:
             "AcknowledgePlanningJobRequest": self._method(self._acknowledge_planning_job_request, cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
+        server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
+            "glimmer.conversation.v1.ConversationService", {
+                "AcceptExecutionResult": self._method(self._accept_execution_result,
+                    conversation_pb.AcceptExecutionResultRequest, conversation_pb.AcceptExecutionResultResponse),
+            }),))
         port = server.add_insecure_port("127.0.0.1:0")
         if port <= 0:
             raise RuntimeError("Cognition gRPC 动态回环端点绑定失败")
@@ -1534,6 +1544,26 @@ class CognitionGrpcHost:
         if len(self._completed) > 2048:
             self._completed.popitem(last=False)
 
+    async def _accept_execution_result(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            if self._conversation is None or not self._conversation.accepts_execution_results:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Conversation 结果接收 owner 未 ready", retryable=True)
+            try:
+                if not request.HasField("event"):
+                    raise ValueError("缺少 Execution 结果")
+                fact = execution_result_from_wire(request.event)
+                moment = await self._conversation.accept_execution_result(fact)
+            except (ValueError, TypeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Execution 结果无效") from error
+            except RuntimeError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Execution 交互引用或接纳 identity 冲突") from error
+            if not 1 <= moment.seq <= 9007199254740991:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Conversation Log position 不可表示")
+            return conversation_pb.AcceptExecutionResultResponse(event_id=fact.event_id,
+                invocation_id=fact.invocation_id, revision=fact.revision,
+                moment_id=moment.moment_id, log_position=moment.seq, accepted=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
     async def _submit_perception(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             operation_id = request.call.idempotency_key or trace_id
@@ -1604,7 +1634,10 @@ class CognitionGrpcHost:
 
     async def _synthesize(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            output = await self._inbound.on_agent_synthesis(agent_synthesis_from_wire(request, trace_id=trace_id))
+            try:
+                output = await self._inbound.on_agent_synthesis(agent_synthesis_from_wire(request, trace_id=trace_id))
+            except RuntimeError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "合成等待已接纳的 Execution 交互结果", retryable=True) from error
             return agent_synthesis_to_wire(output)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
@@ -1874,6 +1907,7 @@ class KernelGrpcClient:
             channel_hint=str(target.get("channel_hint") or ""),
             text=str(payload.get("text") or ""),
         )
+        request.call.causation_id = str(command.get("source_fact_id") or "")
         for message in payload.get("messages") or []:
             request.messages.add(sequence=int(message.get("sequence") or 0), content_type=str(message.get("content_type") or "text"), text=str(message.get("text") or ""), language=str(message.get("language") or ""))
         for item in payload.get("items") or []:
@@ -2041,6 +2075,7 @@ class CognitionHost:
                 readiness=self.readiness,
                 consolidation=components.consolidation_coordinator,
                 planning=components.planning_store,
+                conversation=components.conversation_recorder,
             )
 
             # 1.5 启动 Conversation Log 单写者。

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 import uuid
@@ -16,6 +18,7 @@ import pytest
 from glimmer_cradle.conversation import (
     ConversationController,
     ConversationStore,
+    ExecutionResultFact,
     MomentKind,
     build_conversation_recorder,
 )
@@ -73,6 +76,105 @@ def recorder(path: Path):
         observability=Observability(),
         flush_interval_ms=60_000,
     )
+
+
+def execution_fact(source):
+    return ExecutionResultFact(
+        event_id=hashlib.sha256(b'["invoke:1",4]').hexdigest(), invocation_id="invoke:1",
+        revision=4, attempt=1, scope_id=source.conversation_id, conversation_id=source.conversation_id,
+        source_fact_id=source.moment_id, executor_id="browser", capability_id="open",
+        definition_revision="actual", request_digest="a" * 64, state="succeeded", side_effects="confirmed",
+        result={"text": "实际结果"}, error_code="", updated_at_ms=1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_execution_receipt_reopen_identity_and_scope(tmp_path):
+    owner = recorder(tmp_path)
+    await owner.start()
+    try:
+        source = owner.record(MomentKind.ACTION, {"action_type": "skill_request"},
+            conversation_id="private", scene_id="device", thread_id="thread:1",
+            actor_id="actor", recall_scope="actor_private", disclosure_scope="actor_private")
+        fact = execution_fact(source)
+        accepted = await owner.accept_execution_result(fact)
+        assert accepted.causation_ids == (source.moment_id,)
+        assert (accepted.thread_id, accepted.actor_id, accepted.recall_scope) == ("thread:1", "actor", "actor_private")
+        assert accepted.origin.trust_tier == "untrusted" and accepted.retention_ceiling == "experience"
+        await owner.stop()
+        owner = recorder(tmp_path)
+        await owner.start()
+        assert await owner.accept_execution_result(fact) == accepted
+        assert len(owner.log.query()) == 2
+        with pytest.raises(RuntimeError, match="冲突"):
+            await owner.accept_execution_result(replace(fact, result="changed"))
+        for change in ({"source_fact_id": "missing"}, {"scope_id": "other", "conversation_id": "other"}):
+            with pytest.raises(RuntimeError):
+                await owner.accept_execution_result(replace(fact, **change))
+        for change in ({"event_id": "wrong"}, {"revision": True}, {"attempt": 1.0},
+                       {"state": "unknown"}, {"updated_at_ms": 9007199254740991},
+                       {"result": float("nan")}, {"side_effects": "unknown"}):
+            with pytest.raises(ValueError):
+                await owner.accept_execution_result(replace(fact, **change))
+    finally:
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+async def test_execution_receipt_repeated_cancel_holds_real_commit_barrier(tmp_path, monkeypatch):
+    owner = recorder(tmp_path)
+    await owner.start()
+    entered, release = threading.Event(), threading.Event()
+    original = owner.log._write_batch
+    tasks = []
+    try:
+        source = owner.record(MomentKind.ACTION, {}, conversation_id="private")
+        await owner.flush()
+        def blocked(batch):
+            entered.set()
+            assert release.wait(5)
+            original(batch)
+        monkeypatch.setattr(owner.log, "_write_batch", blocked)
+        fact = execution_fact(source)
+        first = asyncio.create_task(owner.accept_execution_result(fact)); tasks.append(first)
+        assert await asyncio.to_thread(entered.wait, 2)
+        first.cancel(); await asyncio.sleep(0); first.cancel(); await asyncio.sleep(0)
+        second = asyncio.create_task(owner.accept_execution_result(fact)); tasks.append(second)
+        await asyncio.sleep(0.02)
+        assert not first.done() and not second.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        accepted = await second
+        assert accepted.seq == 2 and len(owner.log.query()) == 2
+        await owner.stop(); owner = recorder(tmp_path); await owner.start()
+        assert await owner.accept_execution_result(fact) == accepted
+    finally:
+        release.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+async def test_execution_receipt_failed_flush_returns_no_receipt_then_retries(tmp_path, monkeypatch):
+    owner = recorder(tmp_path); await owner.start()
+    try:
+        source = owner.record(MomentKind.ACTION, {}, conversation_id="private")
+        await owner.flush()
+        original = owner.log._write_batch
+        def fail(_batch):
+            raise OSError("fixture disk failure")
+        monkeypatch.setattr(owner.log, "_write_batch", fail)
+        fact = execution_fact(source)
+        with pytest.raises(OSError):
+            await owner.accept_execution_result(fact)
+        monkeypatch.setattr(owner.log, "_write_batch", original)
+        accepted = await owner.accept_execution_result(fact)
+        assert accepted.seq == 2
+        await owner.stop(); owner = recorder(tmp_path); await owner.start()
+        assert await owner.accept_execution_result(fact) == accepted
+    finally:
+        await owner.stop()
 
 
 def projection_config():

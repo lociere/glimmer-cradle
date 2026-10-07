@@ -37,7 +37,7 @@ fail closed，不能静默改写既有作用域；Kernel Application Runtime 停
 `ConversationTurn` 保存一次完整交互周期的稳定 identity、输入摘要、权限上下文、状态与修订。`TurnController` 通过
 `SqliteTurnStore` 提供幂等接纳、乐观并发和 `accepted → running → completed/interrupted/failed` 合法转换；
 进程重启会把遗留 active Turn 明确收束为 `interrupted/process_restarted`。普通回复或沉默在 Log 提交后完成
-Turn；能力请求保持 running，直到 ToolCall/ToolResult/Reply 持久并 flush 后完成。Cognition `CycleTurn`
+Turn；能力请求保持 running，直到原 Action/已接纳 Execution Result/Reply 持久并 flush 后完成。Cognition `CycleTurn`
 只保存一拍内的 perception、ActionPlan、intent 和 arbitration，并引用持久 Turn；模型推理 Step 在阶段 5
 留在 Cognition Loop，不再把 Turn 和 Step 当同一种状态。
 
@@ -95,10 +95,26 @@ continuity/actor 可随交互变化。分页 cursor 以 Log position 为锚，ac
 对应用户历史成对呈现。v3→v4 在事务内释放旧表重命名后保留的索引名，再复制 checkpoint、Message、
 Chapter、Segment、成员和 State；迁移失败回滚，不删除旧数据。
 
-能力请求在外部副作用前写入 `action` 并越过 flush barrier。实际工具调用以稳定 `invocation_id` 写入
-`action(tool_call)`，结果以该调用为 causation 写入 `action_result`，最终 `reply` 再引用结果；相同
-invocation 的 RPC 重放返回原 position，内容冲突则拒绝覆盖。由此模型可见 ToolCall/ToolResult 可从 Log
-恢复，而 Kernel 当前内存 execution journal 的完整持久化仍由阶段 6 收束。
+能力请求在外部副作用前写入 `action` 并越过 flush barrier，其 fact ID 随现行 Action call metadata
+传到 Kernel。Capabilities schema 2 只保存 Conversation ID 与原 Action ID 最小引用；执行状态/结果
+由该 owner 持久保存，不能由 Synthesis 再制造一份 `action(tool_call)` 或 canonical 结果。
+
+独立 `glimmer.conversation.v1.ConversationService.AcceptExecutionResult` 由当前 Worker 同进程承载，
+Adapter 消费唯一 Contract Spine 的 DTO，Core Recorder 消费 owner-local `ExecutionResultFact`。
+校验 result event SHA、invocation/revision/attempt、scope、状态证据、结果 presence/大小后，从真实
+原 Action 恢复线程、actor、trace、因果和隐私域；不存在或不同 conversation 的引用拒绝接纳。
+同一 event ID 使用稳定 Moment ID；同身份不同内容拒绝覆盖，重投返回原 position。
+只有 Log flush 真正提交后返回 accepted receipt。等待者重复取消时仍持有 flush lock，直到实际
+写入线程结束；取消/失败不返回 receipt，失败恢复 pending，阻止第二个请求提前 ACK。
+
+结果是 `experience`、`untrusted` 的外部观察，不提升为 Memory candidate 或 host-verified Knowledge。
+Synthesis 只从已接纳的真实结果恢复 body/state，并将其 Moment ID 作为 Reply causation；未接纳则
+等待重投，wire body/status 不能覆盖事实。规划失败、派发前拒绝与旧无 journal fixture 只是未验证
+观察。真实持久结果的接纳/合成失败向原 Action 调用传播，不发布 fallback 或提交已完成 Turn；
+同进程重试复用原结果，完整跨重启行动恢复仍未完成。规划/旧 fixture
+不写执行事实；这个临时无 journal 分支随阶段 6/12 consumer-zero 删除。Reply 以稳定 fact key
+查询，重放先校验会话/线程并越过 flush barrier，不能依赖最近 200 条窗口猜测幂等。
+完整跨重启计划/调用序列恢复与 native ToolCall/ToolResult 模型入口仍待阶段 6 收束。
 
 模型可见的 tool result 由 Episode/Recent Experience 重建上下文；
 Control Center 的普通 History 只投影 user/assistant Message，不把工具 payload 冒充聊天文本。

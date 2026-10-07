@@ -191,8 +191,8 @@ class RecentExperienceSource(ContextSource):
             text = _moment_text(moment)
             if not text:
                 continue
-            scene_id = moment.scene_id or ""
-            text_tokens = _context_tokens(f"{scene_id} {text}")
+            moment_scene_id = moment.scene_id or ""
+            text_tokens = _context_tokens(f"{moment_scene_id} {text}")
             overlap = len(query_tokens & text_tokens) if query_tokens else 0
             recency = (index + 1) / max(1, len(moments))
             importance = max(0.0, min(1.0, float(moment.importance)))
@@ -215,7 +215,7 @@ class RecentExperienceSource(ContextSource):
                 recency=recency,
                 importance=max(0.0, min(1.0, float(moment.importance))),
                 token_estimate=estimate_tokens(content),
-                trust_tier="host_verified",
+                trust_tier="untrusted" if moment.kind == MomentKind.ACTION_RESULT.value else "host_verified",
                 metadata={
                     "moment_id": moment.moment_id,
                     "scene_id": moment.scene_id,

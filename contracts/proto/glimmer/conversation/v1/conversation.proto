@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package glimmer.conversation.v1;
+
+import "glimmer/capabilities/v1/capabilities.proto";
+import "glimmer/common/v1/service_contract.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Conversation.V1";
+
+message AcceptExecutionResultRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.capabilities.v1.ExecutionResultEvent event = 2;
+}
+
+// accepted 只在原 ACTION 引用有效且结果 Moment 已持久提交后返回。
+message AcceptExecutionResultResponse {
+  string event_id = 1;
+  string invocation_id = 2;
+  uint64 revision = 3;
+  string moment_id = 4;
+  uint64 log_position = 5;
+  bool accepted = 6;
+}
+
+service ConversationService {
+  rpc AcceptExecutionResult(AcceptExecutionResultRequest) returns (AcceptExecutionResultResponse);
+}

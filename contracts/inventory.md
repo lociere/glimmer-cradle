@@ -1,5 +1,12 @@
 # M12 Contract Spine Inventory
 
+Architecture v2 阶段 6 结果投递：`proto/glimmer/capabilities/v1/capabilities.proto` 独占
+`ExecutionResultState`、`ExecutionSideEffects`、`ExecutionResultEvent`；
+`proto/glimmer/conversation/v1/conversation.proto` 新增 `ConversationService`、`AcceptExecutionResult`、
+`AcceptExecutionResultRequest`、`AcceptExecutionResultResponse`。Worker 单写者承载独立 Service，
+Conversation 验证原 ACTION 交互引用、幂等接纳并 flush 后确认。执行结果 DTO 不携带原始输入或
+授权详情，引用真实交互而非复制拓扑。兼容新增，不刷新 baseline；阶段 11 一次性迁移 canonical 根。
+
 Architecture v2 阶段 5/7 Planning 源投递：`proto/glimmer/cognition/v1/cognition_service.proto`
 新增 `PlanningJobSourceRequest`、`ReadPlanningJobRequestsRequest`、`ReadPlanningJobRequestsResponse`、
 `AcknowledgePlanningJobRequestRequest`、`AcknowledgePlanningJobRequestResponse` 与

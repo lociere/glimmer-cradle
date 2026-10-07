@@ -45,6 +45,7 @@ import {
   ReconcileMemoryJobResponseSchema,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { ActionCommand } from '../../ports/application-models';
+import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema } from '@glimmer-cradle/contracts/glimmer/conversation/v1/conversation_pb';
 import { EventBus } from '../../adapters/events/event-bus';
 import { StateSyncEvent } from '../../domain/events';
 import { EndpointRegistry } from '../../adapters/endpoints/endpoint-registry';
@@ -75,6 +76,7 @@ const kernelControlDefinition = serviceDefinition('glimmer.kernel.v1.KernelContr
 });
 
 const cognitionMethods = {
+  AcceptExecutionResult: unaryMethod('/glimmer.conversation.v1.ConversationService/AcceptExecutionResult', AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema),
   SubmitPerception: unaryMethod('/glimmer.cognition.v1.CognitionService/SubmitPerception', SubmitPerceptionRequestSchema, SubmitPerceptionResponseSchema),
   CancelPerception: unaryMethod('/glimmer.cognition.v1.CognitionService/CancelPerception', CancelPerceptionRequestSchema, CancelPerceptionResponseSchema),
   GetPerceptionOperation: unaryMethod('/glimmer.cognition.v1.CognitionService/GetPerceptionOperation', GetPerceptionOperationRequestSchema, GetPerceptionOperationResponseSchema),
@@ -490,6 +492,7 @@ function mapActionCommand(request: any, traceId: string): ActionCommand {
   const conversation = request.skillRequest?.conversation;
   return {
     trace_id: traceId,
+    source_fact_id: request.call?.causationId || undefined,
     action_type: request.actionType,
     target: { scene_id: request.targetSceneId, channel_hint: request.channelHint || undefined },
     payload: {

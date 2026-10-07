@@ -32,6 +32,28 @@ fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
 
+from glimmer.capabilities.v1.capabilities_pb2 import ExecutionResultEvent  # noqa: E402
+from glimmer.conversation.v1.conversation_pb2 import AcceptExecutionResultRequest, AcceptExecutionResultResponse  # noqa: E402
+
+for result_state in (1, 2, 3):
+    execution = ExecutionResultEvent(event_id="a" * 64, invocation_id="invoke:执行", revision=9007199254740991,
+        attempt=1, scope_id="conversation:范围", conversation_id="conversation:范围", source_fact_id="action:原事实",
+        executor_id="executor", capability_id="tool", definition_revision="definition", request_digest="b" * 64,
+        state=result_state, side_effects=3 if result_state == 3 else 1,
+        error_code="" if result_state == 1 else "unconfirmed", updated_at_ms=1900000000000)
+    if result_state == 1:
+        execution.result.null_value = 0
+    execution_request = AcceptExecutionResultRequest(event=execution)
+    execution_request.call.trace_id = "trace:执行"
+    execution_request.call.generation = "generation:1"
+    restored_execution = AcceptExecutionResultRequest.FromString(execution_request.SerializeToString())
+    assert restored_execution == execution_request
+    assert restored_execution.event.HasField("result") == (result_state == 1)
+execution_receipt = AcceptExecutionResultResponse(event_id="a" * 64, invocation_id="invoke:执行",
+    revision=9007199254740991, moment_id="moment:事实", log_position=9007199254740991, accepted=True)
+assert AcceptExecutionResultResponse.FromString(execution_receipt.SerializeToString()) == execution_receipt
+assert not AcceptExecutionResultRequest.FromString(b"").HasField("event")
+
 planning_source = PlanningJobSourceRequest(
     request_id=hashlib.sha256(json.dumps([
         "planning.evaluate", "commitment:长期承诺", "plan:评估", 9007199254740991,

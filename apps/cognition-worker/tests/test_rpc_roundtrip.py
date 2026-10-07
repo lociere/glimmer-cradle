@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from conftest import (
     normalized_document,
 )
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+from glimmer.capabilities.v1 import capabilities_pb2 as capabilities_pb
+from glimmer.conversation.v1 import conversation_pb2 as conversation_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.content.v1 import content_pb2 as content_pb
 from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
@@ -84,6 +87,7 @@ from glimmer_cradle.cognition_worker.rpc_service import (
     KernelServiceError,
 )
 from glimmer_cradle.conversation import (
+    ExecutionResultFact,
     ConversationTurn,
     SqliteTurnStore,
     TurnController,
@@ -552,7 +556,17 @@ async def test_agent_synthesis_records_causal_tool_result_and_replays(
         thread_id="main",
         interaction_id="trace-tool",
         trace_id="trace-tool",
+        actor_id="actor-1", recall_scope="actor_private", disclosure_scope="actor_private",
     )
+    assert request is not None
+    event_id = hashlib.sha256(b'["invocation-1",4]').hexdigest()
+    action_result = await recorder.accept_execution_result(ExecutionResultFact(
+        event_id=event_id, invocation_id="invocation-1", revision=4, attempt=1,
+        scope_id="conversation-1", conversation_id="conversation-1", source_fact_id=request.moment_id,
+        executor_id="browser-extension", capability_id="browser.open", definition_revision="actual",
+        request_digest="a" * 64, state="succeeded", side_effects="confirmed",
+        result={"url": "https://www.bilibili.com"}, error_code="", updated_at_ms=1,
+    ))
     use_case = AgentSynthesisUseCase(
         nickname="月见",
         llm_engine=_SynthesisLLM("已经打开。"),
@@ -571,36 +585,35 @@ async def test_agent_synthesis_records_causal_tool_result_and_replays(
             "skill_id": "browser",
             "tool_name": "browser.open",
             "status": "success",
-            "result_json": '{"url":"https://www.bilibili.com"}',
+            "result_json": '{"url":"spoofed-wire-output"}',
             "arguments_json": '{"url":"https://www.bilibili.com"}',
             "invocation_id": "invocation-1",
             "provider_kind": "extension",
             "provider_id": "browser-extension",
             "provider_version": "1.0.0",
-            "source_event_id": "event-1",
+            "source_event_id": event_id,
             "schema_ref": "glimmer://browser/open-result/v1",
         }],
     )
     first = await use_case.execute(synthesis_input, trace_id="trace-tool")
+    assert "spoofed-wire-output" not in use_case.llm_engine.requests[0].messages[1].content
+    assert "https://www.bilibili.com" in use_case.llm_engine.requests[0].messages[1].content
     await recorder.flush()
     moments = recorder.log.query()
-    tool_call = next(
-        moment for moment in moments
-        if moment.kind == MomentKind.ACTION.value
-        and moment.content.get("action_type") == "tool_call"
-    )
+    assert len([moment for moment in moments if moment.kind == MomentKind.ACTION.value]) == 1
     action_result = next(
         moment for moment in moments if moment.kind == MomentKind.ACTION_RESULT.value
     )
     reply = next(moment for moment in moments if moment.kind == MomentKind.REPLY.value)
-    assert request is not None and tool_call.causation_ids == (request.moment_id,)
-    assert tool_call.origin.schema_ref == "glimmer://capability/tool-call/v1"
+    assert action_result.origin.schema_ref == "glimmer://capabilities/execution-result/v1"
     assert action_result.origin.provider_id == "browser-extension"
-    assert action_result.causation_ids == (tool_call.moment_id,)
+    assert action_result.causation_ids == (request.moment_id,)
+    assert action_result.retention_ceiling == "experience" and action_result.origin.trust_tier == "untrusted"
     assert reply.content == {"text": "已经打开。", "length": 5}
     assert reply.causation_ids == (action_result.moment_id,)
-    assert [tool_call.seq, action_result.seq, reply.seq] == sorted(
-        [tool_call.seq, action_result.seq, reply.seq]
+    assert (reply.actor_id, reply.recall_scope, reply.disclosure_scope) == ("actor-1", "actor_private", "actor_private")
+    assert [request.seq, action_result.seq, reply.seq] == sorted(
+        [request.seq, action_result.seq, reply.seq]
     )
     completed = await turn_controller.load("trace-tool")
     assert completed is not None and completed.status == "completed"
@@ -608,7 +621,10 @@ async def test_agent_synthesis_records_causal_tool_result_and_replays(
     replay = await use_case.execute(synthesis_input, trace_id="trace-tool")
     await recorder.flush()
     assert replay.reply_content == first.reply_content
-    assert len(recorder.log.query()) == 4
+    assert len(recorder.log.query()) == 3
+    synthesis_input.conversation["recall_scope"] = "space_shared"
+    with pytest.raises(RuntimeError, match="交互范围冲突"):
+        await use_case.execute(synthesis_input, trace_id="trace-tool")
     await turn_controller.close()
     await recorder.stop()
 
@@ -739,6 +755,151 @@ async def service():
     finally:
         await channel.close()
         await host.stop()
+
+
+@pytest.fixture
+async def execution_result_service(tmp_path):
+    owner = build_test_recorder(tmp_path / "execution-log")
+    await owner.start()
+    source = owner.record(MomentKind.ACTION, {"action_type": "skill_request"},
+        conversation_id="conversation-1", scene_id="scene-1", thread_id="private-thread",
+        interaction_id="execution-turn", trace_id="execution-turn")
+    await owner.flush()
+    host = CognitionGrpcHost(generation="execution-generation", inbound=_Inbound(),
+        queue=_Queue(), activity=_Activity(), cycle=_Cycle(), shutdown=lambda: asyncio.sleep(0),
+        operations=PerceptionOperationRegistry(), workspace=AttentionController(), conversation=owner)
+    await host.start()
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    call = channel.unary_unary("/glimmer.conversation.v1.ConversationService/AcceptExecutionResult",
+        request_serializer=conversation_pb.AcceptExecutionResultRequest.SerializeToString,
+        response_deserializer=conversation_pb.AcceptExecutionResultResponse.FromString)
+    event = capabilities_pb.ExecutionResultEvent(event_id=hashlib.sha256(b'["invoke:1",4]').hexdigest(),
+        invocation_id="invoke:1", revision=4, attempt=1, scope_id="conversation-1", conversation_id="conversation-1",
+        source_fact_id=source.moment_id, executor_id="browser", capability_id="open", definition_revision="actual",
+        request_digest="a" * 64, state=capabilities_pb.EXECUTION_RESULT_STATE_SUCCEEDED,
+        side_effects=capabilities_pb.EXECUTION_SIDE_EFFECTS_CONFIRMED, updated_at_ms=1)
+    event.result.null_value = 0
+    request = conversation_pb.AcceptExecutionResultRequest(call=_metadata("execution-generation", "execution-turn"), event=event)
+    try:
+        yield host, owner, call, request
+    finally:
+        await channel.close(); await host.stop(); await owner.stop()
+
+
+async def test_execution_service_durable_receipt_reopen_and_conflicts(execution_result_service):
+    host, owner, call, request = execution_result_service
+    with pytest.raises(grpc.aio.AioRpcError) as not_ready:
+        await call(request)
+    assert not_ready.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+    host.mark_ready()
+    receipt = await call(request)
+    assert receipt.accepted and receipt.log_position == 2
+    moment = owner.execution_result(request.event.event_id)
+    assert moment is not None and moment.moment_id == receipt.moment_id and moment.content["result"] is None
+    assert moment.thread_id == "private-thread" and moment.origin.trust_tier == "untrusted"
+    await owner.stop(); await owner.start()
+    assert await call(request) == receipt
+    request.event.result.string_value = "conflicting duplicate"
+    with pytest.raises(grpc.aio.AioRpcError) as conflict:
+        await call(request)
+    assert conflict.value.code() == grpc.StatusCode.FAILED_PRECONDITION
+    assert len(owner.log.query()) == 2
+
+
+async def test_execution_service_rejects_absent_result_unknown_enum_and_generation(execution_result_service):
+    host, owner, call, request = execution_result_service
+    host.mark_ready()
+    original = request.SerializeToString()
+    for mutate in (lambda req: req.event.ClearField("result"), lambda req: setattr(req.event, "state", 99),
+                   lambda req: setattr(req.event, "revision", 9007199254740992),
+                   lambda req: setattr(req.event, "event_id", "wrong")):
+        candidate = conversation_pb.AcceptExecutionResultRequest.FromString(original); mutate(candidate)
+        with pytest.raises(grpc.aio.AioRpcError) as invalid:
+            await call(candidate)
+        assert invalid.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    request.call.generation = "old-generation"
+    with pytest.raises(grpc.aio.AioRpcError) as stale:
+        await call(request)
+    assert stale.value.code() == grpc.StatusCode.PERMISSION_DENIED
+    assert len(owner.log.query()) == 1
+
+
+async def test_execution_service_disk_failure_and_lost_rpc_ack_retries(execution_result_service, monkeypatch):
+    host, owner, call, request = execution_result_service; host.mark_ready()
+    original = owner.log._write_batch
+    def fail(_batch):
+        raise OSError("fixture disk failure")
+    monkeypatch.setattr(owner.log, "_write_batch", fail)
+    with pytest.raises(grpc.aio.AioRpcError):
+        await call(request)
+    monkeypatch.setattr(owner.log, "_write_batch", original)
+    # 客户端未收到成功 ACK 时重投同一 identity，既不增序号也不再执行任何工具。
+    receipt = await call(request)
+    assert await call(request) == receipt and receipt.log_position == 2
+    assert len(owner.log.query()) == 2
+
+
+async def test_execution_service_unknown_is_durable_observation_not_success(execution_result_service):
+    host, owner, call, request = execution_result_service; host.mark_ready()
+    request.event.state = capabilities_pb.EXECUTION_RESULT_STATE_UNKNOWN
+    request.event.side_effects = capabilities_pb.EXECUTION_SIDE_EFFECTS_UNKNOWN
+    request.event.error_code = "executor_unconfirmed"
+    request.event.ClearField("result")
+    receipt = await call(request)
+    moment = owner.execution_result(request.event.event_id)
+    assert receipt.accepted and moment.content["state"] == "unknown" and moment.content["result"] is None
+    assert moment.retention_ceiling == "experience" and moment.origin.trust_tier == "untrusted"
+
+
+async def test_execution_service_cancel_and_host_stop_wait_for_real_commit(execution_result_service, monkeypatch):
+    host, owner, call, request = execution_result_service; host.mark_ready()
+    entered, release = threading.Event(), threading.Event()
+    original = owner.log._write_batch
+    def blocked(batch):
+        entered.set()
+        assert release.wait(5)
+        original(batch)
+    monkeypatch.setattr(owner.log, "_write_batch", blocked)
+    pending = call(request)
+    stopping = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 2)
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending
+        stopping = asyncio.create_task(host.stop())
+        await asyncio.sleep(0.02)
+        assert not stopping.done() and host._inflight
+        release.set(); await stopping
+        assert owner.execution_result(request.event.event_id).seq == 2
+        await host.start(); host.mark_ready()
+        # 原 channel 端点已撤销；新端点使用同一 durable owner，返回原 position。
+        async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+            retry = channel.unary_unary("/glimmer.conversation.v1.ConversationService/AcceptExecutionResult",
+                request_serializer=conversation_pb.AcceptExecutionResultRequest.SerializeToString,
+                response_deserializer=conversation_pb.AcceptExecutionResultResponse.FromString)
+            receipt = await retry(request)
+            assert receipt.accepted and receipt.log_position == 2
+    finally:
+        release.set()
+        if stopping is not None:
+            await stopping
+
+
+async def test_synthesis_without_accepted_result_does_not_invent_facts(tmp_path):
+    owner = build_test_recorder(tmp_path / "receipt-missing"); await owner.start()
+    model = _SynthesisLLM()
+    use_case = AgentSynthesisUseCase(nickname="月见", llm_engine=model,
+        ids=DeterministicIds(), observability=NullObservability(), experience_recorder=owner)
+    try:
+        with pytest.raises(RuntimeError, match="尚未接纳"):
+            await use_case.execute(AgentSynthesisInput(original_goal="外部能力", scene_id="scene",
+                trace_id="turn", conversation={"conversation_id": "private"}, tool_results=[{
+                    "invocation_id": "invoke", "source_event_id": "a" * 64, "result_json": "{}", "status": "success",
+                }]), trace_id="turn")
+        assert not model.requests and owner.log.query() == []
+    finally:
+        await owner.stop()
 
 
 @pytest.fixture

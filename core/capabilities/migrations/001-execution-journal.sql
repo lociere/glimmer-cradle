@@ -1,10 +1,11 @@
 PRAGMA application_id = 1195591000;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 CREATE TABLE executions (
   invocation_id TEXT PRIMARY KEY,
   scope_id TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
   target_json TEXT NOT NULL,
+  interaction_json TEXT,
   request_digest TEXT NOT NULL,
   state TEXT NOT NULL CHECK(state IN ('prepared','authorized','dispatched','succeeded','failed','unknown')),
   revision INTEGER NOT NULL CHECK(revision > 0),

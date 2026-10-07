@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { create } from '@bufbuild/protobuf';
+import { create, fromJson, toBinary, type JsonValue } from '@bufbuild/protobuf';
+import { ValueSchema } from '@bufbuild/protobuf/wkt';
+import { ExecutionResultState, ExecutionSideEffects } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import { AcceptExecutionResultRequestSchema } from '@glimmer-cradle/contracts/glimmer/conversation/v1/conversation_pb';
+import type { ExecutionResultEvent, ExecutionResultReceipt } from '@glimmer-cradle/capabilities';
 import type { AssetRef, ContentPart } from '@glimmer-cradle/content';
 import {
   AddressMode,
@@ -35,6 +39,39 @@ import { KernelCognitionTransport, objectToStruct, structToObject } from './kern
 
 export class CognitionClient {
   public constructor(private readonly transport: KernelCognitionTransport) {}
+
+  public async acceptExecutionResult(event: ExecutionResultEvent, signal?: AbortSignal): Promise<ExecutionResultReceipt> {
+    const invocation = event.invocation;
+    const interaction = invocation.interaction;
+    if (!interaction || !['succeeded', 'failed', 'unknown'].includes(invocation.state)) throw new Error('不可投递的 Execution 结果');
+    const traceId = randomUUID();
+    const request = create(AcceptExecutionResultRequestSchema, {
+      call: this.transport.makeCallMetadata({ traceId, causationId: interaction.source_fact_id,
+        correlationId: invocation.invocation_id, idempotencyKey: event.event_id }),
+      event: {
+        eventId: event.event_id, invocationId: invocation.invocation_id, revision: BigInt(invocation.revision),
+        attempt: invocation.attempt, scopeId: invocation.scope_id, conversationId: interaction.conversation_id,
+        sourceFactId: interaction.source_fact_id, executorId: invocation.target.executor_id,
+        capabilityId: invocation.target.capability_id, definitionRevision: invocation.target.definition_revision,
+        requestDigest: invocation.request_digest,
+        state: invocation.state === 'succeeded' ? ExecutionResultState.SUCCEEDED
+          : invocation.state === 'failed' ? ExecutionResultState.FAILED : ExecutionResultState.UNKNOWN,
+        sideEffects: invocation.side_effects === 'confirmed' ? ExecutionSideEffects.CONFIRMED
+          : invocation.side_effects === 'unknown' ? ExecutionSideEffects.UNKNOWN : ExecutionSideEffects.NONE,
+        result: invocation.state === 'succeeded' ? fromJson(ValueSchema, invocation.result as JsonValue) : undefined,
+        errorCode: invocation.error_code ?? '', updatedAtMs: BigInt(invocation.updated_at),
+      },
+    });
+    if (toBinary(AcceptExecutionResultRequestSchema, request).length > 128 * 1024) throw new Error('Execution wire 超过接收上限');
+    const response = await this.transport.call(this.transport.methods.AcceptExecutionResult, request,
+      { timeoutMs: 5000, traceId, signal });
+    if (!response.accepted || response.eventId !== event.event_id || response.invocationId !== invocation.invocation_id
+      || response.revision !== BigInt(invocation.revision) || !response.momentId.trim()
+      || response.logPosition < 1n || response.logPosition > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error('Conversation durable receipt 无效');
+    }
+    return { event_id: response.eventId, invocation_id: response.invocationId, revision: Number(response.revision), accepted: true };
+  }
 
   public async submitPerception(request: PerceptionEvent, traceId: string, timeoutMs: number): Promise<PerceptionOperationResult> {
     const call = this.transport.makeCallMetadata({

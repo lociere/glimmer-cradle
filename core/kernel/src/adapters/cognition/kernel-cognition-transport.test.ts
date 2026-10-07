@@ -63,7 +63,7 @@ describe('KernelCognitionTransport', () => {
     await transport.start();
     const bootstrap = transport.prepareProcess();
     transport.expectProcess(12345);
-    const handler = vi.fn(async () => undefined);
+    const handler = vi.fn(async (_command: ActionCommand) => undefined);
     transport.setActionHandler(handler);
     const client = new grpc.Client(transport.controlEndpoint.slice('grpc://'.length), grpc.credentials.createInsecure());
     const call = transport.makeCallMetadata({ traceId: 'trace-register', causationId: 'cause-1', correlationId: 'correlation-1' });
@@ -83,7 +83,7 @@ describe('KernelCognitionTransport', () => {
     expect(registration).toMatchObject({ accepted: true, generation: bootstrap.generation });
 
     const action = create(PublishActionRequestSchema, {
-      call: transport.makeCallMetadata({ traceId: 'trace-action', idempotencyKey: 'action-1' }),
+      call: transport.makeCallMetadata({ traceId: 'trace-action', idempotencyKey: 'action-1', causationId: 'original-action-fact' }),
       actionType: 'reply',
       targetSceneId: 'scene-1',
       text: 'hello',
@@ -93,6 +93,7 @@ describe('KernelCognitionTransport', () => {
     expect(first.duplicate).toBe(false);
     expect(second.duplicate).toBe(true);
     expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][0].source_fact_id).toBe('original-action-fact');
 
     action.call!.generation = 'stale-generation';
     await expect(rawCall(client, actionMethod, action)).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });

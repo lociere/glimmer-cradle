@@ -561,6 +561,8 @@ async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path
     assert cmd["payload"]["skill_request"]["capability_kind"] == "realtime_lookup"
     assert cmd["payload"]["skill_request"]["confidence"] == 0.92
     assert cmd["trace_id"] == "t-skill"
+    assert cmd["source_fact_id"] == next(moment.moment_id for moment in persisted_before_emit
+        if moment.kind == "action" and moment.content["action_type"] == "skill_request")
     assert len(reasoning.requests) == 1
     assert reasoning.requests[0].metadata["purpose"] == "cognitive_action_plan"
     assert reasoning.requests[0].metadata["trace_id"] == "t-skill"

@@ -91,6 +91,7 @@ export interface EmotionSnapshot {
 
 export interface ActionCommand {
   readonly trace_id: string;
+  readonly source_fact_id?: string;
   readonly action_type: 'reply' | 'recall' | 'react' | 'skill_request' | 'noop';
   readonly target: { readonly scene_id: string; readonly channel_hint?: string | null };
   readonly payload: {

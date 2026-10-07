@@ -71,6 +71,24 @@ function skillCommand(goal = '查一下天气'): ActionCommand {
 }
 
 describe('SkillActionController', () => {
+  it('真实结果引用接纳前不提交 fallback，重试沿用工具结果与原 Action 引用', async () => {
+    const planning = { ...createPlanning(), resultEventId: () => 'a'.repeat(64), executeSuggestion: vi.fn(async (..._args: unknown[]) => null) };
+    const synthesis = vi.fn().mockRejectedValueOnce(new Error('Conversation result pending')).mockResolvedValue({
+      reply_content: '已经接纳', emotion_state: {}, trace_id: 'trace-1',
+    });
+    const publish = vi.fn(async () => undefined);
+    const controller = new SkillActionController(planning as never, synthesis, publish, logger);
+    const command = { ...skillCommand(), source_fact_id: 'original-action-fact' };
+    await expect(controller.handleActionCommand(command, undefined, 'action:1')).rejects.toThrow('pending');
+    expect(publish).not.toHaveBeenCalled();
+    await controller.handleActionCommand(command, undefined, 'action:1');
+    expect(planning.executeSuggestion).toHaveBeenCalledOnce();
+    expect(planning.executeSuggestion.mock.calls[0][5]).toBe('original-action-fact');
+    expect(synthesis.mock.calls[0][0].tool_results[0]).toMatchObject({
+      source_event_id: 'a'.repeat(64), schema_ref: 'glimmer://capabilities/execution-result/v1',
+    });
+    expect(publish).toHaveBeenCalledOnce();
+  });
   it('executes planned skill and publishes synthesized reply', async () => {
     const synthesisRequests: AgentSynthesisRequest[] = [];
     const replies: ChannelReplyPublishRequest[] = [];

@@ -6,6 +6,7 @@ import glimmer_cradle.cognition_worker.rpc_service as trace_context
 import pytest
 from glimmer_cradle.cognition.adapters.persistence import EpisodeProjection
 from glimmer_cradle.cognition.memory import MemoryConsolidationConflictError
+from glimmer_cradle.cognition.context import RecentExperienceSource
 from glimmer_cradle.cognition.memory.consolidation import consolidation_input
 from glimmer_cradle.conversation.log import Moment, MomentKind, SourceDescriptor
 from tests.conftest import build_experience_recorder
@@ -47,6 +48,26 @@ async def test_disabled_recorder_has_no_physical_storage(tmp_path: Path) -> None
     assert recorder.record(MomentKind.PERCEPTION, {}) is None
     await recorder.stop()
     assert not (tmp_path / "experience").exists()
+
+
+async def test_execution_result_context_cannot_upgrade_external_output_to_host_verified(tmp_path: Path) -> None:
+    recorder = build_experience_recorder(tmp_path / "experience")
+    await recorder.start()
+    try:
+        recorder.record(MomentKind.ACTION_RESULT, {"text": "外部结果"}, conversation_id="private",
+            origin=SourceDescriptor(provider_kind="capability", provider_id="core-device", trust_tier="host_verified"))
+        items = RecentExperienceSource(recorder).items("外部结果", conversation_id="private",
+            allowed_scopes={"conversation_private"})
+        assert len(items) == 1 and items[0].trust_tier == "untrusted"
+        assert RecentExperienceSource(recorder).items("外部结果", conversation_id="other",
+            allowed_scopes={"conversation_private"}) == []
+        recorder.record(MomentKind.REPLY, {"text": "跨场景公开观察"}, scene_id="scene-b", recall_scope="owner_all")
+        recorder.record(MomentKind.ACTION_RESULT, {"text": "scene-b 私有结果"}, scene_id="scene-b", recall_scope="space_local")
+        visible = RecentExperienceSource(recorder).items("结果", scene_id="scene-a",
+            allowed_scopes={"owner_all", "space_local"})
+        assert len(visible) == 1 and "跨场景公开观察" in visible[0].content
+    finally:
+        await recorder.stop()
 
 
 async def test_late_moment_starts_new_episode_after_boundary(tmp_path: Path) -> None:

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { executionJson, invocationDigest, ExecutionConflictError, ExecutionRecoveryRequiredError,
+import { executionDigest, executionJson, invocationDigest, ExecutionConflictError, ExecutionRecoveryRequiredError,
   type Invocation, type InvocationRequest } from './invocation.js';
 import type { ExecutionJournal } from './execution-journal.js';
 import type { ExecutorPort, ExecutionOutcome } from './executor-port.js';
@@ -41,6 +41,11 @@ export class ExecutionController {
     this.stopped = true;
     for (const value of this.active.values()) value.abort.abort(new Error('Execution 正在排空'));
     await Promise.allSettled([...this.active.values()].map(value => value.promise));
+  }
+  public resultEvent(invocationId: string): import('./execution-journal.js').ExecutionResultEvent | null {
+    const invocation = this.journal.load(invocationId);
+    if (!invocation || !['succeeded', 'failed', 'unknown'].includes(invocation.state)) return null;
+    return { event_id: executionDigest([invocationId, invocation.revision]), invocation };
   }
   private async run(request: InvocationRequest, executor: ExecutorPort, signal: AbortSignal): Promise<Invocation> {
     signal.throwIfAborted();

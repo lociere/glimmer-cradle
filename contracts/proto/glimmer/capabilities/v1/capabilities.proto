@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package glimmer.capabilities.v1;
+
+import "google/protobuf/struct.proto";
+
+option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Capabilities.V1";
+
+enum ExecutionResultState {
+  EXECUTION_RESULT_STATE_UNSPECIFIED = 0;
+  EXECUTION_RESULT_STATE_SUCCEEDED = 1;
+  EXECUTION_RESULT_STATE_FAILED = 2;
+  EXECUTION_RESULT_STATE_UNKNOWN = 3;
+}
+
+enum ExecutionSideEffects {
+  EXECUTION_SIDE_EFFECTS_UNSPECIFIED = 0;
+  EXECUTION_SIDE_EFFECTS_NONE = 1;
+  EXECUTION_SIDE_EFFECTS_CONFIRMED = 2;
+  EXECUTION_SIDE_EFFECTS_UNKNOWN = 3;
+}
+
+// Execution 拥有结果；不传入请求正文/授权详情，也不复制 Conversation 拓扑。
+message ExecutionResultEvent {
+  // SHA-256(紧凑 UTF-8 JSON [invocation_id, revision])。
+  string event_id = 1;
+  string invocation_id = 2;
+  uint64 revision = 3;
+  uint32 attempt = 4;
+  string scope_id = 5;
+  string conversation_id = 6;
+  string source_fact_id = 7;
+  string executor_id = 8;
+  string capability_id = 9;
+  string definition_revision = 10;
+  string request_digest = 11;
+  ExecutionResultState state = 12;
+  ExecutionSideEffects side_effects = 13;
+  // succeeded 必须有 presence；null 是已确认结果，不是“缺少结果”。
+  google.protobuf.Value result = 14;
+  string error_code = 15;
+  uint64 updated_at_ms = 16;
+}

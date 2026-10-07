@@ -94,6 +94,10 @@ export class SkillPlanningAppService {
       )).length, 0);
   }
 
+  public resultEventId(invocationId: string): string | undefined {
+    return this._gateway.resultEventId(invocationId);
+  }
+
   public getSkillSource(skillId: string): { providerKind: 'core' | 'extension' | 'mcp' | 'user'; providerId: string } {
     const provider = this._catalog.findCatalogEntry(skillId)?.provider;
     const providerKind = provider?.kind === 'mcp_server' ? 'mcp' : provider?.kind ?? 'core';
@@ -106,6 +110,7 @@ export class SkillPlanningAppService {
     conversation?: ConversationContext,
     signal?: AbortSignal,
     invocationId?: string,
+    sourceFactId?: string,
   ): Promise<unknown> {
     return this._gateway.invoke({
       skillId: suggestion.skill_id,
@@ -115,6 +120,7 @@ export class SkillPlanningAppService {
       conversation,
       signal,
       invocationId,
+      sourceFactId,
     });
   }
 

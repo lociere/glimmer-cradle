@@ -97,7 +97,8 @@ describe('持久 Execution 不明结果与竞争', () => {
   });
   it('未知 owner/version/部分 schema 不重置；空 foreign owner 也不覆盖', () => {
     for (const setup of ["PRAGMA application_id=7", "PRAGMA user_version=9", 'CREATE TABLE foreign_data(value TEXT)',
-      'PRAGMA application_id=1195591000; PRAGMA user_version=1; CREATE TABLE executions(invocation_id TEXT)']) {
+      'PRAGMA application_id=1195591000; PRAGMA user_version=1; CREATE TABLE executions(invocation_id TEXT)',
+      'PRAGMA application_id=1195591000; PRAGMA user_version=2; CREATE TABLE executions(invocation_id TEXT)']) {
       const file = path(); const db = new Database(file); db.exec(setup); db.close();
       expect(() => new SqliteExecutionJournal(file)).toThrow();
       const unchanged = new Database(file); try {
@@ -112,6 +113,19 @@ describe('持久 Execution 不明结果与竞争', () => {
       expect(() => journal.prepare({ ...request, input }, 1)).toThrow(ExecutionConflictError);
     }
     expect(journal.load(request.invocation_id)).toBeNull();
+  });
+  it('旧 schema 1 的结果/outbox 保留，不隐式升级或重建', () => {
+    const file = path(); const raw = new Database(file);
+    raw.exec(`PRAGMA application_id=1195591000; PRAGMA user_version=1;
+      CREATE TABLE execution_outbox(event_id TEXT,event_json TEXT);
+      INSERT INTO execution_outbox VALUES('old-result','{"invocation":"original"}');`);
+    raw.close();
+    expect(() => new SqliteExecutionJournal(file)).toThrow('受控迁移');
+    const preserved = new Database(file);
+    try {
+      expect(preserved.pragma('user_version', { simple: true })).toBe(1);
+      expect(preserved.prepare('SELECT * FROM execution_outbox').get()).toEqual({ event_id: 'old-result', event_json: '{"invocation":"original"}' });
+    } finally { preserved.close(); }
   });
   it('稳定 invocation/key、定义或参数冲突均拒绝，不重置第一次调用', () => {
     const journal = open(); journal.prepare(request, 1);

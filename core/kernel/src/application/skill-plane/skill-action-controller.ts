@@ -132,6 +132,7 @@ export class SkillActionController {
       conversation,
       signal,
       journal,
+      sourceFactId: cmd.source_fact_id,
     });
 
     let synthesis = journal.synthesis;
@@ -147,6 +148,8 @@ export class SkillActionController {
       journal.synthesis = synthesis;
     } catch (error) {
       if (isAbortError(error, signal)) throw error;
+      // 持久结果尚未被合成 owner 接纳时，保持可重投；fallback 不能冒充已完成的 Turn。
+      if (toolResults.some(result => result.schema_ref === 'glimmer://capabilities/execution-result/v1')) throw error;
       this.logger.error('Skill 结果回传 Cognition 合成失败', {
         trace_id: traceId,
         scene_id: sceneId,
@@ -185,6 +188,7 @@ export class SkillActionController {
     conversation?: ConversationContext;
     signal?: AbortSignal;
     journal: ActionExecutionJournal;
+    sourceFactId?: string;
   }): Promise<AgentToolResult[]> {
     const readyToolCount = this._skillPlanningReadyToolCount(options.conversation);
     let plan = options.journal.plan;
@@ -233,12 +237,13 @@ export class SkillActionController {
           options.conversation,
           options.signal,
           invocationId,
+          options.sourceFactId,
         );
         const toolResult = makeToolResult(suggestion.tool_name, 'success', {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           result,
-        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint);
+        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint, this._skillPlanning.resultEventId?.(invocationId));
         options.journal.toolResults.set(invocationId, toolResult);
         results.push(toolResult);
       } catch (error) {
@@ -251,7 +256,7 @@ export class SkillActionController {
           skill_id: suggestion.skill_id,
           purpose: suggestion.purpose,
           error: normalizeError(error),
-        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint);
+        }, source, invocationId, suggestion.skill_id, suggestion.arguments_hint, this._skillPlanning.resultEventId?.(invocationId));
         options.journal.toolResults.set(invocationId, toolResult);
         results.push(toolResult);
       }
@@ -345,6 +350,7 @@ function makeToolResult(
   invocationId: string,
   skillId?: string,
   argumentsValue?: Record<string, unknown>,
+  resultEventId?: string,
 ): AgentToolResult {
   return {
     skill_id: skillId,
@@ -354,8 +360,8 @@ function makeToolResult(
     invocation_id: invocationId,
     provider_kind: source.providerKind,
     provider_id: source.providerId,
-    source_event_id: invocationId,
-    schema_ref: 'glimmer://skill/action-result/v1',
+    source_event_id: resultEventId ?? invocationId,
+    schema_ref: resultEventId ? 'glimmer://capabilities/execution-result/v1' : 'glimmer://skill/action-result/v1',
     arguments_json: argumentsValue === undefined ? undefined : safeJsonStringify(argumentsValue),
   };
 }

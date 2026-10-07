@@ -8,6 +8,8 @@ History 投影和输出 Delivery。认知内容由 Cognition 决定；平台地�
 - TypeScript 消费方只从 `@glimmer-cradle/conversation` 根入口导入 Binding、Interaction、Delivery 与 Port。
 - Python 消费方只从 `glimmer_cradle.conversation` 根入口导入 Log、History、Turn 与 Port。
 - `contracts/` 仍是跨进程 wire 唯一来源，本包不手写 generated DTO。
+- `ConversationRecorder.accept_execution_result` 绑定已存在的原 ACTION 与 Execution result identity，
+  继承其线程/隐私上下文，刷盘后才返回原 Moment/position；重复接纳不产生第二份交互事实。
 
 ## 持久状态
 

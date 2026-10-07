@@ -614,7 +614,7 @@ class LoopController:
         # Act：只发送通过仲裁的 ActionCommand。
         with self._observability.span("act") as s_act:
             await self._continuity.record_action(self._turn)
-            emitted = await self._action_emitter.emit(self._turn.arbitration)
+            emitted = await self._action_emitter.emit(self._turn.arbitration, source_fact_id=self._turn.action_moment_id)
             s_act.set_attribute("actions_emitted", emitted)
             if emitted:
                 if self._activity is not None and hasattr(self._activity, "record_self_activity"):

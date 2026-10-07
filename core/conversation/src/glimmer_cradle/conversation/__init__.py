@@ -2,6 +2,7 @@
 
 from glimmer_cradle.conversation.history import ConversationController, ConversationStore
 from glimmer_cradle.conversation.log import AffectSnapshot, Moment, MomentKind, SourceDescriptor
+from glimmer_cradle.conversation.log.record import ExecutionResultFact
 from glimmer_cradle.conversation.log.reader import ConversationLogReaderPort
 from glimmer_cradle.conversation.log.writer import (
     ConversationRecorder,
@@ -29,6 +30,7 @@ __all__ = [
     "ConversationStore",
     "ConversationTurn",
     "ConversationWorkingSet",
+    "ExecutionResultFact",
     "Moment",
     "MomentKind",
     "SourceDescriptor",

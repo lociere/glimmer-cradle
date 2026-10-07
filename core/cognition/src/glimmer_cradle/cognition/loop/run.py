@@ -33,7 +33,7 @@ class ActionEmitter:
         self._observability = observability
         self._logger = observability.logger("cognition_action_emitter")
 
-    async def emit(self, arbitration: ArbitrationResult | None) -> int:
+    async def emit(self, arbitration: ArbitrationResult | None, *, source_fact_id: str | None = None) -> int:
         if self._sink is None or arbitration is None:
             return 0
         emitted = 0
@@ -41,6 +41,8 @@ class ActionEmitter:
             command = self.to_command(intent)
             if command is None:
                 continue
+            if command.get("action_type") == "skill_request" and source_fact_id:
+                command["source_fact_id"] = source_fact_id
             try:
                 await self._sink(command)
                 emitted += 1

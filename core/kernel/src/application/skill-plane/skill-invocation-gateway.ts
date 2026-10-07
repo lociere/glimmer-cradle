@@ -17,7 +17,7 @@ import type { SkillPolicyDecision } from './skill-policy-engine';
 import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
-import { ExecutionController, ExecutionRecoveryRequiredError, executionDigest, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
+import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, executionDigest, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
 import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
@@ -29,6 +29,7 @@ export interface SkillInvocationRequest {
   signal?: AbortSignal;
   /** 由反向 Service operation 派生的稳定副作用键，重试不得重新生成。 */
   invocationId?: string;
+  sourceFactId?: string;
 }
 
 export class SkillInvocationRecoveryRequiredError extends RecoveryRequiredError {
@@ -107,6 +108,8 @@ export class LoggingSkillInvocationAuditSink implements SkillInvocationAuditSink
 }
 
 export class SkillInvocationGateway {
+  private readonly active = new Set<Promise<unknown>>();
+  private stopped = false;
   constructor(
     private readonly _registry: SkillRegistry,
     private readonly _policyEngine: SkillPolicyEngine,
@@ -116,9 +119,27 @@ export class SkillInvocationGateway {
     private readonly _requestConfirmation?: SkillConfirmationRequester,
     private readonly _execution?: ExecutionController,
     private readonly _newInvocationId: () => string = () => _observability.createTraceContext().trace_id,
+    private readonly _resultOutbox?: ExecutionResultOutbox,
   ) {}
 
-  public async invoke(request: SkillInvocationRequest): Promise<unknown> {
+  public resultEventId(invocationId: string): string | undefined {
+    return this._execution?.resultEvent(invocationId)?.event_id;
+  }
+
+  public invoke(request: SkillInvocationRequest): Promise<unknown> {
+    if (this.stopped) return Promise.reject(new Error('Skill invocation 已停止接纳'));
+    const promise = this.invokeTool(request).finally(() => this.active.delete(promise));
+    this.active.add(promise);
+    return promise;
+  }
+
+  public async stop(): Promise<void> {
+    this.stopped = true;
+    await this._execution?.stop();
+    await Promise.allSettled([...this.active]);
+  }
+
+  private async invokeTool(request: SkillInvocationRequest): Promise<unknown> {
     request.signal?.throwIfAborted();
     const registered = this._registry.findById(request.skillId);
     if (!registered) {
@@ -161,6 +182,8 @@ export class SkillInvocationGateway {
         revision,
         context: context ? { conversation_id: context.conversation_id, scene_id: context.scene_id,
           source_provider_id: context.source_provider_id } : null,
+        interaction: request.sourceFactId && context ? { conversation_id: context.conversation_id,
+          source_fact_id: request.sourceFactId } : undefined,
         validate: () => {
           if (this._registry.findById(request.skillId) !== registered
             || !registered.skill.tools.includes(tool) || tool.handler !== handler || definition() !== revision) return false;
@@ -242,7 +265,8 @@ export class SkillInvocationGateway {
     execute: (args?: unknown, signal?: AbortSignal) => Promise<unknown> | unknown;
     signal?: AbortSignal;
     invocationId?: string;
-    durable?: { scopeId: string; executorId: string; revision: string; context: unknown; validate(): boolean };
+    durable?: { scopeId: string; executorId: string; revision: string; context: unknown;
+      interaction?: { conversation_id: string; source_fact_id: string }; validate(): boolean };
   }): Promise<unknown> {
     const traceId = options.traceId
       ?? this._observability.currentTraceId()
@@ -328,6 +352,7 @@ export class SkillInvocationGateway {
             target: { executor_id: options.durable.executorId,
               capability_id: `${options.skill.id}.${options.targetName}`, definition_revision: options.durable.revision },
             input: { has_args: options.args !== undefined, args: options.args ?? null, context: options.durable.context },
+            ...(options.durable.interaction ? { interaction: options.durable.interaction } : {}),
           }, {
             authorize: async (request, signal) => {
               try {
@@ -357,6 +382,7 @@ export class SkillInvocationGateway {
           }, options.signal);
         } catch (error) {
           if (error instanceof ExecutionRecoveryRequiredError) {
+            await this.publishResult(options.invocationId, options.signal);
             this.recordCommittedAudit({ traceId, skill: options.skill, targetKind: options.targetKind,
               targetName: options.targetName, decision, status: 'unknown', durationMs: Date.now() - startedAt,
               errorMessage: 'execution_recovery_required', policy });
@@ -364,6 +390,7 @@ export class SkillInvocationGateway {
           }
           throw error;
         }
+        await this.publishResult(options.invocationId, options.signal);
         // 诊断失败不能改写已提交的 Execution 事实；重放仍返回原结果而不再派发。
         this.recordCommittedAudit({ traceId, skill: options.skill, targetKind: options.targetKind,
           targetName: options.targetName, decision, status: outcome.state === 'succeeded' ? 'succeeded'
@@ -415,6 +442,17 @@ export class SkillInvocationGateway {
       // 诊断不是执行事实 owner；sink 故障不能令调用者将已提交成功当作失败再派发。
       try { this._observability.logger('skill-invocation').warn('Execution 事实已保留，调用诊断写入失败', { trace_id: options.traceId }); }
       catch { /* journal/outbox 是可恢复事实，日志可重建且不能覆写该结果。 */ }
+    }
+  }
+
+  private async publishResult(invocationId: string, signal?: AbortSignal): Promise<void> {
+    const event = this._execution?.resultEvent(invocationId);
+    if (!event || !this._resultOutbox) return;
+    try { await this._resultOutbox.publish(event, signal); }
+    catch {
+      // 执行结果已提交；失败只保留 outbox，不重复执行。Synthesis 单独核验真实 Log 接纳。
+      try { this._observability.logger('execution-results').warn('交互结果投递待重试', { invocation_id: invocationId }); }
+      catch { /* outbox 保留可靠事实。 */ }
     }
   }
 
