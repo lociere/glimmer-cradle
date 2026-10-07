@@ -7,6 +7,7 @@ import {
   ReconcileMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema,
   ReadMemoryJobRequestsRequestSchema, ReadMemoryJobRequestsResponseSchema,
   AcknowledgeMemoryJobRequestRequestSchema, AcknowledgeMemoryJobRequestResponseSchema,
+  GetReadinessRequestSchema, GetReadinessResponseSchema, ShutdownRequestSchema, ShutdownResponseSchema,
   type ExecuteMemoryJobRequest, type ExecuteMemoryJobResponse,
   type ReconcileMemoryJobRequest, type ReconcileMemoryJobResponse,
   type ReadMemoryJobRequestsRequest, type ReadMemoryJobRequestsResponse,
@@ -39,6 +40,15 @@ export class CognitionClient implements MemoryJobsCognitionPort {
   public execute(request: ExecuteMemoryJobRequest, signal?: AbortSignal): Promise<ExecuteMemoryJobResponse> {
     return this.call('ExecuteMemoryJob', ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
       create(ExecuteMemoryJobRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public readiness(signal?: AbortSignal) {
+    return this.call('GetReadiness', GetReadinessRequestSchema, GetReadinessResponseSchema,
+      create(GetReadinessRequestSchema, { call: this.metadata() }), signal);
+  }
+  public shutdown(reason: string, signal?: AbortSignal) {
+    const call = this.metadata(); call.idempotencyKey = `shutdown:${this.generation}`;
+    return this.call('Shutdown', ShutdownRequestSchema, ShutdownResponseSchema,
+      create(ShutdownRequestSchema, { call, reason }), signal);
   }
   public reconcile(request: ReconcileMemoryJobRequest, signal?: AbortSignal): Promise<ReconcileMemoryJobResponse> {
     return this.call('ReconcileMemoryJob', ReconcileMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema,

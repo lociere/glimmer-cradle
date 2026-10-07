@@ -1,6 +1,7 @@
 import { AuthorityConflictError, HandoverController, isAuthorityCurrent, type AuthorityLease,
   type AuthorityStorePort } from '@glimmer-cradle/platform';
 import { HostJobsController, type HostJobsOptions, type HostJobsSnapshot } from './host.js';
+import { WorkerSupervisor, type WorkerSupervisorSnapshot } from '../supervision/worker-supervisor.js';
 
 export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly authority: AuthorityStorePort;
@@ -8,6 +9,85 @@ export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly renewal_interval_ms: number;
   /** 接纳显式 handover 的持久 receipt；不是自行指定 epoch。 */
   readonly initial_lease?: AuthorityLease;
+}
+
+export interface HostCognitionJobsOptions {
+  readonly worker: WorkerSupervisor;
+  readonly jobs: Omit<HostJobsOwnerOptions, 'cognition'>;
+}
+export interface HostCognitionJobsSnapshot {
+  readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
+  readonly worker: WorkerSupervisorSnapshot;
+  readonly jobs: HostJobsOwnerSnapshot | null;
+}
+
+/** 实际 Worker 与 Jobs 的局部生命周期；不替代整个产品的 ingress/readiness owner。 */
+export class HostCognitionJobsOwner {
+  private phase: HostCognitionJobsSnapshot['phase'] = 'idle';
+  private jobs?: HostJobsOwner;
+  private starting?: Promise<HostCognitionJobsSnapshot>;
+  private stopping?: Promise<void>;
+  private lossTask?: Promise<void>;
+  private unsubscribe?: () => void;
+  private stopRequested = false;
+  private readonly options: HostCognitionJobsOptions;
+  public constructor(options: HostCognitionJobsOptions) {
+    this.options = { worker: options.worker, jobs: { ...options.jobs,
+      submission_policy: { ...options.jobs.submission_policy }, retry_policy: { ...options.jobs.retry_policy },
+      ...(options.jobs.initial_lease ? { initial_lease: { ...options.jobs.initial_lease } } : {}) } };
+  }
+  public get snapshot(): HostCognitionJobsSnapshot {
+    return { phase: this.phase, worker: this.options.worker.snapshot, jobs: this.jobs?.snapshot ?? null };
+  }
+  public start(): Promise<HostCognitionJobsSnapshot> {
+    if (this.stopRequested || this.phase === 'failed') return Promise.reject(new Error('Host Worker/Jobs owner 已撤销'));
+    if (this.starting) return this.starting;
+    this.phase = 'starting';
+    this.unsubscribe = this.options.worker.onFailure(() => {
+      this.phase = 'failed';
+      this.lossTask = this.jobs?.stop() ?? Promise.resolve();
+      void this.lossTask.catch(() => undefined);
+    });
+    this.starting = this.begin(); void this.starting.catch(() => undefined); return this.starting;
+  }
+  public stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
+    this.stopRequested = true; this.phase = 'stopping';
+    // 尚未装配 Jobs 时立即中断启动屏障，不能等 startup deadline 才停止。
+    if (!this.jobs) void this.options.worker.stop().catch(() => undefined);
+    this.stopping = (async () => {
+      let drained = false;
+      try {
+        await this.jobs?.stop();
+        await this.starting?.catch(() => undefined);
+        await this.lossTask;
+        drained = true;
+      } finally {
+        try { await this.options.worker.stop(); this.phase = drained ? 'stopped' : 'failed'; }
+        catch (error) { this.phase = 'failed'; throw error; }
+        finally { this.unsubscribe?.(); this.unsubscribe = undefined; }
+      }
+    })();
+    return this.stopping;
+  }
+  private async begin(): Promise<HostCognitionJobsSnapshot> {
+    try {
+      await this.options.worker.start();
+      if (this.stopRequested || this.phase !== 'starting') throw new Error('Host Worker/Jobs 启动已撤销');
+      const cognition = this.options.worker.createJobsClient();
+      try { this.jobs = new HostJobsOwner({ ...this.options.jobs, cognition }); }
+      catch (error) { cognition.close(); throw error; }
+      await this.jobs.start();
+      if (this.stopRequested || this.phase !== 'starting' || this.options.worker.snapshot.state !== 'ready') {
+        throw new Error('Host Worker/Jobs 启动身份已撤销');
+      }
+      this.phase = 'active'; return this.snapshot;
+    } catch (error) {
+      if (!this.stopRequested) this.phase = 'failed';
+      try { await this.jobs?.stop(); } finally { await this.options.worker.stop(); this.unsubscribe?.(); }
+      throw error;
+    }
+  }
 }
 type OwnerPhase = 'idle' | 'starting' | 'active' | 'transferring' | 'transferred' | 'lease_lost' | 'failed' | 'stopping' | 'stopped';
 export interface HostJobsOwnerSnapshot {

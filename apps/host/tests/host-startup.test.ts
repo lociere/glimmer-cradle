@@ -1,25 +1,247 @@
 import { describe, it, expect, vi } from 'vitest';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { createConnection } from 'node:net';
+import * as grpc from '@grpc/grpc-js';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 import os from 'node:os';
 import Database from 'better-sqlite3';
-import { create } from '@bufbuild/protobuf';
+import { create, fromBinary, toBinary, type DescMessage, type Message } from '@bufbuild/protobuf';
+import { PublishStateResponseSchema, PublishStateRequestSchema, PublishActionRequestSchema, PublishActionResponseSchema,
+  RegisterCognitionRequestSchema, RegisterCognitionResponseSchema } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
+import type { RegisterCognitionRequest, RegisterCognitionResponse } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
 import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { JobController, JobRecoveryController, SqliteJobStore, type Job } from '@glimmer-cradle/jobs';
-import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
+  WorkerSupervisor, HostCognitionJobsOwner, type WorkerSupervisorOptions,
   memoryJobIdentity, memoryJobEvidence, memoryJobRequest } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
 const submissionPolicy = { debounce_ms: 0, max_attempts: 3 };
 const clock = { now: () => Date.now() };
+async function productionWorker(root: string, overrides: Partial<WorkerSupervisorOptions> = {}) {
+  const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
+    'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-production-seed', root], { cwd: repository, windowsHide: true });
+  const input = JSON.parse(seeded.stdout);
+  const projections: Message[] = [];
+  const supervisor = new WorkerSupervisor({ ...input, app_root: repository, data_root: root,
+    console_path: path.join(root, 'logs', 'worker-console.log'), startup_timeout_ms: 15_000,
+    shutdown_timeout_ms: 3000, request_timeout_ms: 2000,
+    accept_state: async request => {
+      projections.push(request);
+      return create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' });
+    }, ...overrides });
+  return { supervisor, projections };
+}
+async function portClosed(endpoint: string) {
+  const port = Number(endpoint.split(':').at(-1));
+  return new Promise<boolean>(resolve => {
+    const connection = createConnection({ host: '127.0.0.1', port });
+    connection.once('connect', () => { connection.destroy(); resolve(false); });
+    connection.once('error', () => { connection.destroy(); resolve(true); });
+  });
+}
+async function controlCall(endpoint: string, method: string, request: Message, input: DescMessage, output: DescMessage) {
+  const client = new grpc.Client(endpoint.replace('grpc://', ''), grpc.credentials.createInsecure());
+  try {
+    return await new Promise<Message>((resolve, reject) => client.makeUnaryRequest(`/glimmer.kernel.v1.KernelControlService/${method}`,
+      value => Buffer.from(toBinary(input, value)), bytes => fromBinary(output, bytes), request,
+      { deadline: Date.now() + 2000 }, (error, value) => error ? reject(error) : resolve(value!)));
+  } finally { client.close(); }
+}
+function productionJobs(supervisor: WorkerSupervisor, store: SqliteJobStore, authority: SqliteAuthorityStore) {
+  return new HostCognitionJobsOwner({ worker: supervisor, jobs: { store, authority, clock, owner_id: 'production-host',
+    authority_lease_ms: 2000, renewal_interval_ms: 25, poll_interval_ms: 10, batch_size: 8, lease_ms: 60_000,
+    submission_policy: { debounce_ms: 60_000, max_attempts: 3 }, retry_policy: policy } });
+}
+
+describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
+  it('实际注册/首条投影/业务 ready 后接纳持久源，先 drain Jobs 再优雅退出并释放端口', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-'));
+    const { supervisor, projections } = await productionWorker(root);
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite')), authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const owner = productionJobs(supervisor, store, authority);
+    const registration = supervisor as unknown as { register(request: RegisterCognitionRequest): RegisterCognitionResponse };
+    const register = registration.register.bind(supervisor);
+    let probes = 0;
+    const verified = vi.spyOn(registration, 'register').mockImplementation(request => {
+      for (const drift of [{ registrationNonce: 'forged' }, { call: { ...request.call!, generation: 'old' } },
+        { processId: 9007199254740992n }, { supervisorProcessId: 0n }, { endpoint: 'grpc://127.0.0.1:65536' },
+        { authProof: new Uint8Array(32) }]) {
+        expect(() => register(create(RegisterCognitionRequestSchema, { ...request, ...drift }))).toThrow(); probes++;
+      }
+      const result = register(request);
+      expect(() => register(request)).toThrow('能力已失效');
+      return result;
+    });
+    let endpoints: string[] = [];
+    try {
+      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+      const start = owner.start(); expect(owner.start()).toBe(start);
+      expect(await start).toMatchObject({ phase: 'active', worker: { state: 'ready' }, jobs: { phase: 'active' } });
+      expect(projections.length).toBeGreaterThan(0);
+      expect(probes).toBe(6);
+      expect(store.readOutbox(1, 100)).toHaveLength(1);
+      const client = supervisor.createJobsClient();
+      expect((await client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests).toEqual([]);
+      client.close();
+      const memory = new Database(path.join(root, 'state/cognition/memory.sqlite'), { readonly: true });
+      try { expect(memory.prepare('SELECT owner FROM memory_consolidation_dispatch').get()).toEqual({ owner: 'external' }); }
+      finally { memory.close(); }
+      endpoints = [supervisor.snapshot.endpoint!, supervisor.snapshot.control_endpoint!];
+      expect(owner.stop()).toBe(owner.stop()); await owner.stop();
+      expect(owner.snapshot).toMatchObject({ phase: 'stopped', worker: { state: 'stopped', forced: false, exit_code: 0 } });
+      expect(authority.load('jobs')?.status).toBe('released');
+      for (const endpoint of endpoints) expect(await portClosed(endpoint)).toBe(true);
+      const consoleLines = readFileSync(path.join(root, 'logs/worker-console.log'), 'utf8').trim().split('\n');
+      expect(JSON.parse(consoleLines[0]).module).toBe('cognition_host');
+      await expect(supervisor.start()).rejects.toThrow('已撤销');
+    } finally { verified.mockRestore(); await owner.stop(); authority.close(); store.close(); }
+  }, 30_000);
+
+  it('首条投影屏障不伪 ready；取消启动 drain 接收方且不获取 Jobs authority', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-cancel-'));
+    let received = false, cancelled = false;
+    const { supervisor } = await productionWorker(root, { accept_state: async (_request, signal) => {
+      received = true;
+      await new Promise<void>(resolve => signal.addEventListener('abort', () => { cancelled = true; resolve(); }, { once: true }));
+      signal.throwIfAborted();
+      return create(PublishStateResponseSchema);
+    } });
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite')), authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const owner = productionJobs(supervisor, store, authority);
+    try {
+      const start = owner.start(); void start.catch(() => undefined);
+      await eventually(() => received);
+      const endpoints = [supervisor.snapshot.endpoint!, supervisor.snapshot.control_endpoint!];
+      expect(supervisor.snapshot.state).toBe('starting'); expect(owner.snapshot.jobs).toBeNull();
+      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+      await owner.stop(); await expect(start).rejects.toThrow();
+      expect(cancelled).toBe(true); expect(authority.load('jobs')).toBeNull();
+      expect(store.loadAuthorityEpoch()).toBeNull();
+      for (const endpoint of endpoints) expect(await portClosed(endpoint)).toBe(true);
+    } finally { await owner.stop(); authority.close(); store.close(); }
+  }, 30_000);
+
+  it('崩溃撤销旧 client/续期，重新装配新世代与更高 epoch；旧世代投影和缺失 Action 接收拒绝', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-restart-'));
+    const { supervisor, projections } = await productionWorker(root);
+    const store = new SqliteJobStore(path.join(root, 'jobs.sqlite')), authority = new SqliteAuthorityStore(path.join(root, 'authority.sqlite'));
+    const owner = productionJobs(supervisor, store, authority);
+    let next: HostCognitionJobsOwner | undefined;
+    try {
+      await owner.start(); const prior = supervisor.snapshot;
+      const client = supervisor.createJobsClient();
+      const trace = create(CallMetadataSchema, { generation: prior.generation!, traceId: 'negative' });
+      const before = projections.length;
+      await expect(controlCall(prior.control_endpoint!, 'PublishState', create(PublishStateRequestSchema,
+        { call: { ...trace, generation: 'old-generation' } }), PublishStateRequestSchema, PublishStateResponseSchema)).rejects.toThrow();
+      expect(projections).toHaveLength(before);
+      const missing = await controlCall(prior.control_endpoint!, 'PublishAction', create(PublishActionRequestSchema,
+        { call: trace, actionType: 'test' }), PublishActionRequestSchema, PublishActionResponseSchema).catch(error => error as grpc.ServiceError);
+      expect(missing).toBeInstanceOf(Error);
+      expect(fromBinary(ServiceErrorDetailSchema, (missing as grpc.ServiceError).metadata.get('glimmer-error-bin')[0] as Buffer).code).toBe(ServiceErrorCode.NOT_READY);
+      await expect(controlCall(prior.control_endpoint!, 'RegisterCognition', create(RegisterCognitionRequestSchema, { call: trace,
+        endpoint: prior.endpoint!, processId: BigInt(prior.process_id!), supervisorProcessId: BigInt(process.pid),
+        registrationNonce: 'replay', authProof: new Uint8Array(32) }), RegisterCognitionRequestSchema, RegisterCognitionResponseSchema)).rejects.toThrow();
+      process.kill(prior.process_id!, 'SIGKILL');
+      await eventually(() => owner.snapshot.phase === 'failed' && authority.load('jobs')?.status === 'released');
+      await expect(client.readiness()).rejects.toThrow();
+      await owner.stop();
+      // 重用同一持久事实，但新实例必须重新认证，不能拿旧 handler/世代当重启。
+      const seeded = await productionWorker(root);
+      next = productionJobs(seeded.supervisor, store, authority);
+      expect(await next.start()).toMatchObject({ phase: 'active', jobs: { lease: { epoch: 2 } } });
+      expect(seeded.supervisor.snapshot.generation).not.toBe(prior.generation);
+      const events = store.readOutbox(2, 100);
+      // 接管会发布新 revision；不能把事件条数当业务 Job 条数。
+      expect(events).toHaveLength(2);
+      expect(new Set(events.map(event => event.job_id)).size).toBe(1);
+      expect(events.map(event => event.authority_epoch)).toEqual([1, 2]);
+    } finally { await next?.stop(); await owner.stop(); authority.close(); store.close(); }
+  }, 40_000);
+
+  it.each(['config', 'executable'])('生产启动失败（%s）撤销注册能力并回收，错误快照不包含配置密钥', async mode => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-failure-'));
+    const { supervisor } = await productionWorker(root, mode === 'config'
+      ? { runtime_document: { api_key: 'fixture-private-key' } }
+      : { python_executable: path.join(root, 'missing-python.exe') });
+    try {
+      await expect(supervisor.start()).rejects.toThrow();
+      expect(supervisor.snapshot).toMatchObject({ state: 'failed', endpoint: null, control_endpoint: null });
+      expect(JSON.stringify(supervisor.snapshot)).not.toContain('fixture-private-key');
+      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+    } finally { await supervisor.stop(); }
+  }, 30_000);
+
+  it('启动 deadline 取消状态接收并回收实际进程，不把已注册端点当 ready', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-deadline-'));
+    let cancelled = false;
+    const { supervisor } = await productionWorker(root, { startup_timeout_ms: 2500, request_timeout_ms: 2500,
+      accept_state: async (_request, signal) => {
+        await new Promise<void>(resolve => signal.addEventListener('abort', () => { cancelled = true; resolve(); }, { once: true }));
+        signal.throwIfAborted(); return create(PublishStateResponseSchema);
+      } });
+    try {
+      const began = Date.now();
+      await expect(supervisor.start()).rejects.toThrow();
+      expect(Date.now() - began).toBeGreaterThanOrEqual(2500);
+      expect(cancelled).toBe(true);
+      expect(supervisor.snapshot).toMatchObject({ state: 'failed', endpoint: null, control_endpoint: null });
+    } finally { await supervisor.stop(); }
+  }, 30_000);
+
+  it('协议 shutdown 不可用时只强制回收本实例进程，真实端口关闭后报告 forced', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-forced-'));
+    const { supervisor } = await productionWorker(root, { shutdown_timeout_ms: 100 });
+    let shutdown: { mockRestore(): void } | undefined;
+    try {
+      await supervisor.start();
+      const endpoints = [supervisor.snapshot.endpoint!, supervisor.snapshot.control_endpoint!];
+      shutdown = vi.spyOn(CognitionClient.prototype, 'shutdown').mockRejectedValue(new Error('fixture unavailable'));
+      await supervisor.stop();
+      expect(supervisor.snapshot).toMatchObject({ state: 'stopped', forced: true });
+      for (const endpoint of endpoints) expect(await portClosed(endpoint)).toBe(true);
+    } finally { shutdown?.mockRestore(); await supervisor.stop(); }
+  }, 30_000);
+
+  it('状态接收方返回拒绝不建立首条投影 ready', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-rejected-state-'));
+    const { supervisor } = await productionWorker(root, { accept_state: async () =>
+      create(PublishStateResponseSchema, { operationId: 'rejected', status: 'rejected' }) });
+    try {
+      await expect(supervisor.start()).rejects.toThrow();
+      expect(supervisor.snapshot).toMatchObject({ state: 'failed', endpoint: null, control_endpoint: null });
+    } finally { await supervisor.stop(); }
+  }, 30_000);
+
+  it('不响应取消的接收方不能伪称 drain/stopped，端口仍必须回收', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-production-undrained-'));
+    let received = false, release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const { supervisor } = await productionWorker(root, { shutdown_timeout_ms: 100, accept_state: async request => {
+      received = true; await pending;
+      return create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' });
+    } });
+    const start = supervisor.start(); void start.catch(() => undefined);
+    try {
+      await eventually(() => received);
+      const endpoint = supervisor.snapshot.control_endpoint!;
+      await expect(supervisor.stop()).rejects.toThrow('接收方未响应取消');
+      expect(supervisor.snapshot).toMatchObject({ state: 'failed', error_code: 'worker_control_failed', control_endpoint: null });
+      expect(await portClosed(endpoint)).toBe(true);
+      await expect(start).rejects.toThrow();
+    } finally { release(); await supervisor.stop().catch(() => undefined); }
+  }, 30_000);
+});
 async function worker(root: string, generation: string) {
   const child = spawn('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
     'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-job-fixture', root, generation],

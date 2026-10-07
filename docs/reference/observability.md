@@ -24,6 +24,13 @@ Desktop main 的 `process_log_ref` 只暴露一个规范化 `path`、owner 与�
 
 ## 可观测数据类型
 
+目标 Host `WorkerSupervisor` 将子进程 stdout/stderr 追加到装配方显式注入的绝对 console 路径，
+对配置/环境中识别的敏感值与 Bearer 脱敏；超过 64 KiB 的整行省略，避免分块绕过脱敏边界。
+该路径不是新增产品默认日志目录，最终仍由产品路径装配归入 application logs。局部监督 snapshot
+只暴露 state、generation、受管 PID、Worker/control 回环端点、稳定 error_code、exit_code 与 forced，
+不含原始错误、注册能力或配置；接收取消/drain 失败不能显示 stopped。整个 Host/UI 运行状态接线
+仍待迁移，该快照不是整个产品的 runtime catalog。
+
 | 类型 | 回答的问题 | 典型位置 | 不能替代 |
 |---|---|---|---|
 | 日志 | 发生了什么离散事件，摘要是什么 | `data/observability/logs/`、`events/` | trace 的因果链 |

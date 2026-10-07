@@ -1,8 +1,10 @@
 export { CognitionJobAdapter } from './composition/cognition-job-adapter.js';
 export { HostJobsController } from './composition/host.js';
 export type { HostJobsOptions, HostJobsSnapshot } from './composition/host.js';
-export { HostJobsOwner } from './composition/domain-owners.js';
-export type { HostJobsOwnerOptions, HostJobsOwnerSnapshot } from './composition/domain-owners.js';
+export { HostJobsOwner, HostCognitionJobsOwner } from './composition/domain-owners.js';
+export type { HostJobsOwnerOptions, HostJobsOwnerSnapshot, HostCognitionJobsOptions, HostCognitionJobsSnapshot } from './composition/domain-owners.js';
+export { WorkerSupervisor } from './supervision/worker-supervisor.js';
+export type { WorkerSupervisorOptions, WorkerSupervisorSnapshot, WorkerSession } from './supervision/worker-supervisor.js';
 export { SqliteAuthorityStore } from './adapters/platform/authority-store.js';
 export { CognitionClient, HostCognitionError } from './adapters/protocol/cognition-client.js';
 export type { MemoryJobsCognitionPort } from './adapters/protocol/cognition-client.js';

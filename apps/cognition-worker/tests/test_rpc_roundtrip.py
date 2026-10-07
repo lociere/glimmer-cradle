@@ -12,6 +12,7 @@ from conftest import (
     FixedClock,
     NullObservability,
     build_test_recorder,
+    normalized_document,
 )
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
@@ -943,6 +944,39 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
 
 if __name__ == "__main__" and len(sys.argv) == 4 and sys.argv[1] == "--host-job-fixture":
     asyncio.run(_host_memory_job_fixture(Path(sys.argv[2]), sys.argv[3]))
+
+
+async def _host_production_seed(root: Path) -> None:
+    """仅准备真实持久源；被验收的进程仍由 Host 直接启动生产 CLI/factory。"""
+    state = root / "state" / "cognition"
+    recorder = build_test_recorder(state / "experience")
+    await recorder.start()
+    database = SqliteMemoryStore(state / "memory.sqlite")
+    coordinator = None
+    try:
+        if not recorder.log.query():
+            recorder.record(MomentKind.PERCEPTION, {"text": "生产装配持久源"}, interaction_id="production-turn",
+                conversation_id="production-conversation", retention_ceiling="memory_candidate", importance=0.9)
+            await recorder.flush()
+        await database.connect()
+        await database.select_consolidation_dispatch("external")
+        memory = MemoryController(clock=FixedClock())
+        memory.bind_repository(MemoryRepository(database))
+        await memory.load()
+        coordinator = ConsolidationCoordinator(episodes=EpisodeProjection(state / "projections" / "episodes.db", recorder),
+            memory=memory, jobs=None, llm=None, clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
+        await coordinator.start()
+        await coordinator.consolidate(force_seal=True)
+    finally:
+        if coordinator is not None:
+            await coordinator.stop()
+        await recorder.stop()
+        await database.close()
+    print(json.dumps({"python_executable": sys.executable, "runtime_document": normalized_document()}), flush=True)
+
+
+if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--host-production-seed":
+    asyncio.run(_host_production_seed(Path(sys.argv[2])))
 
 
 @pytest.mark.asyncio

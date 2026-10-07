@@ -34,6 +34,13 @@ Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legac
 
 ## 变更规则
 
+目标 Host `WorkerSupervisor` 的 owner-local 装配参数须显式提供绝对 Python executable、App/Data 根、
+console 路径、完整规范化 runtime Document 和 startup/shutdown/request deadline；request 不得超过
+startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监督固定选择 external，不改变产品
+默认 legacy。endpoint/generation/nonce/注册能力仅通过 FD3 交给本实例 Worker，不通过配置或环境
+发布；运行根与原有配置 Document 仍通过现行 Worker 环境注入。Jobs schema/catalog、产品路径加载
+与默认入口切换仍待完成，不能把这些装配参数另存为第二份角色配置 Schema。
+
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。
 - 路径配置必须经过 resolver，不能在业务代码拼接源码相对路径或安装相对路径。

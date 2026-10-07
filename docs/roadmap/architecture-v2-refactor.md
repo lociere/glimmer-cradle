@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query、持续单循环调度与持久 authority 交接已通过真实跨进程验证；生产进程监督/config/authority 路径、状态事件接纳与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query、持续单循环调度、持久 authority 交接与真实 Worker CLI 监督/Jobs 生命周期已验证；产品入口/config/authority 路径、状态事件接纳与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -443,6 +443,43 @@ Worker 改动测试 Ruff PASS；Core 两份改动文件 Ruff 报告 12 项既存
 编码、架构与 diff 门 PASS，target-layout 仅 spec-only PASS。下一步将受监督 Worker 与现有
 HostJobsOwner 贯通到目标 Host 的实际进程监督装配，再继续配置 Document/catalog 与状态事件接收；
 不把临时 Kernel 的 opt-in 验收当作目标 Host supervisor 已完成。
+
+### 阶段 7 目标 Host 真实 Worker 监督与 Jobs 生命周期（2026-10-07 当前候选）
+
+输入 `bc905675`；当前会话唯一写入 owner。在目标清单的 `apps/host/src/supervision/worker-supervisor.ts`
+接通实际 Python Worker CLI，并在已有 `composition/domain-owners.ts` 组合 HostJobsOwner；复用现行唯一
+生成的注册、投影、readiness 与 shutdown 契约，不新增跨进程模型。注册能力仅由 FD3 传递；本代
+认证注册、首条投影真实接纳及业务 readiness 全部满足后才启动 Jobs。正常停机先 drain Jobs、释放
+authority，再协议级停止 Worker 并核验实际退出；异常退出撤销旧 client，下一实例使用新世代。
+未装配 Action/Log 接收方明确拒绝，状态接收方为必需注入，不能默认伪 ACK；接收任务取消与 drain
+由监督 owner 持有。现行 KernelControlService 名称随阶段 11 唯一契约原子迁移收束；旧 Kernel 监督
+和默认 legacy 队列仍须在产品入口替换、consumer-zero 与阶段 14 数据门通过后删除。
+验收真实生产 factory 启动/源接纳、首条投影屏障、取消/失败/崩溃/新世代重启、请求世代隔离、
+有序停机与端口/进程回收，以及根 typecheck/build 和文档/编码/架构门。不迁移用户数据库，
+不把局部 Worker+Jobs ready 宣称为整个 Host、产品 ingress 或重构完成。
+
+候选成果：上述生产 CLI/factory 监督与 `HostCognitionJobsOwner` 已接通；一次性能力的 nonce、
+世代、PID/父 PID、端点和 HMAC 反例均拒绝且不消耗合法注册，成功后重放拒绝。状态接收取消、
+拒绝 ACK 或缺少真实接收都不能形成首条 ready；异常退出撤销旧 client/续期，下一实例使用新
+generation、重新注册并接管更高 authority epoch。接管发布同 Job 的新 revision，不把状态事件
+条数误当业务 Job 条数。正常停机 drain Jobs 后使用独立生命周期 client；Shutdown RPC 与进程
+退出等待共用 shutdown 预算，期限后只回收本实例进程树。Windows redirector 退出后仍按本代
+认证 PID 回收其直接子进程；无实际退出或接收方 drain 证据时拒绝报告 stopped。console 按完整
+UTF-8 行捕获，已识别配置/环境敏感值、JSON 转义与 Bearer 脱敏，超长整行省略。
+
+验证输入为父提交 `bc905675` 上本段明确的 16 份源码/测试/文档候选，源码已固定。Host 全量
+48 项（生产监督反例 9 项、既有真实 Memory RPC/Jobs 27 项、authority 9 项和公开 API/日志 3 项）
+PASS；Worker 全量 80 项及改动测试 Ruff PASS。生产监督验收真实 factory、持久源接纳、
+首条状态屏障、启动取消/deadline、非法配置/缺 executable、世代隔离、崩溃/新实例接管、
+正常/强制退出、控制端口回收及不合作接收方拒绝伪 drain；准备 fixture 只生成规范化 Document
+和持久源，被测进程仍直接运行生产 CLI。该生产源采用未到期政策，不宣称该用例验证了供应商模型
+推理或 Memory 业务提交；后者由原 27 项真实 RPC/Memory 回归覆盖，不替代正式产品模型门。
+根 `pnpm typecheck`、`pnpm build` 最终候选复验 PASS；文档 111 页、UTF-8/无 BOM、架构和 diff
+门 PASS，target-layout 仅 spec-only PASS，不代表最终物理清单已完成。未修改 wire、Document Schema、生成树
+或依赖，Contract Spine 完整 22 gate 与 Kernel 14 项未失效证据复用；没有运行完整 UI/Unity、
+跨机部署、安装恢复或迁移用户库。独立审查仍留完整重构的固定最终候选。
+下一步推进 Jobs 配置 Document/catalog、实际 Host 路径装配及状态事件接收；唯一契约迁移前
+维持现行 `contracts/`，旧 Kernel 与旧巩固队列的删除门、阶段 14 数据恢复门不放宽。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

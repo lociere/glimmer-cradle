@@ -254,7 +254,14 @@ signal 与执行接纳，等待在途封口和循环后关闭当前 generation c
 整个产品 ready。未注入持久状态 receiver 时 outbox 保持待确认，不能假 ACK。实例持有政策副本，
 源已接纳工作跨重启恢复首次政策。Host 已通过 `HostJobsOwner` 注入实际持久 authority 并接通
 续期/撤销/drain 确认，具体机制见 [Platform authority](./Platform原语实现.md#authority-与受控转移)。
-生产进程 supervisor、配置/authority 路径加载、状态事件 wire/inbox
+目标 Host 的 `WorkerSupervisor` 已直接接通实际 Python CLI/factory，显式选择 external；FD3 一次性
+注册能力绑定本代 nonce、端点与受管 PID/父 PID，非法探测不消耗合法能力，成功后拒绝重放。
+首条状态真实接纳与生成的 GetReadiness 本代业务 ready 共同封住启动屏障；缺少 Action/Log 接收
+返回 NOT_READY，不伪装业务 ACK。`HostCognitionJobsOwner` 随后启动持久 Jobs owner；正常停机
+先 drain Jobs/释放 authority，再独立生命周期 client 发 Shutdown 并等待实际进程退出。超时回收
+本实例进程树，接收方不响应取消则回收失败，不能宣称 drain 完成。异常退出撤销旧客户端并停止
+续期；下一实例重新注册、新世代/更高 epoch 接管，状态 outbox 包括正常的接管 revision。
+本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；配置/authority 路径加载、状态事件 wire/inbox
 与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

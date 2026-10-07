@@ -59,7 +59,9 @@ Host `adapters/platform/authority-store.ts` 在 SQLite IMMEDIATE 事务中更新
 从原 attempt unknown 对账。更高 epoch 撤销旧循环，旧实例不能释放新主。
 authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒绝启动，不靠重复获取 epoch
 绕过恢复门。phase active 仅表示租约已持有，不表示 Jobs/整个产品 ready。
-当前验证是本地临时库与真实 Worker；生产进程监督、跨机 wire/认证、离线 proposal 和恢复安装仍待完成。
+目标 Host 已通过 `HostCognitionJobsOwner` 接通真实 Worker 监督与本地持久 Jobs 生命周期，见
+[Cognition 实现](./Cognition认知核实现.md#记忆经历与持久化)；当前验证使用临时库，没有替换产品默认
+启动入口。跨机 wire/认证、离线 proposal 和恢复安装仍待完成。
 
 ## 调试与验证
 
