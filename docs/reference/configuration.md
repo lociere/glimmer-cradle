@@ -242,6 +242,12 @@ description: 帮助整理用户提供的笔记。
 
 当前支持 SKILL.md 指令正文；不自动读取引用文件或执行附带脚本。最多加载 100 个目录，每个文件最多 32 KiB，正文不能为空；符号链接技能目录及非普通文件不加载。单个无效文件会产生降级诊断，其余有效技能仍可用。安装或修改后重启服务重新加载，可在能力目录检查 `user.<name>` 的状态。
 
+有效技能贡献方法知识，不贡献 `instructions.read` Tool。现行规划先提供无正文目录，按被选中
+的定义引用复验 scope、revision 与 readiness 后最多加载两份、合计 64 KiB UTF-8 正文；材料
+独立传入模型，不改写用户目标或绕过工具权限。正文加载不调用 Gateway，也不记录 Tool
+Execution；provider 停止后原方法引用失效。原生 Step/Loop 接线状态见
+[执行记录](../roadmap/architecture-v2-refactor.md)。
+
 ## 环境变量边界
 
 环境变量用于部署覆盖、密钥注入或本地调试，不应替代普通配置事实源。音频密钥使用 `DASHSCOPE_API_KEY`；进程级超时可用 `GLIMMER_CRADLE_AUDIO_TTS_TIMEOUT_MS`、`GLIMMER_CRADLE_AUDIO_ASR_TIMEOUT_MS` 覆盖；FunASR 的本机缓存调试方式见 [音频引擎开发指南](../guides/subsystems/音频引擎开发.md)。

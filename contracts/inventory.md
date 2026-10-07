@@ -1,5 +1,9 @@
 # M12 Contract Spine Inventory
 
+Architecture v2 阶段 6 方法知识：`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有
+`SkillReference`、`SkillDescriptor`、`SkillMaterial`。Cognition `PlanRequest` 添加独立方法目录/
+正文，`PlanResponse` 添加所选引用；不把 Skill 变成 Tool 或执行结果。保留原字段和兼容基线。
+
 Architecture v2 阶段 6 结果投递：`proto/glimmer/capabilities/v1/capabilities.proto` 独占
 `ExecutionResultState`、`ExecutionSideEffects`、`ExecutionResultEvent`；
 `proto/glimmer/conversation/v1/conversation.proto` 新增 `ConversationService`、`AcceptExecutionResult`、

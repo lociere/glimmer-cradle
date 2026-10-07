@@ -12,7 +12,82 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/capabilities/v1/capabilities.proto.
  */
 export const file_glimmer_capabilities_v1_capabilities: GenFile = /*@__PURE__*/
-  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxItwDChRFeGVjdXRpb25SZXN1bHRFdmVudBIQCghldmVudF9pZBgBIAEoCRIVCg1pbnZvY2F0aW9uX2lkGAIgASgJEhAKCHJldmlzaW9uGAMgASgEEg8KB2F0dGVtcHQYBCABKA0SEAoIc2NvcGVfaWQYBSABKAkSFwoPY29udmVyc2F0aW9uX2lkGAYgASgJEhYKDnNvdXJjZV9mYWN0X2lkGAcgASgJEhMKC2V4ZWN1dG9yX2lkGAggASgJEhUKDWNhcGFiaWxpdHlfaWQYCSABKAkSGwoTZGVmaW5pdGlvbl9yZXZpc2lvbhgKIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgLIAEoCRI8CgVzdGF0ZRgMIAEoDjItLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4ZWN1dGlvblJlc3VsdFN0YXRlEkMKDHNpZGVfZWZmZWN0cxgNIAEoDjItLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4ZWN1dGlvblNpZGVFZmZlY3RzEiYKBnJlc3VsdBgOIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZRISCgplcnJvcl9jb2RlGA8gASgJEhUKDXVwZGF0ZWRfYXRfbXMYECABKAQqqwEKFEV4ZWN1dGlvblJlc3VsdFN0YXRlEiYKIkVYRUNVVElPTl9SRVNVTFRfU1RBVEVfVU5TUEVDSUZJRUQQABIkCiBFWEVDVVRJT05fUkVTVUxUX1NUQVRFX1NVQ0NFRURFRBABEiEKHUVYRUNVVElPTl9SRVNVTFRfU1RBVEVfRkFJTEVEEAISIgoeRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9VTktOT1dOEAMqqQEKFEV4ZWN1dGlvblNpZGVFZmZlY3RzEiYKIkVYRUNVVElPTl9TSURFX0VGRkVDVFNfVU5TUEVDSUZJRUQQABIfChtFWEVDVVRJT05fU0lERV9FRkZFQ1RTX05PTkUQARIkCiBFWEVDVVRJT05fU0lERV9FRkZFQ1RTX0NPTkZJUk1FRBACEiIKHkVYRUNVVElPTl9TSURFX0VGRkVDVFNfVU5LTk9XThADQjKqAi9HbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkNhcGFiaWxpdGllcy5WMWIGcHJvdG8z", [file_google_protobuf_struct]);
+  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxIj8KDlNraWxsUmVmZXJlbmNlEhAKCHNraWxsX2lkGAEgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAkicAoPU2tpbGxEZXNjcmlwdG9yEjoKCXJlZmVyZW5jZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJlbmNlEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkiYQoNU2tpbGxNYXRlcmlhbBI6CglyZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbFJlZmVyZW5jZRIUCgxpbnN0cnVjdGlvbnMYAiABKAki3AMKFEV4ZWN1dGlvblJlc3VsdEV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEhUKDWludm9jYXRpb25faWQYAiABKAkSEAoIcmV2aXNpb24YAyABKAQSDwoHYXR0ZW1wdBgEIAEoDRIQCghzY29wZV9pZBgFIAEoCRIXCg9jb252ZXJzYXRpb25faWQYBiABKAkSFgoOc291cmNlX2ZhY3RfaWQYByABKAkSEwoLZXhlY3V0b3JfaWQYCCABKAkSFQoNY2FwYWJpbGl0eV9pZBgJIAEoCRIbChNkZWZpbml0aW9uX3JldmlzaW9uGAogASgJEhYKDnJlcXVlc3RfZGlnZXN0GAsgASgJEjwKBXN0YXRlGAwgASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uUmVzdWx0U3RhdGUSQwoMc2lkZV9lZmZlY3RzGA0gASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoGcmVzdWx0GA4gASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEhIKCmVycm9yX2NvZGUYDyABKAkSFQoNdXBkYXRlZF9hdF9tcxgQIAEoBCqrAQoURXhlY3V0aW9uUmVzdWx0U3RhdGUSJgoiRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9VTlNQRUNJRklFRBAAEiQKIEVYRUNVVElPTl9SRVNVTFRfU1RBVEVfU1VDQ0VFREVEEAESIQodRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9GQUlMRUQQAhIiCh5FWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOS05PV04QAyqpAQoURXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoiRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTlNQRUNJRklFRBAAEh8KG0VYRUNVVElPTl9TSURFX0VGRkVDVFNfTk9ORRABEiQKIEVYRUNVVElPTl9TSURFX0VGRkVDVFNfQ09ORklSTUVEEAISIgoeRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTktOT1dOEANCMqoCL0dsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ2FwYWJpbGl0aWVzLlYxYgZwcm90bzM", [file_google_protobuf_struct]);
+
+/**
+ * 方法知识的引用/发现/正文与可执行 Tool 独立；模型选择引用不授予任何权限。
+ *
+ * @generated from message glimmer.capabilities.v1.SkillReference
+ */
+export type SkillReference = Message<"glimmer.capabilities.v1.SkillReference"> & {
+  /**
+   * @generated from field: string skill_id = 1;
+   */
+  skillId: string;
+
+  /**
+   * @generated from field: string definition_revision = 2;
+   */
+  definitionRevision: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.SkillReference.
+ * Use `create(SkillReferenceSchema)` to create a new message.
+ */
+export const SkillReferenceSchema: GenMessage<SkillReference> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 0);
+
+/**
+ * @generated from message glimmer.capabilities.v1.SkillDescriptor
+ */
+export type SkillDescriptor = Message<"glimmer.capabilities.v1.SkillDescriptor"> & {
+  /**
+   * @generated from field: glimmer.capabilities.v1.SkillReference reference = 1;
+   */
+  reference?: SkillReference | undefined;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.SkillDescriptor.
+ * Use `create(SkillDescriptorSchema)` to create a new message.
+ */
+export const SkillDescriptorSchema: GenMessage<SkillDescriptor> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 1);
+
+/**
+ * @generated from message glimmer.capabilities.v1.SkillMaterial
+ */
+export type SkillMaterial = Message<"glimmer.capabilities.v1.SkillMaterial"> & {
+  /**
+   * @generated from field: glimmer.capabilities.v1.SkillReference reference = 1;
+   */
+  reference?: SkillReference | undefined;
+
+  /**
+   * 不可信任务参考材料；不是 system instruction 或已验证事实。
+   *
+   * @generated from field: string instructions = 2;
+   */
+  instructions: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.SkillMaterial.
+ * Use `create(SkillMaterialSchema)` to create a new message.
+ */
+export const SkillMaterialSchema: GenMessage<SkillMaterial> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 2);
 
 /**
  * Execution 拥有结果；不传入请求正文/授权详情，也不复制 Conversation 拓扑。
@@ -110,7 +185,7 @@ export type ExecutionResultEvent = Message<"glimmer.capabilities.v1.ExecutionRes
  * Use `create(ExecutionResultEventSchema)` to create a new message.
  */
 export const ExecutionResultEventSchema: GenMessage<ExecutionResultEvent> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 0);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 3);
 
 /**
  * @generated from enum glimmer.capabilities.v1.ExecutionResultState

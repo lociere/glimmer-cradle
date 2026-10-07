@@ -21,6 +21,7 @@ from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
     AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest, PublishMemoryJobStateRequest,
     PlanningJobSourceRequest, ReadPlanningJobRequestsRequest, ReadPlanningJobRequestsResponse,
     AcknowledgePlanningJobRequestRequest, AcknowledgePlanningJobRequestResponse,
+    PlanRequest, PlanResponse,
 )
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
     AudioPlayEvent,
@@ -31,6 +32,16 @@ fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
+
+from glimmer.capabilities.v1.capabilities_pb2 import SkillReference, SkillDescriptor, SkillMaterial  # noqa: E402
+method_ref = SkillReference(skill_id="method:总结", definition_revision="revision:一")
+method_plan = PlanRequest(user_goal="原始目标", available_skills=[SkillDescriptor(reference=method_ref, name="总结", description="方法知识")],
+    skill_materials=[SkillMaterial(reference=method_ref, instructions="参考材料\n不授予权限。")])
+assert PlanRequest.FromString(method_plan.SerializeToString()) == method_plan
+assert not method_plan.available_tools
+method_response = PlanResponse(selected_skills=[method_ref])
+assert PlanResponse.FromString(method_response.SerializeToString()) == method_response
+assert not PlanRequest.FromString(b"").skill_materials
 
 from glimmer.capabilities.v1.capabilities_pb2 import ExecutionResultEvent  # noqa: E402
 from glimmer.conversation.v1.conversation_pb2 import AcceptExecutionResultRequest, AcceptExecutionResultResponse  # noqa: E402

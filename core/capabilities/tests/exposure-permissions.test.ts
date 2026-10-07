@@ -55,6 +55,21 @@ const resource: Resource = { ...base, reader_id: 'reader', input_schema: null };
 const skill: Skill = { ...base, instructions: { kind: 'inline', text: '方法材料，不授予权限。' } };
 
 describe('Tool / Resource / Skill 独立 owner', () => {
+  it('方法发现只给摘要，正文按 revision/scope/readiness 重新读取，撤销后旧引用失效', () => {
+    const methods = new SkillCatalog(); methods.register(skill);
+    const summary = methods.inlineSummaries(context)[0];
+    expect(summary).not.toHaveProperty('instructions');
+    expect(Object.isFrozen(summary.reference)).toBe(true);
+    expect(methods.inlineMaterial(summary.reference, context)?.instructions).toBe(skill.instructions.kind === 'inline' ? skill.instructions.text : '');
+    methods.register({ ...skill, revision: '2', scopes: [{ kind: 'conversation', ids: ['private'] }] });
+    expect(methods.inlineMaterial(summary.reference, context)).toBeUndefined();
+    expect(methods.inlineSummaries(context)).toEqual([]);
+    methods.register({ ...skill, revision: '3', readiness: 'degraded' });
+    expect(methods.inlineMaterial({ skill_id: skill.id, definition_revision: '3' }, context)).toBeUndefined();
+    methods.register({ ...skill, revision: '4', instructions: { kind: 'reader', reader_id: 'reader', input_schema: {} } });
+    expect(methods.inlineSummaries(context)).toEqual([]);
+    expect(methods.inlineMaterial({ skill_id: skill.id, definition_revision: '4' }, context)).toBeUndefined();
+  });
   it('三类允许同 ID，无 Tool 父 Skill；分别撤销而不互相删除', () => {
     const tools = new ToolRegistry(); const resources = new ResourceRegistry(); const methods = new SkillCatalog();
     tools.register(tool); resources.register(resource); methods.register(skill);

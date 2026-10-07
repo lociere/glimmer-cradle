@@ -1,5 +1,5 @@
 import type { ConversationContext } from '@glimmer-cradle/conversation';
-import type { CapabilityScope, CapabilityScopeContext, Tool, Resource, Skill } from '@glimmer-cradle/capabilities';
+import type { CapabilityScope, CapabilityScopeContext, Tool, Resource, Skill, SkillSummary, SkillReference, SkillMaterial } from '@glimmer-cradle/capabilities';
 export type { CapabilityScope } from '@glimmer-cradle/capabilities';
 
 export type ExtensionProductTarget = 'any' | 'desktop' | 'personal-server';
@@ -130,6 +130,8 @@ export interface CapabilityCatalogPort {
   listCatalogEntries(): SkillCatalogEntry[];
   getCatalogSnapshot(): SkillCatalogSnapshot;
   listReadyTools(context?: CapabilityScopeContext): Array<{ skill_id: string; tool_name: string; description: string; parameters: unknown }>;
+  listReadyMethods(context?: CapabilityScopeContext): readonly SkillSummary[];
+  readMethod(reference: SkillReference, context?: CapabilityScopeContext): SkillMaterial | undefined;
   isProviderReady(ownerId: string): boolean;
 }
 export interface SkillMetadata extends Record<string, unknown> { runtime_status?: SkillRuntimeStatus; implementation?: string; audience?: SkillAudience }

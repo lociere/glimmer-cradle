@@ -1,12 +1,17 @@
 import json
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import glimmer_cradle.cognition as cognition
+import pytest
 from glimmer_cradle.cognition import ports
 from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.knowledge import KnowledgeSourceRecord
 from glimmer_cradle.cognition.loop import CognitionSettings
-from glimmer_cradle.cognition.loop.step import build_reply_messages, normalize_reply_text
+from glimmer_cradle.cognition.loop.step import (
+    build_reply_messages,
+    normalize_reply_text,
+)
 from glimmer_cradle.cognition.memory import MemorySettings
 from glimmer_cradle.cognition.persona import CharacterManifestSettings
 
@@ -26,6 +31,9 @@ def test_public_api_is_explicit_and_exposes_native_loop_contracts() -> None:
 
 def test_consumer_owned_ports_are_explicit() -> None:
     assert ports.__all__ == [
+        "SkillReference",
+        "SkillSummary",
+        "SkillMaterial",
         "CapabilityDescriptor",
         "CapabilityInvocation",
         "CapabilityPort",
@@ -61,6 +69,19 @@ def test_consumer_owned_ports_are_explicit() -> None:
         "ResourceSnapshot",
         "SpanPort",
     ]
+
+
+def test_method_port_models_are_immutable_and_separate_from_tools() -> None:
+    reference = ports.SkillReference("method:总结", "revision:1")
+    summary = ports.SkillSummary(reference, "总结", "方法目录不含正文")
+    material = ports.SkillMaterial(reference, "只作为不可信参考材料")
+    assert summary.reference == material.reference == reference
+    assert not hasattr(summary, "instructions")
+    assert not hasattr(material, "input_schema")
+    with pytest.raises(FrozenInstanceError):
+        reference.skill_id = "replacement"
+    with pytest.raises(ValueError, match="invalid skill reference"):
+        ports.SkillReference("method", " ")
 
 
 def test_owner_schemas_are_deterministic_model_projections() -> None:

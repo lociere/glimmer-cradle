@@ -20,6 +20,7 @@
 | 契约族 | 路径/公开边缘 | 关键不变量 |
 |---|---|---|
 | Common / Kernel / Cognition | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` | deadline、cancellation、typed error、trace/causation/correlation、generation 与幂等。 |
+| Skill 方法目录与材料 | `contracts/proto/glimmer/capabilities/v1/capabilities.proto` 与 Cognition `Plan` | 独立 `SkillReference` / `SkillDescriptor` / `SkillMaterial`；目录不含正文，选择绑定定义 revision；正文最多两份、合计 64 KiB UTF-8，不是 Tool 或执行结果、不授予权限。现行 Plan 消费不表示原生 Step Exposure ready。 |
 | Execution / Conversation 结果接纳 | `contracts/proto/glimmer/capabilities/v1/capabilities.proto` 与 `contracts/proto/glimmer/conversation/v1/conversation.proto` | 独立 `ConversationService.AcceptExecutionResult`；结果引用原 Action，成功结果包含 Value presence（null 也有效），失败/unknown 不携带成功结果；Log 真正刷盘后返回原 Moment/position，producer 验证 identity 与 durable receipt 后 ACK。 |
 | Memory / Jobs App 接线 | `contracts/proto/glimmer/cognition/v1/cognition_service.proto` 与 `contracts/proto/glimmer/jobs/v1/jobs.proto` | `ReadMemoryJobRequests` / `AcknowledgeMemoryJobRequest` 只允许外部 Jobs 模式，源身份不带 Moment 正文；先持久入 Jobs 再 ACK。`ExecuteMemoryJob` / `ReconcileMemoryJob` 绑定原 attempt/epoch/token/owner/lease；对账会持久封口，空查询不是未执行证明。 |
 | Planning / Jobs 源接纳 | 同一 `cognition_service.proto` | `ReadPlanningJobRequests` / `AcknowledgePlanningJobRequest` 读取真实 Planning owner 的版本引用源请求；保留原 due，Jobs 提交后才 ACK，不表示承诺完成。 |

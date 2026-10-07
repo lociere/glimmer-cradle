@@ -116,7 +116,12 @@ Schema 源。现行 SDK/wire 的 `SkillDescriptor` 仍是旧分组投影，`tota
 会使绑定失效。规划直接读取 ToolRegistry 的有效 ready 定义；连接降级不继续暴露/调用旧 handler。
 应用只依赖 `CapabilityCatalogPort`，具体 adapter 只由 composition 注入；旧 SkillRegistry owner
 已经删除。接入映射随阶段 12 移到 App，旧 SDK 分组在阶段 9/11/12 原生消费者归零后删除。
-User Provider 的 `instructions.read` 假 Tool 与现行两次规划仍是待切换项，不声称用户方法语义完成。
+User Provider 已以 inline 方法接入独立 SkillCatalog，删除 `instructions.read` 假 Tool；现行两次
+Plan 分别消费方法目录与正文。原生 Step Exposure 与 Loop broker 仍待切换，不声称整条主链完成。
+
+User 来源整体 degraded 保留坏文件诊断；成功逐文件加载的静态方法由接入事实
+`ready_inline_method_groups` 明确记录并冻结，仍可通过定义/scope/revision 复验。该标记不
+放宽动态 MCP 来源、Tool 或 reader readiness；来源停止、缺少加载事实或方法撤销仍失败关闭。
 新包已接根 test/typecheck/build 与 Kernel workspace 依赖；Kernel 的 with-deps 命令按真实依赖
 闭包构建。Personal Server Docker 安装前显式复制其 Core manifest，构建先于 Kernel；临时
 `pnpm deploy` 已验证新包从部署树自身解析，不回查源码仓库，真实 OCI/完整安装验收仍待执行。
@@ -170,13 +175,13 @@ Core Skill Provider 通过 `CorePlatformBridge` 注入真实 handler，覆盖桌
 
 确认请求只路由到具有 `surface:write` 的连接，回执绑定接收请求的 session 和响应类型；只读就绪观察连接不处理动作。Electron 使用原生确认框，Personal Server 使用应用级确认对话框，均显示可选 `title`/`detail`。浏览器默认聚焦拒绝，关闭、超时或断线撤销请求；用户拒绝、缺少控制表面和执行失败均保留 Gateway 审计。
 
-User Provider 由 IO adapter `UserSkillSource` 从包数据目录加载 SKILL.md，元数据遵循 canonical `user-skill-metadata.schema.json`，安装格式见[配置参考](../../reference/configuration.md#用户指令技能)。每个有效技能暴露只读 `instructions.read`。规划器最多通过 Gateway 读取两个被选中的指令技能，再携带指令重新规划；第二轮仍过滤当前目录之外的工具。指令及 `allowed-tools` 不授予权限，引用文件和脚本不会自动执行。禁用时不读取目录，坏文件单独降级，停止时撤销能力。
+User Provider 由 IO adapter `UserSkillSource` 从包数据目录加载 SKILL.md，元数据遵循 canonical `user-skill-metadata.schema.json`，安装格式见[配置参考](../../reference/configuration.md#用户指令技能)。有效技能在接入边缘映射为 inline Core 方法，贡献零 Tool；旧 SDK/UI 分组暂以 prompt 条目承载，不代表新的公开方法契约。第一轮 Plan 只看方法目录并返回定义引用，应用复验当前 revision、来源 readiness、scope 和绑定后，最多加载两份、合计 64 KiB UTF-8 正文，通过独立材料字段再次规划；两次规划保持原用户目标，不经 Gateway 或 Execution journal。返回后再次复验正文撤销，并过滤不在当次及当前 Tool 目录中的建议。指令及 `allowed-tools` 不授予权限，不作为执行结果或 Memory 事实，引用文件和脚本不会自动执行。动态 reader 和需确认的旧方法不进入直接正文入口，仍保留其受控 Gateway。禁用时不读取目录，坏文件单独降级，停止时撤销方法与旧引用。
 
 MCP 连接失败或断开时撤销旧能力目录，以 1 秒起、最多 30 秒的退避重连；成功连接后重置退避。停止 Provider 会取消重试，迟到的旧连接回调不能重建目录。
 
 扩展首次安装成功后自动尝试激活。激活失败保留安装包并呈现降级原因，用户修正配置、凭据或依赖后需在扩展详情重新激活；重启服务不会自动恢复失败的首次激活。已有扩展的升级与重复安装不自动改变既有激活选择。
 
-`SkillPlanningAppService` 位于 Kernel application 层，负责把 `SkillCatalogSnapshot` 中 `audience=character`、`runtime_status=ready` 且 scope 匹配当前 `ConversationContext` 的工具转成 `AgentPlanRequest.available_tools`，经 `AIProxy.requestAgentPlan()` 请求 Cognition 规划，并在返回后再次过滤目录外建议。`executeSuggestion()` 将同一 ConversationContext 传给 `SkillInvocationGateway`，不直接执行 provider handler。这样 planner 看不到跨来源能力，伪造建议也会在执行层再次被拒绝。
+`SkillPlanningAppService` 位于 Kernel application 层，通过消费方 Catalog Port 读取独立 Core ToolRegistry 中 character audience、ready 且 scope 匹配当前 ConversationContext 的工具，转成 `AgentPlanRequest.available_tools`，经 `AIProxy.requestAgentPlan()` 请求 Cognition 规划；方法目录/正文使用独立字段。返回后再次按当次及当前 Tool 目录过滤建议。`executeSuggestion()` 将同一 ConversationContext 传给 `SkillInvocationGateway`，不直接执行 provider handler。这样 planner 看不到跨来源能力，伪造建议也会在执行层再次被拒绝。
 
 `SkillActionController` 是普通聊天热路径中的 Skill 使用编排入口，随 `ApplicationRuntime` 创建并注册为 `ACTION_COMMAND` handler。它保留原 `reply` 投递行为；收到 `ActionCommand.action_type=skill_request` 时，会按同一 trace 执行：
 

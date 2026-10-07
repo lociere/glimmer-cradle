@@ -13,8 +13,10 @@ Tool 是执行动作，Skill 是 inline/reader 方法知识，Resource 是可读
 继承或聚合关系。三个集合分别保护 owner、revision、撤销与 readiness，定义深冻结且不包含
 handler/IO。Scope 按交集判断。Kernel `CapabilityCatalogAdapter` 保存现行 SDK 分组与 handler
 绑定，规划消费真实 Tool 定义，Tool/Resource/方法 Gateway 在确认后重查 Core 定义与来源状态。
-旧 `skill-registry.ts` 删除；旧分组计数不是 Core Skill 数量。用户 `instructions.read` 与原生 Step
-的完整切换仍待完成，不能把旧 User Tool 当作新的方法知识。
+旧 `skill-registry.ts` 删除；旧分组计数不是 Core Skill 数量。`SkillCatalog.inlineSummaries()` 与
+`inlineMaterial()` 分离目录和正文，并复验引用 revision、readiness 和 scope。User Provider 已
+改为 inline 方法，不再暴露 `instructions.read` Tool；现行 Plan 经独立方法字段最多加载两份
+正文，不执行 Gateway。动态 reader 与需确认的旧方法不进入该正文入口，原生 Step 仍待接线。
 
 Execution 已有真实 SQLite journal/controller，现行生产 Kernel Tool Gateway 委托本包；稳定请求
 冲突失败关闭，派发后不明结果不重试，结果/outbox 原子提交。确认后重查注册/定义/scope/策略。

@@ -8,7 +8,7 @@ import type {
   SkillRegistrationTarget,
   CapabilityCatalogPort,
 } from '../../ports/skill-plane.port';
-import type { CapabilityScopeContext } from '@glimmer-cradle/capabilities';
+import type { CapabilityScopeContext, SkillReference, SkillMaterial, SkillSummary } from '@glimmer-cradle/capabilities';
 
 export class SkillCatalogAppService implements SkillRegistrationTarget {
   constructor(private readonly _registry: CapabilityCatalogPort) {}
@@ -39,6 +39,12 @@ export class SkillCatalogAppService implements SkillRegistrationTarget {
 
   public listReadyTools(context?: CapabilityScopeContext): ReturnType<CapabilityCatalogPort['listReadyTools']> {
     return this._registry.listReadyTools(context);
+  }
+  public listReadyMethods(context?: CapabilityScopeContext): readonly SkillSummary[] {
+    return this._registry.listReadyMethods(context);
+  }
+  public readMethod(reference: SkillReference, context?: CapabilityScopeContext): SkillMaterial | undefined {
+    return this._registry.readMethod(reference, context);
   }
 
   public getCatalogSnapshot(): SkillCatalogSnapshot {

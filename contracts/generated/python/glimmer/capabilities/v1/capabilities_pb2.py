@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n*glimmer/capabilities/v1/capabilities.proto\x12\x17glimmer.capabilities.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x9e\x05\n\x14\x45xecutionResultEvent\x12\x19\n\x08\x65vent_id\x18\x01 \x01(\tR\x07\x65ventId\x12#\n\rinvocation_id\x18\x02 \x01(\tR\x0cinvocationId\x12\x1a\n\x08revision\x18\x03 \x01(\x04R\x08revision\x12\x18\n\x07\x61ttempt\x18\x04 \x01(\rR\x07\x61ttempt\x12\x19\n\x08scope_id\x18\x05 \x01(\tR\x07scopeId\x12\'\n\x0f\x63onversation_id\x18\x06 \x01(\tR\x0e\x63onversationId\x12$\n\x0esource_fact_id\x18\x07 \x01(\tR\x0csourceFactId\x12\x1f\n\x0b\x65xecutor_id\x18\x08 \x01(\tR\nexecutorId\x12#\n\rcapability_id\x18\t \x01(\tR\x0c\x63\x61pabilityId\x12/\n\x13\x64\x65\x66inition_revision\x18\n \x01(\tR\x12\x64\x65\x66initionRevision\x12%\n\x0erequest_digest\x18\x0b \x01(\tR\rrequestDigest\x12\x43\n\x05state\x18\x0c \x01(\x0e\x32-.glimmer.capabilities.v1.ExecutionResultStateR\x05state\x12P\n\x0cside_effects\x18\r \x01(\x0e\x32-.glimmer.capabilities.v1.ExecutionSideEffectsR\x0bsideEffects\x12.\n\x06result\x18\x0e \x01(\x0b\x32\x16.google.protobuf.ValueR\x06result\x12\x1d\n\nerror_code\x18\x0f \x01(\tR\terrorCode\x12\"\n\rupdated_at_ms\x18\x10 \x01(\x04R\x0bupdatedAtMs*\xab\x01\n\x14\x45xecutionResultState\x12&\n\"EXECUTION_RESULT_STATE_UNSPECIFIED\x10\x00\x12$\n EXECUTION_RESULT_STATE_SUCCEEDED\x10\x01\x12!\n\x1d\x45XECUTION_RESULT_STATE_FAILED\x10\x02\x12\"\n\x1e\x45XECUTION_RESULT_STATE_UNKNOWN\x10\x03*\xa9\x01\n\x14\x45xecutionSideEffects\x12&\n\"EXECUTION_SIDE_EFFECTS_UNSPECIFIED\x10\x00\x12\x1f\n\x1b\x45XECUTION_SIDE_EFFECTS_NONE\x10\x01\x12$\n EXECUTION_SIDE_EFFECTS_CONFIRMED\x10\x02\x12\"\n\x1e\x45XECUTION_SIDE_EFFECTS_UNKNOWN\x10\x03\x42\x32\xaa\x02/GlimmerCradle.Contracts.Glimmer.Capabilities.V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n*glimmer/capabilities/v1/capabilities.proto\x12\x17glimmer.capabilities.v1\x1a\x1cgoogle/protobuf/struct.proto\"\\\n\x0eSkillReference\x12\x19\n\x08skill_id\x18\x01 \x01(\tR\x07skillId\x12/\n\x13\x64\x65\x66inition_revision\x18\x02 \x01(\tR\x12\x64\x65\x66initionRevision\"\x8e\x01\n\x0fSkillDescriptor\x12\x45\n\treference\x18\x01 \x01(\x0b\x32\'.glimmer.capabilities.v1.SkillReferenceR\treference\x12\x12\n\x04name\x18\x02 \x01(\tR\x04name\x12 \n\x0b\x64\x65scription\x18\x03 \x01(\tR\x0b\x64\x65scription\"z\n\rSkillMaterial\x12\x45\n\treference\x18\x01 \x01(\x0b\x32\'.glimmer.capabilities.v1.SkillReferenceR\treference\x12\"\n\x0cinstructions\x18\x02 \x01(\tR\x0cinstructions\"\x9e\x05\n\x14\x45xecutionResultEvent\x12\x19\n\x08\x65vent_id\x18\x01 \x01(\tR\x07\x65ventId\x12#\n\rinvocation_id\x18\x02 \x01(\tR\x0cinvocationId\x12\x1a\n\x08revision\x18\x03 \x01(\x04R\x08revision\x12\x18\n\x07\x61ttempt\x18\x04 \x01(\rR\x07\x61ttempt\x12\x19\n\x08scope_id\x18\x05 \x01(\tR\x07scopeId\x12\'\n\x0f\x63onversation_id\x18\x06 \x01(\tR\x0e\x63onversationId\x12$\n\x0esource_fact_id\x18\x07 \x01(\tR\x0csourceFactId\x12\x1f\n\x0b\x65xecutor_id\x18\x08 \x01(\tR\nexecutorId\x12#\n\rcapability_id\x18\t \x01(\tR\x0c\x63\x61pabilityId\x12/\n\x13\x64\x65\x66inition_revision\x18\n \x01(\tR\x12\x64\x65\x66initionRevision\x12%\n\x0erequest_digest\x18\x0b \x01(\tR\rrequestDigest\x12\x43\n\x05state\x18\x0c \x01(\x0e\x32-.glimmer.capabilities.v1.ExecutionResultStateR\x05state\x12P\n\x0cside_effects\x18\r \x01(\x0e\x32-.glimmer.capabilities.v1.ExecutionSideEffectsR\x0bsideEffects\x12.\n\x06result\x18\x0e \x01(\x0b\x32\x16.google.protobuf.ValueR\x06result\x12\x1d\n\nerror_code\x18\x0f \x01(\tR\terrorCode\x12\"\n\rupdated_at_ms\x18\x10 \x01(\x04R\x0bupdatedAtMs*\xab\x01\n\x14\x45xecutionResultState\x12&\n\"EXECUTION_RESULT_STATE_UNSPECIFIED\x10\x00\x12$\n EXECUTION_RESULT_STATE_SUCCEEDED\x10\x01\x12!\n\x1d\x45XECUTION_RESULT_STATE_FAILED\x10\x02\x12\"\n\x1e\x45XECUTION_RESULT_STATE_UNKNOWN\x10\x03*\xa9\x01\n\x14\x45xecutionSideEffects\x12&\n\"EXECUTION_SIDE_EFFECTS_UNSPECIFIED\x10\x00\x12\x1f\n\x1b\x45XECUTION_SIDE_EFFECTS_NONE\x10\x01\x12$\n EXECUTION_SIDE_EFFECTS_CONFIRMED\x10\x02\x12\"\n\x1e\x45XECUTION_SIDE_EFFECTS_UNKNOWN\x10\x03\x42\x32\xaa\x02/GlimmerCradle.Contracts.Glimmer.Capabilities.V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,10 +33,16 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'glimmer.capabilities.v1.cap
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\252\002/GlimmerCradle.Contracts.Glimmer.Capabilities.V1'
-  _globals['_EXECUTIONRESULTSTATE']._serialized_start=775
-  _globals['_EXECUTIONRESULTSTATE']._serialized_end=946
-  _globals['_EXECUTIONSIDEEFFECTS']._serialized_start=949
-  _globals['_EXECUTIONSIDEEFFECTS']._serialized_end=1118
-  _globals['_EXECUTIONRESULTEVENT']._serialized_start=102
-  _globals['_EXECUTIONRESULTEVENT']._serialized_end=772
+  _globals['_EXECUTIONRESULTSTATE']._serialized_start=1138
+  _globals['_EXECUTIONRESULTSTATE']._serialized_end=1309
+  _globals['_EXECUTIONSIDEEFFECTS']._serialized_start=1312
+  _globals['_EXECUTIONSIDEEFFECTS']._serialized_end=1481
+  _globals['_SKILLREFERENCE']._serialized_start=101
+  _globals['_SKILLREFERENCE']._serialized_end=193
+  _globals['_SKILLDESCRIPTOR']._serialized_start=196
+  _globals['_SKILLDESCRIPTOR']._serialized_end=338
+  _globals['_SKILLMATERIAL']._serialized_start=340
+  _globals['_SKILLMATERIAL']._serialized_end=462
+  _globals['_EXECUTIONRESULTEVENT']._serialized_start=465
+  _globals['_EXECUTIONRESULTEVENT']._serialized_end=1135
 # @@protoc_insertion_point(module_scope)

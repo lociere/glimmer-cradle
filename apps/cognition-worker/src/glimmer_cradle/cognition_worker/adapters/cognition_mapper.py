@@ -19,6 +19,9 @@ from glimmer_cradle.cognition.ports import (
     KnowledgeEntryInput,
     KnowledgeInitialization,
     KnowledgeRetrievalInput,
+    SkillMaterial,
+    SkillReference,
+    SkillSummary,
     SkillToolDescriptor,
 )
 from google.protobuf.json_format import MessageToDict, ParseDict
@@ -129,10 +132,36 @@ def knowledge_initialization_from_wire(
 def agent_plan_from_wire(
     request: cognition_pb.PlanRequest, *, trace_id: str
 ) -> AgentPlanInput:
+    if len(request.available_skills) > 1024 or len(request.skill_materials) > 2:
+        raise ValueError("skill planning input exceeds count budget")
+    summaries = []
+    materials = []
+    seen = set()
+    for item in request.available_skills:
+        if not item.HasField("reference") or not item.name.strip():
+            raise ValueError("missing skill summary identity")
+        reference = SkillReference(item.reference.skill_id, item.reference.definition_revision)
+        if reference.skill_id in seen:
+            raise ValueError("duplicate skill summary")
+        seen.add(reference.skill_id)
+        summaries.append(SkillSummary(reference, item.name, item.description))
+    seen.clear()
+    if sum(len(item.instructions.encode("utf-8")) for item in request.skill_materials) > 64 * 1024:
+        raise ValueError("skill material exceeds byte budget")
+    for item in request.skill_materials:
+        if not item.HasField("reference"):
+            raise ValueError("missing skill material identity")
+        reference = SkillReference(item.reference.skill_id, item.reference.definition_revision)
+        if reference.skill_id in seen:
+            raise ValueError("duplicate skill material")
+        seen.add(reference.skill_id)
+        materials.append(SkillMaterial(reference, item.instructions))
     return AgentPlanInput(
         user_goal=request.user_goal,
         scene_id=request.scene_id,
         trace_id=trace_id,
+        available_skills=summaries,
+        skill_materials=materials,
         available_tools=[
             SkillToolDescriptor(
                 skill_id=tool.skill_id,
@@ -159,6 +188,8 @@ def agent_plan_to_wire(output: AgentPlanResult) -> cognition_pb.PlanResponse:
             confidence=suggestion.confidence,
         )
         ParseDict(suggestion.arguments_hint or {}, item.arguments_hint)
+    for reference in output.selected_skills:
+        response.selected_skills.add(skill_id=reference.skill_id, definition_revision=reference.definition_revision)
     return response
 
 

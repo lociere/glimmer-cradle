@@ -31,19 +31,23 @@ it('首次安装尚无 packages 目录时保持空 provider ready', async () => 
   });
 });
 
-it('加载真实 SKILL.md 并注册可调用指令，作者 allowed-tools 不授予权限，停止撤销旧 handler', async () => {
+it('加载真实 SKILL.md 为方法知识而非 Tool，作者 allowed-tools 不授予权限，停止撤销正文读取', async () => {
   const { source } = await fixture();
   const registry = new CapabilityCatalogAdapter();
   const provider = new UserSkillProvider(source);
   await provider.start(registry);
   const skill = provider.listSkills()[0];
   expect(skill.id).toBe('user.summarize');
-  expect(skill.tools).toHaveLength(1);
-  expect(await skill.tools[0].handler({})).toMatchObject({ instructions: '请用三句话总结。' });
+  expect(skill.tools).toHaveLength(0);
+  expect(registry.tools.list()).toEqual([]);
+  const reference = registry.listReadyMethods()[0].reference;
+  expect(registry.readMethod(reference)?.instructions).toBe('请用三句话总结。');
+  expect(registry.getCatalogSnapshot()).toMatchObject({ totalTools: 0, totalPrompts: 1 });
   expect(registry.getCatalogSnapshot().providerRuntimes.find((item) => item.provider.kind === 'user')?.state).toBe('ready');
   provider.stop(registry);
   expect(registry.getAll()).toHaveLength(0);
-  expect(() => skill.tools[0].handler({})).toThrow('已停用');
+  expect(registry.methods.list()).toEqual([]);
+  expect(registry.readMethod(reference)).toBeUndefined();
 });
 
 it('坏 frontmatter、大文件与目录链接独立失败，保留有效技能并投影 degraded', async () => {
@@ -60,7 +64,11 @@ it('坏 frontmatter、大文件与目录链接独立失败，保留有效技能�
   const registry = new CapabilityCatalogAdapter(); const provider = new UserSkillProvider(source);
   await provider.start(registry);
   expect(registry.getCatalogSnapshot().providerRuntimes.find((item) => item.provider.kind === 'user')?.state).toBe('degraded');
+  const reference = registry.listReadyMethods()[0].reference;
+  expect(registry.listReadyMethods()).toHaveLength(1);
+  expect(registry.readMethod(reference)?.instructions).toBe('请用三句话总结。');
   provider.stop(registry);
+  expect(registry.readMethod(reference)).toBeUndefined();
 });
 
 it('配置越界不可读，关闭后不访问文件系统', async () => {

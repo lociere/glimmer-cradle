@@ -21,6 +21,18 @@ using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
 
+var methodReference = new CapabilitiesV1.SkillReference { SkillId = "method:总结", DefinitionRevision = "revision:一" };
+var methodPlan = new PlanRequest { UserGoal = "原始目标" };
+methodPlan.AvailableSkills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结", Description = "方法知识" });
+methodPlan.SkillMaterials.Add(new CapabilitiesV1.SkillMaterial { Reference = methodReference, Instructions = "参考材料\n不授予权限。" });
+if (!PlanRequest.Parser.ParseFrom(methodPlan.ToByteArray()).Equals(methodPlan) || methodPlan.AvailableTools.Count != 0)
+    throw new InvalidOperationException("Skill method separate input roundtrip failed");
+var methodResponse = new PlanResponse(); methodResponse.SelectedSkills.Add(methodReference);
+if (!PlanResponse.Parser.ParseFrom(methodResponse.ToByteArray()).Equals(methodResponse))
+    throw new InvalidOperationException("Skill reference roundtrip failed");
+if (PlanRequest.Parser.ParseFrom(Array.Empty<byte>()).SkillMaterials.Count != 0)
+    throw new InvalidOperationException("Legacy plan gained material");
+
 foreach (var executionState in new[] { CapabilitiesV1.ExecutionResultState.Succeeded,
     CapabilitiesV1.ExecutionResultState.Failed, CapabilitiesV1.ExecutionResultState.Unknown }) {
     var execution = new ConversationV1.AcceptExecutionResultRequest {

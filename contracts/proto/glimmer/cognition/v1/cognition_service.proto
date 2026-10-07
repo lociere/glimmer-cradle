@@ -3,6 +3,7 @@ syntax = "proto3";
 package glimmer.cognition.v1;
 
 import "glimmer/common/v1/service_contract.proto";
+import "glimmer/capabilities/v1/capabilities.proto";
 import "glimmer/content/v1/content.proto";
 import "glimmer/jobs/v1/jobs.proto";
 import "google/protobuf/struct.proto";
@@ -178,6 +179,8 @@ message PlanRequest {
   string user_goal = 2;
   string scene_id = 3;
   repeated SkillToolDescriptor available_tools = 4;
+  repeated glimmer.capabilities.v1.SkillDescriptor available_skills = 5;
+  repeated glimmer.capabilities.v1.SkillMaterial skill_materials = 6;
 }
 
 message SkillToolSuggestion {
@@ -193,6 +196,7 @@ message PlanResponse {
   string reasoning = 2;
   repeated SkillToolSuggestion suggestions = 3;
   string trace_id = 4;
+  repeated glimmer.capabilities.v1.SkillReference selected_skills = 5;
 }
 
 message ToolResult {

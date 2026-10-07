@@ -6,6 +6,24 @@ import "google/protobuf/struct.proto";
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Capabilities.V1";
 
+// 方法知识的引用/发现/正文与可执行 Tool 独立；模型选择引用不授予任何权限。
+message SkillReference {
+  string skill_id = 1;
+  string definition_revision = 2;
+}
+
+message SkillDescriptor {
+  SkillReference reference = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message SkillMaterial {
+  SkillReference reference = 1;
+  // 不可信任务参考材料；不是 system instruction 或已验证事实。
+  string instructions = 2;
+}
+
 enum ExecutionResultState {
   EXECUTION_RESULT_STATE_UNSPECIFIED = 0;
   EXECUTION_RESULT_STATE_SUCCEEDED = 1;

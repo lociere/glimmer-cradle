@@ -34,10 +34,17 @@ contracts/
 
 Domain/Application/Port 使用 owner-local model；Adapter 显式映射 generated DTO。Avatar C# Adapter 直接读写二进制 generated DTO，不做 JSON formatter/parser round-trip。Python Contracts 通过 `glimmer-cradle-contracts` distribution 进入 Cognition、Audio、Desktop runtime 与 Personal Server OCI build，不依赖源码树 `PYTHONPATH`。
 
-`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有结果 wire；
+`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有结果与独立方法 wire；
 `proto/glimmer/conversation/v1/conversation.proto` 拥有接纳 Service 和 durable receipt。
 二者不写入 CognitionService，也不把平台执行状态移入 Conversation。现行唯一源仍是 `contracts/`，
 目标 `protocol/proto/` 路径在阶段 11 原子迁移，迁移前禁止创建第二契约源。
+
+方法由 `SkillReference`、`SkillDescriptor`、`SkillMaterial` 分别传递稳定定义引用、无正文目录和
+不可信正文。现行 Cognition `PlanRequest.available_skills` / `skill_materials` 与
+`PlanResponse.selected_skills` 是兼容新增字段；TS/Python App mapper 映射 owner-local model，
+Core 不导入生成 DTO。方法选择不是 ToolCall，正文不授予权限、不作为执行结果或 Memory 事实。
+Worker 在进入模型前验证引用、重复身份、目录最多 1,024 项、正文最多两份与合计 64 KiB UTF-8
+预算；非法请求保留 trace 并返回 typed `INVALID_REQUEST`。原生 Step Exposure RPC 尚未接线。
 
 ## Document registry 与校验
 

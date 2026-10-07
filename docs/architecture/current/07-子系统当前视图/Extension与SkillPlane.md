@@ -48,8 +48,9 @@ scope 领域规则已由 `core/capabilities` 唯一拥有；Kernel catalog 缺�
 稳定 invocation 重放原结果，派发后失联进入恢复而非自动重试；结果/outbox 同事务保存。
 独立 ToolRegistry/SkillCatalog/ResourceRegistry 已接真实规划与调用；Skill 仅为方法知识，不包含
 Tool。旧 SDK 分组由 CapabilityCatalogAdapter 映射，定义深冻结、独立撤销并在确认后复验来源
-readiness 与绑定。Conversation 已有真实刷盘 receipt；完整 Step Exposure、外部 fencing/对账、
-用户 instructions.read 假 Tool 与原生 Loop 接线仍未完成，
+readiness 与绑定。User 方法已通过独立目录/引用/有界正文接入现行 Plan，旧 instructions.read
+假 Tool 删除；正文不执行 Gateway 或授予权限。Conversation 已有真实刷盘 receipt；完整 Step
+Exposure、外部 fencing/对账与原生 Loop 接线仍未完成，
 不以当前切片宣称 Capabilities ready。细节见[实现地图](../../implementation/Extension与SkillPlane实现.md)。
 
 感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。

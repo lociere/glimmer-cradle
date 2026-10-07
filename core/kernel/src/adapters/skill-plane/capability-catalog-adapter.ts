@@ -11,7 +11,7 @@ import type {
 } from '../../ports/skill-plane.port';
 import { GLOBAL_CAPABILITY_SCOPE, ToolRegistry, ResourceRegistry, SkillCatalog, executionDigest,
   isCapabilityDefinitionVisible } from '@glimmer-cradle/capabilities';
-import type { CapabilityDefinition, CapabilityScopeContext, Tool, Resource, Skill } from '@glimmer-cradle/capabilities';
+import type { CapabilityDefinition, CapabilityScopeContext, Tool, Resource, Skill, SkillReference, SkillMaterial, SkillSummary } from '@glimmer-cradle/capabilities';
 
 const PROVIDER_KINDS: SkillProviderKind[] = ['core', 'extension', 'mcp_server', 'user'];
 const RUNTIME_STATUSES: SkillRuntimeStatus[] = ['ready', 'contract_only'];
@@ -137,9 +137,43 @@ export class CapabilityCatalogAdapter {
     return !runtime || runtime.state === 'ready';
   }
 
+  public listReadyMethods(context?: CapabilityScopeContext): readonly SkillSummary[] {
+    return this.methods.inlineSummaries(context).filter(summary => {
+      const binding = this.methodBindings.get(summary.reference.skill_id);
+      if (!binding) return false;
+      const [group, name] = JSON.parse(binding.definition.id) as [string, string];
+      return this._skills.get(group)?.skill.policy.confirmationRequired === false
+        && this.findMethod(group, name) === binding.definition && this.isInlineMethodSourceReady(group, binding.definition);
+    });
+  }
+
+  public readMethod(reference: SkillReference, context?: CapabilityScopeContext): SkillMaterial | undefined {
+    const binding = this.methodBindings.get(reference.skill_id);
+    if (!binding) return undefined;
+    const [group, name] = JSON.parse(binding.definition.id) as [string, string];
+    // 兼容边缘的确认策略仍有效；正文加载不能绕过旧 prompt 的受控 Gateway。
+    if (this._skills.get(group)?.skill.policy.confirmationRequired !== false
+      || this.findMethod(group, name) !== binding.definition || !this.isInlineMethodSourceReady(group, binding.definition)) return undefined;
+    return this.methods.inlineMaterial(reference, context);
+  }
+
+  private isInlineMethodSourceReady(group: string, definition: Skill): boolean {
+    if (this.isProviderReady(definition.owner_id)) return true;
+    const runtime = this._providerRuntimes.get(definition.owner_id);
+    const source = this._skills.get(group)?.skill;
+    // User 的逐文件成功加载事实独立于总体诊断；不得放宽 Tool 或 MCP reader 的 readiness。
+    const loaded = runtime?.metadata.ready_inline_method_groups;
+    return runtime?.state === 'degraded' && runtime.provider.kind === 'user'
+      && source?.provider.kind === 'user' && source.metadata?.implementation === 'user_skill_instructions'
+      && definition.instructions.kind === 'inline' && Array.isArray(loaded) && loaded.includes(group);
+  }
+
   public upsertProviderRuntime(runtime: SkillProviderRuntimeSnapshot): void {
+    const loaded = runtime.metadata.ready_inline_method_groups;
+    const metadata = Object.freeze({ ...runtime.metadata, ...(Array.isArray(loaded)
+      ? { ready_inline_method_groups: Object.freeze([...loaded]) } : {}) });
     this._providerRuntimes.set(providerRuntimeKey(runtime.provider), Object.freeze({ ...runtime,
-      provider: Object.freeze({ ...runtime.provider }), recovery_actions: [...runtime.recovery_actions], metadata: { ...runtime.metadata } }));
+      provider: Object.freeze({ ...runtime.provider }), recovery_actions: [...runtime.recovery_actions], metadata }));
   }
 
   public removeProviderRuntime(provider: SkillProviderRef): void {

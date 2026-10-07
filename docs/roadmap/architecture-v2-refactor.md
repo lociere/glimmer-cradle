@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：独立三 Registry 已接生产规划/Gateway；scope、持久 Tool Execution 与 Conversation 真实 receipt 已接 App/Worker；ACK 丢失与重启不重执行；User 方法语义/native Step Exposure、外部 fencing/对账、完整行动恢复与 broker 待完成 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：独立三 Registry 已接生产规划/Gateway；User 方法已脱离假 Tool，以独立目录/引用/有界正文接入 Plan；scope、持久 Tool Execution 与 Conversation 真实 receipt 已接 App/Worker；ACK 丢失与重启不重执行；native Step Exposure、外部 fencing/对账、完整行动恢复与 broker 待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,49 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 User 方法目录/材料与真实 Plan 接线（2026-10-07）
+
+输入 `857d970e`，本会话唯一写入 owner。User Provider 的 SKILL.md 映射为 inline Core 方法，
+贡献零 Tool；删除运行链的 `instructions.read`，旧 SDK/UI 分组暂以 prompt 条目承载。
+Core SkillCatalog 分离摘要和材料，返回冻结定义引用并复验 revision/readiness/scope；平台
+加载留在 UserSkillSource，Core 无 IO。动态 reader 不用 description 冒充正文，需确认的旧
+静态方法不借直接材料入口绕过 Gateway。
+
+补齐逐文件加载就绪：User 整体 degraded 仍呈现坏文件诊断，只有明确记录并冻结的成功加载
+静态方法组可用；动态来源、Tool/reader readiness 不放宽，停止/缺事实仍关闭。
+
+唯一 IDL 新增 SkillReference/SkillDescriptor/SkillMaterial，现行 PlanRequest/Response 兼容
+增加目录、正文与选择引用字段，同步生成 TS/Python/C# 并映射 owner-local Port。先选方法、
+复验后最多加载两份且总计 64 KiB UTF-8，再保持原用户目标重新规划；没有假 Tool、Gateway
+调用、Execution 记录或伪造结果。返回前复验正文撤销，建议只能来自当次及当前 Tool 集合。
+Worker 在模型前拒绝无效/重复引用、超量目录和正文，并保留 trace 返回 INVALID_REQUEST。
+正文作为不可信参考材料，不改写 system 人设，不把 allowed-tools 当权限或生成 Memory 事实。
+
+保留窗口：生产仍是 ActionPlan/Plan 兼容链，原生 Step Exposure RPC、完整权限/位置/协议/
+预算 broker 与 run_native 尚待接线。App 接入映射、旧公开分组及 ActionPlan 随阶段 9/11/12
+consumer-zero 删除。本轮不迁移用户库/配置，不发布或推送；独立审查留整体固定候选。
+
+验证：Capabilities 31 项、Cognition 308 项、Worker 99 项、Kernel 全量 242 项 PASS（11 项
+条件跳过，共 253 项），repo-checks 27 项 PASS。覆盖错误/重复/旧引用、跨 scope、选择最多
+两份、UTF-8 合计预算、规划等待期间撤销、确认策略不能绕过、逐文件降级与冻结加载事实；
+模型选择结构非法时清空半解析计划，不能保留已解析的 Tool 建议。
+
+实际 TS → 受监督 Worker → 本地模型的两次 Plan 往返 PASS：首轮无正文、次轮目标不变、只
+返回实际 Tool，User 贡献零 Tool、无 Gateway/handler 执行。完整进程集成文件 8 项 PASS，
+同时重验真实重启、Execution 结果 ACK 丢失后重放、网络请求取消、崩溃撤销与恢复。真实
+生产 composition bootstrap 的 Worker 注册/ready、Execution schema 2 与逆序停机/exit 0 PASS。
+
+Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三语言方法目录/正文/
+选择引用 roundtrip 与连续生成 clean PASS；兼容基线未改。首次 clean gate 拒绝未暂存的
+预期生成变更，核对并暂存唯一生成器产物后完整重验通过，不刷新 baseline 或放宽检查。
+根 typecheck 初次与 codegen 重叠导致短暂缺文件，改为串行重验；测试类型和预算 fixture
+同步修正后根 `pnpm typecheck` / `pnpm build` PASS，最终 Kernel typecheck 复验 PASS。
+111 页 docs、encoding、architecture、target-layout 规格模式和 diff 检查 PASS；Ruff I/F
+PASS，不声称全规则 lint、原生 broker、最终物理清单、OCI/安装或完整独立审查。
+
+下一步接原生 Step Exposure 的独立目录/权限/预算上下文与实际 Worker consumer，逐步结束
+ActionPlan/旧分组接入窗口；方法材料就绪不能替代完整 broker ready。
 
 ### 阶段 6 独立三 Registry 与真实消费者切换（2026-10-07）
 

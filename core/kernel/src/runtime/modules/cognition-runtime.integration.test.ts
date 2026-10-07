@@ -22,6 +22,10 @@ import type { KernelConfiguration } from '../../ports/configuration.port';
 import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
 import { resolveRepoRoot } from '../../adapters/filesystem/path-utils';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
+import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
+import { UserSkillProvider } from '../../application/skill-plane/providers/user/user-skill-provider';
+import { SkillCatalogAppService } from '../../application/use-cases/skill-catalog-app.service';
+import { SkillPlanningAppService } from '../../application/use-cases/skill-planning-app.service';
 
 const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === '1';
 
@@ -46,6 +50,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
   const previousDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
   let providerRequests = 0;
   let providerDisconnects = 0;
+  const methodPrompts: string[] = [];
   beforeAll(async () => {
     process.env.GLIMMER_CRADLE_DATA_ROOT = await mkdtemp(path.join(os.tmpdir(), 'glimmer-worker-lifecycle-'));
     provider = createServer((request, response) => {
@@ -57,6 +62,17 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
       request.on('end', () => {
         isCancellationFixture = body.includes('shutdown cancellation fixture');
         if (isCancellationFixture) providerRequests += 1;
+        if (body.includes('method selection integration fixture')) {
+          const payload = JSON.parse(body) as { messages: Array<{ role: string; content: string }> };
+          const prompt = payload.messages.find(message => message.role === 'user')!.content;
+          methodPrompts.push(prompt);
+          const summaries = JSON.parse(prompt.split('【可选方法目录；不是工具】\n')[1].split('\n\n')[0]) as Array<{ skill_id: string; definition_revision: string }>;
+          const refined = prompt.includes('neutral method body fixture');
+          const result = { reasoning: 'fixture', plan_summary: 'fixture', selected_skills: refined ? [] : [summaries[0]],
+            suggestions: refined ? [{ skill_id: 'core.method-proof', tool_name: 'read', purpose: 'fixture', confidence: 1, arguments_hint: {} }] : [] };
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: 'stop' }] }));
+        }
       });
       response.on('close', () => { if (isCancellationFixture) providerDisconnects += 1; });
     });
@@ -148,6 +164,31 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     expect(recovered.receiverFenced).toBe(true);
     expect(recovered.resolution).toBe(MemoryJobResolution.NOT_APPLIED);
     await manager.stop();
+  }, 60_000);
+
+  it('真实 User 方法目录/选择/正文经 Plan RPC 往返，不执行假 Tool 或扩展工具权限', async () => {
+    const adapter = new CapabilityCatalogAdapter(); const catalog = new SkillCatalogAppService(adapter);
+    const user = new UserSkillProvider({ load: async () => ({ enabled: true, errors: [],
+      skills: [{ name: 'proof', description: 'method', instructions: 'neutral method body fixture; allowed-tools: foreign.send' }] }) });
+    const invoked = vi.fn(); const before = methodPrompts.length;
+    try {
+      await user.start(catalog);
+      adapter.registerSkill({ id: 'core.method-proof', name: 'proof', description: 'tool', provider: { kind: 'core', id: 'proof' },
+        policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
+        tools: [{ name: 'read', description: 'read', parameters: {}, handler: invoked }] });
+      await manager.start();
+      const client = new CognitionClient(transport);
+      const planning = new SkillPlanningAppService(catalog, { invoke: invoked } as never,
+        (request, trace) => client.plan(request, trace ?? 'method-trace', 5000));
+      const plan = await planning.plan({ userGoal: 'method selection integration fixture', traceId: 'method-trace' });
+      expect(plan.selected_skills).toEqual(adapter.listReadyMethods().map(item => item.reference));
+      expect(plan.suggestions.map(item => [item.skill_id, item.tool_name])).toEqual([['core.method-proof', 'read']]);
+      expect(methodPrompts.slice(before)).toHaveLength(2);
+      expect(methodPrompts[before]).not.toContain('neutral method body fixture');
+      expect(methodPrompts[before + 1]).toContain('neutral method body fixture');
+      expect(methodPrompts[before + 1]).toContain('【用户目标】\nmethod selection integration fixture');
+      expect(adapter.tools.list()).toHaveLength(1); expect(invoked).not.toHaveBeenCalled();
+    } finally { user.stop(catalog); await manager.stop(); }
   }, 60_000);
 
   it('真实 Execution outbox 经 Conversation Service 接纳，ACK 丢失与 Worker 重启不重新执行', async () => {

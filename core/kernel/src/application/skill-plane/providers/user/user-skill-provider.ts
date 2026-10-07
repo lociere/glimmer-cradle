@@ -29,23 +29,18 @@ export class UserSkillProvider implements SkillProvider {
       provider: this.provider,
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
       metadata: { runtime_status: 'ready', implementation: 'user_skill_instructions' },
-      tools: [{
-        name: 'instructions.read', description: document.description,
-        parameters: { type: 'object', properties: {}, additionalProperties: false },
-        handler: () => {
-          if (generation !== this.generation) throw new Error('用户技能已停用');
-          return { kind: 'user_skill_instructions', name: document.name, instructions: document.instructions };
-        },
-      }],
+      tools: [],
+      prompts: [{ id: 'instructions', description: document.description, template: document.instructions }],
     }));
     for (const skill of this.skills) { target.registerSkill(skill); this._registeredSkillIds.add(skill.id); }
     target.upsertProviderRuntime?.({
       provider: this.provider, display_name: '用户指令技能',
       state: !loaded.enabled ? 'stopped' : loaded.errors.length ? 'degraded' : 'ready',
       summary: !loaded.enabled ? '用户技能未启用。' : loaded.errors.length ? loaded.errors.join(' ') : `已加载 ${this.skills.length} 个用户指令技能。`,
-      skill_count: this.skills.length, tool_count: this.skills.length, resource_count: 0, prompt_count: 0,
+      skill_count: this.skills.length, tool_count: 0, resource_count: 0, prompt_count: this.skills.length,
       recovery_actions: loaded.errors.length ? ['修正技能目录后重启服务。'] : [],
-      metadata: {}, updated_at: new Date().toISOString(),
+      // 降级诊断不撤销已逐文件校验、无需活动 IO 的静态方法；不适用于动态来源。
+      metadata: { ready_inline_method_groups: this.skills.map(skill => skill.id) }, updated_at: new Date().toISOString(),
     });
   }
 

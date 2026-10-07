@@ -140,6 +140,13 @@ Kernel CognitionService request
 
 `AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务 Kernel 的 Skill 编排。普通聊天链路中的闭环是：`LoopController ActionPlan skill_request -> Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Conversation 接纳结果 -> Synthesize -> ChannelReplyEvent`。工具使用决定由 Conversation 写入 `action` Moment 并刷盘，原 fact ID 随 Action call metadata 传播。实际执行状态/结果由 Capabilities 唯一拥有，独立 Conversation Service 从该 owner 的已提交 outbox 接纳 `action_result`；Synthesis 不再从请求写第二份执行事实，只用已接纳 body/state 并以其 Moment ID 作为 `reply` 原因。缺失或冲突引用不合成、不提交 fallback；结果是 experience/untrusted 观察，不直接成为记忆候选。接纳与重放规则见[Conversation 实现](Conversation实现.md#history-与恢复)。`Synthesize` 的 system prompt 由 `PersonaCompiler.build_persona_prompt()` 生成人设/profile/dialogue/safety 主体，再追加外部能力结果处理规则；Kernel 不拼接人格表达。
 
+现行 `Plan` 的方法目录、选择引用和正文独立于 Tool 建议：Core Port 使用 `SkillSummary`、
+`SkillReference`、`SkillMaterial`，Worker mapper 消费唯一生成 DTO。第一次模型输入只含目录，
+最多选择两份匹配定义 revision 的方法；App 复验后以不可信材料提供正文、保持原用户目标。
+模型输出不能扩大可用 Tool，方法正文及 allowed-tools 不授予权限、不作为执行结果或 Memory
+事实。引用/重复身份/正文预算在进入模型前校验；正文不拼入 system 人设。此接线仍服务
+上述 ActionPlan 兼容链，不表示普通聊天已切换 `run_native()` 或完整 CapabilityPort broker。
+
 `state/` 是情绪与认知资源状态的唯一 owner。`cognitive_state.py` 定义 affect/activity 状态和资源策略，`decay.py` 纯计算情绪衰减与 `engaged / ambient / quiescent` 迁移，`state_controller.py` 从真实 Perception、Reply、Action 重建最近活动并驱动生命周期。`SqliteStateStore` 使用 `001-state.sql` 和 expected revision 写入 `data/state/cognition/state.sqlite`；冷启动把快照与 Conversation Log 的更新事实合并。控制器不把自动迁移写成 Experience；Kernel 外部 Attention Lease 也不参与活动态计算。
 
 `application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。Conversation `ConversationRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`LoopController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。

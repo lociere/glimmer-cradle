@@ -26,34 +26,45 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
           string.Concat(
             "CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8S",
             "F2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxGhxnb29nbGUvcHJvdG9idWYvc3Ry",
-            "dWN0LnByb3RvIp4FChRFeGVjdXRpb25SZXN1bHRFdmVudBIZCghldmVudF9p",
-            "ZBgBIAEoCVIHZXZlbnRJZBIjCg1pbnZvY2F0aW9uX2lkGAIgASgJUgxpbnZv",
-            "Y2F0aW9uSWQSGgoIcmV2aXNpb24YAyABKARSCHJldmlzaW9uEhgKB2F0dGVt",
-            "cHQYBCABKA1SB2F0dGVtcHQSGQoIc2NvcGVfaWQYBSABKAlSB3Njb3BlSWQS",
-            "JwoPY29udmVyc2F0aW9uX2lkGAYgASgJUg5jb252ZXJzYXRpb25JZBIkCg5z",
-            "b3VyY2VfZmFjdF9pZBgHIAEoCVIMc291cmNlRmFjdElkEh8KC2V4ZWN1dG9y",
-            "X2lkGAggASgJUgpleGVjdXRvcklkEiMKDWNhcGFiaWxpdHlfaWQYCSABKAlS",
-            "DGNhcGFiaWxpdHlJZBIvChNkZWZpbml0aW9uX3JldmlzaW9uGAogASgJUhJk",
-            "ZWZpbml0aW9uUmV2aXNpb24SJQoOcmVxdWVzdF9kaWdlc3QYCyABKAlSDXJl",
-            "cXVlc3REaWdlc3QSQwoFc3RhdGUYDCABKA4yLS5nbGltbWVyLmNhcGFiaWxp",
-            "dGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZVIFc3RhdGUSUAoMc2lkZV9l",
-            "ZmZlY3RzGA0gASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0",
-            "aW9uU2lkZUVmZmVjdHNSC3NpZGVFZmZlY3RzEi4KBnJlc3VsdBgOIAEoCzIW",
-            "Lmdvb2dsZS5wcm90b2J1Zi5WYWx1ZVIGcmVzdWx0Eh0KCmVycm9yX2NvZGUY",
-            "DyABKAlSCWVycm9yQ29kZRIiCg11cGRhdGVkX2F0X21zGBAgASgEUgt1cGRh",
-            "dGVkQXRNcyqrAQoURXhlY3V0aW9uUmVzdWx0U3RhdGUSJgoiRVhFQ1VUSU9O",
-            "X1JFU1VMVF9TVEFURV9VTlNQRUNJRklFRBAAEiQKIEVYRUNVVElPTl9SRVNV",
-            "TFRfU1RBVEVfU1VDQ0VFREVEEAESIQodRVhFQ1VUSU9OX1JFU1VMVF9TVEFU",
-            "RV9GQUlMRUQQAhIiCh5FWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOS05PV04Q",
-            "AyqpAQoURXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoiRVhFQ1VUSU9OX1NJREVf",
-            "RUZGRUNUU19VTlNQRUNJRklFRBAAEh8KG0VYRUNVVElPTl9TSURFX0VGRkVD",
-            "VFNfTk9ORRABEiQKIEVYRUNVVElPTl9TSURFX0VGRkVDVFNfQ09ORklSTUVE",
-            "EAISIgoeRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTktOT1dOEANCMqoCL0ds",
-            "aW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ2FwYWJpbGl0aWVzLlYx",
-            "YgZwcm90bzM="));
+            "dWN0LnByb3RvIlwKDlNraWxsUmVmZXJlbmNlEhkKCHNraWxsX2lkGAEgASgJ",
+            "Ugdza2lsbElkEi8KE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAlSEmRlZmlu",
+            "aXRpb25SZXZpc2lvbiKOAQoPU2tpbGxEZXNjcmlwdG9yEkUKCXJlZmVyZW5j",
+            "ZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJl",
+            "bmNlUglyZWZlcmVuY2USEgoEbmFtZRgCIAEoCVIEbmFtZRIgCgtkZXNjcmlw",
+            "dGlvbhgDIAEoCVILZGVzY3JpcHRpb24iegoNU2tpbGxNYXRlcmlhbBJFCgly",
+            "ZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2ls",
+            "bFJlZmVyZW5jZVIJcmVmZXJlbmNlEiIKDGluc3RydWN0aW9ucxgCIAEoCVIM",
+            "aW5zdHJ1Y3Rpb25zIp4FChRFeGVjdXRpb25SZXN1bHRFdmVudBIZCghldmVu",
+            "dF9pZBgBIAEoCVIHZXZlbnRJZBIjCg1pbnZvY2F0aW9uX2lkGAIgASgJUgxp",
+            "bnZvY2F0aW9uSWQSGgoIcmV2aXNpb24YAyABKARSCHJldmlzaW9uEhgKB2F0",
+            "dGVtcHQYBCABKA1SB2F0dGVtcHQSGQoIc2NvcGVfaWQYBSABKAlSB3Njb3Bl",
+            "SWQSJwoPY29udmVyc2F0aW9uX2lkGAYgASgJUg5jb252ZXJzYXRpb25JZBIk",
+            "Cg5zb3VyY2VfZmFjdF9pZBgHIAEoCVIMc291cmNlRmFjdElkEh8KC2V4ZWN1",
+            "dG9yX2lkGAggASgJUgpleGVjdXRvcklkEiMKDWNhcGFiaWxpdHlfaWQYCSAB",
+            "KAlSDGNhcGFiaWxpdHlJZBIvChNkZWZpbml0aW9uX3JldmlzaW9uGAogASgJ",
+            "UhJkZWZpbml0aW9uUmV2aXNpb24SJQoOcmVxdWVzdF9kaWdlc3QYCyABKAlS",
+            "DXJlcXVlc3REaWdlc3QSQwoFc3RhdGUYDCABKA4yLS5nbGltbWVyLmNhcGFi",
+            "aWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZVIFc3RhdGUSUAoMc2lk",
+            "ZV9lZmZlY3RzGA0gASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhl",
+            "Y3V0aW9uU2lkZUVmZmVjdHNSC3NpZGVFZmZlY3RzEi4KBnJlc3VsdBgOIAEo",
+            "CzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZVIGcmVzdWx0Eh0KCmVycm9yX2Nv",
+            "ZGUYDyABKAlSCWVycm9yQ29kZRIiCg11cGRhdGVkX2F0X21zGBAgASgEUgt1",
+            "cGRhdGVkQXRNcyqrAQoURXhlY3V0aW9uUmVzdWx0U3RhdGUSJgoiRVhFQ1VU",
+            "SU9OX1JFU1VMVF9TVEFURV9VTlNQRUNJRklFRBAAEiQKIEVYRUNVVElPTl9S",
+            "RVNVTFRfU1RBVEVfU1VDQ0VFREVEEAESIQodRVhFQ1VUSU9OX1JFU1VMVF9T",
+            "VEFURV9GQUlMRUQQAhIiCh5FWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOS05P",
+            "V04QAyqpAQoURXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoiRVhFQ1VUSU9OX1NJ",
+            "REVfRUZGRUNUU19VTlNQRUNJRklFRBAAEh8KG0VYRUNVVElPTl9TSURFX0VG",
+            "RkVDVFNfTk9ORRABEiQKIEVYRUNVVElPTl9TSURFX0VGRkVDVFNfQ09ORklS",
+            "TUVEEAISIgoeRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTktOT1dOEANCMqoC",
+            "L0dsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ2FwYWJpbGl0aWVz",
+            "LlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.StructReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionResultState), typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionSideEffects), }, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference.Parser, new[]{ "SkillId", "DefinitionRevision" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillDescriptor), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillDescriptor.Parser, new[]{ "Reference", "Name", "Description" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillMaterial), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillMaterial.Parser, new[]{ "Reference", "Instructions" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionResultEvent), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionResultEvent.Parser, new[]{ "EventId", "InvocationId", "Revision", "Attempt", "ScopeId", "ConversationId", "SourceFactId", "ExecutorId", "CapabilityId", "DefinitionRevision", "RequestDigest", "State", "SideEffects", "Result", "ErrorCode", "UpdatedAtMs" }, null, null, null, null)
           }));
     }
@@ -79,6 +90,772 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
 
   #region Messages
   /// <summary>
+  /// 方法知识的引用/发现/正文与可执行 Tool 独立；模型选择引用不授予任何权限。
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class SkillReference : pb::IMessage<SkillReference>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<SkillReference> _parser = new pb::MessageParser<SkillReference>(() => new SkillReference());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<SkillReference> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[0]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillReference() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillReference(SkillReference other) : this() {
+      skillId_ = other.skillId_;
+      definitionRevision_ = other.definitionRevision_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillReference Clone() {
+      return new SkillReference(this);
+    }
+
+    /// <summary>Field number for the "skill_id" field.</summary>
+    public const int SkillIdFieldNumber = 1;
+    private string skillId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string SkillId {
+      get { return skillId_; }
+      set {
+        skillId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "definition_revision" field.</summary>
+    public const int DefinitionRevisionFieldNumber = 2;
+    private string definitionRevision_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string DefinitionRevision {
+      get { return definitionRevision_; }
+      set {
+        definitionRevision_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as SkillReference);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(SkillReference other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (SkillId != other.SkillId) return false;
+      if (DefinitionRevision != other.DefinitionRevision) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (SkillId.Length != 0) hash ^= SkillId.GetHashCode();
+      if (DefinitionRevision.Length != 0) hash ^= DefinitionRevision.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (SkillId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(SkillId);
+      }
+      if (DefinitionRevision.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(DefinitionRevision);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (SkillId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(SkillId);
+      }
+      if (DefinitionRevision.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(DefinitionRevision);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (SkillId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(SkillId);
+      }
+      if (DefinitionRevision.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(DefinitionRevision);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(SkillReference other) {
+      if (other == null) {
+        return;
+      }
+      if (other.SkillId.Length != 0) {
+        SkillId = other.SkillId;
+      }
+      if (other.DefinitionRevision.Length != 0) {
+        DefinitionRevision = other.DefinitionRevision;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            SkillId = input.ReadString();
+            break;
+          }
+          case 18: {
+            DefinitionRevision = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            SkillId = input.ReadString();
+            break;
+          }
+          case 18: {
+            DefinitionRevision = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class SkillDescriptor : pb::IMessage<SkillDescriptor>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<SkillDescriptor> _parser = new pb::MessageParser<SkillDescriptor>(() => new SkillDescriptor());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<SkillDescriptor> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[1]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillDescriptor() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillDescriptor(SkillDescriptor other) : this() {
+      reference_ = other.reference_ != null ? other.reference_.Clone() : null;
+      name_ = other.name_;
+      description_ = other.description_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillDescriptor Clone() {
+      return new SkillDescriptor(this);
+    }
+
+    /// <summary>Field number for the "reference" field.</summary>
+    public const int ReferenceFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference reference_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference Reference {
+      get { return reference_; }
+      set {
+        reference_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "name" field.</summary>
+    public const int NameFieldNumber = 2;
+    private string name_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Name {
+      get { return name_; }
+      set {
+        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "description" field.</summary>
+    public const int DescriptionFieldNumber = 3;
+    private string description_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Description {
+      get { return description_; }
+      set {
+        description_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as SkillDescriptor);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(SkillDescriptor other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Reference, other.Reference)) return false;
+      if (Name != other.Name) return false;
+      if (Description != other.Description) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (reference_ != null) hash ^= Reference.GetHashCode();
+      if (Name.Length != 0) hash ^= Name.GetHashCode();
+      if (Description.Length != 0) hash ^= Description.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (reference_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Reference);
+      }
+      if (Name.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Name);
+      }
+      if (Description.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Description);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (reference_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Reference);
+      }
+      if (Name.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Name);
+      }
+      if (Description.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Description);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (reference_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Reference);
+      }
+      if (Name.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Name);
+      }
+      if (Description.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Description);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(SkillDescriptor other) {
+      if (other == null) {
+        return;
+      }
+      if (other.reference_ != null) {
+        if (reference_ == null) {
+          Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+        }
+        Reference.MergeFrom(other.Reference);
+      }
+      if (other.Name.Length != 0) {
+        Name = other.Name;
+      }
+      if (other.Description.Length != 0) {
+        Description = other.Description;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 18: {
+            Name = input.ReadString();
+            break;
+          }
+          case 26: {
+            Description = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 18: {
+            Name = input.ReadString();
+            break;
+          }
+          case 26: {
+            Description = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class SkillMaterial : pb::IMessage<SkillMaterial>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<SkillMaterial> _parser = new pb::MessageParser<SkillMaterial>(() => new SkillMaterial());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<SkillMaterial> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[2]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillMaterial() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillMaterial(SkillMaterial other) : this() {
+      reference_ = other.reference_ != null ? other.reference_.Clone() : null;
+      instructions_ = other.instructions_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SkillMaterial Clone() {
+      return new SkillMaterial(this);
+    }
+
+    /// <summary>Field number for the "reference" field.</summary>
+    public const int ReferenceFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference reference_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference Reference {
+      get { return reference_; }
+      set {
+        reference_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "instructions" field.</summary>
+    public const int InstructionsFieldNumber = 2;
+    private string instructions_ = "";
+    /// <summary>
+    /// 不可信任务参考材料；不是 system instruction 或已验证事实。
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Instructions {
+      get { return instructions_; }
+      set {
+        instructions_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as SkillMaterial);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(SkillMaterial other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Reference, other.Reference)) return false;
+      if (Instructions != other.Instructions) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (reference_ != null) hash ^= Reference.GetHashCode();
+      if (Instructions.Length != 0) hash ^= Instructions.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (reference_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Reference);
+      }
+      if (Instructions.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Instructions);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (reference_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Reference);
+      }
+      if (Instructions.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Instructions);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (reference_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Reference);
+      }
+      if (Instructions.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Instructions);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(SkillMaterial other) {
+      if (other == null) {
+        return;
+      }
+      if (other.reference_ != null) {
+        if (reference_ == null) {
+          Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+        }
+        Reference.MergeFrom(other.Reference);
+      }
+      if (other.Instructions.Length != 0) {
+        Instructions = other.Instructions;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 18: {
+            Instructions = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.SkillReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 18: {
+            Instructions = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
   /// Execution 拥有结果；不传入请求正文/授权详情，也不复制 Conversation 拓扑。
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
@@ -96,7 +873,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[0]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[3]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

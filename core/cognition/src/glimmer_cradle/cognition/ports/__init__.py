@@ -5,14 +5,15 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityDescriptor,
     CapabilityInvocation,
     CapabilityPort,
     CapabilityResult,
     CapabilityResultStatus,
+    SkillMaterial,
+    SkillReference,
+    SkillSummary,
 )
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
 from glimmer_cradle.cognition.ports.content_port import ContentPort, ContentReference
@@ -24,6 +25,7 @@ from glimmer_cradle.cognition.ports.job_port import (
     JobRequestStatus,
 )
 from glimmer_cradle.cognition.ports.resource_port import ResourcePort, ResourceSnapshot
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class IdGeneratorPort(Protocol):
@@ -83,6 +85,7 @@ class AgentPlanResult(BaseModel):
     reasoning: str
     suggestions: list[SkillToolSuggestion]
     trace_id: str
+    selected_skills: list[SkillReference] = Field(default_factory=list)
 
 
 @dataclass
@@ -91,6 +94,8 @@ class AgentPlanInput:
     scene_id: str = ""
     available_tools: list[SkillToolDescriptor] = field(default_factory=list)
     trace_id: str = ""
+    available_skills: list[SkillSummary] = field(default_factory=list)
+    skill_materials: list[SkillMaterial] = field(default_factory=list)
 
 
 AgentPlanOutput = AgentPlanResult
@@ -265,6 +270,9 @@ class KernelEventPort(ABC):
         pass
 
 __all__ = [
+    "SkillReference",
+    "SkillSummary",
+    "SkillMaterial",
     "CapabilityDescriptor",
     "CapabilityInvocation",
     "CapabilityPort",

@@ -211,6 +211,12 @@ export class CognitionClient {
         call: this.transport.makeCallMetadata({ traceId, correlationId: traceId }),
         userGoal: request.user_goal,
         sceneId: request.scene_id ?? 'default',
+        availableSkills: (request.available_skills ?? []).map(skill => ({ reference: {
+          skillId: skill.reference.skill_id, definitionRevision: skill.reference.definition_revision },
+        name: skill.name, description: skill.description })),
+        skillMaterials: (request.skill_materials ?? []).map(material => ({ reference: {
+          skillId: material.reference.skill_id, definitionRevision: material.reference.definition_revision },
+        instructions: material.instructions })),
         availableTools: request.available_tools?.map((tool) => ({
           skillId: tool.skill_id,
           toolName: tool.tool_name,
@@ -231,6 +237,8 @@ export class CognitionClient {
         arguments_hint: structToObject(item.argumentsHint),
       })),
       trace_id: response.traceId,
+      selected_skills: response.selectedSkills.flatMap(skill => skill.skillId && skill.definitionRevision
+        ? [{ skill_id: skill.skillId, definition_revision: skill.definitionRevision }] : []),
     };
   }
 

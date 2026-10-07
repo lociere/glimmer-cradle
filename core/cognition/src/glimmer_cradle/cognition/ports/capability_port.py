@@ -7,6 +7,30 @@ from typing import Literal, Protocol
 
 
 @dataclass(frozen=True, slots=True)
+class SkillReference:
+    skill_id: str
+    definition_revision: str
+
+    def __post_init__(self) -> None:
+        for value in (self.skill_id, self.definition_revision):
+            if not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096:
+                raise ValueError("invalid skill reference")
+
+
+@dataclass(frozen=True, slots=True)
+class SkillSummary:
+    reference: SkillReference
+    name: str
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class SkillMaterial:
+    reference: SkillReference
+    instructions: str
+
+
+@dataclass(frozen=True, slots=True)
 class CapabilityDescriptor:
     name: str
     description: str

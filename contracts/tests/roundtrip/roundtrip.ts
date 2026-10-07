@@ -14,7 +14,7 @@ import {
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
 import { JobStatus } from '../../generated/ts/glimmer/jobs/v1/jobs_pb';
-import { PublishMemoryJobStateRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { PublishMemoryJobStateRequestSchema, PlanRequestSchema, PlanResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
   AcknowledgeMemoryJobRequestRequestSchema, ReadPlanningJobRequestsRequestSchema,
   ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestRequestSchema,
@@ -28,6 +28,18 @@ const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
 const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version: string; tool_id: string };
 const digest = createHash('sha256').update(documentBytes).digest();
+
+const methodReference = { skillId: 'method:总结', definitionRevision: 'revision:一' };
+const methodPlan = create(PlanRequestSchema, { userGoal: '原始目标',
+  availableSkills: [{ reference: methodReference, name: '总结', description: '方法知识' }],
+  skillMaterials: [{ reference: methodReference, instructions: '参考材料\n不授予权限。' }] });
+const restoredMethodPlan = fromBinary(PlanRequestSchema, toBinary(PlanRequestSchema, methodPlan));
+if (toJsonString(PlanRequestSchema, methodPlan) !== toJsonString(PlanRequestSchema, restoredMethodPlan)
+  || restoredMethodPlan.availableTools.length !== 0) throw new Error('Skill method separate input roundtrip failed');
+const methodResponse = create(PlanResponseSchema, { selectedSkills: [methodReference] });
+if (toJsonString(PlanResponseSchema, fromBinary(PlanResponseSchema, toBinary(PlanResponseSchema, methodResponse)))
+  !== toJsonString(PlanResponseSchema, methodResponse)) throw new Error('Skill reference roundtrip failed');
+if (fromBinary(PlanRequestSchema, new Uint8Array()).skillMaterials.length) throw new Error('Legacy plan gained material');
 
 for (const state of [ExecutionResultState.SUCCEEDED, ExecutionResultState.FAILED, ExecutionResultState.UNKNOWN]) {
   const request = create(AcceptExecutionResultRequestSchema, {

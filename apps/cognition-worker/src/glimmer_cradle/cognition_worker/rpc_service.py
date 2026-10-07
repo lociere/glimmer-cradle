@@ -1628,7 +1628,11 @@ class CognitionGrpcHost:
 
     async def _plan(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
-            output = await self._inbound.on_agent_plan(agent_plan_from_wire(request, trace_id=trace_id))
+            try:
+                plan_input = agent_plan_from_wire(request, trace_id=trace_id)
+            except (ValueError, TypeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "规划方法引用/材料或预算无效") from error
+            output = await self._inbound.on_agent_plan(plan_input)
             return agent_plan_to_wire(output)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 

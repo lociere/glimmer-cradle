@@ -5,6 +5,7 @@ import type {
   PerceptionEvent,
 } from './application-models';
 import type { ConversationContext } from '@glimmer-cradle/conversation';
+import type { SkillReference, SkillMaterial, SkillSummary } from '@glimmer-cradle/capabilities';
 
 /** Kernel 应用层使用的 Cognition 用例模型；跨进程 DTO 只存在于 Service Adapter。 */
 export interface PerceptionCancelRequest {
@@ -25,6 +26,8 @@ export interface PerceptionOperationResult {
 export interface AgentPlanRequest {
   readonly user_goal: string;
   readonly scene_id?: string;
+  readonly available_skills?: readonly SkillSummary[];
+  readonly skill_materials?: readonly SkillMaterial[];
   readonly available_tools: ReadonlyArray<{
     readonly skill_id: string;
     readonly tool_name: string;
@@ -44,6 +47,7 @@ export interface AgentPlanResponse {
     readonly arguments_hint: Record<string, unknown>;
   }>;
   readonly trace_id: string;
+  readonly selected_skills?: readonly SkillReference[];
 }
 
 export interface AgentSynthesisRequest {
