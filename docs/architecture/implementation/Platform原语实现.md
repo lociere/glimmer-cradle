@@ -17,9 +17,11 @@
 | `/lifecycle` | RuntimeModule、LifecyclePhase、Observer、LifecycleCoordinator | Kernel runtime modules 与 LifecycleOrchestrator |
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
 | root 的 topology exports | AuthorityLease/StorePort、fencing 判定、HandoverController | Host `SqliteAuthorityStore` 与 `HostJobsOwner`；无数据库依赖 |
+| root 的 security exports | 不可变 Principal、PermissionRequest/Grant/Decision 与身份验证 | Host PermissionBroker 登记/授权/审计/撤销；不解释 Resource 内容或 scope |
 
 契约提取不表示具体 IO 实现已迁入 Platform。Scope、完整 Topology/hybrid、Configuration 装配和
-Security 等仍按执行记录推进。
+完整 Security 等仍按执行记录推进；短寿命授权接线见
+[Host Resource 实现](Extension与SkillPlane实现.md#目标-host-resource-授权与读取)，不代表完整用户授权或 SDK 沙箱。
 
 ## 组合与生命周期
 

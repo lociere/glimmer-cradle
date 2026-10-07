@@ -26,4 +26,8 @@ export type { ConfigurationValidation } from './configuration/index.js';
 export { AuthorityConflictError, isAuthorityCurrent, validateAuthorityLease, validateAuthorityWindow } from './topology/authority-lease.js';
 export type { AuthorityLease, AuthorityRecord } from './topology/authority-lease.js';
 export type { AuthorityStorePort, AuthorityHandover, AuthorityDrainReceipt, AuthorityDrainPort } from './topology/authority.js';
+export { snapshotPrincipal, validateSecurityIdentity } from './security/principal.js';
+export type { Principal } from './security/principal.js';
+export { snapshotPermissionRequest } from './security/permission.js';
+export type { PermissionRequest, PermissionGrant, PermissionDecision } from './security/permission.js';
 export { HandoverController, validateDrainReceipt } from './topology/handover.js';

@@ -4,6 +4,9 @@
 不拥有 Cognition、Jobs、Renderer 或第三方协议的领域政策。
 当前公开入口包含 Clock/Identity/Live Events/Observability、LifecycleCoordinator、ConfigurationValidator
 与 topology authority lease/StorePort/HandoverController；具体 IO 由 App 装配。
+`security/principal.ts` 与 `security/permission.ts` 提供不可变主体/细粒度权限值对象；实际登记、
+短寿命授权、审计与撤销由 Host PermissionBroker 拥有，不将主体 ID 或 manifest 当访问凭据。
+具体接线与未完成边界见[能力实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
 
 Authority 按 aggregate 保留单调 epoch/token。Handover 先撤销入口，可信承载 owner drain 后再确认
 新租约；过期接管只 fencing，不能代替业务 unknown 对账。SQLite 实现在 Host，Platform 不引入

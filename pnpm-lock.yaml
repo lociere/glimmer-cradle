@@ -43,6 +43,9 @@ importers:
       '@bufbuild/protobuf':
         specifier: 2.13.0
         version: 2.13.0
+      '@glimmer-cradle/capabilities':
+        specifier: workspace:*
+        version: link:../../core/capabilities
       '@glimmer-cradle/contracts':
         specifier: workspace:*
         version: link:../../contracts
@@ -55,6 +58,9 @@ importers:
       '@grpc/grpc-js':
         specifier: 1.14.0
         version: 1.14.0
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3

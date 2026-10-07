@@ -620,6 +620,55 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 9 Host Resource 授权与接纳接线计划（2026-10-07）
+
+输入 `8718cdec`，当前会话唯一写入 owner。Resource 长期知识接入的前置依赖尚缺 Host-owned
+可撤销授权事实；现行 Kernel 原生链仍用旧 App Policy。先落实 Platform principal/permission
+值对象与 Host PermissionBroker，显式绑定受监督主体/世代、定义版本、目标位置、期限和授权
+revision；拒绝把 manifest 请求、模型参数或旧曝光快照当成授权。Host 资源读取实际消费 broker
+并经过现行 Capabilities journal/outbox，授权/派发前重验，撤销期间迟到结果不得返回当前调用。
+接纳仅由真实 Conversation receipt 确认，派发后异常保持 unknown，不自动重试。
+
+必要反例：无 grant、主体/世代/位置/scope 不符、到期、授权或定义在等待中撤销、重复调用摘要
+漂移、取消/关闭 drain、外部结果接纳丢失与重启恢复。Host 监督注册该 typed CapabilityService
+接线后用真实生产 Worker/local provider/SQLite/Log 验证，不以孤立 broker 单测宣称生产完成。
+这不是完整 SDK IO 沙箱或持久用户授权 UI，也不自动将 Resource 读取/Tool 结果登记为 Knowledge。
+现行 Kernel 默认产品入口的迁移/旧 owner 删除留其 consumer-zero 与阶段 12 接线门；本轮不
+引入第二契约源、用户数据迁移、收费调用或发布。完整目标保持 active。
+
+当前实现候选：Platform 只新增不可变主体/权限值对象，Host PermissionBroker 持有显式、
+默认拒绝的运行期 grant，绑定主体/Host/generation/定义/位置/期限及独立授权 revision。
+墙钟回拨不复活能力；审计失效拒绝新增授权但不能阻止撤销。实际 ResourceRegistry/reader
+进入 `HostResourceContributions`，当次 Step 捕获授权，派发前和返回前复验；同调用摘要
+漂移、越界 scope、用户自报身份及过期/撤销/定义替换均拒绝。
+
+WorkerSupervisor 在真实 HMAC 登记后激活本代主体，开放既有 typed ExposeStep/ReadResource；
+缺失 Tool/Skill 执行 owner 仍 NOT_READY。`createJobsClient` 的仓库 consumer-zero 后改为
+`createCognitionClient`，不保留第二入口。执行用 Core 既有 journal/outbox，持久 target 为
+`resource:<definition_id>`；正文引用仍为原定义 ID/revision。真实结果映射到独立
+ConversationService，核验持久 receipt 才 ACK/返回正文；响应丢失不重读，派发异常不自动
+重试。停止先取消/drain，再撤销全部主体并解除监听，单个审计故障不打断安全清理。
+
+真实生产 Worker/local HTTP SSE/SQLite Log 用例覆盖成功接纳后的模型续接/Reply 因果链，
+及读取中撤权时只保留已知执行、正文不进入后续模型且没有 Reply。输入是 `8718cdec` 上
+本节 Host/Platform/锁文件与相应 Current/Implementation/Reference 文档的 dirty 候选；
+唯一写入 owner，Windows、Node 24、pnpm 11.13.0、根 uv workspace，只有临时测试数据。
+
+验证：Host 全量 95 项 PASS；随后仅补 Step 世代拒绝校验和复用 receiver client，最终 Resource
+12 项与 public API 24 项复验 PASS，其余 Host 59 项的相同输入证据保留。
+Platform 8 项、Capabilities 42 项、repo-checks 27 项 PASS；Kernel 常规回归 PASS，真实 Worker
+条件集成另行显式启用后 11 项与 production bootstrap smoke PASS；外部分发安装的条件
+用例未运行。最终源码的根
+`pnpm typecheck`、`pnpm build` exit 0；docs 111 页、编码、架构、target-layout specification
+与 `git diff --check` PASS。IDL/generated 没有改变，沿用此前 Contract Spine 验证证据，不在
+Worker 运行时重新生成。target-layout 此处仅验证规格，不是完整物理清单 final 门；未验 UI/
+Unity、跨机/安装制品或用户原数据。上文计划的 Host Resource 跨重启恢复尚未接线，不算完成。
+
+剩余：Host grants 持久用户政策/UI、SDK IO broker/沙箱、Tool/Skill 实际迁移、跨重启 Resource
+outbox 驱动/外部 fencing、完整持久 Run/预算、Resource freshness/Knowledge ingest 和产品
+默认启动切换。不删除旧 Kernel owner、不自动吸收正文为 Knowledge。固定完整候选的权限/
+生命周期独立审查仍待最终验收，当前不是安全发布结论。
+
 ### 阶段 5 Knowledge 配置 Vault 版本化索引与失效（2026-10-07）
 
 输入 `fa3862ff`，当前会话唯一写入 owner。沿知识更新主链补 Knowledge 独立持久 owner：

@@ -35,6 +35,11 @@ schema 2 保存 Conversation ID/原 Action fact ID 引用；schema 1 拒绝隐�
 必须保存原结果及 outbox，不能为历史无引用结果猜测路由。Conversation durable receipt 已接线，
 实际接受与刷盘后才 ACK；即使接收方已提交而 RPC/ACK 丢失，也按原 identity 重投，不得清理
 pending outbox 或重新调用工具。备份还需包含原 Action 和已接纳结果的 Conversation Log。
+目标 Host Resource 读取同样消费上述 Core Execution journal，不新增平行执行事实库；路径与
+Store 由装配方显式注入并拥有，须在 Resource controller/outbox drain 完成后关闭，不与旧
+Kernel 同时写同一执行库。Host grant 是本实例短寿命能力，不落入该库成为持久用户授权；
+重启须重新授权，尚无 Host Resource 跨重启 outbox 后台投递/恢复装配。精确边界见
+[能力实现](../architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
 完整跨 owner 恢复、
 外部对账与产品安装验收留阶段 14/15；本候选只操作临时测试根，未迁移用户原库。
 

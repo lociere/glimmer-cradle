@@ -47,6 +47,15 @@ Content 的 TypeScript/Python/C# DTO 只从 canonical proto 生成；`AssetRef` 
 
 `CoreSkillConfirmationRequestEvent` 的字段 8 `title`、字段 9 `detail` 为可选展示文本，由双端 Adapter 映射到确认界面；不授予权限，也不替代目标工具策略。确认回执必须来自接收该请求的可写 Surface session，断线使未完成请求失效。用户 SKILL.md 元数据由 `contracts/json-schema/skill/v1/user-skill-metadata.schema.json` 拥有，加载及调用边界见[Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。
 
+## 目标 Host Resource 接线
+
+目标 Host WorkerSupervisor 复用既有 CapabilityService.ExposeStep/ReadResource 与生成的
+ReadResourceRequest 外壳，受监督 generation/ready 后才开放；尚无实际 owner 的 Tool/Skill
+返回 NOT_READY。Resource 成功的持久 capability_id 为 `resource:<definition_id>`，正文 reference
+使用原 ID/revision；Worker 必须核验原 Action、durable result identity 与 content revision。
+Host 结果接纳使用独立 ConversationService.AcceptExecutionResult，不投递到 CognitionService。
+授权和停止边界见[实现地图](../architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
+
 ## Memory Jobs 状态投递
 
 Jobs 的 `JobStateEvent` 是原 outbox 事实，携带稳定 event/job/scope/goal/kind、revision、状态枚举、

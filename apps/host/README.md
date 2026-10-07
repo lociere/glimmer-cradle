@@ -19,7 +19,7 @@ SQLite 验证源 ACK 丢失、业务响应丢失、重启对账及未到达 atte
 authority 缺失/回退时拒绝用重复启动追赶已有 Jobs epoch。两个数据库仍由装配方注入并拥有。
 `supervision/worker-supervisor.ts` 的 `WorkerSupervisor` 直接启动生产 Python Worker CLI（显式 external），
 通过 FD3 一次性 HMAC 能力核验本代注册；首条状态真实接纳且 Worker 业务 readiness ready 后才
-暴露 Jobs client。`HostCognitionJobsOwner` 组合该监督与 Jobs owner：正常停机先 drain Jobs 并释放
+暴露 `createCognitionClient()` 的受监督 client。`HostCognitionJobsOwner` 组合该监督与 Jobs owner：正常停机先 drain Jobs 并释放
 authority，再协议 shutdown Worker，期限后仅回收本实例进程树并核验退出。崩溃撤销客户端、停止
 Jobs/续期；重启须创建新实例/世代，数据库仍由调用方在整个 owner stop 完成后关闭。
 状态接收方必需注入，Action/Log 接收方缺失时 NOT_READY；投影/inbox 幂等性由实际接收 owner 拥有。
@@ -41,7 +41,12 @@ Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一
 改写首次政策。尚无 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
 `degraded/jobs_handler_pending`，Planning 状态事件保留未 ACK，不阻塞 Memory 状态投递。
 两种源接纳都不代表长期目标完成，精确边界见[协议参考](../../docs/reference/protocol.md#planning-jobs-源接纳)。
-gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
+`HostResourceContributions` 可显式注入 WorkerSupervisor 的 typed CapabilityService；真实资源读取
+消费 Host 短寿命授权、Core 独立 ResourceRegistry 和 Execution journal/outbox，经生成
+Conversation Service 验证持久 receipt 后才返回正文。实际边界见
+[能力实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
+没有显式贡献/授权则拒绝，不是默认产品或完整 Extension IO sandbox。
+Tool/Skill gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
 完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。

@@ -6,12 +6,17 @@ import { setTimeout as schedule, clearTimeout as unschedule } from 'node:timers'
 import { setTimeout as delay } from 'node:timers/promises';
 import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, toBinary, type Message } from '@bufbuild/protobuf';
-import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema, ServiceRecoveryAction } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { KernelControlService, RegisterCognitionResponseSchema,
   type RegisterCognitionRequest, type PublishStateRequest, type PublishStateResponse,
   type PublishLogRequest, type PublishLogResponse, type PublishActionRequest, type PublishActionResponse,
 } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
 import { CognitionClient } from '../adapters/protocol/cognition-client.js';
+import { HostCapabilityRequestError, type HostCapabilityServicePort } from '../composition/extension-contributions.js';
+import { ExecutionRecoveryRequiredError } from '@glimmer-cradle/capabilities';
+import { CapabilityService, type ExposeStepRequest, type ExposeStepResponse,
+  type ReadResourceRequest, type ReadResourceResponse } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import type { CallMetadata } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 
 export interface WorkerSupervisorOptions {
   readonly python_executable: string;
@@ -27,6 +32,7 @@ export interface WorkerSupervisorOptions {
   readonly accept_state: (request: PublishStateRequest, signal: AbortSignal) => Promise<PublishStateResponse>;
   readonly accept_log?: (request: PublishLogRequest, signal: AbortSignal) => Promise<PublishLogResponse>;
   readonly accept_action?: (request: PublishActionRequest, signal: AbortSignal) => Promise<PublishActionResponse>;
+  readonly capability_service?: HostCapabilityServicePort;
 }
 export interface WorkerSession { readonly endpoint: string; readonly generation: string; }
 export interface WorkerSupervisorSnapshot {
@@ -95,7 +101,7 @@ export class WorkerSupervisor {
   }
   public get snapshot(): WorkerSupervisorSnapshot { return { ...this.state }; }
   public onFailure(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
-  public createJobsClient(): CognitionClient {
+  public createCognitionClient(): CognitionClient {
     if (this.state.state !== 'ready' || !this.state.endpoint || !this.state.generation) throw new Error('Worker 尚未业务 ready');
     const client = new CognitionClient(this.state.endpoint, this.state.generation, this.options.request_timeout_ms);
     this.clients.add(client); return client;
@@ -158,6 +164,19 @@ export class WorkerSupervisor {
             return this.options.accept_action(call.request, signal);
           }),
       });
+      const capabilities = Object.fromEntries(CapabilityService.methods.map(method => [method.name, {
+        path: `/${CapabilityService.typeName}/${method.name}`, requestStream: false, responseStream: false,
+        requestSerialize: value => Buffer.from(toBinary(method.input, value)), requestDeserialize: bytes => fromBinary(method.input, bytes),
+        responseSerialize: value => Buffer.from(toBinary(method.output, value)), responseDeserialize: bytes => fromBinary(method.output, bytes),
+      } satisfies grpc.MethodDefinition<Message, Message>]));
+      server.addService(capabilities, {
+        ExposeStep: (call: grpc.ServerUnaryCall<ExposeStepRequest, ExposeStepResponse>, callback: grpc.sendUnaryData<ExposeStepResponse>) =>
+          this.receive(call, callback, signal => this.capabilities().exposeStep(call.request, this.principalId(), signal)),
+        ReadResource: (call: grpc.ServerUnaryCall<ReadResourceRequest, ReadResourceResponse>, callback: grpc.sendUnaryData<ReadResourceResponse>) =>
+          this.receive(call, callback, signal => this.capabilities().readResource(call.request, this.principalId(), signal), call.request.request?.call),
+        InvokeTool: (_call: grpc.ServerUnaryCall<unknown, unknown>, callback: grpc.sendUnaryData<unknown>) => callback(this.fault(ServiceErrorCode.NOT_READY), null),
+        ReadSkill: (_call: grpc.ServerUnaryCall<unknown, unknown>, callback: grpc.sendUnaryData<unknown>) => callback(this.fault(ServiceErrorCode.NOT_READY), null),
+      });
       const port = await new Promise<number>((resolve, reject) => server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(),
         (error, value) => error ? reject(error) : resolve(value)));
       this.cancellation.signal.throwIfAborted();
@@ -215,28 +234,32 @@ export class WorkerSupervisor {
     if (proof.length !== expected.length || !timingSafeEqual(proof, expected)) throw new Error('注册认证失败');
     this.zeroSecret(); this.state = { ...this.state, endpoint: request.endpoint };
     this.registeredProcessId = pid;
+    this.options.capability_service?.activatePrincipal(this.principalId(), this.state.generation!);
     this.lifecycle = new CognitionClient(request.endpoint, this.state.generation!, this.options.request_timeout_ms);
     this.registration!.resolve();
     return create(RegisterCognitionResponseSchema, { generation: this.state.generation!, accepted: true });
   }
-  private receive<I extends { call?: { generation: string; traceId: string } }, O>(call: grpc.ServerUnaryCall<I, O>,
-    callback: grpc.sendUnaryData<O>, handler: (signal: AbortSignal) => Promise<O>): void {
+  private receive<I, O>(call: grpc.ServerUnaryCall<I, O>,
+    callback: grpc.sendUnaryData<O>, handler: (signal: AbortSignal) => Promise<O>, header?: CallMetadata): void {
+    const metadata = header ?? (call.request as { call?: CallMetadata }).call;
     const cancellation = new AbortController(); this.requests.add(cancellation);
     const timer = setTimeout(() => cancellation.abort(), this.options.request_timeout_ms);
     cancellation.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
     call.once('cancelled', () => cancellation.abort());
     const task = (async () => {
       try {
-        this.assertCurrent(call.request.call?.generation);
-        if (!call.request.call?.traceId) throw new Error('缺少 trace');
+        this.assertCurrent(metadata?.generation);
+        if (!metadata?.traceId) throw new Error('缺少 trace');
         const result = await handler(cancellation.signal);
         cancellation.signal.throwIfAborted();
-        this.assertCurrent(call.request.call?.generation);
+        this.assertCurrent(metadata?.generation);
         callback(null, result);
-      } catch {
-        const code = call.request.call?.generation !== this.state.generation ? ServiceErrorCode.GENERATION_MISMATCH
-          : cancellation.signal.aborted ? ServiceErrorCode.CANCELLED : ServiceErrorCode.NOT_READY;
-        callback(this.fault(code, call.request.call?.traceId), null);
+      } catch (error) {
+        const code = metadata?.generation !== this.state.generation ? ServiceErrorCode.GENERATION_MISMATCH
+          : error instanceof ExecutionRecoveryRequiredError ? ServiceErrorCode.RECOVERY_REQUIRED
+          : cancellation.signal.aborted ? ServiceErrorCode.CANCELLED
+          : error instanceof HostCapabilityRequestError ? ServiceErrorCode.INVALID_REQUEST : ServiceErrorCode.NOT_READY;
+        callback(this.fault(code, metadata?.traceId, error instanceof ExecutionRecoveryRequiredError ? error.invocationId : ''), null);
       } finally { clearTimeout(timer); this.requests.delete(cancellation); }
     })();
     this.tasks.add(task); void task.finally(() => this.tasks.delete(task)).catch(() => this.fail('worker_control_failed'));
@@ -244,14 +267,22 @@ export class WorkerSupervisor {
   private assertCurrent(generation?: string): void {
     if (!this.state.endpoint || generation !== this.state.generation || this.cancellation.signal.aborted) throw new Error('Worker 调用世代已撤销');
   }
-  private fault(code: ServiceErrorCode, traceId = ''): grpc.ServiceError {
+  private principalId(): string { return `cognition:${this.state.generation}`; }
+  private capabilities(): HostCapabilityServicePort {
+    if (!this.options.capability_service || this.state.state !== 'ready') throw new Error('Host Capability service 未 ready');
+    return this.options.capability_service;
+  }
+  private fault(code: ServiceErrorCode, traceId = '', operationId = ''): grpc.ServiceError {
     const metadata = new grpc.Metadata();
     metadata.set('glimmer-error-bin', Buffer.from(toBinary(ServiceErrorDetailSchema, create(ServiceErrorDetailSchema,
-      { code, call: create(CallMetadataSchema, { traceId, generation: this.state.generation ?? '' }) }))));
+      { code, call: create(CallMetadataSchema, { traceId, generation: this.state.generation ?? '' }), operationId,
+        recoveryActions: code === ServiceErrorCode.RECOVERY_REQUIRED ? [ServiceRecoveryAction.CONFIRM_SIDE_EFFECT_STATE] : [] }))));
     return Object.assign(new Error('受监督 Worker control 请求失败'), { code: grpc.status.FAILED_PRECONDITION, details: '受监督 Worker control 请求失败', metadata });
   }
   private zeroSecret(): void { this.secret?.fill(0); this.secret = undefined; this.nonce = undefined; }
   private cancel(): void {
+    try { this.options.capability_service?.revokePrincipal(this.principalId()); }
+    catch { this.state = { ...this.state, error_code: 'worker_control_failed' }; }
     this.cancellation.abort(new Error('Worker 监督身份已撤销')); this.zeroSecret();
     this.registration?.reject(new Error('Worker 注册等待已撤销'));
     for (const request of this.requests) request.abort();

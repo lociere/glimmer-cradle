@@ -239,13 +239,13 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
     });
     let endpoints: string[] = [];
     try {
-      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
       const start = owner.start(); expect(owner.start()).toBe(start);
       expect(await start).toMatchObject({ phase: 'active', worker: { state: 'ready' }, jobs: { phase: 'active' } });
       expect(projections.length).toBeGreaterThan(0);
       expect(probes).toBe(6);
       expect(store.readOutbox(1, 100)).toHaveLength(1);
-      const client = supervisor.createJobsClient();
+      const client = supervisor.createCognitionClient();
       expect((await client.readRequests(create(ReadMemoryJobRequestsRequestSchema, { limit: 8 }))).requests).toEqual([]);
       client.close();
       const memory = new Database(path.join(root, 'state/cognition/memory.sqlite'), { readonly: true });
@@ -278,7 +278,7 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
       await eventually(() => received);
       const endpoints = [supervisor.snapshot.endpoint!, supervisor.snapshot.control_endpoint!];
       expect(supervisor.snapshot.state).toBe('starting'); expect(owner.snapshot.jobs).toBeNull();
-      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
       await owner.stop(); await expect(start).rejects.toThrow();
       expect(cancelled).toBe(true); expect(authority.load('jobs')).toBeNull();
       expect(store.loadAuthorityEpoch()).toBeNull();
@@ -294,7 +294,7 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
     let next: HostCognitionJobsOwner | undefined;
     try {
       await owner.start(); const prior = supervisor.snapshot;
-      const client = supervisor.createJobsClient();
+      const client = supervisor.createCognitionClient();
       const trace = create(CallMetadataSchema, { generation: prior.generation!, traceId: 'negative' });
       const before = projections.length;
       await expect(controlCall(prior.control_endpoint!, 'PublishState', create(PublishStateRequestSchema,
@@ -333,7 +333,7 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
       await expect(supervisor.start()).rejects.toThrow();
       expect(supervisor.snapshot).toMatchObject({ state: 'failed', endpoint: null, control_endpoint: null });
       expect(JSON.stringify(supervisor.snapshot)).not.toContain('fixture-private-key');
-      expect(() => supervisor.createJobsClient()).toThrow('尚未业务 ready');
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
     } finally { await supervisor.stop(); }
   }, 30_000);
 

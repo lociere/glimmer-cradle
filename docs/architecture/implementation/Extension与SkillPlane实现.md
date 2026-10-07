@@ -234,6 +234,40 @@ deadline/cancel 会取消 gRPC 且原样上抛，不发布 fallback。若不可�
 
 Control Center 的能力目录通过 Desktop bridge 的 `skill_catalog_request` 读取同一个 `SkillCatalogAppService.getCatalogSnapshot()`，Electron main 只转发受控快照，不在 Desktop 进程中 import Kernel service 或重新构造注册表。`SkillCatalogSnapshot` 现在除了人物可用 skill 条目，还会带 `providerRuntimes`：Kernel 统一投影 core / extension / MCP / user provider 的运行态、契约-only、连接失败和恢复动作，Desktop 能力页只消费这份投影，不探测本地 MCP 端点。Extension 运行态不再停留在 `ExtensionRuntimeProjection` 支线里；`ExtensionHostAppService` 会把 Host 侧 manifest/lifecycle/capability graph/diagnostics 同步映射成 `provider.kind=extension` 的 provider runtime，因此即使一个扩展暂时没有人物可用 skill，Control Center 也能在同一能力目录里看到它是 `contract_only`、`connecting`、`ready`、`degraded` 还是 `unavailable`。Skill Plane 不消失，但收敛为 Host-Owned Capability Plane 上的人物可用调用层：`glimmer.skill` 是内建 contribution point，只有 character audience 的 skill/tool/resource/prompt 进入人物 Skill catalog；管理动作从 `ExtensionRuntimeProjection.actions` 的 user audience action intent 触发，不能混入 `SkillPlanningAppService.available_tools`。
 
+## 目标 Host Resource 授权与读取
+
+`apps/host/src/broker/permission-broker.ts` 拥有本实例可撤销授权；Platform security 仅定义
+不可变 Principal/PermissionRequest/PermissionGrant。授权绑定 Host 登记的主体、generation、
+permission、资源定义 revision、目标位置和过期时间；授权 revision 独立于定义 revision。
+缺省拒绝，副本/模型参数/manifest 不成为 grant。墙钟回拨不复活过期 grant；新增授权的审计
+失败则不登记，撤销先失效再报告审计错误。授权不持久化，Host 重启必须重新显式授权。
+
+`composition/extension-contributions.ts` 的 `HostResourceContributions` 接收真实 reader 和独立
+ResourceRegistry；正文不进入目录。WorkerSupervisor 通过既有 FD3 HMAC 注册本代主体，关闭
+ingress 或切代即撤销，再关闭 client/Worker。CapabilityService 只开放本代 ready 主体的
+ExposeStep/ReadResource；InvokeTool/ReadSkill 尚未接入而返回 NOT_READY。客户端入口统一为
+`createCognitionClient()`，不保留仅表示 Jobs 的旧命名壳。
+
+每个 Step 捕获原授权，晚授予不能扩张旧 Step；scope、readiness、协议 feature、目录字节/
+调用预算及当前定义由 Core Exposure 再过滤。Host 尚未接 user resolver，拒绝自报 userId。
+读取前复验当前 grant/注册/定义；参数经实际 Resource schema 验证并冻结。请求使用稳定
+`run_id:call_id`，持久 Execution target 是 `resource:<definition_id>`，正文 reference 保持原
+定义 ID/revision。成功内容具有 Core 生成的内容 hash/revision 和 32 KiB 限制。
+
+读取结果与 outbox 按既有 Core journal 同事务保存，CognitionClient 将事件映射到独立
+ConversationService.AcceptExecutionResult；验证 event/invocation/revision/Moment/position 的
+真实 receipt 后才 ACK，再复验权限后返回材料。接纳响应丢失只重投同一事实，不重复 reader；
+派发异常保持 unknown/recovery_required，不自动重读。等待中撤权、定义替换、generation
+失效或取消时，已知执行仍可留 journal，但迟到正文不返回当前模型。stop 取消并 drain 后
+停止 controller/outbox、撤销所有主体、解除监听；审计错误不能中断后续安全清理。journal
+由调用方注入并拥有，须在 stop 完成后关闭，不与 Kernel 同时打开同一执行库。
+
+生产 Python Worker、实际 typed RPC/local HTTP SSE 和 SQLite Conversation Log 已覆盖授权
+读取→原 Action 引用→刷盘 result receipt→模型续接→Reply 因果链，以及读取中撤权时不续接。
+该链不是完整 SDK IO 沙箱、持久用户权限 UI、跨重启 outbox 驱动或持久 Run/budget；Tool/Skill
+迁移、Resource freshness/Knowledge ingest 及默认产品 Host 启动仍未完成。旧 Kernel owner
+待相应 consumer-zero/产品切换门后删除，不以新增 Host 模块冒充完整替代。
+
 ## Extension Adapter 链路
 
 ```text

@@ -50,8 +50,12 @@ scope 领域规则已由 `core/capabilities` 唯一拥有；Kernel catalog 缺�
 Tool。旧 SDK 分组由 CapabilityCatalogAdapter 映射，定义深冻结、独立撤销并在确认后复验来源
 readiness 与绑定。User 方法已通过独立目录/引用/有界正文接入现行 Plan，旧 instructions.read
 假 Tool 删除；正文不执行 Gateway 或授予权限。Conversation 已有真实刷盘 receipt；完整 Step
-Exposure、外部 fencing/对账与原生 Loop 接线仍未完成，
+Exposure、外部 fencing/对账与完整原生 Loop 接线仍未完成，
 不以当前切片宣称 Capabilities ready。细节见[实现地图](../../implementation/Extension与SkillPlane实现.md)。
+
+目标 `apps/host` 已有显式 Resource 授权/读取及真实 Worker 原生续接闭环；短寿命 grant 由
+Host 拥有，撤权的迟到正文不进入模型。Tool/Skill、持久用户权限及默认产品入口未迁移，
+边界见[Host Resource 实现](../../implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
 
 感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。
 

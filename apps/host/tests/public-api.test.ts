@@ -12,7 +12,8 @@ it('Host 暴露实际 App 装配/adapter，而不暴露 Kernel 内部或底层 D
   expect(Object.keys(api).sort()).toEqual(['CognitionClient', 'CognitionJobAdapter', 'HostCognitionError', 'HostJobsController',
     'HostJobsOwner', 'HostCognitionJobsOwner', 'ConfiguredHostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
     'HostDataPaths', 'HostConfigurationError', 'loadHostCognitionJobsConfiguration',
-    'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest'].sort());
+    'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest',
+    'PermissionBroker', 'HostResourceContributions', 'HostCapabilityRequestError'].sort());
 });
 
 function configPaths() {

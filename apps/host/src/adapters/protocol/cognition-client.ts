@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
+import { fromJson, type JsonValue } from '@bufbuild/protobuf';
+import { ValueSchema } from '@bufbuild/protobuf/wkt';
+import type { ExecutionResultEvent, ExecutionResultReceipt } from '@glimmer-cradle/capabilities';
+import { ExecutionResultState, ExecutionSideEffects } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import { CallMetadataSchema, ServiceErrorDetailSchema, ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
   ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
@@ -18,7 +22,12 @@ import {
   type ReconcileMemoryJobRequest, type ReconcileMemoryJobResponse,
   type ReadMemoryJobRequestsRequest, type ReadMemoryJobRequestsResponse,
   type AcknowledgeMemoryJobRequestRequest, type AcknowledgeMemoryJobRequestResponse,
+  SubmitPerceptionRequestSchema, SubmitPerceptionResponseSchema,
+  GetPerceptionOperationRequestSchema, GetPerceptionOperationResponseSchema,
+  type SubmitPerceptionRequest, type GetPerceptionOperationRequest,
+  CognitionService,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema, ConversationService } from '@glimmer-cradle/contracts/glimmer/conversation/v1/conversation_pb';
 
 export interface MemoryJobsCognitionPort {
   execute(request: ExecuteMemoryJobRequest, signal?: AbortSignal): Promise<ExecuteMemoryJobResponse>;
@@ -52,6 +61,41 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public execute(request: ExecuteMemoryJobRequest, signal?: AbortSignal): Promise<ExecuteMemoryJobResponse> {
     return this.call('ExecuteMemoryJob', ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
       create(ExecuteMemoryJobRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public submitPerception(request: SubmitPerceptionRequest, signal?: AbortSignal) {
+    const call = request.call ? create(CallMetadataSchema, { ...request.call, generation: this.generation }) : this.metadata();
+    if (!call.traceId) call.traceId = randomUUID();
+    return this.call('SubmitPerception', SubmitPerceptionRequestSchema, SubmitPerceptionResponseSchema,
+      create(SubmitPerceptionRequestSchema, { ...request, call }), signal);
+  }
+  public perceptionOperation(request: GetPerceptionOperationRequest, signal?: AbortSignal) {
+    return this.call('GetPerceptionOperation', GetPerceptionOperationRequestSchema, GetPerceptionOperationResponseSchema,
+      create(GetPerceptionOperationRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public async acceptExecutionResult(event: ExecutionResultEvent, signal?: AbortSignal): Promise<ExecutionResultReceipt> {
+    const invocation = event.invocation, interaction = invocation.interaction;
+    if (!interaction || !['succeeded', 'failed', 'unknown'].includes(invocation.state)) throw new Error('不可投递的 Execution 结果');
+    const call = this.metadata(); call.causationId = interaction.source_fact_id;
+    call.correlationId = invocation.invocation_id; call.idempotencyKey = event.event_id;
+    const request = create(AcceptExecutionResultRequestSchema, { call, event: {
+      eventId: event.event_id, invocationId: invocation.invocation_id, revision: BigInt(invocation.revision),
+      attempt: invocation.attempt, scopeId: invocation.scope_id, conversationId: interaction.conversation_id,
+      sourceFactId: interaction.source_fact_id, executorId: invocation.target.executor_id,
+      capabilityId: invocation.target.capability_id, definitionRevision: invocation.target.definition_revision,
+      requestDigest: invocation.request_digest,
+      state: invocation.state === 'succeeded' ? ExecutionResultState.SUCCEEDED
+        : invocation.state === 'failed' ? ExecutionResultState.FAILED : ExecutionResultState.UNKNOWN,
+      sideEffects: invocation.side_effects === 'confirmed' ? ExecutionSideEffects.CONFIRMED
+        : invocation.side_effects === 'unknown' ? ExecutionSideEffects.UNKNOWN : ExecutionSideEffects.NONE,
+      ...(invocation.state === 'succeeded' ? { result: fromJson(ValueSchema, invocation.result as JsonValue) } : {}),
+      errorCode: invocation.error_code ?? '', updatedAtMs: BigInt(invocation.updated_at),
+    } });
+    if (toBinary(AcceptExecutionResultRequestSchema, request).length > 128 * 1024) throw new Error('Execution wire 超过接收上限');
+    const receipt = await this.call('AcceptExecutionResult', AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema, request, signal, ConversationService.typeName);
+    if (!receipt.accepted || receipt.eventId !== event.event_id || receipt.invocationId !== invocation.invocation_id
+      || receipt.revision !== BigInt(invocation.revision) || !receipt.momentId.trim()
+      || receipt.logPosition < 1n || receipt.logPosition > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Conversation durable receipt 无效');
+    return { event_id: receipt.eventId, invocation_id: receipt.invocationId, revision: Number(receipt.revision), accepted: true };
   }
   public readiness(signal?: AbortSignal) {
     return this.call('GetReadiness', GetReadinessRequestSchema, GetReadinessResponseSchema,
@@ -93,13 +137,13 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   }
   private metadata() { return create(CallMetadataSchema, { traceId: randomUUID(), generation: this.generation }); }
   private call<I extends DescMessage, O extends DescMessage>(name: string, input: I, output: O,
-    request: MessageShape<I>, signal?: AbortSignal): Promise<MessageShape<O>> {
+    request: MessageShape<I>, signal?: AbortSignal, serviceName: string = CognitionService.typeName): Promise<MessageShape<O>> {
     if (this.closed) return Promise.reject(new HostCognitionError(ServiceErrorCode.UNAVAILABLE));
     return new Promise((resolve, reject) => {
       if (signal?.aborted) { reject(signal.reason); return; }
       let call: grpc.ClientUnaryCall;
       const abort = () => call?.cancel();
-      call = this.client.makeUnaryRequest(`/glimmer.cognition.v1.CognitionService/${name}`,
+      call = this.client.makeUnaryRequest(`/${serviceName}/${name}`,
         value => Buffer.from(toBinary(input, value)), bytes => fromBinary(output, bytes), request,
         new grpc.Metadata(), { deadline: Date.now() + this.timeoutMs }, (error, result) => {
           this.inflight.delete(call);

@@ -171,7 +171,7 @@ export class HostCognitionJobsOwner {
     try {
       await this.options.worker.start();
       if (this.stopRequested || this.phase !== 'starting') throw new Error('Host Worker/Jobs 启动已撤销');
-      const cognition = this.options.worker.createJobsClient();
+      const cognition = this.options.worker.createCognitionClient();
       try { this.jobs = new HostJobsOwner({ ...this.options.jobs, cognition }); }
       catch (error) { cognition.close(); throw error; }
       await this.jobs.start();
