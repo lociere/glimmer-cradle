@@ -19,7 +19,7 @@ SQLite 验证源 ACK 丢失、业务响应丢失、重启对账及未到达 atte
 authority 缺失/回退时拒绝用重复启动追赶已有 Jobs epoch。两个数据库仍由装配方注入并拥有。
 `supervision/worker-supervisor.ts` 的 `WorkerSupervisor` 直接启动生产 Python Worker CLI（显式 external），
 通过 FD3 一次性 HMAC 能力核验本代注册；首条状态真实接纳且 Worker 业务 readiness ready 后才
-暴露 `createCognitionClient()` 的受监督 client。`HostCognitionJobsOwner` 组合该监督与 Jobs owner：正常停机先 drain Jobs 并释放
+暴露 `createCognitionClient()` 的受监督 client。`HostCognitionJobsOwner` 组合该监督与 Jobs/可选 Knowledge owner：正常停机先撤 Knowledge IO 并 drain 管理请求、drain Jobs 并释放
 authority，再协议 shutdown Worker，期限后仅回收本实例进程树并核验退出。崩溃撤销客户端、停止
 Jobs/续期；重启须创建新实例/世代，数据库仍由调用方在整个 owner stop 完成后关闭。
 状态接收方必需注入，Action/Log 接收方缺失时 NOT_READY；投影/inbox 幂等性由实际接收 owner 拥有。
@@ -49,6 +49,11 @@ Conversation Service 验证持久 receipt 后才返回正文。实际边界见
 `registerKnowledgeAccess` 与独立 typed 采集/复验 RPC 允许已登记主体读取 Host 接纳的固定来源，
 须有 resource.read/knowledge.ingest 双 grant；短寿命证明不代表知识持久接纳。详情与剩余
 接线见[Knowledge 采集边界](../../docs/architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
+`HostKnowledgeController` 已消费生产 CognitionService 的查询/CAS 登记/停用/采集，Host 不写
+Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 HostConfig 审批，按实际
+新世代重验来源 revision/digest/enabled 并新发双 grant、重新采集；未审批/失配/到期拒绝读取。
+管理更新先撤销原 IO/证明，停止取消并 drain 后关闭本实例 client；字段和 UI/默认入口边界见
+上述配置参考。实际测试已覆盖生产 Worker/SQLite 重启、停用与源冲突，非字典 transport。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

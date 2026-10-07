@@ -302,7 +302,7 @@ class SqliteKnowledgeStore:
             entry = await cursor.fetchone()
             if entry is not None and entry[2] != "resource":
                 raise KnowledgeConflictError("Resource 不能覆盖另一 Knowledge 来源")
-            if previous and previous[1] == encoded:
+            if previous and _source_from_json(previous[1]) == source:
                 return previous[0]
             if entry:
                 await self._invalidate_resource(connection, KnowledgeRevision(source.entry_id, entry[0], entry[2], entry[1]))
@@ -324,6 +324,8 @@ class SqliteKnowledgeStore:
             return source, row[0], entry[0] if entry else 0
 
     async def upsert_resource_entry(self, capture: KnowledgeResourceCapture, *, expected_source_revision: int, expected_entry_revision: int) -> KnowledgeRevision:
+        if not capture.source.enabled:
+            raise PermissionError("Knowledge source is disabled")
         if resource_capture_from(capture.source, capture.snapshot) != capture:
             raise KnowledgeConflictError("Knowledge Resource 转换不匹配")
         if type(expected_source_revision) is not int or not 1 <= expected_source_revision <= 2**53 - 1 \

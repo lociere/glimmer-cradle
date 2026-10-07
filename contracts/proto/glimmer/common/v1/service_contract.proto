@@ -23,6 +23,9 @@ enum ServiceErrorCode {
   SERVICE_ERROR_CODE_INTERNAL = 6;
   SERVICE_ERROR_CODE_UNAVAILABLE = 7;
   SERVICE_ERROR_CODE_RECOVERY_REQUIRED = 8;
+  // 乐观修订冲突：读取当前事实后作新决策，不自动覆盖或声称重复成功。
+  SERVICE_ERROR_CODE_CONFLICT = 9;
+  SERVICE_ERROR_CODE_PERMISSION_DENIED = 10;
 }
 
 enum ServiceRecoveryAction {

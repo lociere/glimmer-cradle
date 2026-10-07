@@ -70,7 +70,13 @@ class KnowledgeIndex:
         async with self._index_lock:
             return await self._repo.register_resource_source(source, expected_revision=expected_revision)
 
-    async def collect_resource(self, source_id: str) -> KnowledgeRevision:
+    async def get_resource_source(self, source_id: str) -> tuple[KnowledgeResourceSource, int, int] | None:
+        if self._repo is None:
+            raise RuntimeError("Knowledge store is not bound")
+        async with self._index_lock:
+            return await self._repo.get_resource_source(source_id)
+
+    async def collect_resource(self, source_id: str, *, expected_source_revision: int | None = None) -> KnowledgeRevision:
         """显式采集一次，不跨 RPC 持有 SQL 事务，不自动重试/写入 Memory。"""
         if self._repo is None or self._resource_port is None or self._principal_id is None:
             raise RuntimeError("Knowledge resource collection is not bound")
@@ -79,6 +85,11 @@ class KnowledgeIndex:
             if declaration is None:
                 raise KeyError(source_id)
             source, source_revision, entry_revision = declaration
+            if expected_source_revision is not None and (type(expected_source_revision) is not int
+                    or expected_source_revision != source_revision):
+                raise KnowledgeConflictError("Knowledge source revision conflict")
+            if not source.enabled:
+                raise PermissionError("Knowledge source is disabled")
             snapshot = deepcopy(await self._resource_port.read(source.resource_id,
                 source_id=source.source_id, definition_revision=source.definition_revision,
                 principal_id=self._principal_id, scope=source.scope))

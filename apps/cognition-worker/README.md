@@ -12,7 +12,9 @@ ResourceClient 与 KernelGrpcClient 已消费独立 Knowledge 采集/证明复�
 持久采集/Context 接入见
 [采集实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 生产 composition 已为 KnowledgeIndex 注入本代主体和 ResourceClient，使用受控登记/显式采集；
-live 检索与原生 Step/Reply 复验不放行撤权或未知证明。来源管理/重新授权产品入口仍待落位，
+live 检索与原生 Step/Reply 复验不放行撤权或未知证明。可信 App 来源管理 RPC 已接入同一
+持久 owner，查询/CAS 登记/停用/采集要求本代 ready，Host 显式审批驱动重启重新采集；
+产品权限 UI 与默认入口切换仍待完成。精确 wire 见[协议参考](../../docs/reference/protocol.md#knowledge-来源管理)。
 旧 Knowledge v1 库拒绝启动时静默升级，恢复与迁移见[数据布局](../../docs/reference/data-layout.md#knowledge-v1-受控迁移与恢复)。
 后续切片把其余 client 接入真实 Host broker，
 继续收束兼容 RPC service 的其余主体。生产 Host 已使用 `readiness.py` 的逐项业务 ready 条件和

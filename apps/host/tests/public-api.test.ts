@@ -13,7 +13,7 @@ it('Host 暴露实际 App 装配/adapter，而不暴露 Kernel 内部或底层 D
     'HostJobsOwner', 'HostCognitionJobsOwner', 'ConfiguredHostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
     'HostDataPaths', 'HostConfigurationError', 'loadHostCognitionJobsConfiguration',
     'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest',
-    'PermissionBroker', 'HostResourceContributions', 'HostCapabilityRequestError'].sort());
+    'PermissionBroker', 'HostResourceContributions', 'HostKnowledgeController', 'HostCapabilityRequestError'].sort());
 });
 
 function configPaths() {
@@ -23,6 +23,32 @@ function configPaths() {
   for (const file of [paths.host_config, paths.jobs_config, paths.memory_config]) writeFileSync(file, '{}\n', 'utf8');
   return paths;
 }
+const approval = { source_id: 'source:资料', source_revision: 1, declaration_digest: 'a'.repeat(64),
+  arguments: {}, max_age_ms: 500, expires_at_ms: 9007199254740991 };
+it.each([
+  { ...approval, source_id: ' ' }, { ...approval, source_revision: 0 }, { ...approval, source_revision: 9007199254740992 },
+  { ...approval, declaration_digest: 'forged' }, { ...approval, max_age_ms: 86400001 },
+  { ...approval, expires_at_ms: 0 }, { ...approval, arguments: { value: 'x'.repeat(32768) } },
+])('Knowledge 审批拒绝非法绑定/参数，不创建数据', value => {
+  const paths = configPaths();
+  writeFileSync(paths.host_config, JSON.stringify({ knowledge: { approvals: [value] } }), 'utf8');
+  expect(() => api.loadHostCognitionJobsConfiguration(paths)).toThrow(api.HostConfigurationError);
+  expect(existsSync(paths.data_root)).toBe(false);
+});
+it('Knowledge 审批重复和非有限 JSON 拒绝；有审批而无 Resource 装配在建库前失败', async () => {
+  const paths = configPaths();
+  writeFileSync(paths.host_config, JSON.stringify({ knowledge: { approvals: [approval, approval] } }), 'utf8');
+  expect(() => api.loadHostCognitionJobsConfiguration(paths)).toThrow(api.HostConfigurationError);
+  writeFileSync(paths.host_config, `knowledge:\n  approvals:\n    - source_id: source:资料\n      source_revision: 1\n      declaration_digest: ${approval.declaration_digest}\n      arguments: { value: .nan }\n      max_age_ms: 500\n      expires_at_ms: 9007199254740991\n`, 'utf8');
+  expect(() => api.loadHostCognitionJobsConfiguration(paths)).toThrow(api.HostConfigurationError);
+  writeFileSync(paths.host_config, JSON.stringify({ knowledge: { approvals: [approval] } }), 'utf8');
+  const owner = new api.ConfiguredHostCognitionJobsOwner({ paths, clock: { now: Date.now }, owner_id: 'no-resource',
+    worker: { python_executable: path.join(paths.app_root, 'python.exe'), runtime_document: {}, accept_state: async () => {
+      throw new Error('must not start');
+    } } });
+  await expect(owner.start()).rejects.toThrow('真实 Resource');
+  expect(existsSync(paths.data_root)).toBe(false); await owner.stop();
+});
 it('配置从唯一 Schema 填默认值并冻结；根显式分离，loader 不创建任何数据/安装产物', () => {
   const paths = configPaths(), configuration = api.loadHostCognitionJobsConfiguration(paths);
   expect(configuration).toMatchObject({ jobs: { poll_interval_ms: 1000, batch_size: 8, lease_ms: 180000,
@@ -32,6 +58,8 @@ it('配置从唯一 Schema 填默认值并冻结；根显式分离，loader 不�
   worker: { startup_timeout_ms: 120000, shutdown_timeout_ms: 30000, request_timeout_ms: 30000 } });
   expect(Object.isFrozen(configuration.jobs.retry_policy)).toBe(true);
   expect(Object.isFrozen(configuration.memory_document.consolidation)).toBe(true);
+  expect(configuration.knowledge_approvals).toEqual([]);
+  expect(Object.isFrozen(configuration.knowledge_approvals)).toBe(true);
   expect(paths.jobs_database).toBe(path.join(paths.data_root, 'state/jobs/jobs.sqlite'));
   expect(paths.authority_database).toBe(path.join(paths.data_root, 'state/platform/authority.sqlite'));
   expect(existsSync(paths.data_root)).toBe(false); expect(existsSync(paths.app_root)).toBe(false);

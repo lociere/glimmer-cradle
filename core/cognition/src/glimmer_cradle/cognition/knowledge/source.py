@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -34,6 +36,7 @@ class KnowledgeResourceSource:
     definition_revision: str
     scope: ResourceScope
     priority: int = 1
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         for value in (self.source_id, self.resource_id, self.definition_revision):
@@ -49,6 +52,16 @@ class KnowledgeResourceSource:
             raise ValueError("Knowledge resource scope incomplete")
         if type(self.priority) is not int or not 1 <= self.priority <= 2**53 - 1:
             raise ValueError("Knowledge resource priority invalid")
+        if type(self.enabled) is not bool:
+            raise ValueError("Knowledge resource enabled invalid")
+
+    @property
+    def declaration_digest(self) -> str:
+        """跨语言审批绑定：固定顺序 UTF-8 JSON；不包含正文或临时授权。"""
+        value = ["knowledge-resource-source.v1", self.source_id, self.resource_id,
+                 self.definition_revision, [self.scope.source_provider_id,
+                 self.scope.scene_id, self.scope.conversation_id], self.priority, self.enabled]
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
 
     @property
     def entry_id(self) -> str:

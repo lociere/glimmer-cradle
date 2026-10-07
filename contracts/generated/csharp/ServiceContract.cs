@@ -39,7 +39,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             "aW9uUg9yZWNvdmVyeUFjdGlvbnMSIQoMb3BlcmF0aW9uX2lkGAYgASgJUgtv",
             "cGVyYXRpb25JZCJoCg1Db21tYW5kUmVzdWx0EiEKDG9wZXJhdGlvbl9pZBgB",
             "IAEoCVILb3BlcmF0aW9uSWQSFgoGc3RhdHVzGAIgASgJUgZzdGF0dXMSHAoJ",
-            "ZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUq5wIKEFNlcnZpY2VFcnJvckNv",
+            "ZHVwbGljYXRlGAMgASgIUglkdXBsaWNhdGUqsgMKEFNlcnZpY2VFcnJvckNv",
             "ZGUSIgoeU0VSVklDRV9FUlJPUl9DT0RFX1VOU1BFQ0lGSUVEEAASJgoiU0VS",
             "VklDRV9FUlJPUl9DT0RFX0lOVkFMSURfUkVRVUVTVBABEiAKHFNFUlZJQ0Vf",
             "RVJST1JfQ09ERV9OT1RfUkVBRFkQAhIqCiZTRVJWSUNFX0VSUk9SX0NPREVf",
@@ -47,11 +47,13 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
             "QU5DRUxMRUQQBBIoCiRTRVJWSUNFX0VSUk9SX0NPREVfREVBRExJTkVfRVhD",
             "RUVERUQQBRIfChtTRVJWSUNFX0VSUk9SX0NPREVfSU5URVJOQUwQBhIiCh5T",
             "RVJWSUNFX0VSUk9SX0NPREVfVU5BVkFJTEFCTEUQBxIoCiRTRVJWSUNFX0VS",
-            "Uk9SX0NPREVfUkVDT1ZFUllfUkVRVUlSRUQQCCp3ChVTZXJ2aWNlUmVjb3Zl",
-            "cnlBY3Rpb24SJwojU0VSVklDRV9SRUNPVkVSWV9BQ1RJT05fVU5TUEVDSUZJ",
-            "RUQQABI1CjFTRVJWSUNFX1JFQ09WRVJZX0FDVElPTl9DT05GSVJNX1NJREVf",
-            "RUZGRUNUX1NUQVRFEAFCLKoCKUdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkds",
-            "aW1tZXIuQ29tbW9uLlYxYgZwcm90bzM="));
+            "Uk9SX0NPREVfUkVDT1ZFUllfUkVRVUlSRUQQCBIfChtTRVJWSUNFX0VSUk9S",
+            "X0NPREVfQ09ORkxJQ1QQCRIoCiRTRVJWSUNFX0VSUk9SX0NPREVfUEVSTUlT",
+            "U0lPTl9ERU5JRUQQCip3ChVTZXJ2aWNlUmVjb3ZlcnlBY3Rpb24SJwojU0VS",
+            "VklDRV9SRUNPVkVSWV9BQ1RJT05fVU5TUEVDSUZJRUQQABI1CjFTRVJWSUNF",
+            "X1JFQ09WRVJZX0FDVElPTl9DT05GSVJNX1NJREVfRUZGRUNUX1NUQVRFEAFC",
+            "LKoCKUdsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ29tbW9uLlYx",
+            "YgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceErrorCode), typeof(global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceRecoveryAction), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -74,6 +76,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Common.V1 {
     [pbr::OriginalName("SERVICE_ERROR_CODE_INTERNAL")] Internal = 6,
     [pbr::OriginalName("SERVICE_ERROR_CODE_UNAVAILABLE")] Unavailable = 7,
     [pbr::OriginalName("SERVICE_ERROR_CODE_RECOVERY_REQUIRED")] RecoveryRequired = 8,
+    /// <summary>
+    /// 乐观修订冲突：读取当前事实后作新决策，不自动覆盖或声称重复成功。
+    /// </summary>
+    [pbr::OriginalName("SERVICE_ERROR_CODE_CONFLICT")] Conflict = 9,
+    [pbr::OriginalName("SERVICE_ERROR_CODE_PERMISSION_DENIED")] PermissionDenied = 10,
   }
 
   public enum ServiceRecoveryAction {

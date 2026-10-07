@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 
+from glimmer.capabilities.v1 import capabilities_pb2 as capabilities_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+from glimmer_cradle.cognition.knowledge import KnowledgeResourceSource
 from glimmer_cradle.cognition.perception import Observation, ObservationNormalizer
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
@@ -14,12 +16,39 @@ from glimmer_cradle.cognition.ports import (
     KnowledgeEntryInput,
     KnowledgeInitialization,
     KnowledgeRetrievalInput,
+    ResourceScope,
     SkillMaterial,
     SkillReference,
     SkillSummary,
     SkillToolDescriptor,
 )
 from google.protobuf.json_format import MessageToDict, ParseDict
+
+
+def knowledge_source_from_wire(value: cognition_pb.KnowledgeResourceSource) -> KnowledgeResourceSource:
+    if not value.HasField("reference") or not value.HasField("enabled"):
+        raise ValueError("Knowledge source definition/presence missing")
+    if value.HasField("scope"):
+        if value.scope.HasField("user_id") or any(not item.strip() for item in (
+            value.scope.source_provider_id, value.scope.scene_id, value.scope.conversation_id
+        )):
+            raise ValueError("Knowledge source scope invalid")
+        scope = ResourceScope(value.scope.source_provider_id, value.scope.scene_id, value.scope.conversation_id)
+    else:
+        scope = ResourceScope()
+    return KnowledgeResourceSource(value.source_id, value.reference.id, value.reference.revision,
+                                   scope, value.priority, value.enabled)
+
+
+def knowledge_source_state_to_wire(source: KnowledgeResourceSource, revision: int) -> cognition_pb.KnowledgeResourceSourceState:
+    scope = None if source.scope == ResourceScope() else capabilities_pb.CapabilityScopeContext(
+        source_provider_id=source.scope.source_provider_id, scene_id=source.scope.scene_id,
+        conversation_id=source.scope.conversation_id)
+    return cognition_pb.KnowledgeResourceSourceState(source=cognition_pb.KnowledgeResourceSource(
+        source_id=source.source_id, reference=capabilities_pb.CapabilityReference(
+            id=source.resource_id, revision=source.definition_revision), scope=scope,
+        priority=source.priority, enabled=source.enabled), source_revision=revision,
+        declaration_digest=source.declaration_digest)
 
 
 def observation_from_wire(

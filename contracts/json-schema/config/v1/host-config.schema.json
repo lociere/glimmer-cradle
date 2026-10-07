@@ -6,6 +6,27 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "knowledge": {
+      "type": "object", "additionalProperties": false, "default": {},
+      "description": "可信 App 显式审批；新 Worker 世代按当前来源重验并重新采集，不恢复临时 grant/proof。默认拒绝。",
+      "properties": {
+        "approvals": {
+          "type": "array", "default": [], "maxItems": 1024,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["source_id", "source_revision", "declaration_digest", "arguments", "max_age_ms", "expires_at_ms"],
+            "properties": {
+              "source_id": { "type": "string", "minLength": 1, "maxLength": 4096 },
+              "source_revision": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+              "declaration_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "arguments": { "type": "object" },
+              "max_age_ms": { "type": "integer", "minimum": 1, "maximum": 86400000 },
+              "expires_at_ms": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+            }
+          }
+        }
+      }
+    },
     "authority": {
       "type": "object", "additionalProperties": false, "default": {},
       "description": "renewal_interval_ms 必须小于 lease_ms，装配核验后才允许启动。",

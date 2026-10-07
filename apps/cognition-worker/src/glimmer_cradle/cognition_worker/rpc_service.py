@@ -33,6 +33,7 @@ from glimmer.conversation.v1 import conversation_pb2 as conversation_pb
 from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
+from glimmer_cradle.cognition.knowledge import KnowledgeConflictError, KnowledgeIndex
 from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.memory import (
     ConsolidationCoordinator,
@@ -61,6 +62,8 @@ from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
     agent_synthesis_from_wire,
     agent_synthesis_to_wire,
     knowledge_initialization_from_wire,
+    knowledge_source_from_wire,
+    knowledge_source_state_to_wire,
     observation_from_wire,
 )
 from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
@@ -1379,6 +1382,8 @@ def _grpc_status(code: int) -> grpc.StatusCode:
         common_pb.SERVICE_ERROR_CODE_DEADLINE_EXCEEDED: grpc.StatusCode.DEADLINE_EXCEEDED,
         common_pb.SERVICE_ERROR_CODE_UNAVAILABLE: grpc.StatusCode.UNAVAILABLE,
         common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED: grpc.StatusCode.FAILED_PRECONDITION,
+        common_pb.SERVICE_ERROR_CODE_CONFLICT: grpc.StatusCode.ABORTED,
+        common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED: grpc.StatusCode.PERMISSION_DENIED,
     }.get(code, grpc.StatusCode.INTERNAL)
 
 
@@ -1400,6 +1405,7 @@ class CognitionGrpcHost:
         consolidation: ConsolidationCoordinator | None = None,
         planning: PlanningStore | None = None,
         conversation: ConversationRecorder | None = None,
+        knowledge: KnowledgeIndex | None = None,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -1412,6 +1418,7 @@ class CognitionGrpcHost:
         self._consolidation = consolidation
         self._planning = planning
         self._conversation = conversation
+        self._knowledge = knowledge
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._readiness_tracker = readiness or ReadinessTracker(frozenset({"domain"}))
@@ -1433,6 +1440,9 @@ class CognitionGrpcHost:
             "CancelPerception": self._method(self._cancel_perception, cognition_pb.CancelPerceptionRequest, cognition_pb.CancelPerceptionResponse),
             "GetPerceptionOperation": self._method(self._get_perception_operation, cognition_pb.GetPerceptionOperationRequest, cognition_pb.GetPerceptionOperationResponse),
             "InitializeKnowledge": self._method(self._initialize_knowledge, cognition_pb.InitializeKnowledgeRequest, cognition_pb.InitializeKnowledgeResponse),
+            "GetKnowledgeResourceSource": self._method(self._get_knowledge_source, cognition_pb.GetKnowledgeResourceSourceRequest, cognition_pb.GetKnowledgeResourceSourceResponse),
+            "RegisterKnowledgeResourceSource": self._method(self._register_knowledge_source, cognition_pb.RegisterKnowledgeResourceSourceRequest, cognition_pb.RegisterKnowledgeResourceSourceResponse),
+            "CollectKnowledgeSource": self._method(self._collect_knowledge_source, cognition_pb.CollectKnowledgeSourceRequest, cognition_pb.CollectKnowledgeSourceResponse),
             "Plan": self._method(self._plan, cognition_pb.PlanRequest, cognition_pb.PlanResponse),
             "Synthesize": self._method(self._synthesize, cognition_pb.SynthesizeRequest, cognition_pb.SynthesizeResponse),
             "GetConversationHistory": self._method(self._history, cognition_pb.GetConversationHistoryRequest, cognition_pb.GetConversationHistoryResponse),
@@ -1536,6 +1546,55 @@ class CognitionGrpcHost:
     def _is_completed(self, call: common_pb.CallMetadata) -> bool:
         key = call.idempotency_key
         return bool(key and key in self._completed)
+
+    async def _knowledge_invoke(self, request: Any, context: Any, operation: Callable[..., Awaitable[Any]]) -> Any:
+        async def guarded(_trace_id: str) -> Any:
+            if self._knowledge is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Knowledge owner 未装配")
+            try:
+                return await operation(self._knowledge)
+            except KnowledgeConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_CONFLICT, "Knowledge 来源或修订冲突") from error
+            except PermissionError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Knowledge 采集已拒绝或撤销") from error
+            except (ValueError, KeyError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Knowledge 来源请求无效") from error
+            except KernelServiceError as error:
+                raise ServiceFault(error.code, "Knowledge Resource 服务拒绝或不可用", retryable=error.retryable) from error
+        return await self._invoke(request, context, guarded, track=True, require_ready=True)
+
+    async def _get_knowledge_source(self, request: Any, context: Any) -> Any:
+        async def operation(knowledge: KnowledgeIndex) -> Any:
+            self._validate_knowledge_source_id(request.source_id)
+            current = await knowledge.get_resource_source(request.source_id)
+            return cognition_pb.GetKnowledgeResourceSourceResponse(
+                state=knowledge_source_state_to_wire(current[0], current[1]) if current else None)
+        return await self._knowledge_invoke(request, context, operation)
+
+    async def _register_knowledge_source(self, request: Any, context: Any) -> Any:
+        async def operation(knowledge: KnowledgeIndex) -> Any:
+            if not request.HasField("source") or not 0 <= request.expected_source_revision < 2**53 - 1:
+                raise ValueError("Knowledge source revision/presence invalid")
+            source = knowledge_source_from_wire(request.source)
+            revision = await knowledge.register_resource_source(source, expected_revision=request.expected_source_revision)
+            return cognition_pb.RegisterKnowledgeResourceSourceResponse(state=knowledge_source_state_to_wire(source, revision))
+        return await self._knowledge_invoke(request, context, operation)
+
+    async def _collect_knowledge_source(self, request: Any, context: Any) -> Any:
+        async def operation(knowledge: KnowledgeIndex) -> Any:
+            self._validate_knowledge_source_id(request.source_id)
+            if not 1 <= request.expected_source_revision <= 2**53 - 1:
+                raise ValueError("Knowledge source revision invalid")
+            reference = await knowledge.collect_resource(request.source_id, expected_source_revision=request.expected_source_revision)
+            return cognition_pb.CollectKnowledgeSourceResponse(source_id=request.source_id,
+                source_revision=request.expected_source_revision, entry_id=reference.entry_id,
+                entry_revision=reference.revision, content_digest=reference.content_digest)
+        return await self._knowledge_invoke(request, context, operation)
+
+    @staticmethod
+    def _validate_knowledge_source_id(value: str) -> None:
+        if not value.strip() or len(value.encode("utf-8")) > 4096:
+            raise ValueError("Knowledge source id invalid")
 
     def _mark_completed(self, call: common_pb.CallMetadata) -> None:
         key = call.idempotency_key
@@ -2120,6 +2179,7 @@ class CognitionHost:
                 consolidation=components.consolidation_coordinator,
                 planning=components.planning_store,
                 conversation=components.conversation_recorder,
+                knowledge=components.knowledge_base,
             )
 
             # 1.5 启动 Conversation Log 单写者。

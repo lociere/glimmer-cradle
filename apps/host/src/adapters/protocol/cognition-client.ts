@@ -26,6 +26,10 @@ import {
   GetPerceptionOperationRequestSchema, GetPerceptionOperationResponseSchema,
   type SubmitPerceptionRequest, type GetPerceptionOperationRequest,
   CognitionService,
+  GetKnowledgeResourceSourceRequestSchema, GetKnowledgeResourceSourceResponseSchema,
+  RegisterKnowledgeResourceSourceRequestSchema, RegisterKnowledgeResourceSourceResponseSchema,
+  CollectKnowledgeSourceRequestSchema, CollectKnowledgeSourceResponseSchema,
+  type RegisterKnowledgeResourceSourceRequest,
 } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema, ConversationService } from '@glimmer-cradle/contracts/glimmer/conversation/v1/conversation_pb';
 
@@ -100,6 +104,18 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public readiness(signal?: AbortSignal) {
     return this.call('GetReadiness', GetReadinessRequestSchema, GetReadinessResponseSchema,
       create(GetReadinessRequestSchema, { call: this.metadata() }), signal);
+  }
+  public getKnowledgeSource(sourceId: string, signal?: AbortSignal) {
+    return this.call('GetKnowledgeResourceSource', GetKnowledgeResourceSourceRequestSchema, GetKnowledgeResourceSourceResponseSchema,
+      create(GetKnowledgeResourceSourceRequestSchema, { call: this.metadata(), sourceId }), signal);
+  }
+  public registerKnowledgeSource(request: RegisterKnowledgeResourceSourceRequest, signal?: AbortSignal) {
+    return this.call('RegisterKnowledgeResourceSource', RegisterKnowledgeResourceSourceRequestSchema, RegisterKnowledgeResourceSourceResponseSchema,
+      create(RegisterKnowledgeResourceSourceRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public collectKnowledgeSource(sourceId: string, expectedSourceRevision: bigint, signal?: AbortSignal) {
+    return this.call('CollectKnowledgeSource', CollectKnowledgeSourceRequestSchema, CollectKnowledgeSourceResponseSchema,
+      create(CollectKnowledgeSourceRequestSchema, { call: this.metadata(), sourceId, expectedSourceRevision }), signal);
   }
   public shutdown(reason: string, signal?: AbortSignal) {
     const call = this.metadata(); call.idempotencyKey = `shutdown:${this.generation}`;

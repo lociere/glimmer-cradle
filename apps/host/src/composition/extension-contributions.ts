@@ -1,5 +1,5 @@
-import { create, fromJson } from '@bufbuild/protobuf';
-import { randomUUID } from 'node:crypto';
+import { clone, create, fromJson } from '@bufbuild/protobuf';
+import { createHash, randomUUID } from 'node:crypto';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import type { JsonValue } from '@bufbuild/protobuf';
 import Ajv2020 from 'ajv/dist/2020';
@@ -17,6 +17,9 @@ import type { Resource, ResourceContent, StepExposureRequest, StepSurface, Expos
 import type { Principal, PermissionGrant, PermissionRequest } from '@glimmer-cradle/platform';
 import { PermissionBroker } from '../broker/permission-broker.js';
 import { validateSecurityIdentity } from '@glimmer-cradle/platform';
+import type { KnowledgeResourceSourceState, RegisterKnowledgeResourceSourceRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { RegisterKnowledgeResourceSourceRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { CognitionClient } from '../adapters/protocol/cognition-client.js';
 
 export interface HostResourceOptions {
   readonly host_id: string;
@@ -47,6 +50,15 @@ export interface HostKnowledgeResourceAccess {
   readonly scope: StepExposureRequest['scope'];
   readonly arguments: Readonly<Record<string, JsonValue>>;
   readonly max_age_ms: number;
+}
+/** 内部装配参数；唯一可存储审批 Document 是 HostConfig，不复制来源声明。 */
+export interface HostKnowledgeApproval {
+  readonly source_id: string;
+  readonly source_revision: number;
+  readonly declaration_digest: string;
+  readonly arguments: HostKnowledgeResourceAccess['arguments'];
+  readonly max_age_ms: number;
+  readonly expires_at_ms: number;
 }
 type KnowledgeAdmission = { readonly policy: HostKnowledgeResourceAccess; readonly principal: Principal; attempt: number };
 type KnowledgeProof = { readonly admission: KnowledgeAdmission; readonly binding: { definition: Resource; reader: ResourceReader };
@@ -139,6 +151,39 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     const source = this.knowledgeAdmissions.get(key); this.knowledgeAdmissions.delete(key);
     for (const [id, proof] of this.knowledgeProofs) if (proof.admission === source) this.knowledgeProofs.delete(id);
     if (source) this.abortResource(source.policy.reference.id);
+  }
+  public approveKnowledgeSource(principalId: string, state: KnowledgeResourceSourceState, approval: HostKnowledgeApproval): { revoke: () => void; current: () => boolean } {
+    validateHostKnowledgeApprovals([approval]);
+    this.assertRunning(); const principal = this.principal(principalId), source = state.source;
+    if (!source?.reference || source.enabled !== true || source.sourceId !== approval.source_id
+      || state.sourceRevision !== BigInt(approval.source_revision) || state.declarationDigest !== approval.declaration_digest
+      || source.scope?.userId !== undefined || source.priority < 1n || source.priority > BigInt(Number.MAX_SAFE_INTEGER)) throw new HostCapabilityRequestError('Knowledge 来源与审批冲突');
+    for (const value of [source.sourceId, source.reference.id, source.reference.revision]) validateSecurityIdentity(value);
+    if (source.scope) for (const value of [source.scope.sourceProviderId, source.scope.sceneId, source.scope.conversationId]) validateSecurityIdentity(value);
+    const digest = createHash('sha256').update(JSON.stringify(['knowledge-resource-source.v1', source.sourceId,
+      source.reference.id, source.reference.revision, source.scope ? [source.scope.sourceProviderId, source.scope.sceneId, source.scope.conversationId]
+        : [null, null, null], Number(source.priority), source.enabled]), 'utf8').digest('hex');
+    if (digest !== state.declarationDigest) throw new HostCapabilityRequestError('Knowledge 来源摘要无效');
+    const request: PermissionRequest = { principal_id: principal.principal_id, host_id: principal.host_id,
+      generation: principal.generation, permission: 'resource.read', resource_id: source.reference.id,
+      resource_revision: source.reference.revision, target_location: this.options.target_location };
+    const grants: PermissionGrant[] = [];
+    const sourceId = source.sourceId;
+    const revoke = () => {
+      this.revokeKnowledgeAccess(principalId, sourceId);
+      // 即使一次审计失败，也必须撤销另一个 grant；Broker 先删除再报告审计错误。
+      let failure: unknown;
+      for (const grant of grants) try { this.options.permissions.revokeGrant(grant.grant_id); } catch (error) { failure ??= error; }
+      if (failure) throw failure;
+    };
+    try {
+      this.registerKnowledgeAccess(principalId, { source_id: source.sourceId, reference: source.reference,
+        scope: source.scope ? { source_provider_id: source.scope.sourceProviderId, scene_id: source.scope.sceneId,
+          conversation_id: source.scope.conversationId } : undefined, arguments: approval.arguments, max_age_ms: approval.max_age_ms });
+      grants.push(this.options.permissions.grant(request, approval.expires_at_ms));
+      grants.push(this.options.permissions.grant({ ...request, permission: 'knowledge.ingest' }, approval.expires_at_ms));
+      return { revoke, current: () => !this.stopped && grants.every(grant => this.options.permissions.isCurrent(grant)) };
+    } catch (error) { revoke(); throw error; }
   }
   public collectKnowledgeResource(wire: CollectKnowledgeResourceRequest, principalId: string, signal: AbortSignal): Promise<CollectKnowledgeResourceResponse> {
     const task = this.collect(wire, principalId, signal).finally(() => this.tasks.delete(task));
@@ -342,6 +387,124 @@ export class HostResourceContributions implements HostCapabilityServicePort {
     for (const [key, proof] of this.knowledgeProofs) if (proof.binding.definition.id === id) this.knowledgeProofs.delete(key);
   }
   private assertRunning(): void { if (this.stopped) throw new Error('Host Resource 已停止'); }
+}
+
+/** 当前世代的可信 App controller；来源留在 Cognition，IO 审批留在 Host。 */
+export class HostKnowledgeController {
+  private readonly approvals: ReadonlyMap<string, HostKnowledgeApproval>;
+  private readonly admissions = new Map<string, { revoke: () => void; current: () => boolean }>();
+  private readonly pending = new Map<string, Promise<unknown>>();
+  private readonly aborts = new Map<string, Set<AbortController>>();
+  private stopped = false;
+  private starting?: Promise<void>;
+  private stopping?: Promise<void>;
+  public constructor(private readonly resources: HostResourceContributions, private readonly cognition: CognitionClient,
+    private readonly generation: string, approvals: readonly HostKnowledgeApproval[]) {
+    if (!generation.trim()) throw new HostCapabilityRequestError('Knowledge 装配无效');
+    validateHostKnowledgeApprovals(approvals);
+    const policies = new Map<string, HostKnowledgeApproval>();
+    for (const value of approvals) {
+      const policy = { ...value, arguments: JSON.parse(JSON.stringify(value.arguments)) };
+      freezeJson(policy); policies.set(value.source_id, policy);
+    }
+    this.approvals = policies;
+  }
+  public start(): Promise<void> {
+    if (this.stopped) return Promise.reject(new HostCapabilityRequestError('Knowledge controller 已停止'));
+    return this.starting ??= (async () => {
+      for (const sourceId of this.approvals.keys()) await this.collect(sourceId);
+    })();
+  }
+  public getSource(sourceId: string) {
+    return this.run(sourceId, signal => this.cognition.getKnowledgeSource(sourceId, signal));
+  }
+  public registerSource(request: RegisterKnowledgeResourceSourceRequest) {
+    const captured = clone(RegisterKnowledgeResourceSourceRequestSchema, request);
+    const sourceId = captured.source?.sourceId ?? '';
+    // 先撤销正在使用的 IO/证明，再等待来源 CAS；丢失响应保持拒绝而非复活旧审批。
+    this.revoke(sourceId);
+    return this.run(sourceId, signal => this.cognition.registerKnowledgeSource(captured, signal));
+  }
+  public collect(sourceId: string) {
+    this.revoke(sourceId);
+    return this.run(sourceId, async signal => {
+      const approval = this.approvals.get(sourceId);
+      if (!approval) throw new HostCapabilityRequestError('Knowledge 未显式审批');
+      const response = await this.cognition.getKnowledgeSource(sourceId, signal);
+      signal.throwIfAborted();
+      if (this.stopped || !response.state) throw new HostCapabilityRequestError('Knowledge 来源不存在或已停止');
+      const admitted = this.resources.approveKnowledgeSource(`cognition:${this.generation}`, response.state, approval);
+      this.admissions.set(sourceId, admitted);
+      try {
+        const receipt = await this.cognition.collectKnowledgeSource(sourceId, BigInt(approval.source_revision), signal);
+        signal.throwIfAborted();
+        if (!admitted.current() || receipt.sourceId !== sourceId || receipt.sourceRevision !== BigInt(approval.source_revision)
+          || receipt.entryId !== `resource:${sourceId}` || receipt.entryRevision < 1n
+          || receipt.entryRevision > BigInt(Number.MAX_SAFE_INTEGER) || !/^[a-f0-9]{64}$/.test(receipt.contentDigest)) {
+          throw new HostCapabilityRequestError('Knowledge 采集确认无效或已撤销');
+        }
+        return receipt;
+      } catch (error) {
+        if (this.admissions.get(sourceId) === admitted) { this.admissions.delete(sourceId); admitted.revoke(); }
+        throw error;
+      }
+    });
+  }
+  public stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
+    this.stopped = true;
+    this.stopping = (async () => {
+      const failures: unknown[] = [];
+      for (const sourceId of new Set([...this.aborts.keys(), ...this.admissions.keys()])) {
+        try { this.revoke(sourceId); } catch (error) { failures.push(error); }
+      }
+      await Promise.allSettled([...this.pending.values()]);
+      this.cognition.close();
+      if (failures.length) throw new AggregateError(failures, 'Knowledge 撤销审计失败');
+    })();
+    return this.stopping;
+  }
+  private revoke(sourceId: string): void {
+    for (const abort of this.aborts.get(sourceId) ?? []) abort.abort();
+    const admitted = this.admissions.get(sourceId); this.admissions.delete(sourceId); admitted?.revoke();
+  }
+  private run<T>(sourceId: string, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    if (this.stopped) return Promise.reject(new HostCapabilityRequestError('Knowledge controller 已停止'));
+    validateSecurityIdentity(sourceId);
+    const abort = new AbortController(), prior = this.pending.get(sourceId);
+    const controllers = this.aborts.get(sourceId) ?? new Set<AbortController>();
+    controllers.add(abort); this.aborts.set(sourceId, controllers);
+    const task = (async () => {
+      await prior?.catch(() => undefined); abort.signal.throwIfAborted();
+      return operation(abort.signal);
+    })().finally(() => {
+      controllers.delete(abort); if (!controllers.size) this.aborts.delete(sourceId);
+      if (this.pending.get(sourceId) === task) this.pending.delete(sourceId);
+    });
+    this.pending.set(sourceId, task); return task;
+  }
+}
+
+/** Schema 之后的实际字节/JSON/唯一性门；loader 在创建任何库/进程前调用。 */
+export function validateHostKnowledgeApprovals(approvals: readonly HostKnowledgeApproval[]): void {
+  if (approvals.length > 1024) throw new HostCapabilityRequestError('Knowledge 审批过多');
+  const ids = new Set<string>();
+  for (const value of approvals) {
+    validateSecurityIdentity(value.source_id);
+    if (ids.has(value.source_id) || !Number.isSafeInteger(value.source_revision) || value.source_revision < 1
+      || !/^[a-f0-9]{64}$/.test(value.declaration_digest) || !Number.isSafeInteger(value.max_age_ms)
+      || value.max_age_ms < 1 || value.max_age_ms > 86_400_000 || !Number.isSafeInteger(value.expires_at_ms)
+      || value.expires_at_ms < 1 || !value.arguments || Array.isArray(value.arguments)) throw new HostCapabilityRequestError('Knowledge 审批无效');
+    assertJson(value.arguments);
+    if (Buffer.byteLength(JSON.stringify(value.arguments), 'utf8') > 32 * 1024) throw new HostCapabilityRequestError('Knowledge 审批参数过大');
+    ids.add(value.source_id);
+  }
+}
+function assertJson(value: unknown, depth = 0): void {
+  if (depth > 64) throw new HostCapabilityRequestError('Knowledge 参数嵌套过深');
+  if (value === null || typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number' && Number.isFinite(value)) return;
+  if (typeof value !== 'object' || !value) throw new HostCapabilityRequestError('Knowledge 参数不是 JSON');
+  for (const child of Object.values(value)) assertJson(child, depth + 1);
 }
 
 function freezeJson(value: unknown): void {

@@ -162,8 +162,8 @@ ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终
 资源 UTF-8 内容限 32 KiB。资源定义 revision 与内容 SHA-256 分开，Worker 从已接纳 Log
 核验 reference/hash/media 后才续接。旧无实现的 `resource.read` 字典 transport 已删除；
 `resource_client.py` 分别拥有原生加载的内容解码和显式 Knowledge 采集/复验 Adapter，二者不提升
-彼此权限。受控来源的持久采集与 live Context 已接通，详见下文；资源主动订阅、产品来源管理、
-跨重启重新授权和持久 Run 恢复仍未完成，原生 Step 材料不会自动提升为 Knowledge。
+彼此权限。受控来源的持久采集、live Context、可信 App 管理 RPC 与显式审批重启重采集已接通，
+详见下文；资源主动订阅、产品权限 UI 和持久 Run 恢复仍未完成，原生 Step 材料不会自动提升为 Knowledge。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
@@ -317,7 +317,7 @@ composition 注入本代 `cognition:<generation>` 主体及 ResourceClient；Cor
 
 可信 App 通过 `KnowledgeIndex.register_resource_source` 显式登记 `KnowledgeResourceSource`，
 绑定 source ID、Resource ID/定义 revision、完整 provider/scene/conversation scope 或明确 global、
-priority。登记不是授权，模型没有此管理入口。`collect_resource(source_id)` 读取已经登记的意图，
+priority、enabled。登记不是授权，模型没有此管理入口。`collect_resource(source_id)` 读取已经登记的意图，
 实际调用 Port，验证真实 UTF-8/hash、双授权证明与本代主体，转换后在提交前/后复验 live 证明。
 SQL 接纳同时比较来源声明 revision 和 entry revision；过时采集不能覆盖新的声明或正文。
 RPC/模型 await 不持有 SQL 事务，失联/撤权没有缓存放行；已提交事实保留，撤权接纳的正文立即
@@ -341,8 +341,25 @@ scope/主体不匹配只是不可见，不以别的会话查询删除来源。�
 旧 prompt/history，也不接纳最终 Reply。已合法发给供应商的输入无法撤回。通用 Workspace 不具有
 此复验门，MemoryProvider 不缓存 Resource 正文 Attention，避免陈旧/私有材料进入无 scope 投影。
 
-现有 source 入口仍是可信 App API，Host 显式 IO 政策仍需分别接纳；持久用户来源配置/管理 RPC、
-权限 UI/重新授权、主动变更订阅、安装态迁移及完整 Knowledge 生命周期尚未交付。不是完整产品 ready。
+生产 CognitionService 已提供来源查询、CAS 登记/更新/停用与显式采集；wire 由 Worker mapper
+转换，不进入 Core。管理查询只返回声明/来源修订/声明摘要，不返回正文或临时 proof。停用与
+当前正文 tombstone/向量失效同事务，停用来源在实际 IO 前拒绝。采集请求也绑定期望来源修订，
+防止审批读取后被新声明替换；RPC 要求实际 owner、当前 generation、业务 ready，并受取消/drain
+监督。修订冲突不套用副作用恢复 code，不以 process-local cache 或丢失 ACK 宣称重复成功。
+schema 2 历史声明/采集中的 enabled 缺省仍解释为当时唯一启用语义；语义相同登记不制造新修订，
+不改写历史材料。新 wire 则必须有 enabled presence，遗漏拒绝。
+
+HostKnowledgeController 通过这些生成 RPC 管理来源，不直接写 Knowledge SQLite；持久审批
+仅由唯一 HostConfig 拥有。ConfiguredHostCognitionJobsOwner 显式装配同一 Resource 服务后，
+在 Worker ready 后重验当前来源 revision/digest/enabled，为实际新世代签发双 grant/IO 接纳并
+重新采集，再完成领域启动；不得恢复旧证明。管理更新先撤 IO/证明，再做来源 CAS，失败保持
+拒绝；停止先撤销、取消并 drain 管理请求再关闭 client。审批字段与摘要算法见
+[协议参考](../../reference/protocol.md#knowledge-来源管理) 和
+[配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)。没有审批默认拒绝；审批与
+当前来源不符、已到期或 Resource graph 未装配时明确失败，不忽略配置或自造假 ready。
+
+产品权限 UI、主动变更订阅、采集调度、安装态迁移与完整 Knowledge 生命周期尚未交付。
+上述局部 Host 入口不替代产品默认 Kernel，不是完整产品 ready 或跨机认证/安全发行证明。
 
 共享 Memory 连接的读写由 `SqliteMemoryStore.read()` / `transaction()` 串行化；Memory、Vector、
 Relationship、关系 checkpoint 与旧巩固队列不再各自 commit。写事务使用 IMMEDIATE，BEGIN/业务写入/

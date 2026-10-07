@@ -1,5 +1,16 @@
 # M12 Contract Spine Inventory
 
+Knowledge 来源管理由同一 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
+`KnowledgeResourceSource`、`KnowledgeResourceSourceState`、`GetKnowledgeResourceSourceRequest`、
+`GetKnowledgeResourceSourceResponse`、`RegisterKnowledgeResourceSourceRequest`、
+`RegisterKnowledgeResourceSourceResponse`、`CollectKnowledgeSourceRequest`、`CollectKnowledgeSourceResponse`；
+`CognitionService` 增加 `GetKnowledgeResourceSource`、`RegisterKnowledgeResourceSource`、`CollectKnowledgeSource`。
+可信 App 按来源 CAS 管理；可选 enabled 必须有 presence，缺省 scope 明确 global，存在时完整且无 user_id。
+查询仅声明/修订/摘要，采集仅真实接纳 receipt，不公开正文或临时 proof。ServiceErrorCode 兼容新增
+CONFLICT / PERMISSION_DENIED；审批 Document 为现行唯一 HostConfig.knowledge.approvals，默认空/拒绝，
+绑定来源 revision/digest、固定 arguments、freshness 与绝对 expiry。Proto 基线未刷新；HostConfig
+新增可选字段，经旧默认/合法非法审批自查后只更新该 JSON Schema hash 快照，门禁不变，无第二契约源。
+
 Knowledge 显式资源采集复用同一 `proto/glimmer/capabilities/v1/capabilities.proto`：
 `CollectKnowledgeResourceRequest`、`CollectKnowledgeResourceResponse`、`KnowledgeResourceAccess`、
 `ValidateKnowledgeResourceRequest`、`ValidateKnowledgeResourceResponse`，同一 `CapabilityService`

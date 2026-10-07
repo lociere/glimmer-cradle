@@ -68,6 +68,36 @@ KnowledgeResourceAccess，复验将原证明、定义、实际内容 hash/media_
 旧 Kernel 服务未提供该新采集入口，不建立兼容假采集；精确生命周期和未完成接线见
 [实现地图](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 
+## Knowledge 来源管理
+
+同一 CognitionService 的 GetKnowledgeResourceSource、RegisterKnowledgeResourceSource、
+CollectKnowledgeSource 属于可信 App 管理面，不公开给模型、Tool 或 Extension。管理声明
+KnowledgeResourceSource 绑定 source_id、Resource reference、priority、enabled 和 scope；priority
+为 1–JS max safe integer，enabled 必须有 presence。scope 缺省明确 global，存在时完整
+provider/scene/conversation 且禁止 user_id（包括显式空 user_id）。三类调用均要求本代 metadata、
+实际 Knowledge owner 与业务 ready；取消/停止进入实际 task drain，不在 SQL 事务内等待 RPC。
+
+来源状态只携声明、正 source_revision 和 declaration_digest；不存在时 state 缺省，正文/proof
+不进入管理查询。摘要是 SHA-256 的小写 hex，输入为无空格、Unicode 不转义的 UTF-8 JSON：
+`["knowledge-resource-source.v1",source_id,resource_id,definition_revision,[provider,scene,conversation],priority,enabled]`；
+global 三个 context 值均为 null，priority 是安全整数，enabled 是 JSON bool。Host 在比较
+持久审批 revision/digest 后也从实际声明复算摘要，不靠 revision 单独授权。
+
+登记 expected_source_revision 为 0 时只允许新来源；更新为当前修订，语义相同且期望当前修订
+返回原修订。冲突返回 CONFLICT（gRPC ABORTED），读取当前事实后由 App 作新决策，不自动
+覆盖，不宣称请求 identity 已幂等接纳。停用原子失效当前条目/向量，保存来源和采集历史。
+采集期望修订为正，IO 前及 SQL 接纳均比较；disabled 或已复验为失效返回 PERMISSION_DENIED，缺字段、
+非法 scope/整数或不存在来源为 INVALID_REQUEST。Resource 服务失败延续其稳定 code，不透传
+正文或原始异常。Get/登记返回状态，Collect 仅返回 source/revision、entry/revision、content_digest
+的实际接纳 receipt；无正文或 access ID。丢失采集 ACK 不代表未写入，新的明确采集产生新证据，
+不重放旧 proof，也不靠内存 idempotency cache 假称成功。
+
+Host 审批先由唯一 HostConfig 校验，再由同一 Resource/Broker graph 对实际注册主体发新双 grant。
+管理更新先撤 IO/proof 再 CAS；失败保持拒绝，不承诺跨 Host/SQLite 分布式原子事务。审批不是
+临时 grant，来源声明不是读取授权，采集材料不是 Memory。配置、重新装配和未交付 UI 边界见
+[配置参考](configuration.md#目标-host-与-jobs-配置) 与
+[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+
 ## Memory Jobs 状态投递
 
 Jobs 的 `JobStateEvent` 是原 outbox 事实，携带稳定 event/job/scope/goal/kind、revision、状态枚举、

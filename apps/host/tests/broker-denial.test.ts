@@ -1,20 +1,24 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import { create } from '@bufbuild/protobuf';
+import { createHash } from 'node:crypto';
+import Database from 'better-sqlite3';
 import { ExposeStepRequestSchema, ReadResourceRequestSchema, CollectKnowledgeResourceRequestSchema, ValidateKnowledgeResourceRequestSchema,
   type CollectKnowledgeResourceResponse } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry, ExecutionRecoveryRequiredError } from '@glimmer-cradle/capabilities';
 import type { Resource, ExecutionResultReceiverPort } from '@glimmer-cradle/capabilities';
-import { PermissionBroker, HostResourceContributions } from '../src/index.js';
+import { PermissionBroker, HostResourceContributions, HostKnowledgeController, ConfiguredHostCognitionJobsOwner, HostDataPaths,
+  type HostKnowledgeApproval, type WorkerSupervisorOptions } from '../src/index.js';
 import { WorkerSupervisor } from '../src/index.js';
 import { PublishStateResponseSchema, PublishActionResponseSchema } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
 import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy, RetentionCeiling,
-  PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  PerceptionOperationState, RegisterKnowledgeResourceSourceRequestSchema, KnowledgeResourceSourceStateSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import type { PermissionRequest } from '@glimmer-cradle/platform';
 
 const principal = { principal_id: 'worker', host_id: 'host', generation: 'generation', kind: 'service' as const };
@@ -49,6 +53,35 @@ function harness(receiver?: ExecutionResultReceiverPort) {
 
 const knowledgePolicy = { source_id: 'source:document', reference: { id: 'document', revision: 'definition:1' },
   scope: { source_provider_id: 'provider', scene_id: 'scene', conversation_id: 'conversation' }, arguments: {}, max_age_ms: 50 };
+it('来源审批核验摘要/到期/禁用；审计失败不留下部分授权', async () => {
+  const h = harness();
+  const digest = createHash('sha256').update(JSON.stringify(['knowledge-resource-source.v1', 'source:document', 'document',
+    'definition:1', ['provider', 'scene', 'conversation'], 1, true])).digest('hex');
+  const state = create(KnowledgeResourceSourceStateSchema, { sourceRevision: 1n, declarationDigest: digest,
+    source: { sourceId: 'source:document', reference: knowledgePolicy.reference, priority: 1n, enabled: true,
+      scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } } });
+  const approval = { source_id: 'source:document', source_revision: 1, declaration_digest: digest, arguments: {}, max_age_ms: 50, expires_at_ms: 300 };
+  try {
+    for (const drift of [{ declaration_digest: 'f'.repeat(64) }, { source_revision: 2 }, { expires_at_ms: 100 }]) {
+      expect(() => h.service.approveKnowledgeSource('worker', state, { ...approval, ...drift })).toThrow();
+      expect(h.broker.authorize(request).allowed).toBe(false);
+    }
+    expect(() => h.service.approveKnowledgeSource('worker', create(KnowledgeResourceSourceStateSchema, {
+      ...state, source: { ...state.source!, enabled: false } }), approval)).toThrow('冲突');
+    let grants = 0;
+    h.audit.mockImplementation(event => { if (event.action === 'permission_granted' && ++grants === 2) throw new Error('second grant audit failure'); });
+    expect(() => h.service.approveKnowledgeSource('worker', state, approval)).toThrow('audit');
+    expect(h.broker.authorize(request).allowed).toBe(false);
+    await expect(collectKnowledge(h)).rejects.toThrow('接纳');
+    h.audit.mockReset();
+    const admitted = h.service.approveKnowledgeSource('worker', state, approval);
+    const proof = await collectKnowledge(h); expect(admitted.current()).toBe(true);
+    h.time(301); expect(admitted.current()).toBe(false);
+    h.time(101); expect(admitted.current()).toBe(false);
+    expect(() => h.service.approveKnowledgeSource('worker', state, approval)).toThrow();
+    admitted.revoke(); expect((await validateKnowledge(h, proof)).current).toBe(false);
+  } finally { await h.close(); }
+});
 function collectKnowledge(h: ReturnType<typeof harness>, drift = {}) {
   return h.service.collectKnowledgeResource(create(CollectKnowledgeResourceRequestSchema, {
     call: { generation: 'generation', traceId: 'knowledge-trace' }, sourceId: knowledgePolicy.source_id,
@@ -259,6 +292,11 @@ it.each([
     } });
   let resourceReadCount = 0;
   let knowledgeGrant: ReturnType<PermissionBroker['grant']> | undefined;
+  const originalGrant = broker.grant.bind(broker);
+  const grantSpy = vi.spyOn(broker, 'grant').mockImplementation((value, expiry) => {
+    const granted = originalGrant(value, expiry); if (value.permission === 'knowledge.ingest') knowledgeGrant = granted; return granted;
+  });
+  let knowledgeController: HostKnowledgeController | undefined;
   const reader = vi.fn(async () => {
     resourceReadCount++;
     if (revokeDuringRead) broker.revokePrincipal(`cognition:${supervisor.snapshot.generation}`);
@@ -276,8 +314,16 @@ it.each([
     await supervisor.start();
     if (!revokeDuringRead) {
       const actualPrincipal = `cognition:${supervisor.snapshot.generation}`;
-      knowledgeGrant = broker.grant({ ...request, principal_id: actualPrincipal, generation: supervisor.snapshot.generation!, permission: 'knowledge.ingest' }, Date.now() + 30_000);
-      service.registerKnowledgeAccess(actualPrincipal, { ...knowledgePolicy, max_age_ms: 20_000 });
+      const client = supervisor.createCognitionClient();
+      const registered = await client.registerKnowledgeSource(create(RegisterKnowledgeResourceSourceRequestSchema, {
+        source: { sourceId: 'source:document', reference: knowledgePolicy.reference, priority: 1n, enabled: true,
+          scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } },
+      }));
+      knowledgeController = new HostKnowledgeController(service, client, supervisor.snapshot.generation!, [{
+        source_id: 'source:document', source_revision: Number(registered.state!.sourceRevision),
+        declaration_digest: registered.state!.declarationDigest, arguments: {}, max_age_ms: 20_000, expires_at_ms: Date.now() + 30_000,
+      }]);
+      expect((await knowledgeController.collect('source:document')).entryRevision).toBe(1n);
       const resourceScript = `
 import asyncio, json, grpc
 from dataclasses import asdict, replace
@@ -287,7 +333,6 @@ from glimmer.capabilities.v1 import capabilities_pb2 as pb
 from glimmer.common.v1 import service_contract_pb2 as common
 from glimmer_cradle.cognition.ports import ResourceScope
 from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
-from glimmer_cradle.cognition.knowledge import KnowledgeIndex, KnowledgeResourceSource
 from glimmer_cradle.cognition_worker.adapters.resource_client import ResourceClient
 from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
 async def run():
@@ -297,19 +342,9 @@ async def run():
     adapter = ResourceClient(transport, trace_id="knowledge-resource-proof")
     scope = ResourceScope("provider", "scene", "conversation")
     store = SqliteKnowledgeStore(Path(${JSON.stringify(root)}) / "state/cognition/knowledge.sqlite")
-    noop = lambda *args, **kwargs: None
-    observability = SimpleNamespace(logger=lambda _: SimpleNamespace(info=noop, warning=noop, debug=noop))
-    index = KnowledgeIndex(observability=observability)
-    index.bind_repository(store)
-    index.bind_resource_port(adapter, principal_id=${JSON.stringify(actualPrincipal)})
     try:
         await store.connect()
-        await index.register_resource_source(KnowledgeResourceSource("source:document", "document", "definition:1", scope))
-        reference = await index.collect_resource("source:document")
-        assert reference.revision == 1
         snapshot = (await store.get_all_entries())[0]["resource"].snapshot
-        assert len(await index.get_knowledge(scope=scope)) == 1
-        assert await index.get_knowledge(scope=ResourceScope("provider", "scene", "other")) == []
         assert await adapter.is_current(snapshot, principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
         assert not await adapter.is_current(replace(snapshot, content=b"forged"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
         assert not await adapter.is_current(replace(snapshot, media_type="application/json"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
@@ -407,9 +442,94 @@ asyncio.run(read())
     expect(moments.find(moment => moment.kind === 'reply')!.causes).toContain(result.id);
     expect(JSON.stringify(result.content)).toContain('真正授权的资料正文');
   } finally {
+    await knowledgeController?.stop(); grantSpy.mockRestore();
     await supervisor.stop(); await service.stop(); journal.close();
     provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve()));
   }
+}, 60000);
+
+it('配置 Host 用实际 RPC 登记来源；重启重验审批并发新 grant/采集，停用和失配拒绝读取', async () => {
+  const repository = path.resolve(__dirname, '../../..');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-knowledge-restart-'));
+  const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+  const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
+    'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-production-seed', paths.data_root], { cwd: repository, windowsHide: true });
+  const input = JSON.parse(seeded.stdout);
+  input.runtime_document.memory.consolidation.enabled = false;
+  mkdirSync(path.dirname(paths.host_config), { recursive: true });
+  writeFileSync(paths.jobs_config, '{}\n', 'utf8');
+  writeFileSync(paths.memory_config, JSON.stringify(input.runtime_document.memory), 'utf8');
+  const approvals: HostKnowledgeApproval[] = [];
+  const configure = () => writeFileSync(paths.host_config, JSON.stringify({ knowledge: { approvals },
+    authority: { lease_ms: 10000, renewal_interval_ms: 1000 },
+    cognition: { startup_timeout_ms: 15000, shutdown_timeout_ms: 3000, request_timeout_ms: 5000 } }), 'utf8');
+  const journal = new SqliteExecutionJournal(path.join(root, 'execution.sqlite'));
+  const execution = new ExecutionController(journal);
+  const outbox = new ExecutionResultOutbox(journal, { accept: async event => ({ event_id: event.event_id,
+    invocation_id: event.invocation.invocation_id, revision: event.invocation.revision, accepted: true }) });
+  const granted: string[] = [];
+  const broker = new PermissionBroker(Date.now, event => { if (event.action === 'permission_granted') granted.push(event.permission_revision!); });
+  const service = new HostResourceContributions({ host_id: 'host', target_location: 'host:local', permissions: broker,
+    resources: new ResourceRegistry(), execution, outbox });
+  const reader = vi.fn(async () => '重新采集的来源资料'); service.registerResource(resource, reader);
+  const options = { paths, clock: { now: Date.now }, owner_id: 'knowledge-host', resources: service,
+    worker: { python_executable: input.python_executable, runtime_document: input.runtime_document, capability_service: service,
+      accept_state: async (value: Parameters<WorkerSupervisorOptions['accept_state']>[0]) =>
+        create(PublishStateResponseSchema, { operationId: value.call!.traceId, status: 'state_published' }) } };
+  let owner: ConfiguredHostCognitionJobsOwner | undefined;
+  let oldController: HostKnowledgeController;
+  const source = { sourceId: 'source:资料', reference: knowledgePolicy.reference, priority: 1n, enabled: true,
+    scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } };
+  const currentCapture = () => {
+    const db = new Database(path.join(paths.data_root, 'state/cognition/knowledge.sqlite'), { readonly: true });
+    try {
+      const value = db.prepare('SELECT snapshot_json FROM knowledge_resource_revision ORDER BY entry_revision DESC LIMIT 1').get() as { snapshot_json: string };
+      return JSON.parse(value.snapshot_json);
+    } finally { db.close(); }
+  };
+  try {
+    configure(); owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+    oldController = owner.knowledge;
+    await expect(oldController.collect(source.sourceId)).rejects.toThrow('审批'); expect(reader).not.toHaveBeenCalled();
+    const registration = create(RegisterKnowledgeResourceSourceRequestSchema, { source });
+    const registering = oldController.registerSource(registration);
+    registration.source!.enabled = false; registration.source!.sourceId = 'caller-mutated';
+    const registered = await registering;
+    expect(registered.state!.source).toMatchObject({ sourceId: source.sourceId, enabled: true });
+    approvals.push({ source_id: source.sourceId, source_revision: Number(registered.state!.sourceRevision),
+      declaration_digest: registered.state!.declarationDigest, arguments: {}, max_age_ms: 10000, expires_at_ms: Date.now() + 60000 });
+    const firstGeneration = owner.snapshot.session!.worker.generation;
+    await owner.stop(); await expect(oldController.getSource(source.sourceId)).rejects.toThrow('停止');
+    configure(); owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+    expect(owner.snapshot.session!.worker.generation).not.toBe(firstGeneration);
+    expect(reader).toHaveBeenCalledOnce(); expect(granted).toHaveLength(2);
+    const firstCapture = currentCapture(), firstGrants = [...granted];
+    expect(firstCapture.access.principal_id).toBe(`cognition:${owner.snapshot.session!.worker.generation}`);
+    expect((await owner.knowledge.getSource(source.sourceId)).state!.sourceRevision).toBe(1n);
+    await owner.stop();
+    owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+    expect(reader).toHaveBeenCalledTimes(2); expect(granted).toHaveLength(4);
+    const nextCapture = currentCapture();
+    expect(nextCapture.access.access_id).not.toBe(firstCapture.access.access_id);
+    expect(nextCapture.access.principal_id).not.toBe(firstCapture.access.principal_id);
+    expect(granted.slice(2).some(value => firstGrants.includes(value))).toBe(false);
+    const disabled = await owner.knowledge.registerSource(create(RegisterKnowledgeResourceSourceRequestSchema, {
+      source: { ...source, enabled: false }, expectedSourceRevision: 1n,
+    }));
+    expect(disabled.state!.sourceRevision).toBe(2n);
+    await expect(owner.knowledge.collect(source.sourceId)).rejects.toThrow('审批冲突');
+    expect(reader).toHaveBeenCalledTimes(2);
+    await expect(owner.knowledge.registerSource(create(RegisterKnowledgeResourceSourceRequestSchema, { source, expectedSourceRevision: 1n })))
+      .rejects.toMatchObject({ code: ServiceErrorCode.CONFLICT });
+    await owner.stop(); owner = new ConfiguredHostCognitionJobsOwner(options);
+    await expect(owner.start()).rejects.toThrow('审批冲突'); expect(reader).toHaveBeenCalledTimes(2);
+    await owner.stop();
+    const db = new Database(path.join(paths.data_root, 'state/cognition/knowledge.sqlite'), { readonly: true });
+    try {
+      expect(db.prepare('SELECT enabled,deleted_at IS NOT NULL AS deleted FROM knowledge_entry WHERE source=?').get('resource')).toEqual({ enabled: 0, deleted: 1 });
+      expect(db.prepare('SELECT COUNT(*) AS count FROM knowledge_resource_revision').get()).toEqual({ count: 2 });
+    } finally { db.close(); }
+  } finally { await owner?.stop(); await service.stop(); journal.close(); }
 }, 60000);
 
 describe('Host Resource 派发与撤销', () => {

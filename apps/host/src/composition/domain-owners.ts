@@ -8,6 +8,7 @@ import { SqliteAuthorityStore } from '../adapters/platform/authority-store.js';
 import { HostDataPaths } from '../adapters/platform/data-paths.js';
 import { loadHostCognitionJobsConfiguration, type HostCognitionJobsConfiguration } from '../adapters/platform/host-configuration.js';
 import { CognitionJobAdapter } from './cognition-job-adapter.js';
+import { HostKnowledgeController, HostResourceContributions, type HostKnowledgeApproval } from './extension-contributions.js';
 
 export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly authority: AuthorityStorePort;
@@ -26,6 +27,7 @@ export interface ConfiguredHostCognitionJobsOptions {
   readonly worker: Omit<WorkerSupervisorOptions, 'app_root' | 'data_root' | 'console_path'
     | 'startup_timeout_ms' | 'shutdown_timeout_ms' | 'request_timeout_ms'>;
   readonly state_receiver?: JobStateReceiverPort;
+  readonly resources?: HostResourceContributions;
 }
 export interface ConfiguredHostCognitionJobsSnapshot {
   readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
@@ -53,6 +55,10 @@ export class ConfiguredHostCognitionJobsOwner {
     return { phase: this.phase === 'active' && session?.phase === 'failed' ? 'failed' : this.phase,
       configuration: this.configuration ?? null, session };
   }
+  public get knowledge(): HostKnowledgeController {
+    if (this.snapshot.phase !== 'active' || !this.session) throw new Error('配置 Host 尚未激活');
+    return this.session.knowledge;
+  }
   public start(): Promise<ConfiguredHostCognitionJobsSnapshot> {
     if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('配置 Host 实例已撤销'));
     if (this.starting) return this.starting;
@@ -74,13 +80,19 @@ export class ConfiguredHostCognitionJobsOwner {
     try {
       // 配置失败不能先创建库，恢复切点异常不能先单向绑定 Memory external。
       this.configuration = loadHostCognitionJobsConfiguration(this.options.paths);
+      if (this.configuration.knowledge_approvals.length && !this.options.resources
+        || this.options.resources && this.options.worker.capability_service !== this.options.resources) {
+        throw new Error('Knowledge 必须装配同一真实 Resource 服务；审批不能静默忽略');
+      }
       this.store = new SqliteJobStore(this.options.paths.jobs_database);
       this.authority = new SqliteAuthorityStore(this.options.paths.authority_database);
       assertJobsRestoration(this.store, this.authority);
       const worker = new WorkerSupervisor({ ...this.options.worker, ...this.configuration.worker,
         runtime_document: { ...this.options.worker.runtime_document, memory: this.configuration.memory_document },
         app_root: this.options.paths.app_root, data_root: this.options.paths.data_root, console_path: this.options.paths.worker_console });
-      this.session = new HostCognitionJobsOwner({ worker, jobs: { ...this.configuration.jobs, ...this.configuration.authority,
+      this.session = new HostCognitionJobsOwner({ worker,
+        ...(this.options.resources ? { knowledge: { resources: this.options.resources, approvals: this.configuration.knowledge_approvals } } : {}),
+        jobs: { ...this.configuration.jobs, ...this.configuration.authority,
         store: this.store, authority: this.authority, clock: this.options.clock, owner_id: this.options.owner_id,
         state_receiver: this.options.state_receiver, memory_state_feedback: true, planning_sources: true } });
       await this.session.start();
@@ -109,6 +121,7 @@ function assertJobsRestoration(store: JobStorePort, authority: AuthorityStorePor
 export interface HostCognitionJobsOptions {
   readonly worker: WorkerSupervisor;
   readonly jobs: Omit<HostJobsOwnerOptions, 'cognition'>;
+  readonly knowledge?: { readonly resources: HostResourceContributions; readonly approvals: readonly HostKnowledgeApproval[] };
 }
 export interface HostCognitionJobsSnapshot {
   readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
@@ -120,6 +133,7 @@ export interface HostCognitionJobsSnapshot {
 export class HostCognitionJobsOwner {
   private phase: HostCognitionJobsSnapshot['phase'] = 'idle';
   private jobs?: HostJobsOwner;
+  private knowledgeController?: HostKnowledgeController;
   private starting?: Promise<HostCognitionJobsSnapshot>;
   private stopping?: Promise<void>;
   private lossTask?: Promise<void>;
@@ -127,7 +141,7 @@ export class HostCognitionJobsOwner {
   private stopRequested = false;
   private readonly options: HostCognitionJobsOptions;
   public constructor(options: HostCognitionJobsOptions) {
-    this.options = { worker: options.worker, jobs: { ...options.jobs,
+    this.options = { worker: options.worker, knowledge: options.knowledge, jobs: { ...options.jobs,
       submission_policy: { ...options.jobs.submission_policy }, retry_policy: { ...options.jobs.retry_policy },
       ...(options.jobs.initial_lease ? { initial_lease: { ...options.jobs.initial_lease } } : {}) } };
   }
@@ -136,13 +150,17 @@ export class HostCognitionJobsOwner {
     const failed = jobs && (['failed', 'lease_lost'].includes(jobs.phase) || jobs.jobs?.status === 'failed');
     return { phase: this.phase === 'active' && failed ? 'failed' : this.phase, worker: this.options.worker.snapshot, jobs };
   }
+  public get knowledge(): HostKnowledgeController {
+    if (this.snapshot.phase !== 'active' || !this.knowledgeController) throw new Error('Knowledge 未装配或尚未激活');
+    return this.knowledgeController;
+  }
   public start(): Promise<HostCognitionJobsSnapshot> {
     if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('Host Worker/Jobs owner 已撤销'));
     if (this.starting) return this.starting;
     this.phase = 'starting';
     this.unsubscribe = this.options.worker.onFailure(() => {
       this.phase = 'failed';
-      this.lossTask = this.jobs?.stop() ?? Promise.resolve();
+      this.lossTask = this.drainDomains();
       void this.lossTask.catch(() => undefined);
     });
     this.starting = this.begin(); void this.starting.catch(() => undefined); return this.starting;
@@ -155,7 +173,7 @@ export class HostCognitionJobsOwner {
     this.stopping = (async () => {
       let drained = false;
       try {
-        await this.jobs?.stop();
+        await this.drainDomains();
         await this.starting?.catch(() => undefined);
         await this.lossTask;
         drained = true;
@@ -174,6 +192,14 @@ export class HostCognitionJobsOwner {
       const cognition = this.options.worker.createCognitionClient();
       try { this.jobs = new HostJobsOwner({ ...this.options.jobs, cognition }); }
       catch (error) { cognition.close(); throw error; }
+      if (this.options.knowledge) {
+        const client = this.options.worker.createCognitionClient();
+        try {
+          this.knowledgeController = new HostKnowledgeController(this.options.knowledge.resources, client,
+            this.options.worker.snapshot.generation!, this.options.knowledge.approvals);
+        } catch (error) { client.close(); throw error; }
+        await this.knowledgeController.start();
+      }
       await this.jobs.start();
       if (this.stopRequested || this.phase !== 'starting' || this.options.worker.snapshot.state !== 'ready') {
         throw new Error('Host Worker/Jobs 启动身份已撤销');
@@ -181,9 +207,14 @@ export class HostCognitionJobsOwner {
       this.phase = 'active'; return this.snapshot;
     } catch (error) {
       if (!this.stopRequested) this.phase = 'failed';
-      try { await this.jobs?.stop(); } finally { await this.options.worker.stop(); this.unsubscribe?.(); }
+      try { await this.drainDomains(); } finally { await this.options.worker.stop(); this.unsubscribe?.(); }
       throw error;
     }
+  }
+  private async drainDomains(): Promise<void> {
+    const outcomes = await Promise.allSettled([this.knowledgeController?.stop(), this.jobs?.stop()]);
+    const failures = outcomes.filter(value => value.status === 'rejected').map(value => value.reason);
+    if (failures.length) throw new AggregateError(failures, 'Host 领域 drain 失败');
   }
 }
 type OwnerPhase = 'idle' | 'starting' | 'active' | 'transferring' | 'transferred' | 'lease_lost' | 'failed' | 'stopping' | 'stopped';

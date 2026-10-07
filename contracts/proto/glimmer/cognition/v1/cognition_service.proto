@@ -167,6 +167,53 @@ message InitializeKnowledgeResponse {
   bool duplicate = 3;
 }
 
+// 可信 App 管理入口；来源声明不是 Resource IO 或保存授权。
+message KnowledgeResourceSource {
+  string source_id = 1;
+  glimmer.capabilities.v1.CapabilityReference reference = 2;
+  // 缺省是显式 global；存在时必须是完整 provider/scene/conversation，禁止 user_id。
+  glimmer.capabilities.v1.CapabilityScopeContext scope = 3;
+  uint64 priority = 4;
+  // 必须有 presence，不能把遗漏等同停用或启用。
+  optional bool enabled = 5;
+}
+
+message KnowledgeResourceSourceState {
+  KnowledgeResourceSource source = 1;
+  uint64 source_revision = 2;
+  // SHA-256 固定顺序 UTF-8 JSON declaration；不包含正文/临时 proof。
+  string declaration_digest = 3;
+}
+
+message GetKnowledgeResourceSourceRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string source_id = 2;
+}
+message GetKnowledgeResourceSourceResponse {
+  // 不存在时缺省；禁止返回伪造的有效 revision。
+  KnowledgeResourceSourceState state = 1;
+}
+message RegisterKnowledgeResourceSourceRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  KnowledgeResourceSource source = 2;
+  uint64 expected_source_revision = 3;
+}
+message RegisterKnowledgeResourceSourceResponse {
+  KnowledgeResourceSourceState state = 1;
+}
+message CollectKnowledgeSourceRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string source_id = 2;
+  uint64 expected_source_revision = 3;
+}
+message CollectKnowledgeSourceResponse {
+  string source_id = 1;
+  uint64 source_revision = 2;
+  string entry_id = 3;
+  uint64 entry_revision = 4;
+  string content_digest = 5;
+}
+
 message SkillToolDescriptor {
   string skill_id = 1;
   string tool_name = 2;
@@ -430,6 +477,10 @@ service CognitionService {
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
   rpc GetPerceptionOperation(GetPerceptionOperationRequest) returns (GetPerceptionOperationResponse);
   rpc InitializeKnowledge(InitializeKnowledgeRequest) returns (InitializeKnowledgeResponse);
+  rpc GetKnowledgeResourceSource(GetKnowledgeResourceSourceRequest) returns (GetKnowledgeResourceSourceResponse);
+  rpc RegisterKnowledgeResourceSource(RegisterKnowledgeResourceSourceRequest) returns (RegisterKnowledgeResourceSourceResponse);
+  // 每次实际采集；丢失 ACK 不能恢复旧 proof 或依靠内存 idempotency cache 宣称成功。
+  rpc CollectKnowledgeSource(CollectKnowledgeSourceRequest) returns (CollectKnowledgeSourceResponse);
   rpc Plan(PlanRequest) returns (PlanResponse);
   rpc Synthesize(SynthesizeRequest) returns (SynthesizeResponse);
   rpc GetConversationHistory(GetConversationHistoryRequest) returns (GetConversationHistoryResponse);

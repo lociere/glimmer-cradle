@@ -19,6 +19,9 @@ import {
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
 import { JobStatus } from '../../generated/ts/glimmer/jobs/v1/jobs_pb';
 import { PublishMemoryJobStateRequestSchema, PlanRequestSchema, PlanResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { RegisterKnowledgeResourceSourceRequestSchema, RegisterKnowledgeResourceSourceResponseSchema,
+  GetKnowledgeResourceSourceRequestSchema, GetKnowledgeResourceSourceResponseSchema,
+  CollectKnowledgeSourceRequestSchema, CollectKnowledgeSourceResponseSchema, KnowledgeResourceSourceSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
   AcknowledgeMemoryJobRequestRequestSchema, ReadPlanningJobRequestsRequestSchema,
   ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestRequestSchema,
@@ -39,6 +42,12 @@ const nativeReference = { id: '["weather","lookup"]', revision: 'revision:一' }
 const resourceAccess = { accessId: 'proof:一', sourceId: 'source:一', principalId: 'principal:一', permissionRevision: 'permission:一',
   collectedAtMs: 1n, expiresAtMs: 9007199254740991n };
 const nativeMessages = [
+  [RegisterKnowledgeResourceSourceRequestSchema, { source: { sourceId: 'source:资料', reference: nativeReference, priority: 9007199254740991n, enabled: false }, expectedSourceRevision: 9007199254740990n }],
+  [RegisterKnowledgeResourceSourceResponseSchema, { state: { source: { sourceId: 'source:资料', reference: nativeReference, scope: nativeScope, priority: 1n, enabled: true }, sourceRevision: 1n, declarationDigest: 'a'.repeat(64) } }],
+  [GetKnowledgeResourceSourceRequestSchema, { sourceId: 'source:资料' }],
+  [GetKnowledgeResourceSourceResponseSchema, {}],
+  [CollectKnowledgeSourceRequestSchema, { sourceId: 'source:资料', expectedSourceRevision: 9007199254740991n }],
+  [CollectKnowledgeSourceResponseSchema, { sourceId: 'source:资料', sourceRevision: 1n, entryId: 'resource:source:资料', entryRevision: 9007199254740991n, contentDigest: 'b'.repeat(64) }],
   [CollectKnowledgeResourceRequestSchema, { call: { traceId: 'trace:采集', generation: 'generation:一' }, sourceId: 'source:一', reference: nativeReference, scope: nativeScope }],
   [CollectKnowledgeResourceResponseSchema, { content: { reference: nativeReference, contentRevision: 'a'.repeat(64), mediaType: 'text/plain', contentUtf8: '资料' }, access: resourceAccess }],
   [ValidateKnowledgeResourceRequestSchema, { call: { traceId: 'trace:复验' }, access: resourceAccess, reference: nativeReference, contentRevision: 'a'.repeat(64), mediaType: 'text/plain', scope: nativeScope }],
@@ -59,6 +68,8 @@ const nativeMessages = [
     content: { case: 'resource', value: { reference: nativeReference, contentRevision: createHash('sha256').update('资源').digest('hex'), mediaType: 'text/plain', contentUtf8: '资源' } } }],
   [ReadCapabilityResponseSchema, { callId: 'read:三', state: ExecutionResultState.FAILED, error: 'authorization_denied', resultEventId: 'd'.repeat(64) }],
 ] as const;
+if (fromBinary(KnowledgeResourceSourceSchema, new Uint8Array()).enabled !== undefined
+  || fromBinary(GetKnowledgeResourceSourceResponseSchema, new Uint8Array()).state !== undefined) throw new Error('Knowledge absent field gained presence');
 for (const [schema, input] of nativeMessages) {
   const message = create(schema as typeof ExposeStepRequestSchema, input as never);
   const restored = fromBinary(schema as typeof ExposeStepRequestSchema, toBinary(schema as typeof ExposeStepRequestSchema, message));

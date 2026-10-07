@@ -36,18 +36,30 @@ digest = hashlib.sha256(fixture_bytes).digest()
 from glimmer.capabilities.v1.capabilities_pb2 import SkillReference, SkillDescriptor, SkillMaterial  # noqa: E402
 method_ref = SkillReference(skill_id="method:总结", definition_revision="revision:一")
 from glimmer.capabilities.v1 import capabilities_pb2 as capability_pb  # noqa: E402
+from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb  # noqa: E402
 from google.protobuf.json_format import ParseDict  # noqa: E402
 native_scope = capability_pb.CapabilityScopeContext(source_provider_id="provider:一", scene_id="scene:一", conversation_id="conversation:一", user_id="user:一")
 native_ref = capability_pb.CapabilityReference(id='["weather","lookup"]', revision="revision:一")
 resource_access = capability_pb.KnowledgeResourceAccess(access_id="proof:一", source_id="source:一", principal_id="principal:一",
     permission_revision="permission:一", collected_at_ms=1, expires_at_ms=9007199254740991)
 collection_messages = (
+    cognition_pb.RegisterKnowledgeResourceSourceRequest(source=cognition_pb.KnowledgeResourceSource(source_id="source:资料",
+        reference=native_ref, priority=9007199254740991, enabled=False), expected_source_revision=9007199254740990),
+    cognition_pb.RegisterKnowledgeResourceSourceResponse(state=cognition_pb.KnowledgeResourceSourceState(
+        source=cognition_pb.KnowledgeResourceSource(source_id="source:资料", reference=native_ref, scope=native_scope, priority=1, enabled=True),
+        source_revision=1, declaration_digest="a" * 64)),
+    cognition_pb.GetKnowledgeResourceSourceRequest(source_id="source:资料"),
+    cognition_pb.GetKnowledgeResourceSourceResponse(),
+    cognition_pb.CollectKnowledgeSourceRequest(source_id="source:资料", expected_source_revision=9007199254740991),
+    cognition_pb.CollectKnowledgeSourceResponse(source_id="source:资料", source_revision=1, entry_id="resource:source:资料", entry_revision=9007199254740991, content_digest="b" * 64),
     capability_pb.CollectKnowledgeResourceRequest(source_id="source:一", reference=native_ref, scope=native_scope),
     capability_pb.CollectKnowledgeResourceResponse(content=capability_pb.ResourceContent(reference=native_ref,
         content_revision="a" * 64, media_type="text/plain", content_utf8="资料"), access=resource_access),
     capability_pb.ValidateKnowledgeResourceRequest(access=resource_access, reference=native_ref, content_revision="a" * 64, media_type="text/plain", scope=native_scope),
     capability_pb.ValidateKnowledgeResourceResponse(current=True),
 )
+assert not cognition_pb.KnowledgeResourceSource.FromString(b"").HasField("enabled")
+assert not cognition_pb.GetKnowledgeResourceSourceResponse.FromString(b"").HasField("state")
 for collection in collection_messages:
     assert type(collection).FromString(collection.SerializeToString()) == collection
 assert not capability_pb.CollectKnowledgeResourceResponse.FromString(b"").HasField("access")

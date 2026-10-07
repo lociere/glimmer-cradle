@@ -24,6 +24,22 @@ var digest = SHA256.HashData(fixtureBytes);
 var methodReference = new CapabilitiesV1.SkillReference { SkillId = "method:总结", DefinitionRevision = "revision:一" };
 var nativeScope = new CapabilitiesV1.CapabilityScopeContext { SourceProviderId = "provider:一", SceneId = "scene:一", ConversationId = "conversation:一", UserId = "user:一" };
 var nativeReference = new CapabilitiesV1.CapabilityReference { Id = "[\"weather\",\"lookup\"]", Revision = "revision:一" };
+var knowledgeRegister = new RegisterKnowledgeResourceSourceRequest { Source = new KnowledgeResourceSource { SourceId = "source:资料", Reference = nativeReference, Priority = 9007199254740991UL, Enabled = false }, ExpectedSourceRevision = 9007199254740990UL };
+var knowledgeState = new KnowledgeResourceSourceState { Source = new KnowledgeResourceSource { SourceId = "source:资料", Reference = nativeReference, Scope = nativeScope, Priority = 1, Enabled = true }, SourceRevision = 1, DeclarationDigest = new string('a', 64) };
+var knowledgeRegistered = new RegisterKnowledgeResourceSourceResponse { State = knowledgeState };
+var knowledgeGet = new GetKnowledgeResourceSourceRequest { SourceId = "source:资料" };
+var knowledgeGot = new GetKnowledgeResourceSourceResponse { State = knowledgeState };
+var knowledgeCollect = new CollectKnowledgeSourceRequest { SourceId = "source:资料", ExpectedSourceRevision = 9007199254740991UL };
+var knowledgeCollected = new CollectKnowledgeSourceResponse { SourceId = "source:资料", SourceRevision = 1, EntryId = "resource:source:资料", EntryRevision = 9007199254740991UL, ContentDigest = new string('b', 64) };
+if (!RegisterKnowledgeResourceSourceRequest.Parser.ParseFrom(knowledgeRegister.ToByteArray()).Equals(knowledgeRegister)
+    || !RegisterKnowledgeResourceSourceResponse.Parser.ParseFrom(knowledgeRegistered.ToByteArray()).Equals(knowledgeRegistered)
+    || !GetKnowledgeResourceSourceRequest.Parser.ParseFrom(knowledgeGet.ToByteArray()).Equals(knowledgeGet)
+    || !GetKnowledgeResourceSourceResponse.Parser.ParseFrom(knowledgeGot.ToByteArray()).Equals(knowledgeGot)
+    || !CollectKnowledgeSourceRequest.Parser.ParseFrom(knowledgeCollect.ToByteArray()).Equals(knowledgeCollect)
+    || !CollectKnowledgeSourceResponse.Parser.ParseFrom(knowledgeCollected.ToByteArray()).Equals(knowledgeCollected)
+    || KnowledgeResourceSource.Parser.ParseFrom(Array.Empty<byte>()).HasEnabled
+    || GetKnowledgeResourceSourceResponse.Parser.ParseFrom(Array.Empty<byte>()).State != null)
+    throw new InvalidOperationException("Knowledge source declaration/CAS/disable/presence roundtrip failed");
 var resourceAccess = new CapabilitiesV1.KnowledgeResourceAccess { AccessId = "proof:一", SourceId = "source:一", PrincipalId = "principal:一",
     PermissionRevision = "permission:一", CollectedAtMs = 1, ExpiresAtMs = 9007199254740991UL };
 var resourceCollection = new CapabilitiesV1.CollectKnowledgeResourceRequest { SourceId = "source:一", Reference = nativeReference, Scope = nativeScope };

@@ -183,6 +183,128 @@ async def test_service_maps_knowledge_plan_synthesis_and_history(service) -> Non
     assert result.items[0].text == "hello"
 
 
+async def test_knowledge_source_management_uses_real_store_cas_and_presence(service, tmp_path):
+    from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import (
+        SqliteKnowledgeStore,
+    )
+    from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+    from glimmer_cradle.cognition.ports import ResourceAccess, ResourceSnapshot
+    host, channel, *_ = service
+    store = SqliteKnowledgeStore(tmp_path / "knowledge.sqlite")
+    index = KnowledgeIndex(observability=NullObservability())
+    index.bind_repository(store)
+
+    class Resource:
+        reads = 0
+        async def read(self, resource_id, *, source_id, definition_revision, principal_id, scope):
+            self.reads += 1
+            content = "可信链路的非可信资料".encode()
+            return ResourceSnapshot(resource_id, hashlib.sha256(content).hexdigest(), "text/plain", content,
+                {"definition_revision": definition_revision}, ResourceAccess("proof", source_id, principal_id, "permission", 1, 100))
+        async def is_current(self, snapshot, **kwargs):
+            return True
+    resource = Resource()
+    index.bind_resource_port(resource, principal_id="cognition:generation-1")
+    host._knowledge = index
+    get = _call(channel, "GetKnowledgeResourceSource", cognition_pb.GetKnowledgeResourceSourceRequest, cognition_pb.GetKnowledgeResourceSourceResponse)
+    register = _call(channel, "RegisterKnowledgeResourceSource", cognition_pb.RegisterKnowledgeResourceSourceRequest, cognition_pb.RegisterKnowledgeResourceSourceResponse)
+    collect = _call(channel, "CollectKnowledgeSource", cognition_pb.CollectKnowledgeSourceRequest, cognition_pb.CollectKnowledgeSourceResponse)
+    call = _metadata("generation-1", "knowledge-admin")
+    source = cognition_pb.KnowledgeResourceSource(source_id="source:资料", priority=2**53 - 1, enabled=True,
+        reference=capabilities_pb.CapabilityReference(id="资料", revision="定义:一"))
+    async def rejected(request, method, code):
+        with pytest.raises(grpc.aio.AioRpcError) as caught:
+            await method(request)
+        detail = common_pb.ServiceErrorDetail.FromString(dict(caught.value.trailing_metadata())["glimmer-error-bin"])
+        assert detail.code == code and not detail.recovery_actions
+    await store.connect()
+    try:
+        assert not (await get(cognition_pb.GetKnowledgeResourceSourceRequest(call=call, source_id=source.source_id))).HasField("state")
+        first = await register(cognition_pb.RegisterKnowledgeResourceSourceRequest(call=call, source=source))
+        assert first.state.source_revision == 1 and first.state.source.enabled
+        assert first.state.declaration_digest == (await index.get_resource_source(source.source_id))[0].declaration_digest
+        await rejected(cognition_pb.RegisterKnowledgeResourceSourceRequest(call=call, source=source), register, common_pb.SERVICE_ERROR_CODE_CONFLICT)
+        replay = await register(cognition_pb.RegisterKnowledgeResourceSourceRequest(call=call, source=source, expected_source_revision=1))
+        assert replay == first
+        for drift in ({"enabled": None}, {"priority": 0}, {"priority": 2**53}, {"scope": capabilities_pb.CapabilityScopeContext()},
+                      {"scope": capabilities_pb.CapabilityScopeContext(source_provider_id="p", scene_id="s", conversation_id="c", user_id="")}):
+            invalid = cognition_pb.KnowledgeResourceSource()
+            invalid.CopyFrom(source)
+            for field, value in drift.items():
+                if value is None:
+                    invalid.ClearField(field)
+                elif field == "scope":
+                    invalid.scope.CopyFrom(value)
+                else:
+                    setattr(invalid, field, value)
+            await rejected(cognition_pb.RegisterKnowledgeResourceSourceRequest(call=call, source=invalid, expected_source_revision=1), register, common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST)
+        await rejected(cognition_pb.CollectKnowledgeSourceRequest(call=call, source_id=source.source_id, expected_source_revision=2), collect, common_pb.SERVICE_ERROR_CODE_CONFLICT)
+        assert resource.reads == 0
+        accepted = await collect(cognition_pb.CollectKnowledgeSourceRequest(call=call, source_id=source.source_id, expected_source_revision=1))
+        assert accepted.entry_revision == 1 and accepted.entry_id == "resource:source:资料"
+        assert "可信链路" not in str(await get(cognition_pb.GetKnowledgeResourceSourceRequest(call=call, source_id=source.source_id)))
+        source.enabled = False
+        assert (await register(cognition_pb.RegisterKnowledgeResourceSourceRequest(call=call, source=source, expected_source_revision=1))).state.source_revision == 2
+        await rejected(cognition_pb.CollectKnowledgeSourceRequest(call=call, source_id=source.source_id, expected_source_revision=2), collect, common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED)
+        assert resource.reads == 1
+        await rejected(cognition_pb.GetKnowledgeResourceSourceRequest(call=_metadata("old", "wrong-generation"), source_id=source.source_id), get, common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH)
+        host._knowledge = None
+        await rejected(cognition_pb.GetKnowledgeResourceSourceRequest(call=call, source_id=source.source_id), get, common_pb.SERVICE_ERROR_CODE_NOT_READY)
+        host._knowledge = index
+        host._readiness_tracker.begin_startup()
+        await rejected(cognition_pb.GetKnowledgeResourceSourceRequest(call=call, source_id=source.source_id), get, common_pb.SERVICE_ERROR_CODE_NOT_READY)
+        host.mark_ready()
+        host._readiness_tracker.begin_shutdown()
+        await rejected(cognition_pb.GetKnowledgeResourceSourceRequest(call=call, source_id=source.source_id), get, common_pb.SERVICE_ERROR_CODE_NOT_READY)
+    finally:
+        host._knowledge = None
+        await store.close()
+
+
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "stop"])
+async def test_knowledge_source_collection_cancellation_drains_actual_rpc(service, tmp_path, termination):
+    from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import (
+        SqliteKnowledgeStore,
+    )
+    from glimmer_cradle.cognition.knowledge import (
+        KnowledgeIndex,
+        KnowledgeResourceSource,
+    )
+    from glimmer_cradle.cognition.ports import ResourceScope
+    host, channel, *_ = service
+    store = SqliteKnowledgeStore(tmp_path / "knowledge.sqlite")
+    await store.connect()
+    index = KnowledgeIndex(observability=NullObservability())
+    index.bind_repository(store)
+    entered, cancelled = asyncio.Event(), asyncio.Event()
+    class WaitingResource:
+        async def read(self, *args, **kwargs):
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+    index.bind_resource_port(WaitingResource(), principal_id="cognition:generation-1")
+    await index.register_resource_source(KnowledgeResourceSource("source", "resource", "definition", ResourceScope()))
+    host._knowledge = index
+    collect = _call(channel, "CollectKnowledgeSource", cognition_pb.CollectKnowledgeSourceRequest, cognition_pb.CollectKnowledgeSourceResponse)
+    try:
+        response = collect(cognition_pb.CollectKnowledgeSourceRequest(call=_metadata("generation-1", "collection-cancel"),
+            source_id="source", expected_source_revision=1), timeout=0.1 if termination == "deadline" else 5)
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        if termination == "cancel":
+            response.cancel()
+        elif termination == "stop":
+            await host.stop()
+        with pytest.raises((grpc.aio.AioRpcError, asyncio.CancelledError)):
+            await response
+        await asyncio.wait_for(cancelled.wait(), timeout=2)
+        assert await store.get_all_entries() == []
+    finally:
+        host._knowledge = None
+        await store.close()
+
+
 class RequestTransport:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object]]] = []

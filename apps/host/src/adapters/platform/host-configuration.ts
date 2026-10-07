@@ -9,6 +9,8 @@ import MemoryConfig from '@glimmer-cradle/contracts/json-schema/config/v1/memory
 import type { HostJobsOptions } from '../../composition/host.js';
 import type { WorkerSupervisorOptions } from '../../supervision/worker-supervisor.js';
 import type { HostDataPaths } from './data-paths.js';
+import type { HostKnowledgeApproval } from '../../composition/extension-contributions.js';
+import { validateHostKnowledgeApprovals } from '../../composition/extension-contributions.js';
 
 export class HostConfigurationError extends Error {
   public constructor(public readonly owner: 'host' | 'jobs' | 'memory') { super(`Host ${owner} 配置无效或不可读取`); }
@@ -21,6 +23,7 @@ export interface HostCognitionJobsConfiguration {
   readonly worker: Pick<WorkerSupervisorOptions, 'startup_timeout_ms' | 'shutdown_timeout_ms' | 'request_timeout_ms'>;
   /** 同一 Memory 事实源同时约束源政策与 Worker 装配，不能保留调用方另一份 Memory 配置。 */
   readonly memory_document: Readonly<Record<string, unknown>>;
+  readonly knowledge_approvals: readonly HostKnowledgeApproval[];
 }
 const validator = new ConfigurationValidator({ JobsConfig, HostConfig, MemoryConfig });
 function document(file: string, owner: HostConfigurationError['owner'], schema: 'JobsConfig' | 'HostConfig' | 'MemoryConfig') {
@@ -47,6 +50,7 @@ export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCo
   const scheduler = jobs.scheduler as Record<string, number>, retry = jobs.retry as Record<string, number>;
   const retention = jobs.retention as Record<string, number>, authority = host.authority as Record<string, number>;
   const cognition = host.cognition as Record<string, number>, consolidation = memory.consolidation as Record<string, number>;
+  const approvals = (host.knowledge as { approvals: HostKnowledgeApproval[] }).approvals;
   try {
     retryDelay(1, { base_delay_ms: retry.base_delay_ms, max_delay_ms: retry.max_delay_ms });
     if (authority.renewal_interval_ms >= authority.lease_ms
@@ -54,6 +58,8 @@ export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCo
     const debounce = consolidation.debounce_seconds * 1000;
     if (!Number.isSafeInteger(debounce) || debounce < 0) throw new HostConfigurationError('memory');
     freezeDocument(memory);
+    try { validateHostKnowledgeApprovals(approvals); } catch { throw new HostConfigurationError('host'); }
+    freezeDocument(approvals);
     return Object.freeze({
       jobs: Object.freeze({ poll_interval_ms: scheduler.poll_interval_ms, batch_size: scheduler.batch_size,
         lease_ms: scheduler.lease_ms, terminal_retention_ms: retention.terminal_ms,
@@ -63,6 +69,7 @@ export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCo
       worker: Object.freeze({ startup_timeout_ms: cognition.startup_timeout_ms,
         shutdown_timeout_ms: cognition.shutdown_timeout_ms, request_timeout_ms: cognition.request_timeout_ms }),
       memory_document: memory,
+      knowledge_approvals: approvals,
     });
   } catch (error) { if (error instanceof HostConfigurationError) throw error; throw new HostConfigurationError('jobs'); }
 }

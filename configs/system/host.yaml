@@ -2,6 +2,9 @@
 authority:
   lease_ms: 60000
   renewal_interval_ms: 20000
+knowledge:
+  # 每项必须绑定实际来源修订/摘要及绝对到期时间；不恢复旧 grant/proof。
+  approvals: []
 cognition:
   startup_timeout_ms: 120000
   shutdown_timeout_ms: 30000

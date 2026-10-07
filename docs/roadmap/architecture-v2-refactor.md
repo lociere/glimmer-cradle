@@ -620,6 +620,60 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/9 Knowledge 来源管理与新世代重新授权（2026-10-07）
+
+输入 `1c0c7bcd`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。本切片将已存在
+的持久来源 API 接进正式生产 CognitionService，并将唯一 HostConfig 显式审批接进实际配置
+Host 启动/停止：登记→来源状态/摘要→用户明确配置审批→新世代重验/双 grant→真实重采集。
+不以测试直写 SQLite、附加 channel 的独立 Index 或字典 transport 作为产品管理入口。
+
+新增 GetKnowledgeResourceSource、RegisterKnowledgeResourceSource、CollectKnowledgeSource，
+生成 TS/Python/C# DTO；源 priority 为安全整数，enabled presence 必须，global 缺 scope，
+private 必须完整且禁止 user_id。查询不携正文/proof，采集只确认实际持久接纳 receipt；CAS
+冲突返回独立 CONFLICT，不误标副作用恢复或自动覆盖，丢失确认不通过内存 cache 伪造成功。
+Core 来源 enabled 停用同事务失效条目/向量并保留历史，登记/采集期望修订在 IO/SQL 前校验。
+旧 schema 2 历史省略 enabled 保留当时启用语义，语义重放不制造修订，不改写不可变材料。
+Worker 实际 owner/biz-ready/generation/取消/drain 门覆盖新增 RPC，Core 不 import wire。
+
+HostKnowledgeController 通过生成 Service 管理，不写 Cognition 私有库。HostConfig 默认审批
+为空；审批绑定来源 revision、固定顺序声明 SHA-256、固定参数、freshness 与绝对 expiry，
+不复制来源声明或临时 grant。配置阶段核验字段/参数/重复，资源 graph 缺失/不一致在建库前
+拒绝。Worker ready 后查询当前来源、复算摘要、验证 enabled，再给当前注册主体新发双 grant
+和 IO 接纳并真实采集；停用/更新先撤 IO/证明再 CAS，失败保持拒绝。停止先撤权/取消并 drain
+管理请求，Jobs 与 Knowledge 均 drain 后才关闭本代 client/Worker/数据库。提交参数先捕获
+生成 DTO，调用方排队期间修改不改变实际登记。无审批、到期、禁用/失配不读取或假装 active。
+主要事实与字段见[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)、
+[协议](../reference/protocol.md#knowledge-来源管理) 和
+[配置](../reference/configuration.md#目标-host-与-jobs-配置)。
+
+契约首次验证由 HostConfig 内容 hash 门正确拒绝，未降低或绕过规则。审阅可选新增字段、旧
+默认和非法审批测试后，显式 JSON-only refresh 只改变 HostConfig 的一个 hash；Proto 历史
+image、其他 Document 快照与检查脚本不变。完整 22 gate、inventory、Proto lint/breaking、
+Document/toolchain、三语言管理/CAS/停用/presence roundtrip、连续生成 clean PASS。
+
+验证候选为 `1c0c7bcd` 上本节 Core/Worker/Host/IDL/审批 Schema、生成物/测试和对应文档；
+无其他写入 owner。Cognition 全量 402、Worker 全量 143 PASS；根 pnpm typecheck/build PASS。
+早期根检查识别一处新增测试可选字段类型错误，改为已构造来源 presence 断言后重跑根全门；
+architecture 指出两个新增 Core deep import，改用现有公开子域面后 PASS，未放宽 checker。
+改动 Python Ruff I/F 与 diff 检查 PASS。最终 Host 全量 120 项 PASS，其中 29 项 broker/
+Knowledge 测试包括实际生产 RPC 登记/采集→模型 Context/原生 Reply、同数据根新世代重新
+采集、新主体/证明/grant、无审批/停用/冲突拒读、排队参数捕获、到期/同实例时钟回拨和第二次
+grant 审计失败撤销。Worker 新增取消/deadline/stop 场景在真实 gRPC 上观测读取任务 drain，
+未写入条目；非法 enabled presence/partial scope/空 user_id/安全整数、未 ready/停止/错代拒绝。
+Kernel 47 文件/271 PASS、14 条件跳过；显式启用实际 Worker 集成 11 PASS，production bootstrap
+smoke PASS。根 typecheck/build 最后在参数捕获改动后完整重跑 PASS，此后仅文档收尾。
+111 页 docs、encoding、architecture、target-layout specification、diff PASS；规格通过不是
+最终物理目录收束。环境 Windows/Node 24.18.0/pnpm 11.13.0/根 uv workspace；Core/Worker 全量
+使用 uv run --no-sync，契约生成/连续生成不与 Python/Worker 测试重叠，root build 不与 runtime
+测试重叠。仅临时 SQLite/本地回环/SSE fixture，无收费模型、用户库迁移或恢复材料删除；未运行
+完整 UI/Unity/安装矩阵、跨机认证与 final 物理清单。高风险独立审查仍属最终固定候选门。
+
+范围仍为局部配置 Host，不切换默认产品 Kernel；没有 Control Center 审批 UI、主动订阅/续期/
+采集调度、文件/多模态转换、完整安装态/用户库迁移或跨整个 Host 重启的持久时钟反回拨。
+独立高风险审查仍待最终固定候选，不宣称安全发行。下一依赖为 Resource 更新/失效订阅与
+受监督重新采集，然后继续 Planning 执行/完成评估和其余完整物理清单；不缩小为本切片完成，
+不推送/发布。
+
 ### 阶段 5/9 Knowledge 持久来源与 live Context（2026-10-07）
 
 输入 `54021df7`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。上一切片已有

@@ -306,8 +306,10 @@ Worker composition 已向 KnowledgeIndex 注入 ResourceClient 与本代主体�
 文本/JSON 持久采集、修订与派生索引失效、scope/live 过滤和原生 Step/Reply 复验门见唯一
 [Knowledge 实现](Cognition认知核实现.md#knowledge-来源与持久化)。真实 Host/生产 Worker/SQLite/SSE
 已验证知识正文进入模型，保存权限撤销后不再续接或产生 Reply。Host 不写 Knowledge 库。
-产品来源配置/管理入口、主动订阅、重启重新授权和完整安装态迁移仍待落位；不能自动保存
-Tool/Step 结果、把数据提升成 Memory 或宣称完整 Knowledge 生命周期已交付。
+HostKnowledgeController 已通过 CognitionService 来源管理 RPC 接入真实持久 owner；唯一
+HostConfig 审批驱动新世代重验与重新采集，来源修订/摘要/enabled 不符或到期拒绝，详细字段与
+生命周期仍归上述 Knowledge 实现。主动订阅、权限 UI、采集调度和完整安装态迁移仍待落位；
+不能自动保存 Tool/Step 结果、把数据提升成 Memory 或宣称完整 Knowledge 生命周期已交付。
 
 ## Extension Adapter 链路
 

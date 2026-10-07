@@ -108,7 +108,7 @@
       "owner": "Host owner",
       "kind": "Document",
       "compatibility": "v2.1 new Document; changes require a drained replacement owner, not hot mutation.",
-      "sha256": "cc137ebb9843236a8c6b589c18533ad3de633bfa16c4a34ea613adc57c040e76"
+      "sha256": "97e9bb653a33d241c14a0088ba5fcc84f595daf2f48f6cd14b2ac6e618c9b467"
     },
     {
       "path": "json-schema/config/v1/inference-config.schema.json",

@@ -52,6 +52,7 @@ startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监
 |---|---|---|
 | HostConfig `authority` | lease 60000 ms、renewal 20000 ms | Host 租约续期；renewal 必须小于 lease |
 | HostConfig `cognition` | startup 120000 ms、shutdown 30000 ms、request 30000 ms | Worker 生命周期；request 不超过 startup |
+| HostConfig `knowledge.approvals` | `[]`，默认拒绝 | 可信 Host 显式 IO/保存审批，drain 后新实例重新装配，不恢复临时 grant/proof |
 | JobsConfig `scheduler` | poll 1000 ms、batch 8、lease 180000 ms | Jobs 调度；batch 为 1–1000 |
 | JobsConfig `retry` | base 30000 ms、max 3600000 ms、max_attempts 3 | Jobs 重试；max 不小于 base |
 | JobsConfig `retention` | terminal 1209600000 ms（14 天） | 仅清理到期且全部状态 ACK 的终态 body；保留原身份、unknown 和未 ACK 事实 |
@@ -64,9 +65,27 @@ startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监
 启动读取上限为每文件 1 MiB，要求 UTF-8 无 BOM；缺失、损坏、重复 YAML 键、未知配置键或
 非法组合均以不含输入内容的 owner 错误拒绝，无静默 fallback。配置全验通过后才创建 Jobs/authority
 库。每个实例持有冻结政策；更改须 drain 后以新实例重启，目前未接 Control Center 编辑或热更新。
-该入口只装配 Worker/Jobs，不替代产品默认 Kernel 或完整角色/provider 配置加载。
+该入口装配 Worker/Jobs 及显式可选 Knowledge controller，不替代产品默认 Kernel 或完整角色/provider 配置加载。
 配置启动默认使用实际 Memory 状态 receiver；源 inbox/投影提交后才 ACK，精确语义见
 [协议参考](protocol.md#memory-jobs-状态投递)。手工装配仍须显式提供接收方，不静默确认 outbox。
+
+Knowledge 每项审批必须有 source_id（非空、最多 4096 UTF-8 bytes）、source_revision（正安全整数）、
+declaration_digest（64 位小写 SHA-256 hex）、arguments（固定 JSON object、最多 32 KiB、嵌套
+不超过 64）、max_age_ms（1–86400000）、expires_at_ms（正安全整数、绝对到期时刻）。最多
+1024 项，source_id 不重复；非有限数字/非 JSON/部分声明拒绝。审批不复制来源正文/声明，来源
+唯一持久 owner 仍是 Cognition；登记状态的精确摘要算法见[协议参考](protocol.md#knowledge-来源管理)。
+
+启动方必须显式提供同一个 HostResourceContributions 作为 resources 与 Worker capability_service，
+有审批但无真实 graph 在建库/启动进程前失败。Worker ready 后逐项查询当前来源，比较修订/摘要/
+enabled，并按实际注册 generation 新发 IO 接纳与 resource.read/knowledge.ingest，再真实采集。
+到期/失配不能读取或启动成 active，不延长绝对 expiry，不恢复旧证明。Broker 在同实例内以
+clock high-water 拒绝回拨复活；跨整个 Host 重启的持久时钟/authority 反回拨仍待完整平台链路，
+不能据此配置宣称已交付。期限内的新 Worker 世代可以重新审批装配，但必须重新采集。
+
+首次可用空审批启动显式资源 graph，通过可信 owner.knowledge.registerSource 登记后获取真实
+修订/摘要；Host 配置写入仍由可信 App/用户管理，drain 后将明确审批配置装配到新实例。更新/停用
+通过 controller 先撤 IO/proof 再做来源 CAS，原审批不会追溯适配新声明。此管理入口不是模型或
+Renderer 直接写配置权限；Control Center 编辑、审批 UI、热更新和自动续期尚未实现。
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。

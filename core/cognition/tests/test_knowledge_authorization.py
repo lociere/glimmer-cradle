@@ -73,6 +73,45 @@ async def _resource_index(tmp_path, *, scope=PRIVATE):
     return store, resource, index, source
 
 
+async def test_source_disable_and_optimistic_collection_are_persistent_and_do_not_read(tmp_path):
+    store, resource, index, source = await _resource_index(tmp_path)
+    try:
+        with pytest.raises(KnowledgeConflictError):
+            await index.collect_resource(source.source_id, expected_source_revision=2)
+        assert resource.reads == 0
+        accepted = await index.collect_resource(source.source_id, expected_source_revision=1)
+        disabled = replace(source, enabled=False)
+        assert disabled.declaration_digest != source.declaration_digest
+        assert await index.register_resource_source(disabled, expected_revision=1) == 2
+        assert not await index.is_context_current((accepted,), scope=PRIVATE)
+        assert await index.get_knowledge(scope=PRIVATE) == []
+        await store.close()
+        await store.connect()
+        assert (await index.get_resource_source(source.source_id))[:2] == (disabled, 2)
+        with pytest.raises(PermissionError):
+            await index.collect_resource(source.source_id, expected_source_revision=2)
+        assert resource.reads == 1
+        with sqlite3.connect(tmp_path / "knowledge.sqlite") as connection:
+            assert connection.execute("SELECT COUNT(*) FROM knowledge_resource_revision").fetchone() == (1,)
+            assert connection.execute("SELECT COUNT(*) FROM knowledge_embedding").fetchone() == (0,)
+    finally:
+        await store.close()
+
+
+async def test_schema2_source_without_enabled_preserves_revision_on_semantic_replay(tmp_path):
+    import json
+    store, _resource, index, source = await _resource_index(tmp_path)
+    try:
+        with sqlite3.connect(tmp_path / "knowledge.sqlite") as connection:
+            encoded = json.loads(connection.execute("SELECT declaration_json FROM knowledge_resource_source").fetchone()[0])
+            del encoded["enabled"]
+            connection.execute("UPDATE knowledge_resource_source SET declaration_json=?", (json.dumps(encoded),))
+        assert await index.register_resource_source(source, expected_revision=1) == 1
+        assert (await index.get_resource_source(source.source_id))[0].enabled is True
+    finally:
+        await store.close()
+
+
 async def test_explicit_resource_capture_reopens_with_provenance_and_two_context_consumers(tmp_path):
     store, resource, index, source = await _resource_index(tmp_path)
     try:

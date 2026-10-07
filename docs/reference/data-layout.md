@@ -120,6 +120,9 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 Cognition 进程内使用的 `ConversationWorkingSet` 是从 `conversations.db` 恢复的有界缓存，不拥有历史事实。长期聊天记录由 Conversation Log 派生到 History Store，Kernel 和 Renderer 都不维护平行对话事实源。Control Center 分开展示 Conversation 消息、Log Moment、Episode、活动 Memory、revision、evidence 和角色知识；Renderer 只消费 Desktop main 生成的只读投影。
 
 Knowledge 正文/修订不可整体删除重建，备份必须包含独立库。派生向量失效与正文修订同事务，
+Resource 来源声明保存 enabled；停用原子 tombstone 当前正文/失效向量，不删除来源或采集历史。
+schema 2 历史材料省略该字段时保持当时的启用语义，不回写不可变采集；新来源管理 wire 要求
+显式 presence。Host 审批属于 ConfigRoot/system/host.yaml，不在 Knowledge 库复制 grant 或审批政策。
 具体持久与检索规则见 [Cognition 实现](../architecture/implementation/Cognition认知核实现.md)。
 既有未版本化 Knowledge/旧 Memory 知识表保持原状；新 owner 拒绝隐式迁移，不以空库或重新注入
 配置代替不可再生历史恢复。实际用户库迁移、跨库备份与最终路径切换仍归重构阶段 14。
