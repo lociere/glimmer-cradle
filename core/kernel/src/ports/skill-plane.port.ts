@@ -1,12 +1,10 @@
 import type { ConversationContext } from '@glimmer-cradle/conversation';
+import type { CapabilityScope } from '@glimmer-cradle/capabilities';
+export type { CapabilityScope } from '@glimmer-cradle/capabilities';
 
 export type ExtensionProductTarget = 'any' | 'desktop' | 'personal-server';
 export type ExtensionPlatform = 'any' | 'windows-x64' | 'windows-arm64' | 'linux-x64' | 'linux-arm64' | 'darwin-x64' | 'darwin-arm64';
 export type ProductFeatureId = 'control_surface_gateway' | 'local_device_actions' | 'avatar' | 'audio.tts' | 'audio.asr' | 'extensions';
-
-export type CapabilityScope =
-  | { readonly kind: 'global' }
-  | { readonly kind: 'source_provider' | 'scene' | 'conversation'; readonly ids: [string, ...string[]] };
 
 export interface ContributionRequirements {
   readonly products?: [ExtensionProductTarget, ...ExtensionProductTarget[]];

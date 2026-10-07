@@ -4,7 +4,20 @@ import type {
   SkillAvailabilityContext,
   SkillPlanePolicyPort,
 } from '../../ports/skill-plane.port';
-import { resolveExtensionCapabilityScope } from './scope';
+import { GLOBAL_CAPABILITY_SCOPE } from '@glimmer-cradle/capabilities';
+
+/** $self 是扩展接入的身份绑定，不属于 Core 的 scope 判断。 */
+function resolveExtensionCapabilityScope(
+  scope: CapabilityScope | undefined,
+  extensionId: string,
+  inherited: CapabilityScope = GLOBAL_CAPABILITY_SCOPE,
+): CapabilityScope {
+  const selected = scope ?? inherited;
+  if (selected.kind === 'global') return selected;
+  const [firstId, ...remainingIds] = selected.ids;
+  return { ...selected, ids: [firstId === '$self' ? extensionId : firstId,
+    ...remainingIds.map(id => id === '$self' ? extensionId : id)] };
+}
 
 export function isContributionAvailable(
   requirements: Partial<ContributionRequirements> | undefined,

@@ -39,13 +39,21 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY contracts/package.json contracts/package.json
 COPY packages/extension-sdk/package.json packages/extension-sdk/package.json
 COPY hosts/extension-host/package.json hosts/extension-host/package.json
+COPY core/platform/package.json core/platform/package.json
+COPY core/content/package.json core/content/package.json
+COPY core/conversation/package.json core/conversation/package.json
+COPY core/capabilities/package.json core/capabilities/package.json
 COPY core/kernel/package.json core/kernel/package.json
 COPY products/personal-server/package.json products/personal-server/package.json
 RUN pnpm install --frozen-lockfile \
     --filter @glimmer-cradle/kernel... \
     --filter @glimmer-cradle/personal-server...
 COPY . .
-RUN pnpm --filter @glimmer-cradle/contracts build \
+RUN pnpm --filter @glimmer-cradle/platform build \
+    && pnpm --filter @glimmer-cradle/content build \
+    && pnpm --filter @glimmer-cradle/conversation build \
+    && pnpm --filter @glimmer-cradle/capabilities build \
+    && pnpm --filter @glimmer-cradle/contracts build \
     && pnpm --filter @glimmer-cradle/extension-sdk build \
     && pnpm --filter @glimmer-cradle/extension-host build \
     && pnpm --filter @glimmer-cradle/kernel build \

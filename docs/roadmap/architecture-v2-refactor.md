@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope 领域 owner 已迁入 Capabilities，Kernel catalog/规划/调用直接消费并删除旧 owner；Step Exposure、三 Registry 分离、持久执行 journal/outbox/unknown、撤销检查与生产 broker 待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,36 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 Capabilities scope owner 提取（2026-10-07 当前候选）
+
+输入 `a643e12d`，当前会话唯一写入 owner。长期 Planning 受监督执行和 native Loop 依赖真正的
+Capabilities；当前 Kernel Scope 是现行 catalog、规划与调用共同消费的领域规则，本轮先迁入
+目标 `core/capabilities/src/exposure/exposure-policy.ts`。类型与 global 缺省同 owner，Kernel
+Port 只引用类型，全部行为消费直接切公开入口并删除旧 `scope.ts`，不留 re-export 壳。
+扩展 `$self` 身份绑定留接入装配；Core 不解释 Extension、MCP、平台 IO 或 Conversation concrete。
+
+有效 scope 语义保持；未知 kind 不再默认为 conversation，空或非法限定范围失败关闭。
+新包保持 `0.1.0`，接 workspace/锁/根 test/build/typecheck；不增加 Schema 副本，完整 manifest
+规格不变。计划验收真实 Kernel 规划/调用拒绝跨来源和未知 scope、扩展身份解析、Core 公开构建
+与反例，Kernel 全量、根类型/构建/生产启停和文档/编码/边界检查。权限/预算/readiness、确认后
+撤销再校验、三 Registry、持久 Execution journal/outbox/unknown 与 broker 仍待迁移；不将本轮
+范围过滤称为完整授权或阶段 6 完成。独立审查继续留整体固定候选。
+
+候选已接真实 Kernel 消费，Core 8 项、Kernel 全量 210 项/9 项原跳过与新增 scope/用户指令
+5 项重验 PASS。真实 Kernel 生产启停与隔离 deploy 导入实际 Gateway/Planning consumer PASS，
+新包在部署树自身解析；offline 安装新增的锁变化只有 importer/Kernel link，不改第三方版本。
+检查部署入口发现 Docker 安装前仍漏 Platform/Content/Conversation manifest，一并补齐
+Capabilities manifest 和 Core 构建顺序；新增约束与两产品/部署契约共 45 项 PASS。
+完整 OCI/安装制品不在本机验证，不以文本契约或临时 Kernel deploy 冒充。
+
+根 `pnpm typecheck` / `pnpm build` PASS；随后 Kernel 的实际依赖闭包构建、包 typecheck 与
+新增消费反例重验 PASS。Contracts 的 workspace gate 22 项、repo-checks 27 项 PASS；Service/
+Schema/generated 未改，复用前一候选完整契约证据，不重生运行中的 DTO。111 页文档、编码、
+架构、target-layout spec-only 与 diff PASS；新增 8 个 ordinary 文件均在既有目标清单，未改
+1,098 文件/435 目录规格。无用户数据/产品默认入口/wire/版本递增，目标 Core 只拥有本轮真实
+消费的 scope；下一步仍是独立 Tool/Skill/Resource 与持久 Execution 主链，不建万能 Registry。
+临时隔离部署副本清理受执行策略拒绝，保留在系统 Temp；未为清理绕过限制或触及用户数据。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

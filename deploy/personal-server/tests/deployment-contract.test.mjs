@@ -15,6 +15,23 @@ const compose = await readFile(path.join(root, 'compose.yaml'), 'utf8');
 const dockerfile = await readFile(path.join(root, 'Dockerfile'), 'utf8');
 const contract = JSON.parse(await readFile(path.join(root, 'tests', 'transaction-contract.fixture.json'), 'utf8'));
 
+test('安装前包含实际 Kernel Core 依赖 manifest，Core 构建先于 Kernel', async () => {
+  const repository = path.resolve(root, '../..');
+  const kernel = JSON.parse(await readFile(path.join(repository, 'core/kernel/package.json'), 'utf8'));
+  const install = dockerfile.indexOf('RUN pnpm install --frozen-lockfile');
+  const kernelBuild = dockerfile.indexOf('&& pnpm --filter @glimmer-cradle/kernel build');
+  assert.ok(install > 0 && kernelBuild > install);
+  for (const name of Object.keys(kernel.dependencies).filter(name => name.startsWith('@glimmer-cradle/'))) {
+    const owner = name.slice('@glimmer-cradle/'.length);
+    if (!['platform', 'content', 'conversation', 'capabilities'].includes(owner)) continue;
+    const manifest = `core/${owner}/package.json`;
+    const copy = dockerfile.indexOf(`COPY ${manifest} ${manifest}`);
+    assert.ok(copy >= 0 && copy < install, `${manifest} must exist before frozen install`);
+    const build = dockerfile.indexOf(`pnpm --filter ${name} build`);
+    assert.ok(build > install && build < kernelBuild, `${name} must build before Kernel`);
+  }
+});
+
 test('query dispatch 发生在 version、Docker elevation 与事务初始化之前', () => {
   const query = deploy.indexOf('if [[ "$COMMAND" == status || "$COMMAND" == logs ]]');
   assert.ok(query > 0);

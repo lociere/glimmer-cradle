@@ -6,6 +6,7 @@ import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service
 import { SkillInvocationGateway } from './skill-invocation-gateway';
 import { SkillRegistry } from './skill-registry';
 import { SkillPolicyEngine } from './skill-policy-engine';
+import { SkillPlanePolicy } from './availability';
 import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
 const registry = new SkillRegistry();
@@ -22,6 +23,29 @@ const observability: KernelObservabilityPort = {
 afterEach(() => registry.unregisterSkill(skillId));
 
 describe('Skill capability scope', () => {
+  it('扩展接入解析 $self 后才交给领域过滤，不修改声明', async () => {
+    const policy = new SkillPlanePolicy();
+    const declared = { kind: 'source_provider' as const, ids: ['$self', 'provider:other'] as [string, ...string[]] };
+    expect(policy.resolveExtensionScope(declared, 'test.napcat')).toEqual({ kind: 'source_provider', ids: ['test.napcat', 'provider:other'] });
+    expect(policy.resolveExtensionScope(undefined, 'test.napcat', declared)).toEqual({ kind: 'source_provider', ids: ['test.napcat', 'provider:other'] });
+    expect(declared.ids).toEqual(['$self', 'provider:other']);
+  });
+
+  it('未知 scope 不进入规划也不能通过实际调用网关', async () => {
+    registerPrivateSkill();
+    registry.findById(skillId)!.skill.scope = { kind: 'unknown', ids: [conversation('test.napcat').conversation_id] } as never;
+    const requestPlan = vi.fn(async (_request: AgentPlanRequest): Promise<AgentPlanResponse> => ({
+      trace_id: 'trace-plan', summary: '', reasoning: '', suggestions: [],
+    }));
+    const planning = new SkillPlanningAppService(new SkillCatalogAppService(registry), {} as never, requestPlan);
+    await planning.plan({ userGoal: '查天气', conversation: conversation('test.napcat') });
+    expect(requestPlan.mock.calls[0][0].available_tools).toEqual([]);
+    const gateway = new SkillInvocationGateway(registry, new SkillPolicyEngine(), { record: () => undefined },
+      observability, { record: () => undefined });
+    await expect(gateway.invoke({ skillId, toolName: 'weather', args: {}, conversation: conversation('test.napcat') }))
+      .rejects.toThrow('不属于当前会话作用域');
+  });
+
   it('只把来源扩展私有工具暴露给对应来源会话', async () => {
     registerPrivateSkill();
     const requestPlan = vi.fn(async (request: AgentPlanRequest): Promise<AgentPlanResponse> => ({

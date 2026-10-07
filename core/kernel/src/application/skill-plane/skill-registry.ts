@@ -9,7 +9,7 @@ import type {
   SkillProviderRuntimeSnapshot,
   SkillRuntimeStatus,
 } from '../../ports/skill-plane.port';
-import { GLOBAL_CAPABILITY_SCOPE } from './scope';
+import { GLOBAL_CAPABILITY_SCOPE } from '@glimmer-cradle/capabilities';
 
 const PROVIDER_KINDS: SkillProviderKind[] = ['core', 'extension', 'mcp_server', 'user'];
 const RUNTIME_STATUSES: SkillRuntimeStatus[] = ['ready', 'contract_only'];

@@ -2,7 +2,7 @@ import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
-import { isCapabilityScopeVisible } from '../skill-plane/scope';
+import { isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
 
 export interface SkillPlanningRequest {
   userGoal: string;

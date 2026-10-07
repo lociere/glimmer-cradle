@@ -100,6 +100,20 @@ core/kernel/src/adapters/skill-plane/
 
 Catalog 不等于授权，Policy 通过不等于执行，执行必须经过 Gateway。
 
+scope 规则的唯一领域 owner 已迁入 `core/capabilities/src/exposure/exposure-policy.ts`，公开入口为
+`@glimmer-cradle/capabilities`。Kernel Registry 的 global 缺省、规划过滤和 Gateway 的调用前
+scope 校验都直接消费它；旧 `application/skill-plane/scope.ts` 已删除，内部 Port 只引用 Core
+类型，不复制规则。Core 只接收 source provider/scene/conversation 身份，未引入 Conversation
+concrete、SDK 或 wire。缺上下文/空限定范围/未知 kind 失败关闭，不把未知 kind 猜为 conversation。
+扩展 `$self` 解析仍由接入层 `availability.ts` 的 `SkillPlanePolicy` 完成，不属于 Core 授权。
+新包已接根 test/typecheck/build 与 Kernel workspace 依赖；Kernel 的 with-deps 命令按真实依赖
+闭包构建。Personal Server Docker 安装前显式复制其 Core manifest，构建先于 Kernel；临时
+`pnpm deploy` 已验证新包从部署树自身解析，不回查源码仓库，真实 OCI/完整安装验收仍待执行。
+
+这是 scope owner 迁移，不是完整 Exposure/Execution：Tool/Skill/Resource 分离、Step 权限/
+readiness/预算、确认等待后撤销再验证、持久 invocation journal/outbox/unknown 和 native broker
+仍待完成。目标与证据见[执行记录](../../roadmap/architecture-v2-refactor.md)。
+
 Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/prompt 统一执行：
 
 1. 解析 `traceId`、当前 ALS trace 或新 trace；
