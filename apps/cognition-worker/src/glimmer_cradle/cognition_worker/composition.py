@@ -103,6 +103,10 @@ from glimmer_cradle.cognition_worker.adapters.model_client import (
     ModelClient,
     MultimodalRouter,
 )
+from glimmer_cradle.cognition_worker.adapters.resource_client import (
+    KnowledgeResourceRpcPort,
+    ResourceClient,
+)
 from glimmer_cradle.conversation import (
     ConversationController,
     ConversationRecorder,
@@ -358,10 +362,14 @@ def compose_cognition(
     paths: WorkerPaths | None = None,
     memory_jobs_owner: str = "legacy",
     capability_rpc: CapabilityRpcPort | None = None,
+    resource_rpc: KnowledgeResourceRpcPort | None = None,
+    resource_principal_id: str | None = None,
 ) -> CognitionComponents:
     """按 Storage、Domain、Inference、Application、Port、Cycle 顺序组装 Cognition。"""
     if memory_jobs_owner not in {"legacy", "external"}:
         raise ValueError("Memory Jobs owner 无效")
+    if (resource_rpc is None) != (resource_principal_id is None):
+        raise ValueError("Knowledge Resource transport/principal 必须成对注入")
     logger = observability.logger("cognition_composition")
     logger.info("Cognition Composition 开始组装")
     memory_config = config.memory
@@ -437,6 +445,9 @@ def compose_cognition(
     )
     memory_substrate.bind_repository(memory_repository)
     knowledge_base.bind_repository(knowledge_store)
+    if resource_rpc is not None:
+        knowledge_base.bind_resource_port(ResourceClient(resource_rpc, trace_id=ids.new()),
+            principal_id=resource_principal_id)
 
     activity_controller = CognitiveActivityController(
         experience_recorder=conversation_recorder,

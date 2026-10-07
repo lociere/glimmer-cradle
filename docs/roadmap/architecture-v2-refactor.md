@@ -620,6 +620,53 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/9 Knowledge 持久来源与 live Context（2026-10-07）
+
+输入 `54021df7`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。上一切片已有
+双 grant/采集证明；本切片接通明确登记→真实采集→确定性转换→独立持久修订→权限过滤
+检索→Context provenance 与原生 Step/Reply 复验，不创建第二来源 store，不自动保存 Tool 结果。
+
+Knowledge schema 2 在原独立库增加 source 声明与 Resource 采集历史两表。来源声明 revision
+及 entry revision 同事务 CAS，过时读取不能覆盖新声明/正文；原 bytes/hash、主体、权限 revision、
+采集/到期时间与真实 parser/chunk 版本随不可变正文修订保留。text/plain 实施 UTF-8 trim，JSON
+严格解析/规范化；一份材料为 `whole-resource.v1` 单元，仍限 32 KiB，不冒充媒体或语义分块。
+配置与 Resource owner 互不覆盖；更新/删除/tombstone 与向量失效同事务。主入口/边界与表事实
+详见[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+
+Worker 生产 composition 注入真实本代主体与 ResourceClient；登记 API 属于可信 App，实际
+采集仍须独立 Host IO 接纳与双 grant。SQL 接纳前/后、编码前/后、最终检索与原生 Step/Reply
+复验。scope/主体不匹配不可见，不删除别的主体来源；已复验为失效或无法复验则落 tombstone，
+删除向量，无缓存回退或自动复活。复验 await 不持 SQL 事务。同步诊断不返回 Resource 正文，
+通用 Workspace 没有复验/隐私域，不缓存 Resource 正文 Attention。模型使用的本地修订引用
+不序列化给供应商；撤权后终止 Run，旧 prompt/history 不再发送，最终文本不接纳为 Reply。
+
+旧 v1 普通启动明确拒绝；停止 owner 后显式 migrate_v1 创建新的完整 SQLite 备份再原子升级。
+不覆盖备份、不导入 Memory、不修改原配置/修订/向量；错误/取消先收完事务/线程，再释放
+owner；部分 DDL/列错误回滚并保留恢复材料。实际用户库未操作，跨库备份仍属于阶段 14。
+迁移与恢复操作见[数据布局](../reference/data-layout.md#knowledge-v1-受控迁移与恢复)。
+
+验证输入为 `54021df7` 上本节 Core 来源/检索/Context/原生 Run/迁移与 Worker 绑定、Host
+真实集成及对应文档的 dirty 候选；无其他写入 owner。Cognition 全量 400 项、Worker 全量
+139 项 PASS；Host 全量 110 项 PASS，其中 27 项 broker/采集测试包括真实生产 Worker、
+当前独立 SQLite、实际 gRPC/SSE 与保存权限撤销后拒绝续接/Reply。最后增加 public Run
+缺失复验门的 IO 前拒绝后，Core/Worker 全量及 Host 27 项再次 PASS；Host 其他未变输入
+证据复用。Kernel 47 文件/271 项 PASS、14 条件跳过；显式启用真实 Worker 集成 11 项
+PASS，production bootstrap smoke PASS，4 个独立扩展外部安装条件仍未覆盖。
+
+根 `pnpm typecheck` / `pnpm build` exit 0；此后只改 Python 拒绝门、对应测试/文档，根
+TS/build 输入未变，覆盖范围复用。docs 111 页、encoding、architecture、target-layout
+specification、改动范围 Ruff I/F、`git diff --check` PASS。全树 Ruff I 检查仍有既有未改文件
+导入格式问题，不做无关格式化，也不把此项记为全树 PASS。Contract Spine/DTO/toolchain
+未变，复用上一切片三语言/兼容性证据，未重复 generate/verify，不变更或刷新 baseline。
+环境为 Windows/Node 24.18.0/pnpm 11.13.0/根 uv workspace，最终 Python 测试用已准备的
+环境 `uv run --no-sync`。测试只有本地临时库/回环服务，未使用收费模型、迁移用户库或
+删除恢复材料；未运行完整 UI/Unity/安装矩阵、跨机认证和 final 物理清单验收。独立安全/
+生命周期审查仍留最终固定候选，不宣称安全发行。
+
+后续：持久用户来源配置及管理 Service、Host source policy/权限 UI 与重启重新授权，主动更新
+订阅与恢复调度、媒体/文件转换、完整安装态数据迁移仍未交付。保持完整重构目标，不将本切片
+视为全部 Resource→Knowledge 生命周期或阶段 5/9/14/15 完成；不推送/发布。
+
 ### 阶段 5/9 Knowledge 采集授权与 freshness 前置（2026-10-07）
 
 输入 `9fa2b2ad`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。已有 ReadResource

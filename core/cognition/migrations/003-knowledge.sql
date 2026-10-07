@@ -38,5 +38,24 @@ CREATE TABLE knowledge_embedding (
 CREATE INDEX idx_knowledge_active
   ON knowledge_entry(enabled, deleted_at, priority DESC);
 
+CREATE TABLE knowledge_resource_source (
+  source_id TEXT PRIMARY KEY,
+  revision INTEGER NOT NULL CHECK(revision > 0),
+  declaration_json TEXT NOT NULL
+);
+CREATE TABLE knowledge_resource_revision (
+  entry_id TEXT NOT NULL,
+  entry_revision INTEGER NOT NULL,
+  source_id TEXT NOT NULL,
+  source_revision INTEGER NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  raw_content BLOB NOT NULL,
+  parser_version TEXT NOT NULL,
+  chunk_version TEXT NOT NULL,
+  PRIMARY KEY(entry_id, entry_revision),
+  FOREIGN KEY(entry_id, entry_revision) REFERENCES knowledge_revision(entry_id, revision),
+  FOREIGN KEY(source_id) REFERENCES knowledge_resource_source(source_id)
+);
+
 PRAGMA application_id = 1195592526;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

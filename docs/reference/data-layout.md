@@ -105,7 +105,7 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
-| `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 正文/不可变修订与按修订/hash/转换版本/模型绑定的派生向量；owner `0x47434B4E`、schema 1，旧库不能隐式修复或自动导入 |
+| `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 与显式 Resource 来源/采集、原始材料/权限时效/parser/chunk provenance、不可变正文修订和派生向量；owner `0x47434B4E`、schema 2，v1 只允许先备份的显式迁移，不隐式修复或导入 |
 | `data/state/cognition/planning.sqlite` | Cognition Planning | 本拍行动 journal；显式长期承诺的目标/计划版本、完成条件、accepted 状态与 request outbox/接纳记录 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
@@ -123,6 +123,30 @@ Knowledge 正文/修订不可整体删除重建，备份必须包含独立库。
 具体持久与检索规则见 [Cognition 实现](../architecture/implementation/Cognition认知核实现.md)。
 既有未版本化 Knowledge/旧 Memory 知识表保持原状；新 owner 拒绝隐式迁移，不以空库或重新注入
 配置代替不可再生历史恢复。实际用户库迁移、跨库备份与最终路径切换仍归重构阶段 14。
+
+### Knowledge v1 受控迁移与恢复
+
+仅适用于已核验 owner `0x47434B4E`、version 1 的独立 Knowledge 库，不导入旧 Memory 表。
+先停止 Host/Cognition Worker 及所有该库 writer，保护现有库和备份；通过当前产品路径 resolver
+取得绝对库路径，并在 `data/backups/` 选一个不存在的备份路径。可信维护代码调用：
+
+```python
+store = SqliteKnowledgeStore(database_path)
+await store.migrate_v1(backup_path=backup_path)
+await store.connect()
+await store.close()
+```
+
+API 不在正常 connect 或 Worker 启动中执行。只接受完整 v1 表/列与 integrity check；持写锁
+期间通过 SQLite backup 获取完整恢复副本，再在同事务添加两张 Resource 表和 version 2。
+原配置正文、修订、tombstone、向量不改写；已有备份、同路径、foreign/未知/部分库均拒绝。
+迁移 SQL/引用/提交失败回滚原库，保留备份；取消先等待线程收尾再释放 owner。失败时核验
+库 header/quick_check、备份完整性与错误，不删除原库或以重新注入配置冒充恢复。
+
+恢复须保持所有 owner 停止，先另存迁移后的库及关联 journal/WAL 材料，再将完整 v1 备份恢复
+到原库路径；使用与 v1 匹配的旧候选，或重新按此流程迁移，不能让 v2 Worker 假装支持 v1。
+恢复核对正文/历史修订/向量及库 owner/version，源事实正确后再启对应候选。库内 Resource
+证明绑定旧 Worker 主体，重启不自动授权，仍须 Host 接纳/双 grant 和新的显式采集。
 
 Desktop main 从 `conversations.db` 读取最近会话记录，从月度 Conversation Log packs 聚合最近 Moment，从 Episode projection 读取分段状态，从 `memory.db` 读取当前 revision、evidence 与巩固结果统计。Control Center 必须区分待巩固、巩固完成但无长期记忆、巩固失败和活动记忆，也不能把预览结果解释为实际 Prompt 召回。
 

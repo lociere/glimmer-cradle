@@ -14,6 +14,7 @@ from glimmer_cradle.cognition.knowledge.transformation import (
 )
 from glimmer_cradle.cognition.memory import MemoryController, RelationshipRecord
 from glimmer_cradle.cognition.ports.clock_port import ClockPort
+from glimmer_cradle.cognition.ports.resource_port import ResourceScope
 from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 
 ContextTrustTier = Literal["untrusted", "user_asserted", "host_verified", "authoritative"]
@@ -35,6 +36,7 @@ class ContextQuery:
     recall_scope: str = "global_safe"
     emotion_hint: str = ""
     focus_summary: str = ""
+    source_provider_id: str | None = None
 
     @property
     def allowed_scopes(self) -> set[str]:
@@ -312,13 +314,40 @@ def _moment_speaker(moment: Moment) -> str:
 
 def knowledge_context_metadata(entry: KnowledgeEntry) -> dict[str, Any]:
     """正文来源修订随投影传递；索引版本不等于来源权限或时效证明。"""
-    return {
+    metadata = {
         "entry_id": entry.entry_id,
         "revision": entry.revision,
         "source": entry.source,
         "content_digest": entry.content_digest,
         "transformation_version": KNOWLEDGE_TRANSFORMATION_VERSION,
     }
+    capture = entry.attributes.get("resource")
+    if capture is not None:
+        access = capture.snapshot.access
+        metadata.update({
+            "source_id": capture.source.source_id,
+            "resource_id": capture.source.resource_id,
+            "definition_revision": capture.source.definition_revision,
+            "resource_content_revision": capture.snapshot.revision,
+            "principal_id": access.principal_id,
+            "permission_revision": access.permission_revision,
+            "collected_at_ms": access.collected_at_ms,
+            "expires_at_ms": access.expires_at_ms,
+            "parser_version": capture.parser_version,
+            "chunk_version": capture.chunk_version,
+            "freshness": "current",
+        })
+    return metadata
+
+
+def knowledge_resource_scope(source_provider_id: str | None, scene_id: str | None,
+                             conversation_id: str | None) -> ResourceScope | None:
+    values = (source_provider_id, scene_id, conversation_id)
+    if all(value is None for value in values):
+        return ResourceScope()
+    if any(not isinstance(value, str) or not value.strip() for value in values):
+        return None
+    return ResourceScope(*values)
 
 
 def render_knowledge_entry(entry: KnowledgeEntry) -> str:
@@ -334,7 +363,8 @@ class KnowledgeSource(ContextSource):
 
     async def activate(self, query: ContextQuery, *, max_items: int = 10) -> list[ContextItem]:
         try:
-            entries = await self._kb.get_knowledge(query=query.text)
+            entries = await self._kb.get_knowledge(query=query.text, scope=knowledge_resource_scope(
+                query.source_provider_id, query.scene_id, query.conversation_id))
         except Exception:
             return []
 

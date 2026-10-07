@@ -13,9 +13,11 @@ from glimmer_cradle.cognition.context.source import (
     ContextQuery,
     ContextSource,
     allowed_recall_scopes,
+    knowledge_resource_scope,
     render_knowledge_entry,
 )
 from glimmer_cradle.cognition.context.trust import ContextTrustPolicy
+from glimmer_cradle.cognition.knowledge.revision import KnowledgeRevision
 from glimmer_cradle.cognition.ports import ObservabilityPort
 
 _EMOTION_HINTS: dict[str, str] = {
@@ -173,6 +175,8 @@ class ReplyContextBuilder:
         emotion_state: dict,
         trace_id: str,
         multimodal_text: str = "",
+        source_provider_id: str | None = None,
+        resource_references: list[KnowledgeRevision] | None = None,
     ) -> str:
         if self._memory is None and self._knowledge_base is None:
             if not multimodal_text:
@@ -187,6 +191,8 @@ class ReplyContextBuilder:
             user_text=user_text,
             emotion_state=emotion_state,
             trace_id=trace_id,
+            source_provider_id=source_provider_id,
+            resource_references=resource_references,
         )
         context["multimodal"] = multimodal_text
         return self._compose(persona_prompt, context)
@@ -202,6 +208,8 @@ class ReplyContextBuilder:
         user_text: str,
         emotion_state: dict,
         trace_id: str,
+        source_provider_id: str | None,
+        resource_references: list[KnowledgeRevision] | None,
     ) -> dict[str, str]:
         context = {
             "conversation_state": "",
@@ -250,10 +258,14 @@ class ReplyContextBuilder:
         except Exception as exc:
             self._logger.debug("相关记忆检索失败", error=str(exc))
         try:
-            knowledge = await self._knowledge_base.get_knowledge(query=query)
+            knowledge = await self._knowledge_base.get_knowledge(query=query, scope=knowledge_resource_scope(
+                source_provider_id, scene_id, conversation_id))
             context["knowledge"] = "\n".join(
                 render_knowledge_entry(item) for item in knowledge
             )
+            if resource_references is not None:
+                resource_references.extend(KnowledgeRevision(item.entry_id, item.revision, item.source, item.content_digest)
+                    for item in knowledge if item.source == "resource")
         except Exception as exc:
             self._logger.debug("世界知识取用失败", error=str(exc))
         if self._experience is not None:

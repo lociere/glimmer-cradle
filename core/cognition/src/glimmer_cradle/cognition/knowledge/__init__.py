@@ -10,6 +10,8 @@ from glimmer_cradle.cognition.knowledge.knowledge_store import (
 from glimmer_cradle.cognition.knowledge.revision import KnowledgeRevision
 from glimmer_cradle.cognition.knowledge.source import (
     KnowledgeEntry,
+    KnowledgeResourceCapture,
+    KnowledgeResourceSource,
     KnowledgeSourceRecord,
 )
 from glimmer_cradle.cognition.knowledge.transformation import content_digest
@@ -19,6 +21,8 @@ __all__ = [
     "KnowledgeConflictError",
     "KnowledgeEntry",
     "KnowledgeIndex",
+    "KnowledgeResourceCapture",
+    "KnowledgeResourceSource",
     "KnowledgeRevision",
     "KnowledgeSourceRecord",
     "KnowledgeStore",

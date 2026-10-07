@@ -1356,7 +1356,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     class _Mem:
         def __init__(self, content): self.content = content
     class _KB:
-        async def get_knowledge(self, query):
+        async def get_knowledge(self, query, *, scope=None):
             from glimmer_cradle.cognition.knowledge import KnowledgeEntry
             return [KnowledgeEntry("sky", "天空是蓝的")]
     class _Conversation:
@@ -1450,7 +1450,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
 
         class knowledge_base:
             @staticmethod
-            async def get_knowledge(query):
+            async def get_knowledge(query, *, scope=None):
                 return []
 
     cap = _CapturingModel("我看到了")

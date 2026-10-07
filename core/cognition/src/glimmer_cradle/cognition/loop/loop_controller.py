@@ -170,6 +170,7 @@ class LoopController:
             raise ValueError("native model and capability factory must be paired")
         self._native_model = native_model
         self._capability_factory = capability_factory
+        self._knowledge_base = knowledge_base
         self._ids = ids
         self._observability = observability
         self.logger = observability.logger("loop_controller")
@@ -276,19 +277,23 @@ class LoopController:
         stop_policy: StopPolicy | None = None,
         invocation_allowed: Callable[[], Awaitable[bool]] | None = None,
         inference_allowed: Callable[[], bool] | None = None,
+        context_allowed: Callable[[], Awaitable[bool]] | None = None,
     ) -> LoopRun:
         """Run a bounded native model/tool loop without reclassifying tool calls."""
+        if request.knowledge_references and context_allowed is None:
+            raise ValueError("versioned knowledge requires context revalidation")
         policy = stop_policy or StopPolicy()
         # Cancellation must reach the active model socket / RPC, not detach a side effect.
         async with asyncio.timeout(policy.max_duration_seconds):
             return await self._run_native(request, model=model, capabilities=capabilities,
                 scope=scope, policy=policy, invocation_allowed=invocation_allowed,
-                inference_allowed=inference_allowed)
+                inference_allowed=inference_allowed, context_allowed=context_allowed)
 
     async def _run_native(self, request: InferenceRequest, *, model: RealtimeModelPort,
         capabilities: CapabilityPort, scope: str, policy: StopPolicy,
         invocation_allowed: Callable[[], Awaitable[bool]] | None,
-        inference_allowed: Callable[[], bool] | None) -> LoopRun:
+        inference_allowed: Callable[[], bool] | None,
+        context_allowed: Callable[[], Awaitable[bool]] | None) -> LoopRun:
         run_id = self._ids.new()
         results: list[CapabilityResult] = []
         output_parts: list[str] = []
@@ -331,9 +336,13 @@ class LoopController:
             resources_by_id = {item.definition_id: item for item in exposure.resources}
             if len(skills_by_id) != len(exposure.skills) or len(resources_by_id) != len(exposure.resources):
                 raise ValueError("duplicate native catalog references")
+            if context_allowed is not None and not await context_allowed():
+                return LoopRun(run_id, "stopped", step_count, stop_reason="context_invalidated",
+                    capability_results=tuple(results))
             current = InferenceRequest(system=request.system, user=request.user, max_tokens=request.max_tokens,
                 temperature=request.temperature, vision=request.vision, provider_key=request.provider_key,
                 history=tuple(history),
+                knowledge_references=request.knowledge_references,
                 metadata={**request.metadata, "run_id": run_id, "step": step_count, "capabilities": tuple(exposed),
                     "skills": exposure.skills, "resources": exposure.resources, "capability_results": tuple(results),
                     "remaining_capability_calls": policy.max_capability_calls - capability_calls if can_invoke else 0})
@@ -381,6 +390,10 @@ class LoopController:
             if not completed:
                 return LoopRun(run_id=run_id, status="failed", step_count=step_count, output="".join(output_parts),
                     stop_reason="model_stream_incomplete", capability_results=tuple(results))
+            if context_allowed is not None and not await context_allowed():
+                # 已送出给供应商的输入不可撤回，但撤权后的结果不能接纳/产生 Reply。
+                return LoopRun(run_id, "stopped", step_count, stop_reason="context_invalidated",
+                    capability_results=tuple(results))
             if not step_calls:
                 return LoopRun(
                     run_id=run_id,
@@ -499,10 +512,18 @@ class LoopController:
             # No local native streaming backend is configured; never promote a local-only request.
             raise InferenceUnavailable("native model tier is unavailable")
         assert self._native_model is not None and self._capability_factory is not None
+        async def context_allowed() -> bool:
+            if not request.knowledge_references:
+                return True
+            from glimmer_cradle.cognition.context.source import knowledge_resource_scope
+            return self._knowledge_base is not None and await self._knowledge_base.is_context_current(
+                request.knowledge_references, scope=knowledge_resource_scope(content.get("source_provider_id"),
+                    content.get("scene_id"), content.get("conversation_id")))
         run = await self.run_native(request, model=self._native_model,
             capabilities=self._capability_factory(content), scope=content["conversation_id"],
             invocation_allowed=lambda: self._native_invocation_allowed(content),
-            inference_allowed=lambda: self._deliberation.reasoning_tier() == ModelTier.CLOUD_ALLOWED)
+            inference_allowed=lambda: self._deliberation.reasoning_tier() == ModelTier.CLOUD_ALLOWED,
+            context_allowed=context_allowed)
         if run.status != "completed":
             raise RuntimeError(f"native inference did not complete: {run.stop_reason}")
         self._turn.native_result_fact_ids = [item.result_fact_id for item in run.capability_results if item.result_fact_id]

@@ -161,9 +161,9 @@ ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终
 `ReadSkill` / `ReadResource` 使用唯一生成 RPC 外壳与共享加载内容定义；实际正文限 16 KiB、
 资源 UTF-8 内容限 32 KiB。资源定义 revision 与内容 SHA-256 分开，Worker 从已接纳 Log
 核验 reference/hash/media 后才续接。旧无实现的 `resource.read` 字典 transport 已删除；
-`resource_client.py` 现在是实际读取链使用的内容解码器，不冒充完整 ResourcePort/Knowledge 接入。
-Knowledge 配置 Vault 的修订绑定/索引失效已接通；Resource ingest、资源权限与 freshness 失效、
-资源订阅和持久 Run 恢复仍未完成，原生资源材料不会自动提升为 Knowledge。
+`resource_client.py` 分别拥有原生加载的内容解码和显式 Knowledge 采集/复验 Adapter，二者不提升
+彼此权限。受控来源的持久采集与 live Context 已接通，详见下文；资源主动订阅、产品来源管理、
+跨重启重新授权和持久 Run 恢复仍未完成，原生 Step 材料不会自动提升为 Knowledge。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
@@ -288,15 +288,20 @@ Provider 错误只暴露安全状态/类型，第三方请求日志不输出 URL
 | Vector | `adapters/persistence/sqlite_memory_store.py` 的 `VectorRepository` | 按 provider/model/dimension 隔离的可重建 embedding 索引；默认不启用 |
 | Memory Database | `adapters/persistence/sqlite_memory_store.py`、`migrations/002-memory.sql` | `data/state/cognition/memory.sqlite`；Job/checkpoint 表仍处于拆库迁移窗口 |
 
+### Knowledge 来源与持久化
+
 Knowledge 由独立 `KnowledgeStore` 拥有正文/修订与派生向量，不复用 Memory 的 VectorIndexStore。
-当前 `knowledge.sqlite` 的 application_id 是 `0x47434B4E`，user_version 是 1；初始化判定、DDL 与
+当前 `knowledge.sqlite` 的 application_id 是 `0x47434B4E`，user_version 是 2；初始化判定、DDL 与
 schema metadata 共用 IMMEDIATE 事务，双连接首次打开不会竞争建表。已存在的未版本化、foreign、
-未知版本或部分库只拒绝打开，不隐式建表/修复/导入旧 Memory。旧数据的受控迁移与备份归阶段 14。
+未知版本或部分库只拒绝打开，不隐式建表/修复/导入旧 Memory。v1 只允许停止 owner 后显式调用
+`SqliteKnowledgeStore.migrate_v1(backup_path=...)`，先创建新的完整备份再原子增加 Resource 表；
+普通 connect 不升级。实际用户库与跨库迁移仍归阶段 14，操作与恢复见
+[数据布局](../../reference/data-layout.md#knowledge-v1-受控迁移与恢复)。
 
 配置条目内容、priority、enabled 的实际变化才追加修订；相同输入重放不递增。配置删除/独立删除与
 对应向量失效同事务，editor 删除保留条目原来源 owner，历史修订记录实际操作来源。向量接纳绑定
-entry ID/revision/正文 SHA-256、模型身份和 `trim-text/whole-entry.v1` 转换版本；目前一条配置正文
-是一条索引单元，不宣称已实现 Resource parser/chunk pipeline。读写、回滚、关闭串行化，模型编码
+entry ID/revision/正文 SHA-256、模型身份和 `trim-text/whole-entry.v1` 索引单元转换版本；一条配置正文
+是一条索引单元。Resource 采集另存实际 parser/chunk 版本，见下文。读写、回滚、关闭串行化，模型编码
 不持有 SQL 事务；迟到向量重验来源修订，回滚失败撤销连接，重复取消先完成清理。
 
 `KnowledgeIndex` 每次实际检索重读当前条目，编码后再次过滤更新/删除/禁用项；进程缓存只是最近
@@ -307,9 +312,37 @@ entry ID/revision/正文 SHA-256、模型身份和 `trim-text/whole-entry.v1` �
 Worker ResourceClient 已实际实现 consumer-owned ResourcePort 的显式采集/活跃证明复验，使用
 唯一 generated CapabilityService 和受监督 metadata；普通模型加载 snapshot 没有采集证明。
 Host 双 grant/IO 接纳与有限 freshness 详见
-[Knowledge 采集边界](Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。当前尚未注入
-Knowledge ingest/持久来源，也未改此处 SQLite schema；后续须把 source identity、权限、时效、
-parser/chunk 版本与索引/Context 失效实际接通，不能只将采集正文复制到配置条目。
+[Knowledge 采集边界](Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。生产 Worker
+composition 注入本代 `cognition:<generation>` 主体及 ResourceClient；Core 不读取进程环境。
+
+可信 App 通过 `KnowledgeIndex.register_resource_source` 显式登记 `KnowledgeResourceSource`，
+绑定 source ID、Resource ID/定义 revision、完整 provider/scene/conversation scope 或明确 global、
+priority。登记不是授权，模型没有此管理入口。`collect_resource(source_id)` 读取已经登记的意图，
+实际调用 Port，验证真实 UTF-8/hash、双授权证明与本代主体，转换后在提交前/后复验 live 证明。
+SQL 接纳同时比较来源声明 revision 和 entry revision；过时采集不能覆盖新的声明或正文。
+RPC/模型 await 不持有 SQL 事务，失联/撤权没有缓存放行；已提交事实保留，撤权接纳的正文立即
+tombstone，历史不回写。Tool/Step 结果、Memory 和 config Vault 都不是这个采集入口。
+
+`knowledge_resource_source` 保存声明当前 revision；`knowledge_resource_revision` 保存每次采集
+绑定的声明、完整证明、主体、permission revision、采集/到期时间、原始 bytes/hash、media type、
+parser/chunk 版本，随正文不可变修订保留。text/plain 实施 `utf8-trim-text.v1`；application/json
+实施拒绝重复键/非有限值的 `utf8-canonical-json.v1`；目前实际分块策略是 `whole-resource.v1`，
+限 32 KiB UTF-8，不宣称已实现文件/媒体 parser 或语义分块。Source/正文更新或删除同事务失效向量。
+
+检索只向 Worker 绑定主体提供当前 scope 可见的来源；private 不降级为 global，partial scope 拒绝。
+编码前、迟到向量接纳、查询后与最终 SQL 投影都重验来源。Host 返回不 current 或无法复验时，
+当前修订落 tombstone 并删除向量；恢复连通/墙钟回拨不自动复活，只有新的显式采集可建立新修订。
+scope/主体不匹配只是不可见，不以别的会话查询删除来源。同步诊断快照不返回 Resource 正文。
+
+`KnowledgeSource` 与 `ReplyContextBuilder` 传递来源/Resource/hash、主体、权限 revision、时间及
+真实 parser/chunk provenance，仍为 untrusted/data，不把 proof access ID 暴露给模型。
+回复 Context 把使用的 Resource 修订附在本地 `InferenceRequest.knowledge_references`；该字段
+不序列化给供应商，显式携带修订的 run_native 未注入复验门会在 IO 前拒绝。Loop 在每个模型 Step 与模型完成后复验这些修订，失效终止 Run，不继续复用
+旧 prompt/history，也不接纳最终 Reply。已合法发给供应商的输入无法撤回。通用 Workspace 不具有
+此复验门，MemoryProvider 不缓存 Resource 正文 Attention，避免陈旧/私有材料进入无 scope 投影。
+
+现有 source 入口仍是可信 App API，Host 显式 IO 政策仍需分别接纳；持久用户来源配置/管理 RPC、
+权限 UI/重新授权、主动变更订阅、安装态迁移及完整 Knowledge 生命周期尚未交付。不是完整产品 ready。
 
 共享 Memory 连接的读写由 `SqliteMemoryStore.read()` / `transaction()` 串行化；Memory、Vector、
 Relationship、关系 checkpoint 与旧巩固队列不再各自 commit。写事务使用 IMMEDIATE，BEGIN/业务写入/

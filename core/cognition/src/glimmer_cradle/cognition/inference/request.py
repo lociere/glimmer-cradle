@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from glimmer_cradle.cognition.ports.capability_port import CapabilityResult
+
+if TYPE_CHECKING:
+    from glimmer_cradle.cognition.knowledge.revision import KnowledgeRevision
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,3 +51,5 @@ class InferenceRequest:
     vision: tuple[tuple[str, str, str], ...] = ()
     provider_key: str | None = None
     history: tuple[InferenceStep, ...] = ()
+    # 只给本地 Loop 的复验门；不序列化给模型供应商，也不是长期来源事实。
+    knowledge_references: tuple[KnowledgeRevision, ...] = ()

@@ -302,10 +302,12 @@ Python `adapters/resource_client.py` 的 ResourceClient 实际实现 Core Resour
 采集证明。真实 Host/已注册生产 Worker 的测试 generation、实际 Python Adapter/transport
 与 gRPC 已验证读取和复验；测试额外 channel 只附加本代，不重新伪造 FD3 注册。
 
-这是 Resource→Knowledge 的前置 IO 接线，不是完整 Knowledge 接入：Cognition 持久来源
-登记、采集提交/来源修订、parser/chunk pipeline、权限过滤检索/Context、派生索引删除及跨
-重启重新授权装配仍待落位。Worker composition 尚未将此 Port 注入 Knowledge ingest owner；
-不能自动保存 Tool/Step 结果、把数据提升成 Memory 或宣称知识更新完整链已完成。
+Worker composition 已向 KnowledgeIndex 注入 ResourceClient 与本代主体。显式来源登记、
+文本/JSON 持久采集、修订与派生索引失效、scope/live 过滤和原生 Step/Reply 复验门见唯一
+[Knowledge 实现](Cognition认知核实现.md#knowledge-来源与持久化)。真实 Host/生产 Worker/SQLite/SSE
+已验证知识正文进入模型，保存权限撤销后不再续接或产生 Reply。Host 不写 Knowledge 库。
+产品来源配置/管理入口、主动订阅、重启重新授权和完整安装态迁移仍待落位；不能自动保存
+Tool/Step 结果、把数据提升成 Memory 或宣称完整 Knowledge 生命周期已交付。
 
 ## Extension Adapter 链路
 

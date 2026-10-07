@@ -845,3 +845,119 @@ async def test_partial_index_failure_keeps_unindexed_valid_source_retrievable(tm
         ] == ["k2", "k1"]
     finally:
         await store.close()
+
+
+async def _v1_fixture(path):
+    store = await _seed(path)
+    await store.close()
+    with sqlite3.connect(path) as connection:
+        connection.execute("DROP TABLE knowledge_resource_revision")
+        connection.execute("DROP TABLE knowledge_resource_source")
+        connection.execute("PRAGMA user_version=1")
+    return store
+
+
+async def test_v1_requires_explicit_backup_migration_and_preserves_history_vectors(tmp_path):
+    path, backup_path = tmp_path / "knowledge.sqlite", tmp_path / "backups" / "knowledge-v1.sqlite"
+    store = await _v1_fixture(path)
+    with sqlite3.connect(path) as connection:
+        original = list(connection.iterdump())
+    with pytest.raises(KnowledgeConflictError, match="受控"):
+        await store.connect()
+    with sqlite3.connect(path) as connection:
+        assert list(connection.iterdump()) == original
+    await store.migrate_v1(backup_path=backup_path)
+    with sqlite3.connect(backup_path) as connection:
+        assert list(connection.iterdump()) == original
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+    await store.connect()
+    try:
+        assert (await store.get_all_entries())[0]["content"] == "原文"
+        assert list(await store.get_embeddings(model="fixture:2", transformation_version="v1")) == [_reference()]
+        with pytest.raises(KnowledgeConflictError, match="关闭"):
+            await store.migrate_v1(backup_path=tmp_path / "unexpected.sqlite")
+    finally:
+        await store.close()
+    with pytest.raises(KnowledgeConflictError, match="新的独立路径"):
+        await store.migrate_v1(backup_path=backup_path)
+    with pytest.raises(KnowledgeConflictError, match="v1 owner"):
+        await store.migrate_v1(backup_path=tmp_path / "second.sqlite")
+    assert not (tmp_path / "second.sqlite").exists()
+
+
+@pytest.mark.parametrize("failure", ["missing_table", "missing_columns"])
+async def test_partial_v1_migration_rolls_back_without_losing_recoverable_backup(tmp_path, failure):
+    path, backup_path = tmp_path / "knowledge.sqlite", tmp_path / "backup.sqlite"
+    store = await _v1_fixture(path)
+    with sqlite3.connect(path) as connection:
+        original = list(connection.iterdump())
+    migration = tmp_path / "incomplete.sql"
+    sql = "CREATE TABLE knowledge_resource_source (source_id TEXT PRIMARY KEY, revision INTEGER, declaration_json TEXT);\n"
+    if failure == "missing_columns":
+        sql += "CREATE TABLE knowledge_resource_revision (entry_id TEXT PRIMARY KEY);\n"
+    migration.write_text(sql, encoding="utf-8")
+    broken = SqliteKnowledgeStore(path, migration_path=migration)
+    with pytest.raises((KnowledgeConflictError, sqlite3.DatabaseError)):
+        await broken.migrate_v1(backup_path=backup_path)
+    with sqlite3.connect(path) as connection:
+        assert list(connection.iterdump()) == original
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+    with sqlite3.connect(backup_path) as connection:
+        assert list(connection.iterdump()) == original
+    await store.migrate_v1(backup_path=tmp_path / "retry-backup.sqlite")
+    await store.connect()
+    assert (await store.get_all_entries())[0]["revision"] == 1
+    await store.close()
+
+
+@pytest.mark.parametrize("failure", ["owner", "version", "columns", "backup", "same_path"])
+async def test_v1_migration_refuses_invalid_owner_or_destructive_backup(tmp_path, failure):
+    path, backup = tmp_path / "knowledge.sqlite", tmp_path / "backup.sqlite"
+    store = await _v1_fixture(path)
+    with sqlite3.connect(path) as connection:
+        if failure == "owner":
+            connection.execute("PRAGMA application_id=123")
+        elif failure == "version":
+            connection.execute("PRAGMA user_version=999")
+        elif failure == "columns":
+            connection.execute("ALTER TABLE knowledge_revision RENAME COLUMN source TO missing_source")
+        before = list(connection.iterdump())
+    if failure == "backup":
+        backup.write_bytes(b"existing recovery material")
+    elif failure == "same_path":
+        backup = path
+    with pytest.raises((KnowledgeConflictError, sqlite3.DatabaseError)):
+        await store.migrate_v1(backup_path=backup)
+    with sqlite3.connect(path) as connection:
+        assert list(connection.iterdump()) == before
+    if failure == "backup":
+        assert backup.read_bytes() == b"existing recovery material"
+    elif failure != "same_path":
+        assert not backup.exists()
+
+
+async def test_cancelled_v1_migration_drains_thread_before_releasing_owner(tmp_path, monkeypatch):
+    from threading import Event
+
+    store = await _v1_fixture(tmp_path / "knowledge.sqlite")
+    entered, release = Event(), Event()
+    original = store._migrate_v1
+    def paused(backup):
+        entered.set()
+        if not release.wait(5):
+            raise RuntimeError("fixture release timeout")
+        original(backup)
+    monkeypatch.setattr(store, "_migrate_v1", paused)
+    migrating = asyncio.create_task(store.migrate_v1(backup_path=tmp_path / "backup.sqlite"))
+    assert await asyncio.to_thread(entered.wait, 2)
+    migrating.cancel()
+    opening = asyncio.create_task(store.connect())
+    await asyncio.sleep(0)
+    migrating.cancel()
+    assert not migrating.done() and not opening.done()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await migrating
+    await opening
+    assert (await store.get_all_entries())[0]["content"] == "原文"
+    await store.close()

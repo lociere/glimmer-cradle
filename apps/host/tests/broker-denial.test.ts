@@ -216,7 +216,11 @@ describe('Host 显式授权而非调用者自报', () => {
   });
 });
 
-it.each([false, true])('实际目标 Host/生产 Worker/typed Resource/SSE/SQLite Log 接纳后才续接，读取时撤权=%s', async revokeDuringRead => {
+it.each([
+  { revokeDuringRead: false, revokeKnowledgeDuringRead: false },
+  { revokeDuringRead: true, revokeKnowledgeDuringRead: false },
+  { revokeDuringRead: false, revokeKnowledgeDuringRead: true },
+])('实际 Host/生产 Worker/Resource/Knowledge/SSE/Log，全主体撤权=$revokeDuringRead，保存权限撤权=$revokeKnowledgeDuringRead', async ({ revokeDuringRead, revokeKnowledgeDuringRead }) => {
   const repository = path.resolve(__dirname, '../../..');
   const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-native-resource-'));
   const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
@@ -253,8 +257,12 @@ it.each([false, true])('实际目标 Host/生产 Worker/typed Resource/SSE/SQLit
     resources: new ResourceRegistry(), execution, outbox, on_principal_registered: value => {
       broker.grant({ ...request, principal_id: value.principal_id, generation: value.generation }, Date.now() + 30_000);
     } });
+  let resourceReadCount = 0;
+  let knowledgeGrant: ReturnType<PermissionBroker['grant']> | undefined;
   const reader = vi.fn(async () => {
+    resourceReadCount++;
     if (revokeDuringRead) broker.revokePrincipal(`cognition:${supervisor.snapshot.generation}`);
+    if (revokeKnowledgeDuringRead && resourceReadCount === 2) broker.revokeGrant(knowledgeGrant!.grant_id);
     return '真正授权的资料正文';
   }); service.registerResource(resource, reader);
   const actions: unknown[] = [];
@@ -268,14 +276,18 @@ it.each([false, true])('实际目标 Host/生产 Worker/typed Resource/SSE/SQLit
     await supervisor.start();
     if (!revokeDuringRead) {
       const actualPrincipal = `cognition:${supervisor.snapshot.generation}`;
-      const knowledgeGrant = broker.grant({ ...request, principal_id: actualPrincipal, generation: supervisor.snapshot.generation!, permission: 'knowledge.ingest' }, Date.now() + 30_000);
-      service.registerKnowledgeAccess(actualPrincipal, { ...knowledgePolicy, max_age_ms: 5000 });
+      knowledgeGrant = broker.grant({ ...request, principal_id: actualPrincipal, generation: supervisor.snapshot.generation!, permission: 'knowledge.ingest' }, Date.now() + 30_000);
+      service.registerKnowledgeAccess(actualPrincipal, { ...knowledgePolicy, max_age_ms: 20_000 });
       const resourceScript = `
 import asyncio, json, grpc
 from dataclasses import asdict, replace
+from pathlib import Path
+from types import SimpleNamespace
 from glimmer.capabilities.v1 import capabilities_pb2 as pb
 from glimmer.common.v1 import service_contract_pb2 as common
 from glimmer_cradle.cognition.ports import ResourceScope
+from glimmer_cradle.cognition.adapters.persistence.sqlite_knowledge_store import SqliteKnowledgeStore
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex, KnowledgeResourceSource
 from glimmer_cradle.cognition_worker.adapters.resource_client import ResourceClient
 from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
 async def run():
@@ -284,30 +296,42 @@ async def run():
     transport._channel = grpc.aio.insecure_channel(${JSON.stringify(supervisor.snapshot.control_endpoint!.slice(7))})
     adapter = ResourceClient(transport, trace_id="knowledge-resource-proof")
     scope = ResourceScope("provider", "scene", "conversation")
+    store = SqliteKnowledgeStore(Path(${JSON.stringify(root)}) / "state/cognition/knowledge.sqlite")
+    noop = lambda *args, **kwargs: None
+    observability = SimpleNamespace(logger=lambda _: SimpleNamespace(info=noop, warning=noop, debug=noop))
+    index = KnowledgeIndex(observability=observability)
+    index.bind_repository(store)
+    index.bind_resource_port(adapter, principal_id=${JSON.stringify(actualPrincipal)})
     try:
-        snapshot = await adapter.read("document", source_id="source:document", definition_revision="definition:1",
-            principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
+        await store.connect()
+        await index.register_resource_source(KnowledgeResourceSource("source:document", "document", "definition:1", scope))
+        reference = await index.collect_resource("source:document")
+        assert reference.revision == 1
+        snapshot = (await store.get_all_entries())[0]["resource"].snapshot
+        assert len(await index.get_knowledge(scope=scope)) == 1
+        assert await index.get_knowledge(scope=ResourceScope("provider", "scene", "other")) == []
         assert await adapter.is_current(snapshot, principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
         assert not await adapter.is_current(replace(snapshot, content=b"forged"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
         assert not await adapter.is_current(replace(snapshot, media_type="application/json"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
         assert not await adapter.is_current(snapshot, principal_id="foreign", scope=scope)
         assert not await adapter.is_current(snapshot, principal_id=${JSON.stringify(actualPrincipal)}, scope=ResourceScope("provider", "scene", "other"))
         print(json.dumps({"body": snapshot.content.decode(), "access": asdict(snapshot.access), "revision": snapshot.revision}))
-    finally: await transport.stop()
+    finally:
+        await store.close()
+        await transport.stop()
 asyncio.run(run())
 `;
       const collected = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', resourceScript],
         { cwd: repository, windowsHide: true, timeout: 30000 });
       const evidence = JSON.parse(collected.stdout);
       expect(evidence.body).toBe('真正授权的资料正文');
-      broker.revokeGrant(knowledgeGrant.grant_id);
       expect((await service.validateKnowledgeResource(create(ValidateKnowledgeResourceRequestSchema, {
         call: { generation: supervisor.snapshot.generation!, traceId: 'knowledge-revocation' },
         access: { accessId: evidence.access.access_id, sourceId: evidence.access.source_id, principalId: actualPrincipal,
           permissionRevision: evidence.access.permission_revision, collectedAtMs: BigInt(evidence.access.collected_at_ms), expiresAtMs: BigInt(evidence.access.expires_at_ms) },
         reference: knowledgePolicy.reference, contentRevision: evidence.revision, mediaType: 'text/plain',
         scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' },
-      }), actualPrincipal, new AbortController().signal)).current).toBe(false);
+      }), actualPrincipal, new AbortController().signal)).current).toBe(true);
       expect(journal.readOutbox(10)).toEqual([]);
     }
     const client = supervisor.createCognitionClient();
@@ -328,7 +352,7 @@ asyncio.run(run())
       if (state.terminal) break;
       await new Promise(resolve => setTimeout(resolve, 25));
     } while (Date.now() < deadline);
-    expect(state).toMatchObject({ state: revokeDuringRead ? PerceptionOperationState.FAILED : PerceptionOperationState.SUCCEEDED, terminal: true });
+    expect(state).toMatchObject({ state: revokeDuringRead || revokeKnowledgeDuringRead ? PerceptionOperationState.FAILED : PerceptionOperationState.SUCCEEDED, terminal: true });
     if (revokeDuringRead) {
       expect(reader).toHaveBeenCalledOnce(); expect(actions).toHaveLength(0); expect(requests).toHaveLength(1);
       expect(JSON.stringify(requests)).not.toContain('真正授权的资料正文');
@@ -336,8 +360,24 @@ asyncio.run(run())
       expect(journal.readOutbox(10)[0].invocation.state).toBe('succeeded');
       return;
     }
+    if (revokeKnowledgeDuringRead) {
+      expect(reader).toHaveBeenCalledTimes(2); expect(actions).toHaveLength(0); expect(requests).toHaveLength(1);
+      expect(JSON.stringify(requests[0])).toContain('真正授权的资料正文');
+      expect(journal.readOutbox(10)).toEqual([]);
+      const inspectKnowledge = `
+import sqlite3
+with sqlite3.connect(${JSON.stringify(path.join(root, 'state/cognition/knowledge.sqlite'))}) as db:
+    assert db.execute("SELECT enabled,deleted_at IS NOT NULL FROM knowledge_entry WHERE source='resource'").fetchone() == (0, 1)
+    assert db.execute("SELECT COUNT(*) FROM knowledge_resource_revision").fetchone() == (1,)
+    assert db.execute("SELECT COUNT(*) FROM knowledge_embedding").fetchone() == (0,)
+`;
+      await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', inspectKnowledge],
+        { cwd: repository, windowsHide: true, timeout: 30000 });
+      return;
+    }
     expect(reader).toHaveBeenCalledTimes(2); expect(actions).toHaveLength(1); expect(requests).toHaveLength(2);
-    expect(JSON.stringify(requests[0])).not.toContain('真正授权的资料正文');
+    expect(JSON.stringify(requests[0])).toContain('真正授权的资料正文');
+    expect(JSON.stringify(requests[0])).toContain('whole-resource.v1');
     expect(JSON.stringify(requests[1].messages.find(message => message.role === 'tool'))).toContain('真正授权的资料正文');
     expect(journal.readOutbox(10)).toEqual([]);
     await supervisor.stop();

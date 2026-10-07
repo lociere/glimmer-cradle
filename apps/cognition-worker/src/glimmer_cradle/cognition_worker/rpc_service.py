@@ -2100,6 +2100,8 @@ class CognitionHost:
                 self.config,
                 action_sink=self.kernel_client.send_action_command,
                 capability_rpc=self.kernel_client,
+                resource_rpc=self.kernel_client,
+                resource_principal_id=f"cognition:{self.generation}",
                 observability=FileObservability(),
                 model_invocation_recorder=record_model_invocation,
                 memory_jobs_owner=self.memory_jobs_owner,

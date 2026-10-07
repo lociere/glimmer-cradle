@@ -9,8 +9,11 @@ Knowledge、Plan、Synthesis 与历史查询已调用 Cognition/Conversation map
 非法重复请求不会获得 accepted 确认。原生模型事件、幂等键、scope、revision 和 Content digest 均在边界验证。
 ResourceClient 与 KernelGrpcClient 已消费独立 Knowledge 采集/证明复验 Service；Host 显式接纳及
 双 grant 为前置，global 不伪造 Conversation，普通 Step snapshot 不获得采集权限。实际边界及
-尚未接入的持久 Knowledge/Context 见
+持久采集/Context 接入见
 [采集实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
+生产 composition 已为 KnowledgeIndex 注入本代主体和 ResourceClient，使用受控登记/显式采集；
+live 检索与原生 Step/Reply 复验不放行撤权或未知证明。来源管理/重新授权产品入口仍待落位，
+旧 Knowledge v1 库拒绝启动时静默升级，恢复与迁移见[数据布局](../../docs/reference/data-layout.md#knowledge-v1-受控迁移与恢复)。
 后续切片把其余 client 接入真实 Host broker，
 继续收束兼容 RPC service 的其余主体。生产 Host 已使用 `readiness.py` 的逐项业务 ready 条件和
 `shutdown.py` 的有序幂等停机图；首条状态投影成功前不 ready，Shutdown ACK 后不再接纳新业务请求。

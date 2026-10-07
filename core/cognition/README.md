@@ -16,6 +16,9 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 ## 状态与恢复
 
 - Persona、State、Memory、Knowledge、Planning 与 Loop checkpoint 分库存储，各自拥有迁移和 revision 规则。
+- Knowledge schema 2 保存独立 Resource 来源/采集修订及实际 parser/chunk 版本；显式采集与
+  检索消费 live ResourcePort，不自动保存 Tool 结果。原生 Step/Reply 复验已使用的修订；
+  v1 的备份迁移只在 owner 停止后显式执行，见[认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
 - Planning 已持有不可变 GoalVersion/PlanVersion、显式 accepted 承诺和同事务 Job request outbox；
   JobPort 接纳只结束源投递，不代表完成条件成立。普通回复或工具调用不自动成为长期承诺；短程 ActionPlan 已删除，旧决策只读恢复。
   生产长期 Jobs wire 已接线；handler、完成条件评估、通知与下一次调度仍未接线，详见

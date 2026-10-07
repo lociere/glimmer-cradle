@@ -6,6 +6,10 @@ from typing import Protocol
 
 import numpy as np
 from glimmer_cradle.cognition.knowledge.revision import KnowledgeRevision
+from glimmer_cradle.cognition.knowledge.source import (
+    KnowledgeResourceCapture,
+    KnowledgeResourceSource,
+)
 
 
 class KnowledgeConflictError(ValueError):
@@ -13,6 +17,14 @@ class KnowledgeConflictError(ValueError):
 
 
 class KnowledgeStore(Protocol):
+    async def register_resource_source(self, source: KnowledgeResourceSource, *, expected_revision: int = 0) -> int: ...
+
+    async def get_resource_source(self, source_id: str) -> tuple[KnowledgeResourceSource, int, int] | None: ...
+
+    async def upsert_resource_entry(self, capture: KnowledgeResourceCapture, *, expected_source_revision: int, expected_entry_revision: int) -> KnowledgeRevision: ...
+
+    async def invalidate_resource_entry(self, reference: KnowledgeRevision) -> None: ...
+
     async def get_all_entries(self) -> list[dict]: ...
 
     async def replace_config_entries(self, entries: list[dict]) -> None: ...
