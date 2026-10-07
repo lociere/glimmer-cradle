@@ -620,6 +620,36 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5 短程 ActionPlan consumer-zero 与历史只读恢复（2026-10-07）
+
+输入 `510448af`，当前会话唯一写入 owner。沿已接通的生产 native chain 删除旧短程分类链：
+ActionPlan/分类枚举与解析器、旧 Goal、PlanningController.plan、Loop 非原生 reasoning/planner
+入口、LoopStep 分类字段、SkillRequest 意图/ActionEmitter 分支与对应 Continuity ACTION 写入。
+长期 GoalVersion/PlanVersion、显式承诺、源 outbox/Jobs 投递及明确 Plan/Synthesis 请求保留。
+
+旧 planning_decision 表/索引/migration 与数据不删；旧 record/latest 行动写入/重建 API 改为
+latest_decision_snapshot，只读不可变 PlanningDecisionSnapshot，原始未知字段不重新分类，不
+恢复可执行行动、权限或承诺。历史 fixture 双次重开/SQL dump 不变，旧表与长期失败回滚共存。
+取消隔离测试改用实际长期源 ACK 写入，不能为保持测试而保留旧 writer。
+
+所有 Core/Worker Loop 消费者测试迁入实际 native events；不引入分类兼容壳。明确 cloud policy
+与真实 capability exposure，禁止猜造能力、local-only/none 提档或执行异常变为成功沉默。
+唯一生产 Loop 不再装配无消费者的短程 InferenceController；显式请求用例仍保留自己的真实
+ModelPort 调用。公开 API 回退断言与原生取消/gRPC 切流门同步。
+
+收束时发现旧 Continuity 只 append 就完成 Turn，已增加真实 Log flush 屏障；独立 reader
+在等待中不能看到缓冲 REPLY/SILENCE，Turn 保持 running，提交失败落为 failed，不能假完成。
+
+固定行为候选验证：Core Cognition 336、Worker 139、真实受监督 Worker 集成 10、repo-checks 27
+PASS；Kernel 常规全量及 production bootstrap smoke PASS。常规 Kernel 仍跳过受监督 Worker/
+外部安装条件项，前者已另启实际集成门，外部安装仍未验证。根 pnpm typecheck/build、Ruff I/F、
+docs 111、编码、架构与 target-layout specification-only PASS，不等于最终 1,098 项清单通过。
+未改变 IDL/生成产物，复用上一候选未失效的 Contracts 证据，不启动生成器干扰活跃 Worker。
+没有收费模型请求、用户库迁移、推送或发布。SDK 仅去除已失效的分类器注释，兼容 wire
+与明确请求型 Skill 编排仍有实际消费者，不在本轮提前删除。
+剩余依赖继续为 Knowledge ingest/资源失效、持久 Run/Host 权限、Planning handler/完成条件
+和全目标目录/协议/App/SDK/产品/恢复验收；整个目标保持 active，非必要独立审查留完整候选。
+
 ### 阶段 5/6 原生方法/资源加载接线（2026-10-07）
 
 输入 `c0e94e41`，唯一写入 owner。保留三个独立目录；原生模型协议提供通用方法加载/资源读取

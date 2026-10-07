@@ -1484,10 +1484,23 @@ async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> N
     started = asyncio.Event()
     emitted: list[dict] = []
 
-    class _SlowReasoning:
-        async def request(self, _request, *, tier):
+    class _SlowModel:
+        async def events(self, _request):
             started.set()
             await asyncio.Future()
+            yield  # 被取消前不产生模型事件。
+
+    class _CloudPolicy:
+        def get_state(self):
+            return {"state": "engaged", "policy": {"model_tier": "cloud_allowed"}}
+
+    class _EmptyCapabilities:
+        async def expose(self, *, scope, run_id, step, remaining_calls):
+            from glimmer_cradle.cognition.ports import CapabilityExposure
+            return CapabilityExposure(run_id, step, ())
+
+        async def invoke(self, invocation):
+            raise AssertionError("没有曝光能力")
 
     queue = ObservationQueue(max_size=10)
     operations = PerceptionOperationRegistry()
@@ -1499,7 +1512,9 @@ async def test_second_ingress_cancels_the_real_cycle_through_grpc(tmp_path) -> N
         providers=[PerceptionProvider(queue)],
         experience_recorder=recorder,
         willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-        reasoning=_SlowReasoning(),
+        native_model=_SlowModel(),
+        capability_factory=lambda _: _EmptyCapabilities(),
+        activity_controller=_CloudPolicy(),
         action_sink=lambda command: _append_async(emitted, command),
         perception_operations=operations,
     )

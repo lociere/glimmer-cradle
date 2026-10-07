@@ -9,18 +9,15 @@ from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import cast
 
 import aiosqlite
 from glimmer_cradle.cognition.planning.commitment import Commitment, CommitmentStatus
-from glimmer_cradle.cognition.planning.goal import Goal, GoalVersion
-from glimmer_cradle.cognition.planning.plan import (
-    ActionPlan,
-    CapabilityKind,
-    CognitiveAction,
-    PlanVersion,
+from glimmer_cradle.cognition.planning.goal import GoalVersion
+from glimmer_cradle.cognition.planning.plan import PlanVersion
+from glimmer_cradle.cognition.planning.planning_store import (
+    PlanningConflictError,
+    PlanningDecisionSnapshot,
 )
-from glimmer_cradle.cognition.planning.planning_store import PlanningConflictError
 from glimmer_cradle.cognition.ports.job_port import JobReceipt, JobRequest
 
 # 普通 journal 启动不迁入长期承诺；首次显式接受才建立这个独立版本窗口。
@@ -117,39 +114,11 @@ class SqlitePlanningStore:
             if connection is not None:
                 await self._drain_cleanup(connection.close(), propagate_cancel=True)
 
-    async def record(self, goal: Goal, plan: ActionPlan) -> int:
-        async with self._transaction() as connection:
-            return await self._record(connection, goal, plan)
-
-    async def _record(
-        self, connection: aiosqlite.Connection, goal: Goal, plan: ActionPlan
-    ) -> int:
-        cursor = await connection.execute(
-            """
-            INSERT INTO planning_decision (
-                trace_id, scene_id, original_goal, planned_goal, action,
-                capability_kind, reason, confidence, planning_hint
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                goal.trace_id,
-                goal.scene_id,
-                plan.original_goal,
-                plan.goal,
-                plan.action,
-                plan.capability_kind,
-                plan.reason,
-                plan.confidence,
-                plan.planning_hint,
-            ),
-        )
-        return int(cursor.lastrowid or 0)
-
-    async def latest(self, *, trace_id: str) -> tuple[Goal, ActionPlan] | None:
+    async def latest_decision_snapshot(self, *, trace_id: str) -> PlanningDecisionSnapshot | None:
         async with self._connection_lock:
-            return await self._latest(trace_id=trace_id)
+            return await self._latest_decision_snapshot(trace_id=trace_id)
 
-    async def _latest(self, *, trace_id: str) -> tuple[Goal, ActionPlan] | None:
+    async def _latest_decision_snapshot(self, *, trace_id: str) -> PlanningDecisionSnapshot | None:
         connection = self._require_connection()
         cursor = await connection.execute(
             """
@@ -165,21 +134,17 @@ class SqlitePlanningStore:
         row = await cursor.fetchone()
         if row is None:
             return None
-        goal = Goal(
-            text=str(row["original_goal"]),
-            scene_id=str(row["scene_id"]),
+        return PlanningDecisionSnapshot(
             trace_id=str(row["trace_id"]),
-        )
-        plan = ActionPlan(
-            action=cast(CognitiveAction, row["action"]),
+            scene_id=str(row["scene_id"]),
             original_goal=str(row["original_goal"]),
-            goal=str(row["planned_goal"]),
-            capability_kind=cast(CapabilityKind, row["capability_kind"]),
+            planned_goal=str(row["planned_goal"]),
+            action=str(row["action"]),
+            capability_kind=str(row["capability_kind"]),
             reason=str(row["reason"]),
             confidence=float(row["confidence"]),
             planning_hint=row["planning_hint"],
         )
-        return goal, plan
 
     async def accept_commitment(
         self, commitment_id: str, plan: PlanVersion, *, due_at: int

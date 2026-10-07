@@ -8,85 +8,71 @@ import pytest
 from glimmer_cradle.cognition.adapters.persistence.sqlite_planning_store import (
     SqlitePlanningStore,
 )
-from glimmer_cradle.cognition.inference import InferenceResponse, ModelTier
 from glimmer_cradle.cognition.planning import (
-    ActionPlan,
     CommitmentStatus,
-    Goal,
     GoalVersion,
     PlanningConflictError,
     PlanningController,
     PlanVersion,
 )
 from glimmer_cradle.cognition.ports import JobReceipt
-from tests.conftest import RecordingObservability
 
 
-class _Reasoning:
-    async def request(self, request, *, tier):
-        assert tier == ModelTier.LOCAL_ONLY
-        assert request.metadata["trace_id"] == "trace-1"
-        return InferenceResponse(
-            text=(
-                '{"action":"skill_request","original_goal":"查天气",'
-                '"goal":"查询上海天气","capability_kind":"realtime_lookup",'
-                '"reason":"需要实时数据","confidence":0.91}'
-            ),
-            tier_used=ModelTier.LOCAL_ONLY,
+def _seed_decision_history(path: Path, *, trace_id: str = "trace-1") -> None:
+    """按旧真实 schema 制造历史 fixture；生产没有 journal 写入口。"""
+    migration = Path(__file__).resolve().parents[1] / "migrations" / "004-planning.sql"
+    with sqlite3.connect(path) as connection:
+        connection.executescript(migration.read_text(encoding="utf-8"))
+        connection.execute(
+            "INSERT INTO planning_decision (trace_id,scene_id,original_goal,planned_goal,"
+            "action,capability_kind,reason,confidence,planning_hint) VALUES(?,?,?,?,?,?,?,?,?)",
+            (trace_id, "scene-1", "查天气", "查询上海天气", "skill_request",
+             "realtime_lookup", "需要实时数据", 0.91, "旧提示"),
         )
 
 
-async def test_planning_decision_is_durable_and_recovers_by_trace(
-    tmp_path: Path,
-) -> None:
+async def test_decision_history_reopens_as_read_only_snapshot(tmp_path: Path) -> None:
+    from dataclasses import FrozenInstanceError
+
     path = tmp_path / "planning.sqlite"
+    _seed_decision_history(path)
+    with sqlite3.connect(path) as connection:
+        before = list(connection.iterdump())
+    for _ in range(2):
+        store = SqlitePlanningStore(path)
+        await store.connect()
+        try:
+            recovered = await store.latest_decision_snapshot(trace_id="trace-1")
+            assert recovered is not None
+            assert recovered.original_goal == "查天气"
+            assert recovered.scene_id == "scene-1"
+            assert recovered.planned_goal == "查询上海天气"
+            assert recovered.capability_kind == "realtime_lookup"
+            assert recovered.planning_hint == "旧提示"
+            with pytest.raises(FrozenInstanceError):
+                recovered.action = "reply"
+            assert await store.latest_decision_snapshot(trace_id="absent") is None
+            assert not hasattr(store, "record") and not hasattr(PlanningController, "plan")
+        finally:
+            await store.close()
+        with sqlite3.connect(path) as connection:
+            assert list(connection.iterdump()) == before
+
+
+async def test_unknown_historical_fields_are_not_reinterpreted(tmp_path: Path) -> None:
+    path = tmp_path / "planning.sqlite"
+    _seed_decision_history(path)
+    with sqlite3.connect(path) as connection:
+        connection.execute("UPDATE planning_decision SET action='old-unknown',capability_kind='old-kind'")
     store = SqlitePlanningStore(path)
     await store.connect()
-    controller = PlanningController(
-        _Reasoning(), observability=RecordingObservability(), store=store
-    )
-
-    plan = await controller.plan(
-        goal="  查天气  ",
-        scene_id="scene-1",
-        trace_id="trace-1",
-        tier=ModelTier.LOCAL_ONLY,
-    )
-    assert plan.action == "skill_request"
-    await store.close()
-
-    reopened = SqlitePlanningStore(path)
-    await reopened.connect()
-    recovered = await reopened.latest(trace_id="trace-1")
-    await reopened.close()
-
-    assert recovered is not None
-    goal, persisted = recovered
-    assert goal.text == "查天气"
-    assert goal.scene_id == "scene-1"
-    assert persisted.goal == "查询上海天气"
-    assert persisted.capability_kind == "realtime_lookup"
-
-
-async def test_planning_fallback_is_also_journaled(tmp_path: Path) -> None:
-    store = SqlitePlanningStore(tmp_path / "planning.sqlite")
-    await store.connect()
-    controller = PlanningController(
-        None, observability=RecordingObservability(), store=store
-    )
-
-    plan = await controller.plan(
-        goal="普通聊天",
-        scene_id="scene-2",
-        trace_id="trace-2",
-        tier=ModelTier.LOCAL_ONLY,
-    )
-    recovered = await store.latest(trace_id="trace-2")
-    await store.close()
-
-    assert plan.action == "reply"
-    assert recovered is not None
-    assert recovered[1].reason == "推理服务不可用，降级为普通回复路径"
+    try:
+        snapshot = await store.latest_decision_snapshot(trace_id="trace-1")
+        assert snapshot.action == "old-unknown" and snapshot.capability_kind == "old-kind"
+        assert await store.pending_job_requests() == []
+        assert not hasattr(snapshot, "reply")
+    finally:
+        await store.close()
 
 
 def _long_plan(*, version: int = 1, scope: str = "scene-1") -> PlanVersion:
@@ -127,9 +113,7 @@ async def test_accepted_commitment_and_source_survive_restart_without_completing
             ).fetchone()[0]
             == 0
         )
-    controller = PlanningController(
-        None, observability=RecordingObservability(), store=store
-    )
+    controller = PlanningController(store=store)
     accepted = await controller.accept_commitment(
         "commitment-1", _long_plan(), due_at=5000
     )
@@ -334,12 +318,10 @@ async def test_first_failed_acceptance_rolls_back_lazy_schema_and_preserves_jour
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "planning.sqlite"
+    _seed_decision_history(path, trace_id="old-trace")
     store = SqlitePlanningStore(path)
     await store.connect()
     try:
-        await store.record(
-            Goal("普通聊天", trace_id="old-trace"), ActionPlan.reply("普通聊天")
-        )
         with pytest.raises(PlanningConflictError):
             await store.accept_commitment(
                 "commitment-2", _long_plan(version=2), due_at=2
@@ -349,7 +331,7 @@ async def test_first_failed_acceptance_rolls_back_lazy_schema_and_preserves_jour
                 "SELECT name FROM sqlite_master WHERE name LIKE 'planning_%' AND type='table'"
             ).fetchall() == [("planning_decision",)]
         assert await store.pending_job_requests() == []
-        assert await store.latest(trace_id="old-trace") is not None
+        assert await store.latest_decision_snapshot(trace_id="old-trace") is not None
         await store.accept_commitment("commitment-1", _long_plan(), due_at=1)
         assert _counts(path) == (1, 1, 1, 1)
         oversized = replace(_long_plan(version=2), steps=("大" * 30_000,))
@@ -430,9 +412,7 @@ async def test_jobs_commit_reply_loss_then_source_restart_replays_same_request(
     await store.connect()
     await store.accept_commitment("commitment-1", _long_plan(), due_at=123)
     source = (await store.pending_job_requests())[0]
-    controller = PlanningController(
-        None, observability=RecordingObservability(), store=store
-    )
+    controller = PlanningController(store=store)
     receiver = _DurableJobReceiver(receiver_path, lose_reply=True)
     with pytest.raises(ConnectionError):
         await controller.deliver_jobs(receiver)
@@ -441,9 +421,7 @@ async def test_jobs_commit_reply_loss_then_source_restart_replays_same_request(
     reopened = SqlitePlanningStore(path)
     await reopened.connect()
     try:
-        controller = PlanningController(
-            None, observability=RecordingObservability(), store=reopened
-        )
+        controller = PlanningController(store=reopened)
         assert await controller.deliver_jobs(_DurableJobReceiver(receiver_path)) == 1
         assert await controller.deliver_jobs(_DurableJobReceiver(receiver_path)) == 0
         with sqlite3.connect(receiver_path) as connection:
@@ -480,7 +458,7 @@ async def test_unsupported_or_partial_long_term_schema_never_auto_repairs(
         assert list(connection.iterdump()) == snapshot
 
 
-async def test_cancelled_write_and_repeated_cancel_drain_before_journal_or_read(
+async def test_cancelled_write_and_repeated_cancel_drain_before_ack_or_read(
     tmp_path: Path, monkeypatch
 ) -> None:
     path = tmp_path / "planning.sqlite"
@@ -507,25 +485,29 @@ async def test_cancelled_write_and_repeated_cancel_drain_before_journal_or_read(
 
     monkeypatch.setattr(store, "_persist_plan", paused_plan)
     monkeypatch.setattr(connection, "rollback", paused_rollback)
+    pending = (await store.pending_job_requests())[0]
     write = asyncio.create_task(
         store.accept_commitment("commitment-2", _long_plan(version=2), due_at=2)
     )
     await asyncio.wait_for(inserted.wait(), 2)
-    journal = asyncio.create_task(
-        store.record(Goal("journal", trace_id="trace-3"), ActionPlan.reply("journal"))
+    ack = asyncio.create_task(
+        store.acknowledge_job_request(
+            pending, JobReceipt("job-1", "accepted", 1)
+        )
     )
     read = asyncio.create_task(store.load_plan("plan-1", 2))
     write.cancel()
     await asyncio.wait_for(rollback_entered.wait(), 2)
     write.cancel()
     await asyncio.sleep(0)
-    assert not journal.done() and not read.done() and not write.done()
-    # 独立连接也只能看到已提交的 v1，不能被 journal 偷偷提交 v2。
+    assert not ack.done() and not read.done() and not write.done()
+    # 独立连接也只能看到已提交的 v1，不能被 ACK 偷偷提交 v2。
     assert _counts(path) == (1, 1, 1, 1)
     release_rollback.set()
     with pytest.raises(asyncio.CancelledError):
         await write
-    assert await journal > 0 and await read is None
+    assert await ack is None and await read is None
+    assert await store.pending_job_requests() == []
     assert _counts(path) == (1, 1, 1, 1)
     monkeypatch.setattr(store, "_persist_plan", original_plan)
     await store.accept_commitment("commitment-2", _long_plan(version=2), due_at=2)

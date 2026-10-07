@@ -33,7 +33,7 @@ class ActionEmitter:
         self._observability = observability
         self._logger = observability.logger("cognition_action_emitter")
 
-    async def emit(self, arbitration: ArbitrationResult | None, *, source_fact_id: str | None = None) -> int:
+    async def emit(self, arbitration: ArbitrationResult | None) -> int:
         if self._sink is None or arbitration is None:
             return 0
         emitted = 0
@@ -41,8 +41,6 @@ class ActionEmitter:
             command = self.to_command(intent)
             if command is None:
                 continue
-            if command.get("action_type") == "skill_request" and source_fact_id:
-                command["source_fact_id"] = source_fact_id
             try:
                 await self._sink(command)
                 emitted += 1
@@ -55,40 +53,6 @@ class ActionEmitter:
 
     def to_command(self, intent: Intent) -> dict | None:
         payload = intent.payload if isinstance(intent.payload, dict) else {}
-        if intent.type.value == "action" and payload.get("action_type") == "skill_request":
-            scene_id = payload.get("scene_id", "")
-            goal = payload.get("original_goal", "")
-            if not isinstance(scene_id, str) or not scene_id:
-                return None
-            if not isinstance(goal, str) or not goal.strip():
-                return None
-            return {
-                "trace_id": payload.get("trace_id", ""),
-                "action_type": "skill_request",
-                "target": {"scene_id": scene_id},
-                "payload": {
-                    "skill_request": {
-                        "original_goal": goal,
-                        "reason": payload.get("reason"),
-                        "capability_kind": payload.get("capability_kind"),
-                        "confidence": payload.get("confidence"),
-                        "planning_hint": payload.get("planning_hint"),
-                        "conversation": {
-                            "scene_id": scene_id,
-                            "conversation_id": payload.get("conversation_id", ""),
-                            "continuity_id": payload.get("continuity_id", ""),
-                            "thread_id": payload.get("thread_id", "main"),
-                            "interaction_id": payload.get("trace_id", ""),
-                            "recall_scope": payload.get(
-                                "recall_scope", "conversation_private"
-                            ),
-                            "disclosure_scope": payload.get(
-                                "disclosure_scope", "conversation_private"
-                            ),
-                        },
-                    }
-                },
-            }
         if intent.type.value != "reply":
             return None
         text = payload.get("text", "")
@@ -131,45 +95,8 @@ class CycleContinuity:
 
     async def commit(self, turn: Any) -> None:
         self._write_outcome(turn)
-
-    async def record_action(self, turn: Any) -> str | None:
-        accepted = turn.arbitration.accepted if turn.arbitration is not None else ()
-        action = next((intent for intent in accepted if intent.type.value == "action"), None)
-        if action is None:
-            return None
-        payload = action.payload if isinstance(action.payload, dict) else {}
-        causation = tuple(
-            moment_id
-            for moment_id in (*turn.perception_moment_ids, turn.emotion_moment_id, *turn.native_result_fact_ids)
-            if moment_id
-        )
-        moment = self._recorder.record(
-            MomentKind.ACTION,
-            content={
-                "action_type": payload.get("action_type", ""),
-                "scene_id": payload.get("scene_id") or turn.turn.scene_id,
-                "original_goal": payload.get("original_goal", ""),
-                "capability_kind": payload.get("capability_kind"),
-                "reason": payload.get("reason"),
-                "planning_hint": payload.get("planning_hint"),
-                "operation_id": f"action:{turn.turn.turn_id}",
-            },
-            scene_id=(payload.get("scene_id") or turn.turn.scene_id) or None,
-            conversation_id=turn.turn.conversation_id,
-            continuity_id=turn.turn.continuity_id,
-            thread_id=turn.turn.thread_id,
-            interaction_id=turn.turn.turn_id,
-            trace_id=turn.turn.turn_id or None,
-            causation_ids=causation,
-            recall_scope=turn.turn.recall_scope,
-            disclosure_scope=turn.turn.disclosure_scope,
-            importance=0.55,
-            idempotency_key=f"action-request:{turn.turn.turn_id}",
-        )
-        turn.action_moment_id = moment.moment_id if moment is not None else None
-        if moment is not None:
-            await self._recorder.flush()
-        return turn.action_moment_id
+        # Turn 完成必须晚于真实 Log 提交，缓冲 append 不能充当 durable receipt。
+        await self._recorder.flush()
 
     def _write_outcome(self, turn: Any) -> str | None:
         causation = tuple(
@@ -201,7 +128,7 @@ class CycleContinuity:
                     importance=0.6,
                 )
                 return moment.moment_id if moment is not None else None
-        if turn.action_moment_id is not None or not turn.perception_moment_ids:
+        if not turn.perception_moment_ids:
             return None
         observe_only = bool(turn.response_policies) and all(
             policy == "observe_only" for policy in turn.response_policies
@@ -211,14 +138,6 @@ class CycleContinuity:
             "reason": "observe_only" if observe_only else "no_reply",
             "response_policy": "observe_only" if observe_only else "reply_allowed",
         }
-        if turn.action_plan is not None and turn.action_plan.action == "noop" and not observe_only:
-            content.update(
-                {
-                    "reason": "action_plan_noop",
-                    "action_plan_reason": turn.action_plan.reason,
-                    "confidence": turn.action_plan.confidence,
-                }
-            )
         self._recorder.record(
             MomentKind.SILENCE,
             content=content,

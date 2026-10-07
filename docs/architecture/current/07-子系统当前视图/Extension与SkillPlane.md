@@ -81,7 +81,9 @@ invocation ID；Cognition 行动以 operation/tool 索引派生 ID，无稳定�
 生成新 ID，不声称能识别任意调用方重试。trace 仍沿用当前 Kernel 上下文或新建。策略拒绝、成功与
 不明结果如实诊断，日志故障不覆写已提交的执行事实。
 
-`CapabilityCatalogAdapter` 的旧分组投影 只包含 character audience 的 skill/tool/resource/prompt；character skill 下显式标为 `user`、`host`、`adapter`、`renderer` 或 `extension` 的子项也会被过滤。`SkillPlanningAppService` 当前只把 character audience 且 ready 的 tools 投影给 Cognition 的 `agent_plan` RPC，并过滤掉目录外建议；执行建议仍走 `SkillInvocationGateway`。普通聊天主循环已通过 `ActionCommand.action_type=skill_request` 接入 Skill Plane：Cognition 的结构化 ActionPlan 判断当前目标需要能力后只发行动意图，Kernel `SkillActionController` 负责 catalog 投影、规划、Policy/Gateway 调用、结果归一化、`agent_synthesis` 回注和最终回复投递。Renderer、Extension 和 Cognition 都不能绕过 Gateway。
+`CapabilityCatalogAdapter` 的旧分组投影 只包含 character audience 的 skill/tool/resource/prompt；character skill 下显式标为 `user`、`host`、`adapter`、`renderer` 或 `extension` 的子项也会被过滤。`SkillPlanningAppService` 当前只把 character audience 且 ready 的 tools 投影给 Cognition 的 `agent_plan` RPC，并过滤掉目录外建议；执行建议仍走 `SkillInvocationGateway`。普通聊天主循环直接消费原生模型事件，通过 typed Capability Service 曝光、调用和加载，
+ACTION 刷盘并接纳真实结果后才续接模型；短程 ActionPlan 及其 SkillRequest 发送分支已删除。
+Kernel `SkillActionController` 的明确请求型 Plan/Synthesis 编排仍有消费者，不能成为聊天旁路。Renderer、Extension 和 Cognition 都不能绕过 Gateway。
 
 `SkillCatalogSnapshot.providerRuntimes` 是当前统一 provider 运行态投影。MCP provider 会显式上报连接状态；Extension provider 则由 `ExtensionHostAppService` 把 `ExtensionRuntimeProjection` 的 lifecycle、Capability Graph 与 diagnostics 映射进同一快照。因此没有人物 skill 的管理型扩展也会作为 `provider.kind=extension` 出现在能力目录中，而不是只能在扩展管理页单独查看。
 

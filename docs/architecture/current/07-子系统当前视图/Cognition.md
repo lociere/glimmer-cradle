@@ -73,10 +73,11 @@ Perception
 未完成流、预算、重复调用、未知副作用、tier 与意愿拒绝均失败关闭；没有本地 stream 时不提升为云。
 具体接线和未完成窗口见[唯一认知循环](../../implementation/Cognition认知核实现.md#唯一认知循环)。
 
-`Intent.initiative` 区分响应性意图与主动意图。来自已准入、`address_mode=direct` 的 `PerceptionEvent` 且已经过 Deliberation 的回复、澄清或 Skill 请求属于 `reactive`，不再被用于角色自发行为的 willingness/activity 闸重复压制；ambient 感知以及 drive、affect 等角色自发行为属于 `proactive`，仍必须通过连续意愿阈值和 `CognitiveActivityPolicy.allows_proactive`。Skill 副作用无论来源都继续由 Kernel Skill Policy 与 Invocation Gateway 决定。
+`Intent.initiative` 区分响应性意图与主动意图。来自已准入、`address_mode=direct` 的 `PerceptionEvent` 且已经过 Deliberation 的回复或澄清属于 `reactive`，不再被用于角色自发行为的 willingness/activity 闸重复压制；ambient 感知以及 drive、affect 等角色自发行为属于 `proactive`，仍必须通过连续意愿阈值和 `CognitiveActivityPolicy.allows_proactive`。Skill 副作用无论来源都继续由 Kernel Skill Policy 与 Invocation Gateway 决定。
 
 明确请求型 `agent_plan` / `agent_synthesis` 仍服务未迁移的 Kernel 编排，不能重新成为生产聊天旁路。
-ActionPlan 非生产消费者与旧 journal 恢复保留有删除条件的窗口；长程 Planning 不随其删除。
+短程 ActionPlan 和非原生 Loop 入口已删除，测试已迁原生事件；旧 journal 只恢复只读
+`PlanningDecisionSnapshot`，不重建行动。长期 Planning/承诺与请求型 Plan/Synthesis 保留实际消费者。
 
 感知进入 Cognition `AttentionController` 时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
 
@@ -84,7 +85,7 @@ ActionPlan 非生产消费者与旧 journal 恢复保留有删除条件的窗口
 
 Planning 已持久保存不可变目标/计划版本、完成条件、显式 accepted 承诺与同事务 Job request outbox；
 重复身份不创建第二份，首次 due time 与 scope 不可悄悄替换。通过 `JobPort` 得到持久接纳才结束源
-投递，回执不表示目标 completed；普通本拍 `ActionPlan` 不自动升级为长期承诺。目标配置 Host
+投递，回执不表示目标 completed；普通模型回复或工具调用不自动升级为长期承诺。目标配置 Host
 已通过生产 Worker RPC 接真实 Planning store 与 Jobs 接纳，原 due/首次预算和 ACK 丢失重启已验证；
 handler 尚未装配，待办只排队、状态不假 ACK，Host 如实降级。完成条件评估、通知与再调度
 仍未装配，不能认作完整长期承诺链路。

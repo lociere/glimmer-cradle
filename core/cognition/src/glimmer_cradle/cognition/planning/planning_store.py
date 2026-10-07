@@ -1,13 +1,28 @@
-"""Persistence port for cognition planning decisions."""
+"""Persistence port for long-term planning and read-only decision history."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from glimmer_cradle.cognition.planning.commitment import Commitment
-from glimmer_cradle.cognition.planning.goal import Goal
-from glimmer_cradle.cognition.planning.plan import ActionPlan, PlanVersion
+from glimmer_cradle.cognition.planning.plan import PlanVersion
 from glimmer_cradle.cognition.ports.job_port import JobReceipt, JobRequest
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningDecisionSnapshot:
+    """旧 journal 的原始只读投影；字段不解释为当前能力、权限或行动。"""
+
+    trace_id: str
+    scene_id: str
+    original_goal: str
+    planned_goal: str
+    action: str
+    capability_kind: str
+    reason: str
+    confidence: float
+    planning_hint: str | None
 
 
 class PlanningConflictError(ValueError):
@@ -19,9 +34,9 @@ class PlanningStore(Protocol):
 
     async def close(self) -> None: ...
 
-    async def record(self, goal: Goal, plan: ActionPlan) -> int: ...
-
-    async def latest(self, *, trace_id: str) -> tuple[Goal, ActionPlan] | None: ...
+    async def latest_decision_snapshot(
+        self, *, trace_id: str
+    ) -> PlanningDecisionSnapshot | None: ...
 
     async def accept_commitment(
         self, commitment_id: str, plan: PlanVersion, *, due_at: int

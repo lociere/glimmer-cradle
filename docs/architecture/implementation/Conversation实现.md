@@ -37,9 +37,9 @@ fail closed，不能静默改写既有作用域；Kernel Application Runtime 停
 `ConversationTurn` 保存一次完整交互周期的稳定 identity、输入摘要、权限上下文、状态与修订。`TurnController` 通过
 `SqliteTurnStore` 提供幂等接纳、乐观并发和 `accepted → running → completed/interrupted/failed` 合法转换；
 进程重启会把遗留 active Turn 明确收束为 `interrupted/process_restarted`。普通回复或沉默在 Log 提交后完成
-Turn；能力请求保持 running，直到原 Action/已接纳 Execution Result/Reply 持久并 flush 后完成。Cognition `CycleTurn`
-只保存一拍内的 perception、ActionPlan、intent 和 arbitration，并引用持久 Turn；模型推理 Step 在阶段 5
-留在 Cognition Loop，不再把 Turn 和 Step 当同一种状态。
+Turn；能力请求保持 running，直到原 Action/已接纳 Execution Result/Reply 持久并 flush 后完成。Cognition `LoopStep`
+只保存一拍内的 perception、原生结果事实引用、reply、intent 和 arbitration，并引用持久 Turn；
+短程 ActionPlan 已删除，模型推理 Step 留在 Cognition Loop，不把 Turn 和 Step 当同一种状态。
 
 ## Interaction 与 Delivery
 

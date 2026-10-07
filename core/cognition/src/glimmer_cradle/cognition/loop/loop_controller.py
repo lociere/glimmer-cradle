@@ -13,7 +13,6 @@ from glimmer_cradle.cognition.attention import (
 )
 from glimmer_cradle.cognition.context import RecentExperienceSource
 from glimmer_cradle.cognition.inference import (
-    InferenceController,
     InferenceRequest,
     InferenceStep,
     InferenceUnavailable,
@@ -45,7 +44,6 @@ from glimmer_cradle.cognition.perception import (
     ObservationQueue,
     PerceptionOperationRegistry,
 )
-from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
 from glimmer_cradle.cognition.ports.capability_port import (
     LOAD_SKILL,
@@ -151,8 +149,6 @@ class LoopController:
         willingness_config: WillingnessConfig | None = None,
         default_tick_interval_ms: int = 5000,
         action_sink=None,
-        reasoning: InferenceController | None = None,
-        planning_controller: PlanningController | None = None,
         native_model: RealtimeModelPort | None = None,
         capability_factory: Callable[[dict], CapabilityPort] | None = None,
         checkpoint_store: LoopCheckpointStore | None = None,
@@ -197,9 +193,7 @@ class LoopController:
             observability=observability,
         )
         self._deliberation = DeliberationController(
-            reasoning=reasoning,
             native_inference=self._deliberate_native if native_model is not None else None,
-            planning_controller=planning_controller,
             memory=memory,
             knowledge_base=knowledge_base,
             conversation=conversation,
@@ -699,20 +693,12 @@ class LoopController:
                 self._perception_operations.mark_running(trace_id, task)
 
         self._turn.broadcast = broadcast_item
-        # Deliberate：角色上下文进入原生 Loop；未迁移消费者保留旧规划。
+        # Deliberate：角色上下文进入唯一原生 Loop。
         with self._observability.span("deliberate") as s_delib:
-            self._turn.skill_request = None
-            self._turn.action_plan = None
             self._turn.reply = await self._deliberation.deliberate(
                 broadcast_item, self._turn
             )
             s_delib.set_attribute("generated_reply", self._turn.reply is not None)
-            s_delib.set_attribute("requested_skill", self._turn.skill_request is not None)
-            s_delib.set_attribute(
-                "action_plan",
-                self._turn.action_plan.action if self._turn.action_plan is not None else "",
-            )
-
         # ── Intend（5.7 Volition 连续意愿 + 仲裁）─────────────────────────
         with self._observability.span("intend") as s_intend:
             intents = self._build_intents(broadcast_item, await self._ws.snapshot())
@@ -730,8 +716,7 @@ class LoopController:
 
         # Act：只发送通过仲裁的 ActionCommand。
         with self._observability.span("act") as s_act:
-            await self._continuity.record_action(self._turn)
-            emitted = await self._action_emitter.emit(self._turn.arbitration, source_fact_id=self._turn.action_moment_id)
+            emitted = await self._action_emitter.emit(self._turn.arbitration)
             s_act.set_attribute("actions_emitted", emitted)
             if emitted:
                 if self._activity is not None and hasattr(self._activity, "record_self_activity"):
@@ -743,8 +728,7 @@ class LoopController:
             await self._continuity.commit(self._turn)
             s_cons.set_attribute("experience_committed", True)
 
-        if self._turn.skill_request is None:
-            await self._finish_active_turn("completed", None)
+        await self._finish_active_turn("completed", None)
 
         await self._consume_ephemeral_broadcast(broadcast_item)
         self._observability.gauge("cognition.tick_alive", 1.0)
@@ -870,29 +854,6 @@ class LoopController:
         bc = broadcast_item.content if isinstance(broadcast_item.content, dict) else {}
         if broadcast_item.source == "perception":
             initiative = "reactive" if bc.get("address_mode") == "direct" else "proactive"
-            if self._turn.skill_request is not None:
-                return [self._make_intent(
-                    type="action",
-                    initiative=initiative,
-                    willingness=w,
-                    payload={
-                        "action_type": "skill_request",
-                        "scene_id": bc.get("scene_id", ""),
-                        "conversation_id": bc.get("conversation_id", ""),
-                        "continuity_id": bc.get("continuity_id", ""),
-                        "thread_id": bc.get("thread_id", "main"),
-                        "recall_scope": bc.get("recall_scope", "conversation_private"),
-                        "disclosure_scope": bc.get("disclosure_scope", "conversation_private"),
-                        "actor_id": bc.get("actor_id"),
-                        "actor_name": bc.get("actor_name"),
-                        "trace_id": bc.get("trace_id", ""),
-                        "original_goal": self._turn.skill_request.get("original_goal", ""),
-                        "reason": self._turn.skill_request.get("reason"),
-                        "capability_kind": self._turn.skill_request.get("capability_kind"),
-                        "confidence": self._turn.skill_request.get("confidence"),
-                        "planning_hint": self._turn.skill_request.get("planning_hint"),
-                    },
-                )]
             # 无生成、越界或推理失败时不产生 reply intent。
             if not self._turn.reply:
                 return []

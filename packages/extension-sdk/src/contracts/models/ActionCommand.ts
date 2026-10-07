@@ -75,7 +75,7 @@ export interface SkillRequestPayload {
    */
   original_goal: string;
   /**
-   * Cognition 结构化 ActionPlan 判定的能力类型，用于规划和审计，不作为授权依据。
+   * 兼容请求的能力类型提示，用于规划和审计，不作为授权依据。
    */
   capability_kind:
     | 'web_navigation'

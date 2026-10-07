@@ -147,16 +147,17 @@ data/observability/model-invocations/captures/<UTC-date>/trace-<trace-id>/
   99-other/
 ```
 
-分类由调用方通过 `capture_category` 显式声明，不由日志层猜测：`cognitive_action_plan` 属于动作决策，`agent_plan` 属于 Skill 规划，`reply` 与 `agent_synthesis` 属于最终回复，`memory_consolidation` 属于记忆整理，未声明的调用进入 `99-other`。
+分类由调用方通过 `capture_category` 显式声明，不由日志层猜测：旧 `cognitive_action_plan` 历史记录保留为动作决策，但短程分类调用入口已删除；`agent_plan` 属于 Skill 规划，`reply` 与 `agent_synthesis` 属于最终回复，`memory_consolidation` 属于记忆整理，未声明的调用进入 `99-other`。
 
 `timeline.md` 是人类阅读入口，跨分类按完成顺序列出 category、purpose、model、outcome、耗时与输入/输出链接；`00-manifest.json` 是单次调用的结构化摘要。数字前缀在整个 Trace 内全局递增，所以分类不会破坏实际调用顺序。`model-invocations/records/*.jsonl` 仍是查询与索引事实源，Markdown 只是可再生成的人类投影。
 
 当前真实接入路径至少覆盖：
-- `InferenceController -> CloudReasoning -> LLMEngine`
+- `LoopController -> ModelClient -> LLMEngine.stream_native`
+- 显式请求型推理/生成调用
 - `AgentPlanUseCase`
 - `AgentSynthesisUseCase`
 
-模型调用记录的 `trace_id` 必须继承触发本次推理的感知或 Skill 调用 trace；`cognitive_action_plan -> reply` 以及 `agent_plan -> skill invocation -> agent_synthesis` 不得在 LLM adapter 内重新生成关联 ID。
+模型调用记录的 `trace_id` 必须继承触发本次推理的感知或 Skill 调用 trace；原生 Loop 的各 Step/reply 以及明确请求型 `agent_plan -> skill invocation -> agent_synthesis` 不得在 LLM adapter 内重新生成关联 ID。
 
 完整 prompt、provider payload 和 raw response 不得进入普通应用日志、DLQ、bundle 或文档，除非显式启用 full capture 且走受控导出。
 

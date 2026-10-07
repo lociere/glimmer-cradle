@@ -142,7 +142,8 @@ MCP 接入 adapter 将 prompt text 转为方法材料、resource text 转为保�
 已提交的确认拒绝投影为已知 failed 结果，不伪造成功；派发后未知仍通过 typed recovery error
 要求可信对账，不能当 failed 重跑。协议和 Worker 接纳链见
 [Contract Spine 实现](Protocol契约层实现.md)及[Cognition 实现](Cognition认知核实现.md#唯一认知循环)。
-普通聊天已切原生模型/Tool 续接；ActionPlan 非生产入口和明确 Plan/Synthesis 请求仍留删除窗口。
+普通聊天已切原生模型/Tool 续接，短程 ActionPlan 及非原生 Loop 入口已删除；
+明确 Plan/Synthesis 请求仍有兼容编排消费者，按 consumer-zero 收束，不恢复为聊天旁路。
 App owner、旧 SDK 分组在阶段 9/11/12 consumer-zero 后迁移/删除。
 
 User 来源整体 degraded 保留坏文件诊断；成功逐文件加载的静态方法由接入事实

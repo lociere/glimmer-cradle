@@ -1101,8 +1101,8 @@ def test_arbitrate_proactive_blocked_dormant_scenario() -> None:
 async def test_loop_intend_with_perception_creates_reply_intent(tmp_path) -> None:
     """LoopController 接 Volition 后：perception 广播 → reply intent。"""
     from glimmer_cradle.cognition.attention import AttentionController, make_attention
-    from glimmer_cradle.cognition.inference import InferenceResponse
     from glimmer_cradle.cognition.loop import Provider
+    from tests.test_cycle_controller import _CloudActivity, _EmptyCapabilities
 
     class _Fixed(Provider):
         name = "perception"
@@ -1116,6 +1116,9 @@ async def test_loop_intend_with_perception_creates_reply_intent(tmp_path) -> Non
                         "address_mode": "direct",
                         "familiarity": 8,
                         "scene_id": "s",
+                        "conversation_id": "conversation:s",
+                        "continuity_id": "continuity:user",
+                        "trace_id": "trace-native-volition",
                     },
                     salience=0.9,
                     clock=CLOCK,
@@ -1123,9 +1126,10 @@ async def test_loop_intend_with_perception_creates_reply_intent(tmp_path) -> Non
                 )
             ]
 
-    class _FakeReasoning:
-        async def request(self, req, *, tier):
-            return InferenceResponse(text="你好呀", tier_used=tier)
+    class _TextModel:
+        async def events(self, req):
+            yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": "你好呀"})
+            yield ModelEvent(1, ModelEventKind.COMPLETED)
 
     ws = AttentionController(capacity=3, clock=CLOCK)
     recorder = build_experience_recorder(tmp_path)
@@ -1140,7 +1144,9 @@ async def test_loop_intend_with_perception_creates_reply_intent(tmp_path) -> Non
             providers=[_Fixed()],
             experience_recorder=recorder,
             willingness_config=cfg,
-            reasoning=_FakeReasoning(),
+            native_model=_TextModel(),
+            capability_factory=lambda _: _EmptyCapabilities(),
+            activity_controller=_CloudActivity(),
             clock=CLOCK,
             ids=IDS,
             observability=OBSERVABILITY,

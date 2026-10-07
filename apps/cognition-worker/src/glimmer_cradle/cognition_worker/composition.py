@@ -37,7 +37,6 @@ from glimmer_cradle.cognition.context import (
     RelationshipSource,
 )
 from glimmer_cradle.cognition.inference import (
-    InferenceController,
     InferenceSettings,
     ModelMessage,
     ModelPort,
@@ -71,7 +70,6 @@ from glimmer_cradle.cognition.persona import (
     PersonaCompiler,
     SafetySettings,
 )
-from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
     AgentPlanOutput,
@@ -98,7 +96,6 @@ from glimmer_cradle.cognition_worker.adapters.capability_client import (
     CapabilityRpcPort,
 )
 from glimmer_cradle.cognition_worker.adapters.model_client import (
-    CloudReasoning,
     EmbeddingEngine,
     EmbeddingSettings,
     LLMEngine,
@@ -517,15 +514,6 @@ def compose_cognition(
         KnowledgeSource(knowledge_base),
         RelationshipSource(relationship_repository),
     ], observability=observability)
-    reasoning = InferenceController(
-        cloud=CloudReasoning(llm_engine), local=None, observability=observability
-    )
-    planning_controller = PlanningController(
-        reasoning,
-        observability=observability,
-        store=planning_store,
-    )
-
     episode_projection = EpisodeProjection(
         cognition_state_dir / "projections" / "episodes.db",
         conversation_recorder,
@@ -577,8 +565,6 @@ def compose_cognition(
         emotion_system=character_session.emotion_system,
         default_tick_interval_ms=cognition_config.default_tick_interval_ms,
         action_sink=action_sink,
-        reasoning=reasoning,
-        planning_controller=planning_controller,
         native_model=ModelClient(llm_engine),
         capability_factory=capability_factory,
         checkpoint_store=checkpoint_store,

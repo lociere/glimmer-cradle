@@ -6,18 +6,27 @@ import asyncio
 from pathlib import Path
 
 import pytest
-
-from glimmer_cradle.cognition.loop import LoopController as _CycleController, PerceptionProvider as _PerceptionProvider
-from glimmer_cradle.cognition.loop import Provider
 from glimmer_cradle.cognition.attention import (
     Attention,
+)
+from glimmer_cradle.cognition.attention import (
     AttentionController as _AttentionController,
+)
+from glimmer_cradle.cognition.attention import (
     make_attention as _make_attention,
 )
 from glimmer_cradle.cognition.context import RecentExperienceSource
+from glimmer_cradle.cognition.inference import (
+    InferenceUnavailable,
+    ModelEvent,
+    ModelEventKind,
+)
+from glimmer_cradle.cognition.loop import LoopController as _CycleController
+from glimmer_cradle.cognition.loop import PerceptionProvider as _PerceptionProvider
+from glimmer_cradle.cognition.loop import Provider
+from glimmer_cradle.cognition.ports import CapabilityExposure
 from glimmer_cradle.conversation import ConversationLog, SqliteTurnStore, TurnController
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
-from glimmer_cradle.cognition.inference import ModelTier, InferenceResponse, InferenceUnavailable
 
 
 def AttentionController(*args, **kwargs):
@@ -28,6 +37,10 @@ def AttentionController(*args, **kwargs):
 def make_attention(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
     kwargs.setdefault("ids", IDS)
+    content = kwargs.get("content")
+    if kwargs.get("source") == "perception" and isinstance(content, dict) and content.get("scene_id"):
+        content.setdefault("conversation_id", f"conversation:{content['scene_id']}")
+        content.setdefault("continuity_id", "continuity:fixture:user")
     return _make_attention(*args, **kwargs)
 
 
@@ -41,6 +54,9 @@ def CycleController(*args, **kwargs):
     kwargs.setdefault("clock", CLOCK)
     kwargs.setdefault("ids", IDS)
     kwargs.setdefault("observability", OBSERVABILITY)
+    if kwargs.get("native_model") is not None:
+        kwargs.setdefault("capability_factory", lambda _: _EmptyCapabilities())
+        kwargs.setdefault("activity_controller", _CloudActivity())
     return _CycleController(*args, **kwargs)
 
 
@@ -48,58 +64,40 @@ def read_ledger_moments(path):
     return ConversationLog(path).query()
 
 
-class _FakeReasoning:
-    """假 InferenceController —— request 返回固定回复文本（阶段 7.2 测试用）。"""
+class _CloudActivity:
+    """这些回复测试明确允许 cloud；不能把真实 local-only policy 提档。"""
+
+    def get_state(self):
+        return {"state": "engaged", "policy": {"model_tier": "cloud_allowed", "allows_proactive": True}}
+
+
+class _EmptyCapabilities:
+    async def expose(self, *, scope, run_id, step, remaining_calls):
+        return CapabilityExposure(run_id, step, ())
+
+    async def invoke(self, invocation):
+        raise AssertionError("未曝光的能力不得执行")
+
+
+class _TextModel:
+    """走实际 native events 边界，不再预先生成分类 JSON。"""
 
     def __init__(self, text: str = "[生成的回复]") -> None:
         self._text = text
-        self.last_tier = None
         self.call_count = 0
-
-    async def request(self, req, *, tier):
-        self.call_count += 1
-        self.last_tier = tier
-        return InferenceResponse(text=self._text, tier_used=tier)
-
-
-class _SequenceReasoning:
-    """按顺序返回多次推理响应；用于区分 ActionPlan 与回复生成。"""
-
-    def __init__(self, texts: list[str]) -> None:
-        self._texts = list(texts)
         self.requests = []
 
-    async def request(self, req, *, tier):
+    async def events(self, req):
+        self.call_count += 1
         self.requests.append(req)
-        text = self._texts.pop(0) if self._texts else ""
-        return InferenceResponse(text=text, tier_used=tier)
+        yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": self._text})
+        yield ModelEvent(1, ModelEventKind.COMPLETED)
 
 
-class _UnavailableReasoning:
-    async def request(self, req, *, tier):
+class _UnavailableModel:
+    async def events(self, req):
         raise InferenceUnavailable("fixture unavailable")
-
-
-def _action_plan_json(
-    action: str,
-    goal: str,
-    capability_kind: str = "none",
-    reason: str = "测试规划",
-    confidence: float = 0.9,
-    planning_hint: str | None = None,
-) -> str:
-    import json
-    payload = {
-        "action": action,
-        "original_goal": goal,
-        "goal": goal,
-        "capability_kind": capability_kind,
-        "reason": reason,
-        "confidence": confidence,
-    }
-    if planning_hint is not None:
-        payload["planning_hint"] = planning_hint
-    return json.dumps(payload, ensure_ascii=False)
+        yield  # 保持真实异步事件迭代契约。
 
 
 # ── 测试用 Provider ──────────────────────────────────────────────────────
@@ -186,14 +184,20 @@ async def test_perception_broadcast_writes_no_thought_moment(tmp_path: Path) -> 
     assert "silence" in kinds  # 收到输入但没回
 
 
-async def test_perception_cycle_persists_and_completes_conversation_turn(
+@pytest.mark.parametrize("reply", [None, "真实回复"])
+@pytest.mark.parametrize("flush_failure", [False, True])
+async def test_perception_cycle_persists_before_completing_conversation_turn(
     tmp_path: Path,
+    monkeypatch,
+    reply: str | None,
+    flush_failure: bool,
 ) -> None:
     ws = AttentionController(capacity=3)
     p = _FixedProvider("perception", [make_attention(
         source="perception",
         content={
             "text": "hi",
+            "address_mode": "direct",
             "scene_id": "scene:test",
             "conversation_id": "conversation:test",
             "continuity_id": "continuity:test",
@@ -208,19 +212,45 @@ async def test_perception_cycle_persists_and_completes_conversation_turn(
     turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=CLOCK)
     await recorder.start()
     await turns.connect()
+    flush_entered, release_flush = asyncio.Event(), asyncio.Event()
+    original_flush = recorder.flush
+
+    async def delayed_flush():
+        flush_entered.set()
+        await release_flush.wait()
+        if flush_failure:
+            raise OSError("fixture Log flush failed")
+        await original_flush()
+
+    monkeypatch.setattr(recorder, "flush", delayed_flush)
     loop = CycleController(
         workspace=ws,
         providers=[p],
         experience_recorder=recorder,
         turn_controller=turns,
+        native_model=_TextModel(reply) if reply is not None else None,
     )
     try:
-        await loop.tick_once()
+        tick = asyncio.create_task(loop.tick_once())
+        await asyncio.wait_for(flush_entered.wait(), 2)
+        pending = await turns.load("turn:test")
+        assert pending is not None and pending.status == "running"
+        assert not any(m.kind in {"reply", "silence"} for m in read_ledger_moments(tmp_path / "experience"))
+        release_flush.set()
+        if flush_failure:
+            with pytest.raises(OSError, match="Log flush failed"):
+                await tick
+        else:
+            await tick
         persisted = await turns.load("turn:test")
         assert persisted is not None
-        assert persisted.status == "completed"
+        assert persisted.status == ("failed" if flush_failure else "completed")
         assert persisted.revision == 3
+        if not flush_failure:
+            assert any(m.kind == ("reply" if reply is not None else "silence")
+                for m in read_ledger_moments(tmp_path / "experience"))
     finally:
+        release_flush.set()
         await turns.close()
         await recorder.stop()
 
@@ -339,7 +369,7 @@ async def _wait_until(predicate) -> None:
 
 # ── Deliberate 推理生成 ─────────────────────────────────────────────────
 
-async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
+async def test_deliberate_generates_reply_via_native_model(tmp_path: Path) -> None:
     """perception 广播 → Deliberate 调 reasoning 生成 → reply intent 用生成文本。"""
     from glimmer_cradle.cognition.loop import WillingnessConfig
 
@@ -358,7 +388,7 @@ async def test_deliberate_generates_reply_via_reasoning(tmp_path: Path) -> None:
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=_FakeReasoning("挺好的呀"),
+            native_model=_TextModel("挺好的呀"),
         )
         await loop.tick_once()
         result = loop.last_arbitration
@@ -415,7 +445,7 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=_FakeReasoning("我是AI"),
+            native_model=_TextModel("我是AI"),
             boundary_validator=lambda text: "AI" not in text,  # 含 AI 即越界
         )
         await loop.tick_once()
@@ -429,7 +459,6 @@ async def test_deliberate_boundary_block_no_reply(tmp_path: Path) -> None:
 async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
     """Deliberate 按 activity profile.model_tier 选档。"""
     from glimmer_cradle.cognition.loop import WillingnessConfig
-    from glimmer_cradle.cognition.inference import ModelTier
 
     class _Fixed(Provider):
         name = "perception"
@@ -444,7 +473,7 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
             return {"state": "engaged",
                     "policy": {"model_tier": "cloud_allowed", "allows_proactive": True}}
 
-    fake = _FakeReasoning("回复")
+    fake = _TextModel("回复")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -453,20 +482,19 @@ async def test_deliberate_tier_follows_activity(tmp_path: Path) -> None:
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             activity_controller=_Activity(),
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=fake,
+            native_model=fake,
         )
         await loop.tick_once()
     finally:
         await recorder.stop()
-    assert fake.last_tier == ModelTier.CLOUD_ALLOWED
+    assert fake.call_count == 1
 
 
 # ── Act 阶段自主输出（阶段 7.1） ─────────────────────────────────────────
 
 async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     """perception 广播 → reply intent → Act 推 ActionCommand 经 sink。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -491,7 +519,7 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=_FakeReasoning("你好呀，很高兴见到你"),  # 阶段 7.2 生成回复
+            native_model=_TextModel("你好呀，很高兴见到你"),  # 阶段 7.2 生成回复
         )
         await loop.tick_once()
     finally:
@@ -506,127 +534,70 @@ async def test_act_emits_reply_action_for_perception(tmp_path: Path) -> None:
     assert cmd["trace_id"] == "t-1"
 
 
-async def test_act_emits_skill_request_for_structured_action_plan(tmp_path: Path) -> None:
-    """结构化 ActionPlan 判定需要外部能力时发 skill_request。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+@pytest.mark.parametrize("user_text", ["我想打开 B 站", "查一下今天上海天气"])
+async def test_unexposed_native_call_fails_without_synthetic_action(tmp_path: Path, user_text: str) -> None:
+    """自然语言不能触发分类兜底；模型猜造未曝光调用必须失败关闭。"""
+    class _CallModel:
+        async def events(self, req):
+            yield ModelEvent(0, ModelEventKind.TOOL_CALL, {
+                "call_id": "call-1", "name": "guessed_browser",
+                "arguments": {},
+            })
+            yield ModelEvent(1, ModelEventKind.COMPLETED)
 
-    class _Fixed(Provider):
-        name = "perception"
+    emitted = []
+    async def sink(command):
+        emitted.append(command)
 
-        async def propose(self, snap):
-            return [make_attention(
-                source="perception",
-                content={"text": "查一下今天的天气", "scene_id": "s1", "trace_id": "t-skill",
-                         "address_mode": "direct", "familiarity": 8},
-                salience=0.9,
-            )]
+    provider = _FixedProvider("perception", [make_attention(
+        source="perception", content={"text": user_text, "scene_id": "s1",
+            "trace_id": "trace-unexposed", "interaction_id": "trace-unexposed",
+            "payload_digest": "sha256:unexposed", "address_mode": "direct"}, salience=1,
+    )])
+    recorder = build_experience_recorder(tmp_path)
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=CLOCK)
+    await turns.connect()
+    await recorder.start()
+    try:
+        loop = CycleController(workspace=AttentionController(capacity=3),
+            providers=[provider], experience_recorder=recorder,
+            native_model=_CallModel(), action_sink=sink, turn_controller=turns)
+        with pytest.raises(RuntimeError, match="capability_not_exposed"):
+            await loop.tick_once()
+        persisted = await turns.load("trace-unexposed")
+        assert persisted is not None and persisted.status == "failed"
+    finally:
+        await turns.close()
+        await recorder.stop()
+    assert emitted == []
+    assert not any(m.kind in {"action", "reply"} for m in read_ledger_moments(tmp_path))
 
-    emitted: list[dict] = []
-    persisted_before_emit = []
 
-    async def _sink(cmd):
-        persisted_before_emit.extend(read_ledger_moments(tmp_path))
-        emitted.append(cmd)
+@pytest.mark.parametrize("tier", ["local_only", "none"])
+async def test_native_loop_never_promotes_unavailable_tier(tmp_path: Path, tier: str) -> None:
+    class _RestrictedActivity:
+        def get_state(self):
+            return {"state": "engaged", "policy": {"model_tier": tier}}
 
-    reasoning = _SequenceReasoning([
-        _action_plan_json(
-            "skill_request",
-            "查一下今天的天气",
-            "realtime_lookup",
-            "需要天气查询",
-            0.92,
-        ),
-    ])
-    ws = AttentionController(capacity=3)
+    model = _TextModel("禁止提档到云")
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
     try:
         loop = CycleController(
-            workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
-            willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            action_sink=_sink,
-            reasoning=reasoning,
+            workspace=AttentionController(capacity=3),
+            providers=[_FixedProvider("perception", [make_attention(
+                source="perception", content={"text": "在吗", "scene_id": "s1",
+                    "trace_id": "trace-restricted", "address_mode": "direct"}, salience=1,
+            )])],
+            experience_recorder=recorder, native_model=model,
+            activity_controller=_RestrictedActivity(),
         )
         await loop.tick_once()
+        assert loop.last_arbitration.accepted == []
+        assert model.call_count == 0
     finally:
         await recorder.stop()
-
-    assert len(emitted) == 1
-    cmd = emitted[0]
-    assert cmd["action_type"] == "skill_request"
-    assert cmd["target"]["scene_id"] == "s1"
-    assert cmd["payload"]["skill_request"]["original_goal"] == "查一下今天的天气"
-    assert cmd["payload"]["skill_request"]["reason"] == "需要天气查询"
-    assert cmd["payload"]["skill_request"]["capability_kind"] == "realtime_lookup"
-    assert cmd["payload"]["skill_request"]["confidence"] == 0.92
-    assert cmd["trace_id"] == "t-skill"
-    assert cmd["source_fact_id"] == next(moment.moment_id for moment in persisted_before_emit
-        if moment.kind == "action" and moment.content["action_type"] == "skill_request")
-    assert len(reasoning.requests) == 1
-    assert reasoning.requests[0].metadata["purpose"] == "cognitive_action_plan"
-    assert reasoning.requests[0].metadata["trace_id"] == "t-skill"
-    assert any(
-        moment.kind == "action"
-        and moment.content["action_type"] == "skill_request"
-        for moment in persisted_before_emit
-    )
-    moments = list(read_ledger_moments(tmp_path))
-    assert any(m.kind == "action" and m.content["action_type"] == "skill_request" for m in moments)
-    assert not any(m.kind == "reply" for m in moments)
-    assert not any(m.kind == "silence" for m in moments)
-
-
-@pytest.mark.parametrize(
-    ("user_text", "capability_kind"),
-    [
-        ("我想打开 B 站", "web_navigation"),
-        ("帮我去 Bilibili 看看", "web_navigation"),
-        ("查一下今天上海天气", "realtime_lookup"),
-    ],
-)
-async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, capability_kind: str) -> None:
-    """自然表达经 ActionPlan 进入 Skill，不依赖关键词 gate。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
-
-    class _Fixed(Provider):
-        name = "perception"
-
-        async def propose(self, snap):
-            return [make_attention(
-                source="perception",
-                content={"text": user_text, "scene_id": "s1", "trace_id": f"trace-{capability_kind}",
-                         "address_mode": "direct", "familiarity": 8},
-                salience=0.9,
-            )]
-
-    emitted: list[dict] = []
-
-    async def _sink(cmd):
-        emitted.append(cmd)
-
-    reasoning = _SequenceReasoning([
-        _action_plan_json("skill_request", user_text, capability_kind, "需要外部能力", 0.91),
-    ])
-    ws = AttentionController(capacity=3)
-    recorder = build_experience_recorder(tmp_path)
-    await recorder.start()
-    try:
-        loop = CycleController(
-            workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
-            willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            action_sink=_sink,
-            reasoning=reasoning,
-        )
-        await loop.tick_once()
-    finally:
-        await recorder.stop()
-
-    assert emitted[0]["action_type"] == "skill_request"
-    request = emitted[0]["payload"]["skill_request"]
-    assert request["original_goal"] == user_text
-    assert request["capability_kind"] == capability_kind
+    assert any(m.kind == "silence" for m in read_ledger_moments(tmp_path))
 
 
 @pytest.mark.parametrize(
@@ -637,10 +608,9 @@ async def test_action_plan_skill_request_cases(tmp_path: Path, user_text: str, c
         "你好呀，今天想跟你聊聊天",
     ],
 )
-async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user_text: str) -> None:
+async def test_native_text_reply_without_preclassification(tmp_path: Path, user_text: str) -> None:
     """解释概念、禁止执行和普通互动不触发 Skill。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -658,10 +628,7 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
     async def _sink(cmd):
         emitted.append(cmd)
 
-    reasoning = _SequenceReasoning([
-        _action_plan_json("reply", user_text, "none", "不需要执行外部能力", 0.88),
-        "可以，我直接告诉你。",
-    ])
+    reasoning = _TextModel("可以，我直接告诉你。")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -670,24 +637,21 @@ async def test_action_plan_reply_cases_do_not_trigger_skill(tmp_path: Path, user
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
     finally:
         await recorder.stop()
 
     assert emitted[0]["action_type"] == "reply"
-    assert "skill_request" not in emitted[0]["payload"]
     assert [req.metadata["purpose"] for req in reasoning.requests] == [
-        "cognitive_action_plan",
         "reply",
     ]
 
 
-async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: Path) -> None:
-    """ActionPlan=noop 是显式沉默，不会落入普通回复生成。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+async def test_native_empty_output_records_silence(tmp_path: Path) -> None:
+    """原生模型无回复时记录真实沉默，不编造分类决策。"""
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -705,10 +669,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
     async def _sink(cmd):
         emitted.append(cmd)
 
-    reasoning = _SequenceReasoning([
-        _action_plan_json("noop", "（用户正在输入中）", "none", "输入尚不完整，等待下一拍", 0.86),
-        "这条普通回复不应该被消费",
-    ])
+    reasoning = _TextModel("")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -717,7 +678,7 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
     finally:
@@ -725,21 +686,19 @@ async def test_action_plan_noop_suppresses_reply_and_records_silence(tmp_path: P
 
     assert emitted == []
     assert len(reasoning.requests) == 1
-    assert reasoning.requests[0].metadata["purpose"] == "cognitive_action_plan"
+    assert reasoning.requests[0].metadata["purpose"] == "reply"
     moments = list(read_ledger_moments(tmp_path))
     assert not any(m.kind == "reply" for m in moments)
     assert any(
         m.kind == "silence"
-        and m.content["reason"] == "action_plan_noop"
-        and m.content["action_plan_reason"] == "输入尚不完整，等待下一拍"
+        and m.content["reason"] == "no_reply"
         for m in moments
     )
 
 
-async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: Path) -> None:
-    """ActionPlan=ask_clarification 生成显式澄清回复，不走普通 reply fallback。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+async def test_native_clarification_is_model_reply(tmp_path: Path) -> None:
+    """澄清内容由原生模型实际回复产生，不解释分类字段。"""
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -757,17 +716,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
     async def _sink(cmd):
         emitted.append(cmd)
 
-    reasoning = _SequenceReasoning([
-        _action_plan_json(
-            "ask_clarification",
-            "帮我处理一下那个",
-            "none",
-            "目标对象不明确",
-            0.87,
-            planning_hint="你想让我处理哪一个对象？",
-        ),
-        "这条普通回复不应该被消费",
-    ])
+    reasoning = _TextModel("你想让我处理哪一个对象？")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -776,7 +725,7 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
     finally:
@@ -786,13 +735,12 @@ async def test_action_plan_ask_clarification_generates_explicit_reply(tmp_path: 
     assert emitted[0]["action_type"] == "reply"
     assert emitted[0]["payload"]["text"] == "你想让我处理哪一个对象？"
     assert len(reasoning.requests) == 1
-    assert reasoning.requests[0].metadata["purpose"] == "cognitive_action_plan"
+    assert reasoning.requests[0].metadata["purpose"] == "reply"
 
 
-async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: Path) -> None:
+async def test_native_unavailable_does_not_trigger_action(tmp_path: Path) -> None:
     """InferenceController 不可用时不能靠关键词或副作用兜底执行 Skill。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -818,13 +766,13 @@ async def test_action_plan_unavailable_does_not_trigger_skill_request(tmp_path: 
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=_UnavailableReasoning(),
+            native_model=_UnavailableModel(),
         )
         await loop.tick_once()
     finally:
         await recorder.stop()
 
-    assert not any(cmd["action_type"] == "skill_request" for cmd in emitted)
+    assert emitted == []
 
 
 async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> None:
@@ -853,7 +801,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
     async def _sink(cmd):
         emitted.append(cmd)
 
-    reasoning = _FakeReasoning("你好呀")
+    reasoning = _TextModel("你好呀")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -862,7 +810,7 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
             workspace=ws, providers=[_Once()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
         await loop.tick_once()
@@ -870,14 +818,14 @@ async def test_perception_broadcast_consumed_after_one_tick(tmp_path: Path) -> N
         await recorder.stop()
 
     assert len(emitted) == 1
-    assert reasoning.call_count == 2
+    assert reasoning.call_count == 1
     assert await ws.size() == 0
 
 
 async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
     """直接外部输入应在同一拍即时唤醒，再进入 Deliberate/Volition。"""
-    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
     from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 
     class _Activity:
         def __init__(self) -> None:
@@ -916,7 +864,7 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
         text="你好",
         trace_id="t-wake",
     ))
-    reasoning = _FakeReasoning("你好呀")
+    reasoning = _TextModel("你好呀")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -929,22 +877,22 @@ async def test_direct_perception_wakes_before_reasoning(tmp_path: Path) -> None:
             activity_controller=activity,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
     finally:
         await recorder.stop()
 
     assert activity.engage_calls == 1
-    assert reasoning.last_tier == ModelTier.CLOUD_ALLOWED
+    assert reasoning.call_count == 1
     assert len(emitted) == 1
     assert emitted[0]["payload"]["text"] == "你好呀"
 
 
 async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: Path) -> None:
     """工作区被 drive 填满时，直接对话仍应成为本拍广播并回复。"""
-    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
     from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.perception import Observation, ObservationQueue
 
     emitted: list[dict] = []
 
@@ -979,7 +927,7 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
             experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=_FakeReasoning("我在。"),
+            native_model=_TextModel("我在。"),
         )
         await loop.tick_once()
     finally:
@@ -994,8 +942,7 @@ async def test_direct_perception_not_blocked_by_full_drive_workspace(tmp_path: P
 
 async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
     """无 action_sink → Act 不推送，不报错（沉默默认）。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1020,8 +967,7 @@ async def test_act_no_sink_no_crash(tmp_path: Path) -> None:
 
 async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
     """Deliberate 生成空文本 → 无 reply intent → 不推 ActionCommand（沉默）。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1044,7 +990,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=_FakeReasoning(""),  # 生成空 → 不回复
+            native_model=_TextModel(""),  # 生成空 → 不回复
         )
         await loop.tick_once()
     finally:
@@ -1054,8 +1000,7 @@ async def test_act_empty_generation_not_emitted(tmp_path: Path) -> None:
 
 async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
     """sink 抛错 → 隔离，不连坐 tick。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1076,7 +1021,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_bad_sink,
-            reasoning=_FakeReasoning("一句回复"),  # 生成 → reply intent → sink 触发
+            native_model=_TextModel("一句回复"),  # 生成 → reply intent → sink 触发
         )
         await loop.tick_once()  # sink 抛但 tick 完成
     finally:
@@ -1086,8 +1031,7 @@ async def test_act_sink_exception_isolated(tmp_path: Path) -> None:
 
 async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
     """有 emotion_system → ActionCommand 带 emotion_state。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1115,7 +1059,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
             emotion_system=_Emotion(),
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
             action_sink=_sink,
-            reasoning=_FakeReasoning("嗯嗯"),  # 阶段 7.2 生成回复
+            native_model=_TextModel("嗯嗯"),  # 阶段 7.2 生成回复
         )
         await loop.tick_once()
     finally:
@@ -1129,8 +1073,7 @@ async def test_act_emits_emotion_snapshot(tmp_path: Path) -> None:
 
 async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> None:
     """perception 入站 → Appraise 调 update_by_input + 写 PERCEPTION/EMOTION Moment。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
     from glimmer_cradle.conversation.log import MomentKind
 
     class _Fixed(Provider):
@@ -1159,7 +1102,7 @@ async def test_appraise_updates_emotion_and_writes_moments(tmp_path: Path) -> No
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             emotion_system=emo,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=_FakeReasoning("嗯嗯"),
+            native_model=_TextModel("嗯嗯"),
         )
         await loop.tick_once()
     finally:
@@ -1224,8 +1167,7 @@ async def test_appraise_no_perception_no_emotion_update(tmp_path: Path) -> None:
 
 async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> None:
     """用户输入与真实回复只写 Experience，供 Conversation 投影重建。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1248,7 +1190,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=_FakeReasoning("你好呀[开心]"),  # 带情绪标签 → 存前应剥
+            native_model=_TextModel("你好呀[开心]"),  # 带情绪标签 → 存前应剥
         )
         await loop.tick_once()
     finally:
@@ -1262,8 +1204,7 @@ async def test_experience_records_user_and_assistant_turns(tmp_path: Path) -> No
 
 async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path: Path) -> None:
     """同拍跨域感知只允许广播项成为回复的 Turn 与因果来源。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
     from glimmer_cradle.conversation import MomentKind
 
     class _Batch(Provider):
@@ -1318,7 +1259,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
             willingness_config=WillingnessConfig(
                 threshold_by_activity={"engaged": 0.2}
             ),
-            reasoning=_FakeReasoning("只回复 A"),
+            native_model=_TextModel("只回复 A"),
         )
         await loop.tick_once()
     finally:
@@ -1341,8 +1282,7 @@ async def test_batch_perceptions_bind_outcome_to_selected_conversation(tmp_path:
 
 async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: Path) -> None:
     """回复未通过仲裁时只保留感知与沉默事实。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1365,7 +1305,7 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             # 高阈值 → reply 被压制
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.99}),
-            reasoning=_FakeReasoning("本不该说出口"),
+            native_model=_TextModel("本不该说出口"),
         )
         await loop.tick_once()
     finally:
@@ -1378,26 +1318,26 @@ async def test_experience_has_no_reply_when_arbitration_suppresses_it(tmp_path: 
 
 # ── 富上下文：Deliberate prompt 纳入记忆/知识/会话历史（阶段 7.5b-3） ──────
 
-class _CapturingReasoning:
-    """捕获 InferenceRequest 的假 reasoning —— 用于断言 system prompt / vision 等。"""
+class _CapturingModel:
+    """捕获 InferenceRequest 的假原生模型 —— 用于断言 system prompt / vision 等。"""
     def __init__(self, text="好的"):
         self._text = text
         self.last_system = None
         self.last_user = None
         self.last_vision = None
         self.last_provider_key = None
-    async def request(self, req, *, tier):
+    async def events(self, req):
         self.last_system = req.system
         self.last_user = req.user
         self.last_vision = req.vision
         self.last_provider_key = req.provider_key
-        return InferenceResponse(text=self._text, tier_used=tier)
+        yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": self._text})
+        yield ModelEvent(1, ModelEventKind.COMPLETED)
 
 
 async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
     """Deliberate 按固定分区装配会话状态、历史片段、记忆与知识。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1441,7 +1381,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
                 return [type("M", (), {"content": "上次聊过音乐", "attributes": {}})()]
         knowledge_base = _KB()
 
-    cap = _CapturingReasoning("我在呀")
+    cap = _CapturingModel("我在呀")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -1449,7 +1389,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap,
+            native_model=cap,
             memory=_Entity.memory,
             knowledge_base=_Entity.knowledge_base,
             conversation=_Conversation(),
@@ -1472,8 +1412,7 @@ async def test_deliberate_prompt_includes_rich_context(tmp_path: Path) -> None:
 
 async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: Path) -> None:
     """本地私聊不能召回扩展群聊的 space-local 经历。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
     from glimmer_cradle.conversation.log import MomentKind
 
     class _Fixed(Provider):
@@ -1512,7 +1451,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
             async def get_knowledge(query):
                 return []
 
-    cap = _CapturingReasoning("我看到了")
+    cap = _CapturingModel("我看到了")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -1531,7 +1470,7 @@ async def test_deliberate_prompt_blocks_cross_scope_recent_experience(tmp_path: 
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap,
+            native_model=cap,
             memory=_Entity.memory,
             knowledge_base=_Entity.knowledge_base,
         )
@@ -1584,8 +1523,7 @@ async def test_recent_experience_digest_does_not_duplicate_speaker_tag(tmp_path:
 
 async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
     """perception→回复 一拍走完：PERCEPTION→EMOTION→REPLY 因果链成形。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1607,7 +1545,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             emotion_system=_Emotion(),
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=_FakeReasoning("你好呀"),
+            native_model=_TextModel("你好呀"),
         )
         await loop.tick_once()
     finally:
@@ -1629,8 +1567,7 @@ async def test_reply_moment_causation_chain_via_loop(tmp_path: Path) -> None:
 
 async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> None:
     """收到输入但回复被压制 → SILENCE Moment 链回 perception（沉默不等于无感）。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1647,7 +1584,7 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.99}),
-            reasoning=_FakeReasoning("本不该说"),
+            native_model=_TextModel("本不该说"),
         )
         await loop.tick_once()
     finally:
@@ -1666,8 +1603,7 @@ async def test_silence_moment_when_reply_suppressed_via_loop(tmp_path: Path) -> 
 
 async def test_observe_only_perception_records_without_reasoning(tmp_path: Path) -> None:
     """observe_only 进入经历链路，但 Deliberate 不调用推理、不生成回复。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1683,7 +1619,7 @@ async def test_observe_only_perception_records_without_reasoning(tmp_path: Path)
                                        "response_policy": "observe_only", "familiarity": 1},
                               salience=0.5)]
 
-    reasoning = _FakeReasoning("不应该生成")
+    reasoning = _TextModel("不应该生成")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -1691,7 +1627,7 @@ async def test_observe_only_perception_records_without_reasoning(tmp_path: Path)
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=reasoning,
+            native_model=reasoning,
         )
         await loop.tick_once()
     finally:
@@ -1738,8 +1674,7 @@ class _FakeRouter:
 
 async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> None:
     """specialist_then_core：图片描述（semantic_text）进 system prompt。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1751,7 +1686,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
                               salience=0.95)]
 
     router = _FakeRouter(_Route(primary_text="", semantic_text="一张开心的表情包"))
-    cap = _CapturingReasoning("哈哈")
+    cap = _CapturingModel("哈哈")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -1759,7 +1694,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap, multimodal_router=router,
+            native_model=cap, multimodal_router=router,
         )
         await loop.tick_once()
     finally:
@@ -1773,8 +1708,7 @@ async def test_multimodal_specialist_description_in_prompt(tmp_path: Path) -> No
 
 async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -> None:
     """core_direct：vision 消息随 InferenceRequest 直发主模型 + 带 provider_key。"""
-    from glimmer_cradle.cognition.loop import Provider
-    from glimmer_cradle.cognition.loop import WillingnessConfig
+    from glimmer_cradle.cognition.loop import Provider, WillingnessConfig
 
     class _Fixed(Provider):
         name = "perception"
@@ -1788,7 +1722,7 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
     route = _Route(primary_text="看这个",
                    vision_messages=[_VM("描述这张图", "http://img/1.png", "image/png")])
     router = _FakeRouter(route)
-    cap = _CapturingReasoning("好看")
+    cap = _CapturingModel("好看")
     ws = AttentionController(capacity=3)
     recorder = build_experience_recorder(tmp_path)
     await recorder.start()
@@ -1796,7 +1730,7 @@ async def test_multimodal_core_direct_vision_passed_to_request(tmp_path: Path) -
         loop = CycleController(
             workspace=ws, providers=[_Fixed()], experience_recorder=recorder,
             willingness_config=WillingnessConfig(threshold_by_activity={"engaged": 0.2}),
-            reasoning=cap,
+            native_model=cap,
             multimodal_router=router,
             multimodal_core_model="vision-pro",
         )

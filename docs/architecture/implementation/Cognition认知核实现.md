@@ -130,9 +130,10 @@ Kernel CognitionService request
 
 单拍临时状态进入 `loop/step.py` 的 `LoopStep`，每拍重建；`context/assembler.py` 的
 `ReplyContextBuilder` 收集上下文与 prompt 分区；`loop/run.py` 的 `ActionEmitter` 映射 Intent，
-`CycleContinuity` 在仲裁后提交 REPLY/ACTION/SILENCE。原生 ToolCall 的 ACTION 与结果接纳沿
+`CycleContinuity` 在仲裁后提交 REPLY/SILENCE。原生 ToolCall 的 ACTION 与结果接纳沿
 Capability/Conversation adapter 单独落实，不伪造外显意图。当前通用循环不生产 Thought。
-循环以 expected revision 保存拍数和终态；启动将遗留 running 落为 interrupted，再启动新运行，
+REPLY/SILENCE 跨过真实 Log flush 屏障后才完成持久 Turn；提交失败落为 failed，取消落为 interrupted，
+不把缓冲 append 冒充 durable receipt。循环以 expected revision 保存拍数和终态；启动将遗留 running 落为 interrupted，再启动新运行，
 这个周期 checkpoint 不是持久原生 Run 的恢复证明。
 
 原生模型/工具迭代由 `LoopController.run_native()` 承担。模型事件中的 `ToolCall` 不再先分类为
@@ -171,8 +172,12 @@ Knowledge ingest、索引失效、资源订阅和持久 Run 恢复仍未完成�
 `observe_only` 不推理；只有当前 `cloud_allowed` 进入已装配云 stream，`local_only`/`none` 不提升为云。
 每次推理前重验 tier，每次曝光和实际工具派发前按 direct/reactive 或 ambient/proactive 意愿复验。
 最终回复仍经人格边界、Intent 仲裁与 ActionEmitter。模型/执行失败关闭真实 Turn，不冒充成功沉默。
-Core 的非原生测试/消费入口暂留 ActionPlan；其消费者转换、旧 journal 只读恢复与数据保护完成后删除，
-不是 production fallback。长程 Planning/承诺及下面明确请求型 Plan/Synthesis 不随聊天切换一起删除。
+短程 ActionPlan 分类器、分类常量、旧 Goal、Loop 的非原生推理入口及 SkillRequest 意图/发送分支已删除；
+测试直接消费原生事件，不保留改名分类器或直调推理 fallback。长程 Planning/承诺及下面明确请求型
+Plan/Synthesis 不随其删除。`PlanningDecisionSnapshot` 只读旧 `planning_decision` 原始字段；
+`SqlitePlanningStore.latest_decision_snapshot()` 不解释行动/能力、不授予权限、不恢复待执行请求，
+旧 record/latest 写入/ActionPlan 重建入口已删除。旧表、索引与 migration 保留历史数据和重开路径，
+不删除用户行、不隐式迁库；不再产生新的短程决策。
 
 `AgentPlanUseCase` 与 `AgentSynthesisUseCase` 通过 Cognition Service `Plan` / `Synthesize` 服务仍未迁移的 Kernel Skill 编排。保留链路是：`Kernel SkillActionController -> SkillPlanningAppService -> SkillInvocationGateway -> Conversation 接纳结果 -> Synthesize -> ChannelReplyEvent`，不再是生产普通聊天入口。原 ACTION 刷盘与已接纳结果引用保持，Synthesis 不写第二份执行事实；其人格主体仍由 Core 编译，不由 Kernel 拼接。缺失/冲突引用不合成，外部结果仍是 experience/untrusted 观察，不直接成为 Memory。接纳规则见[Conversation 实现](Conversation实现.md#history-与恢复)。
 
@@ -190,7 +195,7 @@ Core 的非原生测试/消费入口暂留 ActionPlan；其消费者转换、旧
 ## 长期承诺与 Jobs 源请求
 
 `planning/GoalVersion` 保存不可变 goal ID、scope、连续版本、语义和完成条件；`PlanVersion` 引用
-该目标版本并保存不可变计划 ID/版本和 1 至 64 个语义步骤。普通 `ActionPlan` 仍只服务本拍行动，
+该目标版本并保存不可变计划 ID/版本和 1 至 64 个语义步骤。普通模型回复与工具调用
 不自动创建长期承诺。`PlanningController.accept_commitment()` 显式接受后，由
 `SqlitePlanningStore` 在同一 IMMEDIATE 事务写入目标/计划版本、revision 1 的 accepted 承诺和
 `planning.evaluate` 源请求；身份相同内容相同可重放，版本跳跃、scope 替换、目标版本回退、
@@ -203,7 +208,7 @@ Core 的非原生测试/消费入口暂留 ActionPlan；其消费者转换、旧
 持有 SQLite 事务。同一请求不能绑定另一 Job，重复回执沿用首次接纳记录；请求 payload 被改写则拒绝 ACK。
 
 长期表由首次显式接受原子建立，版本 1；普通 Worker 启动仍只恢复原 journal。未知版本、部分表或
-孤立表失败关闭，不自动重建。journal、版本、源状态读写共享串行连接边界；取消等待回滚结束，
+孤立表失败关闭，不自动重建。历史 journal 只读、版本和源状态读写共享串行连接边界；取消等待回滚结束，
 回滚失败撤销连接。数据与备份范围见[数据目录](../../reference/data-layout.md#用户状态与记忆)。
 
 生产源接纳由 Worker `adapters/job_client.py` 的生成 DTO mapper、真实 Planning store RPC 和 Host
