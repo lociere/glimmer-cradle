@@ -1,8 +1,22 @@
 import { createHash } from 'node:crypto';
-import { create } from '@bufbuild/protobuf';
-import { JobExecutionIdentitySchema, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
+import { create, type JsonObject } from '@bufbuild/protobuf';
+import { JobExecutionIdentitySchema, JobStateEventSchema, JobStatus, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { MemoryJobResolution, type MemoryJobSourceRequest, type MemoryJobResult } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence } from '@glimmer-cradle/jobs';
+import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence, type JobStateEvent } from '@glimmer-cradle/jobs';
+
+export function memoryJobState(event: JobStateEvent) {
+  const statuses = { queued: JobStatus.QUEUED, running: JobStatus.RUNNING, retry_wait: JobStatus.RETRY_WAIT,
+    succeeded: JobStatus.SUCCEEDED, cancelled: JobStatus.CANCELLED, dead_letter: JobStatus.DEAD_LETTER, unknown: JobStatus.UNKNOWN };
+  if (event.kind !== MEMORY_JOB_KIND || !Object.hasOwn(statuses, event.status)
+    || ![event.attempt, event.fencing_token, event.updated_at].every(value => Number.isSafeInteger(value) && value >= 0)) {
+    throw new JobConflictError('Memory Job 状态事实无效');
+  }
+  return create(JobStateEventSchema, { eventId: text(event.event_id), jobId: text(event.job_id), scopeId: text(event.scope_id),
+    goalId: text(event.goal_id), kind: event.kind, revision: BigInt(positive(event.revision)), status: statuses[event.status],
+    attempt: BigInt(event.attempt), authorityEpoch: BigInt(positive(event.authority_epoch)), fencingToken: BigInt(event.fencing_token),
+    updatedAtMs: BigInt(event.updated_at), ...(event.error_code === null ? {} : { errorCode: event.error_code }),
+    ...(event.result === null ? {} : { result: event.result as JsonObject }) });
+}
 
 export const MEMORY_JOB_KIND = 'memory.consolidate';
 export interface MemoryJobSubmissionPolicy { readonly debounce_ms: number; readonly max_attempts: number; }

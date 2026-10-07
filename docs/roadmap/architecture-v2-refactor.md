@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host 源投递/handler/query、持续调度、authority/handover、真实 Worker CLI 监督与唯一配置/三根路径/拥有两库的局部启动已验证；产品入口/完整配置 catalog、状态事件接纳与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；产品入口/完整 catalog、产品状态投影/长期 Planning Jobs 与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -525,6 +525,35 @@ inventory、Buf lint/breaking、JSON Schema、toolchain、TS/Python/C# roundtrip
 
 下一步接真实 Jobs 状态事件 wire/inbox 与 projection consumer，随后继续完整产品装配；旧队列、
 默认 Kernel、旧状态/配置路径均保持明确迁移删除门，不创建第二契约源。
+
+### 阶段 7 Memory Jobs 状态接收（2026-10-07 当前候选）
+
+输入 `d1ed5099`，当前会话唯一执行 owner。唯一 Jobs IDL 新增状态枚举与不可变 outbox 事实，
+Cognition Service 新增 Memory 状态投递 RPC，生成 TS/Python/C#，不改变既有 field number 或公开 SDK。
+Host 映射原事实并附当前投递 epoch；Worker 校验生成 DTO 和业务 receipt，Memory 源请求 owner
+在 Episode 数据库同事务保存 inbox/最新投影。Jobs 是状态事实源，接收端不创建调度 authority；
+较新投递 epoch 只形成观测 high-water，历史 backlog 仍按原 revision 接纳，不反向回退最新状态。
+取消/unknown 不清除 Memory 已提交结果；成功事件不能凭 sender 自报替代持久 receipt。
+配置启动入口默认接真实 receiver；手工装配未注入 receiver 的旧测试仍保留未 ACK 事实，不假 ACK。
+验收真实投递/ACK 丢失/持久重启、拒旧代/非法枚举与身份/内容冲突、投影故障事务回滚、旧 revision
+不回退、取消保留已提交业务与未知结果；保留期须在真实接纳后才清理。产品默认入口和旧库切换不提前。
+
+当前候选验证：Host 全量 79 项（新增 4 项真实跨进程状态/SQLite 接收测试）、Cognition 287 项、
+Worker 80 项 PASS。覆盖接收事务故障回滚、提交后 ACK 丢失与 Worker/Jobs 重开、epoch 高水位与
+旧 generation 拒绝、内容冲突/伪造 receipt、成功后保留清理，以及 Memory 已提交但 Job 被取消时
+保留 committed 业务投影；unknown 仍拒绝普通取消，不通过放宽状态机消除测试失败。
+首次 Host 全量因并发 Contracts 生成短暂删除 Python 生成目录而失败，停止竞争后串行重跑全量通过；
+根 typecheck/build 与真实 Kernel production bootstrap smoke（ready、逆序停机、Worker exit 0）PASS。
+Contracts 完整 22 gate、兼容门、TS/Python/C# round-trip、确定性生成与 generated-clean PASS；
+未刷新兼容基线。新增导入排序已修正；Worker Ruff 全量仍为与父候选相同的 47 项既有诊断，
+不将其报告为全量 lint 通过。111 页文档、编码、架构、target-layout spec-only、diff 检查 PASS。
+清单仍为 1,098 文件/435 目录，spec-only 不代表最终物理目录完成。
+
+Episode 接收表只在显式 external 状态投递时按版本 1 延迟建立；不改 Memory schema 6、Jobs schema 4，
+未知版本或部分接收表失败关闭，不自动重建。接收 inbox/source/最小 receipt 引用属于阶段 14 一致备份
+与迁移保护范围。未迁移用户数据、切换默认产品入口或执行完整 UI/Unity/安装与生产恢复验收；
+独立审查仍留整体最终固定候选。下一步继续产品状态投影消费、长期 Planning Jobs 与完整 Host 装配，
+旧队列删除仍等待 consumer-zero、旧样本及恢复验证，阶段 7 与整体重构均未完成。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

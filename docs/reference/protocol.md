@@ -44,6 +44,23 @@ Content 的 TypeScript/Python/C# DTO 只从 canonical proto 生成；`AssetRef` 
 
 `CoreSkillConfirmationRequestEvent` 的字段 8 `title`、字段 9 `detail` 为可选展示文本，由双端 Adapter 映射到确认界面；不授予权限，也不替代目标工具策略。确认回执必须来自接收该请求的可写 Surface session，断线使未完成请求失效。用户 SKILL.md 元数据由 `contracts/json-schema/skill/v1/user-skill-metadata.schema.json` 拥有，加载及调用边界见[Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。
 
+## Memory Jobs 状态投递
+
+Jobs 的 `JobStateEvent` 是原 outbox 事实，携带稳定 event/job/scope/goal/kind、revision、状态枚举、
+attempt/epoch/token、可选结果与错误、更新时间；不携带请求 payload。event ID 是紧凑 UTF-8 JSON
+`[job_id,revision]` 的 SHA-256。所有整数限制 JS safe integer；revision/epoch 为正，排队前的
+attempt/token 可为零；Memory 执行状态需要非零 attempt/token。未知枚举/身份/溢出或大于 64 KiB
+的事件拒绝为 INVALID_REQUEST。结果为生成 Struct 边缘，不允许非成功状态自报业务结果。
+
+`PublishMemoryJobState` 仅在外部 Jobs 模式且 Worker 本代业务 ready 时开放。Host 附当前
+`delivery_authority_epoch`，可以高于历史 backlog 的原 epoch；Worker 要求合法 generation，接收端
+记已观测投递主 high-water，拒绝旧主，按原 revision 更新投影。high-water 不是新调度 authority。
+同事件同内容重复 ACK，不同内容、源 scope/Job 冲突、authority 回退或无匹配持久业务 receipt 的
+成功状态返回 RECOVERY_REQUIRED。inbox 与投影同事务提交后才 accepted；ACK 丢失可重投。
+取消/unknown 不表示 Memory 未执行或回滚；已提交 receipt 与不确定性必须保留。数据责任见
+[数据目录](data-layout.md#用户状态与记忆)，实现见
+[Cognition 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
+
 ## 生成与兼容
 
 ```powershell

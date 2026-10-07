@@ -20,6 +20,7 @@ from glimmer_cradle.cognition.memory.memory_store import (
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
     MemoryConsolidationRequest,
+    MemoryJobFeedback,
     MemoryJobIdentity,
     MemoryJobResult,
     RelationshipProjectionStore,
@@ -194,6 +195,31 @@ class ConsolidationCoordinator:
         if not self.uses_external_jobs:
             raise MemoryConsolidationConflictError("旧巩固队列尚未切换；禁止双消费")
         self._episodes.acknowledge_job_request(request, job_id)
+
+    async def accept_job_feedback(self, feedback: MemoryJobFeedback, result: dict | None) -> bool:
+        if not self.uses_external_jobs:
+            raise MemoryConsolidationConflictError("旧队列不能接收外部 Jobs 状态")
+        if feedback.status not in {"queued", "running", "retry_wait", "succeeded", "cancelled", "dead_letter", "unknown"} \
+            or not all(isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= 9007199254740991
+                for value in (feedback.revision, feedback.job_epoch, feedback.delivery_epoch)):
+            raise MemoryConsolidationConflictError("Memory 状态投影输入无效")
+        if not isinstance(feedback.updated_at, int) or isinstance(feedback.updated_at, bool) or not 0 <= feedback.updated_at <= 9007199254740991 \
+            or not all(isinstance(value, str) and value.strip() for value in
+                (feedback.request_id, feedback.job_id, feedback.scope_id, feedback.event_id, feedback.event_digest)):
+            raise MemoryConsolidationConflictError("Memory 状态投影 identity/时间无效")
+        source = self._episodes.accepted_job_request(feedback.job_id)
+        if source.request_id != feedback.request_id or source.input.scope_id != feedback.scope_id:
+            raise MemoryConsolidationConflictError("Memory 状态源身份冲突")
+        receipt = await self._memory.find_consolidation(source.input)
+        if feedback.status == "succeeded":
+            expected = None if receipt is None else {"receipt_id": receipt.receipt_id,
+                "operation_id": receipt.operation_id, "memory_ids": list(receipt.memory_ids), "committed_at": receipt.committed_at}
+            if result is None or result != expected:
+                raise MemoryConsolidationConflictError("Memory 成功状态缺少匹配的持久业务 receipt")
+        elif result is not None:
+            raise MemoryConsolidationConflictError("Memory 非成功状态不能自报业务结果")
+        # 取消/unknown 是 Jobs 意图/不确定性；不能擦除实际已提交的 Memory receipt。
+        return self._episodes.accept_job_feedback(feedback, receipt.receipt_id if receipt else None)
 
     async def _consolidate_batch(self, jobs: list[ConsolidationJob]) -> int:
         assert self._jobs is not None

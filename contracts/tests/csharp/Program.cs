@@ -19,6 +19,20 @@ using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
 
+var stateRequest = new PublishMemoryJobStateRequest { DeliveryAuthorityEpoch = 9007199254740991,
+    Event = new JobsV1.JobStateEvent { EventId = "event:one", JobId = "job:one", ScopeId = "scope:one",
+        GoalId = "source:one", Kind = "memory.consolidate", Revision = 9007199254740991,
+        Status = JobsV1.JobStatus.Cancelled, Attempt = 2, AuthorityEpoch = 7, FencingToken = 8,
+        UpdatedAtMs = 1900000000000, ErrorCode = "cancelled" } };
+var restoredState = PublishMemoryJobStateRequest.Parser.ParseFrom(stateRequest.ToByteArray());
+if (restoredState.DeliveryAuthorityEpoch != 9007199254740991 || restoredState.Event.Revision != 9007199254740991
+    || restoredState.Event.Status != JobsV1.JobStatus.Cancelled || restoredState.Event.Result != null
+    || !restoredState.Event.HasErrorCode || restoredState.Event.ErrorCode != "cancelled")
+    throw new InvalidOperationException("Job state precision/presence roundtrip failed");
+stateRequest.Event.Result = Google.Protobuf.WellKnownTypes.Struct.Parser.ParseJson("{\"receipt_id\":\"receipt:one\",\"memory_ids\":[\"memory:one\"]}");
+if (PublishMemoryJobStateRequest.Parser.ParseFrom(stateRequest.ToByteArray()).Event.Result.Fields["receipt_id"].StringValue != "receipt:one")
+    throw new InvalidOperationException("Job state result roundtrip failed");
+
 var sourceAck = new AcknowledgeMemoryJobRequestRequest { JobId = "job:one", Request = new MemoryJobSourceRequest {
     RequestId = "source:one", EpisodeId = "episode:one", EpisodeVersion = 9007199254740991,
     ScopeId = "scope:one", InputDigest = new string('a', 64), CreatedAt = "2026-10-06T00:00:00Z" } };

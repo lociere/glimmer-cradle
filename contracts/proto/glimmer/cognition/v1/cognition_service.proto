@@ -370,6 +370,19 @@ message AcknowledgeMemoryJobRequestResponse {
   bool accepted = 3;
 }
 
+message PublishMemoryJobStateRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobStateEvent event = 2;
+  // 当前投递主的 epoch，可大于待投递事实的原 epoch；接收端只保留观测 high-water。
+  uint64 delivery_authority_epoch = 3;
+}
+
+message PublishMemoryJobStateResponse {
+  string event_id = 1;
+  bool accepted = 2;
+  bool duplicate = 3;
+}
+
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -387,4 +400,6 @@ service CognitionService {
   // 仅在外部 Jobs owner 模式开放；不能与旧巩固队列双消费。
   rpc ReadMemoryJobRequests(ReadMemoryJobRequestsRequest) returns (ReadMemoryJobRequestsResponse);
   rpc AcknowledgeMemoryJobRequest(AcknowledgeMemoryJobRequestRequest) returns (AcknowledgeMemoryJobRequestResponse);
+  // inbox 与投影同事务接纳后才 ACK；legacy 模式拒绝调用。
+  rpc PublishMemoryJobState(PublishMemoryJobStateRequest) returns (PublishMemoryJobStateResponse);
 }

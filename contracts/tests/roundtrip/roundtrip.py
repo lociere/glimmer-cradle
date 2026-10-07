@@ -15,10 +15,10 @@ from glimmer.common.v1.contract_probe_pb2 import (  # noqa: E402
     TraceMetadata,
 )
 from glimmer.content.v1.content_pb2 import AssetRef, ContentPart, FileContent  # noqa: E402
-from glimmer.jobs.v1.jobs_pb2 import JobExecutionIdentity  # noqa: E402
+from glimmer.jobs.v1.jobs_pb2 import JobExecutionIdentity, JobStateEvent, JOB_STATUS_CANCELLED  # noqa: E402
 from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
     ExecuteMemoryJobRequest, ReconcileMemoryJobResponse, MemoryJobResult, MEMORY_JOB_RESOLUTION_NOT_APPLIED,
-    AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest,
+    AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest, PublishMemoryJobStateRequest,
 )
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
     AudioPlayEvent,
@@ -29,6 +29,17 @@ fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
+
+state = PublishMemoryJobStateRequest(delivery_authority_epoch=9007199254740991, event=JobStateEvent(
+    event_id="event:one", job_id="job:one", scope_id="scope:one", goal_id="source:one", kind="memory.consolidate",
+    revision=9007199254740991, status=JOB_STATUS_CANCELLED, attempt=2, authority_epoch=7, fencing_token=8,
+    updated_at_ms=1900000000000, error_code="cancelled"))
+restored_state = PublishMemoryJobStateRequest.FromString(state.SerializeToString())
+assert restored_state.delivery_authority_epoch == restored_state.event.revision == 9007199254740991
+assert restored_state.event.status == JOB_STATUS_CANCELLED and restored_state.event.error_code == "cancelled"
+assert not restored_state.event.HasField("result")
+state.event.result.update({"receipt_id": "receipt:one", "memory_ids": ["memory:one"]})
+assert PublishMemoryJobStateRequest.FromString(state.SerializeToString()).event.result["receipt_id"] == "receipt:one"
 
 source_ack = AcknowledgeMemoryJobRequestRequest(job_id="job:one", request=MemoryJobSourceRequest(
     request_id="source:one", episode_id="episode:one", episode_version=9007199254740991,

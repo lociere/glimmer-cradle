@@ -868,6 +868,10 @@ async def test_memory_source_rpc_requires_external_owner_and_binds_durable_ack(m
     with pytest.raises(grpc.aio.AioRpcError) as unavailable:
         await read(request, timeout=2)
     assert unavailable.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+    publish = _call(channel, "PublishMemoryJobState", cognition_pb.PublishMemoryJobStateRequest, cognition_pb.PublishMemoryJobStateResponse)
+    with pytest.raises(grpc.aio.AioRpcError) as legacy_state:
+        await publish(cognition_pb.PublishMemoryJobStateRequest(call=_metadata("generation-1", "legacy-state")), timeout=2)
+    assert legacy_state.value.code() is grpc.StatusCode.FAILED_PRECONDITION
     monkeypatch.setattr(coordinator, "_jobs", None)
     sources = (await read(request, timeout=2)).requests
     assert len(sources) == 1 and llm.calls == 0

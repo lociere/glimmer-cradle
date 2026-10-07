@@ -2,15 +2,97 @@
 // @generated from file glimmer/jobs/v1/jobs.proto (package glimmer.jobs.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file glimmer/jobs/v1/jobs.proto.
  */
 export const file_glimmer_jobs_v1_jobs: GenFile = /*@__PURE__*/
-  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIqMBChRKb2JFeGVjdXRpb25JZGVudGl0eRIOCgZqb2JfaWQYASABKAkSEAoIc2NvcGVfaWQYAiABKAkSDwoHYXR0ZW1wdBgDIAEoBBIXCg9hdXRob3JpdHlfZXBvY2gYBCABKAQSFQoNZmVuY2luZ190b2tlbhgFIAEoBBIQCghvd25lcl9pZBgGIAEoCRIWCg5sZWFzZV91bnRpbF9tcxgHIAEoBEIqqgInR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Kb2JzLlYxYgZwcm90bzM");
+  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIskCCg1Kb2JTdGF0ZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg4KBmpvYl9pZBgCIAEoCRIQCghzY29wZV9pZBgDIAEoCRIPCgdnb2FsX2lkGAQgASgJEgwKBGtpbmQYBSABKAkSEAoIcmV2aXNpb24YBiABKAQSKgoGc3RhdHVzGAcgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIPCgdhdHRlbXB0GAggASgEEhcKD2F1dGhvcml0eV9lcG9jaBgJIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAogASgEEicKBnJlc3VsdBgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKZXJyb3JfY29kZRgMIAEoCUgAiAEBEhUKDXVwZGF0ZWRfYXRfbXMYDSABKARCDQoLX2Vycm9yX2NvZGUiowEKFEpvYkV4ZWN1dGlvbklkZW50aXR5Eg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdhdHRlbXB0GAMgASgEEhcKD2F1dGhvcml0eV9lcG9jaBgEIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAUgASgEEhAKCG93bmVyX2lkGAYgASgJEhYKDmxlYXNlX3VudGlsX21zGAcgASgEKtkBCglKb2JTdGF0dXMSGgoWSk9CX1NUQVRVU19VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFUVVNfUVVFVUVEEAESFgoSSk9CX1NUQVRVU19SVU5OSU5HEAISGQoVSk9CX1NUQVRVU19SRVRSWV9XQUlUEAMSGAoUSk9CX1NUQVRVU19TVUNDRUVERUQQBBIYChRKT0JfU1RBVFVTX0NBTkNFTExFRBAFEhoKFkpPQl9TVEFUVVNfREVBRF9MRVRURVIQBhIWChJKT0JfU1RBVFVTX1VOS05PV04QB0IqqgInR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Kb2JzLlYxYgZwcm90bzM", [file_google_protobuf_struct]);
+
+/**
+ * Jobs outbox 的不可变事实。取消只表示调度意图撤销，不证明领域副作用回滚。
+ *
+ * @generated from message glimmer.jobs.v1.JobStateEvent
+ */
+export type JobStateEvent = Message<"glimmer.jobs.v1.JobStateEvent"> & {
+  /**
+   * SHA-256(紧凑 UTF-8 JSON [job_id, revision])；同一事实重投不能换 ID。
+   *
+   * @generated from field: string event_id = 1;
+   */
+  eventId: string;
+
+  /**
+   * @generated from field: string job_id = 2;
+   */
+  jobId: string;
+
+  /**
+   * @generated from field: string scope_id = 3;
+   */
+  scopeId: string;
+
+  /**
+   * @generated from field: string goal_id = 4;
+   */
+  goalId: string;
+
+  /**
+   * @generated from field: string kind = 5;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: uint64 revision = 6;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: glimmer.jobs.v1.JobStatus status = 7;
+   */
+  status: JobStatus;
+
+  /**
+   * @generated from field: uint64 attempt = 8;
+   */
+  attempt: bigint;
+
+  /**
+   * @generated from field: uint64 authority_epoch = 9;
+   */
+  authorityEpoch: bigint;
+
+  /**
+   * @generated from field: uint64 fencing_token = 10;
+   */
+  fencingToken: bigint;
+
+  /**
+   * @generated from field: google.protobuf.Struct result = 11;
+   */
+  result?: JsonObject | undefined;
+
+  /**
+   * @generated from field: optional string error_code = 12;
+   */
+  errorCode?: string | undefined;
+
+  /**
+   * @generated from field: uint64 updated_at_ms = 13;
+   */
+  updatedAtMs: bigint;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.JobStateEvent.
+ * Use `create(JobStateEventSchema)` to create a new message.
+ */
+export const JobStateEventSchema: GenMessage<JobStateEvent> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 0);
 
 /**
  * 原执行身份在失效/切代后仍用于接收端对账；不以当前 Job identity 替代。
@@ -60,4 +142,55 @@ export type JobExecutionIdentity = Message<"glimmer.jobs.v1.JobExecutionIdentity
  * Use `create(JobExecutionIdentitySchema)` to create a new message.
  */
 export const JobExecutionIdentitySchema: GenMessage<JobExecutionIdentity> = /*@__PURE__*/
-  messageDesc(file_glimmer_jobs_v1_jobs, 0);
+  messageDesc(file_glimmer_jobs_v1_jobs, 1);
+
+/**
+ * @generated from enum glimmer.jobs.v1.JobStatus
+ */
+export enum JobStatus {
+  /**
+   * @generated from enum value: JOB_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: JOB_STATUS_QUEUED = 1;
+   */
+  QUEUED = 1,
+
+  /**
+   * @generated from enum value: JOB_STATUS_RUNNING = 2;
+   */
+  RUNNING = 2,
+
+  /**
+   * @generated from enum value: JOB_STATUS_RETRY_WAIT = 3;
+   */
+  RETRY_WAIT = 3,
+
+  /**
+   * @generated from enum value: JOB_STATUS_SUCCEEDED = 4;
+   */
+  SUCCEEDED = 4,
+
+  /**
+   * @generated from enum value: JOB_STATUS_CANCELLED = 5;
+   */
+  CANCELLED = 5,
+
+  /**
+   * @generated from enum value: JOB_STATUS_DEAD_LETTER = 6;
+   */
+  DEAD_LETTER = 6,
+
+  /**
+   * @generated from enum value: JOB_STATUS_UNKNOWN = 7;
+   */
+  UNKNOWN = 7,
+}
+
+/**
+ * Describes the enum glimmer.jobs.v1.JobStatus.
+ */
+export const JobStatusSchema: GenEnum<JobStatus> = /*@__PURE__*/
+  enumDesc(file_glimmer_jobs_v1_jobs, 0);

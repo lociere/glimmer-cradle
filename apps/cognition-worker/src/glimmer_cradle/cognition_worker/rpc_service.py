@@ -28,6 +28,7 @@ import grpc
 import structlog
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
+from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
 from glimmer_cradle.cognition.loop import LoopController
@@ -37,6 +38,7 @@ from glimmer_cradle.cognition.memory import (
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
     MemoryConsolidationRequest,
+    MemoryJobFeedback,
     MemoryJobIdentity,
     MemoryJobResult,
 )
@@ -71,7 +73,7 @@ from glimmer_cradle.cognition_worker.shutdown import (
     cancel_task,
     worker_shutdown_steps,
 )
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import MessageToDict, ParseDict
 from structlog.stdlib import ProcessorFormatter
 
 
@@ -1427,6 +1429,7 @@ class CognitionGrpcHost:
             "ReconcileMemoryJob": self._method(self._reconcile_memory_job, cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
             "ReadMemoryJobRequests": self._method(self._read_memory_job_requests, cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
             "AcknowledgeMemoryJobRequest": self._method(self._acknowledge_memory_job_request, cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
+            "PublishMemoryJobState": self._method(self._publish_memory_job_state, cognition_pb.PublishMemoryJobStateRequest, cognition_pb.PublishMemoryJobStateResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         port = server.add_insecure_port("127.0.0.1:0")
@@ -1692,6 +1695,39 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory 源请求接纳冲突") from error
             return cognition_pb.AcknowledgeMemoryJobRequestResponse(request_id=item.request_id,
                 job_id=request.job_id, accepted=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _publish_memory_job_state(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            coordinator = self._external_memory_jobs()
+            if not request.HasField("event") or request.event.ByteSize() > 65536:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 状态事实缺失或超出上限")
+            event = request.event
+            statuses = {jobs_pb.JOB_STATUS_QUEUED: "queued", jobs_pb.JOB_STATUS_RUNNING: "running",
+                jobs_pb.JOB_STATUS_RETRY_WAIT: "retry_wait", jobs_pb.JOB_STATUS_SUCCEEDED: "succeeded",
+                jobs_pb.JOB_STATUS_CANCELLED: "cancelled", jobs_pb.JOB_STATUS_DEAD_LETTER: "dead_letter",
+                jobs_pb.JOB_STATUS_UNKNOWN: "unknown"}
+            identity = json.dumps([event.job_id, event.revision], separators=(",", ":"), ensure_ascii=False)
+            if event.status not in statuses or event.kind != "memory.consolidate" or not event.scope_id.strip() \
+                or event.job_id != f"memory:{event.goal_id}" or not re.fullmatch(r"[a-f0-9]{64}", event.goal_id) \
+                or event.event_id != hashlib.sha256(identity.encode("utf-8")).hexdigest() \
+                or not all(1 <= value <= 9007199254740991 for value in
+                    (event.revision, event.authority_epoch, request.delivery_authority_epoch)) \
+                or not all(0 <= value <= 9007199254740991 for value in
+                    (event.attempt, event.fencing_token, event.updated_at_ms)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 状态事实 identity/枚举/整数无效")
+            if event.status in {jobs_pb.JOB_STATUS_RUNNING, jobs_pb.JOB_STATUS_RETRY_WAIT,
+                    jobs_pb.JOB_STATUS_SUCCEEDED, jobs_pb.JOB_STATUS_UNKNOWN} and (not event.attempt or not event.fencing_token):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 执行状态缺少 attempt/token")
+            feedback = MemoryJobFeedback(event.goal_id, event.job_id, event.scope_id, event.event_id,
+                hashlib.sha256(event.SerializeToString(deterministic=True)).hexdigest(), event.revision,
+                statuses[event.status], event.authority_epoch, request.delivery_authority_epoch, event.updated_at_ms)
+            try:
+                duplicate = await coordinator.accept_job_feedback(feedback,
+                    MessageToDict(event.result) if event.HasField("result") else None)
+            except MemoryConsolidationConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory 状态源/receipt/投递身份冲突") from error
+            return cognition_pb.PublishMemoryJobStateResponse(event_id=event.event_id, accepted=True, duplicate=duplicate)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:

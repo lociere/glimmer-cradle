@@ -71,6 +71,22 @@ class MemoryJobResult:
     observed_at: int
 
 
+@dataclass(frozen=True, slots=True)
+class MemoryJobFeedback:
+    """Memory 源所需的状态投影输入；非 wire DTO，不拥有 Jobs 状态或调度。"""
+
+    request_id: str
+    job_id: str
+    scope_id: str
+    event_id: str
+    event_digest: str
+    revision: int
+    status: str
+    job_epoch: int
+    delivery_epoch: int
+    updated_at: int
+
+
 class EpisodeProjectionStore(Protocol):
     async def start(self) -> None: ...
     async def project_pending(self, *, seal: bool = False) -> int: ...
@@ -83,6 +99,8 @@ class EpisodeProjectionStore(Protocol):
     def mark_consolidated(self, episode_id: str, consolidated_at: str) -> None: ...
     def pending_job_requests(self, *, limit: int = 64) -> list[MemoryConsolidationRequest]: ...
     def acknowledge_job_request(self, request: MemoryConsolidationRequest, job_id: str) -> None: ...
+    def accepted_job_request(self, job_id: str) -> MemoryConsolidationRequest: ...
+    def accept_job_feedback(self, feedback: MemoryJobFeedback, receipt_id: str | None) -> bool: ...
 
 
 class ConsolidationJobStore(Protocol):

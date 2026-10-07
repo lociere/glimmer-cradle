@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Architecture v2 阶段 7 状态投递：`proto/glimmer/jobs/v1/jobs.proto` 新增 `JobStatus`、`JobStateEvent`；
+`proto/glimmer/cognition/v1/cognition_service.proto` 新增 `PublishMemoryJobState`、
+`PublishMemoryJobStateRequest`、`PublishMemoryJobStateResponse`。Host 使用生成 DTO 投递不可变 outbox，
+Worker 校验原事实、当前 generation/投递 epoch 与实际 Memory receipt，源 owner 的 inbox/投影同事务提交
+后确认；legacy 拒绝双消费。仅兼容新增 IDL，不刷新既有 Proto/JSON Schema baseline。
+
 v2.1 新增唯一 Document：`json-schema/config/v1/jobs-config.schema.json`、
 `https://glimmer-cradle.local/contracts/config/v1/jobs-config.schema.json`、`JobsConfig`（Jobs owner）；
 `json-schema/config/v1/host-config.schema.json`、

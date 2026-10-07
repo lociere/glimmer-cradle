@@ -7,6 +7,7 @@ import { SqliteJobStore, type JobClockPort, type JobStateReceiverPort, type JobS
 import { SqliteAuthorityStore } from '../adapters/platform/authority-store.js';
 import { HostDataPaths } from '../adapters/platform/data-paths.js';
 import { loadHostCognitionJobsConfiguration, type HostCognitionJobsConfiguration } from '../adapters/platform/host-configuration.js';
+import { CognitionJobAdapter } from './cognition-job-adapter.js';
 
 export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly authority: AuthorityStorePort;
@@ -14,6 +15,8 @@ export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly renewal_interval_ms: number;
   /** 接纳显式 handover 的持久 receipt；不是自行指定 epoch。 */
   readonly initial_lease?: AuthorityLease;
+  /** 配置启动选择实际 Cognition inbox；未装配的手工 owner 不制造确认。 */
+  readonly memory_state_feedback?: boolean;
 }
 
 export interface ConfiguredHostCognitionJobsOptions {
@@ -79,7 +82,7 @@ export class ConfiguredHostCognitionJobsOwner {
         app_root: this.options.paths.app_root, data_root: this.options.paths.data_root, console_path: this.options.paths.worker_console });
       this.session = new HostCognitionJobsOwner({ worker, jobs: { ...this.configuration.jobs, ...this.configuration.authority,
         store: this.store, authority: this.authority, clock: this.options.clock, owner_id: this.options.owner_id,
-        state_receiver: this.options.state_receiver } });
+        state_receiver: this.options.state_receiver, memory_state_feedback: true } });
       await this.session.start();
       if (this.stopRequested) throw new Error('配置 Host 启动已撤销');
       this.phase = 'active'; return this.snapshot;
@@ -268,7 +271,9 @@ export class HostJobsOwner {
       if (priorJobEpoch !== null && this.lease.epoch <= priorJobEpoch) {
         throw new AuthorityConflictError('新 Host lease 未领先已有 Jobs epoch，须受控恢复');
       }
-      this.jobs = new HostJobsController({ ...this.options, epoch: this.lease.epoch, clock: { now: () => this.guardedNow() } });
+      this.jobs = new HostJobsController({ ...this.options, epoch: this.lease.epoch, clock: { now: () => this.guardedNow() },
+        state_receiver: this.options.state_receiver ?? (this.options.memory_state_feedback
+          ? new CognitionJobAdapter(this.options.cognition).stateReceiver(this.lease.epoch) : undefined) });
       this.scheduleRenewal();
       await this.jobs.start();
       if (this.phase !== 'starting') throw new AuthorityConflictError('Host Jobs 启动身份已撤销');

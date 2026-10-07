@@ -17,7 +17,10 @@ import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
-import { JobController, JobRecoveryController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
+import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
+import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
+import { PublishMemoryJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { JobStatus as WireJobStatus } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
   WorkerSupervisor, HostCognitionJobsOwner, ConfiguredHostCognitionJobsOwner, HostDataPaths, type WorkerSupervisorOptions,
@@ -88,7 +91,11 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         before = jobs.prepare('SELECT job_id,initial_due_at,max_attempts FROM job_source_receipts').get();
         expect(before).toMatchObject({ max_attempts: 5 });
         expect(jobs.prepare('SELECT attempt,status FROM jobs').get()).toEqual({ attempt: 0, status: 'queued' });
+        expect(jobs.prepare('SELECT COUNT(*) AS count FROM job_outbox WHERE acknowledged_at IS NULL').get()).toEqual({ count: 0 });
       } finally { jobs.close(); }
+      const feedback = new Database(path.join(paths.data_root, 'state/cognition/projections/episodes.db'), { readonly: true });
+      try { expect(feedback.prepare('SELECT status,business_outcome FROM memory_job_projection').get()).toEqual({ status: 'queued', business_outcome: 'unknown' }); }
+      finally { feedback.close(); }
       const endpoints = [owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.control_endpoint!];
       expect(owner.stop()).toBe(owner.stop()); await owner.stop();
       expect(owner.snapshot.phase).toBe('stopped');
@@ -435,6 +442,136 @@ it('Host 循环实际执行终态保留政策：缺接收方不删，真实 inbo
   } finally { await next?.stop(); await first.stop(); receiver.close(); store.close(); await service.stop(); }
 }, 30_000);
 
+describe('Memory 状态事实真实 wire/inbox', () => {
+  it('投影写入失败回滚 inbox，未知/取消未执行事实不冒充无副作用，未知 schema 保留数据并拒绝', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-state-rollback-'));
+    const service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const controller = new JobController(store, clock, policy);
+    let projection: Database.Database | undefined;
+    try {
+      store.activateAuthority(1, clock.now()); const adapter = new CognitionJobAdapter(service.client);
+      await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8);
+      const recovery = new JobRecoveryController(store, clock, 1, policy), receiver = adapter.stateReceiver(1);
+      expect(await recovery.deliverOutbox(receiver, 100)).toBe(1);
+      projection = new Database(path.join(root, 'episodes.db'));
+      const claim = store.claim(1, 'fault', clock.now(), 60000)!;
+      projection.exec("CREATE TRIGGER reject_projection BEFORE UPDATE ON memory_job_projection BEGIN SELECT RAISE(ABORT,'injected projection failure'); END");
+      await expect(recovery.deliverOutbox(receiver, 100)).rejects.toMatchObject({ code: ServiceErrorCode.INTERNAL });
+      expect(projection.prepare('SELECT COUNT(*) AS count FROM memory_job_feedback_inbox').get()).toEqual({ count: 1 });
+      expect(projection.prepare('SELECT status FROM memory_job_projection').get()).toEqual({ status: 'queued' });
+      expect(store.readOutbox(1, 100)[0].status).toBe('running');
+      projection.exec('DROP TRIGGER reject_projection');
+      expect(await recovery.deliverOutbox(receiver, 100)).toBe(1);
+      store.finish(claim.lease, clock.now(), { status: 'unknown', error_code: 'unresolved' });
+      await recovery.deliverOutbox(receiver, 100);
+      expect(projection.prepare('SELECT status,receipt_id,business_outcome FROM memory_job_projection').get())
+        .toEqual({ status: 'unknown', receipt_id: null, business_outcome: 'unknown' });
+      const job = store.load(claim.job.job_id)!;
+      expect(controller.cancel(job.job_id, 1, job.revision)).toBeNull(); await recovery.deliverOutbox(receiver, 100);
+      expect(projection.prepare('SELECT status,receipt_id,business_outcome FROM memory_job_projection').get())
+        .toEqual({ status: 'unknown', receipt_id: null, business_outcome: 'unknown' });
+      projection.prepare("UPDATE projection_meta SET value='99' WHERE key='memory_job_feedback_schema'").run();
+      const event = store.readOutbox(1, 100); expect(event).toEqual([]);
+      const queued = { ...job, event_id: createHash('sha256').update(JSON.stringify([job.job_id, job.revision])).digest('hex') };
+      await expect(receiver.accept(queued)).rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      expect(projection.prepare("SELECT value FROM projection_meta WHERE key='memory_job_feedback_schema'").get()).toEqual({ value: '99' });
+      expect(memoryCounts(root)).toEqual([0, 0, 0]);
+    } finally { projection?.close(); await controller.stop(); store.close(); await service.stop(); }
+  }, 30000);
+
+  it('实际接收后 Host retention 清理 body，但源投影/receipt/inbox 保留且业务只提交一次', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-state-loop-'));
+    const service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const host = new HostJobsController({ store, clock, epoch: 1, owner_id: 'state', cognition: service.client,
+      poll_interval_ms: 10, batch_size: 8, lease_ms: 60000, submission_policy: submissionPolicy, retry_policy: policy,
+      terminal_retention_ms: 0, state_receiver: new CognitionJobAdapter(service.client).stateReceiver(1) });
+    try {
+      await host.start();
+      const projection = new Database(path.join(root, 'episodes.db'), { readonly: true });
+      try {
+        const state = projection.prepare('SELECT job_id,status,receipt_id FROM memory_job_projection').get() as { job_id: string; status: string; receipt_id: string };
+        expect(state.status).toBe('succeeded'); expect(state.receipt_id).toBeTruthy();
+        await eventually(() => store.load(state.job_id) === null);
+        expect(projection.prepare('SELECT COUNT(*) AS count FROM memory_job_feedback_inbox').get()).toEqual({ count: 3 });
+        expect(projection.prepare('SELECT COUNT(*) AS count FROM memory_request_outbox').get()).toEqual({ count: 1 });
+      } finally { projection.close(); }
+      expect(memoryCounts(root)).toEqual([1, 1, 1]); expect(store.readOutbox(1, 100)).toEqual([]);
+    } finally { await host.stop(); store.close(); await service.stop(); }
+  }, 30000);
+
+  it('状态业务已提交而 ACK 丢失：跨 Worker/Jobs 重启重复接纳；旧 revision/投递主/非法事实不能回退投影', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-state-loss-'));
+    let service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let controller = new JobController(store, clock, policy);
+    try {
+      store.activateAuthority(1, clock.now()); const adapter = new CognitionJobAdapter(service.client);
+      await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8); controller.register(adapter);
+      await controller.execute(store.claim(1, 'state', clock.now(), 60000)!);
+      const originals = store.readOutbox(1, 100), completed = originals.find(event => event.status === 'succeeded')!;
+      const publish = service.client.publishJobState.bind(service.client);
+      const loss = vi.spyOn(service.client, 'publishJobState').mockImplementation(async (...args: Parameters<CognitionClient['publishJobState']>) => {
+        const result = await publish(...args);
+        if (args[0].event!.eventId === completed.event_id) throw new Error('state ACK lost after commit');
+        return result;
+      });
+      await expect(new JobRecoveryController(store, clock, 1, policy).deliverOutbox(adapter.stateReceiver(1), 100)).rejects.toThrow('ACK lost');
+      expect(store.readOutbox(1, 100)).toEqual([completed]); expect(new JobRetentionController(store, clock, 1).prune(0)).toBe(0);
+      loss.mockRestore(); await controller.stop(); store.close(); await service.stop();
+      service = await worker(root, 'two'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      store.activateAuthority(2, clock.now()); controller = new JobController(store, clock, policy);
+      const recovery = new JobRecoveryController(store, clock, 2, policy), receiving = new CognitionJobAdapter(service.client);
+      expect(await recovery.deliverOutbox(receiving.stateReceiver(2), 100)).toBe(1);
+      const request = (event: JobStateEvent, epoch = 2) => create(PublishMemoryJobStateRequestSchema,
+        { event: memoryJobState(event), deliveryAuthorityEpoch: BigInt(epoch) });
+      expect(await service.client.publishJobState(request(completed))).toMatchObject({ accepted: true, duplicate: true });
+      expect(await service.client.publishJobState(request(originals[0]))).toMatchObject({ accepted: true, duplicate: true });
+      for (const malformed of [
+        { ...completed, scope_id: 'wrong' }, { ...completed, error_code: 'conflict' },
+        { ...completed, result: { ...completed.result!, receipt_id: 'forged' } },
+      ]) await expect(service.client.publishJobState(request(malformed))).rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      const badEnum = request(completed); badEnum.event!.status = 99 as WireJobStatus;
+      await expect(service.client.publishJobState(badEnum)).rejects.toMatchObject({ code: ServiceErrorCode.INVALID_REQUEST });
+      const overflow = request(completed); overflow.event!.revision = 9007199254740992n;
+      await expect(service.client.publishJobState(overflow)).rejects.toMatchObject({ code: ServiceErrorCode.INVALID_REQUEST });
+      const stale = new CognitionClient(service.endpoint, 'one', 2000);
+      try { await expect(stale.publishJobState(request(completed))).rejects.toMatchObject({ code: ServiceErrorCode.GENERATION_MISMATCH }); }
+      finally { stale.close(); }
+      store.activateAuthority(3, clock.now());
+      expect(await service.client.publishJobState(request(completed, 3))).toMatchObject({ duplicate: true });
+      await expect(service.client.publishJobState(request(completed, 2))).rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      const projection = new Database(path.join(root, 'episodes.db'), { readonly: true });
+      try {
+        expect(projection.prepare('SELECT status,revision FROM memory_job_projection').get()).toEqual({ status: 'succeeded', revision: completed.revision });
+        expect(projection.prepare('SELECT COUNT(*) AS count FROM memory_job_feedback_inbox').get()).toEqual({ count: 3 });
+      } finally { projection.close(); }
+      expect(new JobRetentionController(store, clock, 3).prune(0)).toBe(1); expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    } finally { await controller.stop(); store.close(); await service.stop(); }
+  }, 30000);
+
+  it('本地取消晚于 Memory 提交：真实 cancelled 投影保留业务 receipt，不虚报回滚', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-state-cancel-'));
+    const service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const controller = new JobController(store, clock, policy);
+    const execute = service.client.execute.bind(service.client);
+    const cancellation = vi.spyOn(service.client, 'execute').mockImplementation(async (...args: Parameters<CognitionClient['execute']>) => {
+      const result = await execute(...args), job = store.load(args[0].identity!.jobId)!;
+      expect(controller.cancel(job.job_id, 1, job.revision)?.status).toBe('cancelled'); return result;
+    });
+    try {
+      store.activateAuthority(1, clock.now()); const adapter = new CognitionJobAdapter(service.client);
+      await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8); controller.register(adapter);
+      expect(await controller.execute(store.claim(1, 'cancellation', clock.now(), 60000)!)).toMatchObject({ status: 'cancelled', result: null });
+      await new JobRecoveryController(store, clock, 1, policy).deliverOutbox(adapter.stateReceiver(1), 100);
+      const projection = new Database(path.join(root, 'episodes.db'), { readonly: true });
+      try {
+        expect(projection.prepare('SELECT status,receipt_id,business_outcome FROM memory_job_projection').get())
+          .toMatchObject({ status: 'cancelled', receipt_id: expect.any(String), business_outcome: 'committed' });
+      } finally { projection.close(); }
+      expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    } finally { cancellation.mockRestore(); await controller.stop(); store.close(); await service.stop(); }
+  }, 30000);
+});
+
 function ownedJobs(store: SqliteJobStore, client: CognitionClient, authority: SqliteAuthorityStore, owner: string, initial?: AuthorityLease) {
   return new HostJobsOwner({ store, clock, owner_id: owner, cognition: client, authority,
     authority_lease_ms: 2000, renewal_interval_ms: 25, poll_interval_ms: 10, batch_size: 8,
@@ -752,6 +889,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
     let first = true;
     const port = { execute: service.client.execute.bind(service.client), reconcile: service.client.reconcile.bind(service.client),
+      publishJobState: service.client.publishJobState.bind(service.client),
       readRequests: service.client.readRequests.bind(service.client), acknowledge: async (...args: Parameters<CognitionClient['acknowledge']>) => {
         if (first) { first = false; throw new Error('injected ACK loss'); }
         return service.client.acknowledge(...args);
@@ -787,6 +925,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
     let controller = new JobController(store, clock, policy);
     const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+      publishJobState: service.client.publishJobState.bind(service.client),
       reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
       acknowledge: async (...args: Parameters<CognitionClient['acknowledge']>) => {
         await service.client.acknowledge(...args); throw new Error('injected committed ACK response loss');
@@ -818,6 +957,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     let drift = false;
     const acknowledge = vi.fn(async () => { throw new Error('injected ACK loss'); });
     const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+      publishJobState: service.client.publishJobState.bind(service.client),
       reconcile: service.client.reconcile.bind(service.client), acknowledge,
       readRequests: async (...args: Parameters<CognitionClient['readRequests']>) => {
         const response = await actualRead(...args);
@@ -845,7 +985,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
       const adapter = new CognitionJobAdapter({ execute: async (...args) => {
         await service.client.execute(...args); throw new Error('injected completion response loss');
       }, reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
-      acknowledge: service.client.acknowledge.bind(service.client) });
+      acknowledge: service.client.acknowledge.bind(service.client), publishJobState: service.client.publishJobState.bind(service.client) });
       await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8);
       controller.register(adapter);
       const claim = store.claim(1, 'original-host', clock.now(), 60_000)!;
@@ -876,6 +1016,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
       store.activateAuthority(1, clock.now());
       const adapter = new CognitionJobAdapter(service.client);
       const lostAck = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
+        publishJobState: service.client.publishJobState.bind(service.client),
         reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
         acknowledge: async () => { throw new Error('injected ACK loss'); } });
       await expect(lostAck.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK loss');

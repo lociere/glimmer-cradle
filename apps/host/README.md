@@ -32,7 +32,11 @@ Jobs/续期；重启须创建新实例/世代，数据库仍由调用方在整�
 [配置参考](../../docs/reference/configuration.md#目标-host-与-jobs-配置)，路径与备份边界见
 [数据目录](../../docs/reference/data-layout.md#用户状态与记忆)。测试中的安装根包含现行 Worker
 必需的真实 SQL migration，并验证资源摘要未改变；不是完整安装制品/只读 ACL 验收。
-gateway、完整配置 catalog、状态事件接收及产品启动迁移尚未完成；
+配置启动默认接 `CognitionJobAdapter.stateReceiver(epoch)`，经生成 Service 将实际 Jobs outbox
+投递到 Memory 源 owner 的持久 inbox/投影；核验 receipt、拒旧主/旧代，提交后才 ACK。未注入
+receiver 的手工装配仍保留待确认事实。取消/unknown 不代表 Memory 回滚或未执行，见
+[协议参考](../../docs/reference/protocol.md#memory-jobs-状态投递)。
+gateway、完整配置 catalog、产品状态投影消费和长期 Planning Jobs 及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
 完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。

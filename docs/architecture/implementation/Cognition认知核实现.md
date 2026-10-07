@@ -265,8 +265,13 @@ signal 与执行接纳，等待在途封口和循环后关闭当前 generation c
 配置及恢复预检先于 Worker 外部绑定；同一 Memory Document 约束 Worker 与源 debounce。
 真实配置启动/重启保持源首次政策，终态保留期在循环里保护未 ACK 事实；精确规则见
 [配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)与[数据目录](../../reference/data-layout.md#用户状态与记忆)。
-本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、状态事件 wire/inbox
-与旧队列/旧数据切换仍待完成。
+配置启动默认使用 `CognitionJobAdapter.stateReceiver(epoch)` 经生成 `PublishMemoryJobState` 投递
+真实 outbox；手工装配未提供 receiver 仍保持未 ACK。Worker 映射到 Memory consumer-local feedback，
+Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务提交 inbox/最新投影后 ACK。
+取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
+[协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
+本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
+长期 Planning Jobs 与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

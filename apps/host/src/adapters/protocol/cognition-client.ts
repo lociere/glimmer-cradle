@@ -8,6 +8,8 @@ import {
   ReadMemoryJobRequestsRequestSchema, ReadMemoryJobRequestsResponseSchema,
   AcknowledgeMemoryJobRequestRequestSchema, AcknowledgeMemoryJobRequestResponseSchema,
   GetReadinessRequestSchema, GetReadinessResponseSchema, ShutdownRequestSchema, ShutdownResponseSchema,
+  PublishMemoryJobStateRequestSchema, PublishMemoryJobStateResponseSchema,
+  type PublishMemoryJobStateRequest, type PublishMemoryJobStateResponse,
   type ExecuteMemoryJobRequest, type ExecuteMemoryJobResponse,
   type ReconcileMemoryJobRequest, type ReconcileMemoryJobResponse,
   type ReadMemoryJobRequestsRequest, type ReadMemoryJobRequestsResponse,
@@ -19,6 +21,7 @@ export interface MemoryJobsCognitionPort {
   reconcile(request: ReconcileMemoryJobRequest, signal?: AbortSignal): Promise<ReconcileMemoryJobResponse>;
   readRequests(request: ReadMemoryJobRequestsRequest, signal?: AbortSignal): Promise<ReadMemoryJobRequestsResponse>;
   acknowledge(request: AcknowledgeMemoryJobRequestRequest, signal?: AbortSignal): Promise<AcknowledgeMemoryJobRequestResponse>;
+  publishJobState(request: PublishMemoryJobStateRequest, signal?: AbortSignal): Promise<PublishMemoryJobStateResponse>;
 }
 
 export class HostCognitionError extends Error {
@@ -66,6 +69,10 @@ export class CognitionClient implements MemoryJobsCognitionPort {
     this.closed = true;
     for (const call of this.inflight) call.cancel();
     this.client.close();
+  }
+  public publishJobState(request: PublishMemoryJobStateRequest, signal?: AbortSignal): Promise<PublishMemoryJobStateResponse> {
+    return this.call('PublishMemoryJobState', PublishMemoryJobStateRequestSchema, PublishMemoryJobStateResponseSchema,
+      create(PublishMemoryJobStateRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   private metadata() { return create(CallMetadataSchema, { traceId: randomUUID(), generation: this.generation }); }
   private call<I extends DescMessage, O extends DescMessage>(name: string, input: I, output: O,

@@ -23,6 +23,7 @@ from glimmer_cradle.cognition.memory import (
     MemoryConsolidationInput,
     MemoryConsolidationReceipt,
     MemoryConsolidationRequest,
+    MemoryJobFeedback,
     MemoryJobIdentity,
     MemoryJobResult,
     RelationshipRecord,
@@ -1251,6 +1252,57 @@ class EpisodeProjection:
     @staticmethod
     def _hydrate_request(row: tuple[Any, ...]) -> MemoryConsolidationRequest:
         return MemoryConsolidationRequest(row[0], MemoryConsolidationInput(*row[1:5]), row[5])
+
+    def accepted_job_request(self, job_id: str) -> MemoryConsolidationRequest:
+        with closing(sqlite3.connect(self._path)) as conn:
+            rows = conn.execute("""SELECT request_id,episode_id,episode_version,scope_id,input_digest,created_at
+                FROM memory_request_outbox WHERE accepted_job_id=?""", (job_id,)).fetchall()
+        if len(rows) != 1:
+            raise MemoryConsolidationConflictError("Memory Job 缺少唯一已接纳源请求")
+        return self._hydrate_request(rows[0])
+
+    def accept_job_feedback(self, feedback: MemoryJobFeedback, receipt_id: str | None) -> bool:
+        with closing(sqlite3.connect(self._path)) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            # 仅显式 external 状态 RPC 触发此兼容扩展；legacy 启动不改变原库。
+            schema = conn.execute("SELECT value FROM projection_meta WHERE key='memory_job_feedback_schema'").fetchone()
+            tables = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('memory_job_feedback_inbox','memory_job_projection')").fetchone()[0]
+            if schema is not None and (schema[0] != "1" or tables != 2) or schema is None and tables:
+                raise MemoryConsolidationConflictError("Memory 状态接收 schema 不兼容；须受控恢复")
+            conn.execute("""CREATE TABLE IF NOT EXISTS memory_job_feedback_inbox(
+                event_id TEXT PRIMARY KEY,event_digest TEXT NOT NULL)""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS memory_job_projection(
+                request_id TEXT PRIMARY KEY,job_id TEXT NOT NULL UNIQUE,revision INTEGER NOT NULL,
+                job_epoch INTEGER NOT NULL,status TEXT NOT NULL,receipt_id TEXT,updated_at INTEGER NOT NULL,
+                business_outcome TEXT NOT NULL CHECK(business_outcome IN ('committed','unknown')))""")
+            conn.execute("INSERT OR IGNORE INTO projection_meta VALUES('memory_job_feedback_schema','1')")
+            source = conn.execute("SELECT scope_id,accepted_job_id FROM memory_request_outbox WHERE request_id=?",
+                                  (feedback.request_id,)).fetchone()
+            if source != (feedback.scope_id, feedback.job_id):
+                raise MemoryConsolidationConflictError("Memory 状态投递源冲突")
+            high = conn.execute("SELECT value FROM projection_meta WHERE key='memory_job_delivery_epoch'").fetchone()
+            if high and feedback.delivery_epoch < int(high[0]) or feedback.job_epoch > feedback.delivery_epoch:
+                raise MemoryConsolidationConflictError("Memory 状态投递主已失效")
+            prior = conn.execute("SELECT event_digest FROM memory_job_feedback_inbox WHERE event_id=?", (feedback.event_id,)).fetchone()
+            if prior and prior[0] != feedback.event_digest:
+                raise MemoryConsolidationConflictError("Memory 状态事件内容冲突")
+            current = conn.execute("SELECT revision,job_epoch FROM memory_job_projection WHERE request_id=?",
+                                   (feedback.request_id,)).fetchone()
+            if current and feedback.revision > current[0] and feedback.job_epoch < current[1]:
+                raise MemoryConsolidationConflictError("Memory 状态 authority 回退")
+            conn.execute("INSERT INTO projection_meta VALUES('memory_job_delivery_epoch',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                         (str(feedback.delivery_epoch),))
+            if not prior:
+                conn.execute("INSERT INTO memory_job_feedback_inbox VALUES(?,?)", (feedback.event_id, feedback.event_digest))
+                conn.execute("""INSERT INTO memory_job_projection VALUES(?,?,?,?,?,?,?,?)
+                    ON CONFLICT(request_id) DO UPDATE SET revision=excluded.revision,job_epoch=excluded.job_epoch,
+                      status=excluded.status,receipt_id=COALESCE(excluded.receipt_id,memory_job_projection.receipt_id),updated_at=excluded.updated_at,
+                      business_outcome=CASE WHEN COALESCE(excluded.receipt_id,memory_job_projection.receipt_id) IS NOT NULL THEN 'committed' ELSE 'unknown' END
+                    WHERE excluded.revision>memory_job_projection.revision""",
+                    (feedback.request_id, feedback.job_id, feedback.revision, feedback.job_epoch,
+                     feedback.status, receipt_id, feedback.updated_at, "committed" if receipt_id else "unknown"))
+            conn.commit()
+            return prior is not None
 
     def _record_sealed_requests(self, conn: sqlite3.Connection) -> None:
         rows = conn.execute("""SELECT * FROM episodes AS episode

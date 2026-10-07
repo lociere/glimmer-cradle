@@ -1,17 +1,27 @@
 import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
-  AcknowledgeMemoryJobRequestRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
-  type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence } from '@glimmer-cradle/jobs';
+  type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
 import type { MemoryJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
-  type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
+  memoryJobState, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
 export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPort {
   public readonly kind = MEMORY_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;
   public constructor(private readonly cognition: MemoryJobsCognitionPort) {}
+
+  public stateReceiver(epoch: number): JobStateReceiverPort {
+    if (!Number.isSafeInteger(epoch) || epoch < 1) throw new JobConflictError('Memory 状态投递主无效');
+    return { accept: async (event, signal) => {
+      const response = await this.cognition.publishJobState(create(PublishMemoryJobStateRequestSchema,
+        { event: memoryJobState(event), deliveryAuthorityEpoch: BigInt(epoch) }), signal);
+      if (!response.accepted || response.eventId !== event.event_id) throw new JobConflictError('Memory 状态 ACK 身份不匹配');
+      return { event_id: response.eventId, accepted: true };
+    } };
+  }
 
   public async execute(context: JobExecutionContext, payload: Job['payload']): Promise<JobHandlerResult> {
     context.assertLease();

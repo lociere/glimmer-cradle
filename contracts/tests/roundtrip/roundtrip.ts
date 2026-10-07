@@ -10,6 +10,8 @@ import {
   AvatarDownstreamFrameSchema,
 } from '../../generated/ts/glimmer/avatar/v1/avatar_host_pb';
 import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content_pb';
+import { JobStatus } from '../../generated/ts/glimmer/jobs/v1/jobs_pb';
+import { PublishMemoryJobStateRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
   AcknowledgeMemoryJobRequestRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
@@ -24,6 +26,18 @@ const digest = createHash('sha256').update(documentBytes).digest();
 
 const jobIdentity = { jobId: 'job:one', scopeId: 'scope:one', attempt: 2n, authorityEpoch: 7n,
   fencingToken: 9007199254740991n, ownerId: 'host:one', leaseUntilMs: 1900000000000n };
+const stateRequest = create(PublishMemoryJobStateRequestSchema, { deliveryAuthorityEpoch: 9007199254740991n,
+  event: { eventId: 'event:one', jobId: 'job:one', scopeId: 'scope:one', goalId: 'source:one', kind: 'memory.consolidate',
+    revision: 9007199254740991n, status: JobStatus.CANCELLED, attempt: 2n, authorityEpoch: 7n, fencingToken: 8n,
+    updatedAtMs: 1900000000000n, errorCode: 'cancelled' } });
+const restoredState = fromBinary(PublishMemoryJobStateRequestSchema, toBinary(PublishMemoryJobStateRequestSchema, stateRequest));
+if (restoredState.deliveryAuthorityEpoch !== 9007199254740991n || restoredState.event?.revision !== 9007199254740991n
+  || restoredState.event.status !== JobStatus.CANCELLED || restoredState.event.result !== undefined
+  || restoredState.event.errorCode !== 'cancelled') throw new Error('Job state precision/presence roundtrip failed');
+stateRequest.event!.result = { receipt_id: 'receipt:one', memory_ids: ['memory:one'] };
+if (fromBinary(PublishMemoryJobStateRequestSchema, toBinary(PublishMemoryJobStateRequestSchema, stateRequest)).event?.result?.receipt_id !== 'receipt:one') {
+  throw new Error('Job state result roundtrip failed');
+}
 const sourceAck = create(AcknowledgeMemoryJobRequestRequestSchema, { jobId: 'job:one', request: {
   requestId: 'source:one', episodeId: 'episode:one', episodeVersion: 9007199254740991n,
   scopeId: 'scope:one', inputDigest: 'a'.repeat(64), createdAt: '2026-10-06T00:00:00Z' } });

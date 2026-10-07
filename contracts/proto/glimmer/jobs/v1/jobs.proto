@@ -4,6 +4,37 @@ package glimmer.jobs.v1;
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Jobs.V1";
 
+import "google/protobuf/struct.proto";
+
+enum JobStatus {
+  JOB_STATUS_UNSPECIFIED = 0;
+  JOB_STATUS_QUEUED = 1;
+  JOB_STATUS_RUNNING = 2;
+  JOB_STATUS_RETRY_WAIT = 3;
+  JOB_STATUS_SUCCEEDED = 4;
+  JOB_STATUS_CANCELLED = 5;
+  JOB_STATUS_DEAD_LETTER = 6;
+  JOB_STATUS_UNKNOWN = 7;
+}
+
+// Jobs outbox 的不可变事实。取消只表示调度意图撤销，不证明领域副作用回滚。
+message JobStateEvent {
+  // SHA-256(紧凑 UTF-8 JSON [job_id, revision])；同一事实重投不能换 ID。
+  string event_id = 1;
+  string job_id = 2;
+  string scope_id = 3;
+  string goal_id = 4;
+  string kind = 5;
+  uint64 revision = 6;
+  JobStatus status = 7;
+  uint64 attempt = 8;
+  uint64 authority_epoch = 9;
+  uint64 fencing_token = 10;
+  google.protobuf.Struct result = 11;
+  optional string error_code = 12;
+  uint64 updated_at_ms = 13;
+}
+
 // 原执行身份在失效/切代后仍用于接收端对账；不以当前 Job identity 替代。
 // 整数字段在跨语言消费端限制为正数且不超过 JavaScript safe integer。
 message JobExecutionIdentity {

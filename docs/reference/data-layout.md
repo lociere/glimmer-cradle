@@ -61,6 +61,16 @@ SQL migration 并核对启动/重启前后资源摘要不变；尚未证明完�
 旧 v3/v4/v5 库拒绝隐式升级，必须保留迁移前备份并按阶段 14 受控迁移；本切片没有改写用户库。
 此接收边界不代替跨库 request outbox，也不意味着旧 `consolidation_jobs` 已迁入 Jobs。
 
+外部 Memory 状态接收在现行 `episodes.db` 同事务持有 `memory_job_feedback_inbox`（event ID/内容摘要）
+与 `memory_job_projection`（原源/Job、revision/epoch、最新状态、receipt 引用、时间和 business_outcome）。
+Jobs 是状态事实源，该投影不拥有 schedule/lease；`business_outcome=committed` 必须有实际 Memory
+receipt，缺少 receipt 只记 `unknown`，不能解释成未执行。较低 revision 只完成历史 inbox 接纳，
+不覆盖最新投影；取消不擦除已提交结果。首次显式 external 状态 RPC 原子创建这组兼容扩展和
+`projection_meta.memory_job_feedback_schema=1`；legacy 启动不添加它们。未知版本、缺失部分表或
+无标记的既有表拒绝自动修复，原数据保留。`memory_job_delivery_epoch` 只保存已观测投递 high-water。
+Jobs ACK/retention 后这里的最小接收事实不能随意删除；与源 outbox、Memory receipt 一同纳入阶段 14
+一致备份和受控迁移。当前候选只操作临时测试数据，未改写生产用户库。
+
 | 路径 | owner | 说明 |
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |

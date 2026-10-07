@@ -65,6 +65,8 @@ startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监
 非法组合均以不含输入内容的 owner 错误拒绝，无静默 fallback。配置全验通过后才创建 Jobs/authority
 库。每个实例持有冻结政策；更改须 drain 后以新实例重启，目前未接 Control Center 编辑或热更新。
 该入口只装配 Worker/Jobs，不替代产品默认 Kernel 或完整角色/provider 配置加载。
+配置启动默认使用实际 Memory 状态 receiver；源 inbox/投影提交后才 ACK，精确语义见
+[协议参考](protocol.md#memory-jobs-状态投递)。手工装配仍须显式提供接收方，不静默确认 outbox。
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。
