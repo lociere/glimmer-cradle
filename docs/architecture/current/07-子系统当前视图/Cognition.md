@@ -73,6 +73,14 @@ Perception
 
 感知进入 Cognition `AttentionController` 时，`direct` 表示外部互动义务，必须以最高显著度参与本拍竞争，并在同分时优先于长驻的 internal drive；`ambient` 才按熟悉度、场景和当前注意力节律作为背景感知处理。是否允许外显回复由 `response_policy` 单独控制：`reply_allowed` 可进入 Deliberate/Volition 生成回复，`observe_only` 只写经历、情绪、关系观察和记忆候选，不调用回复推理。这个规则只依赖通用 `address_mode` 与 `response_policy`，不得为 QQ 群、直播间或其他平台写特殊分支。
 
+## 长期承诺
+
+Planning 已持久保存不可变目标/计划版本、完成条件、显式 accepted 承诺与同事务 Job request outbox；
+重复身份不创建第二份，首次 due time 与 scope 不可悄悄替换。通过 `JobPort` 得到持久接纳才结束源
+投递，回执不表示目标 completed；普通本拍 `ActionPlan` 不自动升级为长期承诺。生产长期 Jobs
+wire/broker/handler、完成条件评估、通知与再调度仍未装配，不能认作完整长期承诺链路。
+详见[认知核实现](../../implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
+
 ## 记忆与连续性
 
 会话不是由用户反复“新建聊天”才能成立的容器。Desktop 使用稳定的长期 `Conversation`，Conversation History 按空闲边界和片段数量自动形成 `Chapter`，再把连续原始消息压成多级 `Segment`；原始 Moment 始终留在 Conversation Log。外部平台由 Adapter 决定地址粒度，例如 QQ 私聊可一人一个 `external_space_key`、群聊可一群一个，特殊线程可提供 `external_thread_key`，但规范 ID 和权限域只能由 `core/conversation` 解析。

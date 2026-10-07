@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；产品入口/完整 catalog、产品状态投影/长期 Planning Jobs 与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已落位；产品入口/完整 catalog、产品状态投影、长期 Planning Jobs 生产接线/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -554,6 +554,34 @@ Episode 接收表只在显式 external 状态投递时按版本 1 延迟建立�
 与迁移保护范围。未迁移用户数据、切换默认产品入口或执行完整 UI/Unity/安装与生产恢复验收；
 独立审查仍留整体最终固定候选。下一步继续产品状态投影消费、长期 Planning Jobs 与完整 Host 装配，
 旧队列删除仍等待 consumer-zero、旧样本及恢复验证，阶段 7 与整体重构均未完成。
+
+### 阶段 5/7 Planning 长期承诺源基础（2026-10-07 当前候选）
+
+输入 `28c03c24`，当前会话唯一写入 owner。现有 Planning 只有本拍 ActionPlan journal，本轮在
+目标清单的既有文件落实 GoalVersion/PlanVersion、完成条件、显式 accepted 承诺与稳定源请求。
+不可变版本、承诺与 request outbox 同一 IMMEDIATE 事务确认，普通聊天不自动创建长期承诺；
+源投递使用既有消费方 JobPort，实际接纳后才 ACK，不把 Job accepted 或 succeeded 当作目标完成。
+原 journal 与长期状态读写共享串行连接，重复取消等待回滚，回滚失败撤销连接；首次长期初始化
+同事务回滚，未知版本或部分表失败关闭。实现/数据事实分别归
+[Cognition 实现](../architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)和
+[数据目录](../reference/data-layout.md#用户状态与记忆)，不建立第二 wire/schema 源。
+
+计划验收：不可变版本/连续版本/scope/首次 due 冲突、四个实际 SQL 写入点故障、双连接去重、
+接收方提交后回复丢失与源重开、ACK 故障、共享连接 journal/读取不提交半写、重复取消/提交确认
+取消与回滚失败，以及未知版本/部分表/首次初始化回滚。独立接收 SQLite 只证明提交窗口，
+不代替真实 Planning Host broker；生产 wire/handler、证据完成评估、通知/再调度、取消和产品
+消费入口紧随其后。清单/路径、依赖、跨进程 IDL 和生成物不变，未操作生产数据。
+
+验证结果：Planning 定向 21 项、Cognition 全量 306 项、Worker 80 项 PASS。Host 全量 79 项
+在本轮候选通过；最终取消清理改为收集回滚/关闭失败后，重跑 Cognition/Worker 全量、Host 实际
+配置启动与 Memory wire/inbox 9 项，以及真实 Kernel production bootstrap，全部 PASS。
+后者以临时配置/数据验证注册、ready、逆序停机与 Worker exit 0，不代替产品安装/生产数据门。
+根 `pnpm typecheck`、`pnpm build`、111 页文档、编码、架构、target-layout spec-only 和 diff
+PASS；清单仍为 1,098 文件/435 目录。Ruff I/F PASS；本轮文件全规则只剩 PlanningController
+原有两项 BLE001，与父候选逐项核对一致，不报告全量 lint 通过。未新增抑制规则。
+Contracts 源/生成/兼容输入未变，复用 `28c03c24` 完整验证证据，不重复生成影响运行测试。
+用户数据、默认产品入口和旧队列未切换，长期生产 Jobs/完成条件评估及整体重构仍未完成；
+固定整体候选上的独立审查与完整制品/恢复验收继续保留。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

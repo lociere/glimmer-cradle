@@ -71,12 +71,21 @@ receipt，缺少 receipt 只记 `unknown`，不能解释成未执行。较低 re
 Jobs ACK/retention 后这里的最小接收事实不能随意删除；与源 outbox、Memory receipt 一同纳入阶段 14
 一致备份和受控迁移。当前候选只操作临时测试数据，未改写生产用户库。
 
+Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显式接受长期承诺才在同一
+事务建立版本 1 的 `planning_long_term_meta`、`planning_goal_version`、`planning_plan_version`、
+`planning_commitment` 和 `planning_job_outbox`；普通 Worker 启动不增加长期表，旧 journal 不改写。
+目标/计划不可变版本、语义完成条件、承诺 revision 和源投递身份均为不可再生状态；Jobs 接纳后
+仍保留首次请求、Job ID/revision 和 due time，不因 ACK 删除或重建。未知版本、部分表或孤立表拒绝
+自动修复，原数据保留。备份/恢复须在 Planning drain 后与 Jobs/authority 建立一致切点，不允许
+只回滚源请求重新生成承诺；完整产品恢复仍归阶段 14。本候选只使用临时测试数据，未迁移用户库。
+
 | 路径 | owner | 说明 |
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
+| `data/state/cognition/planning.sqlite` | Cognition Planning | 本拍行动 journal；显式长期承诺的目标/计划版本、完成条件、accepted 状态与 request outbox/接纳记录 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |

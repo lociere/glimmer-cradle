@@ -1,10 +1,18 @@
 """Cognition planning public API."""
 
 from glimmer_cradle.cognition.planning.commitment import Commitment, CommitmentStatus
-from glimmer_cradle.cognition.planning.goal import Goal
-from glimmer_cradle.cognition.planning.plan import ActionPlan, CapabilityKind, CognitiveAction
+from glimmer_cradle.cognition.planning.goal import Goal, GoalVersion
+from glimmer_cradle.cognition.planning.plan import (
+    ActionPlan,
+    CapabilityKind,
+    CognitiveAction,
+    PlanVersion,
+)
 from glimmer_cradle.cognition.planning.planning_controller import PlanningController
-from glimmer_cradle.cognition.planning.planning_store import PlanningStore
+from glimmer_cradle.cognition.planning.planning_store import (
+    PlanningConflictError,
+    PlanningStore,
+)
 
 __all__ = [
     "ActionPlan",
@@ -13,6 +21,9 @@ __all__ = [
     "Commitment",
     "CommitmentStatus",
     "Goal",
+    "GoalVersion",
+    "PlanVersion",
+    "PlanningConflictError",
     "PlanningController",
     "PlanningStore",
 ]

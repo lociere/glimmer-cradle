@@ -18,4 +18,5 @@ class Commitment:
     commitment_id: str
     plan_id: str
     status: CommitmentStatus
-    expected_revision: int = 0
+    revision: int
+    plan_version: int

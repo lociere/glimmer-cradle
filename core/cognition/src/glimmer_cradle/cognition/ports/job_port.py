@@ -13,6 +13,8 @@ class JobRequest:
     kind: str
     payload: dict[str, object] = field(default_factory=dict)
     idempotency_key: str = ""
+    scope_id: str = ""
+    due_at: int = 0
 
 
 JobRequestStatus = Literal["accepted", "duplicate", "rejected"]

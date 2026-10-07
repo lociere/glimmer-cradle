@@ -15,15 +15,17 @@ from glimmer_cradle.cognition.inference import (
     InferenceUnavailable,
     ModelTier,
 )
+from glimmer_cradle.cognition.planning.commitment import Commitment
 from glimmer_cradle.cognition.planning.goal import Goal
 from glimmer_cradle.cognition.planning.plan import (
-    ActionPlan,
-    CapabilityKind,
     VALID_ACTIONS,
     VALID_CAPABILITY_KINDS,
+    ActionPlan,
+    CapabilityKind,
+    PlanVersion,
 )
 from glimmer_cradle.cognition.planning.planning_store import PlanningStore
-from glimmer_cradle.cognition.ports import ObservabilityPort
+from glimmer_cradle.cognition.ports import JobPort, ObservabilityPort
 
 
 class PlanningController:
@@ -40,6 +42,25 @@ class PlanningController:
         self._store = store
         self._observability = observability
         self._logger = observability.logger("planning_controller")
+
+    async def accept_commitment(
+        self, commitment_id: str, plan: PlanVersion, *, due_at: int
+    ) -> Commitment:
+        """显式接受语义；普通 ActionPlan 不自动升级为长期承诺。"""
+        if self._store is None:
+            raise RuntimeError("长期承诺没有持久 Planning owner")
+        return await self._store.accept_commitment(commitment_id, plan, due_at=due_at)
+
+    async def deliver_jobs(self, jobs: JobPort, *, limit: int = 64) -> int:
+        """先获得实际 Jobs 持久接纳再 ACK；不跨 await 持有 Planning 事务。"""
+        if self._store is None:
+            raise RuntimeError("长期承诺没有持久 Planning owner")
+        delivered = 0
+        for request in await self._store.pending_job_requests(limit=limit):
+            receipt = await jobs.request(request)
+            await self._store.acknowledge_job_request(request, receipt)
+            delivered += 1
+        return delivered
 
     async def plan(
         self,
@@ -96,15 +117,21 @@ class PlanningController:
         try:
             response = await self._reasoning.request(request, tier=tier)
         except InferenceUnavailable as error:
-            self._logger.debug("ActionPlan 推理不可用，降级为普通回复路径", error=str(error))
+            self._logger.debug(
+                "ActionPlan 推理不可用，降级为普通回复路径", error=str(error)
+            )
             return await self._finish(
-                normalized, ActionPlan.reply(normalized.text, "推理服务不可用，未触发 Skill")
+                normalized,
+                ActionPlan.reply(normalized.text, "推理服务不可用，未触发 Skill"),
             )
         except Exception as error:
-            self._logger.debug("ActionPlan 推理异常，降级为普通回复路径", error=str(error))
+            self._logger.debug(
+                "ActionPlan 推理异常，降级为普通回复路径", error=str(error)
+            )
             self._observability.counter("cognition.action_plan_error", 1)
             return await self._finish(
-                normalized, ActionPlan.reply(normalized.text, "行动规划失败，未触发 Skill")
+                normalized,
+                ActionPlan.reply(normalized.text, "行动规划失败，未触发 Skill"),
             )
 
         plan = self._parse_plan(response.text, fallback_goal=normalized.text)

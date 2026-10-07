@@ -13,6 +13,10 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 ## 状态与恢复
 
 - Persona、State、Memory、Knowledge、Planning 与 Loop checkpoint 分库存储，各自拥有迁移和 revision 规则。
+- Planning 已持有不可变 GoalVersion/PlanVersion、显式 accepted 承诺和同事务 Job request outbox；
+  JobPort 接纳只结束源投递，不代表完成条件成立。普通 ActionPlan 不自动成为长期承诺。
+  生产长期 Jobs wire/handler、完成条件评估、通知与下一次调度仍未接线，详见
+  [认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 - Conversation Log 是交互事实 owner；Cognition 只消费事实并写入受控认知投影。
 - Memory schema 6 的 dispatch 绑定只用于旧巩固队列迁移屏障，不承担 Jobs authority 或新调度；
   非终态旧任务拒绝转交，外部绑定拒绝回退，旧 writer 同事务拒写。受控迁移与删除门见

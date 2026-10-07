@@ -10,6 +10,7 @@
 - [代码结构地图](#代码结构地图)
 - [入站链路](#入站链路)
 - [唯一认知循环](#唯一认知循环)
+- [长期承诺与 Jobs 源请求](#长期承诺与-jobs-源请求)
 - [上下文与推理](#上下文与推理)
 - [记忆、经历与持久化](#记忆经历与持久化)
 - [出站链路](#出站链路)
@@ -142,6 +143,29 @@ Kernel CognitionService request
 `state/` 是情绪与认知资源状态的唯一 owner。`cognitive_state.py` 定义 affect/activity 状态和资源策略，`decay.py` 纯计算情绪衰减与 `engaged / ambient / quiescent` 迁移，`state_controller.py` 从真实 Perception、Reply、Action 重建最近活动并驱动生命周期。`SqliteStateStore` 使用 `001-state.sql` 和 expected revision 写入 `data/state/cognition/state.sqlite`；冷启动把快照与 Conversation Log 的更新事实合并。控制器不把自动迁移写成 Experience；Kernel 外部 Attention Lease 也不参与活动态计算。
 
 `application/maintenance/scheduler.py` 拥有独立异步任务和配置间隔。Conversation `ConversationRecorder` 在写入 `reply` / `silence` 后发出进程内提示，Scheduler 立即投影并巩固对应 sealed Episode；提示本身不可靠，真实待办来自 Episode Projection，配置间隔会重新扫描并补偿。进入 `quiescent` 只唤醒一次 Scheduler 并请求封口。`LoopController` 的 Consolidate 阶段只通过 `CycleContinuity` 提交本拍真实 Moment，不直接调用记忆巩固，也不制造 Dreaming 或 Thought。
+
+## 长期承诺与 Jobs 源请求
+
+`planning/GoalVersion` 保存不可变 goal ID、scope、连续版本、语义和完成条件；`PlanVersion` 引用
+该目标版本并保存不可变计划 ID/版本和 1 至 64 个语义步骤。普通 `ActionPlan` 仍只服务本拍行动，
+不自动创建长期承诺。`PlanningController.accept_commitment()` 显式接受后，由
+`SqlitePlanningStore` 在同一 IMMEDIATE 事务写入目标/计划版本、revision 1 的 accepted 承诺和
+`planning.evaluate` 源请求；身份相同内容相同可重放，版本跳跃、scope 替换、目标版本回退、
+既有内容或首次 due time 变化均拒绝，失败不留下部分版本/承诺。
+
+源 request ID 为 compact UTF-8 JSON `["planning.evaluate", commitment_id, plan_id, plan_version]`
+的 SHA-256；请求只携带原 scope、目标身份、due time 和版本引用，不把完成条件或平台指令交给 Jobs。
+规范化持久信封上限 64 KiB，整数保持 JS safe 范围。`deliver_jobs()` 通过 App 注入的真实 `JobPort`
+请求持久接纳，随后才在源 owner 确认；网络回复或源 ACK 丢失可按同一身份恢复，不跨远程 await
+持有 SQLite 事务。同一请求不能绑定另一 Job，重复回执沿用首次接纳记录；请求 payload 被改写则拒绝 ACK。
+
+长期表由首次显式接受原子建立，版本 1；普通 Worker 启动仍只恢复原 journal。未知版本、部分表或
+孤立表失败关闭，不自动重建。journal、版本、源状态读写共享串行连接边界；取消等待回滚结束，
+回滚失败撤销连接。数据与备份范围见[数据目录](../../reference/data-layout.md#用户状态与记忆)。
+
+当前只完成持久语义与源投递基础；Jobs 接纳不把承诺标为 completed。生产 Planning wire/Host broker、
+handler 的受监督执行、Cognition 依据实际证据评估完成条件、通知/下一次调度，以及撤销/恢复链路仍待
+接线。测试中的独立接收 SQLite 只验证提交窗口，不代表生产 Jobs 已消费长期承诺。
 
 ## 上下文与推理
 
