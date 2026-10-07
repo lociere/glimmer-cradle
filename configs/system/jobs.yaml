@@ -1,0 +1,11 @@
+# 持久 Jobs 机制；Memory 的源 debounce 仍由 Memory owner 配置。
+scheduler:
+  poll_interval_ms: 1000
+  batch_size: 8
+  lease_ms: 180000
+retry:
+  base_delay_ms: 30000
+  max_delay_ms: 3600000
+  max_attempts: 3
+retention:
+  terminal_ms: 1209600000

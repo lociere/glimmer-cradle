@@ -223,7 +223,7 @@ Memory 的 Jobs 接收边界由 `memory_job_attempts` / `memory_job_authority` �
 Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监督 `CognitionGrpcHost`，由
 `ExecuteMemoryJob` / `ReconcileMemoryJob` 映射生成契约；Kernel 迁移期 transport 暴露同一 RPC。
 对账是会持久封口的命令，不是无副作用的查询；generation 鉴权、readiness、取消和停机继续使用原 Service
-边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire 与 Jobs handler/query adapter 已落位，生产 scheduler 与配置装配仍待接线，旧队列仍保留
+边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire、Jobs handler/query、持续调度与局部配置装配已落位，产品默认入口尚未切换，旧队列仍保留
 既定退出门。不自动升级用户 v3/v4/v5 库；受控迁移、备份与恢复归阶段 14。
 
 四个 Memory Jobs RPC 只在 `ConsolidationCoordinator(jobs=None)` 的外部 Jobs 模式开放。
@@ -261,7 +261,11 @@ signal 与执行接纳，等待在途封口和循环后关闭当前 generation c
 先 drain Jobs/释放 authority，再独立生命周期 client 发 Shutdown 并等待实际进程退出。超时回收
 本实例进程树，接收方不响应取消则回收失败，不能宣称 drain 完成。异常退出撤销旧客户端并停止
 续期；下一实例重新注册、新世代/更高 epoch 接管，状态 outbox 包括正常的接管 revision。
-本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；配置/authority 路径加载、状态事件 wire/inbox
+`ConfiguredHostCognitionJobsOwner` 已接唯一 Host/Jobs/Memory 配置和目标 state 路径，拥有两库，
+配置及恢复预检先于 Worker 外部绑定；同一 Memory Document 约束 Worker 与源 debounce。
+真实配置启动/重启保持源首次政策，终态保留期在循环里保护未 ACK 事实；精确规则见
+[配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)与[数据目录](../../reference/data-layout.md#用户状态与记忆)。
+本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、状态事件 wire/inbox
 与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

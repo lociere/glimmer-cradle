@@ -102,6 +102,15 @@
       "sha256": "31914c352c525bbbea1024bb78b5923ba5aad67ba296bc4d3e340ddaea581a59"
     },
     {
+      "path": "json-schema/config/v1/host-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/host-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Host owner",
+      "kind": "Document",
+      "compatibility": "v2.1 new Document; changes require a drained replacement owner, not hot mutation.",
+      "sha256": "cc137ebb9843236a8c6b589c18533ad3de633bfa16c4a34ea613adc57c040e76"
+    },
+    {
       "path": "json-schema/config/v1/inference-config.schema.json",
       "id": "https://glimmer-cradle.local/contracts/config/v1/inference-config.schema.json",
       "dialect": "https://json-schema.org/draft/2020-12/schema",
@@ -118,6 +127,15 @@
       "kind": "Document",
       "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
       "sha256": "d75d4bc5ce7f057199e8c6c7dea4769f7a181bae987d9711a14971cc3a361be8"
+    },
+    {
+      "path": "json-schema/config/v1/jobs-config.schema.json",
+      "id": "https://glimmer-cradle.local/contracts/config/v1/jobs-config.schema.json",
+      "dialect": "https://json-schema.org/draft/2020-12/schema",
+      "owner": "Jobs owner",
+      "kind": "Document",
+      "compatibility": "v2.1 new Document; already accepted source due/budget remains immutable.",
+      "sha256": "c780e13c787930eb2e2fef7bb4b3db065e89ba521ebeaa877b07f0b100261200"
     },
     {
       "path": "json-schema/config/v1/knowledge-base-config.schema.json",

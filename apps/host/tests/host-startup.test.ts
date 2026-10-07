@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import * as grpc from '@grpc/grpc-js';
 import { createInterface } from 'node:readline';
@@ -17,10 +17,10 @@ import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
-import { JobController, JobRecoveryController, SqliteJobStore, type Job } from '@glimmer-cradle/jobs';
+import { JobController, JobRecoveryController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
-  WorkerSupervisor, HostCognitionJobsOwner, type WorkerSupervisorOptions,
+  WorkerSupervisor, HostCognitionJobsOwner, ConfiguredHostCognitionJobsOwner, HostDataPaths, type WorkerSupervisorOptions,
   memoryJobIdentity, memoryJobEvidence, memoryJobRequest } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
@@ -39,8 +39,111 @@ async function productionWorker(root: string, overrides: Partial<WorkerSuperviso
       projections.push(request);
       return create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' });
     }, ...overrides });
-  return { supervisor, projections };
+  return { supervisor, projections, input };
 }
+
+function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts = 5) {
+  mkdirSync(path.dirname(paths.host_config), { recursive: true });
+  writeFileSync(paths.host_config, JSON.stringify({ authority: { lease_ms: 2000, renewal_interval_ms: 25 },
+    cognition: { startup_timeout_ms: 15000, shutdown_timeout_ms: 3000, request_timeout_ms: 2000 } }), 'utf8');
+  writeFileSync(paths.jobs_config, JSON.stringify({ scheduler: { poll_interval_ms: 10, batch_size: 8, lease_ms: 60000 },
+    retry: { base_delay_ms: 1, max_delay_ms: 10, max_attempts: maxAttempts } }), 'utf8');
+  writeFileSync(paths.memory_config, JSON.stringify(memory), 'utf8');
+}
+
+describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
+  it('安装根/配置根/数据根分离，唯一 Memory 设置接进 Worker；持久重启保持首次政策和更高 epoch', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-production-'));
+    const paths = new HostDataPaths({ app_root: path.join(root, 'installation'), config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    mkdirSync(paths.app_root);
+    // 现行 Worker 从安装根读取真实 migration；这不是空目录或完整安装包证明。
+    const migrations = path.join(paths.app_root, 'core/cognition/migrations');
+    mkdirSync(migrations, { recursive: true });
+    const migrationFiles = readdirSync(path.join(repository, 'core/cognition/migrations'));
+    for (const file of migrationFiles) copyFileSync(path.join(repository, 'core/cognition/migrations', file), path.join(migrations, file));
+    const installation = () => migrationFiles.map(file => [file, createHash('sha256').update(readFileSync(path.join(migrations, file))).digest('hex')]);
+    const originalInstallation = installation();
+    const seeded = await productionWorker(paths.data_root);
+    const memory = { ...seeded.input.runtime_document.memory,
+      consolidation: { ...seeded.input.runtime_document.memory.consolidation, debounce_seconds: 60 } };
+    writeConfiguration(paths, memory);
+    let projections = 0;
+    const options = { paths, clock, owner_id: 'configured-production', worker: { python_executable: seeded.input.python_executable,
+      // 此注入副本不能覆盖磁盘 Memory 事实源；其余角色/provider Document 仍按现行入口注入。
+      runtime_document: { ...seeded.input.runtime_document, memory: { broken: true } }, accept_state: async (request: Parameters<WorkerSupervisorOptions['accept_state']>[0]) => {
+        projections++; return create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' });
+      } } };
+    const owner = new ConfiguredHostCognitionJobsOwner(options);
+    let next: ConfiguredHostCognitionJobsOwner | undefined;
+    try {
+      const start = owner.start(); expect(owner.start()).toBe(start);
+      expect(await start).toMatchObject({ phase: 'active', configuration: { jobs: { submission_policy: { debounce_ms: 60000, max_attempts: 5 } } },
+        session: { worker: { state: 'ready' }, jobs: { lease: { epoch: 1 } } } });
+      expect(projections).toBeGreaterThan(0); expect(readdirSync(paths.app_root)).toEqual(['core']);
+      expect(installation()).toEqual(originalInstallation);
+      expect(existsSync(paths.jobs_database)).toBe(true); expect(existsSync(paths.authority_database)).toBe(true);
+      const jobs = new Database(paths.jobs_database, { readonly: true });
+      let before: unknown;
+      try {
+        before = jobs.prepare('SELECT job_id,initial_due_at,max_attempts FROM job_source_receipts').get();
+        expect(before).toMatchObject({ max_attempts: 5 });
+        expect(jobs.prepare('SELECT attempt,status FROM jobs').get()).toEqual({ attempt: 0, status: 'queued' });
+      } finally { jobs.close(); }
+      const endpoints = [owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.control_endpoint!];
+      expect(owner.stop()).toBe(owner.stop()); await owner.stop();
+      expect(owner.snapshot.phase).toBe('stopped');
+      for (const endpoint of endpoints) expect(await portClosed(endpoint)).toBe(true);
+      expect(existsSync(paths.worker_console)).toBe(true);
+      writeConfiguration(paths, memory, 9);
+      next = new ConfiguredHostCognitionJobsOwner(options);
+      expect(await next.start()).toMatchObject({ phase: 'active', configuration: { jobs: { submission_policy: { max_attempts: 9 } } },
+        session: { jobs: { lease: { epoch: 2 } } } });
+      const restored = new Database(paths.jobs_database, { readonly: true });
+      try {
+        expect(restored.prepare('SELECT job_id,initial_due_at,max_attempts FROM job_source_receipts').get()).toEqual(before);
+        expect(restored.prepare('SELECT max_attempts,authority_epoch FROM jobs').get()).toEqual({ max_attempts: 5, authority_epoch: 2 });
+        expect(restored.prepare('SELECT COUNT(*) AS count FROM jobs').get()).toEqual({ count: 1 });
+      } finally { restored.close(); }
+      expect(readdirSync(paths.app_root)).toEqual(['core']); expect(installation()).toEqual(originalInstallation);
+    } finally { await next?.stop(); await owner.stop(); }
+  }, 40_000);
+
+  it.each(['configuration', 'jobs-restore', 'authority-corrupt', 'worker'])('配置启动失败 %s 保留原数据并关闭已持有库，不提前绑定/启动 Worker', async mode => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-failure-'));
+    const paths = new HostDataPaths({ app_root: root, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    writeConfiguration(paths, {});
+    if (mode === 'configuration') writeFileSync(paths.jobs_config, 'retry: fixture-private-key', 'utf8');
+    if (mode === 'jobs-restore') {
+      const jobs = new SqliteJobStore(paths.jobs_database); jobs.activateAuthority(7, Date.now()); jobs.close();
+    }
+    if (mode === 'authority-corrupt') {
+      mkdirSync(path.dirname(paths.authority_database), { recursive: true });
+      const wrong = new Database(paths.authority_database); wrong.exec("CREATE TABLE keep(value TEXT); INSERT INTO keep VALUES('不可删除')"); wrong.close();
+    }
+    const owner = new ConfiguredHostCognitionJobsOwner({ paths, clock, owner_id: 'failure', worker: {
+      python_executable: path.join(root, 'missing-python.exe'), runtime_document: {},
+      accept_state: async () => create(PublishStateResponseSchema) } });
+    const start = vi.spyOn(WorkerSupervisor.prototype, 'start');
+    try {
+      await expect(owner.start()).rejects.toThrow();
+      expect(owner.snapshot.phase).toBe('failed');
+      // spawn ENOENT 没有 console 输出；验证监督确已开始，而非要求制造空日志。
+      expect(existsSync(path.dirname(paths.worker_console))).toBe(mode === 'worker');
+      if (mode !== 'worker') expect(start).not.toHaveBeenCalled();
+      expect(JSON.stringify(owner.snapshot)).not.toContain('fixture-private-key');
+      if (mode === 'configuration') expect(existsSync(paths.data_root)).toBe(false);
+      if (mode !== 'configuration') {
+        const reopened = new SqliteJobStore(paths.jobs_database);
+        try { expect(reopened.loadAuthorityEpoch()).toBe(mode === 'jobs-restore' ? 7 : null); } finally { reopened.close(); }
+      }
+      if (mode === 'authority-corrupt') {
+        const wrong = new Database(paths.authority_database, { readonly: true });
+        try { expect(wrong.prepare('SELECT value FROM keep').get()).toEqual({ value: '不可删除' }); } finally { wrong.close(); }
+      }
+      await owner.stop(); expect(owner.snapshot.phase).toBe('stopped');
+    } finally { start.mockRestore(); await owner.stop(); }
+  }, 30_000);
+});
 async function portClosed(endpoint: string) {
   const port = Number(endpoint.split(':').at(-1));
   return new Promise<boolean>(resolve => {
@@ -291,6 +394,46 @@ async function eventually(predicate: () => boolean) {
   while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
   expect(predicate()).toBe(true);
 }
+
+it('Host 循环实际执行终态保留政策：缺接收方不删，真实 inbox 提交并 ACK 后清理，Memory 不重复写入', async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-retention-'));
+  const service = await worker(root, 'one');
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const receiver = new Database(path.join(root, 'projection.sqlite'));
+  receiver.exec(`CREATE TABLE inbox(event_id TEXT PRIMARY KEY,document TEXT NOT NULL);
+    CREATE TABLE completions(job_id TEXT PRIMARY KEY,count INTEGER NOT NULL);`);
+  const accept = (event: JobStateEvent) => receiver.transaction(() => {
+    const document = JSON.stringify(event);
+    const prior = receiver.prepare('SELECT document FROM inbox WHERE event_id=?').get(event.event_id) as { document: string } | undefined;
+    if (prior) { if (prior.document !== document) throw new Error('inbox identity conflict'); return; }
+    receiver.prepare('INSERT INTO inbox VALUES(?,?)').run(event.event_id, document);
+    if (event.status === 'succeeded') receiver.prepare('INSERT INTO completions VALUES(?,1)').run(event.job_id);
+  }).immediate();
+  const options = { store, clock, owner_id: 'retention', poll_interval_ms: 10, batch_size: 8, lease_ms: 60000,
+    submission_policy: submissionPolicy, retry_policy: policy, terminal_retention_ms: 0 };
+  const first = new HostJobsController({ ...options, epoch: 1, cognition: service.client });
+  let next: HostJobsController | undefined;
+  try {
+    await first.start();
+    const completed = store.readOutbox(1, 100).find(event => event.status === 'succeeded')!;
+    expect(store.load(completed.job_id)?.status).toBe('succeeded');
+    await eventually(() => first.snapshot.completed_cycles > 2);
+    expect(store.load(completed.job_id)?.status).toBe('succeeded');
+    expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    await first.stop();
+    next = new HostJobsController({ ...options, epoch: 2, cognition: new CognitionClient(service.endpoint, 'one', 5000),
+      state_receiver: { async accept(event) { accept(event); return { event_id: event.event_id, accepted: true }; } } });
+    await next.start();
+    await eventually(() => store.load(completed.job_id) === null);
+    expect(store.readOutbox(2, 100)).toEqual([]);
+    expect(receiver.prepare('SELECT count FROM completions').get()).toEqual({ count: 1 });
+    await eventually(() => next!.snapshot.completed_cycles > 2);
+    expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    const jobs = new Database(path.join(root, 'jobs.sqlite'), { readonly: true });
+    try { expect(jobs.prepare('SELECT COUNT(*) AS count FROM job_source_receipts').get()).toEqual({ count: 1 }); }
+    finally { jobs.close(); }
+  } finally { await next?.stop(); await first.stop(); receiver.close(); store.close(); await service.stop(); }
+}, 30_000);
 
 function ownedJobs(store: SqliteJobStore, client: CognitionClient, authority: SqliteAuthorityStore, owner: string, initial?: AuthorityLease) {
   return new HostJobsOwner({ store, clock, owner_id: owner, cognition: client, authority,

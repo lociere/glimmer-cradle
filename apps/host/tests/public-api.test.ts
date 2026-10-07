@@ -2,7 +2,7 @@ import { it, expect } from 'vitest';
 import * as api from '../src/index.js';
 import type { HostJobsOptions } from '../src/index.js';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { create } from '@bufbuild/protobuf';
@@ -10,8 +10,62 @@ import { PublishStateResponseSchema } from '@glimmer-cradle/contracts/glimmer/ke
 
 it('Host 暴露实际 App 装配/adapter，而不暴露 Kernel 内部或底层 DB connection', () => {
   expect(Object.keys(api).sort()).toEqual(['CognitionClient', 'CognitionJobAdapter', 'HostCognitionError', 'HostJobsController',
-    'HostJobsOwner', 'HostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
+    'HostJobsOwner', 'HostCognitionJobsOwner', 'ConfiguredHostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
+    'HostDataPaths', 'HostConfigurationError', 'loadHostCognitionJobsConfiguration',
     'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest'].sort());
+});
+
+function configPaths() {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-config-'));
+  const paths = new api.HostDataPaths({ app_root: path.join(root, 'installation'), config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+  mkdirSync(path.dirname(paths.host_config), { recursive: true });
+  for (const file of [paths.host_config, paths.jobs_config, paths.memory_config]) writeFileSync(file, '{}\n', 'utf8');
+  return paths;
+}
+it('配置从唯一 Schema 填默认值并冻结；根显式分离，loader 不创建任何数据/安装产物', () => {
+  const paths = configPaths(), configuration = api.loadHostCognitionJobsConfiguration(paths);
+  expect(configuration).toMatchObject({ jobs: { poll_interval_ms: 1000, batch_size: 8, lease_ms: 180000,
+    retry_policy: { base_delay_ms: 30000, max_delay_ms: 3600000 }, terminal_retention_ms: 1209600000,
+    submission_policy: { debounce_ms: 120000, max_attempts: 3 } },
+  authority: { authority_lease_ms: 60000, renewal_interval_ms: 20000 },
+  worker: { startup_timeout_ms: 120000, shutdown_timeout_ms: 30000, request_timeout_ms: 30000 } });
+  expect(Object.isFrozen(configuration.jobs.retry_policy)).toBe(true);
+  expect(Object.isFrozen(configuration.memory_document.consolidation)).toBe(true);
+  expect(paths.jobs_database).toBe(path.join(paths.data_root, 'state/jobs/jobs.sqlite'));
+  expect(paths.authority_database).toBe(path.join(paths.data_root, 'state/platform/authority.sqlite'));
+  expect(existsSync(paths.data_root)).toBe(false); expect(existsSync(paths.app_root)).toBe(false);
+  expect(() => new api.HostDataPaths({ app_root: '.', config_root: '.', data_root: '.' })).toThrow('绝对路径');
+});
+it.each([
+  ['jobs', { scheduler: { poll_interval_ms: 0 } }], ['jobs', { scheduler: { poll_interval_ms: 2147483648 } }],
+  ['jobs', { scheduler: { batch_size: 1001 } }], ['jobs', { retry: { max_attempts: 0 } }],
+  ['jobs', { retry: { base_delay_ms: 100, max_delay_ms: 99 } }], ['jobs', { retention: { terminal_ms: -1 } }],
+  ['host', { authority: { lease_ms: 1, renewal_interval_ms: 1 } }],
+  ['host', { cognition: { startup_timeout_ms: 1, request_timeout_ms: 2 } }],
+  ['memory', { consolidation: { debounce_seconds: 9007199254740991 } }],
+  ['jobs', { debounce_ms: 1 }], ['host', { data_root: '/other-root' }], ['memory', { retry: { max_attempts: 1 } }],
+  ['jobs', { retry: { max_attempts: 'fixture-private-key' } }],
+] as const)('配置非法值/owner 越界拒绝且不泄露输入（%s）', (owner, value) => {
+  const paths = configPaths();
+  writeFileSync(paths[`${owner}_config`], JSON.stringify(value), 'utf8');
+  let error: unknown;
+  try { api.loadHostCognitionJobsConfiguration(paths); } catch (caught) { error = caught; }
+  expect(error).toBeInstanceOf(api.HostConfigurationError);
+  expect(error).toMatchObject({ owner }); expect(String(error)).not.toContain('fixture-private-key');
+  expect(existsSync(paths.data_root)).toBe(false);
+});
+it.each(['missing', 'duplicate', 'broken', 'utf8', 'bom', 'oversized', 'alias'])('配置读取边界拒绝 %s，不回落另一个源', mode => {
+  const paths = configPaths();
+  const values = { duplicate: 'retry: {}\nretry: {}\n', broken: 'retry: [\n', utf8: Buffer.from([0xff]),
+    bom: '\uFEFF{}', oversized: '#'.repeat(1048577), alias: 'retry: &bad { base_delay_ms: *bad }' };
+  if (mode === 'missing') {
+    const missing = new api.HostDataPaths({ ...paths, config_root: path.join(paths.config_root, 'missing') });
+    expect(() => api.loadHostCognitionJobsConfiguration(missing)).toThrow(api.HostConfigurationError);
+  } else {
+    writeFileSync(paths.jobs_config, values[mode as keyof typeof values]);
+    expect(() => api.loadHostCognitionJobsConfiguration(paths)).toThrow(api.HostConfigurationError);
+  }
+  expect(existsSync(paths.data_root)).toBe(false);
 });
 
 it('Worker console 按完整 UTF-8 行脱敏，跨 chunk/JSON 转义/超长行不泄露秘密', async () => {

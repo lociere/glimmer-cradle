@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、authority 拒旧写、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory 原 attempt receipt/fencing、原子源 outbox、目标 Host 源投递/handler/query、持续单循环调度、持久 authority 交接与真实 Worker CLI 监督/Jobs 生命周期已验证；产品入口/config/authority 路径、状态事件接纳与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host 源投递/handler/query、持续调度、authority/handover、真实 Worker CLI 监督与唯一配置/三根路径/拥有两库的局部启动已验证；产品入口/完整配置 catalog、状态事件接纳与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -480,6 +480,51 @@ PASS；Worker 全量 80 项及改动测试 Ruff PASS。生产监督验收真实 
 跨机部署、安装恢复或迁移用户库。独立审查仍留完整重构的固定最终候选。
 下一步推进 Jobs 配置 Document/catalog、实际 Host 路径装配及状态事件接收；唯一契约迁移前
 维持现行 `contracts/`，旧 Kernel 与旧巩固队列的删除门、阶段 14 数据恢复门不放宽。
+
+### 阶段 7 Host 配置、路径与拥有资源的装配（2026-10-07 当前候选）
+
+输入 `f53eeb6e`，当前会话唯一写入 owner。新增唯一 `contracts/json-schema/config/v1/{jobs,host}-config.schema.json`
+与 `configs/system/{jobs,host}.yaml`，分别拥有 Jobs 的调度/重试/保留期及 Host authority/Worker 生命周期参数；
+Memory debounce 沿用现行 Memory Document，不将业务政策搬到 Jobs。新 Document 登记现行 inventory 与
+兼容基线；此新增不修改既有 Schema/IDL。阶段 11 将其原子迁入已登记的 `core/jobs/schemas/jobs-config.schema.json`
+与 `apps/host/schemas/host-config.schema.json` 并切换 catalog/consumer，迁移前不建立副本或 `protocol/`。
+新增目标 `adapters/platform/data-paths.ts` 及有真实消费者的 `host-configuration.ts`（普通文件调整同步清单、树、锁）；
+后者复用 Platform validator，只输出已有 owner-local 装配类型，不手写第二 Document 模型。
+既有 `composition/domain-owners.ts` 接拥有 Jobs/authority 数据库、配置与 Worker 的配置启动入口，先验证配置
+及恢复一致性，再启动真实 Worker/Jobs，完成实际 drain 后才关闭持有库；失败不删原数据或自动升级。
+Jobs/authority 使用目标 state 路径；Memory 旧配置入口、Worker console 现行 observability 路径随阶段 11/14
+迁移门受控退出。保留期接真实调度循环并保护未 ACK/unknown/原身份，不新增无人消费的配置。
+验收完整配置默认/未知键/非法组合/缺失损坏/无密钥泄露，分离安装根与数据根的真实生产 Worker 源接纳，
+持久重启、部分恢复拒绝、资源失败回收及 retention；运行 contracts generate/verify、Host/Jobs 测试和根门禁。
+不切换产品默认入口、不迁移用户库，不将局部配置启动认作完整 Host/产品完成。
+
+实际装配已完成，默认配置与精确读取边界归[配置参考](../reference/configuration.md#目标-host-与-jobs-配置)，
+数据/安装输入与恢复责任归[数据目录](../reference/data-layout.md#用户状态与记忆)。当前候选新增两份
+Schema/YAML、两份目标 Host adapter，配置启动 owner 与调度 retention、对应测试、依赖与权威页；
+普通文件清单增加一个真实消费的 configuration adapter，同步树（1098 文件、435 目录）及两处冻结哈希，
+不改变 v2.1 架构语义。Host 新增 yaml 依赖复用锁定 2.8.2；离线安装没有下载或升级其他依赖。
+
+Host 全量 75 项（42 启动/RPC、9 authority、24 API/配置）与 Jobs 38 项、repo-checks 27 项 PASS。
+真实配置 CLI 首代/第二代接纳使用独立 ConfigRoot/DataRoot，原 due/预算保持、epoch 单调；失败配置
+不创建数据域，authority 缺失/其他 owner 拒绝先启动 Worker，原数据保留且已持有库可重开。
+现行 Worker 需要 AppRoot 中的 Cognition migration，首次空安装根实验失败；修正 fixture 放入真实
+静态 SQL，启动/重启前后资源摘要不变，但不宣称完整安装制品或只读 ACL 已验。
+spawn ENOENT 没有输出，测试核对监督已进入 console 父目录与安全失败，而非要求制造空日志。
+真实 Host 循环 retention=0 在缺少 receiver 时保留终态，下一 owner 的 SQLite inbox/业务提交并 ACK
+后清理 body，最小源快照保留且 Memory 只写一次；长于时钟年龄的合法窗口不清理事实。
+
+`pnpm contracts:generate` 不改变 tracked generated；新增兼容基线只含两条 Document。首次 verify
+末端 generated-clean 因已声明的新基线尚未暂存失败；核对并暂存该基线后完整重跑，22 gates、
+inventory、Buf lint/breaking、JSON Schema、toolchain、TS/Python/C# roundtrip 与 generated-clean
+均 PASS，未放宽门禁。架构门识别配置 adapter 到 composition 的类型依赖环，移除反向 type edge
+后 architecture 与 repo-checks 全量 PASS。产品 UI/Unity、完整安装/生产迁移及跨 owner 备份恢复未运行；
+按用户要求，独立高风险审查留完整重构固定候选收尾，不能据当前切片宣称整体完成。
+
+最终根 `pnpm typecheck`、`pnpm build`、`pnpm check:docs`（111 页）、`pnpm check:encoding`、
+`pnpm check:architecture`、target-layout specification-only 与 `git diff --check` 均 PASS。
+
+下一步接真实 Jobs 状态事件 wire/inbox 与 projection consumer，随后继续完整产品装配；旧队列、
+默认 Kernel、旧状态/配置路径均保持明确迁移删除门，不创建第二契约源。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

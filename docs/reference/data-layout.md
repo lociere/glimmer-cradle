@@ -29,19 +29,27 @@ Host `SqliteAuthorityStore` 接受显式 authority 数据库路径，schema vers
 `0x47434155`，保存按 aggregate 的 epoch/token、owner、expiry/revision/status 和完整 handover
 准备/确认记录。未知库、其他 owner 或不兼容版本拒绝打开，不删除或重建；确认和新租约同事务提交。
 该状态由 Platform 机制拥有、Host Adapter 持久化，不是 RunRoot 锁或可重建缓存。
-目标路径是 `${DataRoot}/state/platform/authority.sqlite`，产品 resolver 尚未接入，当前仅临时测试库，
-不将其登记为已运行生产路径。备份/恢复必须保持 authority、Jobs/Memory 与待确认事实的一致切点；
+`HostDataPaths` 已由配置启动入口使用 `${DataRoot}/state/platform/authority.sqlite`；真实生产 Worker
+CLI 的局部配置装配测试使用临时 DataRoot，不代表产品默认入口或生产用户库已切换。
+备份/恢复必须保持 authority、Jobs/Memory 与待确认事实的一致切点；
 禁止单独丢弃/回滚 authority 后用重复启动重算序列，Host 已拒绝 authority 缺失或落后既有 Jobs 的情况。
 完整跨 owner 恢复验证仍归阶段 14，不能仅凭新库初始化宣称恢复可用。
 
-Jobs 基础包已提供接受显式数据库路径的 `SqliteJobStore`，但尚未由产品 Host 装配创建生产库，
-因此本表不提前声明新的已运行数据路径。其 schema version 4/owner 标记、Job/lease/原 attempt、
+配置启动入口拥有 `${DataRoot}/state/jobs/jobs.sqlite` 的 `SqliteJobStore`，但尚未由产品默认
+Host 创建生产用户库。其 schema version 4/owner 标记、Job/lease/原 attempt、
 对账证据摘要、待 ACK 状态 outbox 与去重 tombstone 独立于 Memory；retention 不删除未投递事件或
 unknown，清理终态后仍保留最小身份/审计。`job_source_receipts` 同事务保存 producer/request ID、
 源与业务摘要、稳定 Job ID、首次 due/预算和接纳时间，不复制领域 payload；终态 body 清理不删除
 源快照，重投用首次政策验证原 tombstone。旧候选 v1/v2/v3 拒绝隐式升级，不能对旧 Memory 数据库
-直接应用 Jobs migration。生产路径、备份切点和
-跨库提交须随后续 broker/handler 接线确定，参见[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
+直接应用 Jobs migration。产品入口切换、备份切点和跨库恢复仍须后续验证，参见
+[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
+
+`HostDataPaths` 要求 AppRoot、ConfigRoot、DataRoot 均显式绝对路径，不读环境变量、cwd 或
+创建目录；配置启动 owner 在全量配置和恢复预检后打开两库，实际 Worker/Jobs drain 完成才关闭，
+失败不重建或删除原数据。配置路径与默认值见[配置参考](configuration.md#目标-host-与-jobs-配置)。
+Worker console 派生为 `${DataRoot}/observability/logs/application/cognition.console.log`，属于现行
+可观测路径兼容窗口；阶段 14 与日志 consumer 一同切换。测试在独立安装根放入真实 Cognition
+SQL migration 并核对启动/重启前后资源摘要不变；尚未证明完整安装制品或操作系统只读 ACL。
 
 现行 Memory 新库 schema 为 6，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
 由 `SqliteMemoryStore` 统一持有。业务结果 receipt 与修订/evidence 同事务持久化，详见

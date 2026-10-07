@@ -2,6 +2,11 @@ import { AuthorityConflictError, HandoverController, isAuthorityCurrent, type Au
   type AuthorityStorePort } from '@glimmer-cradle/platform';
 import { HostJobsController, type HostJobsOptions, type HostJobsSnapshot } from './host.js';
 import { WorkerSupervisor, type WorkerSupervisorSnapshot } from '../supervision/worker-supervisor.js';
+import type { WorkerSupervisorOptions } from '../supervision/worker-supervisor.js';
+import { SqliteJobStore, type JobClockPort, type JobStateReceiverPort, type JobStorePort } from '@glimmer-cradle/jobs';
+import { SqliteAuthorityStore } from '../adapters/platform/authority-store.js';
+import { HostDataPaths } from '../adapters/platform/data-paths.js';
+import { loadHostCognitionJobsConfiguration, type HostCognitionJobsConfiguration } from '../adapters/platform/host-configuration.js';
 
 export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly authority: AuthorityStorePort;
@@ -9,6 +14,93 @@ export interface HostJobsOwnerOptions extends Omit<HostJobsOptions, 'epoch'> {
   readonly renewal_interval_ms: number;
   /** 接纳显式 handover 的持久 receipt；不是自行指定 epoch。 */
   readonly initial_lease?: AuthorityLease;
+}
+
+export interface ConfiguredHostCognitionJobsOptions {
+  readonly paths: HostDataPaths;
+  readonly clock: JobClockPort;
+  readonly owner_id: string;
+  readonly worker: Omit<WorkerSupervisorOptions, 'app_root' | 'data_root' | 'console_path'
+    | 'startup_timeout_ms' | 'shutdown_timeout_ms' | 'request_timeout_ms'>;
+  readonly state_receiver?: JobStateReceiverPort;
+}
+export interface ConfiguredHostCognitionJobsSnapshot {
+  readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
+  readonly configuration: HostCognitionJobsConfiguration | null;
+  readonly session: HostCognitionJobsSnapshot | null;
+}
+
+/** 从唯一配置与 resolver 启动实际 Worker/Jobs，拥有两个库，未完成 drain 不关闭资源。 */
+export class ConfiguredHostCognitionJobsOwner {
+  private readonly options: ConfiguredHostCognitionJobsOptions;
+  private phase: ConfiguredHostCognitionJobsSnapshot['phase'] = 'idle';
+  private configuration?: HostCognitionJobsConfiguration;
+  private store?: SqliteJobStore;
+  private authority?: SqliteAuthorityStore;
+  private session?: HostCognitionJobsOwner;
+  private starting?: Promise<ConfiguredHostCognitionJobsSnapshot>;
+  private stopping?: Promise<void>;
+  private stopRequested = false;
+  public constructor(options: ConfiguredHostCognitionJobsOptions) {
+    if (!options.owner_id.trim() || typeof options.clock.now !== 'function') throw new Error('Host 配置启动 identity/clock 无效');
+    this.options = { ...options, worker: { ...options.worker, environment: { ...options.worker.environment } } };
+  }
+  public get snapshot(): ConfiguredHostCognitionJobsSnapshot {
+    const session = this.session?.snapshot ?? null;
+    return { phase: this.phase === 'active' && session?.phase === 'failed' ? 'failed' : this.phase,
+      configuration: this.configuration ?? null, session };
+  }
+  public start(): Promise<ConfiguredHostCognitionJobsSnapshot> {
+    if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('配置 Host 实例已撤销'));
+    if (this.starting) return this.starting;
+    this.phase = 'starting'; this.starting = this.begin(); void this.starting.catch(() => undefined); return this.starting;
+  }
+  public stop(): Promise<void> {
+    if (this.stopping) return this.stopping;
+    this.stopRequested = true; this.phase = 'stopping';
+    this.stopping = (async () => {
+      try {
+        await this.session?.stop();
+        await this.starting?.catch(() => undefined);
+        this.closeStores(); this.phase = 'stopped';
+      } catch (error) { this.phase = 'failed'; throw error; }
+    })();
+    return this.stopping;
+  }
+  private async begin(): Promise<ConfiguredHostCognitionJobsSnapshot> {
+    try {
+      // 配置失败不能先创建库，恢复切点异常不能先单向绑定 Memory external。
+      this.configuration = loadHostCognitionJobsConfiguration(this.options.paths);
+      this.store = new SqliteJobStore(this.options.paths.jobs_database);
+      this.authority = new SqliteAuthorityStore(this.options.paths.authority_database);
+      assertJobsRestoration(this.store, this.authority);
+      const worker = new WorkerSupervisor({ ...this.options.worker, ...this.configuration.worker,
+        runtime_document: { ...this.options.worker.runtime_document, memory: this.configuration.memory_document },
+        app_root: this.options.paths.app_root, data_root: this.options.paths.data_root, console_path: this.options.paths.worker_console });
+      this.session = new HostCognitionJobsOwner({ worker, jobs: { ...this.configuration.jobs, ...this.configuration.authority,
+        store: this.store, authority: this.authority, clock: this.options.clock, owner_id: this.options.owner_id,
+        state_receiver: this.options.state_receiver } });
+      await this.session.start();
+      if (this.stopRequested) throw new Error('配置 Host 启动已撤销');
+      this.phase = 'active'; return this.snapshot;
+    } catch (error) {
+      if (!this.stopRequested) this.phase = 'failed';
+      // 接收方/执行未 drain 时保留所有权，不用关闭底层 DB 伪造成功。
+      await this.session?.stop(); this.closeStores(); throw error;
+    }
+  }
+  private closeStores(): void {
+    this.store?.close(); this.store = undefined;
+    this.authority?.close(); this.authority = undefined;
+  }
+}
+
+function assertJobsRestoration(store: JobStorePort, authority: AuthorityStorePort): number | null {
+  const epoch = store.loadAuthorityEpoch(), current = authority.load('jobs');
+  if (epoch !== null && (!current || current.epoch < epoch)) {
+    throw new AuthorityConflictError('Authority/Jobs 恢复切点不一致，须先恢复权威序列');
+  }
+  return epoch;
 }
 
 export interface HostCognitionJobsOptions {
@@ -37,10 +129,12 @@ export class HostCognitionJobsOwner {
       ...(options.jobs.initial_lease ? { initial_lease: { ...options.jobs.initial_lease } } : {}) } };
   }
   public get snapshot(): HostCognitionJobsSnapshot {
-    return { phase: this.phase, worker: this.options.worker.snapshot, jobs: this.jobs?.snapshot ?? null };
+    const jobs = this.jobs?.snapshot ?? null;
+    const failed = jobs && (['failed', 'lease_lost'].includes(jobs.phase) || jobs.jobs?.status === 'failed');
+    return { phase: this.phase === 'active' && failed ? 'failed' : this.phase, worker: this.options.worker.snapshot, jobs };
   }
   public start(): Promise<HostCognitionJobsSnapshot> {
-    if (this.stopRequested || this.phase === 'failed') return Promise.reject(new Error('Host Worker/Jobs owner 已撤销'));
+    if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('Host Worker/Jobs owner 已撤销'));
     if (this.starting) return this.starting;
     this.phase = 'starting';
     this.unsubscribe = this.options.worker.onFailure(() => {
@@ -162,11 +256,7 @@ export class HostJobsOwner {
   private async begin(): Promise<HostJobsOwnerSnapshot> {
     try {
       const { authority, owner_id, initial_lease, clock, authority_lease_ms } = this.options;
-      const priorJobEpoch = this.options.store.loadAuthorityEpoch(), priorAuthority = authority.load('jobs');
-      // 缺失/局部回滚的 authority DB 不能靠重复启动追上已有业务计数；须恢复一致备份。
-      if (priorJobEpoch !== null && (!priorAuthority || priorAuthority.epoch < priorJobEpoch)) {
-        throw new AuthorityConflictError('Authority/Jobs 恢复切点不一致，须先恢复权威序列');
-      }
+      const priorJobEpoch = assertJobsRestoration(this.options.store, authority);
       if (initial_lease) {
         const current = authority.load('jobs');
         if (initial_lease.aggregate_id !== 'jobs' || initial_lease.owner_id !== owner_id

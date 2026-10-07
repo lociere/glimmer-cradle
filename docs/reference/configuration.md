@@ -8,7 +8,7 @@
 
 | 域 | 目录/入口 | 主要 owner | 消费者 |
 |---|---|---|---|
-| 系统配置 | `configs/system/*.yaml` | Kernel | Kernel、Desktop 投影、Engine runtime、Skill Plane |
+| 系统配置 | `configs/system/*.yaml` | Kernel；目标 Host/Jobs 分别拥有新增 Document | Kernel、目标 Host、Desktop 投影、Engine runtime、Skill Plane |
 | Character Package 配置 | `configs/characters/<character-id>/*.yaml`、`knowledge/*.md` | Cognition | 当前激活角色的最小身份、作者种子、对话策略、provider、知识和推理 |
 | Extension 配置 | `configs/extensions/*.yaml` | Extension Host | 对应扩展、Kernel Extension runtime |
 | Extension manifest | `data/packages/extensions/<id>/<version>/extension-manifest.yaml` | 已安装扩展包 | Extension Host、Skill Plane、权限检查 |
@@ -38,8 +38,33 @@ Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legac
 console 路径、完整规范化 runtime Document 和 startup/shutdown/request deadline；request 不得超过
 startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监督固定选择 external，不改变产品
 默认 legacy。endpoint/generation/nonce/注册能力仅通过 FD3 交给本实例 Worker，不通过配置或环境
-发布；运行根与原有配置 Document 仍通过现行 Worker 环境注入。Jobs schema/catalog、产品路径加载
-与默认入口切换仍待完成，不能把这些装配参数另存为第二份角色配置 Schema。
+发布；运行根与原有配置 Document 仍通过现行 Worker 环境注入。配置启动入口已接入下述唯一 Document；
+产品完整 catalog、默认入口切换仍待完成，不能把这些装配参数另存为第二份角色配置 Schema。
+
+### 目标 Host 与 Jobs 配置
+
+`ConfiguredHostCognitionJobsOwner` 通过显式 `HostDataPaths` 读取 ConfigRoot 下的
+`system/host.yaml`、`system/jobs.yaml` 和现行 `system/memory.yaml`，复用 Platform validator
+应用唯一 Schema 默认值。目前 canonical Schema 仍在 `contracts/json-schema/config/v1/`；阶段 11
+原子迁入蓝图规定的 Host/Jobs owner schema 目录并切换 consumer，迁移前不建立副本。
+
+| Document / 组 | 默认值 | owner / 生效边界 |
+|---|---|---|
+| HostConfig `authority` | lease 60000 ms、renewal 20000 ms | Host 租约续期；renewal 必须小于 lease |
+| HostConfig `cognition` | startup 120000 ms、shutdown 30000 ms、request 30000 ms | Worker 生命周期；request 不超过 startup |
+| JobsConfig `scheduler` | poll 1000 ms、batch 8、lease 180000 ms | Jobs 调度；batch 为 1–1000 |
+| JobsConfig `retry` | base 30000 ms、max 3600000 ms、max_attempts 3 | Jobs 重试；max 不小于 base |
+| JobsConfig `retention` | terminal 1209600000 ms（14 天） | 仅清理到期且全部状态 ACK 的终态 body；保留原身份、unknown 和未 ACK 事实 |
+
+上述 timer 为正安全整数且不超过 Node timer 上限；terminal retention 为非负安全整数，超出
+当前时钟年龄的合法保留窗口不清理任何事实。Memory debounce 仍唯一属于 MemoryConfig，秒转
+毫秒必须为安全整数；同一份规范化 Memory Document 同时注入 Worker 与源接纳政策，调用方
+不能用另一份 Memory 投影覆盖。首次 due/预算一经源接纳便持久固定，重启配置不追溯改变。
+
+启动读取上限为每文件 1 MiB，要求 UTF-8 无 BOM；缺失、损坏、重复 YAML 键、未知配置键或
+非法组合均以不含输入内容的 owner 错误拒绝，无静默 fallback。配置全验通过后才创建 Jobs/authority
+库。每个实例持有冻结政策；更改须 drain 后以新实例重启，目前未接 Control Center 编辑或热更新。
+该入口只装配 Worker/Jobs，不替代产品默认 Kernel 或完整角色/provider 配置加载。
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。
@@ -61,6 +86,8 @@ Base URL 只接受不含账号信息、查询参数和片段的 HTTP(S) 地址�
 | 文件 | 职责 |
 |---|---|
 | `configs/system/kernel.yaml` | Kernel lifecycle、transport、Ingress、runtime 总控 |
+| `configs/system/host.yaml` | 目标 Host authority 续期与受监督 Worker deadline；不替代现行 kernel.yaml |
+| `configs/system/jobs.yaml` | 目标 Jobs 调度、重试预算与终态保留期；不拥有 Memory debounce |
 | `configs/system/avatar.yaml` | Avatar 启停、Presentation 端口、UnityAvatarHost 启动策略和情绪映射 |
 | `configs/system/surfaces.yaml` | Desktop Surface 与 Desktop Shell 端口；不拥有 Avatar |
 | `configs/system/audio.yaml` | TTS/ASR 启停、TTS 路由、韧性、缓存和 provider 执行参数 |

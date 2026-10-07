@@ -135,6 +135,8 @@ it('retention 保留去重 tombstone，不删除 unknown 或活跃工作', () =>
     store.enqueue({ ...request, job_id: 'waiting', idempotency_key: 'waiting', due_at: 5000 }, 1, 1003);
     expect(new JobRetentionController(store, { now: () => 2000 }, 1).prune(500)).toBe(0);
     for (const event of store.readOutbox(1, 100)) store.acknowledgeOutbox(event.event_id, 1, 2000);
+    expect(new JobRetentionController(store, { now: () => 2000 }, 1).prune(Number.MAX_SAFE_INTEGER)).toBe(0);
+    expect(store.load('job-1')?.status).toBe('succeeded');
     expect(new JobRetentionController(store, { now: () => 2000 }, 1).prune(500)).toBe(1);
     expect(store.load('job-1')).toBeNull();
     expect(store.enqueue(request, 1, 2000)).toMatchObject({ duplicate: true, job_id: 'job-1', job: null });

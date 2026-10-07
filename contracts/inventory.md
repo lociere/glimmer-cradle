@@ -1,5 +1,12 @@
 # M12 Contract Spine Inventory
 
+v2.1 新增唯一 Document：`json-schema/config/v1/jobs-config.schema.json`、
+`https://glimmer-cradle.local/contracts/config/v1/jobs-config.schema.json`、`JobsConfig`（Jobs owner）；
+`json-schema/config/v1/host-config.schema.json`、
+`https://glimmer-cradle.local/contracts/config/v1/host-config.schema.json`、`HostConfig`（Host owner）。
+Host validator 消费；既有配置与 wire 不变。阶段 11 原子迁入目标 owner Schema 并登记 catalog，
+迁移前禁止复制 Schema 或创建第二生成链。
+
 当前新增用户技能 Document：`json-schema/skill/v1/user-skill-metadata.schema.json`，
 `https://glimmer-cradle.dev/schemas/skill/v1/user-skill-metadata.schema.json`，`UserSkillMetadata`。
 Contract Spine 拥有 frontmatter validator，Kernel UserSkillSource 消费；无旧格式迁移或并行 owner。

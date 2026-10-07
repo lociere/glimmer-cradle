@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { JobController, JobRecoveryController, JobScheduler, type JobClockPort,
+import { JobController, JobRecoveryController, JobRetentionController, JobScheduler, type JobClockPort,
   type JobStorePort, type JobStateReceiverPort, type RetryPolicy } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, HostCognitionError } from '../adapters/protocol/cognition-client.js';
@@ -19,6 +19,7 @@ export interface HostJobsOptions {
   readonly lease_ms: number;
   readonly submission_policy: MemoryJobSubmissionPolicy;
   readonly retry_policy: RetryPolicy;
+  readonly terminal_retention_ms?: number;
   readonly state_receiver?: JobStateReceiverPort;
 }
 export interface HostJobsSnapshot {
@@ -34,6 +35,7 @@ export class HostJobsController {
   private readonly controller: JobController;
   private readonly recovery: JobRecoveryController;
   private readonly scheduler: JobScheduler;
+  private readonly retention: JobRetentionController;
   private readonly cancellation = new AbortController();
   private state: HostJobsSnapshot = { status: 'idle', completed_cycles: 0, error_code: null };
   private cursor = '';
@@ -47,13 +49,15 @@ export class HostJobsController {
       || options.poll_interval_ms > 2_147_483_647
       || !options.owner_id.trim() || !Number.isSafeInteger(options.submission_policy.debounce_ms)
       || options.submission_policy.debounce_ms < 0 || !Number.isSafeInteger(options.submission_policy.max_attempts)
-      || options.submission_policy.max_attempts < 1) throw new Error('Host Jobs 装配参数无效');
+      || options.submission_policy.max_attempts < 1 || options.terminal_retention_ms !== undefined
+        && (!Number.isSafeInteger(options.terminal_retention_ms) || options.terminal_retention_ms < 0)) throw new Error('Host Jobs 装配参数无效');
     // 一个实例持有一份政策；热变更须 drain 后重新装配，不能改变未确认源的原 request。
     this.options = { ...options, submission_policy: { ...options.submission_policy }, retry_policy: { ...options.retry_policy } };
     this.adapter = new CognitionJobAdapter(options.cognition);
     this.controller = new JobController(options.store, options.clock, this.options.retry_policy);
     this.controller.register(this.adapter);
     this.recovery = new JobRecoveryController(options.store, options.clock, options.epoch, this.options.retry_policy);
+    this.retention = new JobRetentionController(options.store, options.clock, options.epoch);
     this.scheduler = new JobScheduler(options.store, this.controller, options.clock, options.epoch, options.owner_id,
       options.lease_ms, MEMORY_JOB_KIND);
   }
@@ -124,6 +128,7 @@ export class HostJobsController {
       await this.scheduler.runDue(batch_size, signal);
       if (state_receiver) await this.recovery.deliverOutbox(state_receiver, batch_size, signal);
       signal.throwIfAborted();
+      if (this.options.terminal_retention_ms !== undefined) this.retention.prune(this.options.terminal_retention_ms);
       const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0;
       this.state = { status: degraded || pending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
         error_code: degraded ? 'cognition_unavailable' : pending ? 'jobs_recovery_pending' : null };

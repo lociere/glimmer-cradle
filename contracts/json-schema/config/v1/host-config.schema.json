@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimmer-cradle.local/contracts/config/v1/host-config.schema.json",
+  "title": "HostConfig",
+  "description": "Host 的 authority 与 Cognition Worker 生命周期装配；不声明路径、端点、角色或密钥。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "authority": {
+      "type": "object", "additionalProperties": false, "default": {},
+      "description": "renewal_interval_ms 必须小于 lease_ms，装配核验后才允许启动。",
+      "properties": {
+        "lease_ms": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 60000 },
+        "renewal_interval_ms": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 20000 }
+      }
+    },
+    "cognition": {
+      "type": "object", "additionalProperties": false, "default": {},
+      "description": "request_timeout_ms 不超过 startup_timeout_ms；本实例 Shutdown RPC/退出等待共用 shutdown 预算。",
+      "properties": {
+        "startup_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 120000 },
+        "shutdown_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 30000 },
+        "request_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 2147483647, "default": 30000 }
+      }
+    }
+  },
+  "x-glimmer-owner": "Host owner",
+  "x-glimmer-contract-kind": "Document",
+  "x-glimmer-compatibility": "v2.1 new Document; changes require a drained replacement owner, not hot mutation."
+}

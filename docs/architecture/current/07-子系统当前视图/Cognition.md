@@ -119,7 +119,7 @@ Memory 采用 `candidate / active / disputed / superseded / redacted` 状态和�
 同一请求；接纳 ACK 不等于业务完成，已解决源记录也必须保留原身份。旧巩固队列仍是迁移窗口，
 不能认作 Jobs 生产接线完成；Host 源投递与 handler/query adapter 已在目标 App owner 落位并通过真实
 跨进程验证；App 的单循环持续调度、持久 unknown 分页与停机封口已接通。
-默认生产 Worker 仍拒绝外部源投递，防止旧队列双消费；配置/authority、进程监督与状态事件接收
+默认生产 Worker 仍拒绝外部源投递，防止旧队列双消费；目标 Host 的局部配置/authority 路径与进程监督已接线，产品入口与状态事件接收
 继续按执行记录推进。实现与 schema 升级边界见
 [记忆持久化](../../implementation/Cognition认知核实现.md#记忆经历与持久化)。
 

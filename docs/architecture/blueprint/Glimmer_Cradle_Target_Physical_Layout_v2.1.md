@@ -165,7 +165,7 @@ C# SDK 与 Unity UPM 包是两种交付载体，不要求 Unity 直接消费不�
 
 <!-- target-layout:start -->
 
-精确登记 1097 个版本控制文件、333 个父目录。以下是目标，不是当前实物。
+精确登记 1098 个版本控制文件、333 个父目录。以下是目标，不是当前实物。
 
 ```text
 glimmer-cradle/
@@ -408,6 +408,7 @@ glimmer-cradle/
 │       │   │   │   ├── authority-store.ts
 │       │   │   │   ├── backup-coordinator.ts
 │       │   │   │   ├── data-paths.ts
+│       │   │   │   ├── host-configuration.ts
 │       │   │   │   └── migration-coordinator.ts
 │       │   │   └── protocol/
 │       │   │       ├── capability-mapper.ts

@@ -24,7 +24,15 @@ authority，再协议 shutdown Worker，期限后仅回收本实例进程树并�
 Jobs/续期；重启须创建新实例/世代，数据库仍由调用方在整个 owner stop 完成后关闭。
 状态接收方必需注入，Action/Log 接收方缺失时 NOT_READY；投影/inbox 幂等性由实际接收 owner 拥有。
 进程路径、规范化配置 Document、deadline 与 console 路径显式注入；不存在默认第二配置源。
-gateway、配置和 authority 路径加载、状态事件接收及产品启动迁移尚未完成；
+`ConfiguredHostCognitionJobsOwner` 是拥有资源的配置启动入口：`HostDataPaths` 显式分离安装、
+配置与数据根，读取唯一 Host/Jobs/Memory Document；同一 Memory 投影同时注入 Worker 和源政策。
+先验证全部配置和 authority/Jobs 恢复切点，再启动 Worker/Jobs，drain 完成后才关闭持有的两个库；
+失败保留原数据，不隐式升级。Jobs/authority 采用目标 state 路径；终态保留期实际进入循环，仅
+在到期且状态全部 ACK 后清理 body，保留最小源身份。精确默认值见
+[配置参考](../../docs/reference/configuration.md#目标-host-与-jobs-配置)，路径与备份边界见
+[数据目录](../../docs/reference/data-layout.md#用户状态与记忆)。测试中的安装根包含现行 Worker
+必需的真实 SQL migration，并验证资源摘要未改变；不是完整安装制品/只读 ACL 验收。
+gateway、完整配置 catalog、状态事件接收及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
 完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。

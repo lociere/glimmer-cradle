@@ -724,6 +724,10 @@
       "owner": "host"
     },
     {
+      "path": "apps/host/src/adapters/platform/host-configuration.ts",
+      "owner": "host"
+    },
+    {
       "path": "apps/host/src/adapters/platform/migration-coordinator.ts",
       "owner": "host"
     },
