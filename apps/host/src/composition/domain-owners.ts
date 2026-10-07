@@ -82,7 +82,7 @@ export class ConfiguredHostCognitionJobsOwner {
         app_root: this.options.paths.app_root, data_root: this.options.paths.data_root, console_path: this.options.paths.worker_console });
       this.session = new HostCognitionJobsOwner({ worker, jobs: { ...this.configuration.jobs, ...this.configuration.authority,
         store: this.store, authority: this.authority, clock: this.options.clock, owner_id: this.options.owner_id,
-        state_receiver: this.options.state_receiver, memory_state_feedback: true } });
+        state_receiver: this.options.state_receiver, memory_state_feedback: true, planning_sources: true } });
       await this.session.start();
       if (this.stopRequested) throw new Error('配置 Host 启动已撤销');
       this.phase = 'active'; return this.snapshot;

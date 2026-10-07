@@ -30,6 +30,9 @@ Job 状态转换与状态 outbox 同事务提交。`deliverOutbox` 在事务之�
 接收成功但 ACK 丢失时可重投，接收方按 event_id 幂等接纳并校验内容。事件不含请求 payload；result
 仍属于受控数据，receiver 的访问与投影约束由 App 实施，不直接暴露给 Renderer/Extension。
 续期不发布状态事件，revision 可有间隙；消费方不能以连续 revision 判断事件丢失。
+`readOutbox`/`deliverOutbox` 可按 kind 有界筛选，只确认已装配接收 owner 的事件；其他 kind
+仍持久待 ACK。`hasPendingKind` 从当前 authority 下的持久 queued/running/retry_wait/unknown
+查询未解决工作，供 App 如实呈现缺 handler 的降级，不用内存缓存冒充恢复事实。
 
 事件与周期 trigger 定义、occurrence 去重及 next due 持久存储在同一库。定义不可变；同 ID 内容冲突
 失败关闭，启停使用 revision CAS，禁用不取消已经生成的 Job。事件 payload 不能覆盖固定 input，
@@ -48,8 +51,9 @@ v1/v2/v3 库需显式迁移，不把用户旧数据库当成空库。产品数�
 Scheduler 可限定已装配的 kind，避免提前判死其他 owner 的工作；App 的 signal 取消后不再 claim。
 真实 Memory 源 outbox、fencing/receipt、App handler/query 与持续调度已通过跨 Worker/Jobs 的临时库验证，
 当前进度和生产 cutover 门见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
-尚待实现：产品 Host/Worker 监督、authority/config 加载、状态事件接收、Jobs 配置 Document 的唯一
-catalog/Schema 原子切换及安装恢复主链；默认生产仍使用旧巩固队列。目录存在不代表阶段 7 完成。
+目标 Host 已接真实 Worker 监督、authority/config、Memory 状态接收及 Planning 源接纳；尚待
+完整 catalog/产品入口切换、Planning 执行/完成评估及安装恢复主链。默认产品仍使用旧巩固队列，
+目标 Host 不代表产品 cutover；目录存在不代表阶段 7 完成。
 
 ```powershell
 pnpm --filter @glimmer-cradle/jobs test

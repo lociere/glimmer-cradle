@@ -77,8 +77,10 @@ Perception
 
 Planning 已持久保存不可变目标/计划版本、完成条件、显式 accepted 承诺与同事务 Job request outbox；
 重复身份不创建第二份，首次 due time 与 scope 不可悄悄替换。通过 `JobPort` 得到持久接纳才结束源
-投递，回执不表示目标 completed；普通本拍 `ActionPlan` 不自动升级为长期承诺。生产长期 Jobs
-wire/broker/handler、完成条件评估、通知与再调度仍未装配，不能认作完整长期承诺链路。
+投递，回执不表示目标 completed；普通本拍 `ActionPlan` 不自动升级为长期承诺。目标配置 Host
+已通过生产 Worker RPC 接真实 Planning store 与 Jobs 接纳，原 due/首次预算和 ACK 丢失重启已验证；
+handler 尚未装配，待办只排队、状态不假 ACK，Host 如实降级。完成条件评估、通知与再调度
+仍未装配，不能认作完整长期承诺链路。
 详见[认知核实现](../../implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 
 ## 记忆与连续性

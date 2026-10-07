@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { create, type JsonObject } from '@bufbuild/protobuf';
+import { create, toBinary, type JsonObject } from '@bufbuild/protobuf';
 import { JobExecutionIdentitySchema, JobStateEventSchema, JobStatus, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
-import { MemoryJobResolution, type MemoryJobSourceRequest, type MemoryJobResult } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { MemoryJobResolution, PlanningJobSourceRequestSchema, type MemoryJobSourceRequest, type MemoryJobResult, type PlanningJobSourceRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence, type JobStateEvent } from '@glimmer-cradle/jobs';
 
 export function memoryJobState(event: JobStateEvent) {
@@ -19,6 +19,24 @@ export function memoryJobState(event: JobStateEvent) {
 }
 
 export const MEMORY_JOB_KIND = 'memory.consolidate';
+export const PLANNING_JOB_KIND = 'planning.evaluate';
+export function planningJobSource(source: PlanningJobSourceRequest): JobSource {
+  return { source_id: 'cognition.planning', source_request_id: source.requestId,
+    input_digest: createHash('sha256').update(JSON.stringify([source.requestId, source.commitmentId, source.planId,
+      source.planVersion.toString(), source.goalId, source.goalVersion.toString(), source.scopeId, source.dueAtMs.toString()])).digest('hex') };
+}
+export function planningJobRequest(source: PlanningJobSourceRequest, maxAttempts: number): JobRequest {
+  if (toBinary(PlanningJobSourceRequestSchema, source).byteLength > 65536) throw new JobConflictError('Planning 源请求超过大小限制');
+  const planVersion = positive(Number(source.planVersion)), goalVersion = positive(Number(source.goalVersion));
+  const commitment = text(source.commitmentId), plan = text(source.planId), goal = text(source.goalId), scope = text(source.scopeId);
+  const due = Number(source.dueAtMs);
+  const expected = createHash('sha256').update(JSON.stringify([PLANNING_JOB_KIND, commitment, plan, planVersion])).digest('hex');
+  if (source.requestId !== expected || !Number.isSafeInteger(due) || due < 0) throw new JobConflictError('Planning 源 request identity/due 无效');
+  return { job_id: `planning:${source.requestId}`, goal_id: goal, scope_id: scope, kind: PLANNING_JOB_KIND,
+    idempotency_key: source.requestId, payload: { source_request_id: source.requestId, commitment_id: commitment,
+      plan_id: plan, plan_version: planVersion, goal_version: goalVersion }, due_at: due,
+    retry_mode: 'reconcile', max_attempts: positive(maxAttempts) };
+}
 export interface MemoryJobSubmissionPolicy { readonly debounce_ms: number; readonly max_attempts: number; }
 export function memoryJobSource(source: MemoryJobSourceRequest): JobSource {
   return { source_id: 'cognition.memory', source_request_id: source.requestId,
@@ -26,11 +44,11 @@ export function memoryJobSource(source: MemoryJobSourceRequest): JobSource {
       source.episodeVersion.toString(), source.scopeId, source.inputDigest, source.createdAt])).digest('hex') };
 }
 function positive(value: number): number {
-  if (!Number.isSafeInteger(value) || value < 1) throw new JobConflictError('Memory Job 原执行整数无效');
+  if (!Number.isSafeInteger(value) || value < 1) throw new JobConflictError('Job 原执行整数无效');
   return value;
 }
 function text(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim()) throw new JobConflictError('Memory Job identity 为空');
+  if (typeof value !== 'string' || !value.trim()) throw new JobConflictError('Job identity 为空');
   return value;
 }
 export function memoryJobRequest(source: MemoryJobSourceRequest, policy: MemoryJobSubmissionPolicy): JobRequest {

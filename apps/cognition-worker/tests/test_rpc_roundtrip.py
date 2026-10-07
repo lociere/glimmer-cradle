@@ -24,6 +24,7 @@ from glimmer_cradle.cognition.adapters.persistence import (
     EpisodeProjection,
     MemoryRepository,
     SqliteMemoryStore,
+    SqlitePlanningStore,
 )
 from glimmer_cradle.cognition.attention import (
     AttentionController as _AttentionController,
@@ -44,6 +45,7 @@ from glimmer_cradle.cognition.perception import (
     ObservationQueue,
     PerceptionOperationRegistry,
 )
+from glimmer_cradle.cognition.planning import GoalVersion, PlanVersion
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
     AgentPlanResult,
@@ -900,6 +902,79 @@ async def test_memory_source_rpc_rejects_unbounded_scan(memory_job_service, serv
     assert conflict.value.code() is grpc.StatusCode.INVALID_ARGUMENT
 
 
+async def test_planning_source_rpc_requires_actual_owner_and_business_readiness(service, tmp_path):
+    host, channel, _, _ = service
+    read = _call(channel, "ReadPlanningJobRequests", cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse)
+    request = cognition_pb.ReadPlanningJobRequestsRequest(call=_metadata("generation-1", "planning-read"), limit=8)
+    with pytest.raises(grpc.aio.AioRpcError) as missing:
+        await read(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(missing.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_NOT_READY
+    planning = SqlitePlanningStore(tmp_path / "planning.sqlite")
+    await planning.connect()
+    host._planning = planning
+    try:
+        await _seed_planning_source(planning)
+        host._readiness_tracker.mark_degraded("domain", "fixture unready")
+        with pytest.raises(grpc.aio.AioRpcError) as not_ready:
+            await read(request, timeout=2)
+        detail = common_pb.ServiceErrorDetail.FromString(dict(not_ready.value.trailing_metadata())["glimmer-error-bin"])
+        assert detail.code == common_pb.SERVICE_ERROR_CODE_NOT_READY
+        host.mark_ready()
+        assert len((await read(request, timeout=2)).requests) == 1
+        host._readiness_tracker.begin_shutdown()
+        with pytest.raises(grpc.aio.AioRpcError) as stopping:
+            await read(request, timeout=2)
+        detail = common_pb.ServiceErrorDetail.FromString(dict(stopping.value.trailing_metadata())["glimmer-error-bin"])
+        assert detail.code == common_pb.SERVICE_ERROR_CODE_NOT_READY
+        assert len(await planning.pending_job_requests()) == 1
+    finally:
+        host._planning = None
+        await planning.close()
+
+
+async def test_planning_source_rpc_tracks_ack_until_drain_and_preserves_cancelled_source(service, tmp_path, monkeypatch):
+    host, channel, _, _ = service
+    planning = SqlitePlanningStore(tmp_path / "planning.sqlite")
+    await planning.connect()
+    await _seed_planning_source(planning)
+    host._planning = planning
+    request = (await planning.pending_job_requests())[0]
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_source_to_wire,
+    )
+    ack = _call(channel, "AcknowledgePlanningJobRequest", cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse)
+    entered, finished = asyncio.Event(), asyncio.Event()
+
+    async def waiting_ack(_request, _receipt):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(planning, "acknowledge_job_request", waiting_ack)
+    call = ack(cognition_pb.AcknowledgePlanningJobRequestRequest(call=_metadata("generation-1", "planning-ack"),
+        request=planning_source_to_wire(request), job_id=f"planning:{request.request_id}", job_revision=1), timeout=5)
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        await host.stop()
+        await asyncio.wait_for(finished.wait(), 2)
+        assert len(await planning.pending_job_requests()) == 1
+        assert not host._inflight
+    finally:
+        call.cancel()
+        host._planning = None
+        await planning.close()
+
+
+async def _seed_planning_source(store: SqlitePlanningStore) -> None:
+    if await store.load_commitment("commitment:长期计划") is None:
+        await store.accept_commitment("commitment:长期计划", PlanVersion("plan:评估", 1,
+            GoalVersion("goal:长期承诺", "conversation:planning", 1, "核对变化并通知", "实际观察到变化且通知已提交"),
+            ("核对受控来源", "评估完成条件")), due_at=int(time.time() * 1000) + 3_600_000)
+
+
 async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     """Host 跨语言验收入口；业务库/Log/RPC 都是真实 owner，模型为确定性 fixture。"""
     recorder = build_test_recorder(root / "conversation")
@@ -927,13 +1002,17 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
         memory=memory, jobs=None, llm=Llm(), clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
     await coordinator.start()
     await coordinator.consolidate(force_seal=True)
+    planning = SqlitePlanningStore(root / "planning.sqlite")
+    await planning.connect()
+    if generation.startswith("planning-"):
+        await _seed_planning_source(planning)
 
     async def shutdown():
         return None
 
     # 非 Memory RPC 不在该 fixture 的验收范围；不构造第二套业务实现。
     host = CognitionGrpcHost(generation=generation, inbound=None, queue=None, activity=None, cycle=None,
-        shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator)
+        shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator, planning=planning)
     await host.start()
     host.mark_ready()
     print(json.dumps({"endpoint": host.endpoint, "generation": generation}), flush=True)
@@ -944,15 +1023,23 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
         await coordinator.stop()
         await recorder.stop()
         await database.close()
+        await planning.close()
 
 
 if __name__ == "__main__" and len(sys.argv) == 4 and sys.argv[1] == "--host-job-fixture":
     asyncio.run(_host_memory_job_fixture(Path(sys.argv[2]), sys.argv[3]))
 
 
-async def _host_production_seed(root: Path) -> None:
+async def _host_production_seed(root: Path, *, seed_planning: bool = False) -> None:
     """仅准备真实持久源；被验收的进程仍由 Host 直接启动生产 CLI/factory。"""
     state = root / "state" / "cognition"
+    if seed_planning:
+        planning = SqlitePlanningStore(state / "planning.sqlite")
+        await planning.connect()
+        try:
+            await _seed_planning_source(planning)
+        finally:
+            await planning.close()
     recorder = build_test_recorder(state / "experience")
     await recorder.start()
     database = SqliteMemoryStore(state / "memory.sqlite")
@@ -981,6 +1068,9 @@ async def _host_production_seed(root: Path) -> None:
 
 if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--host-production-seed":
     asyncio.run(_host_production_seed(Path(sys.argv[2])))
+
+if __name__ == "__main__" and len(sys.argv) == 3 and sys.argv[1] == "--host-production-planning-seed":
+    asyncio.run(_host_production_seed(Path(sys.argv[2]), seed_planning=True))
 
 
 @pytest.mark.asyncio

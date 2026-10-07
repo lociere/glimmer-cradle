@@ -31,7 +31,8 @@ export interface JobStorePort {
   listAttempts(jobId: string): JobAttempt[];
   reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
     policy: RetryPolicy): JobReconciliationReceipt;
-  readOutbox(epoch: number, limit: number): JobStateEvent[];
+  readOutbox(epoch: number, limit: number, kind?: string): JobStateEvent[];
+  hasPendingKind(epoch: number, kind: string): boolean;
   /** 只有接收方已原子提交业务变化与 event_id inbox 后才能确认。 */
   acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean;
   claim(epoch: number, ownerId: string, now: number, leaseMs: number, kind?: string): JobClaim | null;

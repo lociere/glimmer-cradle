@@ -13,7 +13,9 @@ import { ContentPartSchema } from '../../generated/ts/glimmer/content/v1/content
 import { JobStatus } from '../../generated/ts/glimmer/jobs/v1/jobs_pb';
 import { PublishMemoryJobStateRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
-  AcknowledgeMemoryJobRequestRequestSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+  AcknowledgeMemoryJobRequestRequestSchema, ReadPlanningJobRequestsRequestSchema,
+  ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestRequestSchema,
+  AcknowledgePlanningJobRequestResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -23,6 +25,47 @@ const fixturePath = resolve('fixtures/skill-tool-parameters.valid.json');
 const documentBytes = readFileSync(fixturePath);
 const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version: string; tool_id: string };
 const digest = createHash('sha256').update(documentBytes).digest();
+
+const planningSource = { requestId: createHash('sha256').update(JSON.stringify([
+  'planning.evaluate', 'commitment:长期承诺', 'plan:评估', Number.MAX_SAFE_INTEGER,
+])).digest('hex'), commitmentId: 'commitment:长期承诺', planId: 'plan:评估',
+  planVersion: 9007199254740991n, goalId: 'goal:目标', goalVersion: 9007199254740991n,
+  scopeId: 'conversation:范围', dueAtMs: 9007199254740991n };
+const planningRead = create(ReadPlanningJobRequestsRequestSchema, {
+  call: { traceId: 'trace:planning', generation: 'planning-1' }, limit: 1000,
+});
+const restoredPlanningRead = fromBinary(ReadPlanningJobRequestsRequestSchema,
+  toBinary(ReadPlanningJobRequestsRequestSchema, planningRead));
+if (restoredPlanningRead.limit !== 1000 || restoredPlanningRead.call?.generation !== 'planning-1') {
+  throw new Error('Planning source read metadata roundtrip failed');
+}
+const planningResponse = create(ReadPlanningJobRequestsResponseSchema, { requests: [planningSource] });
+const restoredPlanning = fromBinary(ReadPlanningJobRequestsResponseSchema,
+  toBinary(ReadPlanningJobRequestsResponseSchema, planningResponse)).requests[0];
+if (JSON.stringify(restoredPlanning, (_, value) => typeof value === 'bigint' ? String(value) : value)
+  !== JSON.stringify(planningResponse.requests[0], (_, value) => typeof value === 'bigint' ? String(value) : value)) {
+  throw new Error('Planning source identity/precision roundtrip failed');
+}
+const planningAck = create(AcknowledgePlanningJobRequestRequestSchema, { call: planningRead.call,
+  request: planningSource, jobId: `planning:${planningSource.requestId}`,
+  jobRevision: 9007199254740991n, duplicate: true });
+const restoredPlanningAck = fromBinary(AcknowledgePlanningJobRequestRequestSchema,
+  toBinary(AcknowledgePlanningJobRequestRequestSchema, planningAck));
+if (restoredPlanningAck.request?.requestId !== planningSource.requestId
+  || restoredPlanningAck.jobRevision !== 9007199254740991n || !restoredPlanningAck.duplicate
+  || restoredPlanningAck.jobId !== planningAck.jobId || restoredPlanningAck.call?.generation !== 'planning-1') {
+  throw new Error('Planning source ACK precision/metadata roundtrip failed');
+}
+const planningReceipt = create(AcknowledgePlanningJobRequestResponseSchema, {
+  requestId: planningSource.requestId, jobId: planningAck.jobId, accepted: true,
+});
+const restoredPlanningReceipt = fromBinary(AcknowledgePlanningJobRequestResponseSchema,
+  toBinary(AcknowledgePlanningJobRequestResponseSchema, planningReceipt));
+if (!restoredPlanningReceipt.accepted || restoredPlanningReceipt.requestId !== planningSource.requestId
+  || restoredPlanningReceipt.jobId !== planningAck.jobId) throw new Error('Planning source receipt roundtrip failed');
+if (fromBinary(AcknowledgePlanningJobRequestRequestSchema, new Uint8Array()).request !== undefined) {
+  throw new Error('Planning source ACK absent request gained presence');
+}
 
 const jobIdentity = { jobId: 'job:one', scopeId: 'scope:one', attempt: 2n, authorityEpoch: 7n,
   fencingToken: 9007199254740991n, ownerId: 'host:one', leaseUntilMs: 1900000000000n };

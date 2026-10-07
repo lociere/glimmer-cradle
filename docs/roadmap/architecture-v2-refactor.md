@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 待执行 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已落位；产品入口/完整 catalog、产品状态投影、长期 Planning Jobs 生产接线/完成评估与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -582,6 +582,43 @@ PASS；清单仍为 1,098 文件/435 目录。Ruff I/F PASS；本轮文件全规
 Contracts 源/生成/兼容输入未变，复用 `28c03c24` 完整验证证据，不重复生成影响运行测试。
 用户数据、默认产品入口和旧队列未切换，长期生产 Jobs/完成条件评估及整体重构仍未完成；
 固定整体候选上的独立审查与完整制品/恢复验收继续保留。
+
+### 阶段 5/7 Planning 生产源接纳（2026-10-07 当前候选）
+
+输入 `5766f7fe`，当前会话唯一写入 owner。沿唯一 Cognition Service 增量定义 Planning 源扫描/
+ACK，生产 Worker factory 注入真实 store；Host 配置启动经生成 client/mapper 与实际 Jobs SQLite
+提交后才 ACK。请求只传版本引用和原 due，不复制心智完成条件或平台 IO。Memory debounce
+不适用于 Planning，首次重试预算来自 Jobs Document；ACK 丢失重启不改写首次政策。
+
+当前缺 Planning 执行器，因此 scheduler 不 claim 此 kind，queued/attempt 0、accepted 承诺
+revision 1 与未 ACK 状态保持。Host 以持久 pending-kind 查询报告 `jobs_handler_pending`，
+Memory outbox 按其 kind 投递，不能错误确认 Planning 事件或被其早期 backlog 阻塞。
+不新增 schema/队列 owner、配置源、兼容壳或第二 wire 源；完整执行/证据评估/通知与再调度待完成。
+
+计划验收：真实生产 CLI/配置启动接纳双源、停止/重启与首次政策；真实 wire ACK 提交前后丢失、
+Worker/Jobs 重开、旧代/非法范围/源漂移/伪造身份拒绝；实际 owner/readiness/drain/取消门；
+Jobs outbox 按 owner kind 有界投递、保留未装配事件、拒旧 authority；TS/Python/C# 精度/中文
+身份/消息 presence 往返及完整 Contracts 门禁，最后运行各 owner 与根构建/文档/编码门。
+独立审查仍留整体固定候选，用户数据和产品默认入口不在本轮切换。
+
+验证结果：Host 全量 83 项（50 启动/RPC、9 authority、24 API/配置）、Jobs 39 项、
+Cognition 306 项、Worker 82 项 PASS。最终大小限制补齐后 Planning 真实双源生产 CLI 和 wire
+4 项重验 PASS；覆盖扫描越界、源超 64 KiB、commit 后取消不 ACK、错误 ACK 保留源与实际
+重投沿用首次预算。真实 Kernel production bootstrap 注册/ready/逆序停机/Worker exit 0 PASS。
+根 typecheck 首次暴露测试 spy 泛型与 rest tuple 类型错误，改为精确方法参数和最小清理句柄后
+根 `pnpm typecheck` / `pnpm build` PASS；未放宽编译规则或运行断言。
+
+Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三语言 source/ACK roundtrip
+及连续生成 clean PASS；兼容基线未改。首次 clean gate 因 Windows UNKNOWN 写入异常留下未规范化
+生成物，第二次因此检测到前后差异；核对 unstaged diff 清零并完整重新生成后全门通过，不改
+生成器或接受不一致产物。111 页 docs、编码、architecture、target-layout spec-only、diff PASS；
+清单仍为 1,098 文件/435 目录，规格通过不代表实际物理收束。Ruff I/F PASS；全规则只剩 RPC
+原有 47 项，与父候选按 code/message/source 逐项一致，不报告全量 lint 通过。
+
+首次三个 wire fixture 因 helper 定义在提前 CLI 分支之后而超时，调整定义顺序后原测试通过；
+失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
+进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
+Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
 ### 阶段 3 完成切片（2026-09-20 固定方案）
 

@@ -19,6 +19,35 @@ using var documentJson = JsonDocument.Parse(fixtureBytes);
 var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
 
+var planningSource = new PlanningJobSourceRequest {
+    RequestId = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+        "[\"planning.evaluate\",\"commitment:长期承诺\",\"plan:评估\",9007199254740991]"))).ToLowerInvariant(),
+    CommitmentId = "commitment:长期承诺", PlanId = "plan:评估", PlanVersion = 9007199254740991,
+    GoalId = "goal:目标", GoalVersion = 9007199254740991, ScopeId = "conversation:范围",
+    DueAtMs = 9007199254740991,
+};
+var planningRead = new ReadPlanningJobRequestsRequest {
+    Call = new CallMetadata { TraceId = "trace:planning", Generation = "planning-1" }, Limit = 1000,
+};
+if (!ReadPlanningJobRequestsRequest.Parser.ParseFrom(planningRead.ToByteArray()).Equals(planningRead))
+    throw new InvalidOperationException("Planning source read metadata roundtrip failed");
+var planningResponse = new ReadPlanningJobRequestsResponse { Requests = { planningSource } };
+if (!ReadPlanningJobRequestsResponse.Parser.ParseFrom(planningResponse.ToByteArray()).Equals(planningResponse))
+    throw new InvalidOperationException("Planning source identity/precision roundtrip failed");
+var planningAck = new AcknowledgePlanningJobRequestRequest {
+    Call = planningRead.Call, Request = planningSource, JobId = "planning:" + planningSource.RequestId,
+    JobRevision = 9007199254740991, Duplicate = true,
+};
+if (!AcknowledgePlanningJobRequestRequest.Parser.ParseFrom(planningAck.ToByteArray()).Equals(planningAck))
+    throw new InvalidOperationException("Planning source ACK precision/metadata roundtrip failed");
+var planningReceipt = new AcknowledgePlanningJobRequestResponse {
+    RequestId = planningSource.RequestId, JobId = planningAck.JobId, Accepted = true,
+};
+if (!AcknowledgePlanningJobRequestResponse.Parser.ParseFrom(planningReceipt.ToByteArray()).Equals(planningReceipt))
+    throw new InvalidOperationException("Planning source receipt roundtrip failed");
+if (AcknowledgePlanningJobRequestRequest.Parser.ParseFrom(Array.Empty<byte>()).Request != null)
+    throw new InvalidOperationException("Planning source ACK absent request gained presence");
+
 var stateRequest = new PublishMemoryJobStateRequest { DeliveryAuthorityEpoch = 9007199254740991,
     Event = new JobsV1.JobStateEvent { EventId = "event:one", JobId = "job:one", ScopeId = "scope:one",
         GoalId = "source:one", Kind = "memory.consolidate", Revision = 9007199254740991,

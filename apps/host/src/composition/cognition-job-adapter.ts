@@ -1,11 +1,12 @@
 import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
-  AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
+  ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
   type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
-import type { MemoryJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
+import type { MemoryJobsCognitionPort, PlanningJobsSourcePort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
-  memoryJobState, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
+  memoryJobState, planningJobRequest, planningJobSource, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
 export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPort {
@@ -75,6 +76,31 @@ export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPor
       if (!ack.accepted || ack.requestId !== source.requestId || ack.jobId !== submission.job_id) {
         throw new JobConflictError('Memory 源请求 ACK identity 不匹配');
       }
+      delivered += 1;
+    }
+    return delivered;
+  }
+}
+
+/** 真实生产源接纳；尚未注册 Planning handler 时只排队，不模拟执行或状态 ACK。 */
+export class PlanningJobSourceAdapter {
+  public constructor(private readonly cognition: PlanningJobsSourcePort) {}
+  public async deliverRequests(store: JobStorePort, clock: JobClockPort, epoch: number,
+    maxAttempts: number, limit: number, signal?: AbortSignal): Promise<number> {
+    signal?.throwIfAborted();
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new JobConflictError('Planning 源投递扫描范围无效');
+    const response = await this.cognition.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit }), signal);
+    if (response.requests.length > limit) throw new JobConflictError('Planning 源返回超过扫描范围');
+    let delivered = 0;
+    for (const source of response.requests) {
+      signal?.throwIfAborted();
+      const request = planningJobRequest(source, maxAttempts);
+      const submission = store.enqueueSource(planningJobSource(source), request, epoch, clock.now());
+      signal?.throwIfAborted();
+      const ack = await this.cognition.acknowledgePlanning(create(AcknowledgePlanningJobRequestRequestSchema,
+        { request: source, jobId: submission.job_id, jobRevision: BigInt(submission.revision), duplicate: submission.duplicate }), signal);
+      signal?.throwIfAborted();
+      if (!ack.accepted || ack.requestId !== source.requestId || ack.jobId !== submission.job_id) throw new JobConflictError('Planning 源请求 ACK identity 不匹配');
       delivered += 1;
     }
     return delivered;

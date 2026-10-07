@@ -9,6 +9,10 @@ import {
   AcknowledgeMemoryJobRequestRequestSchema, AcknowledgeMemoryJobRequestResponseSchema,
   GetReadinessRequestSchema, GetReadinessResponseSchema, ShutdownRequestSchema, ShutdownResponseSchema,
   PublishMemoryJobStateRequestSchema, PublishMemoryJobStateResponseSchema,
+  ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,
+  AcknowledgePlanningJobRequestRequestSchema, AcknowledgePlanningJobRequestResponseSchema,
+  type ReadPlanningJobRequestsRequest, type ReadPlanningJobRequestsResponse,
+  type AcknowledgePlanningJobRequestRequest, type AcknowledgePlanningJobRequestResponse,
   type PublishMemoryJobStateRequest, type PublishMemoryJobStateResponse,
   type ExecuteMemoryJobRequest, type ExecuteMemoryJobResponse,
   type ReconcileMemoryJobRequest, type ReconcileMemoryJobResponse,
@@ -24,12 +28,17 @@ export interface MemoryJobsCognitionPort {
   publishJobState(request: PublishMemoryJobStateRequest, signal?: AbortSignal): Promise<PublishMemoryJobStateResponse>;
 }
 
+export interface PlanningJobsSourcePort {
+  readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse>;
+  acknowledgePlanning(request: AcknowledgePlanningJobRequestRequest, signal?: AbortSignal): Promise<AcknowledgePlanningJobRequestResponse>;
+}
+
 export class HostCognitionError extends Error {
   public constructor(public readonly code: ServiceErrorCode) { super('受监督 Cognition Service 请求失败'); }
 }
 
 /** 端点及 generation 由监督 owner 注入；切代必须撤销旧 client，不自造或发现 authority。 */
-export class CognitionClient implements MemoryJobsCognitionPort {
+export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSourcePort {
   private readonly client: grpc.Client;
   private readonly inflight = new Set<grpc.ClientUnaryCall>();
   private closed = false;
@@ -64,6 +73,14 @@ export class CognitionClient implements MemoryJobsCognitionPort {
   public acknowledge(request: AcknowledgeMemoryJobRequestRequest, signal?: AbortSignal): Promise<AcknowledgeMemoryJobRequestResponse> {
     return this.call('AcknowledgeMemoryJobRequest', AcknowledgeMemoryJobRequestRequestSchema, AcknowledgeMemoryJobRequestResponseSchema,
       create(AcknowledgeMemoryJobRequestRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
+    return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,
+      create(ReadPlanningJobRequestsRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public acknowledgePlanning(request: AcknowledgePlanningJobRequestRequest, signal?: AbortSignal): Promise<AcknowledgePlanningJobRequestResponse> {
+    return this.call('AcknowledgePlanningJobRequest', AcknowledgePlanningJobRequestRequestSchema, AcknowledgePlanningJobRequestResponseSchema,
+      create(AcknowledgePlanningJobRequestRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public close(): void {
     this.closed = true;

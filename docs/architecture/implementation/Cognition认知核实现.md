@@ -163,9 +163,16 @@ Kernel CognitionService request
 孤立表失败关闭，不自动重建。journal、版本、源状态读写共享串行连接边界；取消等待回滚结束，
 回滚失败撤销连接。数据与备份范围见[数据目录](../../reference/data-layout.md#用户状态与记忆)。
 
-当前只完成持久语义与源投递基础；Jobs 接纳不把承诺标为 completed。生产 Planning wire/Host broker、
-handler 的受监督执行、Cognition 依据实际证据评估完成条件、通知/下一次调度，以及撤销/恢复链路仍待
-接线。测试中的独立接收 SQLite 只验证提交窗口，不代表生产 Jobs 已消费长期承诺。
+生产源接纳由 Worker `adapters/job_client.py` 的生成 DTO mapper、真实 Planning store RPC 和 Host
+`PlanningJobSourceAdapter` 接通；正常生产 factory 注入实际 store，业务未 ready 或 drain 拒读写。
+配置 Host 每轮有界扫描，Jobs 原子保存原 due/首次预算后 ACK；源接纳提交与响应前后中断均能
+从真实 Worker/Jobs 重启恢复。独立字典 transport `JobClient` 并非此生产链路，不能据其存在
+宣称通用 broker 完成。精确 wire 边界见[协议参考](../../reference/protocol.md#planning-jobs-源接纳)。
+
+Jobs 接纳不把承诺标为 completed。尚未装配 Planning handler，scheduler 不 claim 此 kind；
+queued/attempt 0 和未 ACK 状态事件保持，持久待办使 Host 报 `jobs_handler_pending`，Memory
+状态只消费自己的 kind。handler 的受监督执行、Cognition 依据实际证据评估完成条件、通知/
+下一次调度，以及撤销/恢复链路仍待接线，不认作完整长期承诺执行链路。
 
 ## 上下文与推理
 
@@ -295,7 +302,7 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
 [协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
-长期 Planning Jobs 与旧队列/旧数据切换仍待完成。
+Planning 执行/完成评估与旧队列/旧数据切换仍待完成。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

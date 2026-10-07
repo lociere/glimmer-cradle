@@ -383,6 +383,44 @@ message PublishMemoryJobStateResponse {
   bool duplicate = 3;
 }
 
+// 只携带不可变语义版本引用；完成条件与计划正文继续归 Cognition。
+message PlanningJobSourceRequest {
+  // SHA-256(紧凑 UTF-8 JSON ["planning.evaluate", commitment_id, plan_id, plan_version])。
+  string request_id = 1;
+  string commitment_id = 2;
+  string plan_id = 3;
+  uint64 plan_version = 4;
+  string goal_id = 5;
+  uint64 goal_version = 6;
+  string scope_id = 7;
+  // 源 owner 的首次 due；重投不可按当前时间或 Memory debounce 重算。
+  uint64 due_at_ms = 8;
+}
+
+message ReadPlanningJobRequestsRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  uint32 limit = 2;
+}
+
+message ReadPlanningJobRequestsResponse {
+  repeated PlanningJobSourceRequest requests = 1;
+}
+
+// 仅在真实 Jobs 提交后确认源投递；不代表承诺或业务已完成。
+message AcknowledgePlanningJobRequestRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningJobSourceRequest request = 2;
+  string job_id = 3;
+  uint64 job_revision = 4;
+  bool duplicate = 5;
+}
+
+message AcknowledgePlanningJobRequestResponse {
+  string request_id = 1;
+  string job_id = 2;
+  bool accepted = 3;
+}
+
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -402,4 +440,7 @@ service CognitionService {
   rpc AcknowledgeMemoryJobRequest(AcknowledgeMemoryJobRequestRequest) returns (AcknowledgeMemoryJobRequestResponse);
   // inbox 与投影同事务接纳后才 ACK；legacy 模式拒绝调用。
   rpc PublishMemoryJobState(PublishMemoryJobStateRequest) returns (PublishMemoryJobStateResponse);
+  // 显式 Planning 持久 owner ready 后开放；与 Memory 旧队列选择独立。
+  rpc ReadPlanningJobRequests(ReadPlanningJobRequestsRequest) returns (ReadPlanningJobRequestsResponse);
+  rpc AcknowledgePlanningJobRequest(AcknowledgePlanningJobRequestRequest) returns (AcknowledgePlanningJobRequestResponse);
 }

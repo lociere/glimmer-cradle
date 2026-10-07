@@ -10,9 +10,9 @@ export class JobRecoveryController {
 
   public recoverExpired(): number { return this.store.recoverExpired(this.epoch, this.clock.now(), this.policy); }
 
-  public async deliverOutbox(port: JobStateReceiverPort, limit: number, signal?: AbortSignal): Promise<number> {
+  public async deliverOutbox(port: JobStateReceiverPort, limit: number, signal?: AbortSignal, kind?: string): Promise<number> {
     signal?.throwIfAborted();
-    const events = this.store.readOutbox(this.epoch, limit);
+    const events = this.store.readOutbox(this.epoch, limit, kind);
     let delivered = 0;
     for (const event of events) {
       signal?.throwIfAborted();

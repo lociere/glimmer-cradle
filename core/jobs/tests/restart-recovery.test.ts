@@ -7,6 +7,33 @@ import { spawn } from 'node:child_process';
 import { JobAuthorityError, JobRecoveryController, SqliteJobStore, type JobAttempt,
   type JobReconciliationEvidence, type JobReconciliationPort, type JobRequest, type JobTriggerDefinition } from '../src/index.js';
 
+it('outbox 按实际 owner kind 有界投递，不 ACK 或饿死尚无接收方的其他事实；重开保持', async () => {
+  const databasePath = path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-job-owner-outbox-')), 'jobs.sqlite');
+  let store = new SqliteJobStore(databasePath);
+  const request = JSON.parse(readFileSync(path.resolve(__dirname, 'fixtures/job.json'), 'utf8')) as JobRequest;
+  try {
+    store.activateAuthority(1, 1000);
+    store.enqueue({ ...request, job_id: 'planning', kind: 'planning.evaluate', idempotency_key: 'planning' }, 1, 1000);
+    store.enqueue({ ...request, job_id: 'memory', kind: 'memory.consolidate', idempotency_key: 'memory' }, 1, 1000);
+    expect(store.readOutbox(1, 1, 'memory.consolidate').map(event => event.job_id)).toEqual(['memory']);
+    const recovery = new JobRecoveryController(store, { now: () => 1001 }, 1, { base_delay_ms: 1, max_delay_ms: 10 });
+    expect(await recovery.deliverOutbox({ accept: async event => ({ event_id: event.event_id, accepted: true }) }, 1, undefined, 'memory.consolidate')).toBe(1);
+    store.close(); store = new SqliteJobStore(databasePath);
+    expect(store.readOutbox(1, 10).map(event => event.job_id)).toEqual(['planning']);
+    expect(store.readOutbox(1, 10, 'memory.consolidate')).toEqual([]);
+    expect(store.hasPendingKind(1, 'planning.evaluate')).toBe(true);
+    expect(store.hasPendingKind(1, 'unregistered')).toBe(false);
+    const planning = store.load('planning')!;
+    expect(store.cancel(planning.job_id, 1, planning.revision, 1002)?.status).toBe('cancelled');
+    expect(store.hasPendingKind(1, 'planning.evaluate')).toBe(false);
+    store.activateAuthority(2, 1003);
+    expect(() => store.readOutbox(1, 1, 'memory.consolidate')).toThrow(JobAuthorityError);
+    expect(() => store.hasPendingKind(1, 'planning.evaluate')).toThrow(JobAuthorityError);
+    expect(() => store.readOutbox(2, 1, '')).toThrow();
+    expect(() => store.hasPendingKind(2, '')).toThrow();
+  } finally { store.close(); }
+});
+
 it('重开真实 SQLite 后恢复持久 attempt/backoff；非幂等 unknown 不自动重放', () => {
   const databasePath = path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-job-restart-')), 'jobs.sqlite');
   let store = new SqliteJobStore(databasePath);

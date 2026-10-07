@@ -16,6 +16,11 @@ import type { RegisterCognitionRequest, RegisterCognitionResponse } from '@glimm
 import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
+  PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
+  AcknowledgePlanningJobRequestResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { PlanningJobSourceAdapter } from '../src/composition/cognition-job-adapter.js';
+import { planningJobRequest, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
@@ -30,9 +35,9 @@ const repository = path.resolve(__dirname, '../../..');
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
 const submissionPolicy = { debounce_ms: 0, max_attempts: 3 };
 const clock = { now: () => Date.now() };
-async function productionWorker(root: string, overrides: Partial<WorkerSupervisorOptions> = {}) {
+async function productionWorker(root: string, overrides: Partial<WorkerSupervisorOptions> = {}, seedPlanning = false) {
   const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
-    'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-production-seed', root], { cwd: repository, windowsHide: true });
+    'apps/cognition-worker/tests/test_rpc_roundtrip.py', seedPlanning ? '--host-production-planning-seed' : '--host-production-seed', root], { cwd: repository, windowsHide: true });
   const input = JSON.parse(seeded.stdout);
   const projections: Message[] = [];
   const supervisor = new WorkerSupervisor({ ...input, app_root: repository, data_root: root,
@@ -55,6 +60,46 @@ function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts =
 }
 
 describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
+  it('生产 CLI 接纳实际 Planning 源，缺 handler 如实降级且不 ACK 状态，不阻塞 Memory 投递', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-'));
+    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const seeded = await productionWorker(paths.data_root, {}, true);
+    const memory = { ...seeded.input.runtime_document.memory, consolidation: { ...seeded.input.runtime_document.memory.consolidation, debounce_seconds: 60 } };
+    writeConfiguration(paths, memory, 5);
+    const options = { paths, clock, owner_id: 'planning-production', worker: { python_executable: seeded.input.python_executable,
+      runtime_document: seeded.input.runtime_document, accept_state: async (request: Parameters<WorkerSupervisorOptions['accept_state']>[0]) =>
+        create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' }) } };
+    let owner = new ConfiguredHostCognitionJobsOwner(options);
+    let firstDue: number | undefined;
+    try {
+      for (const epoch of [1, 2]) {
+        if (epoch === 2) { writeConfiguration(paths, memory, 9); owner = new ConfiguredHostCognitionJobsOwner(options); }
+        expect(await owner.start()).toMatchObject({ phase: 'active', session: { worker: { state: 'ready' },
+          jobs: { lease: { epoch }, jobs: { status: 'degraded', error_code: 'jobs_handler_pending' } } } });
+        const db = new Database(paths.jobs_database, { readonly: true });
+        try {
+          const job = db.prepare('SELECT * FROM jobs WHERE kind=?').get(PLANNING_JOB_KIND) as Job;
+          expect(job).toMatchObject({ status: 'queued', attempt: 0, max_attempts: 5, authority_epoch: epoch, goal_id: 'goal:长期承诺', scope_id: 'conversation:planning' });
+          if (epoch === 1) firstDue = job.due_at;
+          expect(job.due_at).toBe(firstDue);
+          expect(db.prepare('SELECT COUNT(*) AS count FROM jobs WHERE kind=?').get(PLANNING_JOB_KIND)).toEqual({ count: 1 });
+          const events = db.prepare('SELECT event_json,acknowledged_at FROM job_outbox').all() as { event_json: string; acknowledged_at: number | null }[];
+          const planningEvents = events.filter(event => JSON.parse(event.event_json).kind === PLANNING_JOB_KIND);
+          const memoryEvents = events.filter(event => JSON.parse(event.event_json).kind === 'memory.consolidate');
+          expect(planningEvents.length).toBeGreaterThan(0);
+          expect(memoryEvents.length).toBeGreaterThan(0);
+          expect(planningEvents.every(event => event.acknowledged_at === null)).toBe(true);
+          expect(memoryEvents.every(event => event.acknowledged_at !== null)).toBe(true);
+        } finally { db.close(); }
+        const source = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
+        try {
+          expect(source.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'accepted', revision: 1 });
+          expect(source.prepare('SELECT COUNT(*) AS count FROM planning_job_outbox WHERE accepted_job_id IS NULL').get()).toEqual({ count: 0 });
+        } finally { source.close(); }
+        await owner.stop(); expect(owner.snapshot.phase).toBe('stopped');
+      }
+    } finally { await owner.stop(); }
+  }, 40_000);
   it('安装根/配置根/数据根分离，唯一 Memory 设置接进 Worker；持久重启保持首次政策和更高 epoch', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-production-'));
     const paths = new HostDataPaths({ app_root: path.join(root, 'installation'), config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
@@ -352,6 +397,99 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
     } finally { release(); await supervisor.stop().catch(() => undefined); }
   }, 30_000);
 });
+describe('Planning 源真实 wire/Jobs 接纳', () => {
+  it.each(['before-commit', 'after-commit'] as const)('源 ACK %s 丢失后重开原源/Job，不重算 due/预算或标为 completed', async mode => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-wire-'));
+    let service = await worker(root, 'planning-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let lost: { mockRestore(): void } | undefined;
+    try {
+      store.activateAuthority(1, clock.now());
+      const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 1 }))).requests[0];
+      const initialDue = Number(source.dueAtMs), original = service.client.acknowledgePlanning.bind(service.client);
+      lost = vi.spyOn(service.client, 'acknowledgePlanning').mockImplementationOnce(async (request, signal) => {
+        if (mode === 'after-commit') await original(request, signal);
+        throw new HostCognitionError(ServiceErrorCode.UNAVAILABLE);
+      });
+      await expect(new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8)).rejects.toMatchObject({ code: ServiceErrorCode.UNAVAILABLE });
+      expect(store.load(`planning:${source.requestId}`)).toMatchObject({ due_at: initialDue, max_attempts: 3, status: 'queued', attempt: 0 });
+      lost.mockRestore(); lost = undefined;
+      store.close(); await service.stop();
+      service = await worker(root, 'planning-restarted'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      store.activateAuthority(2, clock.now());
+      expect(await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 2, 9, 8)).toBe(mode === 'before-commit' ? 1 : 0);
+      expect(store.load(`planning:${source.requestId}`)).toMatchObject({ due_at: initialDue, max_attempts: 3, status: 'queued', authority_epoch: 2, attempt: 0 });
+      expect((await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests).toEqual([]);
+      expect(store.readOutbox(2, 100, PLANNING_JOB_KIND).length).toBeGreaterThan(0);
+      const planning = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      try {
+        expect(planning.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'accepted', revision: 1 });
+        expect(planning.prepare('SELECT COUNT(*) AS count FROM planning_job_outbox').get()).toEqual({ count: 1 });
+        expect(planning.prepare('SELECT payload_json FROM planning_job_outbox').get()).toEqual({ payload_json: expect.stringContaining(`"due_at":${initialDue}`) });
+      } finally { planning.close(); }
+    } finally { lost?.mockRestore(); await service.stop(); store.close(); }
+  }, 30_000);
+
+  it('拒绝非法范围/版本/源、旧代与错 ACK；内容冲突仍保留源', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-invalid-'));
+    const service = await worker(root, 'planning-valid'), stale = new CognitionClient(service.endpoint, 'stale', 2000);
+    try {
+      await expect(stale.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 1 }))).rejects.toMatchObject({ code: ServiceErrorCode.GENERATION_MISMATCH });
+      for (const limit of [0, 1001]) await expect(service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit }))).rejects.toMatchObject({ code: ServiceErrorCode.INVALID_REQUEST });
+      const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests[0];
+      const request = (value = source, jobId = `planning:${source.requestId}`, revision = 1n) =>
+        create(AcknowledgePlanningJobRequestRequestSchema, { request: value, jobId, jobRevision: revision });
+      for (const invalid of [request(source, 'wrong'), request(source, undefined, 0n), request(source, undefined, 9007199254740992n),
+        request(create(PlanningJobSourceRequestSchema, { ...source, goalId: 'x'.repeat(65537) })),
+        request(create(PlanningJobSourceRequestSchema, { ...source, planVersion: 9007199254740992n })),
+        request(create(PlanningJobSourceRequestSchema, { ...source, requestId: 'forged' }))]) {
+        await expect(service.client.acknowledgePlanning(invalid)).rejects.toMatchObject({ code: ServiceErrorCode.INVALID_REQUEST });
+      }
+      for (const changed of [create(PlanningJobSourceRequestSchema, { ...source, scopeId: 'foreign-scope' }),
+        create(PlanningJobSourceRequestSchema, { ...source, dueAtMs: source.dueAtMs + 1n }),
+        create(PlanningJobSourceRequestSchema, { ...source, goalId: 'foreign-goal' })]) {
+        await expect(service.client.acknowledgePlanning(request(changed))).rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      }
+      expect((await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+      for (const changed of [create(PlanningJobSourceRequestSchema, { ...source, planVersion: 9007199254740992n }),
+        create(PlanningJobSourceRequestSchema, { ...source, goalId: 'x'.repeat(65537) }),
+        create(PlanningJobSourceRequestSchema, { ...source, dueAtMs: 9007199254740992n }),
+        create(PlanningJobSourceRequestSchema, { ...source, scopeId: '' }),
+        create(PlanningJobSourceRequestSchema, { ...source, requestId: 'forged' })]) expect(() => planningJobRequest(changed, 3)).toThrow();
+      const cancelled = new AbortController(); cancelled.abort();
+      await expect(new PlanningJobSourceAdapter(service.client).deliverRequests({} as SqliteJobStore, clock, 1, 3, 8, cancelled.signal)).rejects.toThrow();
+      const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      try {
+        store.activateAuthority(1, clock.now());
+        const adapter = new PlanningJobSourceAdapter(service.client);
+        const excess = vi.spyOn(service.client, 'readPlanningRequests').mockResolvedValueOnce(
+          create(ReadPlanningJobRequestsResponseSchema, { requests: [source, source] }));
+        try {
+          await expect(adapter.deliverRequests(store, clock, 1, 3, 1)).rejects.toThrow('扫描范围');
+          expect(store.load(`planning:${source.requestId}`)).toBeNull();
+        } finally { excess.mockRestore(); }
+        const afterCommit = new AbortController(), originalEnqueue = store.enqueueSource.bind(store);
+        const enqueue = vi.spyOn(store, 'enqueueSource').mockImplementationOnce((...args: Parameters<SqliteJobStore['enqueueSource']>) => {
+          const submission = originalEnqueue(...args); afterCommit.abort(); return submission;
+        });
+        const ack = vi.spyOn(service.client, 'acknowledgePlanning');
+        try {
+          await expect(adapter.deliverRequests(store, clock, 1, 3, 8, afterCommit.signal)).rejects.toThrow();
+          expect(ack).not.toHaveBeenCalled();
+          expect(store.load(`planning:${source.requestId}`)).toMatchObject({ status: 'queued', attempt: 0, max_attempts: 3 });
+          expect((await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+          ack.mockResolvedValueOnce(create(AcknowledgePlanningJobRequestResponseSchema, {
+            accepted: true, requestId: source.requestId, jobId: 'foreign-job',
+          }));
+          await expect(adapter.deliverRequests(store, clock, 1, 9, 8)).rejects.toThrow('identity');
+          expect((await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+          expect(await adapter.deliverRequests(store, clock, 1, 9, 8)).toBe(1);
+          expect(store.load(`planning:${source.requestId}`)).toMatchObject({ max_attempts: 3, due_at: Number(source.dueAtMs) });
+        } finally { enqueue.mockRestore(); ack.mockRestore(); }
+      } finally { store.close(); }
+    } finally { stale.close(); await service.stop(); }
+  }, 30_000);
+});
+
 async function worker(root: string, generation: string) {
   const child = spawn('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
     'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-job-fixture', root, generation],
@@ -382,7 +520,15 @@ async function worker(root: string, generation: string) {
     const due = Math.max(0, ...sources.requests.map(source => Date.parse(source.createdAt)));
     await eventually(() => Date.now() >= due);
     return { client, endpoint, child, async stop() { client!.close(); child.stdin!.end('stop\n'); await stopped; } };
-  } catch (error) { client?.close(); if (child.exitCode === null) child.kill(); await stopped.catch(() => undefined); throw error; }
+  } catch (error) {
+    client?.close();
+    if (child.exitCode === null) {
+      // Windows uv/venv redirector 是父进程；只终止本测试创建的树，不能留下持库子进程。
+      if (process.platform === 'win32' && child.pid) await promisify(execFile)('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }).catch(() => undefined);
+      else child.kill();
+    }
+    await stopped.catch(() => undefined); throw error;
+  }
 }
 function memoryCounts(root: string) {
   const db = new Database(path.join(root, 'memory.sqlite'), { readonly: true });

@@ -21,6 +21,7 @@
 |---|---|---|
 | Common / Kernel / Cognition | `contracts/proto/glimmer/{common,kernel,cognition}/v1/` | deadline、cancellation、typed error、trace/causation/correlation、generation 与幂等。 |
 | Memory / Jobs App 接线 | `contracts/proto/glimmer/cognition/v1/cognition_service.proto` 与 `contracts/proto/glimmer/jobs/v1/jobs.proto` | `ReadMemoryJobRequests` / `AcknowledgeMemoryJobRequest` 只允许外部 Jobs 模式，源身份不带 Moment 正文；先持久入 Jobs 再 ACK。`ExecuteMemoryJob` / `ReconcileMemoryJob` 绑定原 attempt/epoch/token/owner/lease；对账会持久封口，空查询不是未执行证明。 |
+| Planning / Jobs 源接纳 | 同一 `cognition_service.proto` | `ReadPlanningJobRequests` / `AcknowledgePlanningJobRequest` 读取真实 Planning owner 的版本引用源请求；保留原 due，Jobs 提交后才 ACK，不表示承诺完成。 |
 | Content | `contracts/proto/glimmer/content/v1/content.proto` | `ContentPart` 的 Text/Image/Audio/Video/File 联合体；媒体为 `AssetRef(asset_id,media_type,size_bytes,sha256)`，不含路径与字节。Cognition `PerceptionContent.parts = 6` 为新入口，`items = 5` 是阶段 9/14 删除门约束的旧 URI 读取入口。 |
 | Surface Gateway | `contracts/proto/glimmer/surface/v1/` | Desktop/Personal Server 只访问 Kernel Gateway；Query、Command、Event 使用有限 typed DTO，不接受 `string kind + Struct {frame}`；浏览器认证 WebSocket 是 Product ingress，不是内部器官协议。 |
 | Avatar Host | `contracts/proto/glimmer/avatar/v1/` | `AvatarHostService.Connect` 是唯一 control consumer；二进制 DTO 直接映射，不经 JSON round-trip。 |
@@ -60,6 +61,25 @@ attempt/token 可为零；Memory 执行状态需要非零 attempt/token。未知
 取消/unknown 不表示 Memory 未执行或回滚；已提交 receipt 与不确定性必须保留。数据责任见
 [数据目录](data-layout.md#用户状态与记忆)，实现见
 [Cognition 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
+
+## Planning Jobs 源接纳
+
+`PlanningJobSourceRequest` 携带 request/commitment/plan/goal/scope 身份、目标/计划版本与原
+`due_at_ms`，不复制目标正文、完成条件或平台命令。request ID 为紧凑 UTF-8 JSON
+`["planning.evaluate",commitment_id,plan_id,plan_version]` 的 SHA-256；版本为正 JS safe integer，
+due 为非负 JS safe integer，单个源消息不超过 64 KiB。扫描 limit 为 1 至 1000。
+两条 RPC 要求本代 generation、真实 Planning store 和 Worker 业务 ready；缺 owner、降级或
+drain 时返回 NOT_READY。Planning 无旧私有执行队列，不继承 Memory 的 legacy/external 选择门。
+
+Host 接纳到 `planning:<request_id>`，kind 为 `planning.evaluate`，source 为 `cognition.planning`；
+保留源原 due，并由 Jobs 同事务固定首次重试预算。真正 Jobs commit 后以原完整请求、Job ID、
+正 JS safe revision 和 duplicate 回执 ACK；源同库提交后才返回 accepted。非法身份/范围为
+INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响应丢失不撤销已接纳 Job，
+重投沿用首次记录。源已提交但回复丢失时，下次不再返回该请求。
+
+当前配置 Host 已接入上述源投递，但未注册 Planning 执行器：Job 保持 queued/attempt 0，
+Host 报 `degraded/jobs_handler_pending`，状态 outbox 不交给 Memory receiver，也不假 ACK。
+完成评估、通知和再调度未完成；Job accepted 不改变承诺 accepted/revision。
 
 ## 生成与兼容
 

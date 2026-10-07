@@ -163,13 +163,23 @@ export class SqliteJobStore implements JobStorePort {
     return this.database.prepare('SELECT * FROM job_attempts WHERE job_id=? ORDER BY attempt').all(jobId) as JobAttempt[];
   }
 
-  public readOutbox(epoch: number, limit: number): JobStateEvent[] {
+  public readOutbox(epoch: number, limit: number, kind?: string): JobStateEvent[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Job outbox batch limit 无效');
+    if (kind !== undefined && !kind.trim()) throw new JobConflictError('Job outbox kind 无效');
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
-      const rows = this.database.prepare(`SELECT event_json FROM job_outbox WHERE acknowledged_at IS NULL
-        ORDER BY created_at,job_id,revision LIMIT ?`).all(limit) as { event_json: string }[];
+      const filter = kind === undefined ? '' : "AND json_extract(event_json,'$.kind')=?";
+      const rows = this.database.prepare(`SELECT event_json FROM job_outbox WHERE acknowledged_at IS NULL ${filter}
+        ORDER BY created_at,job_id,revision LIMIT ?`).all(...(kind === undefined ? [limit] : [kind, limit])) as { event_json: string }[];
       return rows.map(row => JSON.parse(row.event_json) as JobStateEvent);
+    }).deferred();
+  }
+
+  public hasPendingKind(epoch: number, kind: string): boolean {
+    if (!kind.trim()) throw new JobConflictError('Job pending kind 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      return !!this.database.prepare("SELECT 1 FROM jobs WHERE kind=? AND status IN ('queued','running','retry_wait','unknown') LIMIT 1").get(kind);
     }).deferred();
   }
 

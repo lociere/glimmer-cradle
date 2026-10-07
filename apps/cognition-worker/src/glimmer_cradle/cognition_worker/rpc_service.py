@@ -47,7 +47,9 @@ from glimmer_cradle.cognition.perception import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )
+from glimmer_cradle.cognition.planning import PlanningConflictError, PlanningStore
 from glimmer_cradle.cognition.ports import (
+    JobReceipt,
     KernelRequestPort,
 )
 from glimmer_cradle.cognition.state import CognitiveActivityController
@@ -62,6 +64,10 @@ from glimmer_cradle.cognition_worker.adapters.cognition_mapper import (
 from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
     history_query_from_wire,
     history_result_to_wire,
+)
+from glimmer_cradle.cognition_worker.adapters.job_client import (
+    planning_source_from_wire,
+    planning_source_to_wire,
 )
 from glimmer_cradle.cognition_worker.composition import WorkerPaths
 from glimmer_cradle.cognition_worker.readiness import (
@@ -1388,6 +1394,7 @@ class CognitionGrpcHost:
         workspace: AttentionController,
         readiness: ReadinessTracker | None = None,
         consolidation: ConsolidationCoordinator | None = None,
+        planning: PlanningStore | None = None,
     ) -> None:
         self.generation = generation
         self._inbound = inbound
@@ -1398,6 +1405,7 @@ class CognitionGrpcHost:
         self._operations = operations
         self._workspace = workspace
         self._consolidation = consolidation
+        self._planning = planning
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
         self._readiness_tracker = readiness or ReadinessTracker(frozenset({"domain"}))
@@ -1430,6 +1438,8 @@ class CognitionGrpcHost:
             "ReadMemoryJobRequests": self._method(self._read_memory_job_requests, cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
             "AcknowledgeMemoryJobRequest": self._method(self._acknowledge_memory_job_request, cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
             "PublishMemoryJobState": self._method(self._publish_memory_job_state, cognition_pb.PublishMemoryJobStateRequest, cognition_pb.PublishMemoryJobStateResponse),
+            "ReadPlanningJobRequests": self._method(self._read_planning_job_requests, cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse),
+            "AcknowledgePlanningJobRequest": self._method(self._acknowledge_planning_job_request, cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         port = server.add_insecure_port("127.0.0.1:0")
@@ -1730,6 +1740,42 @@ class CognitionGrpcHost:
             return cognition_pb.PublishMemoryJobStateResponse(event_id=event.event_id, accepted=True, duplicate=duplicate)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
+    def _planning_jobs_source(self) -> PlanningStore:
+        if self._planning is None:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 源持久 owner 未装配")
+        return self._planning
+
+    async def _read_planning_job_requests(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if not 1 <= request.limit <= 1000:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 源扫描上限无效")
+            try:
+                requests = await source.pending_job_requests(limit=request.limit)
+                return cognition_pb.ReadPlanningJobRequestsResponse(requests=[planning_source_to_wire(item) for item in requests])
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 持久源无效；须受控恢复") from error
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _acknowledge_planning_job_request(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if not request.HasField("request") or not 1 <= request.job_revision <= 9007199254740991:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 源 ACK 缺少请求或有效 revision")
+            try:
+                item = planning_source_from_wire(request.request)
+                if request.job_id != f"planning:{item.request_id}":
+                    raise ValueError("Planning Job identity 不匹配")
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 源 ACK identity/版本/due 无效") from error
+            try:
+                await source.acknowledge_job_request(item, JobReceipt(request.job_id,
+                    "duplicate" if request.duplicate else "accepted", request.job_revision))
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 源接纳内容或 Job 绑定冲突") from error
+            return cognition_pb.AcknowledgePlanningJobRequestResponse(request_id=item.request_id, job_id=request.job_id, accepted=True)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             duplicate = self._is_completed(request.call)
@@ -1994,6 +2040,7 @@ class CognitionHost:
                 workspace=components.workspace,
                 readiness=self.readiness,
                 consolidation=components.consolidation_coordinator,
+                planning=components.planning_store,
             )
 
             # 1.5 启动 Conversation Log 单写者。

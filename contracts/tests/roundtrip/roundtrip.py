@@ -19,6 +19,8 @@ from glimmer.jobs.v1.jobs_pb2 import JobExecutionIdentity, JobStateEvent, JOB_ST
 from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
     ExecuteMemoryJobRequest, ReconcileMemoryJobResponse, MemoryJobResult, MEMORY_JOB_RESOLUTION_NOT_APPLIED,
     AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest, PublishMemoryJobStateRequest,
+    PlanningJobSourceRequest, ReadPlanningJobRequestsRequest, ReadPlanningJobRequestsResponse,
+    AcknowledgePlanningJobRequestRequest, AcknowledgePlanningJobRequestResponse,
 )
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
     AudioPlayEvent,
@@ -29,6 +31,31 @@ fixture_path = ROOT / "fixtures" / "skill-tool-parameters.valid.json"
 fixture_bytes = fixture_path.read_bytes()
 document = json.loads(fixture_bytes.decode("utf-8"))
 digest = hashlib.sha256(fixture_bytes).digest()
+
+planning_source = PlanningJobSourceRequest(
+    request_id=hashlib.sha256(json.dumps([
+        "planning.evaluate", "commitment:长期承诺", "plan:评估", 9007199254740991,
+    ], ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest(),
+    commitment_id="commitment:长期承诺", plan_id="plan:评估", plan_version=9007199254740991,
+    goal_id="goal:目标", goal_version=9007199254740991, scope_id="conversation:范围",
+    due_at_ms=9007199254740991,
+)
+planning_read = ReadPlanningJobRequestsRequest(limit=1000)
+planning_read.call.trace_id = "trace:planning"
+planning_read.call.generation = "planning-1"
+assert ReadPlanningJobRequestsRequest.FromString(planning_read.SerializeToString()) == planning_read
+planning_response = ReadPlanningJobRequestsResponse(requests=[planning_source])
+assert ReadPlanningJobRequestsResponse.FromString(planning_response.SerializeToString()) == planning_response
+planning_ack = AcknowledgePlanningJobRequestRequest(
+    call=planning_read.call, request=planning_source, job_id=f"planning:{planning_source.request_id}",
+    job_revision=9007199254740991, duplicate=True,
+)
+assert AcknowledgePlanningJobRequestRequest.FromString(planning_ack.SerializeToString()) == planning_ack
+planning_receipt = AcknowledgePlanningJobRequestResponse(
+    request_id=planning_source.request_id, job_id=planning_ack.job_id, accepted=True,
+)
+assert AcknowledgePlanningJobRequestResponse.FromString(planning_receipt.SerializeToString()) == planning_receipt
+assert not AcknowledgePlanningJobRequestRequest.FromString(b"").HasField("request")
 
 state = PublishMemoryJobStateRequest(delivery_authority_epoch=9007199254740991, event=JobStateEvent(
     event_id="event:one", job_id="job:one", scope_id="scope:one", goal_id="source:one", kind="memory.consolidate",

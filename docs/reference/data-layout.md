@@ -77,7 +77,9 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 目标/计划不可变版本、语义完成条件、承诺 revision 和源投递身份均为不可再生状态；Jobs 接纳后
 仍保留首次请求、Job ID/revision 和 due time，不因 ACK 删除或重建。未知版本、部分表或孤立表拒绝
 自动修复，原数据保留。备份/恢复须在 Planning drain 后与 Jobs/authority 建立一致切点，不允许
-只回滚源请求重新生成承诺；完整产品恢复仍归阶段 14。本候选只使用临时测试数据，未迁移用户库。
+只回滚源请求重新生成承诺。配置 Host 已真实接纳源到 Jobs，源 ACK 只结束投递，不修改承诺
+状态；未装配 Planning handler 的 queued Job 与未 ACK 状态仍须备份，不能按“未执行”丢弃。
+完整产品恢复仍归阶段 14。本候选只使用临时测试数据，未迁移用户库。
 
 | 路径 | owner | 说明 |
 |---|---|---|

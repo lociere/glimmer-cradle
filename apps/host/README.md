@@ -10,7 +10,7 @@ SQLite 验证源 ACK 丢失、业务响应丢失、重启对账及未到达 atte
 源接纳使用 Jobs 持久快照，重启或政策变化保持首次 due/预算；完整源信封漂移仍拒绝 ACK。
 源 ACK 已提交但响应丢失时，源扫描不再返回该请求，已接纳 Jobs 继续执行，不将其回滚或重建。
 `composition/host.ts` 的 `HostJobsController` 持续驱动有界投递、持久 unknown 分页与到期执行，
-并提供仅覆盖 Memory Jobs 的 lifecycle snapshot；重复启动共享循环，停机先取消并 drain 后撤销
+并提供当前 Jobs 装配的 lifecycle snapshot；重复启动共享循环，停机先取消并 drain 后撤销
 当前 generation client。epoch、Store、时钟和政策必须显式注入；只有真实持久 receiver 才可确认
 状态 outbox。Store 仍由装配方拥有，必须在 controller 停机返回后关闭。
 `SqliteAuthorityStore` 持久维护 Platform authority 和 handover 记录；
@@ -33,10 +33,15 @@ Jobs/续期；重启须创建新实例/世代，数据库仍由调用方在整�
 [数据目录](../../docs/reference/data-layout.md#用户状态与记忆)。测试中的安装根包含现行 Worker
 必需的真实 SQL migration，并验证资源摘要未改变；不是完整安装制品/只读 ACL 验收。
 配置启动默认接 `CognitionJobAdapter.stateReceiver(epoch)`，经生成 Service 将实际 Jobs outbox
-投递到 Memory 源 owner 的持久 inbox/投影；核验 receipt、拒旧主/旧代，提交后才 ACK。未注入
+按 `memory.consolidate` 筛选投递到 Memory 源 owner 的持久 inbox/投影；核验 receipt、拒旧主/旧代，提交后才 ACK。未注入
 receiver 的手工装配仍保留待确认事实。取消/unknown 不代表 Memory 回滚或未执行，见
 [协议参考](../../docs/reference/protocol.md#memory-jobs-状态投递)。
-gateway、完整配置 catalog、产品状态投影消费和长期 Planning Jobs 及产品启动迁移尚未完成；
+配置启动也默认接入 `PlanningJobSourceAdapter`，经实际 Worker RPC 扫描 Planning store，并在
+Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一 Jobs Document，重启不
+改写首次政策。尚无 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
+`degraded/jobs_handler_pending`，Planning 状态事件保留未 ACK，不阻塞 Memory 状态投递。
+两种源接纳都不代表长期目标完成，精确边界见[协议参考](../../docs/reference/protocol.md#planning-jobs-源接纳)。
+gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
 完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。

@@ -1,5 +1,12 @@
 # M12 Contract Spine Inventory
 
+Architecture v2 阶段 5/7 Planning 源投递：`proto/glimmer/cognition/v1/cognition_service.proto`
+新增 `PlanningJobSourceRequest`、`ReadPlanningJobRequestsRequest`、`ReadPlanningJobRequestsResponse`、
+`AcknowledgePlanningJobRequestRequest`、`AcknowledgePlanningJobRequestResponse` 与
+`ReadPlanningJobRequests`、`AcknowledgePlanningJobRequest`。Worker 暴露真实 Planning 源 outbox，
+Host 按原版本/scope/due 接纳到 Jobs，再确认源；不携带计划正文，不声明完成条件成立。
+兼容新增，不刷新既有 Proto/JSON Schema baseline；执行/状态接收后续仍用唯一 Spine。
+
 Architecture v2 阶段 7 状态投递：`proto/glimmer/jobs/v1/jobs.proto` 新增 `JobStatus`、`JobStateEvent`；
 `proto/glimmer/cognition/v1/cognition_service.proto` 新增 `PublishMemoryJobState`、
 `PublishMemoryJobStateRequest`、`PublishMemoryJobStateResponse`。Host 使用生成 DTO 投递不可变 outbox，

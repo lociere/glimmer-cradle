@@ -3,8 +3,8 @@ import { JobController, JobRecoveryController, JobRetentionController, JobSchedu
   type JobStorePort, type JobStateReceiverPort, type RetryPolicy } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, HostCognitionError } from '../adapters/protocol/cognition-client.js';
-import { MEMORY_JOB_KIND, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
-import { CognitionJobAdapter } from './cognition-job-adapter.js';
+import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
+import { CognitionJobAdapter, PlanningJobSourceAdapter } from './cognition-job-adapter.js';
 
 export interface HostJobsOptions {
   readonly store: JobStorePort;
@@ -21,17 +21,20 @@ export interface HostJobsOptions {
   readonly retry_policy: RetryPolicy;
   readonly terminal_retention_ms?: number;
   readonly state_receiver?: JobStateReceiverPort;
+  /** 仅在真实 Planning 源已装配时开放；不意味 handler/readiness 已完成。 */
+  readonly planning_sources?: boolean;
 }
 export interface HostJobsSnapshot {
   readonly status: 'idle' | 'starting' | 'ready' | 'degraded' | 'failed' | 'stopping' | 'stopped';
   readonly completed_cycles: number;
-  readonly error_code: 'cognition_unavailable' | 'jobs_recovery_pending' | 'jobs_cycle_failed' | null;
+  readonly error_code: 'cognition_unavailable' | 'jobs_recovery_pending' | 'jobs_handler_pending' | 'jobs_cycle_failed' | null;
 }
 
-/** 仅监督已装配的 Memory Jobs 链路；不代表整个 Host/产品已 ready，也不持有领域政策。 */
+/** 监督实际已装配链路；未注册的 Planning handler 如实降级，不代表整个产品 ready。 */
 export class HostJobsController {
   private readonly options: HostJobsOptions;
   private readonly adapter: CognitionJobAdapter;
+  private readonly planningSource?: PlanningJobSourceAdapter;
   private readonly controller: JobController;
   private readonly recovery: JobRecoveryController;
   private readonly scheduler: JobScheduler;
@@ -54,6 +57,7 @@ export class HostJobsController {
     // 一个实例持有一份政策；热变更须 drain 后重新装配，不能改变未确认源的原 request。
     this.options = { ...options, submission_policy: { ...options.submission_policy }, retry_policy: { ...options.retry_policy } };
     this.adapter = new CognitionJobAdapter(options.cognition);
+    this.planningSource = options.planning_sources ? new PlanningJobSourceAdapter(options.cognition) : undefined;
     this.controller = new JobController(options.store, options.clock, this.options.retry_policy);
     this.controller.register(this.adapter);
     this.recovery = new JobRecoveryController(options.store, options.clock, options.epoch, this.options.retry_policy);
@@ -115,6 +119,7 @@ export class HostJobsController {
     try {
       this.recovery.recoverExpired();
       await this.adapter.deliverRequests(store, clock, epoch, submission_policy, batch_size, signal);
+      await this.planningSource?.deliverRequests(store, clock, epoch, submission_policy.max_attempts, batch_size, signal);
       const unknown = store.listUnknown(epoch, MEMORY_JOB_KIND, batch_size, this.cursor);
       let degraded = false;
       for (const job of unknown) {
@@ -126,12 +131,14 @@ export class HostJobsController {
       if (unknown.length < batch_size) this.cursor = '';
       signal.throwIfAborted();
       await this.scheduler.runDue(batch_size, signal);
-      if (state_receiver) await this.recovery.deliverOutbox(state_receiver, batch_size, signal);
+      // 当前实际 receiver 只拥有 Memory；Planning 事实保留待接纳，不能阻塞该 owner 的投递。
+      if (state_receiver) await this.recovery.deliverOutbox(state_receiver, batch_size, signal, MEMORY_JOB_KIND);
       signal.throwIfAborted();
       if (this.options.terminal_retention_ms !== undefined) this.retention.prune(this.options.terminal_retention_ms);
       const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0;
-      this.state = { status: degraded || pending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
-        error_code: degraded ? 'cognition_unavailable' : pending ? 'jobs_recovery_pending' : null };
+      const handlerPending = !!this.planningSource && store.hasPendingKind(epoch, PLANNING_JOB_KIND);
+      this.state = { status: degraded || pending || handlerPending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
+        error_code: degraded ? 'cognition_unavailable' : pending ? 'jobs_recovery_pending' : handlerPending ? 'jobs_handler_pending' : null };
     } catch (error) {
       if (signal.aborted || !this.unavailable(error)) throw error;
       this.state = { ...this.state, status: 'degraded', error_code: 'cognition_unavailable' };
