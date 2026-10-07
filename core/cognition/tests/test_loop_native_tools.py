@@ -48,6 +48,7 @@ from glimmer_cradle.cognition.perception import (
 )
 from glimmer_cradle.cognition.ports import (
     CapabilityDescriptor,
+    CapabilityExposure,
     CapabilityInvocation,
     CapabilityResult,
 )
@@ -192,16 +193,20 @@ class NativeModel:
 class Capabilities:
     def __init__(self) -> None:
         self.invocations: list[CapabilityInvocation] = []
+        self.exposures: list[tuple[int, int]] = []
 
-    async def expose(self, *, scope: str) -> tuple[CapabilityDescriptor, ...]:
+    async def expose(self, *, scope: str, run_id: str, step: int, remaining_calls: int) -> CapabilityExposure:
         assert scope == "conversation:test"
-        return (
+        self.exposures.append((step, remaining_calls))
+        return CapabilityExposure(run_id, step, (
             CapabilityDescriptor(
                 name="weather.lookup",
                 description="Look up current weather",
+                definition_id="weather.lookup",
+                definition_revision=str(step),
                 input_schema={"type": "object"},
             ),
-        )
+        ))
 
     async def invoke(self, invocation: CapabilityInvocation) -> CapabilityResult:
         self.invocations.append(invocation)
@@ -247,6 +252,49 @@ async def test_native_loop_passes_tool_result_to_next_model_step(
     assert run.output == "上海今天晴。"
     assert capabilities.invocations[0].idempotency_key.endswith(":call-weather-1")
     assert model.requests[1].metadata["capability_results"] == run.capability_results
+    assert capabilities.exposures == [(1, 8), (2, 7)]
+    assert capabilities.invocations[0].definition_revision == "1"
+    assert model.requests[1].metadata["capabilities"][0].definition_revision == "2"
+
+
+@pytest.mark.parametrize("failure", ["incomplete", "wrong_result", "wrong_exposure", "revoked"])
+async def test_native_loop_rejects_invalid_step_and_result(tmp_path: Path, failure: str) -> None:
+    class Model:
+        async def events(self, request):
+            yield ModelEvent(0, ModelEventKind.TOOL_CALL, {"call_id": "call-1", "name": "weather.lookup", "arguments": {}})
+            if failure != "incomplete":
+                yield ModelEvent(1, ModelEventKind.COMPLETED, {})
+
+    class InvalidCapabilities(Capabilities):
+        async def expose(self, **kwargs):
+            snapshot = await super().expose(**kwargs)
+            if failure == "wrong_exposure":
+                return CapabilityExposure("wrong-run", snapshot.step, snapshot.tools)
+            if failure == "revoked":
+                return CapabilityExposure(snapshot.run_id, snapshot.step, ())
+            return snapshot
+
+        async def invoke(self, invocation):
+            result = await super().invoke(invocation)
+            if failure == "wrong_result":
+                return CapabilityResult("other-call", result.name, "succeeded")
+            return result
+
+    recorder = build_experience_recorder(tmp_path / "conversation")
+    await recorder.start()
+    capabilities = InvalidCapabilities()
+    controller = LoopController(workspace=AttentionController(clock=CLOCK), providers=[], experience_recorder=recorder,
+        clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    try:
+        if failure in {"wrong_result", "wrong_exposure"}:
+            with pytest.raises(ValueError, match="capability"):
+                await controller.run_native(InferenceRequest(system="", user=""), model=Model(), capabilities=capabilities, scope="conversation:test")
+        else:
+            run = await controller.run_native(InferenceRequest(system="", user=""), model=Model(), capabilities=capabilities, scope="conversation:test")
+            assert run.stop_reason == ("model_stream_incomplete" if failure == "incomplete" else "capability_not_exposed")
+            assert capabilities.invocations == []
+    finally:
+        await recorder.stop()
 
 
 async def test_native_loop_stops_before_exceeding_capability_budget(

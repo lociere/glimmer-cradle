@@ -11,7 +11,8 @@ import type { SkillPolicyDecision } from './skill-policy-engine';
 import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
-import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, isCapabilityDefinitionVisible, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
+import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, isCapabilityDefinitionVisible, isCapabilityScopeVisible,
+  type CapabilityScopeContext } from '@glimmer-cradle/capabilities';
 import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
@@ -19,7 +20,7 @@ export interface SkillInvocationRequest {
   toolName: string;
   args: unknown;
   traceId?: string;
-  conversation?: ConversationContext;
+  conversation?: CapabilityScopeContext;
   signal?: AbortSignal;
   /** 由反向 Service operation 派生的稳定副作用键，重试不得重新生成。 */
   invocationId?: string;
@@ -118,6 +119,9 @@ export class SkillInvocationGateway {
 
   public resultEventId(invocationId: string): string | undefined {
     return this._execution?.resultEvent(invocationId)?.event_id;
+  }
+  public resultEvent(invocationId: string) {
+    return this._execution?.resultEvent(invocationId) ?? null;
   }
 
   public invoke(request: SkillInvocationRequest): Promise<unknown> {
@@ -502,7 +506,7 @@ export class SkillInvocationGateway {
   private assertScopeVisible(
     skillScope: SkillDescriptor['scope'],
     targetScope: SkillDescriptor['tools'][number]['scope'],
-    conversation: ConversationContext | undefined,
+    conversation: CapabilityScopeContext | undefined,
     target: string,
   ): void {
     if (isCapabilityScopeVisible(skillScope, conversation)

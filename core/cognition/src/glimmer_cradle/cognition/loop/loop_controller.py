@@ -4,9 +4,18 @@ from __future__ import annotations
 import asyncio
 from typing import Callable, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from glimmer_cradle.cognition.state import CognitiveActivityController
+from glimmer_cradle.cognition.attention import (
+    Attention,
+    AttentionController,
+    make_attention,
+)
+from glimmer_cradle.cognition.context import RecentExperienceSource
+from glimmer_cradle.cognition.inference import (
+    InferenceController,
+    InferenceRequest,
+    ModelEventKind,
+    RealtimeModelPort,
+)
 from glimmer_cradle.cognition.loop.checkpoint import LoopCheckpoint, LoopCheckpointStore
 from glimmer_cradle.cognition.loop.recovery import recover_checkpoint
 from glimmer_cradle.cognition.loop.run import ActionEmitter, CycleContinuity, LoopRun
@@ -25,26 +34,22 @@ from glimmer_cradle.cognition.loop.step import (
     threshold_for,
 )
 from glimmer_cradle.cognition.loop.stop_policy import StopPolicy
-from glimmer_cradle.cognition.inference import InferenceController
-from glimmer_cradle.cognition.inference import (
-    InferenceRequest,
-    ModelEventKind,
-    RealtimeModelPort,
+from glimmer_cradle.cognition.perception import (
+    Observation,
+    ObservationQueue,
+    PerceptionOperationRegistry,
 )
 from glimmer_cradle.cognition.planning import PlanningController
-from glimmer_cradle.cognition.attention import AttentionController, Attention, make_attention
-from glimmer_cradle.cognition.perception import Observation, ObservationQueue
-from glimmer_cradle.cognition.perception import PerceptionOperationRegistry
-from glimmer_cradle.cognition.ports import ObservabilityPort
-from glimmer_cradle.cognition.ports.clock_port import ClockPort
-from glimmer_cradle.cognition.ports import IdGeneratorPort
+from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
 from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityInvocation,
     CapabilityPort,
     CapabilityResult,
 )
+from glimmer_cradle.cognition.ports.clock_port import ClockPort
+from glimmer_cradle.cognition.state import CognitiveActivityController
 from glimmer_cradle.conversation import ConversationRecorder, TurnController
-from glimmer_cradle.cognition.context import RecentExperienceSource
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CognitionSettings(BaseModel):
@@ -263,26 +268,10 @@ class LoopController:
         """Run a bounded native model/tool loop without reclassifying tool calls."""
         policy = stop_policy or StopPolicy()
         run_id = self._ids.new()
-        exposed = await capabilities.expose(scope=scope)
-        exposed_names = {descriptor.name for descriptor in exposed}
         results: list[CapabilityResult] = []
         output_parts: list[str] = []
         step_count = 0
         capability_calls = 0
-        current = InferenceRequest(
-            system=request.system,
-            user=request.user,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            metadata={
-                **request.metadata,
-                "run_id": run_id,
-                "capabilities": tuple(exposed),
-                "capability_results": (),
-            },
-            vision=request.vision,
-            provider_key=request.provider_key,
-        )
 
         while True:
             reason = policy.stop_reason(
@@ -301,6 +290,17 @@ class LoopController:
                 )
 
             step_count += 1
+            exposure = await capabilities.expose(scope=scope, run_id=run_id, step=step_count,
+                remaining_calls=policy.max_capability_calls - capability_calls)
+            exposed = exposure.tools
+            if exposure.run_id != run_id or exposure.step != step_count or len({item.name for item in exposed}) != len(exposed) \
+                    or any(not item.name or not item.definition_id or not item.definition_revision for item in exposed):
+                raise ValueError("invalid capability exposure")
+            exposed_by_name = {descriptor.name: descriptor for descriptor in exposed}
+            current = InferenceRequest(system=request.system, user=request.user, max_tokens=request.max_tokens,
+                temperature=request.temperature, vision=request.vision, provider_key=request.provider_key,
+                metadata={**request.metadata, "run_id": run_id, "step": step_count, "capabilities": tuple(exposed),
+                    "skills": exposure.skills, "resources": exposure.resources, "capability_results": tuple(results)})
             step_calls: list[dict[str, object]] = []
             completed = False
             async for event in model.events(current):
@@ -334,6 +334,9 @@ class LoopController:
                 elif event.kind == ModelEventKind.COMPLETED:
                     completed = True
 
+            if not completed:
+                return LoopRun(run_id=run_id, status="failed", step_count=step_count, output="".join(output_parts),
+                    stop_reason="model_stream_incomplete", capability_results=tuple(results))
             if not step_calls:
                 return LoopRun(
                     run_id=run_id,
@@ -375,7 +378,7 @@ class LoopController:
                         stop_reason="invalid_tool_arguments",
                         capability_results=tuple(results),
                     )
-                if name not in exposed_names:
+                if name not in exposed_by_name:
                     return LoopRun(
                         run_id=run_id,
                         status="failed",
@@ -393,24 +396,13 @@ class LoopController:
                         name=name,
                         arguments=arguments,
                         idempotency_key=f"{run_id}:{call_id}",
+                        definition_id=exposed_by_name[name].definition_id,
+                        definition_revision=exposed_by_name[name].definition_revision,
                     )
                 )
+                if result.call_id != call_id or result.name != name or result.status not in {"succeeded", "failed", "unknown"}:
+                    raise ValueError("invalid capability result identity")
                 results.append(result)
-
-            current = InferenceRequest(
-                system=request.system,
-                user=request.user,
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                metadata={
-                    **request.metadata,
-                    "run_id": run_id,
-                    "capabilities": tuple(exposed),
-                    "capability_results": tuple(results),
-                },
-                vision=request.vision,
-                provider_key=request.provider_key,
-            )
 
     # ── 循环本体 ──────────────────────────────────────────────────────────
 

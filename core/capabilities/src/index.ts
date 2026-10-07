@@ -1,5 +1,8 @@
 export { GLOBAL_CAPABILITY_SCOPE, isCapabilityScopeVisible, isCapabilityDefinitionVisible } from './exposure/exposure-policy.js';
 export type { CapabilityScope, CapabilityScopeContext, CapabilityDefinition } from './exposure/exposure-policy.js';
+export { ExposureController } from './exposure/exposure-controller.js';
+export type { CapabilityKind, CapabilityReference, ExposureGrant, StepExposureRequest, StepSurface,
+  ToolSurfaceDescriptor, ResourceSurfaceDescriptor } from './exposure/step-surface.js';
 export { ToolRegistry } from './tools/tool-registry.js';
 export type { Tool } from './tools/tool.js';
 export { ResourceRegistry } from './resources/resource-registry.js';

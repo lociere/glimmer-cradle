@@ -35,6 +35,24 @@ digest = hashlib.sha256(fixture_bytes).digest()
 
 from glimmer.capabilities.v1.capabilities_pb2 import SkillReference, SkillDescriptor, SkillMaterial  # noqa: E402
 method_ref = SkillReference(skill_id="method:总结", definition_revision="revision:一")
+from glimmer.capabilities.v1 import capabilities_pb2 as capability_pb  # noqa: E402
+from google.protobuf.json_format import ParseDict  # noqa: E402
+native_scope = capability_pb.CapabilityScopeContext(source_provider_id="provider:一", scene_id="scene:一", conversation_id="conversation:一", user_id="user:一")
+native_ref = capability_pb.CapabilityReference(id='["weather","lookup"]', revision="revision:一")
+native_expose = capability_pb.ExposeStepRequest(run_id="run:一", step=2, scope=native_scope, protocol_features=["tool-call.v1"], max_definitions=128, max_definition_bytes=65536, remaining_tool_calls=7)
+native_surface = capability_pb.ExposeStepResponse(run_id="run:一", step=2, used_definition_bytes=123, truncated=True)
+native_tool = native_surface.tools.add(reference=native_ref, name="tool_weather")
+ParseDict(True, native_tool.input_schema)
+native_surface.skills.add(reference=method_ref, name="总结")
+ParseDict({"type": "object"}, native_surface.resources.add(reference=native_ref, name="resource").input_schema)
+native_invoke = capability_pb.InvokeToolRequest(run_id="run:一", step=2, call_id="call:一", name="tool_weather", reference=native_ref, scope=native_scope, source_fact_id="action:一")
+native_invoke.call.idempotency_key = "run:一:call:一"
+ParseDict({"city": "上海"}, native_invoke.arguments)
+native_result = capability_pb.InvokeToolResponse(call_id="call:一", name="tool_weather", state=capability_pb.EXECUTION_RESULT_STATE_SUCCEEDED, result_event_id="a" * 64)
+ParseDict(None, native_result.result)
+for native_message in (native_expose, native_surface, native_invoke, native_result):
+    assert type(native_message).FromString(native_message.SerializeToString()) == native_message
+assert not capability_pb.ExposeStepRequest.FromString(b"").HasField("scope")
 method_plan = PlanRequest(user_goal="原始目标", available_skills=[SkillDescriptor(reference=method_ref, name="总结", description="方法知识")],
     skill_materials=[SkillMaterial(reference=method_ref, instructions="参考材料\n不授予权限。")])
 assert PlanRequest.FromString(method_plan.SerializeToString()) == method_plan

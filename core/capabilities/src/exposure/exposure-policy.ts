@@ -3,13 +3,14 @@ import { assertExecutionId, executionJson } from '../execution/invocation.js';
 
 export type CapabilityScope =
   | { readonly kind: 'global' }
-  | { readonly kind: 'source_provider' | 'scene' | 'conversation'; readonly ids: [string, ...string[]] };
+  | { readonly kind: 'source_provider' | 'scene' | 'conversation' | 'user'; readonly ids: [string, ...string[]] };
 
 /** 只消费 scope 判断所需身份，不依赖 Conversation concrete 或平台 payload。 */
 export interface CapabilityScopeContext {
   readonly source_provider_id: string;
   readonly scene_id: string;
   readonly conversation_id: string;
+  readonly user_id?: string;
 }
 
 export const GLOBAL_CAPABILITY_SCOPE: CapabilityScope = Object.freeze({ kind: 'global' });
@@ -42,7 +43,7 @@ export function snapshotCapabilityDefinition<T extends CapabilityDefinition>(def
     || !['ready', 'contract_only', 'degraded', 'unavailable'].includes(copy.readiness)
     || !Array.isArray(copy.scopes) || !copy.scopes.length) throw new Error('Capability definition 无效');
   for (const scope of copy.scopes) {
-    if (!scope || !['global', 'source_provider', 'scene', 'conversation'].includes(scope.kind)
+    if (!scope || !['global', 'source_provider', 'scene', 'conversation', 'user'].includes(scope.kind)
       || (scope.kind !== 'global' && (!Array.isArray(scope.ids) || !scope.ids.length
         || !scope.ids.every((id: unknown) => typeof id === 'string' && !!id.trim())))) throw new Error('Capability scope 无效');
   }
@@ -74,6 +75,7 @@ export function isCapabilityScopeVisible(
     case 'source_provider': return selected.ids.includes(context.source_provider_id);
     case 'scene': return selected.ids.includes(context.scene_id);
     case 'conversation': return selected.ids.includes(context.conversation_id);
+    case 'user': return context.user_id !== undefined && selected.ids.includes(context.user_id);
     default: return false;
   }
 }

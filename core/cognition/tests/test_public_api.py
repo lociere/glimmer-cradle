@@ -31,6 +31,8 @@ def test_public_api_is_explicit_and_exposes_native_loop_contracts() -> None:
 
 def test_consumer_owned_ports_are_explicit() -> None:
     assert ports.__all__ == [
+        "CapabilityExposure",
+        "ResourceDescriptor",
         "SkillReference",
         "SkillSummary",
         "SkillMaterial",

@@ -7,10 +7,12 @@ from typing import Any, Literal, Protocol
 
 from glimmer_cradle.cognition.ports.capability_port import (
     CapabilityDescriptor,
+    CapabilityExposure,
     CapabilityInvocation,
     CapabilityPort,
     CapabilityResult,
     CapabilityResultStatus,
+    ResourceDescriptor,
     SkillMaterial,
     SkillReference,
     SkillSummary,
@@ -270,6 +272,8 @@ class KernelEventPort(ABC):
         pass
 
 __all__ = [
+    "CapabilityExposure",
+    "ResourceDescriptor",
     "SkillReference",
     "SkillSummary",
     "SkillMaterial",

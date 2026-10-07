@@ -1,5 +1,6 @@
 import type { ConversationContext } from '@glimmer-cradle/conversation';
-import type { CapabilityScope, CapabilityScopeContext, Tool, Resource, Skill, SkillSummary, SkillReference, SkillMaterial } from '@glimmer-cradle/capabilities';
+import type { CapabilityScope, CapabilityScopeContext, Tool, Resource, Skill, SkillSummary, SkillReference, SkillMaterial,
+  StepExposureRequest, ExposureGrant, StepSurface } from '@glimmer-cradle/capabilities';
 export type { CapabilityScope } from '@glimmer-cradle/capabilities';
 
 export type ExtensionProductTarget = 'any' | 'desktop' | 'personal-server';
@@ -119,6 +120,7 @@ export interface SkillCatalogSnapshot {
 export interface RegisteredSkill { providerId: string; skill: SkillDescriptor }
 /** 应用消费的能力映射契约；具体 SDK/provider 适配器只在 composition 构造。 */
 export interface CapabilityCatalogPort {
+  exposeStep(request: StepExposureRequest, grants: readonly ExposureGrant[]): StepSurface;
   registerSkill(skill: SkillDescriptor): void;
   unregisterSkill(skillId: string): void;
   upsertProviderRuntime(runtime: SkillProviderRuntimeSnapshot): void;

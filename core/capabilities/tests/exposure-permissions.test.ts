@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GLOBAL_CAPABILITY_SCOPE, isCapabilityScopeVisible, isCapabilityDefinitionVisible,
-  ToolRegistry, ResourceRegistry, SkillCatalog, type CapabilityScope, type Tool, type Resource, type Skill } from '../src/index.js';
+  ToolRegistry, ResourceRegistry, SkillCatalog, ExposureController, type StepExposureRequest, type ExposureGrant,
+  type CapabilityScope, type Tool, type Resource, type Skill } from '../src/index.js';
 
 const context = { source_provider_id: 'provider:one', scene_id: 'scene:one', conversation_id: 'conversation:one' };
 
@@ -53,6 +54,58 @@ const base = { id: 'one', owner_id: 'owner', revision: '1', name: 'one', descrip
 const tool: Tool = { ...base, executor_id: 'executor', input_schema: { type: 'object' } };
 const resource: Resource = { ...base, reader_id: 'reader', input_schema: null };
 const skill: Skill = { ...base, instructions: { kind: 'inline', text: '方法材料，不授予权限。' } };
+
+describe('每 Step 的有界三类 Exposure', () => {
+  const request: StepExposureRequest = { run_id: 'run', step: 1, principal_id: 'cognition', user_id: 'user:one',
+    target_location: 'host:one', scope: { ...context, user_id: 'user:one' }, protocol_features: ['tool-call.v1'],
+    budget: { max_definitions: 3, max_definition_bytes: 8192, remaining_tool_calls: 2 } };
+  const grants: ExposureGrant[] = (['tool', 'skill', 'resource'] as const).map(kind => ({ kind,
+    reference: { id: 'one', revision: '1' }, principal_id: 'cognition', user_id: 'user:one',
+    target_location: 'host:one', permission_revision: 'permission:1', required_protocol_features: ['tool-call.v1'] }));
+  function fixture() {
+    const tools = new ToolRegistry(); const methods = new SkillCatalog(); const resources = new ResourceRegistry();
+    tools.register(tool); methods.register(skill); resources.register(resource);
+    return { tools, methods, resources, exposure: new ExposureController(tools, methods, resources) };
+  }
+  it('独立集合、无正文/handler，缺少授权不会从注册推断许可，投影深冻结', () => {
+    const { exposure } = fixture(); expect(exposure.expose(request, []).tools).toEqual([]);
+    const surface = exposure.expose(request, grants);
+    expect([surface.tools.length, surface.skills.length, surface.resources.length]).toEqual([1, 1, 1]);
+    expect(surface.skills[0]).not.toHaveProperty('instructions');
+    expect(surface.tools[0].name).toMatch(/^tool_[a-f0-9]{56}$/);
+    expect(Object.isFrozen(surface.tools[0].reference)).toBe(true);
+    expect(Object.isFrozen(surface.tools[0].input_schema)).toBe(true);
+    expect(surface.used_definition_bytes).toBeGreaterThan(0);
+  });
+  it.each(['principal', 'user', 'location', 'protocol', 'revision', 'permission'])( '%s 事实不匹配则失败关闭', kind => {
+    const bad = grants.map(grant => ({ ...grant,
+      ...(kind === 'principal' ? { principal_id: 'foreign' } : {}), ...(kind === 'user' ? { user_id: 'foreign' } : {}),
+      ...(kind === 'location' ? { target_location: 'remote' } : {}), ...(kind === 'protocol' ? { required_protocol_features: ['unsupported'] } : {}),
+      ...(kind === 'revision' ? { reference: { id: 'one', revision: 'old' } } : {}), ...(kind === 'permission' ? { permission_revision: '' } : {}) }));
+    const surface = fixture().exposure.expose(request, bad);
+    expect(surface.tools).toEqual([]); expect(surface.skills).toEqual([]); expect(surface.resources).toEqual([]);
+  });
+  it('新 Step 复验权限/版本/来源，与旧冻结快照独立；用户 scope 不跨主体', () => {
+    const { tools, exposure } = fixture(); const previous = exposure.expose(request, grants);
+    tools.register({ ...tool, revision: '2', scopes: [{ kind: 'user', ids: ['foreign'] }] });
+    expect(exposure.expose({ ...request, step: 2 }, grants).tools).toEqual([]);
+    expect(previous.tools[0].reference.revision).toBe('1');
+    tools.register({ ...tool, revision: '3', readiness: 'degraded' });
+    expect(exposure.expose(request, grants).tools).toEqual([]);
+    expect(() => exposure.expose({ ...request, user_id: 'foreign' }, grants)).toThrow('user scope');
+  });
+  it('零预算、定义数量、真实 UTF-8 字节与缺失/非法预算不能绕过', () => {
+    const { exposure } = fixture();
+    expect(exposure.expose({ ...request, budget: { ...request.budget, max_definitions: 0 } }, grants).truncated).toBe(true);
+    const full = exposure.expose(request, grants);
+    const bounded = exposure.expose({ ...request, budget: { ...request.budget, max_definition_bytes: full.used_definition_bytes - 1 } }, grants);
+    expect(bounded.truncated).toBe(true); expect(bounded.resources).toEqual([]);
+    expect(exposure.expose({ ...request, budget: { ...request.budget, remaining_tool_calls: 0 } }, grants).tools).toEqual([]);
+    for (const budget of [{}, { ...request.budget, max_definitions: -1 }, { ...request.budget, max_definition_bytes: NaN }]) {
+      expect(() => exposure.expose({ ...request, budget: budget as StepExposureRequest['budget'] }, grants)).toThrow('budget');
+    }
+  });
+});
 
 describe('Tool / Resource / Skill 独立 owner', () => {
   it('方法发现只给摘要，正文按 revision/scope/readiness 重新读取，撤销后旧引用失效', () => {

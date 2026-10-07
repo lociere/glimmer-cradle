@@ -9,9 +9,10 @@ import type {
   SkillProviderRuntimeSnapshot,
   SkillRuntimeStatus,
 } from '../../ports/skill-plane.port';
-import { GLOBAL_CAPABILITY_SCOPE, ToolRegistry, ResourceRegistry, SkillCatalog, executionDigest,
+import { GLOBAL_CAPABILITY_SCOPE, ToolRegistry, ResourceRegistry, SkillCatalog, ExposureController, executionDigest,
   isCapabilityDefinitionVisible } from '@glimmer-cradle/capabilities';
-import type { CapabilityDefinition, CapabilityScopeContext, Tool, Resource, Skill, SkillReference, SkillMaterial, SkillSummary } from '@glimmer-cradle/capabilities';
+import type { CapabilityDefinition, CapabilityScopeContext, Tool, Resource, Skill, SkillReference, SkillMaterial, SkillSummary,
+  StepExposureRequest, ExposureGrant, StepSurface } from '@glimmer-cradle/capabilities';
 
 const PROVIDER_KINDS: SkillProviderKind[] = ['core', 'extension', 'mcp_server', 'user'];
 const RUNTIME_STATUSES: SkillRuntimeStatus[] = ['ready', 'contract_only'];
@@ -29,6 +30,10 @@ export class CapabilityCatalogAdapter {
   private readonly owners = new Map<string, string>();
 
   public constructor() {}
+
+  public exposeStep(request: StepExposureRequest, grants: readonly ExposureGrant[]): StepSurface {
+    return new ExposureController(this.tools, this.methods, this.resources).expose(request, grants);
+  }
 
   public registerSkill(skill: SkillDescriptor): void {
     const owner = providerRuntimeKey(skill.provider);

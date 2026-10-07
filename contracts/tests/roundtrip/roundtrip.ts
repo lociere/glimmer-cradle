@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { create, fromBinary, fromJson, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
-import { ExecutionResultState, ExecutionSideEffects } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
+import { ExecutionResultState, ExecutionSideEffects, ExposeStepRequestSchema, ExposeStepResponseSchema,
+  InvokeToolRequestSchema, InvokeToolResponseSchema } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
 import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema } from '../../generated/ts/glimmer/conversation/v1/conversation_pb';
 import {
   EchoProbeRequestSchema,
@@ -30,6 +31,25 @@ const document = JSON.parse(documentBytes.toString('utf8')) as { schema_version:
 const digest = createHash('sha256').update(documentBytes).digest();
 
 const methodReference = { skillId: 'method:总结', definitionRevision: 'revision:一' };
+const nativeScope = { sourceProviderId: 'provider:一', sceneId: 'scene:一', conversationId: 'conversation:一', userId: 'user:一' };
+const nativeReference = { id: '["weather","lookup"]', revision: 'revision:一' };
+const nativeMessages = [
+  [ExposeStepRequestSchema, { call: { traceId: 'trace:一', generation: 'generation:一' }, runId: 'run:一', step: 2,
+    scope: nativeScope, protocolFeatures: ['tool-call.v1'], maxDefinitions: 128, maxDefinitionBytes: 65536, remainingToolCalls: 7 }],
+  [ExposeStepResponseSchema, { runId: 'run:一', step: 2, tools: [{ reference: nativeReference, name: 'tool_weather', inputSchema: fromJson(ValueSchema, true) }],
+    skills: [{ reference: methodReference, name: '总结' }], resources: [{ reference: nativeReference, name: 'resource', inputSchema: fromJson(ValueSchema, { type: 'object' }) }], usedDefinitionBytes: 123, truncated: true }],
+  [InvokeToolRequestSchema, { call: { idempotencyKey: 'run:一:call:一' }, runId: 'run:一', step: 2, callId: 'call:一', name: 'tool_weather',
+    reference: nativeReference, scope: nativeScope, arguments: { city: '上海' }, sourceFactId: 'action:一' }],
+  [InvokeToolResponseSchema, { callId: 'call:一', name: 'tool_weather', state: ExecutionResultState.SUCCEEDED,
+    result: fromJson(ValueSchema, null), resultEventId: 'a'.repeat(64) }],
+] as const;
+for (const [schema, input] of nativeMessages) {
+  const message = create(schema as typeof ExposeStepRequestSchema, input as never);
+  const restored = fromBinary(schema as typeof ExposeStepRequestSchema, toBinary(schema as typeof ExposeStepRequestSchema, message));
+  if (toJsonString(schema as typeof ExposeStepRequestSchema, message) !== toJsonString(schema as typeof ExposeStepRequestSchema, restored))
+    throw new Error('Native capability Step/reference/privacy/null roundtrip failed');
+}
+if (fromBinary(ExposeStepRequestSchema, new Uint8Array()).scope !== undefined) throw new Error('Absent native scope gained presence');
 const methodPlan = create(PlanRequestSchema, { userGoal: '原始目标',
   availableSkills: [{ reference: methodReference, name: '总结', description: '方法知识' }],
   skillMaterials: [{ reference: methodReference, instructions: '参考材料\n不授予权限。' }] });

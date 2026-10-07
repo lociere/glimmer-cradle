@@ -26,6 +26,7 @@ from typing import Any, Final, Optional
 
 import grpc
 import structlog
+from glimmer.capabilities.v1 import capabilities_pb2 as capabilities_pb
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.common.v1 import service_contract_pb2 as common_pb
 from glimmer.conversation.v1 import conversation_pb2 as conversation_pb
@@ -1937,11 +1938,22 @@ class KernelGrpcClient:
         if response.status not in {"completed", "duplicate"}:
             raise KernelServiceError(common_pb.SERVICE_ERROR_CODE_INTERNAL, "Kernel action 未到达终态")
 
-    async def _call(self, method: str, request: Any, request_type: Any, response_type: Any, *, timeout: float | None = 5.0) -> Any:
+    async def expose_step(self, request: capabilities_pb.ExposeStepRequest, trace_id: str) -> capabilities_pb.ExposeStepResponse:
+        request.call.CopyFrom(self._call_metadata(trace_id))
+        return await self._call("ExposeStep", request, capabilities_pb.ExposeStepRequest, capabilities_pb.ExposeStepResponse,
+            service="glimmer.capabilities.v1.CapabilityService")
+
+    async def invoke_tool(self, request: capabilities_pb.InvokeToolRequest, trace_id: str) -> capabilities_pb.InvokeToolResponse:
+        request.call.CopyFrom(self._call_metadata(trace_id, request.call.idempotency_key))
+        return await self._call("InvokeTool", request, capabilities_pb.InvokeToolRequest, capabilities_pb.InvokeToolResponse,
+            service="glimmer.capabilities.v1.CapabilityService", timeout=None)
+
+    async def _call(self, method: str, request: Any, request_type: Any, response_type: Any, *, timeout: float | None = 5.0,
+                    service: str = _KERNEL_SERVICE) -> Any:
         if self._channel is None:
             raise RuntimeError("Kernel gRPC client 尚未启动")
         call = self._channel.unary_unary(
-            f"/{_KERNEL_SERVICE}/{method}",
+            f"/{service}/{method}",
             request_serializer=request_type.SerializeToString,
             response_deserializer=response_type.FromString,
         )

@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：独立三 Registry 已接生产规划/Gateway；User 方法已脱离假 Tool，以独立目录/引用/有界正文接入 Plan；scope、持久 Tool Execution 与 Conversation 真实 receipt 已接 App/Worker；ACK 丢失与重启不重执行；native Step Exposure、外部 fencing/对账、完整行动恢复与 broker 待完成 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,52 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 原生 Step Exposure 与 typed Capability 接线（2026-10-07 当前候选）
+
+输入 `4b965765`，本会话唯一写入 owner。先落实 Capabilities 的 StepSurface/ExposureController：
+三类定义分别曝光，目录不含正文，按 scope、来源就绪、明确授权事实、主体/用户、目标位置、
+协议能力与定义字节/数量预算过滤；没有授权事实则关闭。App 提供事实与接入映射，Core 不做
+平台 IO 或读取用户配置。曝光只允许提出调用，Execution 仍需当前定义/策略/来源复验。
+
+唯一 IDL 增加 typed 原生 Step 服务，App mapper 与实际受监督 Worker 连接同一服务；原生
+Loop 改为每 Step 重新曝光，ToolCall 绑定当次定义 revision，不能以名称复用替换后的工具。
+按真实 RPC、撤销/替换、预算、拒权、取消与 Core/Worker/Kernel 回归验证；完整普通聊天切换
+与原生模型 provider 接线未满足前不宣称 native broker ready，也不删除仍有消费者的 ActionPlan。
+沿阶段 9/11/12 收束临时接入 owner；不动用户持久库/配置，不发布/推送，独立审查留固定候选。
+
+实现：目标 Core `StepSurface` / `ExposureController` 已实际过滤三类独立目录、精确定义、
+主体/可选用户、位置、协议、就绪与数量/字节预算，深冻结输出；没有匹配授权不曝光。
+App 由生产 composition 注入 catalog、现行 Policy 和持久 Gateway；typed CapabilityService
+已挂载实际 TS transport，Worker KernelGrpcClient 已有同一 IDL 的真实调用，虚构的
+`capability.expose/invoke` 字典协议物理删除。Core Loop 每 Step 重曝光、捕获定义版本并校验
+结果调用身份，未完成流中的 ToolCall 不派发。
+
+Worker native adapter 先写并刷盘真实 ToolCall ACTION，再携原引用调用；返回结果必须已经
+真实 Log 接纳，复验调用/定义/Conversation/交互/隐私/终态，不采信 wire result 形成事实。
+真实 SQLite 并发/重复调用不重复 handler，撤销、换代、scope/版本冲突及预算耗尽不派发。
+
+保留窗口：默认聊天尚未装配 native 模型 provider/caller，仍走 ActionPlan；本轮 RPC client
+与 Log 证据来自真实 gRPC 测试，不等于默认生产流已经切换。授权事实暂映射现行 App Policy，
+permission revision 使用定义 revision，缺少完整 Host 权限 broker；短寿命 Step 缓存限制不是
+持久 Run 配额或外部 authority。Core user scope 尚未进入公开 SDK/Document；App 拒绝未经
+Host 权威解析的自报 user_id，Core 的显式用户事实过滤不等于现行用户认证已完成。
+新 App/Port 随阶段 12 归目标 owner，旧分组/ActionPlan 以原生消费者就绪且 consumer-zero 为删除条件。
+外部 fencing、可信接收方对账、未知副作用恢复及普通聊天统一 native Loop 仍未完成。
+
+验证（`4b965765` 上本轮 38 文件候选，本会话冻结源码后运行）：Capabilities 40、Cognition 312、
+Worker 105、Kernel 256 项 PASS；Kernel 常规运行 11 项条件跳过，其中 7 项真实 Worker 场景
+另以 `GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION=1` 跑完整集成文件 8 项 PASS，4 项外部
+安装条件仍未满足。真实 gRPC client/服务 mapper、ACTION 刷盘与 Log receipt、已知拒绝、
+未知派发重试不重跑、定义撤销/替换、scope、并发幂等、预算、deadline、取消、撤销/直接换代
+均有回归。根 `pnpm typecheck` / `pnpm build`、生产装配启动/真实 Worker ready/有序停机冒烟、
+Contracts 22 gate + TS/Python/C# 往返 + generated clean、repo-checks 27、docs 111、编码、
+架构检查与目标清单 specification-only PASS；不是最终物理清单验收。源码变化时重新核对受影响
+证据，纯文档记录不改变已验证源码。只使用隔离测试数据根，不迁用户数据、不推送/发布。
+
+执行者自查已补直接换代取消、未解析用户身份拒绝及持久失败终态映射；固定完整候选上的
+独立高风险审查仍待总体验收，不把本切片提交视为发布决策。下一依赖是 native 模型的真实
+stream/provider 与默认 caller 装配，以及 Host 权限事实/持久预算；保留 ActionPlan 的删除门。
 
 ### 阶段 6 User 方法目录/材料与真实 Plan 接线（2026-10-07）
 

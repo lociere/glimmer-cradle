@@ -130,7 +130,19 @@ Kernel CognitionService request
 
 单拍临时状态全部进入 `loop/step.py` 的 `LoopStep`，每拍开始即重建；`reply_context.py` 的 `ReplyContextBuilder` 独占回复上下文收集与 prompt 分区；`action_emitter.py` 的 `ActionEmitter` 独占 Intent 到 `ActionCommand` 的映射与发送；`continuity.py` 的 `CycleContinuity` 只在仲裁完成后写入真实发生的 user/assistant 轮、REPLY/ACTION/SILENCE Moment。当前通用循环不生产 Thought，控制器只保留阶段顺序、Provider 隔离、Appraise、Deliberate、Volition 和真实经历提交。循环以 expected revision 把拍数和运行终态写入独立 checkpoint；启动时先把遗留 `running` 状态落为 `interrupted`，再进入新一轮运行。
 
-原生模型/工具迭代由 `LoopController.run_native()` 承担。模型事件中的 `ToolCall` 不再先分类为 `skill_request`；Loop 仅接受本 Step 经 `CapabilityPort.expose()` 暴露的能力名称，使用 `run_id + call_id` 形成稳定幂等键，把执行结果作为下一次模型请求的 `capability_results`。`StopPolicy` 同时限制 Step、能力调用次数和输出字符数；非法调用、未曝光能力和不完整事件流显式失败，不做关键词或静默降级。当前 Host 仍使用下述 ActionPlan 兼容链，待 Cognition Worker 的 capability adapter 接线后删除。
+原生模型/工具迭代由 `LoopController.run_native()` 承担。模型事件中的 `ToolCall` 不再先分类为
+`skill_request`；每个 Step 重新请求 `CapabilityPort.expose()`，校验 Run/Step 及唯一名称，调用绑定
+该 Step 的定义 ID/revision，而不是模型自报版本。Tool、Skill 摘要、Resource 是独立模型输入。
+使用 `run_id + call_id` 形成稳定幂等键，校验返回调用身份后把已接纳结果作为下一次模型请求的
+`capability_results`。`StopPolicy` 同时限制 Step、能力调用次数和输出字符数；未完成模型流中的
+ToolCall 不派发，非法调用/未曝光能力显式失败，不做关键词或静默降级。
+
+Worker `CapabilityClient` 已删除虚构的字典 `capability.expose/invoke` transport，消费 typed
+`CapabilityService` 的真实 gRPC client。它绑定完整 Conversation/交互/隐私上下文，先写原生
+ToolCall ACTION 并刷盘，才携原事实引用派发。响应只定位真实 Log 接纳的结果事件；scope、
+交互、定义版本、调用身份或终态投影冲突、receipt 缺失均失败，wire result 不冒充经历或 Memory。
+该 adapter 与 Core 原生 Loop 已有真实 RPC/Log 回归；生产 App 已挂载服务，但默认普通聊天
+尚未装配原生模型 provider 与该 native caller，仍走下述 ActionPlan，不能据此宣称 native broker ready。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 

@@ -1,6 +1,9 @@
 import * as grpc from '@grpc/grpc-js';
 import { createHmac } from 'node:crypto';
 import { create, fromBinary } from '@bufbuild/protobuf';
+import { ExposeStepRequestSchema, ExposeStepResponseSchema, InvokeToolRequestSchema, InvokeToolResponseSchema } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import { NativeCapabilityRequestError } from '../../ports/native-capability-service.port';
+import type { NativeToolInvocation, NativeToolResult } from '../../ports/native-capability-service.port';
 import {
   ServiceErrorCode,
   ServiceErrorDetailSchema,
@@ -57,6 +60,64 @@ describe('KernelCognitionTransport', () => {
 
   afterEach(async () => {
     await transport.stop();
+    transport.configureActionDeadline(30_000);
+  });
+
+  it.each(['deadline', 'cancel', 'generation', 'replacement'] as const)('native %s 取消实际等待且不冒充成功', async failure => {
+    await transport.start(); const client = await registerTransport(transport, 781);
+    let entered!: () => void; const started = new Promise<void>(resolve => { entered = resolve; });
+    let aborted = false;
+    transport.setCapabilityService({ exposeStep: () => { throw new Error('not used'); }, revokePrincipal: vi.fn(),
+      invokeTool: async (_request, _trace, signal) => {
+        entered();
+        await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => { aborted = true; reject(signal.reason); }, { once: true }));
+        throw new Error('must not complete');
+      } });
+    transport.configureActionDeadline(failure === 'deadline' ? 25 : 30_000);
+    const method = unaryMethod('/glimmer.capabilities.v1.CapabilityService/InvokeTool', InvokeToolRequestSchema, InvokeToolResponseSchema);
+    const pending = cancellableRawCall(client, method, create(InvokeToolRequestSchema, {
+      call: transport.makeCallMetadata({ traceId: 'native-cancel', idempotencyKey: 'run:call' }), runId: 'run', step: 1, callId: 'call', name: 'tool',
+      reference: { id: 'id', revision: 'revision' }, sourceFactId: 'actual-action', scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } }));
+    const rejected = expect(pending.promise).rejects.toMatchObject({ code: failure === 'deadline' ? grpc.status.DEADLINE_EXCEEDED : grpc.status.CANCELLED });
+    try {
+      await started;
+      if (failure === 'cancel') pending.call.cancel();
+      if (failure === 'generation') await transport.invalidateProcess();
+      if (failure === 'replacement') transport.prepareProcess();
+      await rejected;
+      // Client cancellation can arrive before the server has processed its cancel event.
+      await vi.waitFor(() => expect(aborted).toBe(true));
+    } finally { client.close(); }
+  });
+
+  it('typed Capability RPC 绑定监督主体、真实 scope/ref 和结果事件，拒绝旧 generation', async () => {
+    await transport.start(); const client = await registerTransport(transport, 779);
+    const expose = unaryMethod('/glimmer.capabilities.v1.CapabilityService/ExposeStep', ExposeStepRequestSchema, ExposeStepResponseSchema);
+    const invoke = unaryMethod('/glimmer.capabilities.v1.CapabilityService/InvokeTool', InvokeToolRequestSchema, InvokeToolResponseSchema);
+    const exposeStep = vi.fn(request => ({ run_id: request.run_id, step: request.step, tools: [{ reference: { id: 'id', revision: 'revision' }, name: 'tool', description: '天气', input_schema: true }], skills: [], resources: [], used_definition_bytes: 123, truncated: false }));
+    const invokeTool = vi.fn(async (request: NativeToolInvocation): Promise<NativeToolResult> => ({ call_id: request.call_id, name: request.name, state: 'succeeded', result: null, result_event_id: 'a'.repeat(64) }));
+    const revokePrincipal = vi.fn(); transport.setCapabilityService({ exposeStep, invokeTool, revokePrincipal });
+    const scope = { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation', userId: 'user' };
+    try {
+      const surface = await rawCall(client, expose, create(ExposeStepRequestSchema, { call: transport.makeCallMetadata({ traceId: 'native' }),
+        runId: 'run', step: 1, scope, protocolFeatures: ['tool-call.v1'], maxDefinitions: 128, maxDefinitionBytes: 65536, remainingToolCalls: 1 }));
+      expect(surface.tools[0]!.reference).toMatchObject({ id: 'id', revision: 'revision' });
+      expect(exposeStep.mock.calls[0]![0]).toMatchObject({ principal_id: `cognition:${transport.generation}`, user_id: 'user',
+        scope: { conversation_id: 'conversation', source_provider_id: 'provider', scene_id: 'scene', user_id: 'user' } });
+      const request = create(InvokeToolRequestSchema, { call: transport.makeCallMetadata({ traceId: 'native', idempotencyKey: 'run:call' }),
+        runId: 'run', step: 1, callId: 'call', name: 'tool', reference: { id: 'id', revision: 'revision' }, scope, sourceFactId: 'actual-action' });
+      const result = await rawCall(client, invoke, request);
+      expect(result.resultEventId).toBe('a'.repeat(64)); expect(result.result?.kind.case).toBe('nullValue');
+      expect(invokeTool.mock.calls[0]![0]).toMatchObject({ invocation_id: 'run:call', source_fact_id: 'actual-action', reference: { id: 'id', revision: 'revision' } });
+      invokeTool.mockResolvedValueOnce({ call_id: 'call', name: 'tool', state: 'failed', error: 'authorization_denied', result_event_id: 'b'.repeat(64) });
+      const denied = await rawCall(client, invoke, request);
+      expect(denied.error).toBe('authorization_denied'); expect(denied.result).toBeUndefined();
+      invokeTool.mockRejectedValueOnce(new NativeCapabilityRequestError('private diagnostic'));
+      await expect(rawCall(client, invoke, request)).rejects.toMatchObject({ code: grpc.status.INVALID_ARGUMENT });
+      const oldGeneration = transport.generation; transport.prepareProcess();
+      expect(revokePrincipal).toHaveBeenCalledWith(`cognition:${oldGeneration}`);
+      await expect(rawCall(client, invoke, request)).rejects.toMatchObject({ code: grpc.status.PERMISSION_DENIED });
+    } finally { client.close(); }
   });
 
   it('validates supervised generation and deduplicates action callbacks', async () => {

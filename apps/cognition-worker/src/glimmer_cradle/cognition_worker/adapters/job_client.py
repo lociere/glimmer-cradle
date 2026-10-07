@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+from typing import Protocol
 
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer_cradle.cognition.ports import JobReceipt, JobRequest
-from glimmer_cradle.cognition_worker.adapters.capability_client import RequestTransport
+
+
+class JobRequestTransport(Protocol):
+    async def request(
+        self, method: str, payload: dict[str, object]
+    ) -> dict[str, object]: ...
 
 
 class JobClient:
-    def __init__(self, transport: RequestTransport) -> None:
+    def __init__(self, transport: JobRequestTransport) -> None:
         self._transport = transport
 
     async def request(self, request: JobRequest) -> JobReceipt:

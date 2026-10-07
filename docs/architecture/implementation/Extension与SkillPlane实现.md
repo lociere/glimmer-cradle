@@ -117,7 +117,25 @@ Schema 源。现行 SDK/wire 的 `SkillDescriptor` 仍是旧分组投影，`tota
 应用只依赖 `CapabilityCatalogPort`，具体 adapter 只由 composition 注入；旧 SkillRegistry owner
 已经删除。接入映射随阶段 12 移到 App，旧 SDK 分组在阶段 9/11/12 原生消费者归零后删除。
 User Provider 已以 inline 方法接入独立 SkillCatalog，删除 `instructions.read` 假 Tool；现行两次
-Plan 分别消费方法目录与正文。原生 Step Exposure 与 Loop broker 仍待切换，不声称整条主链完成。
+Plan 分别消费方法目录与正文。原生 Step Exposure 接口已经实现，普通聊天与 Loop broker 仍待切换，
+不声称整条主链完成。
+
+`core/capabilities/src/exposure/{step-surface,exposure-controller}.ts` 分别投影 Tool、Skill 摘要、Resource，
+没有正文或 handler。显式授权事实必须匹配主体、可选平台用户、定义 ID/revision、实际目标位置和协议；
+再与定义 audience、ready、多 scope 交集及数量/UTF-8 字节预算共同过滤，缺少事实不曝光。
+Core 增加 user scope，公开 SDK/Document 尚未迁移该 scope，不把外部 Actor 推断为平台 User。
+现行 App 没有权威平台用户解析，拒绝带 user_id 的 Step，不能把 Worker 自报字段变为授权事实。
+
+当前 `NativeCapabilityAppService` 位于 Kernel Application，由生产 composition 注入真实 catalog、
+Policy 与持久 Gateway，实际位置由 App 固定。授权事实暂从现行 App Policy/来源事实映射，
+permission revision 暂绑定定义 revision，不等于完整 Host 粒度权限 broker。服务保存至多 128 个
+短寿命 Step，预算只限制当次已保存 Step，不是持久 Run 配额或 Platform authority。调用复验当次
+与当前曝光、scope、精确定义引用和幂等身份，撤销/换代/替换后不拿旧名称重绑；重复调用进入
+原 journal，不重复副作用。Gateway 确认后仍复验注册、策略与定义。
+已提交的确认拒绝投影为已知 failed 结果，不伪造成功；派发后未知仍通过 typed recovery error
+要求可信对账，不能当 failed 重跑。协议和 Worker 接纳链见
+[Contract Spine 实现](Protocol契约层实现.md)及[Cognition 实现](Cognition认知核实现.md#唯一认知循环)。
+普通聊天仍消费 ActionPlan；App owner、旧 SDK 分组在阶段 9/11/12 consumer-zero 后迁移/删除。
 
 User 来源整体 degraded 保留坏文件诊断；成功逐文件加载的静态方法由接入事实
 `ready_inline_method_groups` 明确记录并冻结，仍可通过定义/scope/revision 复验。该标记不

@@ -56,6 +56,7 @@ import { createChannelReplyPublisher, SkillActionController } from '../applicati
 import { LoggingSkillInvocationAuditSink, SkillInvocationGateway } from '../application/skill-plane/skill-invocation-gateway';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 import { SkillPlanningAppService } from '../application/use-cases/skill-planning-app.service';
+import { NativeCapabilityAppService } from '../application/use-cases/native-capability-app.service';
 import { CoreSkillProvider } from '../application/skill-plane/providers/core';
 import { UserSkillProvider } from '../application/skill-plane/providers/user';
 import { UserSkillSource } from '../adapters/skill-plane/user/user-skill-source';
@@ -296,6 +297,7 @@ function createOperationalRuntimePlan(options: {
     const planning = new SkillPlanningAppService(
       catalog, invocation, (request, traceId) => cognition.requestAgentPlan(request, traceId),
     );
+    transportAdapter.setCapabilityService(new NativeCapabilityAppService(registry, invocation, new SkillPolicyEngine(), `host:${product.id}`));
     const action = new SkillActionController(
       planning, (request, signal) => cognition.requestAgentSynthesis(request, signal),
       createChannelReplyPublisher(

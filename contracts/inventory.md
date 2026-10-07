@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Architecture v2 阶段 6 原生 Step 服务：`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有
+`CapabilityReference`、`CapabilityScopeContext`、`ToolDescriptor`、`ResourceDescriptor`、
+`ExposeStepRequest`、`ExposeStepResponse`、`InvokeToolRequest`、`InvokeToolResponse` 与
+`CapabilityService` 的 `ExposeStep` / `InvokeTool`。Exposure 只传目录和定义引用，不授予执行权限；
+ToolCall 原 ACTION 必须先刷盘，执行继续委托现行唯一 journal，结果引用真实 outbox/接纳事实。
+
 Architecture v2 阶段 6 方法知识：`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有
 `SkillReference`、`SkillDescriptor`、`SkillMaterial`。Cognition `PlanRequest` 添加独立方法目录/
 正文，`PlanResponse` 添加所选引用；不把 Skill 变成 Tool 或执行结果。保留原字段和兼容基线。

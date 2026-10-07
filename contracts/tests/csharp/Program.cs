@@ -22,6 +22,22 @@ var document = documentJson.RootElement;
 var digest = SHA256.HashData(fixtureBytes);
 
 var methodReference = new CapabilitiesV1.SkillReference { SkillId = "method:总结", DefinitionRevision = "revision:一" };
+var nativeScope = new CapabilitiesV1.CapabilityScopeContext { SourceProviderId = "provider:一", SceneId = "scene:一", ConversationId = "conversation:一", UserId = "user:一" };
+var nativeReference = new CapabilitiesV1.CapabilityReference { Id = "[\"weather\",\"lookup\"]", Revision = "revision:一" };
+var nativeExpose = new CapabilitiesV1.ExposeStepRequest { RunId = "run:一", Step = 2, Scope = nativeScope, MaxDefinitions = 128, MaxDefinitionBytes = 65536, RemainingToolCalls = 7 };
+nativeExpose.ProtocolFeatures.Add("tool-call.v1");
+var nativeSurface = new CapabilitiesV1.ExposeStepResponse { RunId = "run:一", Step = 2, UsedDefinitionBytes = 123, Truncated = true };
+nativeSurface.Tools.Add(new CapabilitiesV1.ToolDescriptor { Reference = nativeReference, Name = "tool_weather", InputSchema = Google.Protobuf.WellKnownTypes.Value.ForBool(true) });
+nativeSurface.Skills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结" });
+nativeSurface.Resources.Add(new CapabilitiesV1.ResourceDescriptor { Reference = nativeReference, Name = "resource", InputSchema = Google.Protobuf.WellKnownTypes.Value.Parser.ParseJson("{\"type\":\"object\"}") });
+var nativeInvoke = new CapabilitiesV1.InvokeToolRequest { Call = new CallMetadata { IdempotencyKey = "run:一:call:一" }, RunId = "run:一", Step = 2, CallId = "call:一", Name = "tool_weather", Reference = nativeReference, Scope = nativeScope, SourceFactId = "action:一", Arguments = Google.Protobuf.WellKnownTypes.Struct.Parser.ParseJson("{\"city\":\"上海\"}") };
+var nativeResult = new CapabilitiesV1.InvokeToolResponse { CallId = "call:一", Name = "tool_weather", State = CapabilitiesV1.ExecutionResultState.Succeeded, Result = Google.Protobuf.WellKnownTypes.Value.ForNull(), ResultEventId = new string('a', 64) };
+if (!CapabilitiesV1.ExposeStepRequest.Parser.ParseFrom(nativeExpose.ToByteArray()).Equals(nativeExpose)
+    || !CapabilitiesV1.ExposeStepResponse.Parser.ParseFrom(nativeSurface.ToByteArray()).Equals(nativeSurface)
+    || !CapabilitiesV1.InvokeToolRequest.Parser.ParseFrom(nativeInvoke.ToByteArray()).Equals(nativeInvoke)
+    || !CapabilitiesV1.InvokeToolResponse.Parser.ParseFrom(nativeResult.ToByteArray()).Equals(nativeResult)
+    || CapabilitiesV1.ExposeStepRequest.Parser.ParseFrom(Array.Empty<byte>()).Scope != null)
+    throw new InvalidOperationException("Native Step/reference/privacy/null roundtrip failed");
 var methodPlan = new PlanRequest { UserGoal = "原始目标" };
 methodPlan.AvailableSkills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结", Description = "方法知识" });
 methodPlan.SkillMaterials.Add(new CapabilitiesV1.SkillMaterial { Reference = methodReference, Instructions = "参考材料\n不授予权限。" });

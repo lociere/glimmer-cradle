@@ -1,6 +1,12 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as grpc from '@grpc/grpc-js';
-import { create, fromBinary, toBinary, type JsonObject } from '@bufbuild/protobuf';
+import { create, fromBinary, fromJson, toBinary, type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import { ValueSchema } from '@bufbuild/protobuf/wkt';
+import { ExposeStepRequestSchema, ExposeStepResponseSchema, InvokeToolRequestSchema, InvokeToolResponseSchema,
+  ExecutionResultState } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import type { CapabilityScopeContext, StepExposureRequest } from '@glimmer-cradle/capabilities';
+import { NativeCapabilityRequestError } from '../../ports/native-capability-service.port';
+import type { NativeCapabilityServicePort } from '../../ports/native-capability-service.port';
 import {
   ServiceErrorCode,
   ServiceRecoveryAction,
@@ -74,6 +80,10 @@ const kernelControlDefinition = serviceDefinition('glimmer.kernel.v1.KernelContr
   PublishLog: [PublishLogRequestSchema, PublishLogResponseSchema],
   PublishAction: [PublishActionRequestSchema, PublishActionResponseSchema],
 });
+const capabilityDefinition = serviceDefinition('glimmer.capabilities.v1.CapabilityService', {
+  ExposeStep: [ExposeStepRequestSchema, ExposeStepResponseSchema],
+  InvokeTool: [InvokeToolRequestSchema, InvokeToolResponseSchema],
+});
 
 const cognitionMethods = {
   AcceptExecutionResult: unaryMethod('/glimmer.conversation.v1.ConversationService/AcceptExecutionResult', AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema),
@@ -117,6 +127,7 @@ export class KernelCognitionTransport {
   private registrationSecret: Buffer | null = null;
   private registrationWaiters = new Set<(error?: Error) => void>();
   private actionHandler: CognitionActionHandler | null = null;
+  private capabilityService: NativeCapabilityServicePort | null = null;
   private readonly completedCommands = new Set<string>();
   private readonly inFlightCommands = new Map<string, Promise<unknown>>();
   private readonly actionAbortControllers = new Set<AbortController>();
@@ -147,6 +158,7 @@ export class KernelCognitionTransport {
       PublishLog: this.publishLog.bind(this),
       PublishAction: this.publishAction.bind(this),
     });
+    server.addService(capabilityDefinition, { ExposeStep: this.exposeStep.bind(this), InvokeTool: this.invokeTool.bind(this) });
     const port = await new Promise<number>((resolve, reject) => {
       server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
         if (error) reject(error);
@@ -159,6 +171,9 @@ export class KernelCognitionTransport {
   }
 
   public prepareProcess(): CognitionProcessBootstrap {
+    if (this.processGeneration) this.capabilityService?.revokePrincipal(`cognition:${this.processGeneration}`);
+    // 新 generation 不能继承上一代正在等待授权/派发的反向调用。
+    for (const controller of this.actionAbortControllers) controller.abort(new Error('Cognition 世代已替换'));
     this.invalidateClient();
     this.registrationSecret?.fill(0);
     const superseded = new CognitionTransportError(
@@ -188,6 +203,8 @@ export class KernelCognitionTransport {
 
   public async invalidateProcess(processId?: number, reason?: Error): Promise<void> {
     if (processId !== undefined && this.registeredProcessId !== processId && this.expectedProcessId !== processId) return;
+    if (this.processGeneration) this.capabilityService?.revokePrincipal(`cognition:${this.processGeneration}`);
+    for (const controller of this.actionAbortControllers) controller.abort(new Error('Cognition 世代已撤销'));
     this.invalidateClient();
     this.expectedProcessId = null;
     this.processGeneration = null;
@@ -205,6 +222,7 @@ export class KernelCognitionTransport {
   public setActionHandler(handler: CognitionActionHandler | null): void {
     this.actionHandler = handler;
   }
+  public setCapabilityService(service: NativeCapabilityServicePort | null): void { this.capabilityService = service; }
 
   public configureActionDeadline(timeoutMs: number): void {
     this.actionDeadlineMs = Math.max(1, timeoutMs);
@@ -284,6 +302,7 @@ export class KernelCognitionTransport {
     this.actionAbortControllers.clear();
     await this.invalidateProcess();
     this.actionHandler = null;
+    this.capabilityService = null;
     this.completedCommands.clear();
     this.inFlightCommands.clear();
     for (const waiter of this.registrationWaiters) waiter(new Error('Kernel Cognition gRPC control 已停止'));
@@ -352,6 +371,72 @@ export class KernelCognitionTransport {
       ));
       return this.commandResult(PublishStateResponseSchema, request.call, 'state_published');
     });
+  }
+
+  private exposeStep(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>): void {
+    void this.handleServerCall(call, callback, async request => {
+      this.assertNativeCall(request.call);
+      const scope = this.capabilityScope(request.scope, request.call);
+      const context: StepExposureRequest = { run_id: request.runId, step: request.step,
+        principal_id: `cognition:${this.generation}`, target_location: 'host', scope,
+        ...(scope.user_id === undefined ? {} : { user_id: scope.user_id }), protocol_features: request.protocolFeatures,
+        budget: { max_definitions: request.maxDefinitions, max_definition_bytes: request.maxDefinitionBytes, remaining_tool_calls: request.remainingToolCalls } };
+      let surface;
+      try { surface = this.capabilityService!.exposeStep(context); }
+      catch { throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native Step context/预算无效', false, request.call); }
+      const value = (input: unknown) => fromJson(ValueSchema, input as JsonValue);
+      return create(ExposeStepResponseSchema, { runId: surface.run_id, step: surface.step,
+        tools: surface.tools.map(tool => ({ reference: tool.reference, name: tool.name, description: tool.description, inputSchema: value(tool.input_schema) })),
+        skills: surface.skills.map(skill => ({ reference: { skillId: skill.reference.skill_id, definitionRevision: skill.reference.definition_revision }, name: skill.name, description: skill.description })),
+        resources: surface.resources.map(resource => ({ reference: resource.reference, name: resource.name, description: resource.description, inputSchema: value(resource.input_schema) })),
+        usedDefinitionBytes: surface.used_definition_bytes, truncated: surface.truncated });
+    });
+  }
+
+  private invokeTool(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>): void {
+    const controller = new AbortController(); this.actionAbortControllers.add(controller);
+    let deadlineExpired = false;
+    const timer = setTimeout(() => { deadlineExpired = true; controller.abort(new Error('Native Tool deadline')); }, this.actionDeadlineMs);
+    call.once('cancelled', () => controller.abort(new Error('Native Tool 已取消')));
+    void this.handleServerCall(call, callback, async request => {
+      this.assertNativeCall(request.call);
+      const scope = this.capabilityScope(request.scope, request.call);
+      if (!request.reference?.id || !request.reference?.revision || !request.callId || !request.runId || !request.sourceFactId
+        || !Number.isSafeInteger(request.step) || request.step < 1 || !request.call.idempotencyKey) {
+        throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native Tool 引用/调用身份无效', false, request.call);
+      }
+      try {
+        const result = await this.capabilityService!.invokeTool({ run_id: request.runId, step: request.step, call_id: request.callId,
+          name: request.name, reference: { id: request.reference.id, revision: request.reference.revision }, scope,
+          arguments: structToObject(request.arguments), source_fact_id: request.sourceFactId,
+          invocation_id: request.call.idempotencyKey, principal_id: `cognition:${this.generation}` }, request.call.traceId, controller.signal);
+        return create(InvokeToolResponseSchema, { callId: result.call_id, name: result.name,
+          state: result.state === 'succeeded' ? ExecutionResultState.SUCCEEDED : ExecutionResultState.FAILED,
+          ...(result.state === 'succeeded' ? { result: fromJson(ValueSchema, result.result as JsonValue) } : {}),
+          error: result.error ?? '', resultEventId: result.result_event_id });
+      } catch (error) {
+        if (error instanceof RecoveryRequiredError) throw serviceFault(ServiceErrorCode.RECOVERY_REQUIRED, 'Native Tool 终态不明，需要对账', false,
+          request.call, [ServiceRecoveryAction.CONFIRM_SIDE_EFFECT_STATE], error.operationId);
+        if (controller.signal.aborted) throw serviceFault(deadlineExpired ? ServiceErrorCode.DEADLINE_EXCEEDED : ServiceErrorCode.CANCELLED,
+          deadlineExpired ? 'Native Tool deadline 已到期' : 'Native Tool 调用已取消', false, request.call);
+        if (error instanceof NativeCapabilityRequestError) throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native Tool 未曝光、scope/版本/预算或幂等身份冲突', false, request.call);
+        throw serviceFault(ServiceErrorCode.INTERNAL, 'Native Tool 执行或结果接纳失败', false, request.call);
+      }
+    }).finally(() => { clearTimeout(timer); this.actionAbortControllers.delete(controller); });
+  }
+
+  private assertNativeCall(call: CallMetadata | undefined): void {
+    this.assertCall(call);
+    if (!this.isRegistered || !this.capabilityService) throw serviceFault(ServiceErrorCode.NOT_READY, 'Native Capability service 未 ready', true, call);
+  }
+  private capabilityScope(scope: any, call: CallMetadata | undefined): CapabilityScopeContext {
+    if (!scope || ![scope.sourceProviderId, scope.sceneId, scope.conversationId].every(value => typeof value === 'string' && !!value.trim()
+      && Buffer.byteLength(value, 'utf8') <= 4096) || (scope.userId !== undefined && (typeof scope.userId !== 'string' || !scope.userId.trim()
+        || Buffer.byteLength(scope.userId, 'utf8') > 4096))) {
+      throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native Capability scope 无效', false, call);
+    }
+    return { source_provider_id: scope.sourceProviderId, scene_id: scope.sceneId, conversation_id: scope.conversationId,
+      ...(scope.userId === undefined ? {} : { user_id: scope.userId }) };
   }
 
   private publishLog(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>): void {

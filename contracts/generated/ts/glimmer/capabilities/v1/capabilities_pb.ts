@@ -2,17 +2,19 @@
 // @generated from file glimmer/capabilities/v1/capabilities.proto (package glimmer.capabilities.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Value } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
-import type { Message } from "@bufbuild/protobuf";
+import type { CallMetadata } from "../../common/v1/service_contract_pb";
+import { file_glimmer_common_v1_service_contract } from "../../common/v1/service_contract_pb";
+import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file glimmer/capabilities/v1/capabilities.proto.
  */
 export const file_glimmer_capabilities_v1_capabilities: GenFile = /*@__PURE__*/
-  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxIj8KDlNraWxsUmVmZXJlbmNlEhAKCHNraWxsX2lkGAEgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAkicAoPU2tpbGxEZXNjcmlwdG9yEjoKCXJlZmVyZW5jZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJlbmNlEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkiYQoNU2tpbGxNYXRlcmlhbBI6CglyZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbFJlZmVyZW5jZRIUCgxpbnN0cnVjdGlvbnMYAiABKAki3AMKFEV4ZWN1dGlvblJlc3VsdEV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEhUKDWludm9jYXRpb25faWQYAiABKAkSEAoIcmV2aXNpb24YAyABKAQSDwoHYXR0ZW1wdBgEIAEoDRIQCghzY29wZV9pZBgFIAEoCRIXCg9jb252ZXJzYXRpb25faWQYBiABKAkSFgoOc291cmNlX2ZhY3RfaWQYByABKAkSEwoLZXhlY3V0b3JfaWQYCCABKAkSFQoNY2FwYWJpbGl0eV9pZBgJIAEoCRIbChNkZWZpbml0aW9uX3JldmlzaW9uGAogASgJEhYKDnJlcXVlc3RfZGlnZXN0GAsgASgJEjwKBXN0YXRlGAwgASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uUmVzdWx0U3RhdGUSQwoMc2lkZV9lZmZlY3RzGA0gASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoGcmVzdWx0GA4gASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEhIKCmVycm9yX2NvZGUYDyABKAkSFQoNdXBkYXRlZF9hdF9tcxgQIAEoBCqrAQoURXhlY3V0aW9uUmVzdWx0U3RhdGUSJgoiRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9VTlNQRUNJRklFRBAAEiQKIEVYRUNVVElPTl9SRVNVTFRfU1RBVEVfU1VDQ0VFREVEEAESIQodRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9GQUlMRUQQAhIiCh5FWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOS05PV04QAyqpAQoURXhlY3V0aW9uU2lkZUVmZmVjdHMSJgoiRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTlNQRUNJRklFRBAAEh8KG0VYRUNVVElPTl9TSURFX0VGRkVDVFNfTk9ORRABEiQKIEVYRUNVVElPTl9TSURFX0VGRkVDVFNfQ09ORklSTUVEEAISIgoeRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTktOT1dOEANCMqoCL0dsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ2FwYWJpbGl0aWVzLlYxYgZwcm90bzM", [file_google_protobuf_struct]);
+  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxIj8KDlNraWxsUmVmZXJlbmNlEhAKCHNraWxsX2lkGAEgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAkicAoPU2tpbGxEZXNjcmlwdG9yEjoKCXJlZmVyZW5jZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJlbmNlEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkiYQoNU2tpbGxNYXRlcmlhbBI6CglyZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbFJlZmVyZW5jZRIUCgxpbnN0cnVjdGlvbnMYAiABKAkiMwoTQ2FwYWJpbGl0eVJlZmVyZW5jZRIKCgJpZBgBIAEoCRIQCghyZXZpc2lvbhgCIAEoCSKBAQoWQ2FwYWJpbGl0eVNjb3BlQ29udGV4dBIaChJzb3VyY2VfcHJvdmlkZXJfaWQYASABKAkSEAoIc2NlbmVfaWQYAiABKAkSFwoPY29udmVyc2F0aW9uX2lkGAMgASgJEhQKB3VzZXJfaWQYBCABKAlIAIgBAUIKCghfdXNlcl9pZCKiAQoOVG9vbERlc2NyaXB0b3ISPwoJcmVmZXJlbmNlGAEgASgLMiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVJlZmVyZW5jZRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiwKDGlucHV0X3NjaGVtYRgEIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZSKmAQoSUmVzb3VyY2VEZXNjcmlwdG9yEj8KCXJlZmVyZW5jZRgBIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USDAoEbmFtZRgCIAEoCRITCgtkZXNjcmlwdGlvbhgDIAEoCRIsCgxpbnB1dF9zY2hlbWEYBCABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUikAIKEUV4cG9zZVN0ZXBSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESDgoGcnVuX2lkGAIgASgJEgwKBHN0ZXAYAyABKA0SPgoFc2NvcGUYBCABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5U2NvcGVDb250ZXh0EhkKEXByb3RvY29sX2ZlYXR1cmVzGAUgAygJEhcKD21heF9kZWZpbml0aW9ucxgGIAEoDRIcChRtYXhfZGVmaW5pdGlvbl9ieXRlcxgHIAEoDRIcChRyZW1haW5pbmdfdG9vbF9jYWxscxgIIAEoDSKWAgoSRXhwb3NlU3RlcFJlc3BvbnNlEg4KBnJ1bl9pZBgBIAEoCRIMCgRzdGVwGAIgASgNEjYKBXRvb2xzGAMgAygLMicuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuVG9vbERlc2NyaXB0b3ISOAoGc2tpbGxzGAQgAygLMiguZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuU2tpbGxEZXNjcmlwdG9yEj4KCXJlc291cmNlcxgFIAMoCzIrLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlc291cmNlRGVzY3JpcHRvchIdChV1c2VkX2RlZmluaXRpb25fYnl0ZXMYBiABKA0SEQoJdHJ1bmNhdGVkGAcgASgIIsQCChFJbnZva2VUb29sUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEg4KBnJ1bl9pZBgCIAEoCRIMCgRzdGVwGAMgASgNEg8KB2NhbGxfaWQYBCABKAkSDAoEbmFtZRgFIAEoCRI/CglyZWZlcmVuY2UYBiABKAsyLC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5UmVmZXJlbmNlEj4KBXNjb3BlGAcgASgLMi8uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVNjb3BlQ29udGV4dBIqCglhcmd1bWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhYKDnNvdXJjZV9mYWN0X2lkGAkgASgJIsEBChJJbnZva2VUb29sUmVzcG9uc2USDwoHY2FsbF9pZBgBIAEoCRIMCgRuYW1lGAIgASgJEjwKBXN0YXRlGAMgASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uUmVzdWx0U3RhdGUSJgoGcmVzdWx0GAQgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlEg0KBWVycm9yGAUgASgJEhcKD3Jlc3VsdF9ldmVudF9pZBgGIAEoCSLcAwoURXhlY3V0aW9uUmVzdWx0RXZlbnQSEAoIZXZlbnRfaWQYASABKAkSFQoNaW52b2NhdGlvbl9pZBgCIAEoCRIQCghyZXZpc2lvbhgDIAEoBBIPCgdhdHRlbXB0GAQgASgNEhAKCHNjb3BlX2lkGAUgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgGIAEoCRIWCg5zb3VyY2VfZmFjdF9pZBgHIAEoCRITCgtleGVjdXRvcl9pZBgIIAEoCRIVCg1jYXBhYmlsaXR5X2lkGAkgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YCiABKAkSFgoOcmVxdWVzdF9kaWdlc3QYCyABKAkSPAoFc3RhdGUYDCABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRJDCgxzaWRlX2VmZmVjdHMYDSABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25TaWRlRWZmZWN0cxImCgZyZXN1bHQYDiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSEgoKZXJyb3JfY29kZRgPIAEoCRIVCg11cGRhdGVkX2F0X21zGBAgASgEKqsBChRFeGVjdXRpb25SZXN1bHRTdGF0ZRImCiJFWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9TVUNDRUVERUQQARIhCh1FWEVDVVRJT05fUkVTVUxUX1NUQVRFX0ZBSUxFRBACEiIKHkVYRUNVVElPTl9SRVNVTFRfU1RBVEVfVU5LTk9XThADKqkBChRFeGVjdXRpb25TaWRlRWZmZWN0cxImCiJFWEVDVVRJT05fU0lERV9FRkZFQ1RTX1VOU1BFQ0lGSUVEEAASHwobRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19OT05FEAESJAogRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19DT05GSVJNRUQQAhIiCh5FWEVDVVRJT05fU0lERV9FRkZFQ1RTX1VOS05PV04QAzLhAQoRQ2FwYWJpbGl0eVNlcnZpY2USZQoKRXhwb3NlU3RlcBIqLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4cG9zZVN0ZXBSZXF1ZXN0GisuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhwb3NlU3RlcFJlc3BvbnNlEmUKCkludm9rZVRvb2wSKi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5JbnZva2VUb29sUmVxdWVzdBorLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkludm9rZVRvb2xSZXNwb25zZUIyqgIvR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5DYXBhYmlsaXRpZXMuVjFiBnByb3RvMw", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
 
 /**
  * 方法知识的引用/发现/正文与可执行 Tool 独立；模型选择引用不授予任何权限。
@@ -88,6 +90,324 @@ export type SkillMaterial = Message<"glimmer.capabilities.v1.SkillMaterial"> & {
  */
 export const SkillMaterialSchema: GenMessage<SkillMaterial> = /*@__PURE__*/
   messageDesc(file_glimmer_capabilities_v1_capabilities, 2);
+
+/**
+ * @generated from message glimmer.capabilities.v1.CapabilityReference
+ */
+export type CapabilityReference = Message<"glimmer.capabilities.v1.CapabilityReference"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string revision = 2;
+   */
+  revision: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.CapabilityReference.
+ * Use `create(CapabilityReferenceSchema)` to create a new message.
+ */
+export const CapabilityReferenceSchema: GenMessage<CapabilityReference> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 3);
+
+/**
+ * @generated from message glimmer.capabilities.v1.CapabilityScopeContext
+ */
+export type CapabilityScopeContext = Message<"glimmer.capabilities.v1.CapabilityScopeContext"> & {
+  /**
+   * @generated from field: string source_provider_id = 1;
+   */
+  sourceProviderId: string;
+
+  /**
+   * @generated from field: string scene_id = 2;
+   */
+  sceneId: string;
+
+  /**
+   * @generated from field: string conversation_id = 3;
+   */
+  conversationId: string;
+
+  /**
+   * @generated from field: optional string user_id = 4;
+   */
+  userId?: string | undefined;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.CapabilityScopeContext.
+ * Use `create(CapabilityScopeContextSchema)` to create a new message.
+ */
+export const CapabilityScopeContextSchema: GenMessage<CapabilityScopeContext> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 4);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ToolDescriptor
+ */
+export type ToolDescriptor = Message<"glimmer.capabilities.v1.ToolDescriptor"> & {
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityReference reference = 1;
+   */
+  reference?: CapabilityReference | undefined;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: google.protobuf.Value input_schema = 4;
+   */
+  inputSchema?: Value | undefined;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ToolDescriptor.
+ * Use `create(ToolDescriptorSchema)` to create a new message.
+ */
+export const ToolDescriptorSchema: GenMessage<ToolDescriptor> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 5);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ResourceDescriptor
+ */
+export type ResourceDescriptor = Message<"glimmer.capabilities.v1.ResourceDescriptor"> & {
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityReference reference = 1;
+   */
+  reference?: CapabilityReference | undefined;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: google.protobuf.Value input_schema = 4;
+   */
+  inputSchema?: Value | undefined;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ResourceDescriptor.
+ * Use `create(ResourceDescriptorSchema)` to create a new message.
+ */
+export const ResourceDescriptorSchema: GenMessage<ResourceDescriptor> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 6);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ExposeStepRequest
+ */
+export type ExposeStepRequest = Message<"glimmer.capabilities.v1.ExposeStepRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: string run_id = 2;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: uint32 step = 3;
+   */
+  step: number;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityScopeContext scope = 4;
+   */
+  scope?: CapabilityScopeContext | undefined;
+
+  /**
+   * @generated from field: repeated string protocol_features = 5;
+   */
+  protocolFeatures: string[];
+
+  /**
+   * @generated from field: uint32 max_definitions = 6;
+   */
+  maxDefinitions: number;
+
+  /**
+   * @generated from field: uint32 max_definition_bytes = 7;
+   */
+  maxDefinitionBytes: number;
+
+  /**
+   * @generated from field: uint32 remaining_tool_calls = 8;
+   */
+  remainingToolCalls: number;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ExposeStepRequest.
+ * Use `create(ExposeStepRequestSchema)` to create a new message.
+ */
+export const ExposeStepRequestSchema: GenMessage<ExposeStepRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 7);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ExposeStepResponse
+ */
+export type ExposeStepResponse = Message<"glimmer.capabilities.v1.ExposeStepResponse"> & {
+  /**
+   * @generated from field: string run_id = 1;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: uint32 step = 2;
+   */
+  step: number;
+
+  /**
+   * @generated from field: repeated glimmer.capabilities.v1.ToolDescriptor tools = 3;
+   */
+  tools: ToolDescriptor[];
+
+  /**
+   * @generated from field: repeated glimmer.capabilities.v1.SkillDescriptor skills = 4;
+   */
+  skills: SkillDescriptor[];
+
+  /**
+   * @generated from field: repeated glimmer.capabilities.v1.ResourceDescriptor resources = 5;
+   */
+  resources: ResourceDescriptor[];
+
+  /**
+   * @generated from field: uint32 used_definition_bytes = 6;
+   */
+  usedDefinitionBytes: number;
+
+  /**
+   * @generated from field: bool truncated = 7;
+   */
+  truncated: boolean;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ExposeStepResponse.
+ * Use `create(ExposeStepResponseSchema)` to create a new message.
+ */
+export const ExposeStepResponseSchema: GenMessage<ExposeStepResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 8);
+
+/**
+ * @generated from message glimmer.capabilities.v1.InvokeToolRequest
+ */
+export type InvokeToolRequest = Message<"glimmer.capabilities.v1.InvokeToolRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: string run_id = 2;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: uint32 step = 3;
+   */
+  step: number;
+
+  /**
+   * @generated from field: string call_id = 4;
+   */
+  callId: string;
+
+  /**
+   * @generated from field: string name = 5;
+   */
+  name: string;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityReference reference = 6;
+   */
+  reference?: CapabilityReference | undefined;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityScopeContext scope = 7;
+   */
+  scope?: CapabilityScopeContext | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Struct arguments = 8;
+   */
+  arguments?: JsonObject | undefined;
+
+  /**
+   * Worker 先持久提交原生 ToolCall ACTION；不得以模型自报引用代替。
+   *
+   * @generated from field: string source_fact_id = 9;
+   */
+  sourceFactId: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.InvokeToolRequest.
+ * Use `create(InvokeToolRequestSchema)` to create a new message.
+ */
+export const InvokeToolRequestSchema: GenMessage<InvokeToolRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 9);
+
+/**
+ * @generated from message glimmer.capabilities.v1.InvokeToolResponse
+ */
+export type InvokeToolResponse = Message<"glimmer.capabilities.v1.InvokeToolResponse"> & {
+  /**
+   * @generated from field: string call_id = 1;
+   */
+  callId: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.ExecutionResultState state = 3;
+   */
+  state: ExecutionResultState;
+
+  /**
+   * @generated from field: google.protobuf.Value result = 4;
+   */
+  result?: Value | undefined;
+
+  /**
+   * @generated from field: string error = 5;
+   */
+  error: string;
+
+  /**
+   * @generated from field: string result_event_id = 6;
+   */
+  resultEventId: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.InvokeToolResponse.
+ * Use `create(InvokeToolResponseSchema)` to create a new message.
+ */
+export const InvokeToolResponseSchema: GenMessage<InvokeToolResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 10);
 
 /**
  * Execution 拥有结果；不传入请求正文/授权详情，也不复制 Conversation 拓扑。
@@ -185,7 +505,7 @@ export type ExecutionResultEvent = Message<"glimmer.capabilities.v1.ExecutionRes
  * Use `create(ExecutionResultEventSchema)` to create a new message.
  */
 export const ExecutionResultEventSchema: GenMessage<ExecutionResultEvent> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 3);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 11);
 
 /**
  * @generated from enum glimmer.capabilities.v1.ExecutionResultState
@@ -248,3 +568,26 @@ export enum ExecutionSideEffects {
  */
 export const ExecutionSideEffectsSchema: GenEnum<ExecutionSideEffects> = /*@__PURE__*/
   enumDesc(file_glimmer_capabilities_v1_capabilities, 1);
+
+/**
+ * @generated from service glimmer.capabilities.v1.CapabilityService
+ */
+export const CapabilityService: GenService<{
+  /**
+   * @generated from rpc glimmer.capabilities.v1.CapabilityService.ExposeStep
+   */
+  exposeStep: {
+    methodKind: "unary";
+    input: typeof ExposeStepRequestSchema;
+    output: typeof ExposeStepResponseSchema;
+  },
+  /**
+   * @generated from rpc glimmer.capabilities.v1.CapabilityService.InvokeTool
+   */
+  invokeTool: {
+    methodKind: "unary";
+    input: typeof InvokeToolRequestSchema;
+    output: typeof InvokeToolResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_glimmer_capabilities_v1_capabilities, 0);

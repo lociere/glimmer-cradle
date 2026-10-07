@@ -3,6 +3,7 @@ syntax = "proto3";
 package glimmer.capabilities.v1;
 
 import "google/protobuf/struct.proto";
+import "glimmer/common/v1/service_contract.proto";
 
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Capabilities.V1";
 
@@ -22,6 +23,80 @@ message SkillMaterial {
   SkillReference reference = 1;
   // 不可信任务参考材料；不是 system instruction 或已验证事实。
   string instructions = 2;
+}
+
+message CapabilityReference {
+  string id = 1;
+  string revision = 2;
+}
+
+message CapabilityScopeContext {
+  string source_provider_id = 1;
+  string scene_id = 2;
+  string conversation_id = 3;
+  optional string user_id = 4;
+}
+
+message ToolDescriptor {
+  CapabilityReference reference = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Value input_schema = 4;
+}
+
+message ResourceDescriptor {
+  CapabilityReference reference = 1;
+  string name = 2;
+  string description = 3;
+  google.protobuf.Value input_schema = 4;
+}
+
+message ExposeStepRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string run_id = 2;
+  uint32 step = 3;
+  CapabilityScopeContext scope = 4;
+  repeated string protocol_features = 5;
+  uint32 max_definitions = 6;
+  uint32 max_definition_bytes = 7;
+  uint32 remaining_tool_calls = 8;
+}
+
+message ExposeStepResponse {
+  string run_id = 1;
+  uint32 step = 2;
+  repeated ToolDescriptor tools = 3;
+  repeated SkillDescriptor skills = 4;
+  repeated ResourceDescriptor resources = 5;
+  uint32 used_definition_bytes = 6;
+  bool truncated = 7;
+}
+
+message InvokeToolRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string run_id = 2;
+  uint32 step = 3;
+  string call_id = 4;
+  string name = 5;
+  CapabilityReference reference = 6;
+  CapabilityScopeContext scope = 7;
+  google.protobuf.Struct arguments = 8;
+  // Worker 先持久提交原生 ToolCall ACTION；不得以模型自报引用代替。
+  string source_fact_id = 9;
+}
+
+message InvokeToolResponse {
+  string call_id = 1;
+  string name = 2;
+  ExecutionResultState state = 3;
+  google.protobuf.Value result = 4;
+  string error = 5;
+  string result_event_id = 6;
+}
+
+service CapabilityService {
+  rpc ExposeStep(ExposeStepRequest) returns (ExposeStepResponse);
+  rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
 }
 
 enum ExecutionResultState {
