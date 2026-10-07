@@ -2,7 +2,6 @@ import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { AgentPlanRequest, AgentPlanResponse } from '../../ports/cognition-service-port';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
-import { isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
 
 export interface SkillPlanningRequest {
   userGoal: string;
@@ -27,18 +26,8 @@ export class SkillPlanningAppService {
 
   public async plan(request: SkillPlanningRequest): Promise<AgentPlanResponse> {
     const catalog = this._catalog.getCatalogSnapshot();
-    const availableTools: AgentPlanRequest['available_tools'] = catalog.entries
-      .filter((entry) => entry.audience === 'character'
-        && (entry.metadata.runtime_status ?? 'ready') === 'ready'
-        && isCapabilityScopeVisible(entry.scope, request.conversation))
-      .flatMap((entry) => entry.tools.filter((tool) => (
-        tool.audience === 'character' && isCapabilityScopeVisible(tool.scope, request.conversation)
-      )).map((tool) => ({
-        skill_id: entry.id,
-        tool_name: tool.name,
-        description: tool.description,
-        parameters: this.toParameterObject(tool.parameters),
-      })));
+    const availableTools: AgentPlanRequest['available_tools'] = this._catalog.listReadyTools(request.conversation)
+      .map(tool => ({ ...tool, parameters: this.toParameterObject(tool.parameters) }));
 
     let plan = await this._requestPlan(
       {
@@ -84,14 +73,7 @@ export class SkillPlanningAppService {
   }
 
   public getReadyToolCount(conversation?: ConversationContext): number {
-    const catalog = this._catalog.getCatalogSnapshot();
-    return catalog.entries
-      .filter((entry) => entry.audience === 'character'
-        && (entry.metadata.runtime_status ?? 'ready') === 'ready'
-        && isCapabilityScopeVisible(entry.scope, conversation))
-      .reduce((total, entry) => total + entry.tools.filter((tool) => (
-        tool.audience === 'character' && isCapabilityScopeVisible(tool.scope, conversation)
-      )).length, 0);
+    return this._catalog.listReadyTools(conversation).length;
   }
 
   public resultEventId(invocationId: string): string | undefined {

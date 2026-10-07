@@ -2,7 +2,7 @@
 
 感知媒体的真实入站为 Extension Host IPC `asset.begin/write/abort` 与 `perception.inject`。Kernel 每次检查 `PERCEPTION_WRITE`，暂存 token 绑定扩展且只可消费一次；Host 等待 Cognition 感知操作结果，持久资产由 Kernel 单写者提交。旧 URI-only `items` 仍是阶段 9/14 删除门约束的读取兼容。准确字段见 [SDK Reference](../../reference/extension-sdk.md) 与 [ADR-0020](../decisions/ADR-0020-Content资产单写者与恢复边界.md)。
 
-> 范围：Extension SDK、Extension Host、Skill Registry、Policy、Invocation Gateway、Core/Extension/MCP/User Provider 和 Adapter 如何在代码中接线；不写 SDK 字段全表。
+> 范围：Extension SDK、Extension Host、Capabilities 三类定义、接入映射、Policy、Invocation Gateway、Core/Extension/MCP/User Provider 如何接线；不写 SDK 字段全表。
 > 源码依据：`packages/extension-sdk/src/`、`templates/extension-basic/`、独立 `glimmer-cradle-extensions` 仓库、`data/packages/extensions/<extension-id>/<version>/`、`core/kernel/src/application/skill-plane/`、`core/kernel/src/adapters/{extension-host,skill-plane}/`、`core/kernel/src/ports/{extension-host,skill-plane,application-capabilities}.port.ts`、`configs/system/skills.yaml`、`configs/extensions/`。
 > 维护触发：SDK API、manifest、permissions/requires、activation、provider 生命周期、MCP、Policy、Gateway、catalog、confirmation 或 audit 变化。
 
@@ -75,7 +75,6 @@ Desktop main 只保留精确激活版本与扩展配置 YAML 的受控编辑入�
 
 ```text
 core/kernel/src/application/skill-plane/
-├── skill-registry.ts
 ├── skill-policy-engine.ts
 ├── skill-invocation-gateway.ts
 └── providers/
@@ -84,14 +83,16 @@ core/kernel/src/application/skill-plane/
 
 core/kernel/src/ports/skill-plane.port.ts
 core/kernel/src/adapters/skill-plane/
+├── capability-catalog-adapter.ts
 ├── extension/
 └── mcp-server/
 ```
 
 | 组件 | 职责 |
 |---|---|
-| Registry | 汇总 provider catalog，只提供 character audience 的 skill/tool/resource/prompt 可发现能力快照 |
-| Policy Engine | 判断权限、风险、确认需求和拒绝原因 |
+| Core ToolRegistry / SkillCatalog / ResourceRegistry | 分别拥有动作、方法知识、可读资源的不可变定义、owner/revision/readiness 与撤销；没有万能集合或 Skill→Tool 父子关系 |
+| CapabilityCatalogAdapter | 映射现行 SDK 分组与 handler/reader，投影旧界面目录，不成为三类定义的第二事实源 |
+| Policy Engine | 当前判断契约就绪、风险与确认需求；完整 permission/broker 不在此切片中 |
 | Invocation Gateway | 唯一执行入口，统一 audience/scope/requirements/Policy、timeout、trace、audit 与错误归一化 |
 | Core Provider | Kernel 内置基础能力 |
 | Extension Provider | Extension manifest/handler 暴露的能力 |
@@ -101,11 +102,21 @@ core/kernel/src/adapters/skill-plane/
 Catalog 不等于授权，Policy 通过不等于执行，执行必须经过 Gateway。
 
 scope 规则的唯一领域 owner 已迁入 `core/capabilities/src/exposure/exposure-policy.ts`，公开入口为
-`@glimmer-cradle/capabilities`。Kernel Registry 的 global 缺省、规划过滤和 Gateway 的调用前
+`@glimmer-cradle/capabilities`。Kernel 接入映射的 global 缺省、规划过滤和 Gateway 的调用前
 scope 校验都直接消费它；旧 `application/skill-plane/scope.ts` 已删除，内部 Port 只引用 Core
 类型，不复制规则。Core 只接收 source provider/scene/conversation 身份，未引入 Conversation
 concrete、SDK 或 wire。缺上下文/空限定范围/未知 kind 失败关闭，不把未知 kind 猜为 conversation。
 扩展 `$self` 解析仍由接入层 `availability.ts` 的 `SkillPlanePolicy` 完成，不属于 Core 授权。
+三类定义实际位于 Core `tools/`、`skills/`、`resources/`：Tool 只保存 executor 引用；Resource
+只保存 reader 引用；Skill 保存 inline 方法正文或参数化 reader 引用，动态 prompt description
+不冒充正文。各集合分别校验 JSON 数据、保护 owner/revision 并深冻结快照；这不是新的跨进程
+Schema 源。现行 SDK/wire 的 `SkillDescriptor` 仍是旧分组投影，`totalSkills` 不等于 Core 方法数量。
+`CapabilityCatalogAdapter` 在注册前验证整组，失败保留旧快照；分组/目标内部引用用无歧义元组，
+既有公开 ID、journal capability ID 与摘要算法不重算。原地修改、handler 替换或独立 Core 撤销
+会使绑定失效。规划直接读取 ToolRegistry 的有效 ready 定义；连接降级不继续暴露/调用旧 handler。
+应用只依赖 `CapabilityCatalogPort`，具体 adapter 只由 composition 注入；旧 SkillRegistry owner
+已经删除。接入映射随阶段 12 移到 App，旧 SDK 分组在阶段 9/11/12 原生消费者归零后删除。
+User Provider 的 `instructions.read` 假 Tool 与现行两次规划仍是待切换项，不声称用户方法语义完成。
 新包已接根 test/typecheck/build 与 Kernel workspace 依赖；Kernel 的 with-deps 命令按真实依赖
 闭包构建。Personal Server Docker 安装前显式复制其 Core manifest，构建先于 Kernel；临时
 `pnpm deploy` 已验证新包从部署树自身解析，不回查源码仓库，真实 OCI/完整安装验收仍待执行。
@@ -140,7 +151,7 @@ Platform authority，未实施外部 fencing/证据对账或自动接管；人�
 也排空计时器/调用再释放资源；没有把 cancellation 等同进程已停止。装配失败逆序关闭已打开的库。Core tests 使用
 真实 SQLite 重开、双连接、事务故障；Gateway tests 验证真实撤销与稳定 ID 重放。仅 fixture
 可不注入 controller；生产组装始终注入，旧无 journal 分支在三 Registry/入口切换后 consumer-zero
-删除。resource/prompt、完整 Step Exposure、三 Registry、native broker 与完整行动恢复
+删除。resource 内容 revision/Knowledge ingest、完整 Step Exposure、native broker 与完整行动恢复
 仍待完成。目标与证据见[执行记录](../../roadmap/architecture-v2-refactor.md)。
 
 Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/prompt 统一执行：
@@ -236,12 +247,12 @@ configs/system/skills.yaml
   -> mcp-server provider config
   -> MCP initialize
   -> enumerate tools/resources/prompts
-  -> SkillRegistry catalog
+  -> CapabilityCatalogAdapter -> Core ToolRegistry / ResourceRegistry / SkillCatalog
   -> Gateway call
   -> normalized result / error
 ```
 
-MCP server 是外部能力来源，默认不可信。`adapters/skill-plane/mcp-server/McpServerSkillProvider` 会把连接状态同步为 `SkillCatalogSnapshot.providerRuntimes` 中的 `mcp_server` provider runtime：`connecting` 只表示正在握手，`ready` 表示能力目录已枚举并注册进 Skill Registry，`unavailable` 表示连接失败或能力刷新失败。它还会通过同目录的 `mcp-server-runtime-readiness.ts` 把这些 provider runtime 折叠成 `RuntimeReadinessSnapshot[]`：`mcp.host` 表达整个 MCP capability plane，`mcp.<server-id>` 表达逐 server desired/actual/readiness，且在连接状态变化时经 `RuntimeProjectionInputPort` 持续刷新唯一 Application projection store。断连、initialize 失败、枚举失败、调用超时、工具返回非法结果都要有 trace、provider id、server id 和错误 code。
+MCP server 是外部能力来源，默认不可信。`adapters/skill-plane/mcp-server/McpServerSkillProvider` 会把连接状态同步为 `SkillCatalogSnapshot.providerRuntimes` 中的 `mcp_server` provider runtime：`connecting` 只表示正在握手，`ready` 表示能力目录已枚举并映射进独立三类 Core owner，`unavailable` 表示连接失败或能力刷新失败。它还会通过同目录的 `mcp-server-runtime-readiness.ts` 把这些 provider runtime 折叠成 `RuntimeReadinessSnapshot[]`：`mcp.host` 表达整个 MCP capability plane，`mcp.<server-id>` 表达逐 server desired/actual/readiness，且在连接状态变化时经 `RuntimeProjectionInputPort` 持续刷新唯一 Application projection store。断连、initialize 失败、枚举失败、调用超时、工具返回非法结果都要有 trace、provider id、server id 和错误 code。
 
 ## 调试入口
 

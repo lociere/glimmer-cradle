@@ -3,7 +3,7 @@ import { BuiltInContributionPoint, type ContributionRequirements } from '@glimme
 import { ExtensionHostAppService } from '../../adapters/extension-host/extension-host-application-adapter';
 import { ExtensionRuntimeRegistry } from '../../adapters/extension-host/extension-runtime-registry';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
-import { SkillRegistry } from '../skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
 import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';
 import { SkillPlanePolicy } from '../skill-plane/availability';
 import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
@@ -23,7 +23,7 @@ const availability: SkillAvailabilityContext = {
 };
 const skillPlanePolicy = new SkillPlanePolicy();
 
-function createHostService(perception: unknown, catalog = new SkillCatalogAppService(new SkillRegistry()), uploads?: StagedAssetUploads) {
+function createHostService(perception: unknown, catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter()), uploads?: StagedAssetUploads) {
   return {
     catalog,
     service: new ExtensionHostAppService(
@@ -237,7 +237,7 @@ describe('ExtensionHostAppService', () => {
 
   it('projects extension runtime into skill provider runtimes and removes it on unregister', () => {
     const extensionId = `runtime-provider-${Date.now()}`;
-    const skillCatalog = new SkillCatalogAppService(new SkillRegistry());
+    const skillCatalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const { service: hostService } = createHostService({}, skillCatalog);
 
     hostService.registerExtensionRuntimeManifest({

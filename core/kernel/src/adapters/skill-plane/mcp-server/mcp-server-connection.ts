@@ -223,7 +223,7 @@ export class McpServerConnection {
             properties: Object.fromEntries(
               (prompt.arguments ?? []).map((argument) => [argument.name, {
                 type: 'string',
-                description: argument.description,
+                ...(argument.description === undefined ? {} : { description: argument.description }),
               }]),
             ),
             required: (prompt.arguments ?? [])

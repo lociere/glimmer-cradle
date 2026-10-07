@@ -4,7 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { UserSkillSource } from './user-skill-source';
 import { UserSkillProvider } from '../../../application/skill-plane/providers/user/user-skill-provider';
-import { SkillRegistry } from '../../../application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../capability-catalog-adapter';
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
@@ -22,7 +22,7 @@ it('首次安装尚无 packages 目录时保持空 provider ready', async () => 
     () => ({ enabled: true, root_dir: 'skills' }),
     () => path.join(root, 'data', 'packages'),
   );
-  const registry = new SkillRegistry();
+  const registry = new CapabilityCatalogAdapter();
   await new UserSkillProvider(source).start(registry);
   expect(registry.getCatalogSnapshot().providerRuntimes.find((item) => item.provider.kind === 'user')).toMatchObject({
     state: 'ready',
@@ -33,7 +33,7 @@ it('首次安装尚无 packages 目录时保持空 provider ready', async () => 
 
 it('加载真实 SKILL.md 并注册可调用指令，作者 allowed-tools 不授予权限，停止撤销旧 handler', async () => {
   const { source } = await fixture();
-  const registry = new SkillRegistry();
+  const registry = new CapabilityCatalogAdapter();
   const provider = new UserSkillProvider(source);
   await provider.start(registry);
   const skill = provider.listSkills()[0];
@@ -57,7 +57,7 @@ it('坏 frontmatter、大文件与目录链接独立失败，保留有效技能�
   const result = await source.load();
   expect(result.skills.map((item) => item.name)).toEqual(['summarize']);
   expect(result.errors).toHaveLength(3);
-  const registry = new SkillRegistry(); const provider = new UserSkillProvider(source);
+  const registry = new CapabilityCatalogAdapter(); const provider = new UserSkillProvider(source);
   await provider.start(registry);
   expect(registry.getCatalogSnapshot().providerRuntimes.find((item) => item.provider.kind === 'user')?.state).toBe('degraded');
   provider.stop(registry);
@@ -72,7 +72,7 @@ it('配置越界不可读，关闭后不访问文件系统', async () => {
 it('停止后到达的加载结果不能重新注册技能', async () => {
   let resolve!: (value: any) => void;
   const provider = new UserSkillProvider({ load: () => new Promise((done) => { resolve = done; }) });
-  const registry = new SkillRegistry();
+  const registry = new CapabilityCatalogAdapter();
   const pending = provider.start(registry); provider.stop(registry);
   resolve({ enabled: true, skills: [{ name: 'late', description: 'late', instructions: 'late' }], errors: [] });
   await pending;

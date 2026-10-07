@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
-import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../src/adapters/skill-plane/capability-catalog-adapter';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
 import { McpServerSkillProvider } from '../../src/adapters/skill-plane/mcp-server/mcp-server-skill-provider';
 import { RuntimeReadinessProjectionMapper } from '../../src/application/projection/runtime-readiness-projection';
@@ -22,7 +22,7 @@ const observability: KernelObservabilityPort = {
 
 describe('McpServerSkillProvider', () => {
   it('真实 stdio 断线撤销旧目录并重连，stop 取消后续重试', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const provider = new McpServerSkillProvider(new RuntimeReadinessProjectionMapper(), () => ({ mcp_servers: [{
       id: 'reconnect', enabled: true, transport: 'stdio', command: process.execPath,
       args: [path.resolve(__dirname, '../fixtures/mcp-stdio-fixture.mjs')], env: {}, timeout_ms: 5000,
@@ -45,7 +45,7 @@ describe('McpServerSkillProvider', () => {
     } finally { await provider.stop(registry); }
   });
   it('把 stdio MCP 的 tool、resource、prompt 投影为可调用 Skill，并在停止时回收', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const provider = new McpServerSkillProvider(new RuntimeReadinessProjectionMapper(), () => ({
       mcp_servers: [
         {

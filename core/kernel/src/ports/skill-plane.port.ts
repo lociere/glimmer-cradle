@@ -1,5 +1,5 @@
 import type { ConversationContext } from '@glimmer-cradle/conversation';
-import type { CapabilityScope } from '@glimmer-cradle/capabilities';
+import type { CapabilityScope, CapabilityScopeContext, Tool, Resource, Skill } from '@glimmer-cradle/capabilities';
 export type { CapabilityScope } from '@glimmer-cradle/capabilities';
 
 export type ExtensionProductTarget = 'any' | 'desktop' | 'personal-server';
@@ -117,6 +117,21 @@ export interface SkillCatalogSnapshot {
 }
 
 export interface RegisteredSkill { providerId: string; skill: SkillDescriptor }
+/** 应用消费的能力映射契约；具体 SDK/provider 适配器只在 composition 构造。 */
+export interface CapabilityCatalogPort {
+  registerSkill(skill: SkillDescriptor): void;
+  unregisterSkill(skillId: string): void;
+  upsertProviderRuntime(runtime: SkillProviderRuntimeSnapshot): void;
+  removeProviderRuntime(provider: SkillProviderRef): void;
+  findById(skillId: string): RegisteredSkill | undefined;
+  findTool(skillId: string, name: string): Tool | undefined;
+  findResource(skillId: string, name: string): Resource | undefined;
+  findMethod(skillId: string, name: string): Skill | undefined;
+  listCatalogEntries(): SkillCatalogEntry[];
+  getCatalogSnapshot(): SkillCatalogSnapshot;
+  listReadyTools(context?: CapabilityScopeContext): Array<{ skill_id: string; tool_name: string; description: string; parameters: unknown }>;
+  isProviderReady(ownerId: string): boolean;
+}
 export interface SkillMetadata extends Record<string, unknown> { runtime_status?: SkillRuntimeStatus; implementation?: string; audience?: SkillAudience }
 export interface SkillRegistrationTarget {
   registerSkill(skill: SkillDescriptor): void;

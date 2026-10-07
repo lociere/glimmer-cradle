@@ -137,12 +137,12 @@ Skill Plane 的实现落点：
 
 ```text
 application/skill-plane/
-├── skill-registry.ts
 ├── skill-policy-engine.ts
 ├── skill-invocation-gateway.ts
 └── providers/{core,user}/
 
 ports/skill-plane.port.ts
+adapters/skill-plane/capability-catalog-adapter.ts -> Core ToolRegistry / SkillCatalog / ResourceRegistry
 adapters/skill-plane/{extension,mcp-server}/
 ```
 
@@ -205,7 +205,7 @@ Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能
 | UI 可见但输入没反应 | Ingress Gate、runtime snapshot、Desktop -> Kernel IPC |
 | Cognition 无回复 | PerceptionAppService、CognitionManager、Cognition Service registration/readiness、同一 trace 的 Cognition span |
 | Avatar 假 ready | AvatarController、Avatar status、`host_hello`/`host_ready`、process log |
-| 工具调用失败 | SkillRegistry、Policy decision、InvocationGateway、provider log |
+| 工具调用失败 | Capabilities ToolRegistry、CapabilityCatalogAdapter、Policy decision、InvocationGateway、provider log |
 | 子进程残留 | ProcessSupervisor、runtime stop、process log、退出路径 |
 | 状态投影旧 | event bus、projection producer、preload IPC、renderer subscription |
 | 注意力焦点异常 | Extension `sceneAttention.requestAttentionLease()`、`AttentionLeaseStore` projection、`AttentionSessionManager` 合并日志、`LifeClockManager` 有机体事件 |

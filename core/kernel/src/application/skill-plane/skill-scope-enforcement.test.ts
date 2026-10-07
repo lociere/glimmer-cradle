@@ -4,12 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SkillCatalogAppService } from '../use-cases/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../use-cases/skill-planning-app.service';
 import { SkillInvocationGateway } from './skill-invocation-gateway';
-import { SkillRegistry } from './skill-registry';
+import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
 import { SkillPolicyEngine } from './skill-policy-engine';
 import { SkillPlanePolicy } from './availability';
 import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
-const registry = new SkillRegistry();
+const registry = new CapabilityCatalogAdapter();
 const skillId = 'extension:test.napcat:private-weather';
 const observability: KernelObservabilityPort = {
   logger: () => ({ debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined }),

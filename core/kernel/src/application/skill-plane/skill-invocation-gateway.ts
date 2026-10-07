@@ -1,23 +1,17 @@
 import { SkillPolicyEngine } from './skill-policy-engine';
-import {
-  SkillRegistry,
-  resolvePromptAudience,
-  resolveResourceAudience,
-  resolveSkillAudience,
-  resolveToolAudience,
-} from './skill-registry';
 import type {
   SkillConfirmationRequest,
   SkillConfirmationRequester,
   SkillDescriptor,
   SkillPolicy,
   SkillProviderKind,
+  CapabilityCatalogPort,
 } from '../../ports/skill-plane.port';
 import type { SkillPolicyDecision } from './skill-policy-engine';
 import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
-import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, executionDigest, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
+import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, isCapabilityDefinitionVisible, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
 import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
@@ -111,7 +105,7 @@ export class SkillInvocationGateway {
   private readonly active = new Set<Promise<unknown>>();
   private stopped = false;
   constructor(
-    private readonly _registry: SkillRegistry,
+    private readonly _registry: CapabilityCatalogPort,
     private readonly _policyEngine: SkillPolicyEngine,
     private readonly _auditSink: SkillInvocationAuditSink,
     private readonly _observability: KernelObservabilityPort,
@@ -150,23 +144,21 @@ export class SkillInvocationGateway {
     if (!tool) {
       throw new Error(`技能 ${request.skillId} 未提供工具: ${request.toolName}`);
     }
-    if (resolveSkillAudience(registered.skill) !== 'character' || resolveToolAudience(registered.skill, tool) !== 'character') {
+    this.assertScopeVisible(registered.skill.scope, tool.scope, request.conversation, `${request.skillId}.${request.toolName}`);
+    if (this._registry.findTool(request.skillId, request.toolName)?.audience !== 'character') {
       throw new Error(`技能 ${request.skillId}.${request.toolName} 未暴露给角色使用`);
     }
-    this.assertScopeVisible(registered.skill.scope, tool.scope, request.conversation, `${request.skillId}.${request.toolName}`);
+    const definition = this._registry.findTool(request.skillId, request.toolName);
+    if (!definition) throw new Error('Tool 定义已撤销或变更');
 
     const invocationId = request.invocationId ?? (this._execution ? this._newInvocationId() : undefined);
     const handler = tool.handler;
-    const definition = () => executionDigest({
-      skill_id: registered.skill.id, provider: { kind: registered.skill.provider.kind, id: registered.skill.provider.id },
-      audience: resolveSkillAudience(registered.skill), scope: registered.skill.scope ?? null,
-      runtime_status: registered.skill.metadata?.runtime_status ?? null,
-      skill_policy: registered.skill.policy, tool_name: tool.name, description: tool.description,
-      tool_audience: resolveToolAudience(registered.skill, tool), tool_scope: tool.scope ?? null,
-      parameters: tool.parameters ?? null, tool_policy: tool.policy ?? null,
-    });
-    const revision = this._execution ? definition() : '';
+    const revision = definition.revision;
     const context = request.conversation ? { ...request.conversation } : undefined;
+    const validate = () => this._registry.findById(request.skillId) === registered
+      && this._registry.findTool(request.skillId, request.toolName) === definition
+      && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id)
+      && this._policyEngine.evaluate(registered.skill, tool.policy ?? registered.skill.policy).allowed;
     return this.executeWithAudit({
       traceId: request.traceId,
       skill: registered.skill,
@@ -176,6 +168,7 @@ export class SkillInvocationGateway {
       args: request.args,
       signal: request.signal,
       invocationId,
+      validate,
       durable: this._execution ? {
         scopeId: context?.conversation_id ?? 'global',
         executorId: registered.skill.provider.id,
@@ -184,12 +177,7 @@ export class SkillInvocationGateway {
           source_provider_id: context.source_provider_id } : null,
         interaction: request.sourceFactId && context ? { conversation_id: context.conversation_id,
           source_fact_id: request.sourceFactId } : undefined,
-        validate: () => {
-          if (this._registry.findById(request.skillId) !== registered
-            || !registered.skill.tools.includes(tool) || tool.handler !== handler || definition() !== revision) return false;
-          this.assertScopeVisible(registered.skill.scope, tool.scope, context, `${request.skillId}.${request.toolName}`);
-          return this._policyEngine.evaluate(registered.skill, tool.policy ?? registered.skill.policy).allowed;
-        },
+        validate,
       } : undefined,
       execute: (args, signal) => handler(args, {
         signal,
@@ -208,11 +196,14 @@ export class SkillInvocationGateway {
     if (!resource) {
       throw new Error(`技能 ${request.skillId} 未提供资源: ${request.resourceId}`);
     }
-    if (resolveSkillAudience(registered.skill) !== 'character'
-      || resolveResourceAudience(registered.skill, resource) !== 'character') {
+    this.assertScopeVisible(registered.skill.scope, resource.scope, request.conversation, `${request.skillId}.${request.resourceId}`);
+    if (this._registry.findResource(request.skillId, request.resourceId)?.audience !== 'character') {
       throw new Error(`技能 ${request.skillId}.${request.resourceId} 未暴露给角色使用`);
     }
-    this.assertScopeVisible(registered.skill.scope, resource.scope, request.conversation, `${request.skillId}.${request.resourceId}`);
+    const definition = this._registry.findResource(request.skillId, request.resourceId);
+    if (!definition) throw new Error('Resource 定义已撤销或变更');
+    const context = request.conversation ? { ...request.conversation } : undefined;
+    const read = resource.read;
 
     return this.executeWithAudit({
       traceId: request.traceId,
@@ -221,7 +212,10 @@ export class SkillInvocationGateway {
       targetKind: 'resource',
       targetName: request.resourceId,
       args: request.args,
-      execute: () => resource.read(request.args),
+      validate: () => this._registry.findById(request.skillId) === registered
+        && this._registry.findResource(request.skillId, request.resourceId) === definition
+        && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id),
+      execute: () => read(request.args),
     });
   }
 
@@ -235,14 +229,14 @@ export class SkillInvocationGateway {
     if (!prompt) {
       throw new Error(`技能 ${request.skillId} 未提供提示模板: ${request.promptId}`);
     }
-    if (resolveSkillAudience(registered.skill) !== 'character'
-      || resolvePromptAudience(registered.skill, prompt) !== 'character') {
+    this.assertScopeVisible(registered.skill.scope, prompt.scope, request.conversation, `${request.skillId}.${request.promptId}`);
+    if (this._registry.findMethod(request.skillId, request.promptId)?.audience !== 'character') {
       throw new Error(`技能 ${request.skillId}.${request.promptId} 未暴露给角色使用`);
     }
-    this.assertScopeVisible(registered.skill.scope, prompt.scope, request.conversation, `${request.skillId}.${request.promptId}`);
-    if (!prompt.render) {
-      return prompt.template;
-    }
+    const definition = this._registry.findMethod(request.skillId, request.promptId);
+    if (!definition) throw new Error('Skill 方法定义已撤销或变更');
+    const context = request.conversation ? { ...request.conversation } : undefined;
+    const render = prompt.render;
 
     return this.executeWithAudit({
       traceId: request.traceId,
@@ -251,7 +245,10 @@ export class SkillInvocationGateway {
       targetKind: 'prompt',
       targetName: request.promptId,
       args: request.args,
-      execute: () => prompt.render?.(request.args),
+      validate: () => this._registry.findById(request.skillId) === registered
+        && this._registry.findMethod(request.skillId, request.promptId) === definition
+        && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id),
+      execute: () => definition.instructions.kind === 'inline' ? definition.instructions.text : render?.(request.args),
     });
   }
 
@@ -265,6 +262,7 @@ export class SkillInvocationGateway {
     execute: (args?: unknown, signal?: AbortSignal) => Promise<unknown> | unknown;
     signal?: AbortSignal;
     invocationId?: string;
+    validate(): boolean;
     durable?: { scopeId: string; executorId: string; revision: string; context: unknown;
       interaction?: { conversation_id: string; source_fact_id: string }; validate(): boolean };
   }): Promise<unknown> {
@@ -401,6 +399,7 @@ export class SkillInvocationGateway {
       }
 
       await authorize(options.args, options.signal);
+      if (!options.validate()) throw new Error('Capability revoked_before_dispatch');
 
       try {
         const result = await options.execute(options.args, options.signal);

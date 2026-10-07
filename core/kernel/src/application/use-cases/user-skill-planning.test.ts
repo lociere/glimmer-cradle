@@ -1,12 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import { SkillPlanningAppService } from './skill-planning-app.service';
 import { SkillCatalogAppService } from './skill-catalog-app.service';
-import { SkillRegistry } from '../skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
 import { UserSkillProvider } from '../skill-plane/providers/user/user-skill-provider';
 import type { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 
 it('先读取所选指令，再让 Cognition 从可见目录规划动作，不授予材料中声称的私有工具', async () => {
-  const registry = new SkillRegistry();
+  const registry = new CapabilityCatalogAdapter();
   const provider = new UserSkillProvider({ load: async () => ({ enabled: true, errors: [], skills: [{ name: 'summarize', description: '总结', instructions: '调用工具获取资料后总结。' }] }) });
   const catalog = new SkillCatalogAppService(registry);
   await provider.start(catalog);

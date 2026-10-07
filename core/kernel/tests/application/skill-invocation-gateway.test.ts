@@ -8,7 +8,7 @@ import {
   type SkillInvocationAuditRecord,
   type SkillInvocationAuditSink,
 } from '../../src/application/skill-plane/skill-invocation-gateway';
-import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../src/adapters/skill-plane/capability-catalog-adapter';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
 import type { SkillConfirmationRequester } from '../../src/ports/skill-plane.port';
 import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
@@ -35,7 +35,7 @@ const observability: KernelObservabilityPort = {
 };
 
 function createGateway(
-  registry: SkillRegistry,
+  registry: CapabilityCatalogAdapter,
   audit: SkillInvocationAuditSink = { record: () => undefined },
   requestConfirmation?: SkillConfirmationRequester,
 ): SkillInvocationGateway {
@@ -52,7 +52,7 @@ function createGateway(
 describe('SkillInvocationGateway', () => {
   it('用户拒绝落持久未派发结果，再次请求不弹框、不执行 handler', async () => {
     const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-denied-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
-    const registry = new SkillRegistry(); const handler = vi.fn(); const confirm = vi.fn(async () => false);
+    const registry = new CapabilityCatalogAdapter(); const handler = vi.fn(); const confirm = vi.fn(async () => false);
     registry.registerSkill({ id: 'test.denied', name: '测试', description: '拒绝', provider: { kind: 'core', id: 'receiver' },
       policy: { riskLevel: 'medium', confirmationRequired: true, sideEffects: ['external'], audit: true },
       tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
@@ -70,7 +70,7 @@ describe('SkillInvocationGateway', () => {
   it('真实 journal 重开重放成功结果，诊断故障不改写成功、不重复副作用', async () => {
     const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-execution-')); const file = join(root, 'execution.sqlite');
     let journal = new SqliteExecutionJournal(file);
-    const registry = new SkillRegistry(); const handler = vi.fn(async (args) => ({ ok: true, args }));
+    const registry = new CapabilityCatalogAdapter(); const handler = vi.fn(async (args) => ({ ok: true, args }));
     registry.registerSkill({ id: 'test.execution', name: '测试', description: '执行', provider: { kind: 'core', id: 'receiver' },
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: ['external'], audit: true },
       tools: [{ name: 'run', description: 'run', parameters: { type: 'object' }, handler }] });
@@ -88,9 +88,9 @@ describe('SkillInvocationGateway', () => {
       expect(handler).toHaveBeenCalledOnce();
     } finally { journal.close(); rmSync(root, { recursive: true }); }
   });
-  it.each(['unregister', 'policy', 'scope', 'handler', 'readiness'])('确认期间 %s 变更，派发前真实复验拒绝执行', async (change) => {
+  it.each(['unregister', 'policy', 'scope', 'handler', 'readiness', 'core_revoke', 'core_replace', 'provider_degraded'])('确认期间 %s 变更，派发前真实复验拒绝执行', async (change) => {
     const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-revoked-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
-    const registry = new SkillRegistry(); const handler = vi.fn();
+    const registry = new CapabilityCatalogAdapter(); const handler = vi.fn();
     registry.registerSkill({ id: 'test.revoked', name: '测试', description: '撤销', provider: { kind: 'core', id: 'receiver' },
       policy: { riskLevel: 'medium', confirmationRequired: true, sideEffects: ['external'], audit: true },
       tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
@@ -101,6 +101,12 @@ describe('SkillInvocationGateway', () => {
       if (change === 'scope') skill.scope = { kind: 'conversation', ids: ['other'] };
       if (change === 'handler') skill.tools[0].handler = () => 'replacement';
       if (change === 'readiness') skill.metadata = { runtime_status: 'contract_only' };
+      const definition = registry.tools.list()[0];
+      if (change === 'core_revoke') registry.tools.revoke(definition.id, definition.owner_id);
+      if (change === 'core_replace') registry.tools.register({ ...definition, revision: 'changed', readiness: 'degraded' });
+      if (change === 'provider_degraded') registry.upsertProviderRuntime({ provider: skill.provider, state: 'degraded',
+        summary: '连接丢失', skill_count: 1, tool_count: 1, resource_count: 0, prompt_count: 0,
+        recovery_actions: [], metadata: {}, updated_at: new Date().toISOString() });
       return true;
     };
     const gateway = new SkillInvocationGateway(registry, new SkillPolicyEngine(), { record: () => undefined },
@@ -111,9 +117,36 @@ describe('SkillInvocationGateway', () => {
       expect(journal.load('stable')).toMatchObject({ state: 'failed', attempt: 0, side_effects: 'none' });
     } finally { journal.close(); rmSync(root, { recursive: true }); }
   });
+  it.each(['resource', 'prompt'] as const)('%s 确认期间独立撤销，不调用旧 reader，且不撤销其他域', async kind => {
+    const registry = new CapabilityCatalogAdapter(); const read = vi.fn(() => 'resource'); const render = vi.fn(() => 'method');
+    registry.registerSkill({ id: 'test.readers', name: '来源', description: '', provider: { kind: 'core', id: 'reader' },
+      policy: { riskLevel: 'low', confirmationRequired: true, sideEffects: [], audit: true }, tools: [],
+      resources: [{ id: 'same', description: '资源', read }],
+      prompts: [{ id: 'same', description: '方法', template: '不是正文', render }] });
+    const gateway = createGateway(registry, undefined, async () => {
+      const source = kind === 'resource' ? registry.resources : registry.methods;
+      const definition = source.list()[0]; source.revoke(definition.id, definition.owner_id);
+      return true;
+    });
+    const promise = kind === 'resource' ? gateway.readResource({ skillId: 'test.readers', resourceId: 'same' })
+      : gateway.renderPrompt({ skillId: 'test.readers', promptId: 'same' });
+    await expect(promise).rejects.toThrow('revoked_before_dispatch');
+    expect(read).not.toHaveBeenCalled(); expect(render).not.toHaveBeenCalled();
+    expect(kind === 'resource' ? registry.methods.list() : registry.resources.list()).toHaveLength(1);
+  });
+
+  it('inline 方法也执行策略，而非静态模板绕过确认', async () => {
+    const registry = new CapabilityCatalogAdapter(); const confirm = vi.fn(async () => false);
+    registry.registerSkill({ id: 'test.method', name: '方法', description: '', provider: { kind: 'core', id: 'reader' },
+      policy: { riskLevel: 'low', confirmationRequired: true, sideEffects: [], audit: true }, tools: [],
+      prompts: [{ id: 'guide', description: '说明', template: 'private method' }] });
+    await expect(createGateway(registry, undefined, confirm).renderPrompt({ skillId: 'test.method', promptId: 'guide' }))
+      .rejects.toThrow('用户拒绝');
+    expect(confirm).toHaveBeenCalledOnce(); expect(registry.tools.list()).toEqual([]);
+  });
   it('接收方抛错始终 unknown，即使声明没有 sideEffects；不作为普通失败重试', async () => {
     const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-unknown-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
-    const registry = new SkillRegistry(); const handler = vi.fn(() => { throw new Error('lost receipt'); }); const audit = new MemoryAuditSink();
+    const registry = new CapabilityCatalogAdapter(); const handler = vi.fn(() => { throw new Error('lost receipt'); }); const audit = new MemoryAuditSink();
     registry.registerSkill({ id: 'test.unknown', name: '测试', description: 'unknown', provider: { kind: 'core', id: 'receiver' },
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
       tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
@@ -128,7 +161,7 @@ describe('SkillInvocationGateway', () => {
     } finally { journal.close(); rmSync(root, { recursive: true }); }
   });
   it('调用成功时记录 provider、policy、trace 与结果摘要', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.audit.success';
     const audit = new MemoryAuditSink();
 
@@ -176,7 +209,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('策略拒绝时记录拒绝原因，即使成功审计未开启', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.audit.denied';
     const audit = new MemoryAuditSink();
 
@@ -227,7 +260,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('拒绝执行非 character audience 的扩展工具', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.user-audience';
 
     registry.registerSkill({
@@ -260,7 +293,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('拒绝读取或渲染非 character audience 的资源与提示模板', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.resource-prompt-audience';
 
     registry.registerSkill({
@@ -336,7 +369,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('需要确认的 skill 在用户确认后才执行 handler', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.confirmation.approved';
     const audit = new MemoryAuditSink();
     const confirmationRequests: unknown[] = [];
@@ -389,7 +422,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('需要确认的 skill 被用户拒绝时不执行 handler 并记录拒绝', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.confirmation.rejected';
     const audit = new MemoryAuditSink();
     let executed = false;
@@ -436,7 +469,7 @@ describe('SkillInvocationGateway', () => {
   });
 
   it('handler 抛错时记录失败并保留原错误', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const skillId = 'test.gateway.audit.failed';
     const audit = new MemoryAuditSink();
 

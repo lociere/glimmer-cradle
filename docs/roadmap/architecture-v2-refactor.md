@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope、持久 Tool Execution 与独立 Conversation 结果接纳/真实 receipt 已接生产 Gateway/App/Worker；ACK 丢失与重启不重新执行，Synthesis 只读实际结果；Step Exposure、三 Registry、外部 fencing/对账、完整行动恢复与 broker 待完成 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：独立三 Registry 已接生产规划/Gateway；scope、持久 Tool Execution 与 Conversation 真实 receipt 已接 App/Worker；ACK 丢失与重启不重执行；User 方法语义/native Step Exposure、外部 fencing/对账、完整行动恢复与 broker 待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,43 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 独立三 Registry 与真实消费者切换（2026-10-07）
+
+输入 `ff712776`，本会话唯一写入 owner。独立 Core ToolRegistry、SkillCatalog、ResourceRegistry
+分别拥有动作、inline/reader 方法知识、可读资源定义；保存 JSON 数据与 executor/reader 引用，
+没有 handler/IO、SDK/generated 依赖或 Skill→Tool 父子关系。各自保护 owner、revision、深冻结
+快照、readiness 与 scope 交集，旧 revision 撤销不能删除新定义。
+
+现行 SDK/wire 分组与 provider-specific handler 由 `CapabilityCatalogAdapter` 映射；应用只依赖
+消费方 `CapabilityCatalogPort`，composition 注入实际 adapter。注册先验证整组，坏注册/重复
+目标/跨 owner 替换保留原快照；内部元组 ID 不因点号碰撞覆写另一 Tool，现行公开/persistent
+ID 与 Tool journal 定义摘要不改。规划真实读取 Core ToolRegistry；Tool/Resource/方法调用
+确认后复验独立定义、scope、handler 与来源状态。静态方法也不绕过策略/确认。旧
+`application/skill-plane/skill-registry.ts` consumer-zero 后物理删除，无旧导出或兼容壳。
+
+保留窗口：SDK 的 SkillDescriptor 与 UI totalSkills 仍指旧分组，而非 Core 方法；User Provider
+的 instructions.read 假 Tool/两次规划尚未切换。动态 prompt 仅注册 reader，不以 description
+冒充正文。接入映射随阶段 12 移 App；旧分组契约与 ActionPlan 随阶段 9/11/12 native 消费者
+归零删除。Resource 内容 revision/Knowledge、Step 权限/预算/位置/协议、原生 Loop/RPC 与完整
+broker 仍待完成，不能称三 Registry 切片为完整授权或阶段 6 完成。未迁移用户数据/配置、
+未更改公开 SDK/wire/唯一 Schema/generated；独立审查按既定目标留整体固定候选。
+
+验证：Capabilities 30 项、Kernel 全量 235 项 PASS（10 项条件跳过，共 245 项）、repo-checks
+27 项 PASS；确认期间 Core 撤销/替换、原地 scope/policy/handler/readiness 修改、来源降级、
+资源/方法独立撤销、静态方法确认、深冻结、跨 owner 覆盖、坏注册保留与内部点号碰撞反例通过。
+真实 MCP stdio 枚举/调用/断线撤销/重连与 stop 收束通过；MCP prompt 参数映射不再产生
+undefined description。首次架构定向测试指出 App 不应导入具体 adapter，修正为消费方 Port
+后通过，未放宽层次矩阵或建立例外。旧源码 import consumer-zero；本地两份过期
+skill-registry.js/d.ts 也删除，均为可再生编译产物。
+
+根 `pnpm typecheck`、`pnpm build` PASS；目录投影细化后 Kernel typecheck/build 和全量测试
+复验 PASS。实际生产 composition 启动受监督 Worker、Execution schema 2、ready 与逆序停止/
+Worker exit 0 烟测 PASS。Docs 111 份、encoding、architecture、target-layout 规格模式和
+diff 检查 PASS。唯一 Contract Spine 未变，复用 `ff712776` 的完整三语言/生成门证据；不声称
+运行本轮新协议生成或完整原生 Step、OCI、安装、最终物理清单与独立风险审查。
+
+下一步沿原生 Step 接线收束 User 方法选择与假 Tool，再接完整 Exposure、权限与预算上下文。
 
 ### 阶段 6 Execution → Conversation 结果接纳计划（2026-10-07）
 

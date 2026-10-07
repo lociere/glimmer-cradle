@@ -3,7 +3,7 @@ import type { AgentPlanRequest, AgentPlanResponse } from '../../src/ports/cognit
 import { SkillCatalogAppService } from '../../src/application/use-cases/skill-catalog-app.service';
 import { SkillPlanningAppService } from '../../src/application/use-cases/skill-planning-app.service';
 import { SkillInvocationGateway } from '../../src/application/skill-plane/skill-invocation-gateway';
-import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../src/adapters/skill-plane/capability-catalog-adapter';
 import { SkillPolicyEngine } from '../../src/application/skill-plane/skill-policy-engine';
 import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 
@@ -20,7 +20,7 @@ const observability: KernelObservabilityPort = {
   close: async () => undefined,
 };
 
-function createGateway(registry: SkillRegistry): SkillInvocationGateway {
+function createGateway(registry: CapabilityCatalogAdapter): SkillInvocationGateway {
   return new SkillInvocationGateway(
     registry,
     new SkillPolicyEngine(),
@@ -31,8 +31,57 @@ function createGateway(registry: SkillRegistry): SkillInvocationGateway {
 }
 
 describe('SkillPlanningAppService', () => {
+  it('真实消费独立 Tool 定义：撤销、来源降级与原地篡改均从规划移除，另两域不被误删', () => {
+    const adapter = new CapabilityCatalogAdapter();
+    const source = { id: 'one', name: '来源', description: '', provider: { kind: 'core' as const, id: 'provider' },
+      policy: { riskLevel: 'low' as const, confirmationRequired: false, sideEffects: [], audit: true },
+      tools: [{ name: 'run', description: '运行', parameters: {}, handler: () => 1 }],
+      resources: [{ id: 'read', description: '资源', read: () => 1 }],
+      prompts: [{ id: 'guide', description: '方法', template: '正文' }] };
+    adapter.registerSkill(source);
+    const catalog = new SkillCatalogAppService(adapter);
+    expect(catalog.listReadyTools()).toHaveLength(1);
+    const definition = adapter.tools.list()[0]; adapter.tools.revoke(definition.id, definition.owner_id);
+    expect(catalog.listReadyTools()).toEqual([]);
+    expect(catalog.getCatalogSnapshot()).toMatchObject({ totalTools: 0, totalResources: 1, totalPrompts: 1 });
+    adapter.registerSkill(source);
+    const runtime = { provider: source.provider, state: 'degraded' as const, summary: '断连',
+      skill_count: 1, tool_count: 1, resource_count: 1, prompt_count: 1, recovery_actions: [], metadata: {}, updated_at: 'now' };
+    adapter.upsertProviderRuntime(runtime);
+    expect(catalog.listReadyTools()).toEqual([]);
+    adapter.upsertProviderRuntime({ ...runtime, state: 'ready' });
+    expect(catalog.listReadyTools()).toHaveLength(1);
+    source.tools[0].description = '原地改写';
+    expect(catalog.listReadyTools()).toEqual([]);
+    adapter.unregisterSkill(source.id);
+    expect(adapter.tools.list()).toEqual([]); expect(adapter.resources.list()).toEqual([]); expect(adapter.methods.list()).toEqual([]);
+  });
+
+  it('坏注册保留整个有效快照，来源不能覆盖别人的分组，点号重名不覆盖独立 Tool', () => {
+    const adapter = new CapabilityCatalogAdapter();
+    const first = { id: 'a.b', name: '来源', description: '', provider: { kind: 'core' as const, id: 'provider' },
+      policy: { riskLevel: 'low' as const, confirmationRequired: false, sideEffects: [], audit: true },
+      tools: [{ name: 'c', description: '动作', parameters: {}, handler: () => 1 }] };
+    adapter.registerSkill(first); const definition = adapter.tools.list()[0];
+    expect(() => adapter.registerSkill({ ...first, tools: [...first.tools, first.tools[0]] })).toThrow('重复');
+    expect(adapter.findTool('a.b', 'c')).toBe(definition);
+    expect(() => adapter.registerSkill({ ...first, provider: { kind: 'extension', id: 'foreign' } })).toThrow('owner');
+    expect(adapter.findTool('a.b', 'c')).toBe(definition);
+    adapter.registerSkill({ ...first, id: 'a', tools: [{ ...first.tools[0], name: 'b.c' }] });
+    expect(adapter.tools.list()).toHaveLength(2);
+    expect(adapter.findTool('a', 'b.c')?.id).not.toBe(definition.id);
+  });
+
+  it('动态方法保留 reader 引用，不以描述冒充方法正文或创建 Tool', () => {
+    const adapter = new CapabilityCatalogAdapter();
+    adapter.registerSkill({ id: 'methods', name: '来源', description: '', provider: { kind: 'mcp_server', id: 'reader' },
+      policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true }, tools: [],
+      prompts: [{ id: 'guide', description: '动态说明', template: '动态说明', parameters: { type: 'object' }, render: () => '真实方法' }] });
+    expect(adapter.tools.list()).toEqual([]);
+    expect(adapter.methods.list()[0].instructions).toEqual({ kind: 'reader', reader_id: 'mcp_server:reader', input_schema: { type: 'object' } });
+  });
   it('人物 catalog 只暴露 character tool/resource/prompt，保留 Core/MCP/User 默认 character 能力', () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const mixedSkillId = 'test.catalog.mixed-audience';
     const coreSkillId = 'test.catalog.core-default';
     const catalog = new SkillCatalogAppService(registry);
@@ -132,7 +181,7 @@ describe('SkillPlanningAppService', () => {
   });
 
   it('只向 Cognition 投影 ready 工具，过滤越界建议并经网关执行', async () => {
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const readySkillId = 'test.planning.ready';
     const contractOnlySkillId = 'test.planning.contract-only';
     const userSkillId = 'test.planning.user';

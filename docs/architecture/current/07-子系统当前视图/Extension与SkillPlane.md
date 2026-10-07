@@ -46,7 +46,10 @@ scope 领域规则已由 `core/capabilities` 唯一拥有；Kernel catalog 缺�
 消费其公开入口，旧 scope owner 删除。未知 kind 或非法限定范围失败关闭。扩展 `$self` 身份
 绑定保留在接入装配。生产 Tool Gateway 已委托 Capabilities 的持久 Execution：确认后复验撤销，
 稳定 invocation 重放原结果，派发后失联进入恢复而非自动重试；结果/outbox 同事务保存。
-完整 Step Exposure、外部 fencing/对账、Conversation receipt 与 Tool/Skill/Resource 分离仍未完成，
+独立 ToolRegistry/SkillCatalog/ResourceRegistry 已接真实规划与调用；Skill 仅为方法知识，不包含
+Tool。旧 SDK 分组由 CapabilityCatalogAdapter 映射，定义深冻结、独立撤销并在确认后复验来源
+readiness 与绑定。Conversation 已有真实刷盘 receipt；完整 Step Exposure、外部 fencing/对账、
+用户 instructions.read 假 Tool 与原生 Loop 接线仍未完成，
 不以当前切片宣称 Capabilities ready。细节见[实现地图](../../implementation/Extension与SkillPlane实现.md)。
 
 感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。
@@ -57,7 +60,7 @@ scope 领域规则已由 `core/capabilities` 唯一拥有；Kernel catalog 缺�
 
 ```text
 catalog source
-  -> SkillRegistry
+  -> CapabilityCatalogAdapter -> Core ToolRegistry / ResourceRegistry / SkillCatalog
   -> Planner context / tool intent
   -> SkillPolicyEngine
   -> confirmation / denial / allow
@@ -77,7 +80,7 @@ invocation ID；Cognition 行动以 operation/tool 索引派生 ID，无稳定�
 生成新 ID，不声称能识别任意调用方重试。trace 仍沿用当前 Kernel 上下文或新建。策略拒绝、成功与
 不明结果如实诊断，日志故障不覆写已提交的执行事实。
 
-`SkillRegistry` 的人物 catalog 只包含 character audience 的 skill/tool/resource/prompt；character skill 下显式标为 `user`、`host`、`adapter`、`renderer` 或 `extension` 的子项也会被过滤。`SkillPlanningAppService` 当前只把 character audience 且 ready 的 tools 投影给 Cognition 的 `agent_plan` RPC，并过滤掉目录外建议；执行建议仍走 `SkillInvocationGateway`。普通聊天主循环已通过 `ActionCommand.action_type=skill_request` 接入 Skill Plane：Cognition 的结构化 ActionPlan 判断当前目标需要能力后只发行动意图，Kernel `SkillActionController` 负责 catalog 投影、规划、Policy/Gateway 调用、结果归一化、`agent_synthesis` 回注和最终回复投递。Renderer、Extension 和 Cognition 都不能绕过 Gateway。
+`CapabilityCatalogAdapter` 的旧分组投影 只包含 character audience 的 skill/tool/resource/prompt；character skill 下显式标为 `user`、`host`、`adapter`、`renderer` 或 `extension` 的子项也会被过滤。`SkillPlanningAppService` 当前只把 character audience 且 ready 的 tools 投影给 Cognition 的 `agent_plan` RPC，并过滤掉目录外建议；执行建议仍走 `SkillInvocationGateway`。普通聊天主循环已通过 `ActionCommand.action_type=skill_request` 接入 Skill Plane：Cognition 的结构化 ActionPlan 判断当前目标需要能力后只发行动意图，Kernel `SkillActionController` 负责 catalog 投影、规划、Policy/Gateway 调用、结果归一化、`agent_synthesis` 回注和最终回复投递。Renderer、Extension 和 Cognition 都不能绕过 Gateway。
 
 `SkillCatalogSnapshot.providerRuntimes` 是当前统一 provider 运行态投影。MCP provider 会显式上报连接状态；Extension provider 则由 `ExtensionHostAppService` 把 `ExtensionRuntimeProjection` 的 lifecycle、Capability Graph 与 diagnostics 映射进同一快照。因此没有人物 skill 的管理型扩展也会作为 `provider.kind=extension` 出现在能力目录中，而不是只能在扩展管理页单独查看。
 

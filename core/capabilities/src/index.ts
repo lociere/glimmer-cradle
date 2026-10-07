@@ -1,5 +1,11 @@
-export { GLOBAL_CAPABILITY_SCOPE, isCapabilityScopeVisible } from './exposure/exposure-policy.js';
-export type { CapabilityScope, CapabilityScopeContext } from './exposure/exposure-policy.js';
+export { GLOBAL_CAPABILITY_SCOPE, isCapabilityScopeVisible, isCapabilityDefinitionVisible } from './exposure/exposure-policy.js';
+export type { CapabilityScope, CapabilityScopeContext, CapabilityDefinition } from './exposure/exposure-policy.js';
+export { ToolRegistry } from './tools/tool-registry.js';
+export type { Tool } from './tools/tool.js';
+export { ResourceRegistry } from './resources/resource-registry.js';
+export type { Resource } from './resources/resource.js';
+export { SkillCatalog } from './skills/skill-catalog.js';
+export type { Skill } from './skills/skill.js';
 export { ExecutionController } from './execution/execution-controller.js';
 export { SqliteExecutionJournal } from './adapters/storage/sqlite-execution-journal.js';
 export { executionDigest, ExecutionConflictError, ExecutionRecoveryRequiredError } from './execution/invocation.js';

@@ -48,7 +48,7 @@ import { ActionStreamManager } from '../application/capabilities/action-stream/a
 import { VisualCommandDispatcher } from '../application/capabilities/action-stream/visual-command-dispatcher';
 import { LifeClockManager } from '../application/organism/life-clock/life-clock-manager';
 import { PerceptionAppService } from '../application/use-cases/perception-app.service';
-import { SkillRegistry } from '../application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../adapters/skill-plane/capability-catalog-adapter';
 import { SkillCatalogAppService } from '../application/use-cases/skill-catalog-app.service';
 import { SkillPolicyEngine } from '../application/skill-plane/skill-policy-engine';
 import { SkillPlanePolicy } from '../application/skill-plane/availability';
@@ -241,7 +241,7 @@ function createOperationalRuntimePlan(options: {
       observability.logger('life-clock-manager'), attentionLeases, clock,
     );
     const visual = new VisualCommandDispatcher(config.system.avatar, eventBus, observability.logger('visual-command-dispatcher'));
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const bridge = new ControlSurfaceCorePlatformBridge(surface);
     const invocation = new SkillInvocationGateway(

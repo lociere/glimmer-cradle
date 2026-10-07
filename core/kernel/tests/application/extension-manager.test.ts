@@ -11,7 +11,7 @@ import type {
 import type { DomainEvent } from '../../src/domain/events';
 import { RuntimeReadinessProjectionMapper } from '../../src/application/projection/runtime-readiness-projection';
 import { SkillCatalogAppService } from '../../src/application/use-cases/skill-catalog-app.service';
-import { SkillRegistry } from '../../src/application/skill-plane/skill-registry';
+import { CapabilityCatalogAdapter } from '../../src/adapters/skill-plane/capability-catalog-adapter';
 import {
   createDeclaredExtensionSkill,
   createExtensionSkillFromSubAgent,
@@ -43,7 +43,7 @@ describe('ExtensionManager', () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'extension-first-install-'));
     tempRoots.push(root);
     const extensionId = 'test.first-install';
-    const host = new FakeExtensionHost(root, new SkillCatalogAppService(new SkillRegistry()), []);
+    const host = new FakeExtensionHost(root, new SkillCatalogAppService(new CapabilityCatalogAdapter()), []);
     const manager = new ExtensionManager(host, readinessProjection);
     await manager.init();
     vi.spyOn(manager as any, 'getPackageManager').mockReturnValue({ commitInstall: async () => {
@@ -70,7 +70,7 @@ describe('ExtensionManager', () => {
     const appRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'glimmer-extension-app-root-'));
     tempRoots.push(appRoot);
     process.env.GLIMMER_CRADLE_DATA_ROOT = path.join(fixture.root, 'data');
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(appRoot, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -94,7 +94,7 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '2.0.0',
     });
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -131,7 +131,7 @@ describe('ExtensionManager', () => {
       `,
       version: '2.0.0',
     });
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '1.0.0' }]);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -164,7 +164,7 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(new SkillRegistry()),
+      new SkillCatalogAppService(new CapabilityCatalogAdapter()),
       [{ id: fixture.extensionId, version: '1.0.0' }],
     ), readinessProjection);
 
@@ -195,7 +195,7 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '1.10.0',
     });
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -223,7 +223,7 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(new SkillRegistry()),
+      new SkillCatalogAppService(new CapabilityCatalogAdapter()),
     ), readinessProjection);
 
     try {
@@ -244,7 +244,7 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(new SkillRegistry()),
+      new SkillCatalogAppService(new CapabilityCatalogAdapter()),
       [{ id: fixture.extensionId, version: '1.0.0' }],
     ), readinessProjection);
 
@@ -265,7 +265,7 @@ describe('ExtensionManager', () => {
     });
     const manager = new ExtensionManager(new FakeExtensionHost(
       fixture.root,
-      new SkillCatalogAppService(new SkillRegistry()),
+      new SkillCatalogAppService(new CapabilityCatalogAdapter()),
       [{ id: fixture.extensionId, version: '1.0.0' }],
       '0.2.2',
     ), readinessProjection);
@@ -284,7 +284,7 @@ describe('ExtensionManager', () => {
       entrySource: 'module.exports = { onActivate() {} };',
       version: '1.0.0',
     });
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(fixture.root, catalog, [{ id: fixture.extensionId, version: '2.0.0' }]);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -304,7 +304,7 @@ describe('ExtensionManager', () => {
       'main: index.cjs',
       'minAppVersion: 0.1.0',
     ].join('\n'), 'utf-8');
-    const catalog = new SkillCatalogAppService(new SkillRegistry());
+    const catalog = new SkillCatalogAppService(new CapabilityCatalogAdapter());
     const host = new FakeExtensionHost(root, catalog, [{ id: extensionId, version: '1.0.0' }]);
     const manager = new ExtensionManager(host, readinessProjection);
 
@@ -328,7 +328,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
@@ -373,7 +373,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
@@ -418,7 +418,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
@@ -466,7 +466,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
@@ -512,7 +512,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
@@ -538,7 +538,7 @@ describe('ExtensionManager', () => {
         };
       `,
     });
-    const registry = new SkillRegistry();
+    const registry = new CapabilityCatalogAdapter();
     const catalog = new SkillCatalogAppService(registry);
     const host = new FakeExtensionHost(fixture.root, catalog);
     const manager = new ExtensionManager(host, readinessProjection);
