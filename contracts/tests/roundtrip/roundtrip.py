@@ -39,6 +39,18 @@ from glimmer.capabilities.v1 import capabilities_pb2 as capability_pb  # noqa: E
 from google.protobuf.json_format import ParseDict  # noqa: E402
 native_scope = capability_pb.CapabilityScopeContext(source_provider_id="provider:一", scene_id="scene:一", conversation_id="conversation:一", user_id="user:一")
 native_ref = capability_pb.CapabilityReference(id='["weather","lookup"]', revision="revision:一")
+resource_access = capability_pb.KnowledgeResourceAccess(access_id="proof:一", source_id="source:一", principal_id="principal:一",
+    permission_revision="permission:一", collected_at_ms=1, expires_at_ms=9007199254740991)
+collection_messages = (
+    capability_pb.CollectKnowledgeResourceRequest(source_id="source:一", reference=native_ref, scope=native_scope),
+    capability_pb.CollectKnowledgeResourceResponse(content=capability_pb.ResourceContent(reference=native_ref,
+        content_revision="a" * 64, media_type="text/plain", content_utf8="资料"), access=resource_access),
+    capability_pb.ValidateKnowledgeResourceRequest(access=resource_access, reference=native_ref, content_revision="a" * 64, media_type="text/plain", scope=native_scope),
+    capability_pb.ValidateKnowledgeResourceResponse(current=True),
+)
+for collection in collection_messages:
+    assert type(collection).FromString(collection.SerializeToString()) == collection
+assert not capability_pb.CollectKnowledgeResourceResponse.FromString(b"").HasField("access")
 native_expose = capability_pb.ExposeStepRequest(run_id="run:一", step=2, scope=native_scope, protocol_features=["tool-call.v1"], max_definitions=128, max_definition_bytes=65536, remaining_tool_calls=7)
 native_surface = capability_pb.ExposeStepResponse(run_id="run:一", step=2, used_definition_bytes=123, truncated=True)
 native_tool = native_surface.tools.add(reference=native_ref, name="tool_weather")

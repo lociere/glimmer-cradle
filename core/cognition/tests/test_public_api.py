@@ -82,6 +82,8 @@ def test_consumer_owned_ports_are_explicit() -> None:
         "LoggerPort",
         "ObservabilityPort",
         "ResourcePort",
+        "ResourceAccess",
+        "ResourceScope",
         "ResourceSnapshot",
         "SpanPort",
     ]

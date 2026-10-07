@@ -15,6 +15,8 @@ import { CognitionClient } from '../adapters/protocol/cognition-client.js';
 import { HostCapabilityRequestError, type HostCapabilityServicePort } from '../composition/extension-contributions.js';
 import { ExecutionRecoveryRequiredError } from '@glimmer-cradle/capabilities';
 import { CapabilityService, type ExposeStepRequest, type ExposeStepResponse,
+  type CollectKnowledgeResourceRequest, type CollectKnowledgeResourceResponse,
+  type ValidateKnowledgeResourceRequest, type ValidateKnowledgeResourceResponse,
   type ReadResourceRequest, type ReadResourceResponse } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import type { CallMetadata } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 
@@ -170,6 +172,10 @@ export class WorkerSupervisor {
         responseSerialize: value => Buffer.from(toBinary(method.output, value)), responseDeserialize: bytes => fromBinary(method.output, bytes),
       } satisfies grpc.MethodDefinition<Message, Message>]));
       server.addService(capabilities, {
+        CollectKnowledgeResource: (call: grpc.ServerUnaryCall<CollectKnowledgeResourceRequest, CollectKnowledgeResourceResponse>, callback: grpc.sendUnaryData<CollectKnowledgeResourceResponse>) =>
+          this.receive(call, callback, signal => this.capabilities().collectKnowledgeResource(call.request, this.principalId(), signal)),
+        ValidateKnowledgeResource: (call: grpc.ServerUnaryCall<ValidateKnowledgeResourceRequest, ValidateKnowledgeResourceResponse>, callback: grpc.sendUnaryData<ValidateKnowledgeResourceResponse>) =>
+          this.receive(call, callback, signal => this.capabilities().validateKnowledgeResource(call.request, this.principalId(), signal)),
         ExposeStep: (call: grpc.ServerUnaryCall<ExposeStepRequest, ExposeStepResponse>, callback: grpc.sendUnaryData<ExposeStepResponse>) =>
           this.receive(call, callback, signal => this.capabilities().exposeStep(call.request, this.principalId(), signal)),
         ReadResource: (call: grpc.ServerUnaryCall<ReadResourceRequest, ReadResourceResponse>, callback: grpc.sendUnaryData<ReadResourceResponse>) =>

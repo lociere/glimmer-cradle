@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import { create, fromBinary, fromJson, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import { ExecutionResultState, ExecutionSideEffects, ExposeStepRequestSchema, ExposeStepResponseSchema,
+  CollectKnowledgeResourceRequestSchema, CollectKnowledgeResourceResponseSchema,
+  ValidateKnowledgeResourceRequestSchema, ValidateKnowledgeResourceResponseSchema,
   InvokeToolRequestSchema, InvokeToolResponseSchema, ReadCapabilityRequestSchema, ReadCapabilityResponseSchema,
   ReadSkillRequestSchema, ReadSkillResponseSchema, ReadResourceRequestSchema, ReadResourceResponseSchema } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
 import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema } from '../../generated/ts/glimmer/conversation/v1/conversation_pb';
@@ -34,7 +36,13 @@ const digest = createHash('sha256').update(documentBytes).digest();
 const methodReference = { skillId: 'method:总结', definitionRevision: 'revision:一' };
 const nativeScope = { sourceProviderId: 'provider:一', sceneId: 'scene:一', conversationId: 'conversation:一', userId: 'user:一' };
 const nativeReference = { id: '["weather","lookup"]', revision: 'revision:一' };
+const resourceAccess = { accessId: 'proof:一', sourceId: 'source:一', principalId: 'principal:一', permissionRevision: 'permission:一',
+  collectedAtMs: 1n, expiresAtMs: 9007199254740991n };
 const nativeMessages = [
+  [CollectKnowledgeResourceRequestSchema, { call: { traceId: 'trace:采集', generation: 'generation:一' }, sourceId: 'source:一', reference: nativeReference, scope: nativeScope }],
+  [CollectKnowledgeResourceResponseSchema, { content: { reference: nativeReference, contentRevision: 'a'.repeat(64), mediaType: 'text/plain', contentUtf8: '资料' }, access: resourceAccess }],
+  [ValidateKnowledgeResourceRequestSchema, { call: { traceId: 'trace:复验' }, access: resourceAccess, reference: nativeReference, contentRevision: 'a'.repeat(64), mediaType: 'text/plain', scope: nativeScope }],
+  [ValidateKnowledgeResourceResponseSchema, { current: true }],
   [ExposeStepRequestSchema, { call: { traceId: 'trace:一', generation: 'generation:一' }, runId: 'run:一', step: 2,
     scope: nativeScope, protocolFeatures: ['tool-call.v1'], maxDefinitions: 128, maxDefinitionBytes: 65536, remainingToolCalls: 7 }],
   [ExposeStepResponseSchema, { runId: 'run:一', step: 2, tools: [{ reference: nativeReference, name: 'tool_weather', inputSchema: fromJson(ValueSchema, true) }],
@@ -58,6 +66,7 @@ for (const [schema, input] of nativeMessages) {
     throw new Error('Native capability Step/reference/privacy/null roundtrip failed');
 }
 if (fromBinary(ExposeStepRequestSchema, new Uint8Array()).scope !== undefined) throw new Error('Absent native scope gained presence');
+if (fromBinary(CollectKnowledgeResourceResponseSchema, new Uint8Array()).access !== undefined) throw new Error('Absent collection gained access evidence');
 if (fromBinary(ReadCapabilityResponseSchema, new Uint8Array()).content.case !== undefined) throw new Error('Absent read gained content');
 for (const [schema, input] of [[ReadSkillRequestSchema, { request: { callId: '加载:一', sourceFactId: 'action:加载', reference: nativeReference } }],
   [ReadResourceRequestSchema, { request: { callId: '资源:一', scope: nativeScope, reference: nativeReference } }],

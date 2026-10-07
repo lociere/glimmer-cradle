@@ -14,7 +14,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/capabilities/v1/capabilities.proto.
  */
 export const file_glimmer_capabilities_v1_capabilities: GenFile = /*@__PURE__*/
-  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxIj8KDlNraWxsUmVmZXJlbmNlEhAKCHNraWxsX2lkGAEgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAkingEKD1NraWxsRGVzY3JpcHRvchI6CglyZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbFJlZmVyZW5jZRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiwKDGlucHV0X3NjaGVtYRgEIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZSJhCg1Ta2lsbE1hdGVyaWFsEjoKCXJlZmVyZW5jZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJlbmNlEhQKDGluc3RydWN0aW9ucxgCIAEoCSIzChNDYXBhYmlsaXR5UmVmZXJlbmNlEgoKAmlkGAEgASgJEhAKCHJldmlzaW9uGAIgASgJIoEBChZDYXBhYmlsaXR5U2NvcGVDb250ZXh0EhoKEnNvdXJjZV9wcm92aWRlcl9pZBgBIAEoCRIQCghzY2VuZV9pZBgCIAEoCRIXCg9jb252ZXJzYXRpb25faWQYAyABKAkSFAoHdXNlcl9pZBgEIAEoCUgAiAEBQgoKCF91c2VyX2lkIqIBCg5Ub29sRGVzY3JpcHRvchI/CglyZWZlcmVuY2UYASABKAsyLC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5UmVmZXJlbmNlEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSLAoMaW5wdXRfc2NoZW1hGAQgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlIqYBChJSZXNvdXJjZURlc2NyaXB0b3ISPwoJcmVmZXJlbmNlGAEgASgLMiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVJlZmVyZW5jZRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiwKDGlucHV0X3NjaGVtYRgEIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZSKQAgoRRXhwb3NlU3RlcFJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIOCgZydW5faWQYAiABKAkSDAoEc3RlcBgDIAEoDRI+CgVzY29wZRgEIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNvbnRleHQSGQoRcHJvdG9jb2xfZmVhdHVyZXMYBSADKAkSFwoPbWF4X2RlZmluaXRpb25zGAYgASgNEhwKFG1heF9kZWZpbml0aW9uX2J5dGVzGAcgASgNEhwKFHJlbWFpbmluZ190b29sX2NhbGxzGAggASgNIpYCChJFeHBvc2VTdGVwUmVzcG9uc2USDgoGcnVuX2lkGAEgASgJEgwKBHN0ZXAYAiABKA0SNgoFdG9vbHMYAyADKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ub29sRGVzY3JpcHRvchI4CgZza2lsbHMYBCADKAsyKC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbERlc2NyaXB0b3ISPgoJcmVzb3VyY2VzGAUgAygLMisuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVzb3VyY2VEZXNjcmlwdG9yEh0KFXVzZWRfZGVmaW5pdGlvbl9ieXRlcxgGIAEoDRIRCgl0cnVuY2F0ZWQYByABKAgixAIKEUludm9rZVRvb2xSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESDgoGcnVuX2lkGAIgASgJEgwKBHN0ZXAYAyABKA0SDwoHY2FsbF9pZBgEIAEoCRIMCgRuYW1lGAUgASgJEj8KCXJlZmVyZW5jZRgGIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USPgoFc2NvcGUYByABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5U2NvcGVDb250ZXh0EioKCWFyZ3VtZW50cxgIIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFgoOc291cmNlX2ZhY3RfaWQYCSABKAkiwQEKEkludm9rZVRvb2xSZXNwb25zZRIPCgdjYWxsX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSPAoFc3RhdGUYAyABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRImCgZyZXN1bHQYBCABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSDQoFZXJyb3IYBSABKAkSFwoPcmVzdWx0X2V2ZW50X2lkGAYgASgJIsgCChVSZWFkQ2FwYWJpbGl0eVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIOCgZydW5faWQYAiABKAkSDAoEc3RlcBgDIAEoDRIPCgdjYWxsX2lkGAQgASgJEgwKBG5hbWUYBSABKAkSPwoJcmVmZXJlbmNlGAYgASgLMiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVJlZmVyZW5jZRI+CgVzY29wZRgHIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNvbnRleHQSKgoJYXJndW1lbnRzGAggASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIWCg5zb3VyY2VfZmFjdF9pZBgJIAEoCSKWAQoPUmVzb3VyY2VDb250ZW50Ej8KCXJlZmVyZW5jZRgBIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USGAoQY29udGVudF9yZXZpc2lvbhgCIAEoCRISCgptZWRpYV90eXBlGAMgASgJEhQKDGNvbnRlbnRfdXRmOBgEIAEoCSKfAgoWUmVhZENhcGFiaWxpdHlSZXNwb25zZRIPCgdjYWxsX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSPAoFc3RhdGUYAyABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRI3CgVza2lsbBgEIAEoCzImLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsTWF0ZXJpYWxIABI8CghyZXNvdXJjZRgFIAEoCzIoLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlc291cmNlQ29udGVudEgAEg0KBWVycm9yGAYgASgJEhcKD3Jlc3VsdF9ldmVudF9pZBgHIAEoCUIJCgdjb250ZW50IlMKEFJlYWRTa2lsbFJlcXVlc3QSPwoHcmVxdWVzdBgBIAEoCzIuLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRDYXBhYmlsaXR5UmVxdWVzdCJUChFSZWFkU2tpbGxSZXNwb25zZRI/CgZyZXN1bHQYASABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkQ2FwYWJpbGl0eVJlc3BvbnNlIlYKE1JlYWRSZXNvdXJjZVJlcXVlc3QSPwoHcmVxdWVzdBgBIAEoCzIuLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRDYXBhYmlsaXR5UmVxdWVzdCJXChRSZWFkUmVzb3VyY2VSZXNwb25zZRI/CgZyZXN1bHQYASABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkQ2FwYWJpbGl0eVJlc3BvbnNlItwDChRFeGVjdXRpb25SZXN1bHRFdmVudBIQCghldmVudF9pZBgBIAEoCRIVCg1pbnZvY2F0aW9uX2lkGAIgASgJEhAKCHJldmlzaW9uGAMgASgEEg8KB2F0dGVtcHQYBCABKA0SEAoIc2NvcGVfaWQYBSABKAkSFwoPY29udmVyc2F0aW9uX2lkGAYgASgJEhYKDnNvdXJjZV9mYWN0X2lkGAcgASgJEhMKC2V4ZWN1dG9yX2lkGAggASgJEhUKDWNhcGFiaWxpdHlfaWQYCSABKAkSGwoTZGVmaW5pdGlvbl9yZXZpc2lvbhgKIAEoCRIWCg5yZXF1ZXN0X2RpZ2VzdBgLIAEoCRI8CgVzdGF0ZRgMIAEoDjItLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4ZWN1dGlvblJlc3VsdFN0YXRlEkMKDHNpZGVfZWZmZWN0cxgNIAEoDjItLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4ZWN1dGlvblNpZGVFZmZlY3RzEiYKBnJlc3VsdBgOIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZRISCgplcnJvcl9jb2RlGA8gASgJEhUKDXVwZGF0ZWRfYXRfbXMYECABKAQqqwEKFEV4ZWN1dGlvblJlc3VsdFN0YXRlEiYKIkVYRUNVVElPTl9SRVNVTFRfU1RBVEVfVU5TUEVDSUZJRUQQABIkCiBFWEVDVVRJT05fUkVTVUxUX1NUQVRFX1NVQ0NFRURFRBABEiEKHUVYRUNVVElPTl9SRVNVTFRfU1RBVEVfRkFJTEVEEAISIgoeRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9VTktOT1dOEAMqqQEKFEV4ZWN1dGlvblNpZGVFZmZlY3RzEiYKIkVYRUNVVElPTl9TSURFX0VGRkVDVFNfVU5TUEVDSUZJRUQQABIfChtFWEVDVVRJT05fU0lERV9FRkZFQ1RTX05PTkUQARIkCiBFWEVDVVRJT05fU0lERV9FRkZFQ1RTX0NPTkZJUk1FRBACEiIKHkVYRUNVVElPTl9TSURFX0VGRkVDVFNfVU5LTk9XThADMrIDChFDYXBhYmlsaXR5U2VydmljZRJlCgpFeHBvc2VTdGVwEiouZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhwb3NlU3RlcFJlcXVlc3QaKy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeHBvc2VTdGVwUmVzcG9uc2USZQoKSW52b2tlVG9vbBIqLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkludm9rZVRvb2xSZXF1ZXN0GisuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuSW52b2tlVG9vbFJlc3BvbnNlEmIKCVJlYWRTa2lsbBIpLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRTa2lsbFJlcXVlc3QaKi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkU2tpbGxSZXNwb25zZRJrCgxSZWFkUmVzb3VyY2USLC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkUmVzb3VyY2VSZXF1ZXN0Gi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZFJlc291cmNlUmVzcG9uc2VCMqoCL0dsaW1tZXJDcmFkbGUuQ29udHJhY3RzLkdsaW1tZXIuQ2FwYWJpbGl0aWVzLlYxYgZwcm90bzM", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
+  fileDesc("CipnbGltbWVyL2NhcGFiaWxpdGllcy92MS9jYXBhYmlsaXRpZXMucHJvdG8SF2dsaW1tZXIuY2FwYWJpbGl0aWVzLnYxIj8KDlNraWxsUmVmZXJlbmNlEhAKCHNraWxsX2lkGAEgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YAiABKAkingEKD1NraWxsRGVzY3JpcHRvchI6CglyZWZlcmVuY2UYASABKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbFJlZmVyZW5jZRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiwKDGlucHV0X3NjaGVtYRgEIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZSJhCg1Ta2lsbE1hdGVyaWFsEjoKCXJlZmVyZW5jZRgBIAEoCzInLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsUmVmZXJlbmNlEhQKDGluc3RydWN0aW9ucxgCIAEoCSIzChNDYXBhYmlsaXR5UmVmZXJlbmNlEgoKAmlkGAEgASgJEhAKCHJldmlzaW9uGAIgASgJIoEBChZDYXBhYmlsaXR5U2NvcGVDb250ZXh0EhoKEnNvdXJjZV9wcm92aWRlcl9pZBgBIAEoCRIQCghzY2VuZV9pZBgCIAEoCRIXCg9jb252ZXJzYXRpb25faWQYAyABKAkSFAoHdXNlcl9pZBgEIAEoCUgAiAEBQgoKCF91c2VyX2lkIqIBCg5Ub29sRGVzY3JpcHRvchI/CglyZWZlcmVuY2UYASABKAsyLC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5UmVmZXJlbmNlEgwKBG5hbWUYAiABKAkSEwoLZGVzY3JpcHRpb24YAyABKAkSLAoMaW5wdXRfc2NoZW1hGAQgASgLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlIqYBChJSZXNvdXJjZURlc2NyaXB0b3ISPwoJcmVmZXJlbmNlGAEgASgLMiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVJlZmVyZW5jZRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEiwKDGlucHV0X3NjaGVtYRgEIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZSKQAgoRRXhwb3NlU3RlcFJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIOCgZydW5faWQYAiABKAkSDAoEc3RlcBgDIAEoDRI+CgVzY29wZRgEIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNvbnRleHQSGQoRcHJvdG9jb2xfZmVhdHVyZXMYBSADKAkSFwoPbWF4X2RlZmluaXRpb25zGAYgASgNEhwKFG1heF9kZWZpbml0aW9uX2J5dGVzGAcgASgNEhwKFHJlbWFpbmluZ190b29sX2NhbGxzGAggASgNIpYCChJFeHBvc2VTdGVwUmVzcG9uc2USDgoGcnVuX2lkGAEgASgJEgwKBHN0ZXAYAiABKA0SNgoFdG9vbHMYAyADKAsyJy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ub29sRGVzY3JpcHRvchI4CgZza2lsbHMYBCADKAsyKC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Ta2lsbERlc2NyaXB0b3ISPgoJcmVzb3VyY2VzGAUgAygLMisuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVzb3VyY2VEZXNjcmlwdG9yEh0KFXVzZWRfZGVmaW5pdGlvbl9ieXRlcxgGIAEoDRIRCgl0cnVuY2F0ZWQYByABKAgixAIKEUludm9rZVRvb2xSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESDgoGcnVuX2lkGAIgASgJEgwKBHN0ZXAYAyABKA0SDwoHY2FsbF9pZBgEIAEoCRIMCgRuYW1lGAUgASgJEj8KCXJlZmVyZW5jZRgGIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USPgoFc2NvcGUYByABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5U2NvcGVDb250ZXh0EioKCWFyZ3VtZW50cxgIIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFgoOc291cmNlX2ZhY3RfaWQYCSABKAkiwQEKEkludm9rZVRvb2xSZXNwb25zZRIPCgdjYWxsX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSPAoFc3RhdGUYAyABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRImCgZyZXN1bHQYBCABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSDQoFZXJyb3IYBSABKAkSFwoPcmVzdWx0X2V2ZW50X2lkGAYgASgJIsgCChVSZWFkQ2FwYWJpbGl0eVJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIOCgZydW5faWQYAiABKAkSDAoEc3RlcBgDIAEoDRIPCgdjYWxsX2lkGAQgASgJEgwKBG5hbWUYBSABKAkSPwoJcmVmZXJlbmNlGAYgASgLMiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2FwYWJpbGl0eVJlZmVyZW5jZRI+CgVzY29wZRgHIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNvbnRleHQSKgoJYXJndW1lbnRzGAggASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdBIWCg5zb3VyY2VfZmFjdF9pZBgJIAEoCSKWAQoPUmVzb3VyY2VDb250ZW50Ej8KCXJlZmVyZW5jZRgBIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USGAoQY29udGVudF9yZXZpc2lvbhgCIAEoCRISCgptZWRpYV90eXBlGAMgASgJEhQKDGNvbnRlbnRfdXRmOBgEIAEoCSKfAgoWUmVhZENhcGFiaWxpdHlSZXNwb25zZRIPCgdjYWxsX2lkGAEgASgJEgwKBG5hbWUYAiABKAkSPAoFc3RhdGUYAyABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRI3CgVza2lsbBgEIAEoCzImLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlNraWxsTWF0ZXJpYWxIABI8CghyZXNvdXJjZRgFIAEoCzIoLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlc291cmNlQ29udGVudEgAEg0KBWVycm9yGAYgASgJEhcKD3Jlc3VsdF9ldmVudF9pZBgHIAEoCUIJCgdjb250ZW50IuQBCh9Db2xsZWN0S25vd2xlZGdlUmVzb3VyY2VSZXF1ZXN0Ei0KBGNhbGwYASABKAsyHy5nbGltbWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGESEQoJc291cmNlX2lkGAIgASgJEj8KCXJlZmVyZW5jZRgDIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USPgoFc2NvcGUYBCABKAsyLy5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5U2NvcGVDb250ZXh0IqIBChdLbm93bGVkZ2VSZXNvdXJjZUFjY2VzcxIRCglhY2Nlc3NfaWQYASABKAkSEQoJc291cmNlX2lkGAIgASgJEhQKDHByaW5jaXBhbF9pZBgDIAEoCRIbChNwZXJtaXNzaW9uX3JldmlzaW9uGAQgASgJEhcKD2NvbGxlY3RlZF9hdF9tcxgFIAEoBBIVCg1leHBpcmVzX2F0X21zGAYgASgEIp8BCiBDb2xsZWN0S25vd2xlZGdlUmVzb3VyY2VSZXNwb25zZRI5Cgdjb250ZW50GAEgASgLMiguZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVzb3VyY2VDb250ZW50EkAKBmFjY2VzcxgCIAEoCzIwLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLktub3dsZWRnZVJlc291cmNlQWNjZXNzIsICCiBWYWxpZGF0ZUtub3dsZWRnZVJlc291cmNlUmVxdWVzdBItCgRjYWxsGAEgASgLMh8uZ2xpbW1lci5jb21tb24udjEuQ2FsbE1ldGFkYXRhEkAKBmFjY2VzcxgCIAEoCzIwLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLktub3dsZWRnZVJlc291cmNlQWNjZXNzEj8KCXJlZmVyZW5jZRgDIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlSZWZlcmVuY2USGAoQY29udGVudF9yZXZpc2lvbhgEIAEoCRI+CgVzY29wZRgFIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNvbnRleHQSEgoKbWVkaWFfdHlwZRgGIAEoCSI0CiFWYWxpZGF0ZUtub3dsZWRnZVJlc291cmNlUmVzcG9uc2USDwoHY3VycmVudBgBIAEoCCJTChBSZWFkU2tpbGxSZXF1ZXN0Ej8KB3JlcXVlc3QYASABKAsyLi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkQ2FwYWJpbGl0eVJlcXVlc3QiVAoRUmVhZFNraWxsUmVzcG9uc2USPwoGcmVzdWx0GAEgASgLMi8uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZENhcGFiaWxpdHlSZXNwb25zZSJWChNSZWFkUmVzb3VyY2VSZXF1ZXN0Ej8KB3JlcXVlc3QYASABKAsyLi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkQ2FwYWJpbGl0eVJlcXVlc3QiVwoUUmVhZFJlc291cmNlUmVzcG9uc2USPwoGcmVzdWx0GAEgASgLMi8uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZENhcGFiaWxpdHlSZXNwb25zZSLcAwoURXhlY3V0aW9uUmVzdWx0RXZlbnQSEAoIZXZlbnRfaWQYASABKAkSFQoNaW52b2NhdGlvbl9pZBgCIAEoCRIQCghyZXZpc2lvbhgDIAEoBBIPCgdhdHRlbXB0GAQgASgNEhAKCHNjb3BlX2lkGAUgASgJEhcKD2NvbnZlcnNhdGlvbl9pZBgGIAEoCRIWCg5zb3VyY2VfZmFjdF9pZBgHIAEoCRITCgtleGVjdXRvcl9pZBgIIAEoCRIVCg1jYXBhYmlsaXR5X2lkGAkgASgJEhsKE2RlZmluaXRpb25fcmV2aXNpb24YCiABKAkSFgoOcmVxdWVzdF9kaWdlc3QYCyABKAkSPAoFc3RhdGUYDCABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25SZXN1bHRTdGF0ZRJDCgxzaWRlX2VmZmVjdHMYDSABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRpb25TaWRlRWZmZWN0cxImCgZyZXN1bHQYDiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUSEgoKZXJyb3JfY29kZRgPIAEoCRIVCg11cGRhdGVkX2F0X21zGBAgASgEKqsBChRFeGVjdXRpb25SZXN1bHRTdGF0ZRImCiJFWEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9TVUNDRUVERUQQARIhCh1FWEVDVVRJT05fUkVTVUxUX1NUQVRFX0ZBSUxFRBACEiIKHkVYRUNVVElPTl9SRVNVTFRfU1RBVEVfVU5LTk9XThADKqkBChRFeGVjdXRpb25TaWRlRWZmZWN0cxImCiJFWEVDVVRJT05fU0lERV9FRkZFQ1RTX1VOU1BFQ0lGSUVEEAASHwobRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19OT05FEAESJAogRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19DT05GSVJNRUQQAhIiCh5FWEVDVVRJT05fU0lERV9FRkZFQ1RTX1VOS05PV04QAzLZBQoRQ2FwYWJpbGl0eVNlcnZpY2USZQoKRXhwb3NlU3RlcBIqLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4cG9zZVN0ZXBSZXF1ZXN0GisuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhwb3NlU3RlcFJlc3BvbnNlEmUKCkludm9rZVRvb2wSKi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5JbnZva2VUb29sUmVxdWVzdBorLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkludm9rZVRvb2xSZXNwb25zZRJiCglSZWFkU2tpbGwSKS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkU2tpbGxSZXF1ZXN0GiouZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZFNraWxsUmVzcG9uc2USawoMUmVhZFJlc291cmNlEiwuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZFJlc291cmNlUmVxdWVzdBotLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRSZXNvdXJjZVJlc3BvbnNlEo8BChhDb2xsZWN0S25vd2xlZGdlUmVzb3VyY2USOC5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5Db2xsZWN0S25vd2xlZGdlUmVzb3VyY2VSZXF1ZXN0GjkuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ29sbGVjdEtub3dsZWRnZVJlc291cmNlUmVzcG9uc2USkgEKGVZhbGlkYXRlS25vd2xlZGdlUmVzb3VyY2USOS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5WYWxpZGF0ZUtub3dsZWRnZVJlc291cmNlUmVxdWVzdBo6LmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlZhbGlkYXRlS25vd2xlZGdlUmVzb3VyY2VSZXNwb25zZUIyqgIvR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5DYXBhYmlsaXRpZXMuVjFiBnByb3RvMw", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
 
 /**
  * 方法知识的引用/发现/正文与可执行 Tool 独立；模型选择引用不授予任何权限。
@@ -564,6 +564,163 @@ export const ReadCapabilityResponseSchema: GenMessage<ReadCapabilityResponse> = 
   messageDesc(file_glimmer_capabilities_v1_capabilities, 13);
 
 /**
+ * @generated from message glimmer.capabilities.v1.CollectKnowledgeResourceRequest
+ */
+export type CollectKnowledgeResourceRequest = Message<"glimmer.capabilities.v1.CollectKnowledgeResourceRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: string source_id = 2;
+   */
+  sourceId: string;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityReference reference = 3;
+   */
+  reference?: CapabilityReference | undefined;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityScopeContext scope = 4;
+   */
+  scope?: CapabilityScopeContext | undefined;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.CollectKnowledgeResourceRequest.
+ * Use `create(CollectKnowledgeResourceRequestSchema)` to create a new message.
+ */
+export const CollectKnowledgeResourceRequestSchema: GenMessage<CollectKnowledgeResourceRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 14);
+
+/**
+ * Host 的短寿命可撤销采集证明；id 本身不授予权限，不能作为跨重启授权。
+ *
+ * @generated from message glimmer.capabilities.v1.KnowledgeResourceAccess
+ */
+export type KnowledgeResourceAccess = Message<"glimmer.capabilities.v1.KnowledgeResourceAccess"> & {
+  /**
+   * @generated from field: string access_id = 1;
+   */
+  accessId: string;
+
+  /**
+   * @generated from field: string source_id = 2;
+   */
+  sourceId: string;
+
+  /**
+   * @generated from field: string principal_id = 3;
+   */
+  principalId: string;
+
+  /**
+   * @generated from field: string permission_revision = 4;
+   */
+  permissionRevision: string;
+
+  /**
+   * @generated from field: uint64 collected_at_ms = 5;
+   */
+  collectedAtMs: bigint;
+
+  /**
+   * @generated from field: uint64 expires_at_ms = 6;
+   */
+  expiresAtMs: bigint;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.KnowledgeResourceAccess.
+ * Use `create(KnowledgeResourceAccessSchema)` to create a new message.
+ */
+export const KnowledgeResourceAccessSchema: GenMessage<KnowledgeResourceAccess> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 15);
+
+/**
+ * @generated from message glimmer.capabilities.v1.CollectKnowledgeResourceResponse
+ */
+export type CollectKnowledgeResourceResponse = Message<"glimmer.capabilities.v1.CollectKnowledgeResourceResponse"> & {
+  /**
+   * @generated from field: glimmer.capabilities.v1.ResourceContent content = 1;
+   */
+  content?: ResourceContent | undefined;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.KnowledgeResourceAccess access = 2;
+   */
+  access?: KnowledgeResourceAccess | undefined;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.CollectKnowledgeResourceResponse.
+ * Use `create(CollectKnowledgeResourceResponseSchema)` to create a new message.
+ */
+export const CollectKnowledgeResourceResponseSchema: GenMessage<CollectKnowledgeResourceResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 16);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ValidateKnowledgeResourceRequest
+ */
+export type ValidateKnowledgeResourceRequest = Message<"glimmer.capabilities.v1.ValidateKnowledgeResourceRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.KnowledgeResourceAccess access = 2;
+   */
+  access?: KnowledgeResourceAccess | undefined;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityReference reference = 3;
+   */
+  reference?: CapabilityReference | undefined;
+
+  /**
+   * @generated from field: string content_revision = 4;
+   */
+  contentRevision: string;
+
+  /**
+   * @generated from field: glimmer.capabilities.v1.CapabilityScopeContext scope = 5;
+   */
+  scope?: CapabilityScopeContext | undefined;
+
+  /**
+   * @generated from field: string media_type = 6;
+   */
+  mediaType: string;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ValidateKnowledgeResourceRequest.
+ * Use `create(ValidateKnowledgeResourceRequestSchema)` to create a new message.
+ */
+export const ValidateKnowledgeResourceRequestSchema: GenMessage<ValidateKnowledgeResourceRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 17);
+
+/**
+ * @generated from message glimmer.capabilities.v1.ValidateKnowledgeResourceResponse
+ */
+export type ValidateKnowledgeResourceResponse = Message<"glimmer.capabilities.v1.ValidateKnowledgeResourceResponse"> & {
+  /**
+   * @generated from field: bool current = 1;
+   */
+  current: boolean;
+};
+
+/**
+ * Describes the message glimmer.capabilities.v1.ValidateKnowledgeResourceResponse.
+ * Use `create(ValidateKnowledgeResourceResponseSchema)` to create a new message.
+ */
+export const ValidateKnowledgeResourceResponseSchema: GenMessage<ValidateKnowledgeResourceResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 18);
+
+/**
  * 独立 RPC 外壳复用同一调用/正文定义。
  *
  * @generated from message glimmer.capabilities.v1.ReadSkillRequest
@@ -580,7 +737,7 @@ export type ReadSkillRequest = Message<"glimmer.capabilities.v1.ReadSkillRequest
  * Use `create(ReadSkillRequestSchema)` to create a new message.
  */
 export const ReadSkillRequestSchema: GenMessage<ReadSkillRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 14);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 19);
 
 /**
  * @generated from message glimmer.capabilities.v1.ReadSkillResponse
@@ -597,7 +754,7 @@ export type ReadSkillResponse = Message<"glimmer.capabilities.v1.ReadSkillRespon
  * Use `create(ReadSkillResponseSchema)` to create a new message.
  */
 export const ReadSkillResponseSchema: GenMessage<ReadSkillResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 15);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 20);
 
 /**
  * @generated from message glimmer.capabilities.v1.ReadResourceRequest
@@ -614,7 +771,7 @@ export type ReadResourceRequest = Message<"glimmer.capabilities.v1.ReadResourceR
  * Use `create(ReadResourceRequestSchema)` to create a new message.
  */
 export const ReadResourceRequestSchema: GenMessage<ReadResourceRequest> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 16);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 21);
 
 /**
  * @generated from message glimmer.capabilities.v1.ReadResourceResponse
@@ -631,7 +788,7 @@ export type ReadResourceResponse = Message<"glimmer.capabilities.v1.ReadResource
  * Use `create(ReadResourceResponseSchema)` to create a new message.
  */
 export const ReadResourceResponseSchema: GenMessage<ReadResourceResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 17);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 22);
 
 /**
  * Execution 拥有结果；不传入请求正文/授权详情，也不复制 Conversation 拓扑。
@@ -729,7 +886,7 @@ export type ExecutionResultEvent = Message<"glimmer.capabilities.v1.ExecutionRes
  * Use `create(ExecutionResultEventSchema)` to create a new message.
  */
 export const ExecutionResultEventSchema: GenMessage<ExecutionResultEvent> = /*@__PURE__*/
-  messageDesc(file_glimmer_capabilities_v1_capabilities, 18);
+  messageDesc(file_glimmer_capabilities_v1_capabilities, 23);
 
 /**
  * @generated from enum glimmer.capabilities.v1.ExecutionResultState
@@ -828,6 +985,24 @@ export const CapabilityService: GenService<{
     methodKind: "unary";
     input: typeof ReadResourceRequestSchema;
     output: typeof ReadResourceResponseSchema;
+  },
+  /**
+   * 显式登记的 Knowledge 采集不是模型 Step/Tool，不伪造 Action 或执行结果。
+   *
+   * @generated from rpc glimmer.capabilities.v1.CapabilityService.CollectKnowledgeResource
+   */
+  collectKnowledgeResource: {
+    methodKind: "unary";
+    input: typeof CollectKnowledgeResourceRequestSchema;
+    output: typeof CollectKnowledgeResourceResponseSchema;
+  },
+  /**
+   * @generated from rpc glimmer.capabilities.v1.CapabilityService.ValidateKnowledgeResource
+   */
+  validateKnowledgeResource: {
+    methodKind: "unary";
+    input: typeof ValidateKnowledgeResourceRequestSchema;
+    output: typeof ValidateKnowledgeResourceResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_glimmer_capabilities_v1_capabilities, 0);

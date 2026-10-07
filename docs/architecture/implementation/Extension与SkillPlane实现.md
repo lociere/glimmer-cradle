@@ -268,6 +268,45 @@ ConversationService.AcceptExecutionResult；验证 event/invocation/revision/Mom
 迁移、Resource freshness/Knowledge ingest 及默认产品 Host 启动仍未完成。旧 Kernel owner
 待相应 consumer-zero/产品切换门后删除，不以新增 Host 模块冒充完整替代。
 
+## Knowledge 显式资源采集边界
+
+同一 HostResourceContributions 的 `registerKnowledgeAccess` 只接纳 Host IO 政策：主体、source_id、
+定义引用、固定 schema-valid 参数、明确 global 或精确 provider/scene/conversation scope 和最大采集年龄。
+它不拥有 Cognition 的 Knowledge 正文、来源修订或索引，不是第二份 Knowledge source store。
+缺省没有接纳项；参数、模型加载、manifest 和单独 resource.read grant 都不能触发采集。
+global 只允许 Host 显式接纳且无 context 时仍可见的资源；wire scope 缺省表示该 global
+接纳，不伪造 Conversation。部分/空 context 拒绝，private 来源不能删 scope 升为 global。
+实际采集需同时拥有 resource.read/knowledge.ingest，当前定义 character/ready/scope 可见。
+
+WorkerSupervisor 开放唯一生成的 CollectKnowledgeResource/ValidateKnowledgeResource；Host
+从本代受监督身份推导 principal。采集没有模型 Step 或原 Action，因此不伪造 Execution/
+Conversation result，也不作为模型工具暴露。真实 reader 的实际文本/JSON 经 Core 生成 hash，
+仍受 32 KiB 限制。Host 只缓存采集证明和 hash、不缓存正文；证明绑定原来源、定义、reader、
+双 grant、主体/世代和精确 scope。期限取两个 grant 和 Host 最大采集年龄的最小值；墙钟回拨
+不复活旧证明。返回前再验证；较早并发读取迟到不能覆盖较新采集。重采集撤销旧证明。
+
+grant/主体/来源/资源撤销和定义替换取消在途采集、删除证明；reader 忽略取消时迟到正文仍不
+返回。stop drain 后解除监听/清空证明，store 仍由调用方拥有。外部资源内容变更通过
+`invalidateResourceContent(resourceId, ownerId)` 独立失效，不强迫改写目录定义 revision；
+错误 owner 无权失效，正确通知取消等待并撤销旧证明，后续重新采集产生新证明/hash。
+定义替换仍按注册 revision 失效；TTL 是有限采集年龄，不冒充供应商主动更新订阅。
+RPC 复验比对完整证明 identity/revision/time、内容 hash 和作用域，不接受仅凭 id 或时间戳
+自报授权。未知、过期、被撤销证明为 current=false；不自动恢复或提升权限。
+实际 media_type 也绑定证明，不能在复验后自报另一 parser 输入类型。单来源最多两次在途采集，
+总 active 上限 128；超限拒绝，不递增 attempt 或再读取，避免非合作 reader 导致无界资源积累。
+
+Python `adapters/resource_client.py` 的 ResourceClient 实际实现 Core ResourcePort.read/is_current，
+由 KernelGrpcClient 补本代 metadata、唯一 generated DTO mapper 调上述 RPC；Body/hash、主体、
+来源、时间与返回 presence 均验证。ResourceScope/ResourceAccess 属于 Core consumer Port，
+不 import generated/供应商 SDK。普通 Step 的 decoder 仍返回 access=None，不能作为知识
+采集证明。真实 Host/已注册生产 Worker 的测试 generation、实际 Python Adapter/transport
+与 gRPC 已验证读取和复验；测试额外 channel 只附加本代，不重新伪造 FD3 注册。
+
+这是 Resource→Knowledge 的前置 IO 接线，不是完整 Knowledge 接入：Cognition 持久来源
+登记、采集提交/来源修订、parser/chunk pipeline、权限过滤检索/Context、派生索引删除及跨
+重启重新授权装配仍待落位。Worker composition 尚未将此 Port 注入 Knowledge ingest owner；
+不能自动保存 Tool/Step 结果、把数据提升成 Memory 或宣称知识更新完整链已完成。
+
 ## Extension Adapter 链路
 
 ```text

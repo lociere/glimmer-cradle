@@ -56,6 +56,9 @@ Exposure、外部 fencing/对账与完整原生 Loop 接线仍未完成，
 目标 `apps/host` 已有显式 Resource 授权/读取及真实 Worker 原生续接闭环；短寿命 grant 由
 Host 拥有，撤权的迟到正文不进入模型。Tool/Skill、持久用户权限及默认产品入口未迁移，
 边界见[Host Resource 实现](../../implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
+独立 Knowledge 采集已有 Host 显式 IO 接纳/双 grant/有时效证明及 Python ResourcePort Adapter，
+不伪造模型 Action 或 Execution result；尚未进入持久 Knowledge/Context，见
+[采集边界](../../implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 
 感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。
 

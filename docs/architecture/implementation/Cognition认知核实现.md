@@ -304,6 +304,13 @@ entry ID/revision/正文 SHA-256、模型身份和 `trim-text/whole-entry.v1` �
 也不重写来源事实。`KnowledgeSource` 与默认 `ReplyContextBuilder` 传递当前修订/hash/转换版本；
 数据仍为 untrusted/data，配置来源和索引版本不提升人格、权限、指令 authority 或 Resource freshness。
 
+Worker ResourceClient 已实际实现 consumer-owned ResourcePort 的显式采集/活跃证明复验，使用
+唯一 generated CapabilityService 和受监督 metadata；普通模型加载 snapshot 没有采集证明。
+Host 双 grant/IO 接纳与有限 freshness 详见
+[Knowledge 采集边界](Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。当前尚未注入
+Knowledge ingest/持久来源，也未改此处 SQLite schema；后续须把 source identity、权限、时效、
+parser/chunk 版本与索引/Context 失效实际接通，不能只将采集正文复制到配置条目。
+
 共享 Memory 连接的读写由 `SqliteMemoryStore.read()` / `transaction()` 串行化；Memory、Vector、
 Relationship、关系 checkpoint 与旧巩固队列不再各自 commit。写事务使用 IMMEDIATE，BEGIN/业务写入/
 commit 取消均等待回滚收尾再允许连接复用，回滚失败撤销并关闭连接；关闭本身被取消也先完成资源释放。

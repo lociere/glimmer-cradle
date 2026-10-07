@@ -46,6 +46,9 @@ Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一
 Conversation Service 验证持久 receipt 后才返回正文。实际边界见
 [能力实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
 没有显式贡献/授权则拒绝，不是默认产品或完整 Extension IO sandbox。
+`registerKnowledgeAccess` 与独立 typed 采集/复验 RPC 允许已登记主体读取 Host 接纳的固定来源，
+须有 resource.read/knowledge.ingest 双 grant；短寿命证明不代表知识持久接纳。详情与剩余
+接线见[Knowledge 采集边界](../../docs/architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

@@ -9,6 +9,9 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 - Python 消费方从 `glimmer_cradle.cognition`、明确子域根入口或 `ports/` 导入公开契约，不 deep import 内部实现。
 - `CapabilityPort`、`ContentPort`、`ConversationPort`、`JobPort` 与 `ResourcePort` 由 Cognition 定义需求，由 App 装配实现。
 - `contracts/` 仍是跨进程 wire 唯一来源；Core 不导入 generated DTO。
+- ResourcePort 用 source/principal、明确 global/context scope 和 live 采集证明表示知识采集需求；
+  具体 RPC 在 Worker，IO 接纳/授权在 Host。普通加载 snapshot 没有此权限，不自行保存成知识，
+  接线边界见[采集实现](../../docs/architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 
 ## 状态与恢复
 

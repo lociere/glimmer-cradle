@@ -6,7 +6,8 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import { create } from '@bufbuild/protobuf';
-import { ExposeStepRequestSchema, ReadResourceRequestSchema } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import { ExposeStepRequestSchema, ReadResourceRequestSchema, CollectKnowledgeResourceRequestSchema, ValidateKnowledgeResourceRequestSchema,
+  type CollectKnowledgeResourceResponse } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry, ExecutionRecoveryRequiredError } from '@glimmer-cradle/capabilities';
 import type { Resource, ExecutionResultReceiverPort } from '@glimmer-cradle/capabilities';
 import { PermissionBroker, HostResourceContributions } from '../src/index.js';
@@ -31,7 +32,7 @@ function harness(receiver?: ExecutionResultReceiverPort) {
   const outbox = new ExecutionResultOutbox(journal, receiver ?? { accept: async event => ({ event_id: event.event_id,
     invocation_id: event.invocation.invocation_id, revision: event.invocation.revision, accepted: true }) });
   const service = new HostResourceContributions({ host_id: 'host', target_location: 'host:local', permissions: broker,
-    resources: new ResourceRegistry(), execution: controller, outbox });
+    resources: new ResourceRegistry(), execution: controller, outbox, now: () => now });
   service.activatePrincipal('worker', 'generation');
   const reader = vi.fn(async () => '实际资料'); service.registerResource(resource, reader);
   const expose = (drift = {}) => service.exposeStep(create(ExposeStepRequestSchema, { call: { generation: 'generation', traceId: 'trace' },
@@ -45,6 +46,147 @@ function harness(receiver?: ExecutionResultReceiverPort) {
   return { service, broker, reader, journal, expose, read, audit, time: (value: number) => { now = value; },
     close: async () => { await service.stop(); journal.close(); } };
 }
+
+const knowledgePolicy = { source_id: 'source:document', reference: { id: 'document', revision: 'definition:1' },
+  scope: { source_provider_id: 'provider', scene_id: 'scene', conversation_id: 'conversation' }, arguments: {}, max_age_ms: 50 };
+function collectKnowledge(h: ReturnType<typeof harness>, drift = {}) {
+  return h.service.collectKnowledgeResource(create(CollectKnowledgeResourceRequestSchema, {
+    call: { generation: 'generation', traceId: 'knowledge-trace' }, sourceId: knowledgePolicy.source_id,
+    reference: knowledgePolicy.reference, scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' }, ...drift,
+  }), 'worker', new AbortController().signal);
+}
+function validateKnowledge(h: ReturnType<typeof harness>, proof: CollectKnowledgeResourceResponse, drift = {}) {
+  return h.service.validateKnowledgeResource(create(ValidateKnowledgeResourceRequestSchema, {
+    call: { generation: 'generation', traceId: 'knowledge-trace' }, access: proof.access,
+    reference: proof.content!.reference, contentRevision: proof.content!.contentRevision, mediaType: proof.content!.mediaType,
+    scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' }, ...drift,
+  }), 'worker', new AbortController().signal);
+}
+
+describe('显式 Knowledge IO 接纳与可撤销采集证明', () => {
+  it('global 来源无需伪造 Conversation/Step；不能丢弃 private scope 获取相同权限', async () => {
+    const h = harness();
+    try {
+      expect(() => h.service.registerKnowledgeAccess('worker', { ...knowledgePolicy, scope: undefined })).toThrow('不可见');
+      h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+      h.broker.grant(request, 300); h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+      await expect(collectKnowledge(h, { scope: undefined })).rejects.toThrow('scope');
+      const privateProof = await collectKnowledge(h);
+      expect((await validateKnowledge(h, privateProof, { scope: undefined })).current).toBe(false);
+      h.service.revokeKnowledgeAccess('worker', knowledgePolicy.source_id);
+      h.service.registerResource({ ...resource, revision: 'definition:2', scopes: [{ kind: 'global' }] }, h.reader);
+      h.broker.grant({ ...request, resource_revision: 'definition:2' }, 300);
+      h.broker.grant({ ...request, resource_revision: 'definition:2', permission: 'knowledge.ingest' }, 300);
+      h.service.registerKnowledgeAccess('worker', { ...knowledgePolicy, reference: { id: 'document', revision: 'definition:2' }, scope: undefined });
+      const proof = await collectKnowledge(h, { reference: { id: 'document', revision: 'definition:2' }, scope: undefined });
+      expect((await validateKnowledge(h, proof, { scope: undefined })).current).toBe(true);
+      expect((await validateKnowledge(h, proof)).current).toBe(false);
+    } finally { await h.close(); }
+  });
+  it('声明不是授权；读取与采集双 grant 缺一不可，模型加载没有采集证明', async () => {
+    const h = harness();
+    try {
+      await expect(collectKnowledge(h)).rejects.toThrow('接纳');
+      h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+      await expect(collectKnowledge(h)).rejects.toThrow('授权');
+      h.broker.grant(request, 300); await expect(collectKnowledge(h)).rejects.toThrow('授权');
+      h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+      const proof = await collectKnowledge(h);
+      expect(proof.content!.contentUtf8).toBe('实际资料'); expect(proof.access!.sourceId).toBe(knowledgePolicy.source_id);
+      expect((await validateKnowledge(h, proof)).current).toBe(true);
+      expect(h.journal.readOutbox(10)).toEqual([]);
+      expect(h.reader).toHaveBeenCalledOnce();
+      await expect(collectKnowledge(h, { sourceId: 'model-invented' })).rejects.toThrow('接纳');
+      expect(h.reader).toHaveBeenCalledOnce();
+    } finally { await h.close(); }
+  });
+  it('采集证明绑定实际主体/来源/定义/内容/权限修订/时刻/scope；过期回拨不复活', async () => {
+    const h = harness();
+    try {
+      h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+      h.broker.grant(request, 300); h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+      const proof = await collectKnowledge(h);
+      for (const drift of [{ sourceId: 'other' }, { principalId: 'other' }, { permissionRevision: 'forged' },
+        { accessId: 'forged' }, { collectedAtMs: 0n }, { expiresAtMs: 300n }]) {
+        expect((await validateKnowledge(h, proof, { access: { ...proof.access, ...drift } })).current).toBe(false);
+      }
+      for (const drift of [{ reference: { id: 'other', revision: 'definition:1' } }, { contentRevision: 'forged' }, { mediaType: 'application/json' },
+        { scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'other' } }]) {
+        expect((await validateKnowledge(h, proof, drift)).current).toBe(false);
+      }
+      h.time(151); expect((await validateKnowledge(h, proof)).current).toBe(false);
+      h.time(101); expect((await validateKnowledge(h, proof)).current).toBe(false);
+    } finally { await h.close(); }
+  });
+  it.each(['read', 'ingest', 'definition', 'source', 'content'] as const)('%s 撤销使原采集证明即时失效', async change => {
+    const h = harness();
+    try {
+      h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+      const read = h.broker.grant(request, 300), ingest = h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+      const proof = await collectKnowledge(h);
+      if (change === 'read') h.broker.revokeGrant(read.grant_id);
+      else if (change === 'ingest') h.broker.revokeGrant(ingest.grant_id);
+      else if (change === 'source') h.service.revokeKnowledgeAccess('worker', knowledgePolicy.source_id);
+      else if (change === 'content') {
+        expect(() => h.service.invalidateResourceContent('document', 'foreign')).toThrow('owner');
+        expect((await validateKnowledge(h, proof)).current).toBe(true);
+        h.service.invalidateResourceContent('document', 'reader-owner');
+        const refreshed = await collectKnowledge(h);
+        expect((await validateKnowledge(h, refreshed)).current).toBe(true);
+        expect(refreshed.content!.reference).toEqual(proof.content!.reference);
+      }
+      else h.service.registerResource({ ...resource, revision: 'definition:2' }, async () => '新资料');
+      expect((await validateKnowledge(h, proof)).current).toBe(false);
+    } finally { await h.close(); }
+  });
+  it('较早采集迟到不能覆盖更新的采集证明', async () => {
+    const h = harness(); let release!: () => void, enter!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; }); let calls = 0;
+    h.service.revokeResource('document', 'reader-owner');
+    h.service.registerResource(resource, async () => { if (++calls === 1) { enter(); await gate; return '旧资料'; } return '新资料'; });
+    h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+    h.broker.grant(request, 300); const ingest = h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+    try {
+      const first = collectKnowledge(h), rejected = expect(first).rejects.toThrow('失效'); await entered;
+      const current = await collectKnowledge(h); release(); await rejected;
+      expect(current.content!.contentUtf8).toBe('新资料'); expect((await validateKnowledge(h, current)).current).toBe(true);
+      h.broker.revokeGrant(ingest.grant_id); expect((await validateKnowledge(h, current)).current).toBe(false);
+    } finally { release(); await h.close(); }
+  });
+  it('单来源最多两次在途采集；超限不替换已接纳 attempt 或额外读取', async () => {
+    const h = harness(); let release!: () => void, enter!: () => void; let calls = 0;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    h.service.revokeResource('document', 'reader-owner');
+    h.service.registerResource(resource, async () => { if (++calls === 2) enter(); await gate; return '资料'; });
+    h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+    h.broker.grant(request, 300); h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+    const first = collectKnowledge(h), rejected = expect(first).rejects.toThrow('失效');
+    const second = collectKnowledge(h);
+    try {
+      await entered; await expect(collectKnowledge(h)).rejects.toThrow('预算'); expect(calls).toBe(2);
+      release(); await rejected; expect((await validateKnowledge(h, await second)).current).toBe(true);
+    } finally { release(); await h.close(); }
+  });
+  it.each(['read', 'ingest', 'content', 'source'] as const)('%s 失效取消在途采集；reader 忽略取消的迟到正文不返回', async change => {
+    const h = harness(); let release!: () => void, enter!: () => void; let signal!: AbortSignal;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    h.service.revokeResource('document', 'reader-owner');
+    h.service.registerResource(resource, async (_arguments, actualSignal) => { signal = actualSignal; enter(); await gate; return '迟到资料'; });
+    h.service.registerKnowledgeAccess('worker', knowledgePolicy);
+    const read = h.broker.grant(request, 300), ingest = h.broker.grant({ ...request, permission: 'knowledge.ingest' }, 300);
+    const collecting = collectKnowledge(h), rejected = expect(collecting).rejects.toThrow();
+    try {
+      await entered;
+      if (change === 'content') h.service.invalidateResourceContent('document', 'reader-owner');
+      else if (change === 'source') h.service.revokeKnowledgeAccess('worker', knowledgePolicy.source_id);
+      else h.broker.revokeGrant(change === 'read' ? read.grant_id : ingest.grant_id);
+      expect(signal.aborted).toBe(true); release(); await rejected;
+    } finally { release(); await h.close(); }
+  });
+});
 
 describe('Host 显式授权而非调用者自报', () => {
   it('主体、世代、定义、位置、期限及 grant revision 独立验证，回拨不复活过期能力', () => {
@@ -124,6 +266,50 @@ it.each([false, true])('实际目标 Host/生产 Worker/typed Resource/SSE/SQLit
     } });
   try {
     await supervisor.start();
+    if (!revokeDuringRead) {
+      const actualPrincipal = `cognition:${supervisor.snapshot.generation}`;
+      const knowledgeGrant = broker.grant({ ...request, principal_id: actualPrincipal, generation: supervisor.snapshot.generation!, permission: 'knowledge.ingest' }, Date.now() + 30_000);
+      service.registerKnowledgeAccess(actualPrincipal, { ...knowledgePolicy, max_age_ms: 5000 });
+      const resourceScript = `
+import asyncio, json, grpc
+from dataclasses import asdict, replace
+from glimmer.capabilities.v1 import capabilities_pb2 as pb
+from glimmer.common.v1 import service_contract_pb2 as common
+from glimmer_cradle.cognition.ports import ResourceScope
+from glimmer_cradle.cognition_worker.adapters.resource_client import ResourceClient
+from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
+async def run():
+    transport = KernelGrpcClient(${JSON.stringify(supervisor.snapshot.generation)}, "fixture", bytearray())
+    # 已由真实 Worker 注册的测试 generation；只附加测试 channel，不再次伪造 FD3 注册。
+    transport._channel = grpc.aio.insecure_channel(${JSON.stringify(supervisor.snapshot.control_endpoint!.slice(7))})
+    adapter = ResourceClient(transport, trace_id="knowledge-resource-proof")
+    scope = ResourceScope("provider", "scene", "conversation")
+    try:
+        snapshot = await adapter.read("document", source_id="source:document", definition_revision="definition:1",
+            principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
+        assert await adapter.is_current(snapshot, principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
+        assert not await adapter.is_current(replace(snapshot, content=b"forged"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
+        assert not await adapter.is_current(replace(snapshot, media_type="application/json"), principal_id=${JSON.stringify(actualPrincipal)}, scope=scope)
+        assert not await adapter.is_current(snapshot, principal_id="foreign", scope=scope)
+        assert not await adapter.is_current(snapshot, principal_id=${JSON.stringify(actualPrincipal)}, scope=ResourceScope("provider", "scene", "other"))
+        print(json.dumps({"body": snapshot.content.decode(), "access": asdict(snapshot.access), "revision": snapshot.revision}))
+    finally: await transport.stop()
+asyncio.run(run())
+`;
+      const collected = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python', '-c', resourceScript],
+        { cwd: repository, windowsHide: true, timeout: 30000 });
+      const evidence = JSON.parse(collected.stdout);
+      expect(evidence.body).toBe('真正授权的资料正文');
+      broker.revokeGrant(knowledgeGrant.grant_id);
+      expect((await service.validateKnowledgeResource(create(ValidateKnowledgeResourceRequestSchema, {
+        call: { generation: supervisor.snapshot.generation!, traceId: 'knowledge-revocation' },
+        access: { accessId: evidence.access.access_id, sourceId: evidence.access.source_id, principalId: actualPrincipal,
+          permissionRevision: evidence.access.permission_revision, collectedAtMs: BigInt(evidence.access.collected_at_ms), expiresAtMs: BigInt(evidence.access.expires_at_ms) },
+        reference: knowledgePolicy.reference, contentRevision: evidence.revision, mediaType: 'text/plain',
+        scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' },
+      }), actualPrincipal, new AbortController().signal)).current).toBe(false);
+      expect(journal.readOutbox(10)).toEqual([]);
+    }
     const client = supervisor.createCognitionClient();
     const accepted = await client.submitPerception(create(SubmitPerceptionRequestSchema, {
       call: { traceId: 'host-resource-trace', idempotencyKey: 'host-resource-perception', causationId: 'perception-proof' },
@@ -150,7 +336,7 @@ it.each([false, true])('实际目标 Host/生产 Worker/typed Resource/SSE/SQLit
       expect(journal.readOutbox(10)[0].invocation.state).toBe('succeeded');
       return;
     }
-    expect(reader).toHaveBeenCalledOnce(); expect(actions).toHaveLength(1); expect(requests).toHaveLength(2);
+    expect(reader).toHaveBeenCalledTimes(2); expect(actions).toHaveLength(1); expect(requests).toHaveLength(2);
     expect(JSON.stringify(requests[0])).not.toContain('真正授权的资料正文');
     expect(JSON.stringify(requests[1].messages.find(message => message.role === 'tool'))).toContain('真正授权的资料正文');
     expect(journal.readOutbox(10)).toEqual([]);

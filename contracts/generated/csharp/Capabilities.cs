@@ -103,49 +103,81 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
             "UgVza2lsbBJGCghyZXNvdXJjZRgFIAEoCzIoLmdsaW1tZXIuY2FwYWJpbGl0",
             "aWVzLnYxLlJlc291cmNlQ29udGVudEgAUghyZXNvdXJjZRIUCgVlcnJvchgG",
             "IAEoCVIFZXJyb3ISJgoPcmVzdWx0X2V2ZW50X2lkGAcgASgJUg1yZXN1bHRF",
-            "dmVudElkQgkKB2NvbnRlbnQiXAoQUmVhZFNraWxsUmVxdWVzdBJICgdyZXF1",
-            "ZXN0GAEgASgLMi4uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZENhcGFi",
-            "aWxpdHlSZXF1ZXN0UgdyZXF1ZXN0IlwKEVJlYWRTa2lsbFJlc3BvbnNlEkcK",
-            "BnJlc3VsdBgBIAEoCzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRD",
-            "YXBhYmlsaXR5UmVzcG9uc2VSBnJlc3VsdCJfChNSZWFkUmVzb3VyY2VSZXF1",
-            "ZXN0EkgKB3JlcXVlc3QYASABKAsyLi5nbGltbWVyLmNhcGFiaWxpdGllcy52",
-            "MS5SZWFkQ2FwYWJpbGl0eVJlcXVlc3RSB3JlcXVlc3QiXwoUUmVhZFJlc291",
-            "cmNlUmVzcG9uc2USRwoGcmVzdWx0GAEgASgLMi8uZ2xpbW1lci5jYXBhYmls",
-            "aXRpZXMudjEuUmVhZENhcGFiaWxpdHlSZXNwb25zZVIGcmVzdWx0Ip4FChRF",
-            "eGVjdXRpb25SZXN1bHRFdmVudBIZCghldmVudF9pZBgBIAEoCVIHZXZlbnRJ",
-            "ZBIjCg1pbnZvY2F0aW9uX2lkGAIgASgJUgxpbnZvY2F0aW9uSWQSGgoIcmV2",
-            "aXNpb24YAyABKARSCHJldmlzaW9uEhgKB2F0dGVtcHQYBCABKA1SB2F0dGVt",
-            "cHQSGQoIc2NvcGVfaWQYBSABKAlSB3Njb3BlSWQSJwoPY29udmVyc2F0aW9u",
-            "X2lkGAYgASgJUg5jb252ZXJzYXRpb25JZBIkCg5zb3VyY2VfZmFjdF9pZBgH",
-            "IAEoCVIMc291cmNlRmFjdElkEh8KC2V4ZWN1dG9yX2lkGAggASgJUgpleGVj",
-            "dXRvcklkEiMKDWNhcGFiaWxpdHlfaWQYCSABKAlSDGNhcGFiaWxpdHlJZBIv",
-            "ChNkZWZpbml0aW9uX3JldmlzaW9uGAogASgJUhJkZWZpbml0aW9uUmV2aXNp",
-            "b24SJQoOcmVxdWVzdF9kaWdlc3QYCyABKAlSDXJlcXVlc3REaWdlc3QSQwoF",
-            "c3RhdGUYDCABKA4yLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeGVjdXRp",
-            "b25SZXN1bHRTdGF0ZVIFc3RhdGUSUAoMc2lkZV9lZmZlY3RzGA0gASgOMi0u",
-            "Z2xpbW1lci5jYXBhYmlsaXRpZXMudjEuRXhlY3V0aW9uU2lkZUVmZmVjdHNS",
-            "C3NpZGVFZmZlY3RzEi4KBnJlc3VsdBgOIAEoCzIWLmdvb2dsZS5wcm90b2J1",
-            "Zi5WYWx1ZVIGcmVzdWx0Eh0KCmVycm9yX2NvZGUYDyABKAlSCWVycm9yQ29k",
-            "ZRIiCg11cGRhdGVkX2F0X21zGBAgASgEUgt1cGRhdGVkQXRNcyqrAQoURXhl",
-            "Y3V0aW9uUmVzdWx0U3RhdGUSJgoiRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9V",
-            "TlNQRUNJRklFRBAAEiQKIEVYRUNVVElPTl9SRVNVTFRfU1RBVEVfU1VDQ0VF",
-            "REVEEAESIQodRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9GQUlMRUQQAhIiCh5F",
-            "WEVDVVRJT05fUkVTVUxUX1NUQVRFX1VOS05PV04QAyqpAQoURXhlY3V0aW9u",
-            "U2lkZUVmZmVjdHMSJgoiRVhFQ1VUSU9OX1NJREVfRUZGRUNUU19VTlNQRUNJ",
-            "RklFRBAAEh8KG0VYRUNVVElPTl9TSURFX0VGRkVDVFNfTk9ORRABEiQKIEVY",
-            "RUNVVElPTl9TSURFX0VGRkVDVFNfQ09ORklSTUVEEAISIgoeRVhFQ1VUSU9O",
-            "X1NJREVfRUZGRUNUU19VTktOT1dOEAMysgMKEUNhcGFiaWxpdHlTZXJ2aWNl",
-            "EmUKCkV4cG9zZVN0ZXASKi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5FeHBv",
-            "c2VTdGVwUmVxdWVzdBorLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4cG9z",
-            "ZVN0ZXBSZXNwb25zZRJlCgpJbnZva2VUb29sEiouZ2xpbW1lci5jYXBhYmls",
-            "aXRpZXMudjEuSW52b2tlVG9vbFJlcXVlc3QaKy5nbGltbWVyLmNhcGFiaWxp",
-            "dGllcy52MS5JbnZva2VUb29sUmVzcG9uc2USYgoJUmVhZFNraWxsEikuZ2xp",
-            "bW1lci5jYXBhYmlsaXRpZXMudjEuUmVhZFNraWxsUmVxdWVzdBoqLmdsaW1t",
-            "ZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRTa2lsbFJlc3BvbnNlEmsKDFJlYWRS",
-            "ZXNvdXJjZRIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRSZXNvdXJj",
-            "ZVJlcXVlc3QaLS5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkUmVzb3Vy",
-            "Y2VSZXNwb25zZUIyqgIvR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1l",
-            "ci5DYXBhYmlsaXRpZXMuVjFiBnByb3RvMw=="));
+            "dmVudElkQgkKB2NvbnRlbnQihgIKH0NvbGxlY3RLbm93bGVkZ2VSZXNvdXJj",
+            "ZVJlcXVlc3QSMwoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNh",
+            "bGxNZXRhZGF0YVIEY2FsbBIbCglzb3VyY2VfaWQYAiABKAlSCHNvdXJjZUlk",
+            "EkoKCXJlZmVyZW5jZRgDIAEoCzIsLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYx",
+            "LkNhcGFiaWxpdHlSZWZlcmVuY2VSCXJlZmVyZW5jZRJFCgVzY29wZRgEIAEo",
+            "CzIvLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNhcGFiaWxpdHlTY29wZUNv",
+            "bnRleHRSBXNjb3BlIvMBChdLbm93bGVkZ2VSZXNvdXJjZUFjY2VzcxIbCglh",
+            "Y2Nlc3NfaWQYASABKAlSCGFjY2Vzc0lkEhsKCXNvdXJjZV9pZBgCIAEoCVII",
+            "c291cmNlSWQSIQoMcHJpbmNpcGFsX2lkGAMgASgJUgtwcmluY2lwYWxJZBIv",
+            "ChNwZXJtaXNzaW9uX3JldmlzaW9uGAQgASgJUhJwZXJtaXNzaW9uUmV2aXNp",
+            "b24SJgoPY29sbGVjdGVkX2F0X21zGAUgASgEUg1jb2xsZWN0ZWRBdE1zEiIK",
+            "DWV4cGlyZXNfYXRfbXMYBiABKARSC2V4cGlyZXNBdE1zIrABCiBDb2xsZWN0",
+            "S25vd2xlZGdlUmVzb3VyY2VSZXNwb25zZRJCCgdjb250ZW50GAEgASgLMigu",
+            "Z2xpbW1lci5jYXBhYmlsaXRpZXMudjEuUmVzb3VyY2VDb250ZW50Ugdjb250",
+            "ZW50EkgKBmFjY2VzcxgCIAEoCzIwLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYx",
+            "Lktub3dsZWRnZVJlc291cmNlQWNjZXNzUgZhY2Nlc3Mi/gIKIFZhbGlkYXRl",
+            "S25vd2xlZGdlUmVzb3VyY2VSZXF1ZXN0EjMKBGNhbGwYASABKAsyHy5nbGlt",
+            "bWVyLmNvbW1vbi52MS5DYWxsTWV0YWRhdGFSBGNhbGwSSAoGYWNjZXNzGAIg",
+            "ASgLMjAuZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuS25vd2xlZGdlUmVzb3Vy",
+            "Y2VBY2Nlc3NSBmFjY2VzcxJKCglyZWZlcmVuY2UYAyABKAsyLC5nbGltbWVy",
+            "LmNhcGFiaWxpdGllcy52MS5DYXBhYmlsaXR5UmVmZXJlbmNlUglyZWZlcmVu",
+            "Y2USKQoQY29udGVudF9yZXZpc2lvbhgEIAEoCVIPY29udGVudFJldmlzaW9u",
+            "EkUKBXNjb3BlGAUgASgLMi8uZ2xpbW1lci5jYXBhYmlsaXRpZXMudjEuQ2Fw",
+            "YWJpbGl0eVNjb3BlQ29udGV4dFIFc2NvcGUSHQoKbWVkaWFfdHlwZRgGIAEo",
+            "CVIJbWVkaWFUeXBlIj0KIVZhbGlkYXRlS25vd2xlZGdlUmVzb3VyY2VSZXNw",
+            "b25zZRIYCgdjdXJyZW50GAEgASgIUgdjdXJyZW50IlwKEFJlYWRTa2lsbFJl",
+            "cXVlc3QSSAoHcmVxdWVzdBgBIAEoCzIuLmdsaW1tZXIuY2FwYWJpbGl0aWVz",
+            "LnYxLlJlYWRDYXBhYmlsaXR5UmVxdWVzdFIHcmVxdWVzdCJcChFSZWFkU2tp",
+            "bGxSZXNwb25zZRJHCgZyZXN1bHQYASABKAsyLy5nbGltbWVyLmNhcGFiaWxp",
+            "dGllcy52MS5SZWFkQ2FwYWJpbGl0eVJlc3BvbnNlUgZyZXN1bHQiXwoTUmVh",
+            "ZFJlc291cmNlUmVxdWVzdBJICgdyZXF1ZXN0GAEgASgLMi4uZ2xpbW1lci5j",
+            "YXBhYmlsaXRpZXMudjEuUmVhZENhcGFiaWxpdHlSZXF1ZXN0UgdyZXF1ZXN0",
+            "Il8KFFJlYWRSZXNvdXJjZVJlc3BvbnNlEkcKBnJlc3VsdBgBIAEoCzIvLmds",
+            "aW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRDYXBhYmlsaXR5UmVzcG9uc2VS",
+            "BnJlc3VsdCKeBQoURXhlY3V0aW9uUmVzdWx0RXZlbnQSGQoIZXZlbnRfaWQY",
+            "ASABKAlSB2V2ZW50SWQSIwoNaW52b2NhdGlvbl9pZBgCIAEoCVIMaW52b2Nh",
+            "dGlvbklkEhoKCHJldmlzaW9uGAMgASgEUghyZXZpc2lvbhIYCgdhdHRlbXB0",
+            "GAQgASgNUgdhdHRlbXB0EhkKCHNjb3BlX2lkGAUgASgJUgdzY29wZUlkEicK",
+            "D2NvbnZlcnNhdGlvbl9pZBgGIAEoCVIOY29udmVyc2F0aW9uSWQSJAoOc291",
+            "cmNlX2ZhY3RfaWQYByABKAlSDHNvdXJjZUZhY3RJZBIfCgtleGVjdXRvcl9p",
+            "ZBgIIAEoCVIKZXhlY3V0b3JJZBIjCg1jYXBhYmlsaXR5X2lkGAkgASgJUgxj",
+            "YXBhYmlsaXR5SWQSLwoTZGVmaW5pdGlvbl9yZXZpc2lvbhgKIAEoCVISZGVm",
+            "aW5pdGlvblJldmlzaW9uEiUKDnJlcXVlc3RfZGlnZXN0GAsgASgJUg1yZXF1",
+            "ZXN0RGlnZXN0EkMKBXN0YXRlGAwgASgOMi0uZ2xpbW1lci5jYXBhYmlsaXRp",
+            "ZXMudjEuRXhlY3V0aW9uUmVzdWx0U3RhdGVSBXN0YXRlElAKDHNpZGVfZWZm",
+            "ZWN0cxgNIAEoDjItLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkV4ZWN1dGlv",
+            "blNpZGVFZmZlY3RzUgtzaWRlRWZmZWN0cxIuCgZyZXN1bHQYDiABKAsyFi5n",
+            "b29nbGUucHJvdG9idWYuVmFsdWVSBnJlc3VsdBIdCgplcnJvcl9jb2RlGA8g",
+            "ASgJUgllcnJvckNvZGUSIgoNdXBkYXRlZF9hdF9tcxgQIAEoBFILdXBkYXRl",
+            "ZEF0TXMqqwEKFEV4ZWN1dGlvblJlc3VsdFN0YXRlEiYKIkVYRUNVVElPTl9S",
+            "RVNVTFRfU1RBVEVfVU5TUEVDSUZJRUQQABIkCiBFWEVDVVRJT05fUkVTVUxU",
+            "X1NUQVRFX1NVQ0NFRURFRBABEiEKHUVYRUNVVElPTl9SRVNVTFRfU1RBVEVf",
+            "RkFJTEVEEAISIgoeRVhFQ1VUSU9OX1JFU1VMVF9TVEFURV9VTktOT1dOEAMq",
+            "qQEKFEV4ZWN1dGlvblNpZGVFZmZlY3RzEiYKIkVYRUNVVElPTl9TSURFX0VG",
+            "RkVDVFNfVU5TUEVDSUZJRUQQABIfChtFWEVDVVRJT05fU0lERV9FRkZFQ1RT",
+            "X05PTkUQARIkCiBFWEVDVVRJT05fU0lERV9FRkZFQ1RTX0NPTkZJUk1FRBAC",
+            "EiIKHkVYRUNVVElPTl9TSURFX0VGRkVDVFNfVU5LTk9XThADMtkFChFDYXBh",
+            "YmlsaXR5U2VydmljZRJlCgpFeHBvc2VTdGVwEiouZ2xpbW1lci5jYXBhYmls",
+            "aXRpZXMudjEuRXhwb3NlU3RlcFJlcXVlc3QaKy5nbGltbWVyLmNhcGFiaWxp",
+            "dGllcy52MS5FeHBvc2VTdGVwUmVzcG9uc2USZQoKSW52b2tlVG9vbBIqLmds",
+            "aW1tZXIuY2FwYWJpbGl0aWVzLnYxLkludm9rZVRvb2xSZXF1ZXN0GisuZ2xp",
+            "bW1lci5jYXBhYmlsaXRpZXMudjEuSW52b2tlVG9vbFJlc3BvbnNlEmIKCVJl",
+            "YWRTa2lsbBIpLmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLlJlYWRTa2lsbFJl",
+            "cXVlc3QaKi5nbGltbWVyLmNhcGFiaWxpdGllcy52MS5SZWFkU2tpbGxSZXNw",
+            "b25zZRJrCgxSZWFkUmVzb3VyY2USLC5nbGltbWVyLmNhcGFiaWxpdGllcy52",
+            "MS5SZWFkUmVzb3VyY2VSZXF1ZXN0Gi0uZ2xpbW1lci5jYXBhYmlsaXRpZXMu",
+            "djEuUmVhZFJlc291cmNlUmVzcG9uc2USjwEKGENvbGxlY3RLbm93bGVkZ2VS",
+            "ZXNvdXJjZRI4LmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYxLkNvbGxlY3RLbm93",
+            "bGVkZ2VSZXNvdXJjZVJlcXVlc3QaOS5nbGltbWVyLmNhcGFiaWxpdGllcy52",
+            "MS5Db2xsZWN0S25vd2xlZGdlUmVzb3VyY2VSZXNwb25zZRKSAQoZVmFsaWRh",
+            "dGVLbm93bGVkZ2VSZXNvdXJjZRI5LmdsaW1tZXIuY2FwYWJpbGl0aWVzLnYx",
+            "LlZhbGlkYXRlS25vd2xlZGdlUmVzb3VyY2VSZXF1ZXN0GjouZ2xpbW1lci5j",
+            "YXBhYmlsaXRpZXMudjEuVmFsaWRhdGVLbm93bGVkZ2VSZXNvdXJjZVJlc3Bv",
+            "bnNlQjKqAi9HbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkNhcGFi",
+            "aWxpdGllcy5WMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.StructReflection.Descriptor, global::GlimmerCradle.Contracts.Glimmer.Common.V1.ServiceContractReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionResultState), typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ExecutionSideEffects), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -163,6 +195,11 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadCapabilityRequest), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadCapabilityRequest.Parser, new[]{ "Call", "RunId", "Step", "CallId", "Name", "Reference", "Scope", "Arguments", "SourceFactId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent.Parser, new[]{ "Reference", "ContentRevision", "MediaType", "ContentUtf8" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadCapabilityResponse), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadCapabilityResponse.Parser, new[]{ "CallId", "Name", "State", "Skill", "Resource", "Error", "ResultEventId" }, new[]{ "Content" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CollectKnowledgeResourceRequest), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CollectKnowledgeResourceRequest.Parser, new[]{ "Call", "SourceId", "Reference", "Scope" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess.Parser, new[]{ "AccessId", "SourceId", "PrincipalId", "PermissionRevision", "CollectedAtMs", "ExpiresAtMs" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CollectKnowledgeResourceResponse), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CollectKnowledgeResourceResponse.Parser, new[]{ "Content", "Access" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ValidateKnowledgeResourceRequest), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ValidateKnowledgeResourceRequest.Parser, new[]{ "Call", "Access", "Reference", "ContentRevision", "Scope", "MediaType" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ValidateKnowledgeResourceResponse), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ValidateKnowledgeResourceResponse.Parser, new[]{ "Current" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadSkillRequest), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadSkillRequest.Parser, new[]{ "Request" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadSkillResponse), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadSkillResponse.Parser, new[]{ "Result" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadResourceRequest), global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ReadResourceRequest.Parser, new[]{ "Request" }, null, null, null, null),
@@ -5327,6 +5364,1598 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
 
   }
 
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class CollectKnowledgeResourceRequest : pb::IMessage<CollectKnowledgeResourceRequest>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<CollectKnowledgeResourceRequest> _parser = new pb::MessageParser<CollectKnowledgeResourceRequest>(() => new CollectKnowledgeResourceRequest());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<CollectKnowledgeResourceRequest> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[14]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceRequest() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceRequest(CollectKnowledgeResourceRequest other) : this() {
+      call_ = other.call_ != null ? other.call_.Clone() : null;
+      sourceId_ = other.sourceId_;
+      reference_ = other.reference_ != null ? other.reference_.Clone() : null;
+      scope_ = other.scope_ != null ? other.scope_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceRequest Clone() {
+      return new CollectKnowledgeResourceRequest(this);
+    }
+
+    /// <summary>Field number for the "call" field.</summary>
+    public const int CallFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata call_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata Call {
+      get { return call_; }
+      set {
+        call_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "source_id" field.</summary>
+    public const int SourceIdFieldNumber = 2;
+    private string sourceId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string SourceId {
+      get { return sourceId_; }
+      set {
+        sourceId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "reference" field.</summary>
+    public const int ReferenceFieldNumber = 3;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference reference_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference Reference {
+      get { return reference_; }
+      set {
+        reference_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "scope" field.</summary>
+    public const int ScopeFieldNumber = 4;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext scope_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext Scope {
+      get { return scope_; }
+      set {
+        scope_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as CollectKnowledgeResourceRequest);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(CollectKnowledgeResourceRequest other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Call, other.Call)) return false;
+      if (SourceId != other.SourceId) return false;
+      if (!object.Equals(Reference, other.Reference)) return false;
+      if (!object.Equals(Scope, other.Scope)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (call_ != null) hash ^= Call.GetHashCode();
+      if (SourceId.Length != 0) hash ^= SourceId.GetHashCode();
+      if (reference_ != null) hash ^= Reference.GetHashCode();
+      if (scope_ != null) hash ^= Scope.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (SourceId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(SourceId);
+      }
+      if (reference_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Reference);
+      }
+      if (scope_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Scope);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (SourceId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(SourceId);
+      }
+      if (reference_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Reference);
+      }
+      if (scope_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(Scope);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (call_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Call);
+      }
+      if (SourceId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(SourceId);
+      }
+      if (reference_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Reference);
+      }
+      if (scope_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Scope);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(CollectKnowledgeResourceRequest other) {
+      if (other == null) {
+        return;
+      }
+      if (other.call_ != null) {
+        if (call_ == null) {
+          Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+        }
+        Call.MergeFrom(other.Call);
+      }
+      if (other.SourceId.Length != 0) {
+        SourceId = other.SourceId;
+      }
+      if (other.reference_ != null) {
+        if (reference_ == null) {
+          Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+        }
+        Reference.MergeFrom(other.Reference);
+      }
+      if (other.scope_ != null) {
+        if (scope_ == null) {
+          Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+        }
+        Scope.MergeFrom(other.Scope);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            SourceId = input.ReadString();
+            break;
+          }
+          case 26: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 34: {
+            if (scope_ == null) {
+              Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+            }
+            input.ReadMessage(Scope);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            SourceId = input.ReadString();
+            break;
+          }
+          case 26: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 34: {
+            if (scope_ == null) {
+              Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+            }
+            input.ReadMessage(Scope);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// Host 的短寿命可撤销采集证明；id 本身不授予权限，不能作为跨重启授权。
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class KnowledgeResourceAccess : pb::IMessage<KnowledgeResourceAccess>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<KnowledgeResourceAccess> _parser = new pb::MessageParser<KnowledgeResourceAccess>(() => new KnowledgeResourceAccess());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<KnowledgeResourceAccess> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[15]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public KnowledgeResourceAccess() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public KnowledgeResourceAccess(KnowledgeResourceAccess other) : this() {
+      accessId_ = other.accessId_;
+      sourceId_ = other.sourceId_;
+      principalId_ = other.principalId_;
+      permissionRevision_ = other.permissionRevision_;
+      collectedAtMs_ = other.collectedAtMs_;
+      expiresAtMs_ = other.expiresAtMs_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public KnowledgeResourceAccess Clone() {
+      return new KnowledgeResourceAccess(this);
+    }
+
+    /// <summary>Field number for the "access_id" field.</summary>
+    public const int AccessIdFieldNumber = 1;
+    private string accessId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string AccessId {
+      get { return accessId_; }
+      set {
+        accessId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "source_id" field.</summary>
+    public const int SourceIdFieldNumber = 2;
+    private string sourceId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string SourceId {
+      get { return sourceId_; }
+      set {
+        sourceId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "principal_id" field.</summary>
+    public const int PrincipalIdFieldNumber = 3;
+    private string principalId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string PrincipalId {
+      get { return principalId_; }
+      set {
+        principalId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "permission_revision" field.</summary>
+    public const int PermissionRevisionFieldNumber = 4;
+    private string permissionRevision_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string PermissionRevision {
+      get { return permissionRevision_; }
+      set {
+        permissionRevision_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "collected_at_ms" field.</summary>
+    public const int CollectedAtMsFieldNumber = 5;
+    private ulong collectedAtMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong CollectedAtMs {
+      get { return collectedAtMs_; }
+      set {
+        collectedAtMs_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "expires_at_ms" field.</summary>
+    public const int ExpiresAtMsFieldNumber = 6;
+    private ulong expiresAtMs_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong ExpiresAtMs {
+      get { return expiresAtMs_; }
+      set {
+        expiresAtMs_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as KnowledgeResourceAccess);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(KnowledgeResourceAccess other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (AccessId != other.AccessId) return false;
+      if (SourceId != other.SourceId) return false;
+      if (PrincipalId != other.PrincipalId) return false;
+      if (PermissionRevision != other.PermissionRevision) return false;
+      if (CollectedAtMs != other.CollectedAtMs) return false;
+      if (ExpiresAtMs != other.ExpiresAtMs) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (AccessId.Length != 0) hash ^= AccessId.GetHashCode();
+      if (SourceId.Length != 0) hash ^= SourceId.GetHashCode();
+      if (PrincipalId.Length != 0) hash ^= PrincipalId.GetHashCode();
+      if (PermissionRevision.Length != 0) hash ^= PermissionRevision.GetHashCode();
+      if (CollectedAtMs != 0UL) hash ^= CollectedAtMs.GetHashCode();
+      if (ExpiresAtMs != 0UL) hash ^= ExpiresAtMs.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (AccessId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(AccessId);
+      }
+      if (SourceId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(SourceId);
+      }
+      if (PrincipalId.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(PrincipalId);
+      }
+      if (PermissionRevision.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(PermissionRevision);
+      }
+      if (CollectedAtMs != 0UL) {
+        output.WriteRawTag(40);
+        output.WriteUInt64(CollectedAtMs);
+      }
+      if (ExpiresAtMs != 0UL) {
+        output.WriteRawTag(48);
+        output.WriteUInt64(ExpiresAtMs);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (AccessId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(AccessId);
+      }
+      if (SourceId.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(SourceId);
+      }
+      if (PrincipalId.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(PrincipalId);
+      }
+      if (PermissionRevision.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(PermissionRevision);
+      }
+      if (CollectedAtMs != 0UL) {
+        output.WriteRawTag(40);
+        output.WriteUInt64(CollectedAtMs);
+      }
+      if (ExpiresAtMs != 0UL) {
+        output.WriteRawTag(48);
+        output.WriteUInt64(ExpiresAtMs);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (AccessId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(AccessId);
+      }
+      if (SourceId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(SourceId);
+      }
+      if (PrincipalId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(PrincipalId);
+      }
+      if (PermissionRevision.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(PermissionRevision);
+      }
+      if (CollectedAtMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(CollectedAtMs);
+      }
+      if (ExpiresAtMs != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(ExpiresAtMs);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(KnowledgeResourceAccess other) {
+      if (other == null) {
+        return;
+      }
+      if (other.AccessId.Length != 0) {
+        AccessId = other.AccessId;
+      }
+      if (other.SourceId.Length != 0) {
+        SourceId = other.SourceId;
+      }
+      if (other.PrincipalId.Length != 0) {
+        PrincipalId = other.PrincipalId;
+      }
+      if (other.PermissionRevision.Length != 0) {
+        PermissionRevision = other.PermissionRevision;
+      }
+      if (other.CollectedAtMs != 0UL) {
+        CollectedAtMs = other.CollectedAtMs;
+      }
+      if (other.ExpiresAtMs != 0UL) {
+        ExpiresAtMs = other.ExpiresAtMs;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            AccessId = input.ReadString();
+            break;
+          }
+          case 18: {
+            SourceId = input.ReadString();
+            break;
+          }
+          case 26: {
+            PrincipalId = input.ReadString();
+            break;
+          }
+          case 34: {
+            PermissionRevision = input.ReadString();
+            break;
+          }
+          case 40: {
+            CollectedAtMs = input.ReadUInt64();
+            break;
+          }
+          case 48: {
+            ExpiresAtMs = input.ReadUInt64();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            AccessId = input.ReadString();
+            break;
+          }
+          case 18: {
+            SourceId = input.ReadString();
+            break;
+          }
+          case 26: {
+            PrincipalId = input.ReadString();
+            break;
+          }
+          case 34: {
+            PermissionRevision = input.ReadString();
+            break;
+          }
+          case 40: {
+            CollectedAtMs = input.ReadUInt64();
+            break;
+          }
+          case 48: {
+            ExpiresAtMs = input.ReadUInt64();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class CollectKnowledgeResourceResponse : pb::IMessage<CollectKnowledgeResourceResponse>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<CollectKnowledgeResourceResponse> _parser = new pb::MessageParser<CollectKnowledgeResourceResponse>(() => new CollectKnowledgeResourceResponse());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<CollectKnowledgeResourceResponse> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[16]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceResponse() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceResponse(CollectKnowledgeResourceResponse other) : this() {
+      content_ = other.content_ != null ? other.content_.Clone() : null;
+      access_ = other.access_ != null ? other.access_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public CollectKnowledgeResourceResponse Clone() {
+      return new CollectKnowledgeResourceResponse(this);
+    }
+
+    /// <summary>Field number for the "content" field.</summary>
+    public const int ContentFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent content_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent Content {
+      get { return content_; }
+      set {
+        content_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "access" field.</summary>
+    public const int AccessFieldNumber = 2;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess access_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess Access {
+      get { return access_; }
+      set {
+        access_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as CollectKnowledgeResourceResponse);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(CollectKnowledgeResourceResponse other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Content, other.Content)) return false;
+      if (!object.Equals(Access, other.Access)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (content_ != null) hash ^= Content.GetHashCode();
+      if (access_ != null) hash ^= Access.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (content_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Content);
+      }
+      if (access_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Access);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (content_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Content);
+      }
+      if (access_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Access);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (content_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Content);
+      }
+      if (access_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Access);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(CollectKnowledgeResourceResponse other) {
+      if (other == null) {
+        return;
+      }
+      if (other.content_ != null) {
+        if (content_ == null) {
+          Content = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent();
+        }
+        Content.MergeFrom(other.Content);
+      }
+      if (other.access_ != null) {
+        if (access_ == null) {
+          Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+        }
+        Access.MergeFrom(other.Access);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (content_ == null) {
+              Content = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent();
+            }
+            input.ReadMessage(Content);
+            break;
+          }
+          case 18: {
+            if (access_ == null) {
+              Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+            }
+            input.ReadMessage(Access);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (content_ == null) {
+              Content = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.ResourceContent();
+            }
+            input.ReadMessage(Content);
+            break;
+          }
+          case 18: {
+            if (access_ == null) {
+              Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+            }
+            input.ReadMessage(Access);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ValidateKnowledgeResourceRequest : pb::IMessage<ValidateKnowledgeResourceRequest>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ValidateKnowledgeResourceRequest> _parser = new pb::MessageParser<ValidateKnowledgeResourceRequest>(() => new ValidateKnowledgeResourceRequest());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ValidateKnowledgeResourceRequest> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[17]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceRequest() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceRequest(ValidateKnowledgeResourceRequest other) : this() {
+      call_ = other.call_ != null ? other.call_.Clone() : null;
+      access_ = other.access_ != null ? other.access_.Clone() : null;
+      reference_ = other.reference_ != null ? other.reference_.Clone() : null;
+      contentRevision_ = other.contentRevision_;
+      scope_ = other.scope_ != null ? other.scope_.Clone() : null;
+      mediaType_ = other.mediaType_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceRequest Clone() {
+      return new ValidateKnowledgeResourceRequest(this);
+    }
+
+    /// <summary>Field number for the "call" field.</summary>
+    public const int CallFieldNumber = 1;
+    private global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata call_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata Call {
+      get { return call_; }
+      set {
+        call_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "access" field.</summary>
+    public const int AccessFieldNumber = 2;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess access_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess Access {
+      get { return access_; }
+      set {
+        access_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "reference" field.</summary>
+    public const int ReferenceFieldNumber = 3;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference reference_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference Reference {
+      get { return reference_; }
+      set {
+        reference_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "content_revision" field.</summary>
+    public const int ContentRevisionFieldNumber = 4;
+    private string contentRevision_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string ContentRevision {
+      get { return contentRevision_; }
+      set {
+        contentRevision_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "scope" field.</summary>
+    public const int ScopeFieldNumber = 5;
+    private global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext scope_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext Scope {
+      get { return scope_; }
+      set {
+        scope_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "media_type" field.</summary>
+    public const int MediaTypeFieldNumber = 6;
+    private string mediaType_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string MediaType {
+      get { return mediaType_; }
+      set {
+        mediaType_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ValidateKnowledgeResourceRequest);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ValidateKnowledgeResourceRequest other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(Call, other.Call)) return false;
+      if (!object.Equals(Access, other.Access)) return false;
+      if (!object.Equals(Reference, other.Reference)) return false;
+      if (ContentRevision != other.ContentRevision) return false;
+      if (!object.Equals(Scope, other.Scope)) return false;
+      if (MediaType != other.MediaType) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (call_ != null) hash ^= Call.GetHashCode();
+      if (access_ != null) hash ^= Access.GetHashCode();
+      if (reference_ != null) hash ^= Reference.GetHashCode();
+      if (ContentRevision.Length != 0) hash ^= ContentRevision.GetHashCode();
+      if (scope_ != null) hash ^= Scope.GetHashCode();
+      if (MediaType.Length != 0) hash ^= MediaType.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (access_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Access);
+      }
+      if (reference_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Reference);
+      }
+      if (ContentRevision.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(ContentRevision);
+      }
+      if (scope_ != null) {
+        output.WriteRawTag(42);
+        output.WriteMessage(Scope);
+      }
+      if (MediaType.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(MediaType);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (call_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(Call);
+      }
+      if (access_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(Access);
+      }
+      if (reference_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(Reference);
+      }
+      if (ContentRevision.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(ContentRevision);
+      }
+      if (scope_ != null) {
+        output.WriteRawTag(42);
+        output.WriteMessage(Scope);
+      }
+      if (MediaType.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(MediaType);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (call_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Call);
+      }
+      if (access_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Access);
+      }
+      if (reference_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Reference);
+      }
+      if (ContentRevision.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(ContentRevision);
+      }
+      if (scope_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Scope);
+      }
+      if (MediaType.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(MediaType);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ValidateKnowledgeResourceRequest other) {
+      if (other == null) {
+        return;
+      }
+      if (other.call_ != null) {
+        if (call_ == null) {
+          Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+        }
+        Call.MergeFrom(other.Call);
+      }
+      if (other.access_ != null) {
+        if (access_ == null) {
+          Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+        }
+        Access.MergeFrom(other.Access);
+      }
+      if (other.reference_ != null) {
+        if (reference_ == null) {
+          Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+        }
+        Reference.MergeFrom(other.Reference);
+      }
+      if (other.ContentRevision.Length != 0) {
+        ContentRevision = other.ContentRevision;
+      }
+      if (other.scope_ != null) {
+        if (scope_ == null) {
+          Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+        }
+        Scope.MergeFrom(other.Scope);
+      }
+      if (other.MediaType.Length != 0) {
+        MediaType = other.MediaType;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            if (access_ == null) {
+              Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+            }
+            input.ReadMessage(Access);
+            break;
+          }
+          case 26: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 34: {
+            ContentRevision = input.ReadString();
+            break;
+          }
+          case 42: {
+            if (scope_ == null) {
+              Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+            }
+            input.ReadMessage(Scope);
+            break;
+          }
+          case 50: {
+            MediaType = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (call_ == null) {
+              Call = new global::GlimmerCradle.Contracts.Glimmer.Common.V1.CallMetadata();
+            }
+            input.ReadMessage(Call);
+            break;
+          }
+          case 18: {
+            if (access_ == null) {
+              Access = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.KnowledgeResourceAccess();
+            }
+            input.ReadMessage(Access);
+            break;
+          }
+          case 26: {
+            if (reference_ == null) {
+              Reference = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityReference();
+            }
+            input.ReadMessage(Reference);
+            break;
+          }
+          case 34: {
+            ContentRevision = input.ReadString();
+            break;
+          }
+          case 42: {
+            if (scope_ == null) {
+              Scope = new global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilityScopeContext();
+            }
+            input.ReadMessage(Scope);
+            break;
+          }
+          case 50: {
+            MediaType = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ValidateKnowledgeResourceResponse : pb::IMessage<ValidateKnowledgeResourceResponse>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ValidateKnowledgeResourceResponse> _parser = new pb::MessageParser<ValidateKnowledgeResourceResponse>(() => new ValidateKnowledgeResourceResponse());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ValidateKnowledgeResourceResponse> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[18]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceResponse() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceResponse(ValidateKnowledgeResourceResponse other) : this() {
+      current_ = other.current_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ValidateKnowledgeResourceResponse Clone() {
+      return new ValidateKnowledgeResourceResponse(this);
+    }
+
+    /// <summary>Field number for the "current" field.</summary>
+    public const int CurrentFieldNumber = 1;
+    private bool current_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Current {
+      get { return current_; }
+      set {
+        current_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ValidateKnowledgeResourceResponse);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ValidateKnowledgeResourceResponse other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Current != other.Current) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Current != false) hash ^= Current.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Current != false) {
+        output.WriteRawTag(8);
+        output.WriteBool(Current);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Current != false) {
+        output.WriteRawTag(8);
+        output.WriteBool(Current);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Current != false) {
+        size += 1 + 1;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ValidateKnowledgeResourceResponse other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Current != false) {
+        Current = other.Current;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            Current = input.ReadBool();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            Current = input.ReadBool();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
   /// <summary>
   /// 独立 RPC 外壳复用同一调用/正文定义。
   /// </summary>
@@ -5345,7 +6974,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[14]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[19]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5552,7 +7181,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[15]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[20]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5759,7 +7388,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[16]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[21]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5966,7 +7595,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[17]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[22]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6176,7 +7805,7 @@ namespace GlimmerCradle.Contracts.Glimmer.Capabilities.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[18]; }
+      get { return global::GlimmerCradle.Contracts.Glimmer.Capabilities.V1.CapabilitiesReflection.Descriptor.MessageTypes[23]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

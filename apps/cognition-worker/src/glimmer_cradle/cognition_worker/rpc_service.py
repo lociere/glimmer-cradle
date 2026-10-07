@@ -1954,6 +1954,16 @@ class KernelGrpcClient:
     async def read_resource(self, request: capabilities_pb.ReadCapabilityRequest, trace_id: str) -> capabilities_pb.ReadCapabilityResponse:
         return await self._read_capability("ReadResource", request, trace_id)
 
+    async def collect_knowledge_resource(self, request: capabilities_pb.CollectKnowledgeResourceRequest, trace_id: str) -> capabilities_pb.CollectKnowledgeResourceResponse:
+        request.call.CopyFrom(self._call_metadata(trace_id))
+        return await self._call("CollectKnowledgeResource", request, capabilities_pb.CollectKnowledgeResourceRequest,
+            capabilities_pb.CollectKnowledgeResourceResponse, service="glimmer.capabilities.v1.CapabilityService")
+
+    async def validate_knowledge_resource(self, request: capabilities_pb.ValidateKnowledgeResourceRequest, trace_id: str) -> capabilities_pb.ValidateKnowledgeResourceResponse:
+        request.call.CopyFrom(self._call_metadata(trace_id))
+        return await self._call("ValidateKnowledgeResource", request, capabilities_pb.ValidateKnowledgeResourceRequest,
+            capabilities_pb.ValidateKnowledgeResourceResponse, service="glimmer.capabilities.v1.CapabilityService")
+
     async def _read_capability(self, method: str, request: capabilities_pb.ReadCapabilityRequest, trace_id: str) -> capabilities_pb.ReadCapabilityResponse:
         request.call.CopyFrom(self._call_metadata(trace_id, request.call.idempotency_key))
         request_type, response_type = (capabilities_pb.ReadSkillRequest, capabilities_pb.ReadSkillResponse) if method == "ReadSkill" else (capabilities_pb.ReadResourceRequest, capabilities_pb.ReadResourceResponse)

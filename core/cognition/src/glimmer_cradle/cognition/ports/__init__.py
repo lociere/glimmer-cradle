@@ -28,7 +28,12 @@ from glimmer_cradle.cognition.ports.job_port import (
     JobRequest,
     JobRequestStatus,
 )
-from glimmer_cradle.cognition.ports.resource_port import ResourcePort, ResourceSnapshot
+from glimmer_cradle.cognition.ports.resource_port import (
+    ResourceAccess,
+    ResourcePort,
+    ResourceScope,
+    ResourceSnapshot,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -313,6 +318,8 @@ __all__ = [
     "LoggerPort",
     "ObservabilityPort",
     "ResourcePort",
+    "ResourceAccess",
+    "ResourceScope",
     "ResourceSnapshot",
     "SpanPort",
 ]

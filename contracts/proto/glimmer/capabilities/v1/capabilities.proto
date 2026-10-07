@@ -134,6 +134,44 @@ service CapabilityService {
   rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
   rpc ReadSkill(ReadSkillRequest) returns (ReadSkillResponse);
   rpc ReadResource(ReadResourceRequest) returns (ReadResourceResponse);
+  // 显式登记的 Knowledge 采集不是模型 Step/Tool，不伪造 Action 或执行结果。
+  rpc CollectKnowledgeResource(CollectKnowledgeResourceRequest) returns (CollectKnowledgeResourceResponse);
+  rpc ValidateKnowledgeResource(ValidateKnowledgeResourceRequest) returns (ValidateKnowledgeResourceResponse);
+}
+
+message CollectKnowledgeResourceRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string source_id = 2;
+  CapabilityReference reference = 3;
+  CapabilityScopeContext scope = 4;
+}
+
+// Host 的短寿命可撤销采集证明；id 本身不授予权限，不能作为跨重启授权。
+message KnowledgeResourceAccess {
+  string access_id = 1;
+  string source_id = 2;
+  string principal_id = 3;
+  string permission_revision = 4;
+  uint64 collected_at_ms = 5;
+  uint64 expires_at_ms = 6;
+}
+
+message CollectKnowledgeResourceResponse {
+  ResourceContent content = 1;
+  KnowledgeResourceAccess access = 2;
+}
+
+message ValidateKnowledgeResourceRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  KnowledgeResourceAccess access = 2;
+  CapabilityReference reference = 3;
+  string content_revision = 4;
+  CapabilityScopeContext scope = 5;
+  string media_type = 6;
+}
+
+message ValidateKnowledgeResourceResponse {
+  bool current = 1;
 }
 
 // 独立 RPC 外壳复用同一调用/正文定义。

@@ -620,6 +620,58 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/9 Knowledge 采集授权与 freshness 前置（2026-10-07）
+
+输入 `9fa2b2ad`，当前会话唯一写入 owner，完整 v2.1 重构目标保持 active。已有 ReadResource
+属于模型 Step 加载，必须引用原 Action/Log；不能伪造 Action 把它变成后台采集，更不能自动
+将 Tool/加载结果保存成知识。Resource→Knowledge 依赖明确来源接纳和保存权限的 live 验证。
+
+当前接线：同一 Contract Spine 的 CapabilityService 追加独立 CollectKnowledgeResource /
+ValidateKnowledgeResource。Host 先登记 source_id/定义/固定 schema-valid 参数/精确 scope /
+采集年龄的 IO 接纳政策；只有受监督本代主体同时具备 resource.read/knowledge.ingest 才读取。
+global 资源允许明确无 context 的接纳，不伪造 Conversation；partial/empty context 拒绝，
+private 接纳不能删 scope 升为 global。证明同时绑定真实 media_type，防止 parser 输入类型
+被伪造；单来源在途至多 2、总 active 至多 128，超限不改变 attempt 或增加 reader 调用。
+Host 不拥有 Knowledge source store/正文/索引；声明不是 grant，证明不是持久知识或 Memory。
+采集响应绑定真实 UTF-8 hash、来源/主体/定义/双授权及收集时间/期限；复验完整证明、scope
+和内容 revision。旧 Kernel 不实现新采集，不增加兼容假 owner。
+
+Host 再次授权检查/返回检查、双 grant 撤销和 Source/Resource 撤销/定义替换关闭迟到正文。
+并发采集以前最后启动 attempt 为接纳条件，旧读取不能覆盖新证明；重采集撤销旧证明。
+内容 owner 可独立 invalidateResourceContent，不改写定义 revision，取消等待并删除原证明；
+错误 owner 拒绝。期限取两份 grant 与有限采集年龄的最小值，墙钟回拨不能复活过期证明。
+仅内存保存证明/hash，不存 Resource 正文；停止 drain/切代清理。未假设供应商主动订阅已完成。
+
+Core ResourceScope/ResourceAccess/ResourceSnapshot 与 ResourcePort 表达消费方边界，Python
+ResourceClient/KernelGrpcClient 通过唯一 generated RPC 实际采集/复验，普通 Step decoder
+保留 access=None。实际测试使用生产 Worker 注册的测试 generation，在 Python transport
+额外附加回环 channel，不再次伪造 FD3 注册；双权限撤销不影响仅有 read 权限的正常原生聊天。
+IDL、generated TS/Python/C#、Inventory 与三语言 round-trip 同步，不刷新旧兼容基线。
+
+验证输入为 `9fa2b2ad` 上本节 Core Port/Worker Adapter、Host 和 Contract Spine 范围的 dirty
+候选及对应文档，当前唯一写入 owner。Host 全量 109 项（含 Resource 26 项）PASS，Cognition
+363 项、Worker 139 项 PASS；Kernel 47 文件/271 项 PASS、14 条件跳过，其中真实 Worker
+集成另行显式启用后 11 项 PASS，4 个外部分发安装条件未覆盖；production bootstrap smoke
+PASS。Contract Spine gates 22 项、Inventory、Buf lint/breaking、JSON Schema、锁定工具链、
+typecheck、TS/Python/C# round-trip 和 generated-clean 全部 PASS；generated 由命令生成并
+暂存后验证连续生成 hash/文件集与 index 一致，compatibility 无改动。初次 gate 缺符号时同步
+inventory；随后 generated-clean 拒绝未暂存的新生成物，按实际生成候选暂存后完整复验通过，
+没有刷新兼容基线或降低断言。
+
+根 `pnpm typecheck` / `pnpm build` exit 0；最后仅放宽已接纳的 global scope 后，Host
+typecheck/build 与完整测试、Core/Worker 全量测试再次验证，其他未变输入证据复用。
+docs 111 页、编码、架构、target-layout specification、Ruff I/F 和 `git diff --check` PASS。
+Windows/Node 24.18.0/pnpm 11.13.0/根 uv workspace；只有临时 fixture、回环 RPC/HTTP 和本地
+SQLite，不使用收费模型、不操作用户库、不推送/发布。未验完整产品 UI/Unity/安装制品与
+跨机认证，target-layout 这里只验规格而不是 final 物理清单；完整目标与审查门保持未完成。
+
+下一步：Cognition 持久登记来源与修订/采集提交；验证原证明后接纳真实文本/JSON转换和索引，
+在实际检索/Context 使用当前 principal/scope 与 live freshness，撤权、更新和删除失效派生物。
+须实现 Worker composition/API 与 Host source 配置/重新授权装配，不增加模型自行保存入口，
+不把来源正文装进 config Vault；未知/失联证明不放行。Knowledge user_version 仍为 1，未
+迁移用户库。完整 source ledger、parser/chunk pipeline 与跨重启恢复尚未完成，最终固定候选
+安全/生命周期独立审查仍待执行，当前不是生产发布结论。
+
 ### 阶段 9 Host Resource 授权与接纳接线计划（2026-10-07）
 
 输入 `8718cdec`，当前会话唯一写入 owner。Resource 长期知识接入的前置依赖尚缺 Host-owned

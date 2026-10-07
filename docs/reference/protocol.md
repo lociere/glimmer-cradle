@@ -56,6 +56,18 @@ ReadResourceRequest 外壳，受监督 generation/ready 后才开放；尚无实
 Host 结果接纳使用独立 ConversationService.AcceptExecutionResult，不投递到 CognitionService。
 授权和停止边界见[实现地图](../architecture/implementation/Extension与SkillPlane实现.md#目标-host-resource-授权与读取)。
 
+Knowledge 专用 IO 通过同一 CapabilityService.CollectKnowledgeResource/ValidateKnowledgeResource；
+Host 必须先显式接纳 source_id、定义引用、固定参数、scope 与最大采集年龄，同时存在
+resource.read/knowledge.ingest grant。请求不携带模型 Step/Action 或任意读取参数；global 已接纳
+来源的 scope 缺省，private 来源须传精确 context，不允许空 context 或丢 scope 升为 global。
+该区别依赖 message presence，不猜测默认字段。Host 从本代
+受监督主体推导 principal，不接受调用方自报授权。采集响应包含 ResourceContent 及
+KnowledgeResourceAccess，复验将原证明、定义、实际内容 hash/media_type 和 scope 一并发送；完整身份/
+授权 revision/时间与 Host 活跃证明不符即 current=false。未接纳、世代不符、超时/撤销失败
+关闭；不以证明声明 Knowledge 已持久接纳。正文不进入发现目录或审计。
+旧 Kernel 服务未提供该新采集入口，不建立兼容假采集；精确生命周期和未完成接线见
+[实现地图](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
+
 ## Memory Jobs 状态投递
 
 Jobs 的 `JobStateEvent` 是原 outbox 事实，携带稳定 event/job/scope/goal/kind、revision、状态枚举、

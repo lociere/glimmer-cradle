@@ -24,6 +24,19 @@ var digest = SHA256.HashData(fixtureBytes);
 var methodReference = new CapabilitiesV1.SkillReference { SkillId = "method:总结", DefinitionRevision = "revision:一" };
 var nativeScope = new CapabilitiesV1.CapabilityScopeContext { SourceProviderId = "provider:一", SceneId = "scene:一", ConversationId = "conversation:一", UserId = "user:一" };
 var nativeReference = new CapabilitiesV1.CapabilityReference { Id = "[\"weather\",\"lookup\"]", Revision = "revision:一" };
+var resourceAccess = new CapabilitiesV1.KnowledgeResourceAccess { AccessId = "proof:一", SourceId = "source:一", PrincipalId = "principal:一",
+    PermissionRevision = "permission:一", CollectedAtMs = 1, ExpiresAtMs = 9007199254740991UL };
+var resourceCollection = new CapabilitiesV1.CollectKnowledgeResourceRequest { SourceId = "source:一", Reference = nativeReference, Scope = nativeScope };
+var resourceCollectionResult = new CapabilitiesV1.CollectKnowledgeResourceResponse { Access = resourceAccess,
+    Content = new CapabilitiesV1.ResourceContent { Reference = nativeReference, ContentRevision = new string('a', 64), MediaType = "text/plain", ContentUtf8 = "资料" } };
+var resourceValidation = new CapabilitiesV1.ValidateKnowledgeResourceRequest { Access = resourceAccess, Reference = nativeReference, ContentRevision = new string('a', 64), MediaType = "text/plain", Scope = nativeScope };
+var resourceValidationResult = new CapabilitiesV1.ValidateKnowledgeResourceResponse { Current = true };
+if (!CapabilitiesV1.CollectKnowledgeResourceRequest.Parser.ParseFrom(resourceCollection.ToByteArray()).Equals(resourceCollection)
+    || !CapabilitiesV1.CollectKnowledgeResourceResponse.Parser.ParseFrom(resourceCollectionResult.ToByteArray()).Equals(resourceCollectionResult)
+    || !CapabilitiesV1.ValidateKnowledgeResourceRequest.Parser.ParseFrom(resourceValidation.ToByteArray()).Equals(resourceValidation)
+    || !CapabilitiesV1.ValidateKnowledgeResourceResponse.Parser.ParseFrom(resourceValidationResult.ToByteArray()).Equals(resourceValidationResult)
+    || CapabilitiesV1.CollectKnowledgeResourceResponse.Parser.ParseFrom(Array.Empty<byte>()).Access != null)
+    throw new InvalidOperationException("Knowledge resource evidence/safe integer/presence roundtrip failed");
 var nativeExpose = new CapabilitiesV1.ExposeStepRequest { RunId = "run:一", Step = 2, Scope = nativeScope, MaxDefinitions = 128, MaxDefinitionBytes = 65536, RemainingToolCalls = 7 };
 nativeExpose.ProtocolFeatures.Add("tool-call.v1");
 var nativeSurface = new CapabilitiesV1.ExposeStepResponse { RunId = "run:一", Step = 2, UsedDefinitionBytes = 123, Truncated = true };

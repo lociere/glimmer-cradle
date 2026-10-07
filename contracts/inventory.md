@@ -1,5 +1,12 @@
 # M12 Contract Spine Inventory
 
+Knowledge 显式资源采集复用同一 `proto/glimmer/capabilities/v1/capabilities.proto`：
+`CollectKnowledgeResourceRequest`、`CollectKnowledgeResourceResponse`、`KnowledgeResourceAccess`、
+`ValidateKnowledgeResourceRequest`、`ValidateKnowledgeResourceResponse`，同一 `CapabilityService`
+增加 `CollectKnowledgeResource` / `ValidateKnowledgeResource`。Host 接纳固定来源/目标/参数/scope，
+同时验证 resource.read 与 knowledge.ingest；采集证明绑定实际内容/主体/授权和有界 freshness。
+不伪造 Step/Action/Execution result，不将加载正文自动登记成 Knowledge；旧字段/基线保持不变。
+
 Architecture v2 阶段 6 原生 Step 服务：`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有
 `CapabilityReference`、`CapabilityScopeContext`、`ToolDescriptor`、`ResourceDescriptor`、
 `ExposeStepRequest`、`ExposeStepResponse`、`InvokeToolRequest`、`InvokeToolResponse` 与
