@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GLOBAL_CAPABILITY_SCOPE, isCapabilityScopeVisible, isCapabilityDefinitionVisible,
   ToolRegistry, ResourceRegistry, SkillCatalog, ExposureController, type StepExposureRequest, type ExposureGrant,
-  type CapabilityScope, type Tool, type Resource, type Skill } from '../src/index.js';
+  type CapabilityScope, type Tool, type Resource, type Skill, resourceContentFromValue } from '../src/index.js';
 
 const context = { source_provider_id: 'provider:one', scene_id: 'scene:one', conversation_id: 'conversation:one' };
 
@@ -108,6 +108,28 @@ describe('每 Step 的有界三类 Exposure', () => {
 });
 
 describe('Tool / Resource / Skill 独立 owner', () => {
+  it('资源内容版本来自实际 UTF-8/规范 JSON，不等于定义版本或不可序列化平台对象', () => {
+    const reference = { id: 'resource', revision: 'definition1' };
+    const text = resourceContentFromValue(reference, '资源');
+    expect(text).toMatchObject({ reference, media_type: 'text/plain', content_utf8: '资源', content_revision: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    expect(resourceContentFromValue({ ...reference, revision: 'definition2' }, '资源').content_revision).toBe(text.content_revision);
+    expect(resourceContentFromValue(reference, '新资源').content_revision).not.toBe(text.content_revision);
+    expect(resourceContentFromValue(reference, { b: 1, a: '资料' })).toEqual(resourceContentFromValue(reference, { a: '资料', b: 1 }));
+    for (const invalid of [undefined, new Date(), { invalid: NaN }, { get content() { throw new Error('must not run'); } }]) {
+      expect(() => resourceContentFromValue(reference, invalid)).toThrow();
+    }
+    expect(() => resourceContentFromValue(reference, '资'.repeat(11000))).toThrow('预算');
+    expect(resourceContentFromValue(reference, '')).toMatchObject({ content_utf8: '' });
+  });
+  it('动态方法只曝光参数 Schema，不将摘要当正文或额外 Tool', () => {
+    const methods = new SkillCatalog(); const tools = new ToolRegistry(); const resources = new ResourceRegistry();
+    methods.register({ ...skill, instructions: { kind: 'reader', reader_id: 'reader', input_schema: { type: 'object', required: ['topic'] } } });
+    const surface = new ExposureController(tools, methods, resources).expose({ run_id: 'run', step: 1, principal_id: 'principal', target_location: 'host',
+      protocol_features: ['capability-read.v1'], budget: { max_definitions: 3, max_definition_bytes: 8192, remaining_tool_calls: 1 } },
+      [{ kind: 'skill', reference: { id: skill.id, revision: skill.revision }, principal_id: 'principal', target_location: 'host', permission_revision: '1', required_protocol_features: ['capability-read.v1'] }]);
+    expect(surface.tools).toEqual([]); expect(surface.skills[0].input_schema).toEqual({ type: 'object', required: ['topic'] });
+    expect(surface.skills[0]).not.toHaveProperty('instructions');
+  });
   it('方法发现只给摘要，正文按 revision/scope/readiness 重新读取，撤销后旧引用失效', () => {
     const methods = new SkillCatalog(); methods.register(skill);
     const summary = methods.inlineSummaries(context)[0];

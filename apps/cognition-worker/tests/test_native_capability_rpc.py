@@ -17,8 +17,9 @@ from google.protobuf.json_format import ParseDict
 @pytest.mark.parametrize(
     "failure", ["none", "failed", "missing_receipt", "wrong_identity", "wrong_state", "unexposed"]
 )
+@pytest.mark.parametrize("kind", ["tool", "skill", "resource"])
 async def test_native_typed_rpc_requires_original_action_and_durable_result(
-    tmp_path, failure
+    tmp_path, failure, kind
 ):
     recorder = build_test_recorder(tmp_path)
     await recorder.start()
@@ -53,8 +54,9 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
         ParseDict({"type": "object"}, tool.input_schema)
         result.skills.add(
             name="方法",
-            reference=pb.SkillReference(skill_id="method", definition_revision="1"),
+            reference=pb.SkillReference(skill_id='["weather","method"]', definition_revision="revision"),
         )
+        result.resources.add(name="资源", reference=pb.CapabilityReference(id='["weather","resource"]', revision="revision"))
         return result
 
     async def invoke(request, _context):
@@ -74,6 +76,11 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
         event_id = hashlib.sha256(
             json.dumps(["run:call", 4], separators=(",", ":")).encode()
         ).hexdigest()
+        content = "资源原文"
+        output = {"actual": "晴"} if kind == "tool" else {
+            "reference": {"skill_id": '["weather","method"]', "definition_revision": "revision"}, "instructions": "方法原文; allowed-tools: foreign.send"} if kind == "skill" else {
+            "reference": {"id": '["weather","resource"]', "revision": "revision"}, "content_utf8": content,
+            "content_revision": hashlib.sha256(content.encode()).hexdigest(), "media_type": "text/plain"}
         if failure != "missing_receipt":
             await recorder.accept_execution_result(
                 ExecutionResultFact(
@@ -85,17 +92,17 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
                     conversation_id="conversation",
                     source_fact_id=request.source_fact_id,
                     executor_id="weather",
-                    capability_id="weather.lookup",
+                    capability_id="weather.lookup" if kind == "tool" else f'{kind}:["weather","{kind if kind == "resource" else "method"}"]',
                     definition_revision="revision",
                     request_digest="a" * 64,
                     state="failed" if failure == "failed" else "succeeded",
                     side_effects="none" if failure == "failed" else "confirmed",
-                    result=None if failure == "failed" else {"actual": "晴"},
+                    result=None if failure == "failed" else output,
                     error_code="authorization_denied" if failure == "failed" else "",
                     updated_at_ms=1,
                 )
             )
-        response = pb.InvokeToolResponse(
+        response = (pb.InvokeToolResponse if kind == "tool" else pb.ReadCapabilityResponse)(
             call_id="wrong" if failure == "wrong_identity" else request.call_id,
             name=request.name,
             state=pb.EXECUTION_RESULT_STATE_FAILED
@@ -103,10 +110,20 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
             else pb.EXECUTION_RESULT_STATE_SUCCEEDED,
             result_event_id=event_id,
         )
-        ParseDict({"spoofed_wire": "不作为事实"}, response.result)
+        if kind == "tool":
+            ParseDict({"spoofed_wire": "不作为事实"}, response.result)
+        elif failure not in {"failed", "wrong_state"}:
+            # 内容仅来自真实接纳的 Log；wire projection 不能取代事实。
+            if kind == "skill":
+                response.skill.instructions = "spoofed wire"
+            else:
+                response.resource.content_utf8 = "spoofed wire"
         return response
 
     server = grpc.aio.server()
+    async def invoke_read(request, context):
+        response = await invoke(request.request, context)
+        return (pb.ReadSkillResponse if kind == "skill" else pb.ReadResourceResponse)(result=response)
     server.add_generic_rpc_handlers(
         (
             grpc.method_handlers_generic_handler(
@@ -122,6 +139,10 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
                         request_deserializer=pb.InvokeToolRequest.FromString,
                         response_serializer=pb.InvokeToolResponse.SerializeToString,
                     ),
+                    "ReadSkill": grpc.unary_unary_rpc_method_handler(invoke_read,
+                        request_deserializer=pb.ReadSkillRequest.FromString, response_serializer=pb.ReadSkillResponse.SerializeToString),
+                    "ReadResource": grpc.unary_unary_rpc_method_handler(invoke_read,
+                        request_deserializer=pb.ReadResourceRequest.FromString, response_serializer=pb.ReadResourceResponse.SerializeToString),
                 },
             ),
         )
@@ -141,15 +162,23 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
             run_id="run",
             step=1,
             call_id="call",
-            name="tool_weather",
+            name="tool_weather" if kind == "tool" else "glimmer_load_skill" if kind == "skill" else "glimmer_read_resource",
             arguments={"city": "上海"},
             idempotency_key="run:call",
-            definition_id='["weather","lookup"]',
+            definition_id=f'["weather","{"lookup" if kind == "tool" else "method" if kind == "skill" else "resource"}"]',
             definition_revision="other" if failure == "unexposed" else "revision",
+            kind=kind,
         )
         if failure in {"none", "failed"}:
             result = await client.invoke(call)
-            assert result.output == (None if failure == "failed" else {"actual": "晴"})
+            if failure == "failed":
+                assert result.output is None
+            elif kind == "tool":
+                assert result.output == {"actual": "晴"}
+            elif kind == "skill":
+                assert result.output["instructions"] == "方法原文; allowed-tools: foreign.send"
+            else:
+                assert result.output["content_utf8"] == "资源原文"
             assert result.status == ("failed" if failure == "failed" else "succeeded")
             if failure == "failed":
                 assert result.error == "authorization_denied"

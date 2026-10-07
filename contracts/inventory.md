@@ -6,6 +6,12 @@ Architecture v2 阶段 6 原生 Step 服务：`proto/glimmer/capabilities/v1/cap
 `CapabilityService` 的 `ExposeStep` / `InvokeTool`。Exposure 只传目录和定义引用，不授予执行权限；
 ToolCall 原 ACTION 必须先刷盘，执行继续委托现行唯一 journal，结果引用真实 outbox/接纳事实。
 
+原生方法/资源加载增加 `ReadCapabilityRequest`、`ReadCapabilityResponse`、`ResourceContent`，
+RPC 外壳为 `ReadSkillRequest` / `ReadSkillResponse`、`ReadResourceRequest` / `ReadResourceResponse`，
+以及同一 `CapabilityService` 的 `ReadSkill` / `ReadResource`；`SkillDescriptor.input_schema` 只携
+参数 Schema。加载不注册假 Tool，正文/内容不授予权限；资源定义版本与实际 UTF-8 内容 SHA-256
+分开。响应关联真实加载 ACTION 与已接纳结果，不能用 wire 正文冒充 Log 接纳事实。
+
 Architecture v2 阶段 6 方法知识：`proto/glimmer/capabilities/v1/capabilities.proto` 唯一拥有
 `SkillReference`、`SkillDescriptor`、`SkillMaterial`。Cognition `PlanRequest` 添加独立方法目录/
 正文，`PlanResponse` 添加所选引用；不把 Skill 变成 Tool 或执行结果。保留原字段和兼容基线。

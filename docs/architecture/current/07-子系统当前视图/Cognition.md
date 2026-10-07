@@ -67,6 +67,8 @@ Perception
 
 当前生产聊天由唯一 Loop 直接消费原生模型流：每 Step 曝光 Tool、方法摘要和 Resource，绑定实际
 定义后调用 typed Capability Service；ACTION 先刷盘，真实执行结果被 Conversation 接纳后才续接。
+方法正文与 Resource 内容通过通用加载操作按当次引用读取，与业务 Tool 共用预算；仍是独立
+目录。正文不提升为人格/权限，资源内容 hash 与定义 revision 分开，完整 Knowledge 消费仍待接线。
 最终 `reply` 经角色边界、Intent 仲裁和 `ActionCommand` 外发，不再经过 ActionPlan 预分类。
 未完成流、预算、重复调用、未知副作用、tier 与意愿拒绝均失败关闭；没有本地 stream 时不提升为云。
 具体接线和未完成窗口见[唯一认知循环](../../implementation/Cognition认知核实现.md#唯一认知循环)。

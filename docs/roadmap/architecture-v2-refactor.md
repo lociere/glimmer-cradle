@@ -620,7 +620,63 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 5/6 原生模型流与默认聊天接线（2026-10-07 当前候选）
+### 阶段 5/6 原生方法/资源加载接线（2026-10-07）
+
+输入 `c0e94e41`，唯一写入 owner。保留三个独立目录；原生模型协议提供通用方法加载/资源读取
+操作，不为每个方法注册假 Tool。Core 从当次独立曝光绑定引用/版本，加载共用有界 native 调用
+预算与意愿策略；供应商 function 格式只在 Worker。正文不能授予 Tool 权限或变为 system 人格。
+
+唯一 IDL 增加 typed ReadSkill/ReadResource，加载复验当次与当前曝光、scope、权限/ready、版本、
+参数与确认。当前 App 使用现有 Gateway/journal/outbox，不另建事实存储；原加载 ACTION 刷盘，
+结果真实接纳后续接。资源定义 revision 与内容 hash/revision 分开，返回规范化有界内容与来源，
+不把原始供应商 DTO 泄入 Core；方法返回实际正文，不用 description 代替。
+
+reader 的取消/停用/换代、重复和未知结果沿原恢复规则；即使声明无副作用也不凭异常判定未执行。
+实际 gRPC/SQLite/Log 与本地 HTTP 默认聊天加载链验收，覆盖静态/动态方法、资源内容版本、
+撤销/定义漂移、确认拒绝、预算、取消和不能扩大工具权限。依次运行生成与多语言/兼容门，
+避免生成器与活跃 Python Worker/测试重叠；再跑 owner/根构建/文档门。
+此接线不等于完整 Knowledge ingest/失效、Host 权限 broker、持久 Run 恢复或 SDK 三语言完成。
+保留上述后续依赖与 ActionPlan consumer-zero/旧数据保护删除门，不迁用户数据或发布。
+
+实现：Core 从独立 Skill/Resource 曝光绑定 ID/revision/reader 参数；供应商通用加载 function
+不进入 ToolRegistry，也不提升方法里的 allowed-tools。原助手加载参数保留在 native history，
+实际 reader 参数和当次定义引用单独进入 CapabilityInvocation；三类共用预算与重复调用闸。
+IDL 采用独立 ReadSkill/ReadResource RPC 外壳，复用同一调用与 oneof 内容定义，兼容基线未刷新。
+App 校验当次/当前曝光、参数 Schema与 scope；Gateway 确认后复验当前定义/策略/ready，
+委托现行持久 journal/outbox。ACTION 先刷盘，真实 Log receipt 后才续接；已知拒绝和未知不混淆。
+方法限 16 KiB UTF-8、资源限 32 KiB 文本/规范 JSON。Capabilities owner 计算实际内容 SHA-256，
+与定义 revision 分离；Worker 从真实 Log 材料核验引用/hash/media。不新增内容/契约存储。
+原未实现的 ResourceRequestTransport/ResourceClient 字典 RPC 已删除；目标 resource_client.py
+保留实际加载链使用的 ResourceSnapshot 解码器，不宣称完整 ResourcePort/Knowledge 已接通。
+MCP reader signal/SDK deadline 到达真实请求；文本 prompt/resource 在 adapter 规范化，保留
+resource URI/media 来源，非文本 prompt/binary resource 明确不支持。stop 跟踪实际读取任务。
+
+本轮已验证：Core Cognition 332、Worker 139、Capabilities 42、Kernel 271、repo-checks 27 PASS。
+Kernel 常规运行 13 项条件跳过（9 项受监督 Worker、4 项外部安装）；启用受监督 Worker 后
+完整集成文件 10 项 PASS，4 项外部安装条件仍未满足。新增默认聊天静态方法/资源两个真实 typed 读取与 Log 结果续接，
+首个模型请求只有摘要，正文不进入 system，外来 allowed-tools 不增加任何业务 Tool。
+实际 gRPC 逐 kind 覆盖 deadline/cancel/generation/换代、oneof 内容/拒绝投影；SQLite 覆盖
+动态正文/参数 Schema、共用预算、跨类型身份冲突、撤销/版本、确认拒绝和未知不重跑。
+MCP stdio 验证接收方实际收到 cancel，取消后连接仍能完成下一真实请求。
+Contracts 22 项门、IDL lint/breaking、三语言新增 Unicode/Schema/oneof/presence 往返、连续生成
+一致性 PASS；只暂存当前生成结果以运行 git-diff 门，不重置兼容基线。docs 111、编码、目标
+物理 specification-only 已通过，不等于最终 1,098 项实际清单通过。
+最后固定源码候选上的根 `pnpm typecheck` / `pnpm build` 与真实生产装配冒烟 PASS：真实
+Worker ready、唯一 execution 库存在、有序停止正常。冒烟禁用设备、Avatar、Audio、
+Extension 产品功能，不证明这些链完成；所有运行数据使用隔离临时根。
+
+失败收敛：初次 Kernel 门发现 Application 直接 Node hash，已移回 Capabilities owner；新模型
+adapter 深导入常量改走 Core 公共 ports 入口，未增加架构例外。IDL 初次共享 RPC 入出类型
+违反既有 lint，改独立外壳；inventory 正则误把英文注释中的 service 当声明，改精确中文注释
+并补清单。生成一致性门第一次只因候选 generated 未暂存而失败，重生成一致后暂存再完整通过。
+Ruff I/F 对触及 Python 文件通过，不是全仓 lint；本地 fixture 无收费模型请求、用户数据迁移、
+推送或发布。非必要独立审查按用户要求留完整固定候选收尾，整个重构目标仍未完成。
+
+下一依赖调查已确认 ActionPlan 仍被 LoopStep/Deliberation/Continuity、PlanningController 与
+SqlitePlanningStore.record/latest 消费；planning_decision 与长期承诺共用 store。删除必须先
+转换非生产消费者、保留旧行只读恢复/数据保护，再物理移除短程预分类，不删除长期 Planning。
+
+### 阶段 5/6 原生模型流与默认聊天接线（2026-10-07）
 
 输入 `2c9ab0d1`，本会话唯一写入 owner。沿现行 OpenAI-compatible provider 配置接真实
 HTTP/SSE；供应商消息与工具参数拼接只留 Worker adapter，Core 持有供应商无关的 Step 历史。

@@ -41,6 +41,10 @@ Domain/Application/Port 使用 owner-local model；Adapter 显式映射 generate
 
 `CapabilityService.ExposeStep` 传独立 Tool/Skill 摘要/Resource、精确定义引用、作用域和预算；
 `InvokeTool` 携稳定调用键及已刷盘原 ACTION 引用，结果指向 journal 事件与 Conversation 实际接纳。
+`ReadSkill` / `ReadResource` 使用各自 RPC 外壳，复用 `ReadCapabilityRequest` /
+`ReadCapabilityResponse` 的加载身份/内容定义。`SkillDescriptor.input_schema` 传 reader 参数，
+响应 oneof 只给实际 `SkillMaterial` 或 `ResourceContent`；失败不携内容，结果事件绑定已刷盘
+加载 ACTION。资源定义 revision 与 content_utf8 的 SHA-256 分离，wire 内容不替代 Log 事实。
 主体来自已注册监督 generation，位置由 App 决定，模型不能声明权限。TS App mapper 和 Python
 Worker client 显式转换 owner-local Port，不向 Core 泄漏生成类型。取消、deadline、无效引用及
 未知副作用使用 typed error；未知不自动重新执行。新消息纳入 TS/Python/C# Unicode、scope、
@@ -51,7 +55,8 @@ schema boolean/object、null 和 presence 往返；兼容基线未重置。
 `PlanResponse.selected_skills` 是兼容新增字段；TS/Python App mapper 映射 owner-local model，
 Core 不导入生成 DTO。方法选择不是 ToolCall，正文不授予权限、不作为执行结果或 Memory 事实。
 Worker 在进入模型前验证引用、重复身份、目录最多 1,024 项、正文最多两份与合计 64 KiB UTF-8
-预算；非法请求保留 trace 并返回 typed `INVALID_REQUEST`。原生 Step Exposure RPC 尚未接线。
+预算；非法请求保留 trace 并返回 typed `INVALID_REQUEST`。原生 Step/加载链路见上文，完整
+Host 权限、持久 Run 预算与 Knowledge 资源消费不由这些兼容新增字段证明。
 
 ## Document registry 与校验
 

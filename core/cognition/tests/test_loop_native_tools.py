@@ -52,7 +52,11 @@ from glimmer_cradle.cognition.ports import (
     CapabilityExposure,
     CapabilityInvocation,
     CapabilityResult,
+    ResourceDescriptor,
+    SkillReference,
+    SkillSummary,
 )
+from glimmer_cradle.cognition.ports.capability_port import LOAD_SKILL, READ_RESOURCE
 from tests.conftest import CLOCK, IDS, OBSERVABILITY, build_experience_recorder
 
 PROVIDER_CLASSES = (
@@ -217,6 +221,52 @@ class Capabilities:
             status="succeeded",
             output={"condition": "sunny"},
         )
+
+
+@pytest.mark.parametrize("failure", ["none", "unexposed", "wrong_kind", "bad_arguments", "foreign_tool", "budget"])
+async def test_native_loads_independent_catalogs_with_original_history(tmp_path, failure):
+    class Catalog(Capabilities):
+        async def expose(self, *, scope, run_id, step, remaining_calls):
+            return CapabilityExposure(run_id, step, (),
+                (SkillSummary(SkillReference("method", f"m{step}"), "方法", "摘要"),),
+                (ResourceDescriptor("资源", "摘要", "resource", f"r{step}"),))
+
+    class Model:
+        def __init__(self): self.requests = []
+        async def events(self, request):
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                payload = {"call_id": "method-call", "name": LOAD_SKILL, "kind": "skill", "arguments": {"skill_id": "method", "arguments": {"topic": "上海"}}}
+                if failure == "unexposed": payload["arguments"]["skill_id"] = "foreign"
+                if failure == "wrong_kind": payload["kind"] = "tool"
+                if failure == "bad_arguments": payload["arguments"]["arguments"] = []
+                if failure == "foreign_tool": payload.update(name="foreign.send", kind="tool")
+                yield ModelEvent(0, ModelEventKind.TOOL_CALL, payload)
+                yield ModelEvent(1, ModelEventKind.TOOL_CALL, {"call_id": "resource-call", "name": READ_RESOURCE, "kind": "resource",
+                    "arguments": {"resource_id": "resource", "arguments": {}}})
+                yield ModelEvent(2, ModelEventKind.COMPLETED, {})
+            else:
+                yield ModelEvent(0, ModelEventKind.TEXT_DELTA, {"text": "完成"})
+                yield ModelEvent(1, ModelEventKind.COMPLETED, {})
+
+    recorder = build_experience_recorder(tmp_path / "conversation")
+    await recorder.start()
+    catalog, model = Catalog(), Model()
+    controller = LoopController(workspace=AttentionController(capacity=3, clock=CLOCK), providers=[],
+        experience_recorder=recorder, clock=CLOCK, ids=IDS, observability=OBSERVABILITY)
+    try:
+        run = await controller.run_native(InferenceRequest("", "读取"), model=model, capabilities=catalog, scope="conversation:test",
+            stop_policy=StopPolicy(max_capability_calls=1 if failure == "budget" else 8))
+        if failure == "none":
+            assert run.status == "completed" and run.output == "完成"
+            assert [(item.kind, item.definition_id, item.definition_revision, item.arguments) for item in catalog.invocations] == [
+                ("skill", "method", "m1", {"topic": "上海"}), ("resource", "resource", "r1", {})]
+            assert model.requests[1].history[0].tool_calls[0].arguments == {"skill_id": "method", "arguments": {"topic": "上海"}}
+            assert model.requests[1].metadata["capabilities"] == ()
+        else:
+            assert run.status != "completed" and catalog.invocations == []
+    finally:
+        await recorder.stop()
 
 
 async def test_native_loop_passes_tool_result_to_next_model_step(

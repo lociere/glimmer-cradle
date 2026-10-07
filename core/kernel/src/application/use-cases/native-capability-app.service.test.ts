@@ -34,7 +34,7 @@ function fixture(confirmationRequired = false) {
   const gateway = new SkillInvocationGateway(catalog, policy, { record() {} }, observability, { record() {} }, confirm, new ExecutionController(journal));
   const service = new NativeCapabilityAppService(catalog, gateway, policy, 'host:test');
   const request: StepExposureRequest = { run_id: 'run', step: 1, principal_id: 'cognition:1', target_location: 'untrusted-input',
-    protocol_features: ['tool-call.v1'], scope: { conversation_id: 'conversation', scene_id: 'scene', source_provider_id: 'provider' },
+    protocol_features: ['tool-call.v1', 'capability-read.v1'], scope: { conversation_id: 'conversation', scene_id: 'scene', source_provider_id: 'provider' },
     budget: { max_definitions: 128, max_definition_bytes: 65536, remaining_tool_calls: 1 } };
   const surface = service.exposeStep(request);
   const tool = surface.tools[0]!;
@@ -43,6 +43,53 @@ function fixture(confirmationRequired = false) {
   return { service, catalog, definition, journal, handler, request, surface, invocation, confirm };
 }
 describe('NativeCapabilityAppService', () => {
+  it('动态 reader 使用真实参数和正文，Schema 失败不派发；确认拒绝与未知结果不重跑', async () => {
+    const f = fixture(); const render = vi.fn(async (args: unknown) => `实际正文:${(args as { topic: string }).topic}`);
+    f.catalog.registerSkill({ ...f.definition, prompts: [{ id: 'method', description: '摘要不是正文', template: '摘要不是正文',
+      parameters: { type: 'object', properties: { topic: { type: 'string' } }, required: ['topic'], additionalProperties: false }, render }] });
+    const surface = f.service.exposeStep({ ...f.request, step: 2 }); const method = surface.skills[0]!;
+    const request = { ...f.invocation, step: 2, reference: { id: method.reference.skill_id, revision: method.reference.definition_revision }, name: 'glimmer_load_skill' };
+    await expect(f.service.readCapability('skill', request, 'trace', new AbortController().signal)).rejects.toThrow('参数');
+    expect(render).not.toHaveBeenCalled(); expect(f.journal.load('run:call')).toBeNull();
+    const success = await f.service.readCapability('skill', { ...request, arguments: { topic: '资料' } }, 'trace', new AbortController().signal);
+    expect(success.result).toMatchObject({ instructions: '实际正文:资料' }); expect(render).toHaveBeenCalledOnce();
+    const denied = fixture(true); const readDenied = () => denied.service.readCapability('resource', {
+      ...denied.invocation, reference: denied.surface.resources[0]!.reference }, 'trace', new AbortController().signal);
+    const result = await readDenied(); expect(result).toMatchObject({ state: 'failed', error: 'authorization_denied' });
+    await expect(readDenied()).resolves.toEqual(result); expect(denied.confirm).toHaveBeenCalledOnce();
+    const unknown = fixture(); const read = vi.fn(async () => { throw new Error('receiver disconnected'); });
+    unknown.catalog.registerSkill({ ...unknown.definition, resources: [{ id: 'resource', description: '资源', read }] });
+    const snapshot = unknown.service.exposeStep({ ...unknown.request, step: 2 });
+    const uncertain = () => unknown.service.readCapability('resource', { ...unknown.invocation, step: 2, reference: snapshot.resources[0]!.reference }, 'trace', new AbortController().signal);
+    await expect(uncertain()).rejects.toMatchObject({ name: 'SkillInvocationRecoveryRequiredError' });
+    await expect(uncertain()).rejects.toMatchObject({ name: 'SkillInvocationRecoveryRequiredError' });
+    expect(read).toHaveBeenCalledOnce(); expect(unknown.journal.load('run:call')?.state).toBe('unknown');
+  });
+  it.each(['skill', 'resource'] as const)('%s 从独立目录加载，持久重放、共用预算与跨类型身份隔离', async kind => {
+    const f = fixture();
+    const reference = kind === 'skill' ? { id: f.surface.skills[0]!.reference.skill_id, revision: f.surface.skills[0]!.reference.definition_revision }
+      : f.surface.resources[0]!.reference;
+    const request = { ...f.invocation, reference, name: `glimmer_${kind}` };
+    const read = () => f.service.readCapability(kind, request, 'trace', new AbortController().signal);
+    const first = await read();
+    expect(first.state).toBe('succeeded');
+    expect(first.result).toMatchObject(kind === 'skill' ? { instructions: '不进入 Tool 目录的正文' } : { content_utf8: '资源', content_revision: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    expect(f.journal.load('run:call')?.target.capability_id).toBe(`${kind}:${reference.id}`);
+    await expect(read()).resolves.toEqual(first);
+    await expect(f.service.invokeTool(f.invocation, 'trace', new AbortController().signal)).rejects.toThrow('冲突');
+    await expect(f.service.invokeTool({ ...f.invocation, call_id: 'other', invocation_id: 'run:other' }, 'trace', new AbortController().signal)).rejects.toThrow('budget');
+    expect(f.handler).not.toHaveBeenCalled();
+  });
+  it.each(['skill', 'resource'] as const)('%s 读取仍复验撤销、scope、版本与协议支持', async kind => {
+    const f = fixture();
+    const reference = kind === 'skill' ? { id: f.surface.skills[0]!.reference.skill_id, revision: f.surface.skills[0]!.reference.definition_revision }
+      : f.surface.resources[0]!.reference;
+    expect(f.service.exposeStep({ ...f.request, step: 2, protocol_features: ['tool-call.v1'] })[kind === 'skill' ? 'skills' : 'resources']).toEqual([]);
+    await expect(f.service.readCapability(kind, { ...f.invocation, reference: { ...reference, revision: 'stale' } }, 'trace', new AbortController().signal)).rejects.toThrow('版本');
+    f.catalog.unregisterSkill('weather');
+    await expect(f.service.readCapability(kind, { ...f.invocation, reference }, 'trace', new AbortController().signal)).rejects.toThrow('撤销');
+    expect(f.journal.load('run:call')).toBeNull();
+  });
   it('三类独立曝光，真实 journal 幂等重放且不重复副作用', async () => {
     const f = fixture();
     expect([f.surface.tools.length, f.surface.skills.length, f.surface.resources.length]).toEqual([1, 1, 1]);

@@ -322,14 +322,14 @@ export class McpServerSkillProvider implements SkillProvider {
         id: resource.id,
         description: resource.description,
         parameters: resource.parameters,
-        read: (args) => connection.readResource(resource, args),
+        read: (args, context) => connection.readResource(resource, args, context?.signal),
       })),
       prompts: snapshot.prompts.map((prompt) => ({
         id: prompt.id,
         description: prompt.description,
         template: prompt.description,
         parameters: prompt.parameters,
-        render: (args) => connection.getPrompt(prompt.id, args),
+        render: (args, context) => connection.getPrompt(prompt.id, args, context?.signal),
       })),
       policy: {
         riskLevel: 'low',

@@ -7,7 +7,6 @@ from glimmer_cradle.cognition_worker.adapters.content_client import (
 )
 from glimmer_cradle.cognition_worker.adapters.job_client import JobClient
 from glimmer_cradle.cognition_worker.adapters.model_client import ModelClient
-from glimmer_cradle.cognition_worker.adapters.resource_client import ResourceClient
 
 __all__ = [
     "CapabilityClient",
@@ -15,5 +14,4 @@ __all__ = [
     "FileAssetReader",
     "JobClient",
     "ModelClient",
-    "ResourceClient",
 ]

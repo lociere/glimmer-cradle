@@ -1948,6 +1948,21 @@ class KernelGrpcClient:
         return await self._call("InvokeTool", request, capabilities_pb.InvokeToolRequest, capabilities_pb.InvokeToolResponse,
             service="glimmer.capabilities.v1.CapabilityService", timeout=None)
 
+    async def read_skill(self, request: capabilities_pb.ReadCapabilityRequest, trace_id: str) -> capabilities_pb.ReadCapabilityResponse:
+        return await self._read_capability("ReadSkill", request, trace_id)
+
+    async def read_resource(self, request: capabilities_pb.ReadCapabilityRequest, trace_id: str) -> capabilities_pb.ReadCapabilityResponse:
+        return await self._read_capability("ReadResource", request, trace_id)
+
+    async def _read_capability(self, method: str, request: capabilities_pb.ReadCapabilityRequest, trace_id: str) -> capabilities_pb.ReadCapabilityResponse:
+        request.call.CopyFrom(self._call_metadata(trace_id, request.call.idempotency_key))
+        request_type, response_type = (capabilities_pb.ReadSkillRequest, capabilities_pb.ReadSkillResponse) if method == "ReadSkill" else (capabilities_pb.ReadResourceRequest, capabilities_pb.ReadResourceResponse)
+        response = await self._call(method, request_type(request=request), request_type, response_type,
+            service="glimmer.capabilities.v1.CapabilityService", timeout=None)
+        if not response.HasField("result"):
+            raise KernelServiceError(common_pb.SERVICE_ERROR_CODE_INTERNAL, "Native read 缺少结果投影")
+        return response.result
+
     async def _call(self, method: str, request: Any, request_type: Any, response_type: Any, *, timeout: float | None = 5.0,
                     service: str = _KERNEL_SERVICE) -> Any:
         if self._channel is None:

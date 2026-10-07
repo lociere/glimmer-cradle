@@ -45,7 +45,8 @@ export class ExposureController {
         name: `tool_${executionDigest({ id: tool.id }).slice(0, 56)}`, description: tool.description, input_schema: tool.input_schema });
     }
     for (const skill of this.skills.list()) if (allowed('skill', skill)) {
-      add(skills, { reference: { skill_id: skill.id, definition_revision: skill.revision }, name: skill.name, description: skill.description });
+      add(skills, { reference: { skill_id: skill.id, definition_revision: skill.revision }, name: skill.name, description: skill.description,
+        input_schema: skill.instructions.kind === 'reader' ? skill.instructions.input_schema ?? {} : {} });
     }
     for (const resource of this.resources.list()) if (allowed('resource', resource)) {
       add(resources, { reference: { id: resource.id, revision: resource.revision }, name: resource.name,

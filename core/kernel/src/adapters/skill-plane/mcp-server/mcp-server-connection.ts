@@ -126,16 +126,22 @@ export class McpServerConnection {
     );
   }
 
-  public async readResource(resource: McpResourceDefinition, args?: unknown): Promise<unknown> {
+  public async readResource(resource: McpResourceDefinition, args?: unknown, signal?: AbortSignal): Promise<unknown> {
     const uri = resource.uri ?? resolveTemplateUri(resource, args);
-    return this.withTimeout(this._client.readResource({ uri }), `读取 MCP resource ${resource.id}`);
+    const result = await this._client.readResource({ uri }, { signal, timeout: this.target.timeoutMs });
+    // Supplier envelopes stop at this adapter; keep source URI/media as data, never authority.
+    return { contents: result.contents.map(item => {
+      if (!('text' in item)) throw new Error('原生资源加载尚不支持 MCP binary content');
+      return { uri: item.uri, media_type: item.mimeType ?? 'text/plain', text: item.text };
+    }) };
   }
 
-  public async getPrompt(name: string, args?: unknown): Promise<unknown> {
-    return this.withTimeout(
-      this._client.getPrompt({ name, arguments: toPromptArguments(args) }),
-      `渲染 MCP prompt ${name}`,
-    );
+  public async getPrompt(name: string, args?: unknown, signal?: AbortSignal): Promise<string> {
+    const result = await this._client.getPrompt({ name, arguments: toPromptArguments(args) }, { signal, timeout: this.target.timeoutMs });
+    return result.messages.map(message => {
+      if (message.content.type !== 'text') throw new Error('原生方法加载尚不支持 MCP non-text prompt');
+      return `[${message.role}] ${message.content.text}`;
+    }).join('\n\n');
   }
 
   private createTransport(): McpTransport {

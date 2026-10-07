@@ -12,7 +12,15 @@ from glimmer_cradle.cognition.inference import (
     ModelSettings,
     ModelToolCall,
 )
-from glimmer_cradle.cognition.ports import CapabilityDescriptor, CapabilityResult
+from glimmer_cradle.cognition.ports import (
+    LOAD_SKILL,
+    READ_RESOURCE,
+    CapabilityDescriptor,
+    CapabilityResult,
+    ResourceDescriptor,
+    SkillReference,
+    SkillSummary,
+)
 from glimmer_cradle.cognition_worker.adapters.model_client import (
     InferenceException,
     LLMEngine,
@@ -117,6 +125,22 @@ async def test_real_sse_aggregates_interleaved_arguments_and_preserves_native_hi
         assert "ignored" not in json.dumps(payload)
         assert captures[0]["outcome"] == "succeeded" and captures[0]["attributes"]["tool_calls"] == 2
         assert client._sessions == {}
+
+
+@pytest.mark.parametrize("remaining", [0, 2])
+async def test_native_loading_controls_select_independent_catalogs(remaining):
+    body = frame({"tool_calls": [tool(name=LOAD_SKILL, arguments='{"skill_id":"method","arguments":{"topic":"上海"}}'),
+        tool(1, "resource-call", READ_RESOURCE, '{"resource_id":"resource"}')]}, "tool_calls") + b"data: [DONE]\r\n\r\n"
+    async with provider(body) as (endpoint, requests, _, _):
+        events = [event async for event in ModelClient(engine(endpoint)).events(InferenceRequest("", "读取",
+            metadata={"remaining_capability_calls": remaining, "skills": (SkillSummary(SkillReference("method", "m1"), "方法", "摘要"),),
+                "resources": (ResourceDescriptor("资源", "摘要", "resource", "r1"),)}))]
+        functions = [item["function"] for item in requests[0].get("tools", [])]
+        assert [item["name"] for item in functions] == ([LOAD_SKILL, READ_RESOURCE] if remaining else [])
+        assert events[0].payload.get("kind") == ("skill" if remaining else None)
+        assert events[1].payload.get("kind") == ("resource" if remaining else None)
+        if remaining:
+            assert functions[0]["parameters"]["properties"]["skill_id"]["enum"] == ["method"]
 
 
 @pytest.mark.parametrize("failure", ["length", "filter", "no_done", "no_finish", "invalid_json",

@@ -14,6 +14,9 @@ from glimmer_cradle.cognition.ports import (
     SkillReference,
     SkillSummary,
 )
+from glimmer_cradle.cognition_worker.adapters.resource_client import (
+    resource_snapshot_from_result,
+)
 from glimmer_cradle.conversation import ConversationRecorder, MomentKind
 from google.protobuf.json_format import MessageToDict, ParseDict
 
@@ -25,6 +28,8 @@ class CapabilityRpcPort(Protocol):
     async def invoke_tool(
         self, request: capability_pb.InvokeToolRequest, trace_id: str
     ) -> capability_pb.InvokeToolResponse: ...
+    async def read_skill(self, request: capability_pb.ReadCapabilityRequest, trace_id: str) -> capability_pb.ReadCapabilityResponse: ...
+    async def read_resource(self, request: capability_pb.ReadCapabilityRequest, trace_id: str) -> capability_pb.ReadCapabilityResponse: ...
 
 
 class CapabilityClient:
@@ -82,7 +87,7 @@ class CapabilityClient:
                 run_id=run_id,
                 step=step,
                 scope=self._scope(),
-                protocol_features=["tool-call.v1"],
+                protocol_features=["tool-call.v1", "capability-read.v1"],
                 max_definitions=128,
                 max_definition_bytes=64 * 1024,
                 remaining_tool_calls=remaining_calls,
@@ -92,6 +97,14 @@ class CapabilityClient:
         if response.run_id != run_id or response.step != step:
             raise ValueError("native exposure identity mismatch")
 
+        def input_schema(item):
+            schema = MessageToDict(item.input_schema) if item.HasField("input_schema") else {}
+            if schema is None:
+                schema = {}
+            if not isinstance(schema, (dict, bool)):
+                raise ValueError("native exposure input schema invalid")
+            return schema
+
         def descriptor(item, model):
             if (
                 not item.HasField("reference")
@@ -100,21 +113,12 @@ class CapabilityClient:
                 or not item.name
             ):
                 raise ValueError("native exposure definition reference missing")
-            schema = (
-                MessageToDict(item.input_schema)
-                if item.HasField("input_schema")
-                else {}
-            )
-            if schema is None:
-                schema = {}
-            if not isinstance(schema, (dict, bool)):
-                raise ValueError("native exposure input schema invalid")
             return model(
                 name=item.name,
                 description=item.description,
                 definition_id=item.reference.id,
                 definition_revision=item.reference.revision,
-                input_schema=schema,
+                input_schema=input_schema(item),
             )
 
         tools = tuple(descriptor(item, CapabilityDescriptor) for item in response.tools)
@@ -127,6 +131,7 @@ class CapabilityClient:
                 ),
                 item.name,
                 item.description,
+                input_schema(item),
             )
             for item in response.skills
         )
@@ -151,12 +156,7 @@ class CapabilityClient:
 
     async def invoke(self, invocation: CapabilityInvocation) -> CapabilityResult:
         exposure = self._exposures.get((invocation.run_id, invocation.step))
-        if exposure is None or not any(
-            item.name == invocation.name
-            and item.definition_id == invocation.definition_id
-            and item.definition_revision == invocation.definition_revision
-            for item in exposure.tools
-        ):
+        if exposure is None or not self._is_exposed(exposure, invocation):
             raise ValueError("native tool not exposed")
         if invocation.idempotency_key != f"{invocation.run_id}:{invocation.call_id}":
             raise ValueError("native invocation key mismatch")
@@ -164,7 +164,8 @@ class CapabilityClient:
         source = self._recorder.record(
             MomentKind.ACTION,
             {
-                "action_type": "tool_call",
+                "action_type": {"tool": "tool_call", "skill": "skill_load", "resource": "resource_read"}[invocation.kind],
+                "capability_kind": invocation.kind,
                 "run_id": invocation.run_id,
                 "step": invocation.step,
                 "call_id": invocation.call_id,
@@ -187,12 +188,13 @@ class CapabilityClient:
             actor_id=context.get("actor_id"),
             causation_ids=(context["experience_moment_id"],) if context.get("experience_moment_id") else (),
             trace_id=self._trace_id,
-            idempotency_key=f"native-tool-action:{invocation.idempotency_key}",
+            idempotency_key=f"native-{invocation.kind}-action:{invocation.idempotency_key}",
         )
         if source is None:
             raise RuntimeError("native ToolCall has no durable ACTION")
         await self._recorder.flush()
-        request = capability_pb.InvokeToolRequest(
+        request_type = capability_pb.InvokeToolRequest if invocation.kind == "tool" else capability_pb.ReadCapabilityRequest
+        request = request_type(
             run_id=invocation.run_id,
             step=invocation.step,
             call_id=invocation.call_id,
@@ -205,7 +207,11 @@ class CapabilityClient:
         )
         request.call.idempotency_key = invocation.idempotency_key
         ParseDict(invocation.arguments, request.arguments)
-        response = await self._transport.invoke_tool(request, self._trace_id)
+        method = {"tool": self._transport.invoke_tool,
+            "skill": getattr(self._transport, "read_skill", None), "resource": getattr(self._transport, "read_resource", None)}[invocation.kind]
+        if method is None:
+            raise RuntimeError("native reader transport unavailable")
+        response = await method(request, self._trace_id)
         if (
             response.call_id != invocation.call_id
             or response.name != invocation.name
@@ -247,11 +253,42 @@ class CapabilityClient:
             raise ValueError(
                 "native result state projection conflicts with durable fact"
             )
+        output = moment.content.get("result") if state == "succeeded" else None
+        if invocation.kind != "tool":
+            if moment.content.get("capability_id") != f"{invocation.kind}:{invocation.definition_id}":
+                raise ValueError("native read durable capability identity mismatch")
+            if state == "succeeded":
+                if response.WhichOneof("content") != invocation.kind or not isinstance(output, dict):
+                    raise ValueError("native read content missing")
+                expected_reference = {"skill_id": invocation.definition_id, "definition_revision": invocation.definition_revision} if invocation.kind == "skill" else {
+                    "id": invocation.definition_id, "revision": invocation.definition_revision}
+                if output.get("reference") != expected_reference:
+                    raise ValueError("native read content reference mismatch")
+                if invocation.kind == "skill":
+                    text = output.get("instructions")
+                    if not isinstance(text, str) or not text.strip() or len(text.encode("utf-8")) > 16 * 1024:
+                        raise ValueError("native method material invalid")
+                else:
+                    resource_snapshot_from_result(output, invocation.definition_id, invocation.definition_revision)
+            elif response.WhichOneof("content") is not None:
+                raise ValueError("failed read cannot contain material")
         return CapabilityResult(
             invocation.call_id,
             invocation.name,
             state,
-            output=moment.content.get("result") if state == "succeeded" else None,
+            output=output,
             error=moment.content.get("error_code") or None,
             result_fact_id=moment.moment_id,
         )
+
+    @staticmethod
+    def _is_exposed(exposure: CapabilityExposure, invocation: CapabilityInvocation) -> bool:
+        if invocation.kind == "skill":
+            return any(item.reference.skill_id == invocation.definition_id
+                and item.reference.definition_revision == invocation.definition_revision for item in exposure.skills)
+        if invocation.kind == "resource":
+            return any(item.definition_id == invocation.definition_id
+                and item.definition_revision == invocation.definition_revision for item in exposure.resources)
+        return invocation.kind == "tool" and any(item.name == invocation.name
+            and item.definition_id == invocation.definition_id
+            and item.definition_revision == invocation.definition_revision for item in exposure.tools)

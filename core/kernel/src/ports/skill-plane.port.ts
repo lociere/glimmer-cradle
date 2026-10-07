@@ -64,7 +64,7 @@ export interface SkillResource<TArgs = unknown> {
   audience?: SkillAudience;
   scope?: CapabilityScope;
   parameters?: unknown;
-  read: (args?: TArgs) => Promise<unknown> | unknown;
+  read: (args?: TArgs, context?: { readonly signal?: AbortSignal; readonly invocationId?: string }) => Promise<unknown> | unknown;
 }
 
 export interface SkillPrompt<TArgs = unknown> {
@@ -74,7 +74,7 @@ export interface SkillPrompt<TArgs = unknown> {
   scope?: CapabilityScope;
   template: string;
   parameters?: unknown;
-  render?: (args?: TArgs) => Promise<unknown> | unknown;
+  render?: (args?: TArgs, context?: { readonly signal?: AbortSignal; readonly invocationId?: string }) => Promise<unknown> | unknown;
 }
 
 export interface SkillDescriptor {

@@ -142,17 +142,26 @@ Capability/Conversation adapter 单独落实，不伪造外显意图。当前通
 `InferenceRequest.history`：每项 `InferenceStep` 保留该次助手文本、完整 `ModelToolCall` 与真实结果，
 供应商 adapter 据此续接，不把结果伪装成用户消息。`capability_results` 只保留消费兼容元数据，
 不是另一历史 owner。最终回复只取最后无调用 Step，之前文本仍计入输出预算。
+模型协议的通用 `glimmer_load_skill` / `glimmer_read_resource` 加载操作选择独立目录，不给每个
+方法注册假 Tool。Core 将方法/资源 ID 绑定到当次曝光的定义 revision，实际 reader 参数与原始
+助手调用参数分别保留；加载与业务 Tool 共用调用预算、意愿、重复身份和未知结果闸。
+正文和资源内容只作为不可信结果续接，不进入 system 人格、执行权限或 Memory。
 `StopPolicy` 限制 Step、能力调用次数、输出字符和总时长；整个调用批次在首个副作用前验证身份、
 参数与预算。未完成流不派发，重复 ID、未知副作用、未曝光能力失败关闭；提前退出立即关闭流。
 
 Worker `CapabilityClient` 已删除虚构的字典 `capability.expose/invoke` transport，消费 typed
 `CapabilityService` 的真实 gRPC client。它绑定完整 Conversation/交互/隐私上下文，先写原生
-ToolCall ACTION 并刷盘，才携原事实引用派发。响应只定位真实 Log 接纳的结果事件；scope、
+ToolCall/方法加载/资源读取 ACTION 并刷盘，才携原事实引用派发。响应只定位真实 Log 接纳的结果事件；scope、
 交互、定义版本、调用身份或终态投影冲突、receipt 缺失均失败，wire result 不冒充经历或 Memory。
 生产 Worker composition 已把真实 `ModelClient` 和按完整当前感知创建的 `CapabilityClient` 注入
 同一 Loop；canonical `source_provider_id` 从 DTO 经 Observation 传递，不从 Actor/origin 猜测。
 ToolCall ACTION 关联实际 Perception，结果保持原 ACTION 引用，最终 REPLY 关联已接纳结果。
 默认普通聊天已经切换原生链，但完整 Host 权限/持久 Run broker 仍未完成，不能称整体 ready。
+`ReadSkill` / `ReadResource` 使用唯一生成 RPC 外壳与共享加载内容定义；实际正文限 16 KiB、
+资源 UTF-8 内容限 32 KiB。资源定义 revision 与内容 SHA-256 分开，Worker 从已接纳 Log
+核验 reference/hash/media 后才续接。旧无实现的 `resource.read` 字典 transport 已删除；
+`resource_client.py` 现在是实际读取链使用的内容解码器，不冒充完整 ResourcePort/Knowledge 接入。
+Knowledge ingest、索引失效、资源订阅和持久 Run 恢复仍未完成。
 
 跨 owner 依赖由 `ports/{clock,content,conversation,capability,job,resource}_port.py` 描述，具体 Content blob、Conversation Log、Capability execution、Jobs scheduler 与 Resource registry 实现不得进入 Cognition Core。迁移期已有同进程对象尚未全部改接这些 Port；Cognition Worker mapper 接线和旧 Host 删除是结束条件。
 
@@ -172,7 +181,7 @@ Core 的非原生测试/消费入口暂留 ActionPlan；其消费者转换、旧
 最多选择两份匹配定义 revision 的方法；App 复验后以不可信材料提供正文、保持原用户目标。
 模型输出不能扩大可用 Tool，方法正文及 allowed-tools 不授予权限、不作为执行结果或 Memory
 事实。引用/重复身份/正文预算在进入模型前校验；正文不拼入 system 人设。此接线仍服务
-上述请求型兼容编排，不表示完整 CapabilityPort broker 或原生方法/资源内容加载已经完成。
+上述请求型兼容编排；原生加载沿上文独立链路，不能据此声明完整 CapabilityPort broker 已完成。
 
 `state/` 是情绪与认知资源状态的唯一 owner。`cognitive_state.py` 定义 affect/activity 状态和资源策略，`decay.py` 纯计算情绪衰减与 `engaged / ambient / quiescent` 迁移，`state_controller.py` 从真实 Perception、Reply、Action 重建最近活动并驱动生命周期。`SqliteStateStore` 使用 `001-state.sql` 和 expected revision 写入 `data/state/cognition/state.sqlite`；冷启动把快照与 Conversation Log 的更新事实合并。控制器不把自动迁移写成 Experience；Kernel 外部 Attention Lease 也不参与活动态计算。
 

@@ -3,6 +3,18 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 const server = new McpServer({ name: 'selrena-test-mcp', version: '1.0.0' });
+const cancellation = { entered: false, cancelled: false };
+server.registerResource('cancellation', 'selrena-test://cancellation', { description: '测试取消状态。' },
+  async uri => ({ contents: [{ uri: uri.href, text: JSON.stringify(cancellation) }] }));
+server.registerPrompt('slow', { description: '测试真实取消。', argsSchema: {} }, async (_args, extra) => {
+  cancellation.entered = true;
+  await new Promise((_resolve, reject) => {
+    const abort = () => { cancellation.cancelled = true; reject(new Error('cancelled')); };
+    if (extra.signal.aborted) abort();
+    else extra.signal.addEventListener('abort', abort, { once: true });
+  });
+  return { messages: [] };
+});
 
 server.registerTool(
   'echo',

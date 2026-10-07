@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from glimmer_cradle.cognition.ports.capability_port import (
+    LOAD_SKILL,
+    READ_RESOURCE,
     CapabilityDescriptor,
     CapabilityExposure,
     CapabilityInvocation,
@@ -272,6 +274,8 @@ class KernelEventPort(ABC):
         pass
 
 __all__ = [
+    "LOAD_SKILL",
+    "READ_RESOURCE",
     "CapabilityExposure",
     "ResourceDescriptor",
     "SkillReference",

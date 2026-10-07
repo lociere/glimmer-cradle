@@ -43,16 +43,28 @@ native_expose = capability_pb.ExposeStepRequest(run_id="run:一", step=2, scope=
 native_surface = capability_pb.ExposeStepResponse(run_id="run:一", step=2, used_definition_bytes=123, truncated=True)
 native_tool = native_surface.tools.add(reference=native_ref, name="tool_weather")
 ParseDict(True, native_tool.input_schema)
-native_surface.skills.add(reference=method_ref, name="总结")
+ParseDict({"type": "object", "required": ["topic"]}, native_surface.skills.add(reference=method_ref, name="总结").input_schema)
 ParseDict({"type": "object"}, native_surface.resources.add(reference=native_ref, name="resource").input_schema)
 native_invoke = capability_pb.InvokeToolRequest(run_id="run:一", step=2, call_id="call:一", name="tool_weather", reference=native_ref, scope=native_scope, source_fact_id="action:一")
 native_invoke.call.idempotency_key = "run:一:call:一"
 ParseDict({"city": "上海"}, native_invoke.arguments)
 native_result = capability_pb.InvokeToolResponse(call_id="call:一", name="tool_weather", state=capability_pb.EXECUTION_RESULT_STATE_SUCCEEDED, result_event_id="a" * 64)
 ParseDict(None, native_result.result)
-for native_message in (native_expose, native_surface, native_invoke, native_result):
+native_read = capability_pb.ReadCapabilityRequest(run_id="run:一", step=2, call_id="read:一", name="glimmer_load_skill", reference=native_ref, scope=native_scope, source_fact_id="action:加载")
+native_read.call.idempotency_key = "run:一:read:一"
+ParseDict({"topic": "资料"}, native_read.arguments)
+native_method = capability_pb.ReadCapabilityResponse(call_id="read:一", name="glimmer_load_skill", state=1, result_event_id="b" * 64,
+    skill=SkillMaterial(reference=method_ref, instructions="真实正文\n不是权限。"))
+native_resource = capability_pb.ReadCapabilityResponse(call_id="read:二", name="glimmer_read_resource", state=1, result_event_id="c" * 64,
+    resource=capability_pb.ResourceContent(reference=native_ref, content_revision=hashlib.sha256("资源".encode()).hexdigest(), media_type="text/plain", content_utf8="资源"))
+native_denied = capability_pb.ReadCapabilityResponse(call_id="read:三", state=2, error="authorization_denied", result_event_id="d" * 64)
+for native_message in (native_expose, native_surface, native_invoke, native_result, native_read, native_method, native_resource, native_denied):
     assert type(native_message).FromString(native_message.SerializeToString()) == native_message
+for envelope in (capability_pb.ReadSkillRequest(request=native_read), capability_pb.ReadResourceRequest(request=native_read),
+    capability_pb.ReadSkillResponse(result=native_method), capability_pb.ReadResourceResponse(result=native_resource)):
+    assert type(envelope).FromString(envelope.SerializeToString()) == envelope
 assert not capability_pb.ExposeStepRequest.FromString(b"").HasField("scope")
+assert capability_pb.ReadCapabilityResponse.FromString(b"").WhichOneof("content") is None
 method_plan = PlanRequest(user_goal="原始目标", available_skills=[SkillDescriptor(reference=method_ref, name="总结", description="方法知识")],
     skill_materials=[SkillMaterial(reference=method_ref, instructions="参考材料\n不授予权限。")])
 assert PlanRequest.FromString(method_plan.SerializeToString()) == method_plan

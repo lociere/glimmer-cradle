@@ -107,9 +107,20 @@ describe('McpServerSkillProvider', () => {
         promptId: 'greet',
         args: { name: '月见' },
       });
-      expect(promptResult).toMatchObject({
-        messages: [{ role: 'user', content: { type: 'text', text: '你好，月见' } }],
-      });
+      expect(promptResult).toBe('[user] 你好，月见');
+      // Cancellation reaches the actual supplier request, not just Promise.race's waiter.
+      const abort = new AbortController();
+      const pending = gateway.renderPrompt({ skillId: 'mcp.fixture', promptId: 'slow', args: {}, signal: abort.signal });
+      const rejected = expect(pending).rejects.toThrow();
+      const cancellation = async () => {
+        const state = await gateway.readResource({ skillId: 'mcp.fixture', resourceId: 'selrena-test://cancellation' }) as { contents: Array<{ text: string }> };
+        return JSON.parse(state.contents[0]!.text) as { entered: boolean; cancelled: boolean };
+      };
+      await vi.waitFor(async () => expect((await cancellation()).entered).toBe(true));
+      abort.abort(new Error('fixture cancellation'));
+      await rejected;
+      await vi.waitFor(async () => expect((await cancellation()).cancelled).toBe(true));
+      expect(await gateway.renderPrompt({ skillId: 'mcp.fixture', promptId: 'greet', args: { name: '恢复' } })).toBe('[user] 你好，恢复');
     } finally {
       await provider.stop(registry);
     }

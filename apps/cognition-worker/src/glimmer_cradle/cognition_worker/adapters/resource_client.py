@@ -1,54 +1,21 @@
-"""Versioned resource client implementing Cognition's ResourcePort."""
+"""Native reader material decoder; RPC/authorization and durable receipt belong to CapabilityClient."""
 
-from __future__ import annotations
-
-import base64
-from typing import Protocol
+import hashlib
 
 from glimmer_cradle.cognition.ports import ResourceSnapshot
 
 
-class ResourceRequestTransport(Protocol):
-    async def request(
-        self, method: str, payload: dict[str, object]
-    ) -> dict[str, object]: ...
-
-
-class ResourceClient:
-    def __init__(self, transport: ResourceRequestTransport) -> None:
-        self._transport = transport
-
-    async def read(
-        self,
-        resource_id: str,
-        *,
-        revision: str | None,
-        principal_id: str,
-    ) -> ResourceSnapshot:
-        response = await self._transport.request(
-            "resource.read",
-            {
-                "resource_id": resource_id,
-                "revision": revision,
-                "principal_id": principal_id,
-            },
-        )
-        actual_id, actual_revision, media_type, encoded = (
-            response.get("resource_id"),
-            response.get("revision"),
-            response.get("media_type"),
-            response.get("content_base64"),
-        )
-        attributes = response.get("attributes", {})
-        if not all(
-            isinstance(value, str) and value
-            for value in (actual_id, actual_revision, media_type, encoded)
-        ) or not isinstance(attributes, dict):
-            raise ValueError("invalid resource snapshot")
-        return ResourceSnapshot(
-            resource_id=actual_id,
-            revision=actual_revision,
-            media_type=media_type,
-            content=base64.b64decode(encoded, validate=True),
-            attributes=attributes,
-        )
+def resource_snapshot_from_result(output: dict, definition_id: str, definition_revision: str) -> ResourceSnapshot:
+    """Validate actual Log material, not a supplier response or an invented resource.read RPC."""
+    text = output.get("content_utf8")
+    if output.get("reference") != {"id": definition_id, "revision": definition_revision}:
+        raise ValueError("native resource definition mismatch")
+    if not isinstance(text, str) or len(text.encode("utf-8")) > 32 * 1024:
+        raise ValueError("native resource content invalid")
+    content = text.encode("utf-8")
+    revision = hashlib.sha256(content).hexdigest()
+    media_type = output.get("media_type")
+    if output.get("content_revision") != revision or media_type not in {"text/plain", "application/json"}:
+        raise ValueError("native resource content revision/media invalid")
+    return ResourceSnapshot(definition_id, revision, media_type, content,
+        {"definition_revision": definition_revision})

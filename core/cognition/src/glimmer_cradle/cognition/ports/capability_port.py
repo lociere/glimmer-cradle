@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
+# Loading operations select independent catalogs; they are not registered business Tools.
+LOAD_SKILL = "glimmer_load_skill"
+READ_RESOURCE = "glimmer_read_resource"
+
 
 @dataclass(frozen=True, slots=True)
 class SkillReference:
@@ -26,6 +30,7 @@ class SkillSummary:
     reference: SkillReference
     name: str
     description: str
+    input_schema: dict[str, object] | bool = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +78,7 @@ class CapabilityInvocation:
     idempotency_key: str
     definition_id: str
     definition_revision: str
+    kind: Literal["tool", "skill", "resource"] = "tool"
 
 
 CapabilityResultStatus = Literal["succeeded", "failed", "unknown"]

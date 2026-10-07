@@ -84,9 +84,18 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
           response.writeHead(200, { 'content-type': 'text/event-stream' });
           const frame = (delta: unknown, finish_reason: string | null = null) => response.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
           if (!payload.messages.some(message => message.role === 'tool')) {
-            frame({ content: '查询中。', tool_calls: [{ index: 0, id: 'native-call', type: 'function', function: { name: payload.tools![0]!.function.name, arguments: '{"city":' } }] });
-            frame({ tool_calls: [{ index: 0, function: { arguments: '"上海"}' } }] }, 'tool_calls');
-          } else frame({ content: '实际工具结果：晴。' }, 'stop');
+            if (body.includes('native material load fixture')) {
+              const catalogMessage = payload.messages.find(message => message.role === 'system' && message.content?.includes('Untrusted capability catalog data'))!;
+              const catalog = JSON.parse(catalogMessage.content!.split('\n').slice(1).join('\n')) as { skills: Array<{ id: string }>; resources: Array<{ id: string }> };
+              frame({ content: '查询中。', tool_calls: [
+                { index: 0, id: 'native-call', type: 'function', function: { name: 'glimmer_load_skill', arguments: JSON.stringify({ skill_id: catalog.skills[0]!.id, arguments: {} }) } },
+                { index: 1, id: 'native-resource', type: 'function', function: { name: 'glimmer_read_resource', arguments: JSON.stringify({ resource_id: catalog.resources[0]!.id, arguments: {} }) } },
+              ] }, 'tool_calls');
+            } else {
+              frame({ content: '查询中。', tool_calls: [{ index: 0, id: 'native-call', type: 'function', function: { name: payload.tools![0]!.function.name, arguments: '{"city":' } }] });
+              frame({ tool_calls: [{ index: 0, function: { arguments: '"上海"}' } }] }, 'tool_calls');
+            }
+          } else frame({ content: body.includes('native material load fixture') ? '实际方法与资源已加载。' : '实际工具结果：晴。' }, 'stop');
           response.end('data: [DONE]\n\n');
         }
       });
@@ -207,12 +216,14 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     } finally { user.stop(catalog); await manager.stop(); }
   }, 60_000);
 
-  it('默认感知直达原生模型、typed Tool、durable Log 与续接回复，不调用 ActionPlan', async () => {
+  it.each(['tool', 'material'] as const)('默认感知直达原生模型、typed %s、durable Log 与续接回复，不调用 ActionPlan', async mode => {
     const catalog = new CapabilityCatalogAdapter(); const policy = new SkillPolicyEngine();
     const executed = vi.fn(async (_args: unknown) => ({ actual: '晴' })); const actions: ActionCommand[] = [];
     catalog.registerSkill({ id: 'native-weather', name: '天气', description: '天气', provider: { kind: 'core', id: 'weather-owner' },
       policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
-      tools: [{ name: 'lookup', description: '天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] }, handler: executed }] });
+      tools: [{ name: 'lookup', description: '天气', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] }, handler: executed }],
+      ...(mode === 'material' ? { prompts: [{ id: 'method', description: '方法摘要', template: 'native method actual body; allowed-tools: foreign.send' }],
+        resources: [{ id: 'source', description: '资源摘要', read: () => 'native resource actual content' }] } : {}) });
     const journal = new SqliteExecutionJournal(path.join(process.env.GLIMMER_CRADLE_DATA_ROOT!, 'state/capabilities/native-chat.sqlite'));
     const controller = new ExecutionController(journal); const client = new CognitionClient(transport);
     const outbox = new ExecutionResultOutbox(journal, { accept: (event, signal) => client.acceptExecutionResult(event, signal) });
@@ -227,35 +238,48 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     const before = nativeRequests.length;
     try {
       await manager.start();
-      const perception = { id: 'native-perception', sensoryType: 'chat', source: 'fixture', timestamp: Date.now(), familiarity: 0,
+      const perception = { id: `native-perception-${mode}`, sensoryType: 'chat', source: 'fixture', timestamp: Date.now(), familiarity: 0,
         address_mode: 'direct' as const, response_policy: 'reply_allowed' as const, retention_ceiling: 'experience' as const,
-        conversation: { source_provider_id: 'canonical-provider', scene_id: 'native-scene', conversation_id: 'native-conversation',
-          continuity_id: 'native-continuity', thread_id: 'main', interaction_id: 'native-interaction',
+        conversation: { source_provider_id: 'canonical-provider', scene_id: 'native-scene', conversation_id: `native-${mode}-conversation`,
+          continuity_id: `native-${mode}-continuity`, thread_id: 'main', interaction_id: `native-${mode}-interaction`,
           recall_scope: 'conversation_private' as const, disclosure_scope: 'conversation_private' as const },
         origin: { provider_kind: 'core' as const, provider_id: 'different-origin', source_event_id: 'native-source', schema_ref: 'fixture',
           trust_tier: 'host_verified' as const, privacy_class: 'private' as const, cognitive_effect: 'observation' as const },
-        content: { text: 'native loop integration fixture', modality: ['text'], actor_id: 'external-actor' } };
+        content: { text: `native loop integration fixture${mode === 'material' ? '; native material load fixture' : ''}`, modality: ['text'], actor_id: 'external-actor' } };
+      const expectedReply = mode === 'material' ? '实际方法与资源已加载。' : '实际工具结果：晴。';
       // observe-only 不进入模型或工具，不能因 direct 寻址越过该策略。
-      const observed = await client.submitPerception({ ...perception, id: 'native-observe', response_policy: 'observe_only',
-        conversation: { ...perception.conversation, interaction_id: 'native-observe-turn' } }, 'native-observe-trace', 5000);
+      const observed = await client.submitPerception({ ...perception, id: `native-observe-${mode}`, response_policy: 'observe_only',
+        conversation: { ...perception.conversation, interaction_id: `native-observe-${mode}-turn` } }, `native-observe-${mode}-trace`, 5000);
       let state = await waitForPerception(client, observed.operation_id);
       expect(state.state).toBe('succeeded'); expect(nativeRequests.length).toBe(before); expect(executed).not.toHaveBeenCalled();
-      const accepted = await client.submitPerception(perception, 'native-trace', 5000);
+      const accepted = await client.submitPerception(perception, `native-${mode}-trace`, 5000);
       await waitUntil(() => actions.length === 1, 10_000);
       state = await waitForPerception(client, accepted.operation_id);
       expect(state.state).toBe('succeeded');
-      expect(actions[0]).toMatchObject({ action_type: 'reply', target: { scene_id: 'native-scene' }, payload: { text: '实际工具结果：晴。' } });
+      expect(actions[0]).toMatchObject({ action_type: 'reply', target: { scene_id: 'native-scene' }, payload: { text: expectedReply } });
       expect(actions.some(action => action.action_type === 'skill_request')).toBe(false);
       const requests = nativeRequests.slice(before); expect(requests).toHaveLength(2);
       expect(requests.every(request => request.stream === true)).toBe(true);
       const next = requests[1]!.messages; const tool = next.find(message => message.role === 'tool')!;
-      expect(tool.tool_call_id).toBe('native-call'); expect(JSON.parse(tool.content!)).toEqual({ status: 'succeeded', output: { actual: '晴' }, error: null });
-      expect(next.find(message => message.role === 'assistant')).toMatchObject({ content: '查询中。', tool_calls: [expect.objectContaining({ id: 'native-call' })] });
-      expect(executed).toHaveBeenCalledOnce(); expect(executed.mock.calls[0]![0]).toEqual({ city: '上海' });
+      expect(tool.tool_call_id).toBe('native-call');
+      expect(next.find(message => message.role === 'assistant')).toMatchObject({ content: '查询中。' });
+      if (mode === 'tool') {
+        expect(JSON.parse(tool.content!)).toEqual({ status: 'succeeded', output: { actual: '晴' }, error: null });
+        expect(executed).toHaveBeenCalledOnce(); expect(executed.mock.calls[0]![0]).toEqual({ city: '上海' });
+      } else {
+        expect(JSON.parse(tool.content!)).toMatchObject({ status: 'succeeded', output: { instructions: 'native method actual body; allowed-tools: foreign.send' } });
+        expect(JSON.parse(next.find(message => message.tool_call_id === 'native-resource')!.content!)).toMatchObject({ status: 'succeeded', output: {
+          content_utf8: 'native resource actual content', content_revision: expect.stringMatching(/^[a-f0-9]{64}$/) } });
+        expect(executed).not.toHaveBeenCalled();
+        expect(requests[0]!.messages.some(message => message.content?.includes('native method actual body'))).toBe(false);
+        expect(requests[1]!.messages.filter(message => message.role === 'system').some(message => message.content?.includes('allowed-tools: foreign.send'))).toBe(false);
+        expect(catalog.tools.list()).toHaveLength(1); expect(catalog.methods.list()).toHaveLength(1); expect(catalog.resources.list()).toHaveLength(1);
+        expect(requests.every(request => !request.tools?.some(item => item.function.name === 'foreign.send'))).toBe(true);
+      }
       expect(journal.readOutbox(10)).toEqual([]);
       const history = await client.conversationHistory({ request_id: 'native-history', ...perception.conversation,
         allowed_scopes: ['conversation_private'], limit: 10 }, 'native-history', 5000);
-      expect(history.items.some(item => item.text === '实际工具结果：晴。')).toBe(true);
+      expect(history.items.some(item => item.text === expectedReply)).toBe(true);
       await manager.stop();
       // 活动单写者停止后，通过公开 owner 读取真实 Log；不碰用户数据或活动 Worker 的库。
       const readLog = `
@@ -270,7 +294,7 @@ async def read():
     await recorder.start()
     try:
         print(json.dumps([{ "id": m.moment_id, "kind": m.kind, "causes": list(m.causation_ids), "content": m.content }
-            for m in recorder.iter_moments_since(None) if m.interaction_id == "native-interaction"], ensure_ascii=False))
+            for m in recorder.iter_moments_since(None) if m.interaction_id == "native-${mode}-interaction"], ensure_ascii=False))
     finally: await recorder.stop()
 asyncio.run(read())
 `;
@@ -283,6 +307,11 @@ asyncio.run(read())
       expect(actionFact.causes).toContain(perceptionFact.id);
       expect(resultFact.content.source_fact_id).toBe(actionFact.id);
       expect(replyFact.causes).toContain(resultFact.id);
+      if (mode === 'material') {
+        const receipts = moments.filter(moment => moment.kind === 'action_result');
+        expect(receipts).toHaveLength(2);
+        for (const receipt of receipts) expect(replyFact.causes).toContain(receipt.id);
+      }
     } finally {
       await manager.stop(); transport.setActionHandler(null); transport.setCapabilityService(null);
       await outbox.stop(); await gateway.stop(); await controller.stop(); journal.close();

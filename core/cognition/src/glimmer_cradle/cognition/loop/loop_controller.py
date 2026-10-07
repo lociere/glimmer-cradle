@@ -48,6 +48,8 @@ from glimmer_cradle.cognition.perception import (
 from glimmer_cradle.cognition.planning import PlanningController
 from glimmer_cradle.cognition.ports import IdGeneratorPort, ObservabilityPort
 from glimmer_cradle.cognition.ports.capability_port import (
+    LOAD_SKILL,
+    READ_RESOURCE,
     CapabilityInvocation,
     CapabilityPort,
     CapabilityResult,
@@ -329,11 +331,18 @@ class LoopController:
                     or any(not item.name or not item.definition_id or not item.definition_revision for item in exposed):
                 raise ValueError("invalid capability exposure")
             exposed_by_name = {descriptor.name: descriptor for descriptor in exposed}
+            if any(name in exposed_by_name for name in (LOAD_SKILL, READ_RESOURCE)):
+                raise ValueError("native loading operation name collision")
+            skills_by_id = {item.reference.skill_id: item for item in exposure.skills}
+            resources_by_id = {item.definition_id: item for item in exposure.resources}
+            if len(skills_by_id) != len(exposure.skills) or len(resources_by_id) != len(exposure.resources):
+                raise ValueError("duplicate native catalog references")
             current = InferenceRequest(system=request.system, user=request.user, max_tokens=request.max_tokens,
                 temperature=request.temperature, vision=request.vision, provider_key=request.provider_key,
                 history=tuple(history),
                 metadata={**request.metadata, "run_id": run_id, "step": step_count, "capabilities": tuple(exposed),
-                    "skills": exposure.skills, "resources": exposure.resources, "capability_results": tuple(results)})
+                    "skills": exposure.skills, "resources": exposure.resources, "capability_results": tuple(results),
+                    "remaining_capability_calls": policy.max_capability_calls - capability_calls if can_invoke else 0})
             step_calls: list[dict[str, object]] = []
             completed = False
             previous_sequence = -1
@@ -390,6 +399,7 @@ class LoopController:
 
             # Validate the entire batch before the first side effect, including call identity.
             calls: list[ModelToolCall] = []
+            invocations: list[CapabilityInvocation] = []
             batch_ids: set[str] = set()
             for payload in step_calls:
                 if capability_calls >= policy.max_capability_calls:
@@ -432,7 +442,24 @@ class LoopController:
                 if not valid:
                     return LoopRun(run_id, "failed", step_count, stop_reason="invalid_tool_arguments",
                         capability_results=tuple(results))
-                if name not in exposed_by_name:
+                kind = payload.get("kind", "tool")
+                definition_id = definition_revision = ""
+                reader_arguments = arguments
+                if kind == "tool" and name in exposed_by_name:
+                    definition_id = exposed_by_name[name].definition_id
+                    definition_revision = exposed_by_name[name].definition_revision
+                elif kind in {"skill", "resource"} and name == (LOAD_SKILL if kind == "skill" else READ_RESOURCE):
+                    selected = arguments.get("skill_id" if kind == "skill" else "resource_id")
+                    reader_arguments = arguments.get("arguments", {})
+                    if not isinstance(selected, str) or not isinstance(reader_arguments, dict):
+                        return LoopRun(run_id, "failed", step_count, stop_reason="invalid_tool_arguments", capability_results=tuple(results))
+                    if kind == "skill" and selected in skills_by_id:
+                        definition_id = selected
+                        definition_revision = skills_by_id[selected].reference.definition_revision
+                    if kind == "resource" and selected in resources_by_id:
+                        definition_id = selected
+                        definition_revision = resources_by_id[selected].definition_revision
+                if not definition_id or not definition_revision:
                     return LoopRun(
                         run_id=run_id,
                         status="failed",
@@ -446,11 +473,13 @@ class LoopController:
                         capability_results=tuple(results))
                 batch_ids.add(call_id)
                 calls.append(ModelToolCall(call_id, name, arguments))
+                invocations.append(CapabilityInvocation(run_id, step_count, call_id, name, reader_arguments,
+                    f"{run_id}:{call_id}", definition_id, definition_revision, kind))
             step_results: list[CapabilityResult] = []
             if len(calls) > policy.max_capability_calls - capability_calls:
                 return LoopRun(run_id, "stopped", step_count, stop_reason="capability_call_limit",
                     capability_results=tuple(results))
-            for call in calls:
+            for call, invocation in zip(calls, invocations, strict=True):
                 if invocation_allowed is not None and not await invocation_allowed():
                     return LoopRun(run_id, "stopped", step_count, stop_reason="volition_denied",
                         capability_results=tuple(results))
@@ -459,18 +488,7 @@ class LoopController:
                         capability_results=tuple(results))
                 call_id, name, arguments = call.call_id, call.name, call.arguments
                 capability_calls += 1
-                result = await capabilities.invoke(
-                    CapabilityInvocation(
-                        run_id=run_id,
-                        step=step_count,
-                        call_id=call_id,
-                        name=name,
-                        arguments=arguments,
-                        idempotency_key=f"{run_id}:{call_id}",
-                        definition_id=exposed_by_name[name].definition_id,
-                        definition_revision=exposed_by_name[name].definition_revision,
-                    )
-                )
+                result = await capabilities.invoke(invocation)
                 if result.call_id != call_id or result.name != name or result.status not in {"succeeded", "failed", "unknown"}:
                     raise ValueError("invalid capability result identity")
                 results.append(result)

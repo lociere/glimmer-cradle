@@ -118,7 +118,7 @@ Schema 源。现行 SDK/wire 的 `SkillDescriptor` 仍是旧分组投影，`tota
 已经删除。接入映射随阶段 12 移到 App，旧 SDK 分组在阶段 9/11/12 原生消费者归零后删除。
 User Provider 已以 inline 方法接入独立 SkillCatalog，删除 `instructions.read` 假 Tool；现行两次
 Plan 分别消费方法目录与正文。原生 Step Exposure 已接默认聊天的 typed client/模型 Loop，
-原生方法正文与 Resource 内容加载、完整权限/持久预算 broker 仍未完成。
+方法正文与 Resource 内容已由通用加载操作接入原生 Loop；完整权限/持久预算 broker 仍未完成。
 
 `core/capabilities/src/exposure/{step-surface,exposure-controller}.ts` 分别投影 Tool、Skill 摘要、Resource，
 没有正文或 handler。显式授权事实必须匹配主体、可选平台用户、定义 ID/revision、实际目标位置和协议；
@@ -132,6 +132,13 @@ permission revision 暂绑定定义 revision，不等于完整 Host 粒度权限
 短寿命 Step，预算只限制当次已保存 Step，不是持久 Run 配额或 Platform authority。调用复验当次
 与当前曝光、scope、精确定义引用和幂等身份，撤销/换代/替换后不拿旧名称重绑；重复调用进入
 原 journal，不重复副作用。Gateway 确认后仍复验注册、策略与定义。
+`ReadSkill` / `ReadResource` 需要 `capability-read.v1` 支持，分别匹配独立当次/当前曝光与 reader
+参数 Schema，不将加载控制函数注册成业务 Tool。加载 ACTION 先刷盘，共用 Step 调用预算；
+Gateway 委托同一持久执行 owner，读结果携实际方法正文或有界资源内容/内容 hash，失败与
+unknown 沿原恢复纪律。文本/规范 JSON 是当前资源边界，binary/realtime/订阅尚未实现。
+MCP 接入 adapter 将 prompt text 转为方法材料、resource text 转为保留 URI/media 的中性数据，
+不把 supplier DTO 或 description 冒充正文；reader signal/SDK deadline 到达实际请求，不只取消
+等待者。非文本 prompt/binary resource 明确不支持；实际派发后异常仍保留未知结果，不自动重试。
 已提交的确认拒绝投影为已知 failed 结果，不伪造成功；派发后未知仍通过 typed recovery error
 要求可信对账，不能当 failed 重跑。协议和 Worker 接纳链见
 [Contract Spine 实现](Protocol契约层实现.md)及[Cognition 实现](Cognition认知核实现.md#唯一认知循环)。

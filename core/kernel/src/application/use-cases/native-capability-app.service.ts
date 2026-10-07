@@ -1,8 +1,9 @@
 import { executionDigest, ExecutionConflictError } from '@glimmer-cradle/capabilities';
+import Ajv2020 from 'ajv/dist/2020';
 import type { CapabilityDefinition, CapabilityKind, ExposureGrant, StepExposureRequest, StepSurface } from '@glimmer-cradle/capabilities';
 import type { CapabilityCatalogPort } from '../../ports/skill-plane.port';
 import { NativeCapabilityRequestError } from '../../ports/native-capability-service.port';
-import type { NativeCapabilityServicePort, NativeToolInvocation, NativeToolResult } from '../../ports/native-capability-service.port';
+import type { NativeCapabilityServicePort, NativeCapabilityInvocation, NativeCapabilityResult } from '../../ports/native-capability-service.port';
 import { SkillInvocationGateway } from '../skill-plane/skill-invocation-gateway';
 import { SkillPolicyEngine } from '../skill-plane/skill-policy-engine';
 
@@ -32,7 +33,7 @@ export class NativeCapabilityAppService implements NativeCapabilityServicePort {
     return surface;
   }
 
-  public async invokeTool(request: NativeToolInvocation, traceId: string, signal: AbortSignal): Promise<NativeToolResult> {
+  public async invokeTool(request: NativeCapabilityInvocation, traceId: string, signal: AbortSignal): Promise<NativeCapabilityResult> {
     signal.throwIfAborted();
     const step = this.steps.get(this.key(request.principal_id, request.run_id, request.step));
     if (!step || executionDigest(step.request.scope) !== executionDigest(request.scope)) throw new NativeCapabilityRequestError('Step 未曝光或 scope 冲突');
@@ -41,18 +42,47 @@ export class NativeCapabilityAppService implements NativeCapabilityServicePort {
     if (!matches(step.surface) || !matches(this.catalog.exposeStep(step.request, this.grants(step.request)))) {
       throw new NativeCapabilityRequestError('Tool 未曝光、已撤销或定义版本变更');
     }
-    if (request.invocation_id !== `${request.run_id}:${request.call_id}` || !request.source_fact_id) throw new NativeCapabilityRequestError('Tool invocation identity 无效');
-    const digest = executionDigest({ reference: request.reference, arguments: request.arguments, source_fact_id: request.source_fact_id });
-    const previous = step.calls.get(request.invocation_id);
-    if (previous && previous !== digest) throw new NativeCapabilityRequestError('Tool invocation 内容冲突');
-    if (!previous && step.calls.size >= step.request.budget.remaining_tool_calls) throw new NativeCapabilityRequestError('Step Tool budget 耗尽');
-    step.calls.set(request.invocation_id, digest);
+    this.reserve('tool', request, step);
     // 仅解析当次真实注册且曝光过的接入引用，不从模型名称推断 provider/权限。
     const [group, name] = JSON.parse(request.reference.id) as [string, string];
+    return this.projectResult(request, () => this.gateway.invoke({ skillId: group, toolName: name, args: request.arguments,
+      conversation: request.scope, invocationId: request.invocation_id, sourceFactId: request.source_fact_id, traceId, signal }));
+  }
+
+  public async readCapability(kind: 'skill' | 'resource', request: NativeCapabilityInvocation, traceId: string, signal: AbortSignal): Promise<NativeCapabilityResult> {
+    signal.throwIfAborted();
+    const step = this.steps.get(this.key(request.principal_id, request.run_id, request.step));
+    if (!step || executionDigest(step.request.scope) !== executionDigest(request.scope)) throw new NativeCapabilityRequestError('Step 未曝光或 scope 冲突');
+    const find = (surface: StepSurface) => kind === 'skill'
+      ? surface.skills.find(item => item.reference.skill_id === request.reference.id && item.reference.definition_revision === request.reference.revision)
+      : surface.resources.find(item => item.reference.id === request.reference.id && item.reference.revision === request.reference.revision);
+    const captured = find(step.surface);
+    if (!captured || !find(this.catalog.exposeStep(step.request, this.grants(step.request)))) throw new NativeCapabilityRequestError('Capability read 未曝光、已撤销或版本变更');
+    // reader 参数来自当次独立目录；模型的加载控制函数不拥有额外授权。
+    try {
+      if (!new Ajv2020({ strict: false }).validate(captured.input_schema ?? {}, request.arguments)) throw new Error('invalid arguments');
+    } catch { throw new NativeCapabilityRequestError('Capability read 参数不符合定义'); }
+    this.reserve(kind, request, step);
+    const [group, id] = JSON.parse(request.reference.id) as [string, string];
+    const common = { skillId: group, args: request.arguments, conversation: request.scope,
+      invocationId: request.invocation_id, sourceFactId: request.source_fact_id, traceId, signal, nativeProjection: true };
+    return this.projectResult(request, () => kind === 'skill'
+      ? this.gateway.renderPrompt({ ...common, promptId: id }) : this.gateway.readResource({ ...common, resourceId: id }));
+  }
+
+  private reserve(kind: CapabilityKind, request: NativeCapabilityInvocation, step: { request: StepExposureRequest; calls: Map<string, string> }): void {
+    if (request.invocation_id !== `${request.run_id}:${request.call_id}` || !request.source_fact_id) throw new NativeCapabilityRequestError('Capability invocation identity 无效');
+    const digest = executionDigest({ kind, reference: request.reference, arguments: request.arguments, source_fact_id: request.source_fact_id });
+    const previous = step.calls.get(request.invocation_id);
+    if (previous && previous !== digest) throw new NativeCapabilityRequestError('Capability invocation 内容冲突');
+    if (!previous && step.calls.size >= step.request.budget.remaining_tool_calls) throw new NativeCapabilityRequestError('Step Capability budget 耗尽');
+    step.calls.set(request.invocation_id, digest);
+  }
+
+  private async projectResult(request: NativeCapabilityInvocation, execute: () => Promise<unknown>): Promise<NativeCapabilityResult> {
     let result: unknown;
     try {
-      result = await this.gateway.invoke({ skillId: group, toolName: name, args: request.arguments,
-        conversation: request.scope, invocationId: request.invocation_id, sourceFactId: request.source_fact_id, traceId, signal });
+      result = await execute();
     } catch (error) {
       const event = this.gateway.resultEvent(request.invocation_id);
       // 只投影已经提交的已知失败；摘要冲突/未知派发/普通异常不能伪造 failed。
@@ -60,7 +90,7 @@ export class NativeCapabilityAppService implements NativeCapabilityServicePort {
       return { call_id: request.call_id, name: request.name, state: 'failed', error: event.invocation.error_code ?? 'execution_failed', result_event_id: event.event_id };
     }
     const event = this.gateway.resultEventId(request.invocation_id);
-    if (!event) throw new Error('Native Tool 缺少 durable result event');
+    if (!event) throw new Error('Native Capability 缺少 durable result event');
     return { call_id: request.call_id, name: request.name, state: 'succeeded', result, result_event_id: event };
   }
 
@@ -75,7 +105,7 @@ export class NativeCapabilityAppService implements NativeCapabilityServicePort {
       if (definition) grants.push({ kind, reference: { id: definition.id, revision: definition.revision },
         principal_id: request.principal_id, ...(request.user_id === undefined ? {} : { user_id: request.user_id }),
         target_location: this.location, permission_revision: definition.revision,
-        required_protocol_features: kind === 'tool' ? ['tool-call.v1'] : [] });
+        required_protocol_features: kind === 'tool' ? ['tool-call.v1'] : ['capability-read.v1'] });
     };
     const inlineMethods = new Set(this.catalog.listReadyMethods(request.scope).map(item => item.reference.skill_id));
     for (const entry of this.catalog.listCatalogEntries()) {

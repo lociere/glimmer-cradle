@@ -28,7 +28,7 @@ var nativeExpose = new CapabilitiesV1.ExposeStepRequest { RunId = "run:一", Ste
 nativeExpose.ProtocolFeatures.Add("tool-call.v1");
 var nativeSurface = new CapabilitiesV1.ExposeStepResponse { RunId = "run:一", Step = 2, UsedDefinitionBytes = 123, Truncated = true };
 nativeSurface.Tools.Add(new CapabilitiesV1.ToolDescriptor { Reference = nativeReference, Name = "tool_weather", InputSchema = Google.Protobuf.WellKnownTypes.Value.ForBool(true) });
-nativeSurface.Skills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结" });
+nativeSurface.Skills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结", InputSchema = Google.Protobuf.WellKnownTypes.Value.Parser.ParseJson("{\"type\":\"object\",\"required\":[\"topic\"]}") });
 nativeSurface.Resources.Add(new CapabilitiesV1.ResourceDescriptor { Reference = nativeReference, Name = "resource", InputSchema = Google.Protobuf.WellKnownTypes.Value.Parser.ParseJson("{\"type\":\"object\"}") });
 var nativeInvoke = new CapabilitiesV1.InvokeToolRequest { Call = new CallMetadata { IdempotencyKey = "run:一:call:一" }, RunId = "run:一", Step = 2, CallId = "call:一", Name = "tool_weather", Reference = nativeReference, Scope = nativeScope, SourceFactId = "action:一", Arguments = Google.Protobuf.WellKnownTypes.Struct.Parser.ParseJson("{\"city\":\"上海\"}") };
 var nativeResult = new CapabilitiesV1.InvokeToolResponse { CallId = "call:一", Name = "tool_weather", State = CapabilitiesV1.ExecutionResultState.Succeeded, Result = Google.Protobuf.WellKnownTypes.Value.ForNull(), ResultEventId = new string('a', 64) };
@@ -39,6 +39,28 @@ if (!CapabilitiesV1.ExposeStepRequest.Parser.ParseFrom(nativeExpose.ToByteArray(
     || CapabilitiesV1.ExposeStepRequest.Parser.ParseFrom(Array.Empty<byte>()).Scope != null)
     throw new InvalidOperationException("Native Step/reference/privacy/null roundtrip failed");
 var methodPlan = new PlanRequest { UserGoal = "原始目标" };
+var nativeRead = new CapabilitiesV1.ReadCapabilityRequest { Call = new CallMetadata { IdempotencyKey = "run:一:read:一" }, RunId = "run:一", Step = 2, CallId = "read:一", Name = "glimmer_load_skill",
+    Reference = nativeReference, Scope = nativeScope, SourceFactId = "action:加载", Arguments = Google.Protobuf.WellKnownTypes.Struct.Parser.ParseJson("{\"topic\":\"资料\"}") };
+var nativeMethod = new CapabilitiesV1.ReadCapabilityResponse { CallId = "read:一", Name = "glimmer_load_skill", State = CapabilitiesV1.ExecutionResultState.Succeeded, ResultEventId = new string('b', 64),
+    Skill = new CapabilitiesV1.SkillMaterial { Reference = methodReference, Instructions = "真实正文\n不是权限。" } };
+var nativeResource = new CapabilitiesV1.ReadCapabilityResponse { CallId = "read:二", Name = "glimmer_read_resource", State = CapabilitiesV1.ExecutionResultState.Succeeded, ResultEventId = new string('c', 64),
+    Resource = new CapabilitiesV1.ResourceContent { Reference = nativeReference, ContentRevision = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("资源"))).ToLowerInvariant(), MediaType = "text/plain", ContentUtf8 = "资源" } };
+var nativeDenied = new CapabilitiesV1.ReadCapabilityResponse { CallId = "read:三", State = CapabilitiesV1.ExecutionResultState.Failed, Error = "authorization_denied", ResultEventId = new string('d', 64) };
+if (!CapabilitiesV1.ReadCapabilityRequest.Parser.ParseFrom(nativeRead.ToByteArray()).Equals(nativeRead)
+    || !CapabilitiesV1.ReadCapabilityResponse.Parser.ParseFrom(nativeMethod.ToByteArray()).Equals(nativeMethod)
+    || !CapabilitiesV1.ReadCapabilityResponse.Parser.ParseFrom(nativeResource.ToByteArray()).Equals(nativeResource)
+    || !CapabilitiesV1.ReadCapabilityResponse.Parser.ParseFrom(nativeDenied.ToByteArray()).Equals(nativeDenied)
+    || CapabilitiesV1.ReadCapabilityResponse.Parser.ParseFrom(Array.Empty<byte>()).ContentCase != CapabilitiesV1.ReadCapabilityResponse.ContentOneofCase.None)
+    throw new InvalidOperationException("Native read Unicode/schema/content presence roundtrip failed");
+var readSkillEnvelope = new CapabilitiesV1.ReadSkillRequest { Request = nativeRead };
+var readResourceEnvelope = new CapabilitiesV1.ReadResourceRequest { Request = nativeRead };
+var skillEnvelopeResult = new CapabilitiesV1.ReadSkillResponse { Result = nativeMethod };
+var resourceEnvelopeResult = new CapabilitiesV1.ReadResourceResponse { Result = nativeResource };
+if (!CapabilitiesV1.ReadSkillRequest.Parser.ParseFrom(readSkillEnvelope.ToByteArray()).Equals(readSkillEnvelope)
+    || !CapabilitiesV1.ReadResourceRequest.Parser.ParseFrom(readResourceEnvelope.ToByteArray()).Equals(readResourceEnvelope)
+    || !CapabilitiesV1.ReadSkillResponse.Parser.ParseFrom(skillEnvelopeResult.ToByteArray()).Equals(skillEnvelopeResult)
+    || !CapabilitiesV1.ReadResourceResponse.Parser.ParseFrom(resourceEnvelopeResult.ToByteArray()).Equals(resourceEnvelopeResult))
+    throw new InvalidOperationException("Read service envelope roundtrip failed");
 methodPlan.AvailableSkills.Add(new CapabilitiesV1.SkillDescriptor { Reference = methodReference, Name = "总结", Description = "方法知识" });
 methodPlan.SkillMaterials.Add(new CapabilitiesV1.SkillMaterial { Reference = methodReference, Instructions = "参考材料\n不授予权限。" });
 if (!PlanRequest.Parser.ParseFrom(methodPlan.ToByteArray()).Equals(methodPlan) || methodPlan.AvailableTools.Count != 0)

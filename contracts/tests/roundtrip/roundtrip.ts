@@ -4,7 +4,8 @@ import { resolve } from 'node:path';
 import { create, fromBinary, fromJson, fromJsonString, toBinary, toJsonString } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import { ExecutionResultState, ExecutionSideEffects, ExposeStepRequestSchema, ExposeStepResponseSchema,
-  InvokeToolRequestSchema, InvokeToolResponseSchema } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
+  InvokeToolRequestSchema, InvokeToolResponseSchema, ReadCapabilityRequestSchema, ReadCapabilityResponseSchema,
+  ReadSkillRequestSchema, ReadSkillResponseSchema, ReadResourceRequestSchema, ReadResourceResponseSchema } from '../../generated/ts/glimmer/capabilities/v1/capabilities_pb';
 import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema } from '../../generated/ts/glimmer/conversation/v1/conversation_pb';
 import {
   EchoProbeRequestSchema,
@@ -37,11 +38,18 @@ const nativeMessages = [
   [ExposeStepRequestSchema, { call: { traceId: 'trace:一', generation: 'generation:一' }, runId: 'run:一', step: 2,
     scope: nativeScope, protocolFeatures: ['tool-call.v1'], maxDefinitions: 128, maxDefinitionBytes: 65536, remainingToolCalls: 7 }],
   [ExposeStepResponseSchema, { runId: 'run:一', step: 2, tools: [{ reference: nativeReference, name: 'tool_weather', inputSchema: fromJson(ValueSchema, true) }],
-    skills: [{ reference: methodReference, name: '总结' }], resources: [{ reference: nativeReference, name: 'resource', inputSchema: fromJson(ValueSchema, { type: 'object' }) }], usedDefinitionBytes: 123, truncated: true }],
+    skills: [{ reference: methodReference, name: '总结', inputSchema: fromJson(ValueSchema, { type: 'object', required: ['topic'] }) }], resources: [{ reference: nativeReference, name: 'resource', inputSchema: fromJson(ValueSchema, { type: 'object' }) }], usedDefinitionBytes: 123, truncated: true }],
   [InvokeToolRequestSchema, { call: { idempotencyKey: 'run:一:call:一' }, runId: 'run:一', step: 2, callId: 'call:一', name: 'tool_weather',
     reference: nativeReference, scope: nativeScope, arguments: { city: '上海' }, sourceFactId: 'action:一' }],
   [InvokeToolResponseSchema, { callId: 'call:一', name: 'tool_weather', state: ExecutionResultState.SUCCEEDED,
     result: fromJson(ValueSchema, null), resultEventId: 'a'.repeat(64) }],
+  [ReadCapabilityRequestSchema, { call: { idempotencyKey: 'run:一:read:一' }, runId: 'run:一', step: 2, callId: 'read:一', name: 'glimmer_load_skill',
+    reference: nativeReference, scope: nativeScope, arguments: { topic: '资料' }, sourceFactId: 'action:加载' }],
+  [ReadCapabilityResponseSchema, { callId: 'read:一', name: 'glimmer_load_skill', state: ExecutionResultState.SUCCEEDED, resultEventId: 'b'.repeat(64),
+    content: { case: 'skill', value: { reference: methodReference, instructions: '真实正文\n不是权限。' } } }],
+  [ReadCapabilityResponseSchema, { callId: 'read:二', name: 'glimmer_read_resource', state: ExecutionResultState.SUCCEEDED, resultEventId: 'c'.repeat(64),
+    content: { case: 'resource', value: { reference: nativeReference, contentRevision: createHash('sha256').update('资源').digest('hex'), mediaType: 'text/plain', contentUtf8: '资源' } } }],
+  [ReadCapabilityResponseSchema, { callId: 'read:三', state: ExecutionResultState.FAILED, error: 'authorization_denied', resultEventId: 'd'.repeat(64) }],
 ] as const;
 for (const [schema, input] of nativeMessages) {
   const message = create(schema as typeof ExposeStepRequestSchema, input as never);
@@ -50,6 +58,15 @@ for (const [schema, input] of nativeMessages) {
     throw new Error('Native capability Step/reference/privacy/null roundtrip failed');
 }
 if (fromBinary(ExposeStepRequestSchema, new Uint8Array()).scope !== undefined) throw new Error('Absent native scope gained presence');
+if (fromBinary(ReadCapabilityResponseSchema, new Uint8Array()).content.case !== undefined) throw new Error('Absent read gained content');
+for (const [schema, input] of [[ReadSkillRequestSchema, { request: { callId: '加载:一', sourceFactId: 'action:加载', reference: nativeReference } }],
+  [ReadResourceRequestSchema, { request: { callId: '资源:一', scope: nativeScope, reference: nativeReference } }],
+  [ReadSkillResponseSchema, { result: { content: { case: 'skill', value: { reference: methodReference, instructions: '方法' } } } }],
+  [ReadResourceResponseSchema, { result: { content: { case: 'resource', value: { reference: nativeReference, contentUtf8: '资源' } } } }]] as const) {
+  const message = create(schema as typeof ReadSkillRequestSchema, input as never);
+  if (toJsonString(schema as typeof ReadSkillRequestSchema, fromBinary(schema as typeof ReadSkillRequestSchema, toBinary(schema as typeof ReadSkillRequestSchema, message)))
+      !== toJsonString(schema as typeof ReadSkillRequestSchema, message)) throw new Error('Read service envelope roundtrip failed');
+}
 const methodPlan = create(PlanRequestSchema, { userGoal: '原始目标',
   availableSkills: [{ reference: methodReference, name: '总结', description: '方法知识' }],
   skillMaterials: [{ reference: methodReference, instructions: '参考材料\n不授予权限。' }] });

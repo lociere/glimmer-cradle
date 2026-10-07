@@ -2,8 +2,9 @@ import * as grpc from '@grpc/grpc-js';
 import { createHmac } from 'node:crypto';
 import { create, fromBinary } from '@bufbuild/protobuf';
 import { ExposeStepRequestSchema, ExposeStepResponseSchema, InvokeToolRequestSchema, InvokeToolResponseSchema } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import { ReadCapabilityRequestSchema, ReadSkillRequestSchema, ReadSkillResponseSchema, ReadResourceRequestSchema, ReadResourceResponseSchema } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import { NativeCapabilityRequestError } from '../../ports/native-capability-service.port';
-import type { NativeToolInvocation, NativeToolResult } from '../../ports/native-capability-service.port';
+import type { NativeCapabilityInvocation, NativeCapabilityResult } from '../../ports/native-capability-service.port';
 import {
   ServiceErrorCode,
   ServiceErrorDetailSchema,
@@ -63,21 +64,26 @@ describe('KernelCognitionTransport', () => {
     transport.configureActionDeadline(30_000);
   });
 
-  it.each(['deadline', 'cancel', 'generation', 'replacement'] as const)('native %s 取消实际等待且不冒充成功', async failure => {
+  it.each((['tool', 'skill', 'resource'] as const).flatMap(kind => (['deadline', 'cancel', 'generation', 'replacement'] as const).map(failure => [kind, failure] as const)))('native %s %s 取消实际等待且不冒充成功', async (kind, failure) => {
     await transport.start(); const client = await registerTransport(transport, 781);
     let entered!: () => void; const started = new Promise<void>(resolve => { entered = resolve; });
     let aborted = false;
-    transport.setCapabilityService({ exposeStep: () => { throw new Error('not used'); }, revokePrincipal: vi.fn(),
-      invokeTool: async (_request, _trace, signal) => {
+    const execute = async (_request: NativeCapabilityInvocation, _trace: string, signal: AbortSignal): Promise<NativeCapabilityResult> => {
         entered();
         await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => { aborted = true; reject(signal.reason); }, { once: true }));
         throw new Error('must not complete');
-      } });
+      };
+    transport.setCapabilityService({ exposeStep: () => { throw new Error('not used'); }, revokePrincipal: vi.fn(),
+      invokeTool: execute, readCapability: (_kind, request, trace, signal) => execute(request, trace, signal) });
     transport.configureActionDeadline(failure === 'deadline' ? 25 : 30_000);
-    const method = unaryMethod('/glimmer.capabilities.v1.CapabilityService/InvokeTool', InvokeToolRequestSchema, InvokeToolResponseSchema);
-    const pending = cancellableRawCall(client, method, create(InvokeToolRequestSchema, {
+    const method = unaryMethod(`/glimmer.capabilities.v1.CapabilityService/${kind === 'tool' ? 'InvokeTool' : kind === 'skill' ? 'ReadSkill' : 'ReadResource'}`,
+      kind === 'tool' ? InvokeToolRequestSchema : kind === 'skill' ? ReadSkillRequestSchema : ReadResourceRequestSchema,
+      kind === 'tool' ? InvokeToolResponseSchema : kind === 'skill' ? ReadSkillResponseSchema : ReadResourceResponseSchema);
+    const invocation = {
       call: transport.makeCallMetadata({ traceId: 'native-cancel', idempotencyKey: 'run:call' }), runId: 'run', step: 1, callId: 'call', name: 'tool',
-      reference: { id: 'id', revision: 'revision' }, sourceFactId: 'actual-action', scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } }));
+      reference: { id: 'id', revision: 'revision' }, sourceFactId: 'actual-action', scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } };
+    const pending = cancellableRawCall(client, method, kind === 'tool' ? create(InvokeToolRequestSchema, invocation)
+      : kind === 'skill' ? create(ReadSkillRequestSchema, { request: invocation }) : create(ReadResourceRequestSchema, { request: invocation }));
     const rejected = expect(pending.promise).rejects.toMatchObject({ code: failure === 'deadline' ? grpc.status.DEADLINE_EXCEEDED : grpc.status.CANCELLED });
     try {
       await started;
@@ -90,13 +96,36 @@ describe('KernelCognitionTransport', () => {
     } finally { client.close(); }
   });
 
+  it.each(['skill', 'resource'] as const)('typed %s 只返回相应 oneof material 与已提交事件', async kind => {
+    await transport.start(); const client = await registerTransport(transport, 790);
+    const readCapability = vi.fn(async (_kind, request: NativeCapabilityInvocation): Promise<NativeCapabilityResult> => ({ call_id: request.call_id,
+      name: request.name, state: 'succeeded', result_event_id: 'a'.repeat(64), result: kind === 'skill'
+        ? { reference: { skill_id: 'id', definition_revision: 'revision' }, instructions: '正文' }
+        : { reference: { id: 'id', revision: 'revision' }, content_revision: 'b'.repeat(64), media_type: 'text/plain', content_utf8: '资源' } }));
+    transport.setCapabilityService({ exposeStep: vi.fn(), invokeTool: vi.fn(), readCapability, revokePrincipal: vi.fn() });
+    const method = unaryMethod(`/glimmer.capabilities.v1.CapabilityService/${kind === 'skill' ? 'ReadSkill' : 'ReadResource'}`,
+      kind === 'skill' ? ReadSkillRequestSchema : ReadResourceRequestSchema, kind === 'skill' ? ReadSkillResponseSchema : ReadResourceResponseSchema);
+    const invocation = create(ReadCapabilityRequestSchema, { call: transport.makeCallMetadata({ traceId: 'native-read', idempotencyKey: 'run:read' }),
+      runId: 'run', step: 1, callId: 'read', name: 'loader', reference: { id: 'id', revision: 'revision' }, sourceFactId: 'actual-action',
+      scope: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation' } });
+    const request = kind === 'skill' ? create(ReadSkillRequestSchema, { request: invocation }) : create(ReadResourceRequestSchema, { request: invocation });
+    try {
+      const result = (await rawCall(client, method, request)).result!;
+      expect(result.content.case).toBe(kind); expect(result.resultEventId).toBe('a'.repeat(64));
+      expect(readCapability.mock.calls[0]![0]).toBe(kind);
+      readCapability.mockResolvedValueOnce({ call_id: 'read', name: 'loader', state: 'failed', error: 'authorization_denied', result_event_id: 'c'.repeat(64) });
+      const denied = (await rawCall(client, method, request)).result!;
+      expect(denied.content.case).toBeUndefined(); expect(denied.error).toBe('authorization_denied');
+    } finally { client.close(); }
+  });
+
   it('typed Capability RPC 绑定监督主体、真实 scope/ref 和结果事件，拒绝旧 generation', async () => {
     await transport.start(); const client = await registerTransport(transport, 779);
     const expose = unaryMethod('/glimmer.capabilities.v1.CapabilityService/ExposeStep', ExposeStepRequestSchema, ExposeStepResponseSchema);
     const invoke = unaryMethod('/glimmer.capabilities.v1.CapabilityService/InvokeTool', InvokeToolRequestSchema, InvokeToolResponseSchema);
     const exposeStep = vi.fn(request => ({ run_id: request.run_id, step: request.step, tools: [{ reference: { id: 'id', revision: 'revision' }, name: 'tool', description: '天气', input_schema: true }], skills: [], resources: [], used_definition_bytes: 123, truncated: false }));
-    const invokeTool = vi.fn(async (request: NativeToolInvocation): Promise<NativeToolResult> => ({ call_id: request.call_id, name: request.name, state: 'succeeded', result: null, result_event_id: 'a'.repeat(64) }));
-    const revokePrincipal = vi.fn(); transport.setCapabilityService({ exposeStep, invokeTool, revokePrincipal });
+    const invokeTool = vi.fn(async (request: NativeCapabilityInvocation): Promise<NativeCapabilityResult> => ({ call_id: request.call_id, name: request.name, state: 'succeeded', result: null, result_event_id: 'a'.repeat(64) }));
+    const revokePrincipal = vi.fn(); transport.setCapabilityService({ exposeStep, invokeTool, readCapability: vi.fn(), revokePrincipal });
     const scope = { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation', userId: 'user' };
     try {
       const surface = await rawCall(client, expose, create(ExposeStepRequestSchema, { call: transport.makeCallMetadata({ traceId: 'native' }),

@@ -17,6 +17,8 @@ message SkillDescriptor {
   SkillReference reference = 1;
   string name = 2;
   string description = 3;
+  // 动态方法的参数 Schema；静态方法使用 object，无正文或执行权限。
+  google.protobuf.Value input_schema = 4;
 }
 
 message SkillMaterial {
@@ -94,10 +96,51 @@ message InvokeToolResponse {
   string result_event_id = 6;
 }
 
+// 加载操作不把方法/资源注册成 Tool；仍需当次曝光与独立定义版本。
+message ReadCapabilityRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string run_id = 2;
+  uint32 step = 3;
+  string call_id = 4;
+  string name = 5;
+  CapabilityReference reference = 6;
+  CapabilityScopeContext scope = 7;
+  google.protobuf.Struct arguments = 8;
+  string source_fact_id = 9;
+}
+
+message ResourceContent {
+  CapabilityReference reference = 1;
+  // SHA-256(实际 content_utf8 UTF-8 bytes)；不是定义 revision。
+  string content_revision = 2;
+  string media_type = 3;
+  string content_utf8 = 4;
+}
+
+message ReadCapabilityResponse {
+  string call_id = 1;
+  string name = 2;
+  ExecutionResultState state = 3;
+  oneof content {
+    SkillMaterial skill = 4;
+    ResourceContent resource = 5;
+  }
+  string error = 6;
+  string result_event_id = 7;
+}
+
 service CapabilityService {
   rpc ExposeStep(ExposeStepRequest) returns (ExposeStepResponse);
   rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
+  rpc ReadSkill(ReadSkillRequest) returns (ReadSkillResponse);
+  rpc ReadResource(ReadResourceRequest) returns (ReadResourceResponse);
 }
+
+// 独立 RPC 外壳复用同一调用/正文定义。
+message ReadSkillRequest { ReadCapabilityRequest request = 1; }
+message ReadSkillResponse { ReadCapabilityResponse result = 1; }
+message ReadResourceRequest { ReadCapabilityRequest request = 1; }
+message ReadResourceResponse { ReadCapabilityResponse result = 1; }
 
 enum ExecutionResultState {
   EXECUTION_RESULT_STATE_UNSPECIFIED = 0;

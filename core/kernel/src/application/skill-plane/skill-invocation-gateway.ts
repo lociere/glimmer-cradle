@@ -8,12 +8,12 @@ import type {
   CapabilityCatalogPort,
 } from '../../ports/skill-plane.port';
 import type { SkillPolicyDecision } from './skill-policy-engine';
-import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
 import { ExecutionController, ExecutionRecoveryRequiredError, ExecutionResultOutbox, isCapabilityDefinitionVisible, isCapabilityScopeVisible,
   type CapabilityScopeContext } from '@glimmer-cradle/capabilities';
 import { RecoveryRequiredError } from '../../domain/errors';
+import { resourceContentFromValue } from '@glimmer-cradle/capabilities';
 
 export interface SkillInvocationRequest {
   skillId: string;
@@ -40,7 +40,11 @@ export interface SkillResourceReadRequest {
   resourceId: string;
   args?: unknown;
   traceId?: string;
-  conversation?: ConversationContext;
+  conversation?: CapabilityScopeContext;
+  signal?: AbortSignal;
+  invocationId?: string;
+  sourceFactId?: string;
+  nativeProjection?: boolean;
 }
 
 export interface SkillPromptRenderRequest {
@@ -48,7 +52,11 @@ export interface SkillPromptRenderRequest {
   promptId: string;
   args?: unknown;
   traceId?: string;
-  conversation?: ConversationContext;
+  conversation?: CapabilityScopeContext;
+  signal?: AbortSignal;
+  invocationId?: string;
+  sourceFactId?: string;
+  nativeProjection?: boolean;
 }
 
 export type SkillInvocationTargetKind = 'tool' | 'resource' | 'prompt';
@@ -190,7 +198,13 @@ export class SkillInvocationGateway {
     });
   }
 
-  public async readResource(request: SkillResourceReadRequest): Promise<unknown> {
+  public readResource(request: SkillResourceReadRequest): Promise<unknown> {
+    return this.trackRead(() => this.executeResourceRead(request));
+  }
+
+  private async executeResourceRead(request: SkillResourceReadRequest): Promise<unknown> {
+    request.signal?.throwIfAborted();
+    this.assertNativeRead(request);
     const registered = this._registry.findById(request.skillId);
     if (!registered) {
       throw new Error(`技能不存在: ${request.skillId}`);
@@ -208,6 +222,10 @@ export class SkillInvocationGateway {
     if (!definition) throw new Error('Resource 定义已撤销或变更');
     const context = request.conversation ? { ...request.conversation } : undefined;
     const read = resource.read;
+    const validate = () => this._registry.findById(request.skillId) === registered
+      && this._registry.findResource(request.skillId, request.resourceId) === definition
+      && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id)
+      && this._policyEngine.evaluate(registered.skill).allowed;
 
     return this.executeWithAudit({
       traceId: request.traceId,
@@ -216,14 +234,36 @@ export class SkillInvocationGateway {
       targetKind: 'resource',
       targetName: request.resourceId,
       args: request.args,
-      validate: () => this._registry.findById(request.skillId) === registered
-        && this._registry.findResource(request.skillId, request.resourceId) === definition
-        && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id),
-      execute: () => read(request.args),
+      signal: request.signal, invocationId: request.invocationId,
+      validate,
+      durable: request.nativeProjection && this._execution && context ? {
+        scopeId: context.conversation_id, executorId: definition.reader_id, revision: definition.revision,
+        capabilityId: `resource:${definition.id}`, context,
+        interaction: request.sourceFactId ? { conversation_id: context.conversation_id, source_fact_id: request.sourceFactId } : undefined,
+        validate,
+      } : undefined,
+      execute: async (args, signal) => {
+        const value = await read(args, { signal, invocationId: request.invocationId });
+        if (!request.nativeProjection) return value;
+        return resourceContentFromValue({ id: definition.id, revision: definition.revision }, value);
+      },
     });
   }
 
-  public async renderPrompt(request: SkillPromptRenderRequest): Promise<unknown> {
+  public renderPrompt(request: SkillPromptRenderRequest): Promise<unknown> {
+    return this.trackRead(() => this.executeMethodRead(request));
+  }
+
+  private trackRead(operation: () => Promise<unknown>): Promise<unknown> {
+    if (this.stopped) return Promise.reject(new Error('Capability read 已停止接纳'));
+    const promise = operation().finally(() => this.active.delete(promise));
+    this.active.add(promise);
+    return promise;
+  }
+
+  private async executeMethodRead(request: SkillPromptRenderRequest): Promise<unknown> {
+    request.signal?.throwIfAborted();
+    this.assertNativeRead(request);
     const registered = this._registry.findById(request.skillId);
     if (!registered) {
       throw new Error(`技能不存在: ${request.skillId}`);
@@ -241,6 +281,12 @@ export class SkillInvocationGateway {
     if (!definition) throw new Error('Skill 方法定义已撤销或变更');
     const context = request.conversation ? { ...request.conversation } : undefined;
     const render = prompt.render;
+    const validate = () => this._registry.findById(request.skillId) === registered
+      && this._registry.findMethod(request.skillId, request.promptId) === definition
+      && isCapabilityDefinitionVisible(definition, context)
+      && (this._registry.isProviderReady(definition.owner_id) || (definition.instructions.kind === 'inline'
+        && this._registry.readMethod({ skill_id: definition.id, definition_revision: definition.revision }, context) !== undefined))
+      && this._policyEngine.evaluate(registered.skill).allowed;
 
     return this.executeWithAudit({
       traceId: request.traceId,
@@ -249,11 +295,28 @@ export class SkillInvocationGateway {
       targetKind: 'prompt',
       targetName: request.promptId,
       args: request.args,
-      validate: () => this._registry.findById(request.skillId) === registered
-        && this._registry.findMethod(request.skillId, request.promptId) === definition
-        && isCapabilityDefinitionVisible(definition, context) && this._registry.isProviderReady(definition.owner_id),
-      execute: () => definition.instructions.kind === 'inline' ? definition.instructions.text : render?.(request.args),
+      signal: request.signal, invocationId: request.invocationId,
+      validate,
+      durable: request.nativeProjection && this._execution && context ? {
+        scopeId: context.conversation_id, executorId: definition.owner_id, revision: definition.revision,
+        capabilityId: `skill:${definition.id}`, context,
+        interaction: request.sourceFactId ? { conversation_id: context.conversation_id, source_fact_id: request.sourceFactId } : undefined,
+        validate,
+      } : undefined,
+      execute: async (args, signal) => {
+        const value = definition.instructions.kind === 'inline' ? definition.instructions.text
+          : await render?.(args, { signal, invocationId: request.invocationId });
+        if (!request.nativeProjection) return value;
+        if (typeof value !== 'string' || !value.trim() || new TextEncoder().encode(value).length > 16 * 1024) throw new Error('方法正文格式/预算无效');
+        return { reference: { skill_id: definition.id, definition_revision: definition.revision }, instructions: value };
+      },
     });
+  }
+
+  private assertNativeRead(request: SkillResourceReadRequest | SkillPromptRenderRequest): void {
+    if (request.nativeProjection && (!this._execution || !request.conversation || !request.invocationId || !request.sourceFactId)) {
+      throw new Error('Native capability read 缺少 durable 执行上下文');
+    }
   }
 
   private async executeWithAudit(options: {
@@ -267,7 +330,7 @@ export class SkillInvocationGateway {
     signal?: AbortSignal;
     invocationId?: string;
     validate(): boolean;
-    durable?: { scopeId: string; executorId: string; revision: string; context: unknown;
+    durable?: { scopeId: string; executorId: string; revision: string; context: unknown; capabilityId?: string;
       interaction?: { conversation_id: string; source_fact_id: string }; validate(): boolean };
   }): Promise<unknown> {
     const traceId = options.traceId
@@ -352,7 +415,7 @@ export class SkillInvocationGateway {
           outcome = await this._execution.execute({
             invocation_id: options.invocationId, scope_id: options.durable.scopeId, idempotency_key: options.invocationId,
             target: { executor_id: options.durable.executorId,
-              capability_id: `${options.skill.id}.${options.targetName}`, definition_revision: options.durable.revision },
+              capability_id: options.durable.capabilityId ?? `${options.skill.id}.${options.targetName}`, definition_revision: options.durable.revision },
             input: { has_args: options.args !== undefined, args: options.args ?? null, context: options.durable.context },
             ...(options.durable.interaction ? { interaction: options.durable.interaction } : {}),
           }, {

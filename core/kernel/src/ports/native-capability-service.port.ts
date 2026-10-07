@@ -1,6 +1,6 @@
 import type { CapabilityReference, CapabilityScopeContext, StepExposureRequest, StepSurface } from '@glimmer-cradle/capabilities';
 
-export interface NativeToolInvocation {
+export interface NativeCapabilityInvocation {
   readonly run_id: string;
   readonly step: number;
   readonly call_id: string;
@@ -12,7 +12,7 @@ export interface NativeToolInvocation {
   readonly invocation_id: string;
   readonly principal_id: string;
 }
-export interface NativeToolResult {
+export interface NativeCapabilityResult {
   readonly call_id: string;
   readonly name: string;
   readonly state: 'succeeded' | 'failed';
@@ -22,7 +22,8 @@ export interface NativeToolResult {
 }
 export interface NativeCapabilityServicePort {
   exposeStep(request: StepExposureRequest): StepSurface;
-  invokeTool(request: NativeToolInvocation, traceId: string, signal: AbortSignal): Promise<NativeToolResult>;
+  invokeTool(request: NativeCapabilityInvocation, traceId: string, signal: AbortSignal): Promise<NativeCapabilityResult>;
+  readCapability(kind: 'skill' | 'resource', request: NativeCapabilityInvocation, traceId: string, signal: AbortSignal): Promise<NativeCapabilityResult>;
   revokePrincipal(principalId: string): void;
 }
 export class NativeCapabilityRequestError extends Error {}

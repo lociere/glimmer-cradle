@@ -4,6 +4,7 @@ import { create, fromBinary, fromJson, toBinary, type JsonObject, type JsonValue
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import { ExposeStepRequestSchema, ExposeStepResponseSchema, InvokeToolRequestSchema, InvokeToolResponseSchema,
   ExecutionResultState } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
+import { ReadCapabilityResponseSchema, ReadSkillRequestSchema, ReadSkillResponseSchema, ReadResourceRequestSchema, ReadResourceResponseSchema } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import type { CapabilityScopeContext, StepExposureRequest } from '@glimmer-cradle/capabilities';
 import { NativeCapabilityRequestError } from '../../ports/native-capability-service.port';
 import type { NativeCapabilityServicePort } from '../../ports/native-capability-service.port';
@@ -83,6 +84,8 @@ const kernelControlDefinition = serviceDefinition('glimmer.kernel.v1.KernelContr
 const capabilityDefinition = serviceDefinition('glimmer.capabilities.v1.CapabilityService', {
   ExposeStep: [ExposeStepRequestSchema, ExposeStepResponseSchema],
   InvokeTool: [InvokeToolRequestSchema, InvokeToolResponseSchema],
+  ReadSkill: [ReadSkillRequestSchema, ReadSkillResponseSchema],
+  ReadResource: [ReadResourceRequestSchema, ReadResourceResponseSchema],
 });
 
 const cognitionMethods = {
@@ -158,7 +161,9 @@ export class KernelCognitionTransport {
       PublishLog: this.publishLog.bind(this),
       PublishAction: this.publishAction.bind(this),
     });
-    server.addService(capabilityDefinition, { ExposeStep: this.exposeStep.bind(this), InvokeTool: this.invokeTool.bind(this) });
+    server.addService(capabilityDefinition, { ExposeStep: this.exposeStep.bind(this), InvokeTool: this.invokeTool.bind(this),
+      ReadSkill: (call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>) => this.invokeCapability(call, callback, 'skill'),
+      ReadResource: (call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>) => this.invokeCapability(call, callback, 'resource') });
     const port = await new Promise<number>((resolve, reject) => {
       server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, boundPort) => {
         if (error) reject(error);
@@ -387,18 +392,24 @@ export class KernelCognitionTransport {
       const value = (input: unknown) => fromJson(ValueSchema, input as JsonValue);
       return create(ExposeStepResponseSchema, { runId: surface.run_id, step: surface.step,
         tools: surface.tools.map(tool => ({ reference: tool.reference, name: tool.name, description: tool.description, inputSchema: value(tool.input_schema) })),
-        skills: surface.skills.map(skill => ({ reference: { skillId: skill.reference.skill_id, definitionRevision: skill.reference.definition_revision }, name: skill.name, description: skill.description })),
+        skills: surface.skills.map(skill => ({ reference: { skillId: skill.reference.skill_id, definitionRevision: skill.reference.definition_revision }, name: skill.name, description: skill.description, inputSchema: value(skill.input_schema ?? {}) })),
         resources: surface.resources.map(resource => ({ reference: resource.reference, name: resource.name, description: resource.description, inputSchema: value(resource.input_schema) })),
         usedDefinitionBytes: surface.used_definition_bytes, truncated: surface.truncated });
     });
   }
 
   private invokeTool(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>): void {
+    this.invokeCapability(call, callback, 'tool');
+  }
+
+  private invokeCapability(call: grpc.ServerUnaryCall<any, any>, callback: grpc.sendUnaryData<any>, kind: 'tool' | 'skill' | 'resource'): void {
     const controller = new AbortController(); this.actionAbortControllers.add(controller);
     let deadlineExpired = false;
     const timer = setTimeout(() => { deadlineExpired = true; controller.abort(new Error('Native Tool deadline')); }, this.actionDeadlineMs);
     call.once('cancelled', () => controller.abort(new Error('Native Tool 已取消')));
-    void this.handleServerCall(call, callback, async request => {
+    void this.handleServerCall(call, callback, async envelope => {
+      const request = kind === 'tool' ? envelope : envelope.request;
+      if (!request) throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native read 缺少 request', false);
       this.assertNativeCall(request.call);
       const scope = this.capabilityScope(request.scope, request.call);
       if (!request.reference?.id || !request.reference?.revision || !request.callId || !request.runId || !request.sourceFactId
@@ -406,10 +417,22 @@ export class KernelCognitionTransport {
         throw serviceFault(ServiceErrorCode.INVALID_REQUEST, 'Native Tool 引用/调用身份无效', false, request.call);
       }
       try {
-        const result = await this.capabilityService!.invokeTool({ run_id: request.runId, step: request.step, call_id: request.callId,
+        const invocation = { run_id: request.runId, step: request.step, call_id: request.callId,
           name: request.name, reference: { id: request.reference.id, revision: request.reference.revision }, scope,
           arguments: structToObject(request.arguments), source_fact_id: request.sourceFactId,
-          invocation_id: request.call.idempotencyKey, principal_id: `cognition:${this.generation}` }, request.call.traceId, controller.signal);
+          invocation_id: request.call.idempotencyKey, principal_id: `cognition:${this.generation}` };
+        const result = kind === 'tool' ? await this.capabilityService!.invokeTool(invocation, request.call.traceId, controller.signal)
+          : await this.capabilityService!.readCapability(kind, invocation, request.call.traceId, controller.signal);
+        if (kind !== 'tool') {
+          const body = result.result as any;
+          const material = create(ReadCapabilityResponseSchema, { callId: result.call_id, name: result.name,
+            state: result.state === 'succeeded' ? ExecutionResultState.SUCCEEDED : ExecutionResultState.FAILED,
+            ...(result.state === 'succeeded' ? { content: kind === 'skill'
+              ? { case: 'skill' as const, value: { reference: { skillId: body.reference.skill_id, definitionRevision: body.reference.definition_revision }, instructions: body.instructions } }
+              : { case: 'resource' as const, value: { reference: body.reference, contentRevision: body.content_revision, mediaType: body.media_type, contentUtf8: body.content_utf8 } } } : {}),
+            error: result.error ?? '', resultEventId: result.result_event_id });
+          return kind === 'skill' ? create(ReadSkillResponseSchema, { result: material }) : create(ReadResourceResponseSchema, { result: material });
+        }
         return create(InvokeToolResponseSchema, { callId: result.call_id, name: result.name,
           state: result.state === 'succeeded' ? ExecutionResultState.SUCCEEDED : ExecutionResultState.FAILED,
           ...(result.state === 'succeeded' ? { result: fromJson(ValueSchema, result.result as JsonValue) } : {}),

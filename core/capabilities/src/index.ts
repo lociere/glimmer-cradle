@@ -6,7 +6,8 @@ export type { CapabilityKind, CapabilityReference, ExposureGrant, StepExposureRe
 export { ToolRegistry } from './tools/tool-registry.js';
 export type { Tool } from './tools/tool.js';
 export { ResourceRegistry } from './resources/resource-registry.js';
-export type { Resource } from './resources/resource.js';
+export type { Resource, ResourceContent } from './resources/resource.js';
+export { resourceContentFromValue } from './resources/resource.js';
 export { SkillCatalog } from './skills/skill-catalog.js';
 export type { Skill, SkillReference, SkillMaterial, SkillSummary } from './skills/skill.js';
 export { ExecutionController } from './execution/execution-controller.js';

@@ -9,7 +9,7 @@ describe('Capabilities 构建公开入口', () => {
     const built = require('../dist/index.js');
     expect(Object.keys(built).sort()).toEqual(['ExecutionConflictError', 'ExecutionController',
       'ExecutionRecoveryRequiredError', 'ExecutionResultOutbox', 'ExposureController', 'GLOBAL_CAPABILITY_SCOPE', 'ResourceRegistry',
-      'SkillCatalog', 'SqliteExecutionJournal', 'ToolRegistry', 'executionDigest', 'isCapabilityDefinitionVisible', 'isCapabilityScopeVisible']);
+      'SkillCatalog', 'SqliteExecutionJournal', 'ToolRegistry', 'executionDigest', 'isCapabilityDefinitionVisible', 'isCapabilityScopeVisible', 'resourceContentFromValue']);
     expect(built.isCapabilityScopeVisible(undefined, undefined)).toBe(true);
     const manifest = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8'));
     expect(manifest.version).toBe('0.1.0');
