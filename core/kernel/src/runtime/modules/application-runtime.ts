@@ -18,6 +18,7 @@ export class ApplicationRuntime implements RuntimeModule {
   private _extensionHostAppService: IExtensionHostService | null = null;
   private readonly _skillProviders: SkillProvider[];
   private readonly ownedResources: ReadonlyArray<{ close(): void | Promise<void> }>;
+  private readonly drainExecution?: () => Promise<void>;
 
   public constructor(options: {
     readonly setCognitionActionHandler: (handler: CognitionActionHandler | null) => void;
@@ -30,6 +31,7 @@ export class ApplicationRuntime implements RuntimeModule {
     readonly skillAction: SkillActionController;
     readonly perception: PerceptionAppService;
     readonly ownedResources?: ReadonlyArray<{ close(): void | Promise<void> }>;
+    readonly drainExecution?: () => Promise<void>;
   }) {
     this._skillProviders = options.skillProviders;
     this._setCognitionActionHandler = options.setCognitionActionHandler;
@@ -41,6 +43,7 @@ export class ApplicationRuntime implements RuntimeModule {
     this.skillAction = options.skillAction;
     this.perception = options.perception;
     this.ownedResources = options.ownedResources ?? [];
+    this.drainExecution = options.drainExecution;
   }
   private readonly logger: KernelLoggerPort;
   private readonly providerReadiness: () => RuntimeReadinessSnapshot[];
@@ -111,6 +114,9 @@ export class ApplicationRuntime implements RuntimeModule {
   public async stop(_context: TraceContext): Promise<void> {
     const skillCatalogAppService = this._skillCatalogAppService ?? this.skillCatalog;
     const failures: unknown[] = [];
+    this._setCognitionActionHandler(null);
+    // Provider 和 journal 的寿命必须长于真实接收方调用；排空失败时保留资源，不假装停机完成。
+    await this.drainExecution?.();
     for (const provider of [...this._skillProviders].reverse()) {
       try {
         await Promise.resolve(provider.stop(skillCatalogAppService));
@@ -130,7 +136,6 @@ export class ApplicationRuntime implements RuntimeModule {
     this._perceptionAppService = null;
     this._skillPlanningAppService = null;
     this._skillCatalogAppService = null;
-    this._setCognitionActionHandler(null);
     this.logger.debug('Application Runtime 已停止');
     if (failures.length > 0) {
       throw new AggregateError(failures, 'Application Runtime 停止时存在资源释放失败');

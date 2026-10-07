@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 
 const previousDataRoot = process.env.GLIMMER_CRADLE_DATA_ROOT;
 const dataRoot = await mkdtemp(path.join(os.tmpdir(), 'kernel-production-bootstrap-'));
@@ -30,6 +33,12 @@ try {
   app = createKernelApplication(smokeProduct);
   await app.start();
   assert.equal(app.state, AppLifecycleState.RUNNING);
+  const execution = new Database(path.join(dataRoot, 'state/capabilities/execution.sqlite'), { readonly: true });
+  try {
+    assert.equal(execution.pragma('application_id', { simple: true }), 0x47434558);
+    assert.equal(execution.pragma('user_version', { simple: true }), 1);
+    assert.equal(execution.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('executions','execution_outbox')").get().n, 2);
+  } finally { execution.close(); }
   await app.stop(0);
   assert.equal(app.state, AppLifecycleState.STOPPED);
 } finally {

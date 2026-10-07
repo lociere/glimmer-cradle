@@ -5,14 +5,16 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": ["dist", "migrations"],
   "exports": { ".": { "types": "./dist/index.d.ts", "require": "./dist/index.js", "default": "./dist/index.js" } },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.build.json",
     "test": "pnpm run build && vitest run"
   },
+  "dependencies": { "better-sqlite3": "13.0.3" },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.13.3",
     "typescript": "^6.0.2",
     "vitest": "^0.34.6"

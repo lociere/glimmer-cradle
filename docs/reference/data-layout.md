@@ -25,6 +25,15 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 ## 用户状态与记忆
 
+生产 Kernel composition 通过 resolver 打开 `${DataRoot}/state/capabilities/execution.sqlite`，由
+Capabilities 持久化，schema version 1、owner `0x47434558`。稳定 invocation/scope/key、请求摘要、
+实际目标定义、授权、派发 owner/attempt、结果/副作用状态与未 ACK outbox 都是不可再生执行事实；
+不保存原始输入正文。unknown 和 dispatched 不能解释为未执行，禁止删库/换 ID 后重跑。
+第二连接打开不重置或接管旧派发；未知版本/foreign owner/部分表拒绝自动修复。备份须先 drain
+实际接收方调用，再与 Conversation/Planning 等相关事实保持一致切点，包含 WAL 的一致快照。
+Conversation 结果 receipt 尚未接线，不得把 pending outbox 当缓存清理。完整跨 owner 恢复、
+外部对账与产品安装验收留阶段 14/15；本候选只操作临时测试根，未迁移用户原库。
+
 Host `SqliteAuthorityStore` 接受显式 authority 数据库路径，schema version 1、owner 标记
 `0x47434155`，保存按 aggregate 的 epoch/token、owner、expiry/revision/status 和完整 handover
 准备/确认记录。未知库、其他 owner 或不兼容版本拒绝打开，不删除或重建；确认和新租约同事务提交。
@@ -91,6 +100,7 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |
+| `data/state/capabilities/execution.sqlite` | Capabilities Execution | invocation/授权/派发/结果与待 ACK outbox；不是可重建的诊断缓存 |
 | `data/state/avatar/action-state.json` | Avatar/Desktop main | 手动动作的最后接受状态；唯一磁盘字段为 `active_action_ids: string[]`，Desktop 启动时读取，Avatar Host 上报后校正 |
 | `data/state/desktop/avatar-presentation.json` | Desktop/Electron main | Avatar 模型选择、显示倍率和 Desktop Surface 呈现偏好 |
 | `data/state/desktop/avatar-placement.json` | Desktop/UnityAvatarHost | Native Composition 窗口位置；由 Kernel 注入唯一状态路径 |

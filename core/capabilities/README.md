@@ -9,8 +9,13 @@ Core 不导入 Kernel、Conversation concrete、公开 SDK 或 generated DTO。
 owner 删除。扩展 `$self` 到 provider ID 的绑定仍在 Kernel 接入装配，不进入 Core；对应公开
 Document 与 SDK 字段仍由现行唯一契约拥有，不新增 Schema 副本。
 
-完整 Tool/Skill/Resource 分离、Step 权限/预算/readiness、执行时撤销检查、持久 Execution journal/
-outbox/unknown 与 Speech 尚未迁移，不能将 scope 过滤当作完整授权或 native broker ready。
+Execution 已有真实 SQLite journal/controller，现行生产 Kernel Tool Gateway 委托本包；稳定请求
+冲突失败关闭，派发后不明结果不重试，结果/outbox 原子提交。确认后重查注册/定义/scope/策略。
+平台接收方和用户确认仍由 App adapter 提供，Core 不直接调用设备。详细调用/排空语义见
+[实现地图](../../docs/architecture/implementation/Extension与SkillPlane实现.md)。
+
+完整 Tool/Skill/Resource 分离、Step 权限/预算/readiness、外部 fencing/对账、Conversation 结果
+接收确认与 Speech 尚未完成，不能将当前切片当作完整授权或 native broker ready。
 进度见[执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
 
 ```powershell

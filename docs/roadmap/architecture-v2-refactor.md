@@ -106,7 +106,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 3 | Content/AssetRef、真实消费者和存储 port | 已完成：Content、资产库、Extension/Desktop ingress、Contract Spine、Cognition/Experience、恢复文档与独立只读审查均通过 |
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
-| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope 领域 owner 已迁入 Capabilities，Kernel catalog/规划/调用直接消费并删除旧 owner；Step Exposure、三 Registry 分离、持久执行 journal/outbox/unknown、撤销检查与生产 broker 待完成 |
+| 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：scope 与持久 Tool Execution 已由 Capabilities 拥有，生产 Gateway 接线 journal/派发 CAS/原子结果 outbox/unknown 与确认后撤销复验；Step Exposure、三 Registry、外部 fencing/对账、Conversation receipt 与 broker 待完成 |
 | 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
@@ -619,6 +619,54 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 6 持久 Execution 接线计划（2026-10-07）
+
+输入 `09583888`，执行 owner 为本会话；不迁移用户旧数据，不改公开 wire。Capabilities
+拥有稳定 invocation、request digest、授权记录、派发 CAS、结果与原子 outbox；现行 Kernel
+Gateway 委托该 owner，并在确认后重查注册、定义、scope 与策略。生产 composition 使用
+`state/capabilities/execution.sqlite`，停机先停止接纳并等待真实调用结束，再卸载 provider/关闭数据库。
+跨连接竞争只允许一次派发；重启遇到 dispatched/unknown 必须要求恢复，不能猜测失败或重试。
+此切片不声称实现外部 fencing、完整授权、三 Registry 或 Conversation 结果 inbox；未获真实接收
+确认的 outbox 保留。验收覆盖 SQL 重开/冲突/原子失败、撤销、取消、排空、真实 composition、
+根 typecheck/build 与文档门禁。独立审查仍留整体固定候选。
+
+切片结果（`09583888` 上本轮候选）：生产 Kernel Tool Gateway 已委托 Capabilities journal/
+controller；Cognition 原稳定 operation/tool invocation 继续使用，无上游 ID 的单次调用由
+组装层注入 Platform identity。scope/key/定义/参数摘要冲突拒绝，输入快照不可变且不持久保存
+正文；实际授权、派发 owner/attempt、结果与未 ACK outbox 保存在目标状态路径。确认后注册
+撤销、策略/scope/handler/readiness 漂移均不派发。普通 handler throw 即使声明没有 sideEffects
+也落 unknown；进程崩溃或结果事务失败留下 dispatched/副作用 unknown，重开不重试。
+取消后收到实际确认仍保存成功。诊断 unknown 不再伪装 failed，audit sink 故障不改写执行结果。
+
+排空停止 Tool 接纳并等待真实调用结束后才卸载 provider/关闭 journal；装配失败逆序关闭已开
+资源。transport/application 启动失败、尚未进入 lifecycle started 栈的已装配资源也释放；该修复
+不声称解决整体 lifecycle observer/stop 异常收敛。resource/prompt 与无 controller 的局部 fixture
+分支仍有明确迁移窗口；生产 factory 始终注入真实 controller。结果 receipt 尚未接线，outbox
+不投递/不假 ACK；不提供换 ID/删库重跑或未经外部证据的人工终态修改。
+
+验证：Capabilities 20 项 PASS；Kernel 全量 225 项 PASS、9 项既有条件跳过（234 项）；部署/
+Desktop/Personal Server 契约 45 项、Contracts gates 22 项、repo-checks 27 项 PASS。最初 Kernel
+全量发现 application 直接 import Node crypto，改为组装层注入 identity 后重跑通过，未放宽规则。
+最终根 `pnpm typecheck`、`pnpm build` PASS；实际 Kernel→Worker 注册/ready/逆序停止、Worker
+exit 0 PASS，并核验新库 owner/version/表。Docs 111 份、encoding、architecture、target-layout
+规格模式与 diff whitespace 检查 PASS；后续仅证据文档更新再复验。所有 10 个新增 Core 文件均在
+固定目标清单内，不增加空 Router/Registry。唯一 wire/Schema/generated/兼容基线未改，完整
+跨语言 verify 复用前切片未失效证据，不将本轮 gates 称为一次新完整 verify。
+
+隔离 `pnpm deploy --prod --offline --ignore-scripts` PASS；部署树内解析真实 Capabilities 与
+SQLite 原生依赖，加载包内 migration、落盘/重开成功结果与 pending outbox，并加载真实 Gateway
+consumer，均不回查源码仓库。它验证本轮 Core package graph/resource，非完整产品安装或 OCI
+fixed-artifact 验收。新的可再生临时副本
+`C:/Users/elise/AppData/Local/Temp/glimmer-execution-deploy-00df0a0f2be140769862d691fd53c39e`
+经明确路径检查后清理仍被执行策略拒绝，未换工具绕过；仅含部署复制品与合成测试库，保留可
+恢复，不涉及用户状态。前切片已记录的旧临时副本同样未动。
+
+阶段 6 仍进行中。下一依赖为结果 outbox 到 Conversation 的真实幂等接纳/确认链，以及三
+Registry/Step Exposure 与接收方可信查询/fencing；不得以持久执行切片宣称完整 Capabilities ready。
+现行 ActionController 的计划/工具结果缓存仍是进程内重放优化，不是第二份持久 Execution owner；
+完整跨重启行动计划/调用序列恢复与 native ToolCall/ToolResult 切换尚须完成，不能凭单 invocation
+重放验收推导整个行动恢复完成。
 
 ### 阶段 6 Capabilities scope owner 提取（2026-10-07 当前候选）
 

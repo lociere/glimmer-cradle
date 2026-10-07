@@ -54,6 +54,7 @@ import { SkillPolicyEngine } from '../application/skill-plane/skill-policy-engin
 import { SkillPlanePolicy } from '../application/skill-plane/availability';
 import { createChannelReplyPublisher, SkillActionController } from '../application/skill-plane/skill-action-controller';
 import { LoggingSkillInvocationAuditSink, SkillInvocationGateway } from '../application/skill-plane/skill-invocation-gateway';
+import { ExecutionController, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 import { SkillPlanningAppService } from '../application/use-cases/skill-planning-app.service';
 import { CoreSkillProvider } from '../application/skill-plane/providers/core';
 import { UserSkillProvider } from '../application/skill-plane/providers/user';
@@ -119,14 +120,17 @@ export class App {
     const orchestrator = new LifecycleOrchestrator(this.logger, this.eventBus, this.projection, this.clock);
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
+    let unstartedApplication: ApplicationRuntime | null = null;
     try {
       await this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context));
       await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context);
       const config = this.bootstrap.config;
       const plan = this.createOperationalPlan(config, (code = 0) => this.stop(code));
+      unstartedApplication = plan.application;
       this.transportRuntime = plan.transport;
       await orchestrator.startPhase({ name: 'transport', modules: [plan.transport] }, context);
       await orchestrator.startPhase({ name: 'application', modules: [plan.application] }, context);
+      unstartedApplication = null;
       await orchestrator.startPhase({ name: 'presentation', modules: [...plan.presentation] }, context);
       await orchestrator.startPhase({ name: 'core-readiness', mode: 'parallel', modules: [...plan.coreReadiness] }, context);
       plan.transport.openIngress();
@@ -140,8 +144,13 @@ export class App {
       this.logger.info('应用启动完成，当前角色已就绪', { total_startup_time_ms: startupTimeMs });
     } catch (error) {
       this.stateValue = AppLifecycleState.ERROR;
-      await this.stop(1);
-      throw new CoreException(`应用启动失败: ${normalizeError(error)}`, 'LIFECYCLE_ERROR', context.trace_id);
+      const failures: unknown[] = [error];
+      // journal 在装配时已打开；transport/provider 启动失败的 application 不在 started 栈中。
+      if (unstartedApplication && !orchestrator.started.includes(unstartedApplication)) {
+        try { await unstartedApplication.stop(context); } catch (cleanupError) { failures.push(cleanupError); }
+      }
+      try { await this.stop(1); } catch (stopError) { failures.push(stopError); }
+      throw new CoreException(`应用启动失败: ${failures.map(normalizeError).join('；')}`, 'LIFECYCLE_ERROR', context.trace_id);
     }
   }
 
@@ -201,106 +210,124 @@ function createOperationalRuntimePlan(options: {
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
   const stableIdentity = new NodeStableIdentityAdapter();
-  const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));
-  const deliveryStore = new SqliteDeliveryStore(resolveStatePath('conversation/delivery.db'));
-  const delivery = new DeliveryController(deliveryStore, stableIdentity.newId());
-  const surface = new ControlSurfaceGateway(
-    projection, avatar, audio, new FileAssetStore(), delivery,
-  );
-  const conversations = new ConversationDirectory(stableIdentity, bindingStore);
-  const channelState = new ChannelStateStore(observability.logger('channel-state'));
-  const attentionLeases = new AttentionLeaseStore(clock);
-  const actionStream = new ActionStreamManager(config.character.inference.action_stream, eventBus, observability);
-  const attention = new AttentionSessionManager(
-    config.character.inference.life_clock, observability, attentionLeases, clock,
-  );
-  const lifeClock = new LifeClockManager(
-    config.character.inference.life_clock, eventBus, observability,
-    observability.logger('life-clock-manager'), attentionLeases, clock,
-  );
-  const visual = new VisualCommandDispatcher(config.system.avatar, eventBus, observability.logger('visual-command-dispatcher'));
-  const registry = new SkillRegistry();
-  const catalog = new SkillCatalogAppService(registry);
-  const bridge = new ControlSurfaceCorePlatformBridge(surface);
-  const invocation = new SkillInvocationGateway(
-    registry, new SkillPolicyEngine(),
-    new LoggingSkillInvocationAuditSink(observability.logger('skill-invocation')),
-    observability, new SkillInvocationDiagnosticsAdapter(),
-    (request) => bridge.requestConfirmation(request),
-  );
-  const planning = new SkillPlanningAppService(
-    catalog, invocation, (request, traceId) => cognition.requestAgentPlan(request, traceId),
-  );
-  const action = new SkillActionController(
-    planning, (request, signal) => cognition.requestAgentSynthesis(request, signal),
-    createChannelReplyPublisher(
-      eventBus,
-      observability,
-      delivery,
+  const constructionResources: Array<{ close(): void }> = [];
+  try {
+    const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));
+    constructionResources.push(bindingStore);
+    const deliveryStore = new SqliteDeliveryStore(resolveStatePath('conversation/delivery.db'));
+    constructionResources.push(deliveryStore);
+    const executionJournal = new SqliteExecutionJournal(resolveStatePath('capabilities/execution.sqlite'));
+    constructionResources.push(executionJournal);
+    const execution = new ExecutionController(executionJournal);
+    const delivery = new DeliveryController(deliveryStore, stableIdentity.newId());
+    const surface = new ControlSurfaceGateway(
+      projection, avatar, audio, new FileAssetStore(), delivery,
+    );
+    const conversations = new ConversationDirectory(stableIdentity, bindingStore);
+    const channelState = new ChannelStateStore(observability.logger('channel-state'));
+    const attentionLeases = new AttentionLeaseStore(clock);
+    const actionStream = new ActionStreamManager(config.character.inference.action_stream, eventBus, observability);
+    const attention = new AttentionSessionManager(
+      config.character.inference.life_clock, observability, attentionLeases, clock,
+    );
+    const lifeClock = new LifeClockManager(
+      config.character.inference.life_clock, eventBus, observability,
+      observability.logger('life-clock-manager'), attentionLeases, clock,
+    );
+    const visual = new VisualCommandDispatcher(config.system.avatar, eventBus, observability.logger('visual-command-dispatcher'));
+    const registry = new SkillRegistry();
+    const catalog = new SkillCatalogAppService(registry);
+    const bridge = new ControlSurfaceCorePlatformBridge(surface);
+    const invocation = new SkillInvocationGateway(
+      registry, new SkillPolicyEngine(),
+      new LoggingSkillInvocationAuditSink(observability.logger('skill-invocation')),
+      observability, new SkillInvocationDiagnosticsAdapter(),
+      (request) => bridge.requestConfirmation(request),
+      execution,
+      () => stableIdentity.newId(),
+    );
+    const planning = new SkillPlanningAppService(
+      catalog, invocation, (request, traceId) => cognition.requestAgentPlan(request, traceId),
+    );
+    const action = new SkillActionController(
+      planning, (request, signal) => cognition.requestAgentSynthesis(request, signal),
+      createChannelReplyPublisher(
+        eventBus,
+        observability,
+        delivery,
+        (content) => stableIdentity.digest([content]),
+      ),
+      observability.logger('skill-action-controller'),
+    );
+    const perception = new PerceptionAppService(
+      conversations,
+      audio,
+      channelState,
+      attention,
+      ingress,
+      observability.logger('perception-gateway'),
       (content) => stableIdentity.digest([content]),
-    ),
-    observability.logger('skill-action-controller'),
-  );
-  const perception = new PerceptionAppService(
-    conversations,
-    audio,
-    channelState,
-    attention,
-    ingress,
-    observability.logger('perception-gateway'),
-    (content) => stableIdentity.digest([content]),
-  );
-  const availability = createSkillAvailability(product);
-  const skillPlanePolicy = new SkillPlanePolicy();
-  const mcpProvider = new McpServerSkillProvider(
-    projection, () => ConfigManager.instance.getConfig().system.skill_plane, product.id,
-  );
-  const providers = [
-    new CoreSkillProvider(bridge, { localDeviceActions: product.features.local_device_actions }),
-    new UserSkillProvider(new UserSkillSource(() => ConfigManager.instance.getConfig().system.skill_plane.user_skills)), mcpProvider,
-  ];
-  const extensionHost = new ExtensionHostAppService(
-    perception, catalog, availability, skillPlanePolicy, attentionLeases, lifeClock,
-    new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
-    product.version,
-    new StagedAssetUploads(
-      new FileAssetStore(),
-      new FileAssetStore(resolveWorkPath('content/transient/assets'), resolveWorkPath('content/transient/uploads'), true),
-    ),
-  );
-  const application = new ApplicationRuntime({
-    setCognitionActionHandler: (handler) => transport.setCognitionActionHandler(handler),
-    logger: observability.logger('application-runtime'), skillProviders: providers,
-    providerReadiness: () => mcpProvider.getReadinessSnapshots(), extensionHostService: extensionHost,
-    skillCatalog: catalog, skillPlanning: planning, skillAction: action, perception,
-    ownedResources: [bindingStore, deliveryStore],
-  });
-  const configApplication = new ConfigApplicationService({ configManager: ConfigManager.instance, cognition: cognitionAdapter });
-  const presentationAdapter = new KernelPresentationAdapter(
-    config, actionStream, visual, surface, perception, catalog, configApplication,
-    new ConversationHistoryService(conversations, cognitionAdapter),
-    (reason) => { observability.logger('app-root').info('收到产品控制表面全局停机请求', { reason }); return options.requestStop(0); },
-  );
-  const extensionAdapter = new KernelExtensionRuntimeAdapter(
-    new ExtensionManager(extensionHost, projection, product.id), surface,
-  );
-  const presentation: RuntimeModule[] = [
-    ...(product.features.avatar ? [new AvatarRuntime(config, new AvatarRuntimeAdapter(avatar))] : []),
-    ...(product.features.control_surface_gateway ? [new PresentationRuntime(presentationAdapter)] : []),
-  ];
-  const coreReadiness: RuntimeModule[] = [
-    cognitionRuntime,
-    ...(product.features.audio.tts || product.features.audio.asr ? [new AudioRuntime(
-      product.features.audio, configuration, audio, surface, projection,
-      observability.logger('audio-runtime'), resolveLogDir(),
-    )] : []),
-  ];
-  return {
-    transport, application, presentation, coreReadiness,
-    extension: product.features.extensions ? new ExtensionRuntime(extensionAdapter, product.id) : undefined,
-    organism: new OrganismRuntime(new KernelOrganismAdapter(attention, lifeClock, cognition, actionStream, eventBus)),
-    recovery: new DlqReplayRuntime(new DlqReplayIngress()),
-  };
+    );
+    const availability = createSkillAvailability(product);
+    const skillPlanePolicy = new SkillPlanePolicy();
+    const mcpProvider = new McpServerSkillProvider(
+      projection, () => ConfigManager.instance.getConfig().system.skill_plane, product.id,
+    );
+    const providers = [
+      new CoreSkillProvider(bridge, { localDeviceActions: product.features.local_device_actions }),
+      new UserSkillProvider(new UserSkillSource(() => ConfigManager.instance.getConfig().system.skill_plane.user_skills)), mcpProvider,
+    ];
+    const extensionHost = new ExtensionHostAppService(
+      perception, catalog, availability, skillPlanePolicy, attentionLeases, lifeClock,
+      new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
+      product.version,
+      new StagedAssetUploads(
+        new FileAssetStore(),
+        new FileAssetStore(resolveWorkPath('content/transient/assets'), resolveWorkPath('content/transient/uploads'), true),
+      ),
+    );
+    const application = new ApplicationRuntime({
+      setCognitionActionHandler: (handler) => transport.setCognitionActionHandler(handler),
+      logger: observability.logger('application-runtime'), skillProviders: providers,
+      providerReadiness: () => mcpProvider.getReadinessSnapshots(), extensionHostService: extensionHost,
+      skillCatalog: catalog, skillPlanning: planning, skillAction: action, perception,
+      ownedResources: [bindingStore, deliveryStore, executionJournal],
+      drainExecution: () => execution.stop(),
+    });
+    const configApplication = new ConfigApplicationService({ configManager: ConfigManager.instance, cognition: cognitionAdapter });
+    const presentationAdapter = new KernelPresentationAdapter(
+      config, actionStream, visual, surface, perception, catalog, configApplication,
+      new ConversationHistoryService(conversations, cognitionAdapter),
+      (reason) => { observability.logger('app-root').info('收到产品控制表面全局停机请求', { reason }); return options.requestStop(0); },
+    );
+    const extensionAdapter = new KernelExtensionRuntimeAdapter(
+      new ExtensionManager(extensionHost, projection, product.id), surface,
+    );
+    const presentation: RuntimeModule[] = [
+      ...(product.features.avatar ? [new AvatarRuntime(config, new AvatarRuntimeAdapter(avatar))] : []),
+      ...(product.features.control_surface_gateway ? [new PresentationRuntime(presentationAdapter)] : []),
+    ];
+    const coreReadiness: RuntimeModule[] = [
+      cognitionRuntime,
+      ...(product.features.audio.tts || product.features.audio.asr ? [new AudioRuntime(
+        product.features.audio, configuration, audio, surface, projection,
+        observability.logger('audio-runtime'), resolveLogDir(),
+      )] : []),
+    ];
+    return {
+      transport, application, presentation, coreReadiness,
+      extension: product.features.extensions ? new ExtensionRuntime(extensionAdapter, product.id) : undefined,
+      organism: new OrganismRuntime(new KernelOrganismAdapter(attention, lifeClock, cognition, actionStream, eventBus)),
+      recovery: new DlqReplayRuntime(new DlqReplayIngress()),
+    };
+  } catch (error) {
+    const failures: unknown[] = [error];
+    for (const resource of constructionResources.reverse()) {
+      try { resource.close(); } catch (closeError) { failures.push(closeError); }
+    }
+    if (failures.length > 1) throw new AggregateError(failures, '应用装配失败，资源释放存在错误');
+    throw error;
+  }
 }
 
 function createSkillAvailability(product: ProductComposition): SkillAvailabilityContext {

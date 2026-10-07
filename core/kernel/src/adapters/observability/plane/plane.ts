@@ -12,6 +12,7 @@ const KERNEL_RUNTIME_ID = `kernel:${process.pid}`;
 export const OBSERVABILITY_EVENT_TYPES = {
   SKILL_INVOCATION_SUCCEEDED: 'skill.invocation.succeeded',
   SKILL_INVOCATION_FAILED: 'skill.invocation.failed',
+  SKILL_INVOCATION_UNKNOWN: 'skill.invocation.unknown',
   SKILL_INVOCATION_POLICY_DENIED: 'skill.invocation.policy_denied',
   LLM_INVOCATION_SUCCEEDED: 'llm.invocation.succeeded',
   LLM_INVOCATION_FAILED: 'llm.invocation.failed',
@@ -27,6 +28,11 @@ interface EventRegistration {
 }
 
 const EVENT_REGISTRY: Record<RegisteredEventType, EventRegistration> = {
+  [OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_UNKNOWN]: {
+    owner: 'skill_plane',
+    module: 'skill-invocation-gateway',
+    defaultAction: 'invoke',
+  },
   [OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_SUCCEEDED]: {
     owner: 'skill_plane',
     module: 'skill-invocation-gateway',

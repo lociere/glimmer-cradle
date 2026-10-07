@@ -21,23 +21,27 @@ export class SkillInvocationDiagnosticsAdapter implements SkillInvocationDiagnos
     };
     counter('skill.invocation.count', 1, labels);
     histogram('skill.invocation.duration_ms', fact.duration_ms, labels);
+    const outcome = fact.status === 'unknown' ? 'partial' : fact.status;
     recordObservabilityEvent(
-      fact.status === 'succeeded'
+      fact.status === 'unknown'
+        ? OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_UNKNOWN
+        : fact.status === 'succeeded'
         ? OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_SUCCEEDED
         : fact.status === 'policy_denied'
           ? OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_POLICY_DENIED
           : OBSERVABILITY_EVENT_TYPES.SKILL_INVOCATION_FAILED,
       {
         level: fact.status === 'succeeded' ? 'info' : 'warn',
-        event_outcome: fact.status,
+        event_outcome: outcome,
         trace_id: fact.trace_id,
         provider_id: fact.provider_id,
         skill_id: fact.skill_id,
         tool_name: fact.target_kind === 'tool' ? fact.target_name : null,
         duration_ms: fact.duration_ms,
-        error_kind: fact.status === 'failed' ? 'skill_execution_error' : null,
+        error_kind: fact.status === 'unknown' ? 'execution_recovery_required'
+          : fact.status === 'failed' ? 'skill_execution_error' : null,
         diagnostic_hint: fact.error_message ?? null,
-        attributes: { provider_kind: fact.provider_kind, target_kind: fact.target_kind },
+        attributes: { provider_kind: fact.provider_kind, target_kind: fact.target_kind, execution_state: fact.status },
       },
     );
     if (!policy.audit && fact.status === 'succeeded') return;
@@ -52,7 +56,7 @@ export class SkillInvocationDiagnosticsAdapter implements SkillInvocationDiagnos
       skill_id: fact.skill_id,
       tool_name: fact.target_kind === 'tool' ? fact.target_name : null,
       risk_level: policy.riskLevel,
-      outcome: fact.status,
+      outcome,
       reason: fact.error_message,
       diagnostic_hint: fact.error_message ?? null,
       duration_ms: fact.duration_ms,

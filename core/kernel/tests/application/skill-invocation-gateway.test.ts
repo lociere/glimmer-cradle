@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ExecutionController, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 import {
   SkillInvocationGateway,
   type SkillInvocationAuditRecord,
@@ -46,6 +50,83 @@ function createGateway(
 }
 
 describe('SkillInvocationGateway', () => {
+  it('用户拒绝落持久未派发结果，再次请求不弹框、不执行 handler', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-denied-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
+    const registry = new SkillRegistry(); const handler = vi.fn(); const confirm = vi.fn(async () => false);
+    registry.registerSkill({ id: 'test.denied', name: '测试', description: '拒绝', provider: { kind: 'core', id: 'receiver' },
+      policy: { riskLevel: 'medium', confirmationRequired: true, sideEffects: ['external'], audit: true },
+      tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
+    const gateway = new SkillInvocationGateway(registry, new SkillPolicyEngine(), { record: () => undefined },
+      observability, { record: () => undefined }, confirm, new ExecutionController(journal));
+    try {
+      const request = { skillId: 'test.denied', toolName: 'run', args: {}, invocationId: 'stable' };
+      await expect(gateway.invoke(request)).rejects.toThrow('用户拒绝');
+      await expect(gateway.invoke(request)).rejects.toThrow('authorization_denied');
+      expect(confirm).toHaveBeenCalledOnce(); expect(handler).not.toHaveBeenCalled();
+      expect(journal.load('stable')).toMatchObject({ state: 'failed', attempt: 0, authorization: { allowed: false }, side_effects: 'none' });
+      expect(journal.readOutbox(10)).toHaveLength(1);
+    } finally { journal.close(); rmSync(root, { recursive: true }); }
+  });
+  it('真实 journal 重开重放成功结果，诊断故障不改写成功、不重复副作用', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-execution-')); const file = join(root, 'execution.sqlite');
+    let journal = new SqliteExecutionJournal(file);
+    const registry = new SkillRegistry(); const handler = vi.fn(async (args) => ({ ok: true, args }));
+    registry.registerSkill({ id: 'test.execution', name: '测试', description: '执行', provider: { kind: 'core', id: 'receiver' },
+      policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: ['external'], audit: true },
+      tools: [{ name: 'run', description: 'run', parameters: { type: 'object' }, handler }] });
+    const gateway = () => new SkillInvocationGateway(registry, new SkillPolicyEngine(),
+      { record: () => { throw new Error('audit unavailable'); } }, observability, { record: () => undefined },
+      undefined, new ExecutionController(journal));
+    const request = { skillId: 'test.execution', toolName: 'run', args: { text: '参数' }, invocationId: 'stable:1' };
+    try {
+      await expect(gateway().invoke(request)).resolves.toEqual({ ok: true, args: request.args });
+      expect(handler.mock.calls[0][1].invocationId).toBe('stable:1');
+      journal.close(); journal = new SqliteExecutionJournal(file);
+      await expect(gateway().invoke(request)).resolves.toEqual({ ok: true, args: request.args });
+      expect(handler).toHaveBeenCalledOnce(); expect(journal.readOutbox(10)).toHaveLength(1);
+      await expect(gateway().invoke({ ...request, args: 'changed' })).rejects.toThrow('冲突');
+      expect(handler).toHaveBeenCalledOnce();
+    } finally { journal.close(); rmSync(root, { recursive: true }); }
+  });
+  it.each(['unregister', 'policy', 'scope', 'handler', 'readiness'])('确认期间 %s 变更，派发前真实复验拒绝执行', async (change) => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-revoked-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
+    const registry = new SkillRegistry(); const handler = vi.fn();
+    registry.registerSkill({ id: 'test.revoked', name: '测试', description: '撤销', provider: { kind: 'core', id: 'receiver' },
+      policy: { riskLevel: 'medium', confirmationRequired: true, sideEffects: ['external'], audit: true },
+      tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
+    const confirmation = async () => {
+      const skill = registry.findById('test.revoked')!.skill;
+      if (change === 'unregister') registry.unregisterSkill(skill.id);
+      if (change === 'policy') skill.policy.sideEffects.push('new-effect');
+      if (change === 'scope') skill.scope = { kind: 'conversation', ids: ['other'] };
+      if (change === 'handler') skill.tools[0].handler = () => 'replacement';
+      if (change === 'readiness') skill.metadata = { runtime_status: 'contract_only' };
+      return true;
+    };
+    const gateway = new SkillInvocationGateway(registry, new SkillPolicyEngine(), { record: () => undefined },
+      observability, { record: () => undefined }, confirmation, new ExecutionController(journal));
+    try {
+      await expect(gateway.invoke({ skillId: 'test.revoked', toolName: 'run', args: {}, invocationId: 'stable' })).rejects.toThrow('revoked_before_dispatch');
+      expect(handler).not.toHaveBeenCalled();
+      expect(journal.load('stable')).toMatchObject({ state: 'failed', attempt: 0, side_effects: 'none' });
+    } finally { journal.close(); rmSync(root, { recursive: true }); }
+  });
+  it('接收方抛错始终 unknown，即使声明没有 sideEffects；不作为普通失败重试', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-gateway-unknown-')); const journal = new SqliteExecutionJournal(join(root, 'execution.sqlite'));
+    const registry = new SkillRegistry(); const handler = vi.fn(() => { throw new Error('lost receipt'); }); const audit = new MemoryAuditSink();
+    registry.registerSkill({ id: 'test.unknown', name: '测试', description: 'unknown', provider: { kind: 'core', id: 'receiver' },
+      policy: { riskLevel: 'low', confirmationRequired: false, sideEffects: [], audit: true },
+      tools: [{ name: 'run', description: 'run', parameters: {}, handler }] });
+    const gateway = new SkillInvocationGateway(registry, new SkillPolicyEngine(), audit, observability,
+      { record: () => undefined }, undefined, new ExecutionController(journal));
+    try {
+      const request = { skillId: 'test.unknown', toolName: 'run', args: {}, invocationId: 'stable' };
+      await expect(gateway.invoke(request)).rejects.toThrow('需要人工恢复');
+      await expect(gateway.invoke(request)).rejects.toThrow('需要人工恢复');
+      expect(handler).toHaveBeenCalledOnce(); expect(audit.records.map(item => item.status)).toEqual(['unknown', 'unknown']);
+      expect(journal.load('stable')).toMatchObject({ state: 'unknown', attempt: 1 });
+    } finally { journal.close(); rmSync(root, { recursive: true }); }
+  });
   it('调用成功时记录 provider、policy、trace 与结果摘要', async () => {
     const registry = new SkillRegistry();
     const skillId = 'test.gateway.audit.success';

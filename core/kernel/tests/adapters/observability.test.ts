@@ -3,8 +3,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sanitizeMetricLabels } from '../../src/adapters/observability/metrics';
 import { DeadLetterQueue } from '../../src/adapters/events/dead-letter-queue';
 import { DBManager } from '../../src/adapters/storage/db-manager';
+import * as plane from '../../src/adapters/observability/plane/plane';
+import { SkillInvocationDiagnosticsAdapter } from '../../src/adapters/observability/skill-invocation-diagnostics-adapter';
 
 describe('observability foundation', () => {
+  it('Execution unknown 投影为独立事件与恢复提示，而不是可重试 failed', () => {
+    const event = vi.spyOn(plane, 'recordObservabilityEvent').mockImplementation(() => undefined as never);
+    const audit = vi.spyOn(plane, 'appendAuditRecord').mockImplementation(() => undefined as never);
+    new SkillInvocationDiagnosticsAdapter().record({ timestamp: '2026-10-07T00:00:00Z', trace_id: 'trace',
+      provider_kind: 'core', provider_id: 'receiver', skill_id: 'test.tool', target_kind: 'tool', target_name: 'run',
+      status: 'unknown', duration_ms: 1, error_message: 'execution_recovery_required', confirmation_required: false },
+    { audit: true, riskLevel: 'low' });
+    expect(event).toHaveBeenCalledWith('skill.invocation.unknown', expect.objectContaining({
+      event_outcome: 'partial', error_kind: 'execution_recovery_required', attributes: expect.objectContaining({ execution_state: 'unknown' }),
+    }));
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'skill.tool.unknown', outcome: 'partial' }));
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });

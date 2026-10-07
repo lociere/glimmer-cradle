@@ -110,7 +110,14 @@ importers:
         version: 5.9.3
 
   core/capabilities:
+    dependencies:
+      better-sqlite3:
+        specifier: 13.0.3
+        version: 13.0.3
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3

@@ -106,9 +106,14 @@ Desktop main 的 `process_log_ref` 只暴露一个规范化 `path`、owner 与�
 |---|---|
 | `skill.invocation.succeeded` | policy 允许且 handler 成功 |
 | `skill.invocation.policy_denied` | policy 拒绝，例如 `contract_only` 或确认缺失 |
-| `skill.invocation.failed` | policy 允许但 handler 抛错或远端调用失败 |
+| `skill.invocation.failed` | 未派发撤销或 legacy resource/prompt 调用失败；不代表持久 Tool 的不明副作用可重试 |
+| `skill.invocation.unknown` | 持久 Tool 派发后缺少确定结果或结果提交失败，需要恢复，不能猜为 failed |
 
 事件字段包含 `trace_id`、`provider_id`、`skill_id`、`tool_name`、`duration_ms`、`event_outcome` 和脱敏后的错误摘要；不记录完整 args、result、token 或 provider key。
+
+现行 owner-local 诊断 outcome 用 `partial` 投影 unknown，`attributes.execution_state=unknown` 与
+`error_kind=execution_recovery_required` 保留确切含义；执行事实仍以 Capabilities journal/outbox
+为准，日志失败不改写终态。它不是 Conversation 结果接收 receipt。
 
 metrics label 只允许低基数字段白名单。`trace_id`、`prompt_hash`、绝对路径、URL、原始 payload key 等高基数字段不得进入 label。
 

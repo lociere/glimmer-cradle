@@ -44,8 +44,10 @@ Host 以 Capability Graph 表达扩展运行事实。扩展一旦被扫描发现
 
 scope 领域规则已由 `core/capabilities` 唯一拥有；Kernel catalog 缺省、规划和调用前检查直接
 消费其公开入口，旧 scope owner 删除。未知 kind 或非法限定范围失败关闭。扩展 `$self` 身份
-绑定保留在接入装配；完整 Step Exposure、执行前撤销再验证、Execution 持久 journal/outbox
-与 Tool/Skill/Resource 分离仍未完成，不以这一 scope 切片宣称 Capabilities ready。
+绑定保留在接入装配。生产 Tool Gateway 已委托 Capabilities 的持久 Execution：确认后复验撤销，
+稳定 invocation 重放原结果，派发后失联进入恢复而非自动重试；结果/outbox 同事务保存。
+完整 Step Exposure、外部 fencing/对账、Conversation receipt 与 Tool/Skill/Resource 分离仍未完成，
+不以当前切片宣称 Capabilities ready。细节见[实现地图](../../implementation/Extension与SkillPlane实现.md)。
 
 感知媒体由扩展自己的 Adapter 提供字节，经 `PERCEPTION_WRITE` 分块暂存后用一次性 token 绑定一条 `perception.inject`；Kernel 转成 `AssetRef`，扩展不能提交本机路径或自造持久引用。旧 URI-only 扩展在阶段 9/14 兼容窗口内按旧读取入口当拍处理。字段与权限见 [Extension SDK Reference](../../../reference/extension-sdk.md)。
 
@@ -60,14 +62,20 @@ catalog source
   -> SkillPolicyEngine
   -> confirmation / denial / allow
   -> SkillInvocationGateway
-  -> provider handler
+  -> Capabilities Execution journal / dispatch CAS
+  -> provider handler (tool)
+  -> durable result + pending outbox
   -> normalized result
   -> audit + trace
 ```
 
 Core Skill Provider 当前将已接入 Desktop bridge handler 的 `desktop.open_url`、`notification.show`、`clipboard.read` 和 `clipboard.write` 标记为 ready；仍未接 handler 的能力继续是 `contract_only`。`contract_only` 能力不可执行。需要确认但确认通道未接入时必须拒绝，而不是绕过。工具结果进入 Cognition 前必须成为不可信输入处理，不能直接写事实源。
 
-`SkillInvocationGateway` 是当前唯一运行时执行入口。调用方必须携带当前 `ConversationContext`，并可显式传入 `traceId`；否则 trace 沿用当前 Kernel 上下文或新建。Gateway 对每次已定位到 skill/tool/resource/prompt 的调用重新校验 audience、scope、requirements 与 Policy，并记录 provider、skill、target、policy decision、trace、耗时、结果类型或错误摘要。`policy.audit = false` 只会关闭成功路径的详细审计；策略拒绝和 handler 失败仍会记录，避免高风险或异常调用从时间线中消失。
+`SkillInvocationGateway` 是当前 App 执行入口；生产 Tool 调用的持久执行事实由 Capabilities 唯一
+拥有，resource/prompt 仍是后续迁移的 legacy 路径。调用方携带当前 `ConversationContext` 和稳定
+invocation ID；Cognition 行动以 operation/tool 索引派生 ID，无稳定上游 ID 的单次调用由 App
+生成新 ID，不声称能识别任意调用方重试。trace 仍沿用当前 Kernel 上下文或新建。策略拒绝、成功与
+不明结果如实诊断，日志故障不覆写已提交的执行事实。
 
 `SkillRegistry` 的人物 catalog 只包含 character audience 的 skill/tool/resource/prompt；character skill 下显式标为 `user`、`host`、`adapter`、`renderer` 或 `extension` 的子项也会被过滤。`SkillPlanningAppService` 当前只把 character audience 且 ready 的 tools 投影给 Cognition 的 `agent_plan` RPC，并过滤掉目录外建议；执行建议仍走 `SkillInvocationGateway`。普通聊天主循环已通过 `ActionCommand.action_type=skill_request` 接入 Skill Plane：Cognition 的结构化 ActionPlan 判断当前目标需要能力后只发行动意图，Kernel `SkillActionController` 负责 catalog 投影、规划、Policy/Gateway 调用、结果归一化、`agent_synthesis` 回注和最终回复投递。Renderer、Extension 和 Cognition 都不能绕过 Gateway。
 

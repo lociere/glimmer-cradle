@@ -6,7 +6,7 @@ export interface SkillInvocationDiagnosticFact {
   readonly skill_id: string;
   readonly target_kind: 'tool' | 'resource' | 'prompt';
   readonly target_name: string;
-  readonly status: 'policy_denied' | 'succeeded' | 'failed';
+  readonly status: 'policy_denied' | 'succeeded' | 'failed' | 'unknown';
   readonly duration_ms: number;
   readonly result_type?: string;
   readonly error_message?: string;

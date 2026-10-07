@@ -110,8 +110,30 @@ concrete、SDK 或 wire。缺上下文/空限定范围/未知 kind 失败关闭�
 闭包构建。Personal Server Docker 安装前显式复制其 Core manifest，构建先于 Kernel；临时
 `pnpm deploy` 已验证新包从部署树自身解析，不回查源码仓库，真实 OCI/完整安装验收仍待执行。
 
-这是 scope owner 迁移，不是完整 Exposure/Execution：Tool/Skill/Resource 分离、Step 权限/
-readiness/预算、确认等待后撤销再验证、持久 invocation journal/outbox/unknown 和 native broker
+持久 Execution 已由 `core/capabilities` 唯一拥有，生产 `kernel-application.ts` 通过 resolver
+打开 `state/capabilities/execution.sqlite` 并向 Tool Gateway 注入真实 journal/controller。Core
+ExecutorPort 由 Gateway 映射当前注册、策略、确认和 handler，不导入 Kernel/SDK/generated。
+prepared → authorized → dispatched 的每次转换在 SQLite IMMEDIATE 事务中使用 revision、
+request digest、owner/attempt CAS；第二连接打开不接管活跃派发。不同参数/目标/定义/身份的同一
+invocation 或 scope/key 冲突失败关闭。输入只持久保存摘要，传给确认与接收方的是不可变 JSON 快照。
+
+确认后、派发前同步检查原注册、handler、定义摘要、scope 与策略；卸载/替换/变更则不调用 handler。
+授权与确认拒绝、撤销为未派发 failed/attempt=0。handler 返回时保存原结果；handler throw、
+断线或结果提交失败均不得猜测“未应用”，即使声明 `sideEffects=[]` 也需要恢复。异常能落盘时
+记 unknown；进程崩溃或事务失败留下 dispatched/side_effects=unknown，重开同样要求恢复，
+不标失败也不自动派发。取消后接收方能实际确认成功时仍提交成功，不擦除已知事实。
+
+结果与 outbox 同事务提交；日志/audit 不拥有执行事实，诊断故障不改写结果。Conversation
+接收端尚未装配，此候选不投递/假 ACK，pending outbox 保留。Store 的 receipt API 绑定 event ID、
+invocation ID/revision 与真实 accepted 接纳；重复 receipt 幂等。Controller instance owner 不是
+Platform authority，未实施外部 fencing/证据对账或自动接管；人工恢复必须待可信接收方证据，
+不得删库或换 invocation ID 重跑。备份约束见[数据布局](../../reference/data-layout.md)。
+
+停机先断开 Cognition handler、停止 Tool 接纳并取消/等待实际 handler 完成，再卸载 provider 和
+关闭 journal；没有把 cancellation 等同进程已停止。装配失败逆序关闭已打开的库。Core tests 使用
+真实 SQLite 重开、双连接、事务故障；Gateway tests 验证真实撤销与稳定 ID 重放。仅 fixture
+可不注入 controller；生产组装始终注入，旧无 journal 分支在三 Registry/入口切换后 consumer-zero
+删除。resource/prompt、完整 Step Exposure、三 Registry、native broker 与 Conversation receipt
 仍待完成。目标与证据见[执行记录](../../roadmap/architecture-v2-refactor.md)。
 
 Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/prompt 统一执行：
@@ -121,7 +143,7 @@ Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/
 3. 校验 Product Composition、平台和 feature requirements，再按 skill policy 或目标级 policy 调用 `SkillPolicyEngine`；
 4. 若 policy 要求确认，先调用确认通道；无确认通道或用户拒绝时写 `policy_denied`；
 5. 成功时调用 handler，并记录结果类型与耗时；
-6. 策略拒绝或 handler 抛错时记录拒绝/失败摘要并保留原错误语义；
+6. 策略拒绝记录拒绝；持久 Tool 的 handler 抛错记录 unknown/恢复，legacy resource/prompt 仍保留错误语义；
 7. 写入 `skill.invocation.count` 与 `skill.invocation.duration_ms` metrics，默认 audit sink 写结构化运行日志。
 
 成功审计受 `policy.audit` 控制；拒绝和失败不受该开关关闭。

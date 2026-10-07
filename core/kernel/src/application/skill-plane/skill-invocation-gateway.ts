@@ -17,7 +17,7 @@ import type { SkillPolicyDecision } from './skill-policy-engine';
 import type { ConversationContext } from '@glimmer-cradle/conversation';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { SkillInvocationDiagnosticsPort } from '../../ports/skill-invocation-diagnostics.port';
-import { isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
+import { ExecutionController, ExecutionRecoveryRequiredError, executionDigest, isCapabilityScopeVisible } from '@glimmer-cradle/capabilities';
 import { RecoveryRequiredError } from '../../domain/errors';
 
 export interface SkillInvocationRequest {
@@ -57,7 +57,7 @@ export interface SkillPromptRenderRequest {
 
 export type SkillInvocationTargetKind = 'tool' | 'resource' | 'prompt';
 
-export type SkillInvocationAuditStatus = 'policy_denied' | 'succeeded' | 'failed';
+export type SkillInvocationAuditStatus = 'policy_denied' | 'succeeded' | 'failed' | 'unknown';
 
 export interface SkillInvocationAuditRecord {
   timestamp: string;
@@ -101,7 +101,8 @@ export class LoggingSkillInvocationAuditSink implements SkillInvocationAuditSink
       return;
     }
 
-    this.logger.warn(record.status === 'policy_denied' ? 'Skill 调用被策略拒绝' : 'Skill 调用失败', meta);
+    this.logger.warn(record.status === 'policy_denied' ? 'Skill 调用被策略拒绝'
+      : record.status === 'unknown' ? 'Skill 调用终态不明，需要恢复' : 'Skill 调用失败', meta);
   }
 }
 
@@ -113,6 +114,8 @@ export class SkillInvocationGateway {
     private readonly _observability: KernelObservabilityPort,
     private readonly _diagnostics: SkillInvocationDiagnosticsPort,
     private readonly _requestConfirmation?: SkillConfirmationRequester,
+    private readonly _execution?: ExecutionController,
+    private readonly _newInvocationId: () => string = () => _observability.createTraceContext().trace_id,
   ) {}
 
   public async invoke(request: SkillInvocationRequest): Promise<unknown> {
@@ -131,6 +134,18 @@ export class SkillInvocationGateway {
     }
     this.assertScopeVisible(registered.skill.scope, tool.scope, request.conversation, `${request.skillId}.${request.toolName}`);
 
+    const invocationId = request.invocationId ?? (this._execution ? this._newInvocationId() : undefined);
+    const handler = tool.handler;
+    const definition = () => executionDigest({
+      skill_id: registered.skill.id, provider: { kind: registered.skill.provider.kind, id: registered.skill.provider.id },
+      audience: resolveSkillAudience(registered.skill), scope: registered.skill.scope ?? null,
+      runtime_status: registered.skill.metadata?.runtime_status ?? null,
+      skill_policy: registered.skill.policy, tool_name: tool.name, description: tool.description,
+      tool_audience: resolveToolAudience(registered.skill, tool), tool_scope: tool.scope ?? null,
+      parameters: tool.parameters ?? null, tool_policy: tool.policy ?? null,
+    });
+    const revision = this._execution ? definition() : '';
+    const context = request.conversation ? { ...request.conversation } : undefined;
     return this.executeWithAudit({
       traceId: request.traceId,
       skill: registered.skill,
@@ -139,10 +154,23 @@ export class SkillInvocationGateway {
       targetName: request.toolName,
       args: request.args,
       signal: request.signal,
-      invocationId: request.invocationId,
-      execute: () => tool.handler(request.args, {
-        signal: request.signal,
-        invocationId: request.invocationId,
+      invocationId,
+      durable: this._execution ? {
+        scopeId: context?.conversation_id ?? 'global',
+        executorId: registered.skill.provider.id,
+        revision,
+        context: context ? { conversation_id: context.conversation_id, scene_id: context.scene_id,
+          source_provider_id: context.source_provider_id } : null,
+        validate: () => {
+          if (this._registry.findById(request.skillId) !== registered
+            || !registered.skill.tools.includes(tool) || tool.handler !== handler || definition() !== revision) return false;
+          this.assertScopeVisible(registered.skill.scope, tool.scope, context, `${request.skillId}.${request.toolName}`);
+          return this._policyEngine.evaluate(registered.skill, tool.policy ?? registered.skill.policy).allowed;
+        },
+      } : undefined,
+      execute: (args, signal) => handler(args, {
+        signal,
+        invocationId,
       }),
     });
   }
@@ -211,9 +239,10 @@ export class SkillInvocationGateway {
     targetKind: SkillInvocationTargetKind;
     targetName: string;
     args?: unknown;
-    execute: () => Promise<unknown> | unknown;
+    execute: (args?: unknown, signal?: AbortSignal) => Promise<unknown> | unknown;
     signal?: AbortSignal;
     invocationId?: string;
+    durable?: { scopeId: string; executorId: string; revision: string; context: unknown; validate(): boolean };
   }): Promise<unknown> {
     const traceId = options.traceId
       ?? this._observability.currentTraceId()
@@ -221,34 +250,18 @@ export class SkillInvocationGateway {
     return this._observability.withTrace(traceId, async () => {
       options.signal?.throwIfAborted();
       const startedAt = Date.now();
-      const policy = options.policy ?? options.skill.policy;
+      const sourcePolicy = options.policy ?? options.skill.policy;
+      const policy = { ...sourcePolicy, sideEffects: [...sourcePolicy.sideEffects] };
       const decision = this._policyEngine.evaluate(options.skill, policy);
-
-      if (!decision.allowed) {
-        const message = decision.reason ?? `技能 ${options.skill.id} 被策略拒绝`;
-        this.recordAudit({
-          traceId,
-          skill: options.skill,
-          targetKind: options.targetKind,
-          targetName: options.targetName,
-          decision,
-          status: 'policy_denied',
-          durationMs: Date.now() - startedAt,
-          errorMessage: message,
-          policy,
-        });
-        throw new Error(message);
-      }
-
-      if (decision.confirmationRequired) {
-        if (!this._requestConfirmation) {
-          const message = `技能 ${options.skill.id} 需要用户确认，但确认通道尚未接入`;
+      const authorize = async (args: unknown, signal?: AbortSignal): Promise<void> => {
+        if (!decision.allowed) {
+          const message = decision.reason ?? `技能 ${options.skill.id} 被策略拒绝`;
           this.recordAudit({
             traceId,
             skill: options.skill,
             targetKind: options.targetKind,
             targetName: options.targetName,
-            decision: { ...decision, allowed: false, reason: message },
+            decision,
             status: 'policy_denied',
             durationMs: Date.now() - startedAt,
             errorMessage: message,
@@ -257,35 +270,113 @@ export class SkillInvocationGateway {
           throw new Error(message);
         }
 
-        const approved = await this._requestConfirmation({
-          traceId,
-          skillId: options.skill.id,
-          targetKind: options.targetKind,
-          targetName: options.targetName,
-          riskLevel: policy.riskLevel,
-          sideEffects: policy.sideEffects,
-          args: options.args,
-        });
-        options.signal?.throwIfAborted();
-        if (!approved) {
-          const message = `用户拒绝执行技能 ${options.skill.id}`;
-          this.recordAudit({
+        if (decision.confirmationRequired) {
+          if (!this._requestConfirmation) {
+            const message = `技能 ${options.skill.id} 需要用户确认，但确认通道尚未接入`;
+            this.recordAudit({
+              traceId,
+              skill: options.skill,
+              targetKind: options.targetKind,
+              targetName: options.targetName,
+              decision: { ...decision, allowed: false, reason: message },
+              status: 'policy_denied',
+              durationMs: Date.now() - startedAt,
+              errorMessage: message,
+              policy,
+            });
+            throw new Error(message);
+          }
+
+          const approved = await this._requestConfirmation({
             traceId,
-            skill: options.skill,
+            skillId: options.skill.id,
             targetKind: options.targetKind,
             targetName: options.targetName,
-            decision: { ...decision, allowed: false, reason: message },
-            status: 'policy_denied',
-            durationMs: Date.now() - startedAt,
-            errorMessage: message,
-            policy,
+            riskLevel: policy.riskLevel,
+            sideEffects: policy.sideEffects,
+            args,
           });
-          throw new Error(message);
+          signal?.throwIfAborted();
+          if (!approved) {
+            const message = `用户拒绝执行技能 ${options.skill.id}`;
+            this.recordAudit({
+              traceId,
+              skill: options.skill,
+              targetKind: options.targetKind,
+              targetName: options.targetName,
+              decision: { ...decision, allowed: false, reason: message },
+              status: 'policy_denied',
+              durationMs: Date.now() - startedAt,
+              errorMessage: message,
+              policy,
+            });
+            throw new Error(message);
+          }
         }
+      };
+
+      if (options.durable && this._execution && options.invocationId) {
+        let originalError: unknown;
+        const args = (input: unknown): unknown => {
+          const body = input as { has_args: boolean; args: unknown };
+          return body.has_args ? body.args : undefined;
+        };
+        let outcome;
+        try {
+          outcome = await this._execution.execute({
+            invocation_id: options.invocationId, scope_id: options.durable.scopeId, idempotency_key: options.invocationId,
+            target: { executor_id: options.durable.executorId,
+              capability_id: `${options.skill.id}.${options.targetName}`, definition_revision: options.durable.revision },
+            input: { has_args: options.args !== undefined, args: options.args ?? null, context: options.durable.context },
+          }, {
+            authorize: async (request, signal) => {
+              try {
+                await authorize(args(request.input), signal);
+                return { allowed: true, decision: { ...decision, confirmation_approved: decision.confirmationRequired } };
+              } catch (error) {
+                signal.throwIfAborted();
+                originalError = error;
+                return { allowed: false, decision: { allowed: false, confirmationRequired: decision.confirmationRequired,
+                  reason_code: 'authorization_denied' } };
+              }
+            },
+            validateBeforeDispatch: () => {
+              try { return options.durable!.validate(); } catch { return false; }
+            },
+            execute: async (request, signal) => {
+              try {
+                const result = await options.execute(args(request.input), signal);
+                return { state: 'succeeded', result: result === undefined ? null : result,
+                  side_effects: 'confirmed' };
+              } catch (error) {
+                originalError = error;
+                // 声明 sideEffects=[] 不是接收方“未应用”的证据，普通 throw 不能安全重试。
+                return { state: 'unknown', error_code: 'executor_unconfirmed', side_effects: 'unknown' };
+              }
+            },
+          }, options.signal);
+        } catch (error) {
+          if (error instanceof ExecutionRecoveryRequiredError) {
+            this.recordCommittedAudit({ traceId, skill: options.skill, targetKind: options.targetKind,
+              targetName: options.targetName, decision, status: 'unknown', durationMs: Date.now() - startedAt,
+              errorMessage: 'execution_recovery_required', policy });
+            throw new SkillInvocationRecoveryRequiredError(error.invocationId);
+          }
+          throw error;
+        }
+        // 诊断失败不能改写已提交的 Execution 事实；重放仍返回原结果而不再派发。
+        this.recordCommittedAudit({ traceId, skill: options.skill, targetKind: options.targetKind,
+          targetName: options.targetName, decision, status: outcome.state === 'succeeded' ? 'succeeded'
+            : outcome.error_code === 'authorization_denied' ? 'policy_denied' : 'failed',
+          durationMs: Date.now() - startedAt, resultType: describeResult(outcome.result), policy });
+        if (outcome.state === 'failed') throw originalError ?? new Error(`Execution 被拒绝或失败: ${outcome.error_code}`);
+        return outcome.result;
       }
+
+      await authorize(options.args, options.signal);
 
       try {
-        const result = await options.execute();
+        const result = await options.execute(options.args, options.signal);
         this.recordAudit({
           traceId,
           skill: options.skill,
@@ -316,6 +407,15 @@ export class SkillInvocationGateway {
         throw error;
       }
     });
+  }
+
+  private recordCommittedAudit(options: Parameters<SkillInvocationGateway['recordAudit']>[0]): void {
+    try { this.recordAudit(options); }
+    catch {
+      // 诊断不是执行事实 owner；sink 故障不能令调用者将已提交成功当作失败再派发。
+      try { this._observability.logger('skill-invocation').warn('Execution 事实已保留，调用诊断写入失败', { trace_id: options.traceId }); }
+      catch { /* journal/outbox 是可恢复事实，日志可重建且不能覆写该结果。 */ }
+    }
   }
 
   private recordAudit(options: {
