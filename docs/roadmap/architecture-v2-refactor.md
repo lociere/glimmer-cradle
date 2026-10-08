@@ -620,7 +620,40 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 5/7 Planning 通知 wire 与实际来源解析（2026-10-08 当前候选）
+### 阶段 4/7 Delivery 完整回执与持久 owner fencing（2026-10-08 当前候选）
+
+输入 `2616b784`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按数据与路径 Skill 的
+不可再生事实/恢复边界补齐 Conversation Delivery，而不是先用发布回调解除 Planning 待办。
+发现旧去重只比 output ID，异目的地/世代/kind/播放范围的同 receipt ID 可能冒充 duplicate；
+旧 controller 也能重新 allocate 目的地把 epoch 改回。现已删除最小索引的确认捷径。
+
+可信 App 激活同事务维护独立版本 1 的当前/退休 epoch 窗口，已退休身份拒绝复活；allocate、
+interrupt、transition 在真实 SQLite IMMEDIATE 事务复验 owner，旧实例的幂等捷径也拒绝。
+新实际回执与完整 envelope/原 Turn/content digest/状态原子提交，独立事实窗口版本 1；旧
+receipt ID 不自动补造确认。同 ID 只允许原语义重投，晚到时间保留首次事实。查询仅以实际
+delivered/playback_completed 返回历史确认，不以 sent/unknown/播放开始或业务完成替代；
+新主可对账历史真实接纳，但历史证明不提升当前权限、不接纳新迟到回执、不自动 ACK Planning。
+Store 直接调用同样约束实际播放范围、已知时长与原回执原因，窗口/绑定损坏失败关闭不写库。
+精确状态与恢复责任归[Conversation 实现](../architecture/implementation/Conversation实现.md#interaction-与-delivery)
+和[数据目录](../reference/data-layout.md#用户状态与记忆)，没有新增第二契约源或文件。
+
+Conversation TS 全量 64 项 PASS（新增 52 项），Python 全量 22 项 PASS，覆盖六种实际回执、
+重启/晚到精确重复、七种同 ID 漂移、非法字段与预算、两个连接旧主写入、历史确认/新迟到拒绝、
+旧最小行不补造证明、首次 authority/receipt DDL 与后续写入故障全 dump 回滚、直接 Store
+绕过反例、部分/未知版本/损坏 JSON/原绑定漂移查询。首个 completed fixture 跳过 started
+违反既有状态机，已修正测试顺序，未放宽转换规则。Kernel 全量 271 项 PASS、14 项既有跳过；
+真实 Surface Gateway 断言完整事实/同 ID 异目的地拒绝/实际播放完成事实。
+生产 composition 两个独立进程、同一临时 DataRoot 启停/重启 PASS，新 epoch 退休旧身份，
+空态不生成输出或 receipt 窗口。首轮同进程第二启动遇全局日志器 `write after end`，定位后改为
+真实进程重启验证，不改生命周期来适配该 fixture。根 typecheck/build、111 页 docs、encoding、
+architecture、target-layout specification 与 diff PASS；Contract Spine 未改，复用输入契约证据。
+
+下一步仍需接通知的实际 Conversation Turn/Reply/目的地/receiver 与源 ACK，在完整 App
+权限和恢复校验后才解除待办；无目的地、撤权、取消或 unknown 保留原通知。后继调度/撤销、
+默认产品入口、其他阶段和完整物理 final 未完成。仅临时数据，没有调用付费模型、迁移用户库、
+推送或发布；完整固定候选独立审查仍留整体重构收尾。
+
+### 阶段 5/7 Planning 通知 wire 与实际来源解析（2026-10-08）
 
 输入 `d44c53e3`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按协议 Skill 在唯一
 Contract Spine 新增 typed 通知引用、Read/Resolve RPC，生成 TS/Python/C#，不手写 wire 镜像或

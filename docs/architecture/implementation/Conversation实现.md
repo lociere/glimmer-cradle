@@ -63,6 +63,24 @@ authority epoch、generation 和回执身份；Reply/Audio projection 携带同�
 按 segment index/count 累计单调 `heard_through_ms`，只在末段完成。Personal Server 仅在认证浏览器 WebSocket
 发送成功后回报 delivered。EventBus handler 返回仍只代表 sent，不能冒充 delivered 或 heard。
 
+Delivery 持久层维护独立版本 1 的 authority 窗口：可信 App 激活 epoch 时原子记录当前与已退出
+epoch，并 fence 旧输出；已退出 epoch 不能重新激活。allocate、interrupt 与回执转换在同一
+IMMEDIATE 事务复验当前 owner，旧 controller 不能凭新目的地或幂等捷径夺回写入资格。opaque
+epoch 不按字符串排序推断新旧，窗口也不替代 Platform 的 authority 租约和 App 权限判断。
+
+新实际回执建立独立版本 1 的完整事实窗口，保存完整 envelope、原 `turn_id` 和
+`content_digest`，与最小 receipt 索引和输出状态同事务提交。身份/原因限 4 KiB，完整事实限
+64 KiB；回执 kind、字段、目的地/epoch/generation、播放范围和持久绑定均核验。相同 receipt ID
+只允许原语义精确重投，到达时间可更晚，但保留首次时间；异内容不能冒充 duplicate。已知时长
+不能通过省略 duration 绕过，直接调用 Store 也不能倒退进度或篡改回执原因。
+
+`receipt` 与 `confirmedReceipt` 从唯一持久 owner 只读返回可核验事实；后者只认可真实
+delivered/playback_completed，sent、unknown、started/progress、失败或仅旧状态不是确认。
+新主可对账旧主曾接纳的历史确认，supersession 不抹除历史事实，但不接纳新的迟到旧世代回执；
+历史事实不授予当前外部发送权限，也不自动 ACK Planning。普通打开不建立增量窗口，旧最小
+receipt 不回填完整事实；需要独立真实新回执或受控对账。未知版本、部分窗口、损坏或原绑定
+冲突拒绝确认，不自动修复用户库。恢复与备份规则见[数据目录](../../reference/data-layout.md#用户状态与记忆)。
+
 ## Canonical Log 与 Experience
 
 `adapters/persistence/log_store.py` 是唯一 SQLite writer adapter：月度 pack 只追加 Moment，`catalog.db` 维护全局 position 和 pack 范围，

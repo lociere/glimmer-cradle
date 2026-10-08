@@ -10,7 +10,8 @@ import {
   type OutputGeneration,
 } from './output-generation.js';
 import { validatePlayoutProgress } from './playout.js';
-import type { DeliveryReceiptEnvelope, ReceiptDecision } from './receipt.js';
+import { DeliveryReceiptConflictError, deliveryReceiptIdentity, validateDeliveryReceipt,
+  type DeliveryReceiptEnvelope, type DeliveryReceiptFact, type ReceiptDecision } from './receipt.js';
 
 const SYSTEM_DELIVERY_CLOCK: BindingClock = { nowIso: () => new Date().toISOString() };
 
@@ -18,7 +19,7 @@ const TRANSITIONS: Record<DeliveryStatus, ReadonlySet<DeliveryStatus>> = {
   generated: new Set(['queued', 'interrupted', 'failed']),
   queued: new Set(['sent', 'unknown', 'interrupted', 'failed']),
   sent: new Set(['delivered', 'playing', 'unknown', 'interrupted', 'failed']),
-  delivered: new Set(['playing', 'completed', 'unknown', 'interrupted', 'failed']),
+  delivered: new Set(['delivered', 'playing', 'completed', 'unknown', 'interrupted', 'failed']),
   playing: new Set(['playing', 'completed', 'unknown', 'interrupted', 'failed']),
   unknown: new Set(['delivered', 'playing', 'completed', 'failed', 'interrupted']),
   completed: new Set(),
@@ -58,6 +59,7 @@ export class DeliveryController {
   }
 
   public unknown(outputId: string, reason: string): OutputGeneration {
+    if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
     const current = this.store.load(outputId);
     if (!current) throw new Error(`Delivery output 不存在: ${outputId}`);
     if (current.authority_epoch !== this.authorityEpoch) {
@@ -90,26 +92,17 @@ export class DeliveryController {
   }
 
   public applyReceipt(envelope: DeliveryReceiptEnvelope): ReceiptDecision {
-    for (const [name, value] of [
-      ['output_id', envelope.output_id],
-      ['destination_id', envelope.destination_id],
-      ['authority_epoch', envelope.authority_epoch],
-      ['receipt_id', envelope.receipt.receipt_id],
-      ['received_at', envelope.received_at],
-    ] as const) {
-      if (!value.trim()) throw new TypeError(`Delivery receipt ${name} 不得为空`);
+    validateDeliveryReceipt(envelope);
+    if (envelope.authority_epoch !== this.authorityEpoch || !this.store.isCurrentEpoch(this.authorityEpoch)) {
+      return { accepted: false, reason: 'stale_generation' };
     }
-    if (!Number.isFinite(Date.parse(envelope.received_at))) {
-      throw new TypeError('Delivery receipt received_at 必须是有效时间');
-    }
-    if (!Number.isSafeInteger(envelope.generation) || envelope.generation <= 0) {
-      throw new TypeError('Delivery receipt generation 必须是正安全整数');
-    }
-    const receiptOutput = this.store.receiptOutput(envelope.receipt.receipt_id);
-    if (receiptOutput) {
-      return receiptOutput === envelope.output_id
-        ? { accepted: true, reason: 'duplicate' }
-        : { accepted: false, reason: 'receipt_conflict' };
+    try {
+      const fact = this.store.receipt(envelope.receipt.receipt_id);
+      if (fact) return deliveryReceiptIdentity(fact.envelope) === deliveryReceiptIdentity(envelope)
+        ? { accepted: true, reason: 'duplicate' } : { accepted: false, reason: 'receipt_conflict' };
+    } catch (error) {
+      if (error instanceof DeliveryReceiptConflictError) return { accepted: false, reason: 'receipt_conflict' };
+      throw error;
     }
     const current = this.store.load(envelope.output_id);
     if (!current) return { accepted: false, reason: 'unknown_output' };
@@ -128,24 +121,26 @@ export class DeliveryController {
     const receipt = envelope.receipt;
     let transition: DeliveryTransition;
     if (receipt.kind === 'delivered') {
-      transition = { status: 'delivered', updated_at: envelope.received_at, receipt_id: receipt.receipt_id };
+      transition = { status: 'delivered', updated_at: envelope.received_at, receipt: envelope };
     } else if (receipt.kind === 'playback_started') {
-      transition = { status: 'playing', updated_at: envelope.received_at, receipt_id: receipt.receipt_id };
+      transition = { status: 'playing', updated_at: envelope.received_at, receipt: envelope };
     } else if (receipt.kind === 'playback_progress' || receipt.kind === 'playback_completed') {
-      validatePlayoutProgress(current.heard_through_ms, receipt);
+      validatePlayoutProgress(current.heard_through_ms, {
+        ...receipt, duration_ms: receipt.duration_ms ?? current.duration_ms ?? undefined,
+      });
       transition = {
         status: receipt.kind === 'playback_completed' ? 'completed' : 'playing',
         updated_at: envelope.received_at,
         heard_through_ms: receipt.heard_through_ms,
         duration_ms: receipt.duration_ms ?? current.duration_ms,
-        receipt_id: receipt.receipt_id,
+        receipt: envelope,
       };
     } else {
       transition = {
         status: receipt.kind,
         updated_at: envelope.received_at,
         terminal_reason: receipt.reason.trim() || receipt.kind,
-        receipt_id: receipt.receipt_id,
+        receipt: envelope,
       };
     }
     if (!TRANSITIONS[current.status].has(transition.status)) {
@@ -167,12 +162,24 @@ export class DeliveryController {
     return this.store.recover(this.authorityEpoch);
   }
 
+  /** 历史接纳事实可由新主对账；查询不接纳迟到回执、不证明当前发送权限。 */
+  public receipt(receiptId: string): DeliveryReceiptFact | null {
+    if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
+    return this.store.receipt(receiptId);
+  }
+
+  public confirmedReceipt(outputId: string): DeliveryReceiptFact | null {
+    if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
+    return this.store.confirmedReceipt(outputId);
+  }
+
   public current(outputId: string): OutputGeneration | null {
     const output = this.store.load(outputId);
-    return output?.authority_epoch === this.authorityEpoch ? output : null;
+    return this.store.isCurrentEpoch(this.authorityEpoch) && output?.authority_epoch === this.authorityEpoch ? output : null;
   }
 
   private move(outputId: string, status: DeliveryStatus): OutputGeneration {
+    if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
     const current = this.store.load(outputId);
     if (!current) throw new Error(`Delivery output 不存在: ${outputId}`);
     if (current.authority_epoch !== this.authorityEpoch) {

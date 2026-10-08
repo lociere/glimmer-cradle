@@ -25,6 +25,18 @@ Local Data Domain 由产品或部署环境持有：正式产品通过 `GLIMMER_C
 
 ## 用户状态与记忆
 
+Kernel composition 通过 resolver 打开 `${DataRoot}/state/conversation/delivery.db`，由 Conversation
+唯一持久化输出/目的地世代与回执。可信 App 显式激活时建立独立版本 1 的
+`delivery_authority_meta`（schema/current epoch）和 `delivery_retired_authorities`；退休 epoch
+不允许重启重新激活。新实际回执同事务增建独立版本 1 的 `delivery_receipt_meta` 和
+`delivery_receipt_facts`（原 envelope/Turn/content digest 的规范 JSON），与既有最小 receipt
+索引/输出状态原子提交。完整事实限 64 KiB；普通打开不建这些窗口，不补造旧最小索引的证明。
+旧库必须受控对账，未知/部分窗口、版本或绑定异常保留原材料并拒绝确认。这里只保存历史真实
+接纳，不持有 Platform 租约、App 当前授权或第二份 Planning 通知状态机。
+该库不是可重建缓存；备份须 drain 实际 publisher/回执处理，与 Conversation 原 Turn/Log、
+Planning 通知、Jobs/authority 保持一致切点，包含完整 SQLite/WAL 快照。不可只回滚 outbox
+或丢弃已退出 epoch/完整回执后重新发送。完整跨库恢复和路径迁移留阶段 14，本轮只验证临时库。
+
 生产 Kernel composition 通过 resolver 打开 `${DataRoot}/state/capabilities/execution.sqlite`，由
 Capabilities 持久化，schema version 2、owner `0x47434558`。稳定 invocation/scope/key、请求摘要、
 实际目标定义、授权、派发 owner/attempt、结果/副作用状态与未 ACK outbox 都是不可再生执行事实；
@@ -128,6 +140,7 @@ digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可�
 | 路径 | owner | 说明 |
 |---|---|---|
 | `data/state/cognition/experience/catalog.db` | Conversation（兼容路径） | Conversation Log 全局 position、pack 范围与单写者目录；物理迁移留阶段 14 |
+| `data/state/conversation/delivery.db` | Conversation Delivery | 输出/目的地世代、当前和已退出 epoch、状态与完整回执/原 Turn/内容摘要绑定；不可单独删除重建 |
 | `data/state/cognition/experience/packs/YYYY/YYYY-MM.experience.db` | Conversation（兼容路径） | 月度不可变 Moment、来源、因果与检索索引；物理迁移留阶段 14 |
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |

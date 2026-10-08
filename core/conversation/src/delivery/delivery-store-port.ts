@@ -1,4 +1,5 @@
 import type { DeliveryStatus, OutputGeneration } from './output-generation.js';
+import type { DeliveryReceiptEnvelope, DeliveryReceiptFact } from './receipt.js';
 
 export interface CreateOutputRequest {
   readonly output_id: string;
@@ -15,11 +16,12 @@ export interface DeliveryTransition {
   readonly heard_through_ms?: number;
   readonly duration_ms?: number | null;
   readonly terminal_reason?: string | null;
-  readonly receipt_id?: string;
+  readonly receipt?: DeliveryReceiptEnvelope;
 }
 
 export interface DeliveryStorePort {
   activateEpoch(authorityEpoch: string, activatedAt: string): number;
+  isCurrentEpoch(authorityEpoch: string): boolean;
   allocate(request: CreateOutputRequest): OutputGeneration;
   load(outputId: string): OutputGeneration | null;
   transition(
@@ -36,6 +38,7 @@ export interface DeliveryStorePort {
     reason: string,
   ): number;
   recover(authorityEpoch: string): OutputGeneration[];
-  receiptOutput(receiptId: string): string | null;
+  receipt(receiptId: string): DeliveryReceiptFact | null;
+  confirmedReceipt(outputId: string): DeliveryReceiptFact | null;
   close(): void;
 }

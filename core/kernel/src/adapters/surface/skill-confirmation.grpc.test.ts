@@ -114,6 +114,26 @@ it('Surface delivery receipt 只提交匹配 epoch 与 generation 的真实回�
       },
     }, { readyState: 1, send: () => {} });
     expect(delivery.current(output.output_id)?.status).toBe('delivered');
+    expect(delivery.confirmedReceipt(output.output_id)).toEqual({
+      turn_id: output.turn_id,
+      content_digest: output.content_digest,
+      envelope: {
+        output_id: output.output_id, destination_id: output.destination_id,
+        authority_epoch: output.authority_epoch, generation: output.generation,
+        received_at: '2026-09-22T00:00:01Z',
+        receipt: { kind: 'delivered', receipt_id: 'receipt:test' },
+      },
+    });
+    await expect((gateway as any)._dispatchSurfaceRequest({
+      kind: 'delivery_receipt', timestamp: Date.now(),
+      delivery_receipt: {
+        output_id: output.output_id, destination_id: 'other:destination',
+        authority_epoch: output.authority_epoch, generation: output.generation,
+        receipt_id: 'receipt:test', receipt_kind: 'delivered',
+        received_at: '2026-09-22T00:00:02Z',
+      },
+    }, { readyState: 1, send: () => {} })).rejects.toThrow(/receipt_conflict/u);
+    expect(delivery.current(output.output_id)?.status).toBe('delivered');
 
     await expect((gateway as any)._dispatchSurfaceRequest({
       kind: 'delivery_receipt',
@@ -151,6 +171,9 @@ it('Surface delivery receipt 只提交匹配 epoch 与 generation 的真实回�
       status: 'completed',
       heard_through_ms: 250,
       duration_ms: 250,
+    });
+    expect(delivery.confirmedReceipt(output.output_id)?.envelope.receipt).toEqual({
+      kind: 'playback_completed', receipt_id: 'receipt:completed', heard_through_ms: 250, duration_ms: 250,
     });
   } finally {
     store.close();
