@@ -33,6 +33,7 @@ from glimmer.conversation.v1 import conversation_pb2 as conversation_pb
 from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
 from glimmer.kernel.v1 import kernel_control_service_pb2 as kernel_pb
 from glimmer_cradle.cognition.attention import AttentionController
+from glimmer_cradle.cognition.inference import ModelPort
 from glimmer_cradle.cognition.knowledge import KnowledgeConflictError, KnowledgeIndex
 from glimmer_cradle.cognition.loop import LoopController
 from glimmer_cradle.cognition.memory import (
@@ -50,7 +51,13 @@ from glimmer_cradle.cognition.perception import (
     PerceptionOperationConflict,
     PerceptionOperationRegistry,
 )
-from glimmer_cradle.cognition.planning import PlanningConflictError, PlanningStore
+from glimmer_cradle.cognition.planning import (
+    ModelPlanningCompletionEvaluator,
+    PlanningConflictError,
+    PlanningController,
+    PlanningStore,
+    PlanVersion,
+)
 from glimmer_cradle.cognition.ports import (
     JobReceipt,
     KernelRequestPort,
@@ -72,6 +79,8 @@ from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
     history_result_to_wire,
 )
 from glimmer_cradle.cognition_worker.adapters.job_client import (
+    PlanningEvidenceAdapter,
+    PlanningModelAdapter,
     planning_identity_from_wire,
     planning_result_to_wire,
     planning_source_from_wire,
@@ -1406,6 +1415,7 @@ class CognitionGrpcHost:
         readiness: ReadinessTracker | None = None,
         consolidation: ConsolidationCoordinator | None = None,
         planning: PlanningStore | None = None,
+        planning_model: ModelPort | None = None,
         conversation: ConversationRecorder | None = None,
         knowledge: KnowledgeIndex | None = None,
     ) -> None:
@@ -1419,6 +1429,8 @@ class CognitionGrpcHost:
         self._workspace = workspace
         self._consolidation = consolidation
         self._planning = planning
+        self._planning_controller = PlanningController(store=planning) if planning is not None else None
+        self._planning_model = planning_model
         self._conversation = conversation
         self._knowledge = knowledge
         self._server: grpc.aio.Server | None = None
@@ -1459,6 +1471,8 @@ class CognitionGrpcHost:
             "ReadPlanningJobRequests": self._method(self._read_planning_job_requests, cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse),
             "AcknowledgePlanningJobRequest": self._method(self._acknowledge_planning_job_request, cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse),
             "ReconcilePlanningJob": self._method(self._reconcile_planning_job, cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse),
+            "AcceptPlanningCommitment": self._method(self._accept_planning_commitment, cognition_pb.AcceptPlanningCommitmentRequest, cognition_pb.AcceptPlanningCommitmentResponse),
+            "ExecutePlanningJob": self._method(self._execute_planning_job, cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1895,6 +1909,67 @@ class CognitionGrpcHost:
         # 对账本身会封口；不要求认知推理 ready，但必须保留 generation/deadline/取消与 drain。
         return await self._invoke(request, context, operation, track=True, allow_stopping=True)
 
+    def _planning_evidence(self) -> PlanningEvidenceAdapter:
+        if self._conversation is None or self._knowledge is None or self._activity is None:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 实际证据 owner 未装配")
+        return PlanningEvidenceAdapter(self._conversation, self._knowledge, self._activity.get_state)
+
+    async def _accept_planning_commitment(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            evidence = self._planning_evidence()
+            if request.ByteSize() > 65_536 or not 0 <= request.due_at_ms <= 9007199254740991 \
+                    or not all(1 <= value <= 9007199254740991 for value in (request.plan_version, request.goal_version)) \
+                    or any(not value.strip() or len(value.encode("utf-8")) > 4096 for value in (
+                        request.commitment_id, request.plan_id, request.goal_id, request.source_moment_id)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 接纳请求预算/due 无效")
+            try:
+                previous = await source.load_plan(request.plan_id, request.plan_version)
+                goal = await evidence.bind_goal(goal_id=request.goal_id, version=request.goal_version, text=request.text,
+                    completion_condition=request.completion_condition, source_moment_id=request.source_moment_id,
+                    accepted_tier=previous.goal.model_tier if previous is not None else None)
+                plan = PlanVersion(request.plan_id, request.plan_version, goal, tuple(request.steps))
+                commitment = await source.accept_commitment(request.commitment_id, plan, due_at=request.due_at_ms)
+            except PermissionError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Planning 来源/隐私/推理政策未接纳") from error
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_CONFLICT, "Planning 不可变语义/版本或源请求冲突") from error
+            except (TypeError, ValueError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 目标/计划字段无效") from error
+            return cognition_pb.AcceptPlanningCommitmentResponse(commitment_id=commitment.commitment_id,
+                plan_id=commitment.plan_id, plan_version=commitment.plan_version, revision=commitment.revision,
+                status=commitment.status.value, scope_id=goal.scope_id)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _execute_planning_job(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if self._planning_model is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning ModelPort 未装配")
+            evidence = self._planning_evidence()
+            if not request.HasField("identity") or request.ByteSize() > 16_384:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 原 attempt identity 缺失或超过预算")
+            try:
+                identity = planning_identity_from_wire(request.identity)
+                if not re.fullmatch(r"[a-f0-9]{64}", request.request_id) or identity.job_id != f"planning:{request.request_id}":
+                    raise ValueError("Planning 原请求 identity 无效")
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 原 attempt identity/请求无效") from error
+            controller = self._planning_controller
+            if controller is None:
+                # 只支持构造时装配的执行 owner，不靠运行期替换 store 自动启用第二 controller。
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 执行 owner 未装配")
+            try:
+                await controller.evaluate_job(identity, request.request_id, evidence=evidence,
+                    evaluator=ModelPlanningCompletionEvaluator(PlanningModelAdapter(self._planning_model, evidence)))
+                proof = await source.reconcile_evaluation(identity, request.request_id)
+                return cognition_pb.ExecutePlanningJobResponse(result=planning_result_to_wire(proof, request.request_id))
+            except PermissionError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Planning 证据或模型政策已拒绝/撤销") from error
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 原 attempt/源/评估提交冲突；须对账") from error
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:
             duplicate = self._is_completed(request.call)
@@ -2200,6 +2275,7 @@ class CognitionHost:
                 readiness=self.readiness,
                 consolidation=components.consolidation_coordinator,
                 planning=components.planning_store,
+                planning_model=components.planning_model,
                 conversation=components.conversation_recorder,
                 knowledge=components.knowledge_base,
             )

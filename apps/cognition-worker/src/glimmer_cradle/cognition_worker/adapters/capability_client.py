@@ -17,7 +17,11 @@ from glimmer_cradle.cognition.ports import (
 from glimmer_cradle.cognition_worker.adapters.resource_client import (
     resource_snapshot_from_result,
 )
-from glimmer_cradle.conversation import ConversationRecorder, MomentKind
+from glimmer_cradle.conversation import (
+    ConversationRecorder,
+    MomentKind,
+    SourceDescriptor,
+)
 from google.protobuf.json_format import MessageToDict, ParseDict
 
 
@@ -161,6 +165,13 @@ class CapabilityClient:
         if invocation.idempotency_key != f"{invocation.run_id}:{invocation.call_id}":
             raise ValueError("native invocation key mismatch")
         context = self._conversation
+        parent = self._recorder.log.get_moment(context["experience_moment_id"]) if context.get("experience_moment_id") else None
+        if context.get("experience_moment_id") and (parent is None or parent.kind != MomentKind.PERCEPTION.value
+            or parent.content.get("source_provider_id") != context["source_provider_id"]
+            or parent.actor_id != context.get("actor_id")
+            or any(getattr(parent, key) != context[key] for key in (
+                "conversation_id", "scene_id", "continuity_id", "thread_id", "interaction_id", "recall_scope", "disclosure_scope"))):
+            raise ValueError("native ACTION perception/privacy anchor mismatch")
         source = self._recorder.record(
             MomentKind.ACTION,
             {
@@ -172,6 +183,7 @@ class CapabilityClient:
                 "definition_id": invocation.definition_id,
                 "definition_revision": invocation.definition_revision,
                 "arguments": invocation.arguments,
+                "source_provider_id": context["source_provider_id"],
             },
             **{
                 key: context[key]
@@ -186,6 +198,7 @@ class CapabilityClient:
                 )
             },
             actor_id=context.get("actor_id"),
+            origin=SourceDescriptor(privacy_class=parent.origin.privacy_class) if parent else None,
             causation_ids=(context["experience_moment_id"],) if context.get("experience_moment_id") else (),
             trace_id=self._trace_id,
             idempotency_key=f"native-{invocation.kind}-action:{invocation.idempotency_key}",

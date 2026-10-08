@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -14,6 +15,9 @@ class GoalVersion:
     version: int
     text: str
     completion_condition: str
+    source_moment_id: str | None = None
+    source_digest: str | None = None
+    model_tier: str | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -28,6 +32,14 @@ class GoalVersion:
             raise ValueError("长期目标身份、语义与完成条件不得为空")
         if type(self.version) is not int or not 1 <= self.version <= 2**53 - 1:
             raise ValueError("长期目标版本无效")
+        binding = (self.source_moment_id, self.source_digest, self.model_tier)
+        if any(value is not None for value in binding) and (
+            not isinstance(self.source_moment_id, str) or not self.source_moment_id.strip()
+            or len(self.source_moment_id.encode("utf-8")) > 4096
+            or not isinstance(self.source_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", self.source_digest)
+            or self.model_tier not in {"none", "local_only", "cloud_allowed"}
+        ):
+            raise ValueError("长期目标来源绑定/推理政策无效")
 
 
 @dataclass(frozen=True, slots=True)

@@ -264,8 +264,13 @@ class KnowledgeIndex:
             rows = {row["entry_id"]: row for row in await self._repo.get_all_entries() if row["enabled"]}
             for reference in references:
                 row = rows.get(reference.entry_id)
-                if row is None or (row["revision"], row["source"], row["content_digest"]) != (reference.revision, "resource", reference.content_digest) or reference.source != "resource":
+                if reference.source not in {"config", "resource"} or row is None or (
+                    row["revision"], row["source"], row["content_digest"]
+                ) != (reference.revision, reference.source, reference.content_digest):
                     return False
+                if reference.source == "config":
+                    # 配置 intake 沿用角色已接纳的全局资料；仍重查 owner 修订/停用，不套用外部 IO grant。
+                    continue
                 capture = row.get("resource")
                 if not self._resource_visible(capture, scope):
                     return False

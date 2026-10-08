@@ -96,6 +96,23 @@ def _canonical(value: object) -> str:
     return payload
 
 
+def _goal_document(goal: GoalVersion) -> dict:
+    document = asdict(goal)
+    if goal.source_moment_id is None:
+        # 旧不可变版本与 active work 摘要保持字节语义，不给历史目标补造访问资格。
+        for key in ("source_moment_id", "source_digest", "model_tier"):
+            document.pop(key)
+    return document
+
+
+def _plan_document(plan: PlanVersion) -> dict:
+    return {**asdict(plan), "goal": _goal_document(plan.goal)}
+
+
+def _work_document(work: PlanningEvaluationWork) -> dict:
+    return {**asdict(work), "plan": _plan_document(work.plan)}
+
+
 class SqlitePlanningStore:
     def __init__(self, path: Path, *, migration_path: Path | None = None, now_ms: Callable[[], int] | None = None) -> None:
         self._path = path
@@ -199,8 +216,8 @@ class SqlitePlanningStore:
         ):
             raise PlanningConflictError("长期计划或 due time 无效")
         goal_payload, plan_payload = (
-            _canonical(asdict(plan.goal)),
-            _canonical(asdict(plan)),
+            _canonical(_goal_document(plan.goal)),
+            _canonical(_plan_document(plan)),
         )
         identity = json.dumps(
             ["planning.evaluate", commitment_id, plan.plan_id, plan.version],
@@ -475,7 +492,7 @@ class SqlitePlanningStore:
                     ))
             else:
                 receipt = await self._evaluation_receipt(connection, identity.job_id)
-                digest = hashlib.sha256(_canonical(asdict(work)).encode("utf-8")).hexdigest()
+                digest = hashlib.sha256(_canonical(_work_document(work)).encode("utf-8")).hexdigest()
                 if row is not None:
                     if row["state"] == "applied":
                         if receipt is None or receipt.receipt_id != row["receipt_id"]:
@@ -507,7 +524,7 @@ class SqlitePlanningStore:
             or len({item.evidence_id for item in evidence}) != len(evidence)
             or not set(assessment.evidence_ids).issubset(item.evidence_id for item in evidence)):
             raise PlanningConflictError("Planning 评估/证据无效")
-        digest = hashlib.sha256(_canonical(asdict(work)).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(_canonical(_work_document(work)).encode("utf-8")).hexdigest()
         async with self._transaction() as connection:
             if not await self._evaluation_schema(connection):
                 raise PlanningConflictError("Planning attempt 未登记")

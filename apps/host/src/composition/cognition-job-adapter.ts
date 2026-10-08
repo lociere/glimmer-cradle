@@ -2,10 +2,10 @@ import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
   ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
-  ReconcilePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
   type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
-import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort } from '../adapters/protocol/cognition-client.js';
+import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort, PlanningJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
   memoryJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobEvidence,
   type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
@@ -115,5 +115,38 @@ export class PlanningJobSourceAdapter implements JobReconciliationPort {
       delivered += 1;
     }
     return delivered;
+  }
+}
+
+/** 实际 Planning 业务执行；默认 scheduler 接纳闸完成前不批量 claim 未绑定历史目标。 */
+export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort {
+  public readonly kind = PLANNING_JOB_KIND;
+  public readonly retry_mode = 'reconcile' as const;
+  public constructor(private readonly cognition: PlanningJobsCognitionPort) {}
+  public async execute(context: JobExecutionContext, payload: Job['payload']): Promise<JobHandlerResult> {
+    context.assertLease();
+    const identity = planningJobIdentity(context.job), requestId = String(payload.source_request_id);
+    let response;
+    try {
+      response = await this.cognition.executePlanning(create(ExecutePlanningJobRequestSchema, { identity, requestId }), context.signal);
+    } catch (error) {
+      if (context.signal.aborted) {
+        // 已取消的 signal 不能给接收端封口；独立有界 RPC 完成后再交还 Jobs。
+        const sealed = await this.cognition.reconcilePlanning(create(ReconcilePlanningJobRequestSchema, { identity, requestId }));
+        planningJobEvidence(sealed.result, identity, requestId, String(payload.commitment_id));
+      }
+      throw error;
+    }
+    const proof = planningJobEvidence(response.result, identity, requestId, String(payload.commitment_id));
+    context.assertLease();
+    if (proof.resolution !== 'applied') throw new JobConflictError('Planning Execute 缺少真实业务 receipt');
+    return { status: 'succeeded', result: proof.result };
+  }
+  public async query(job: Job, attempt: JobAttempt, signal?: AbortSignal): Promise<JobReconciliationEvidence> {
+    signal?.throwIfAborted();
+    const identity = planningJobIdentity(job, attempt), requestId = String(job.payload.source_request_id);
+    const response = await this.cognition.reconcilePlanning(create(ReconcilePlanningJobRequestSchema, { identity, requestId }), signal);
+    signal?.throwIfAborted();
+    return planningJobEvidence(response.result, identity, requestId, String(job.payload.commitment_id));
   }
 }

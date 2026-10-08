@@ -228,6 +228,9 @@ class ConversationRecorder:
         source = self._log.get_moment(fact.source_fact_id)
         if source is None or source.kind != MomentKind.ACTION.value or source.conversation_id != fact.conversation_id:
             raise RuntimeError("Execution 原 ACTION 交互引用缺失或冲突")
+        # 保留原 ACTION 的 canonical provider；不能以 executor/provider_id 猜 IO 权限域。
+        if "source_provider_id" in source.content:
+            content["source_provider_id"] = source.content["source_provider_id"]
         # 记录“接收了外部输出”，不把输出变成 Knowledge/Memory 的权威断言。
         moment = self.record(MomentKind.ACTION_RESULT, content, causation_ids=(source.moment_id,),
             scene_id=source.scene_id, conversation_id=source.conversation_id, continuity_id=source.continuity_id,

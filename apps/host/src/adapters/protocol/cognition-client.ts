@@ -17,6 +17,10 @@ import {
   AcknowledgePlanningJobRequestRequestSchema, AcknowledgePlanningJobRequestResponseSchema,
   ReconcilePlanningJobRequestSchema, ReconcilePlanningJobResponseSchema,
   type ReconcilePlanningJobRequest, type ReconcilePlanningJobResponse,
+  AcceptPlanningCommitmentRequestSchema, AcceptPlanningCommitmentResponseSchema,
+  ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
+  type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
+  type ExecutePlanningJobRequest, type ExecutePlanningJobResponse,
   type ReadPlanningJobRequestsRequest, type ReadPlanningJobRequestsResponse,
   type AcknowledgePlanningJobRequestRequest, type AcknowledgePlanningJobRequestResponse,
   type PublishMemoryJobStateRequest, type PublishMemoryJobStateResponse,
@@ -52,12 +56,16 @@ export interface PlanningJobsReconciliationPort {
   reconcilePlanning(request: ReconcilePlanningJobRequest, signal?: AbortSignal): Promise<ReconcilePlanningJobResponse>;
 }
 
+export interface PlanningJobsCognitionPort extends PlanningJobsReconciliationPort {
+  executePlanning(request: ExecutePlanningJobRequest, signal?: AbortSignal): Promise<ExecutePlanningJobResponse>;
+}
+
 export class HostCognitionError extends Error {
   public constructor(public readonly code: ServiceErrorCode) { super('受监督 Cognition Service 请求失败'); }
 }
 
 /** 端点及 generation 由监督 owner 注入；切代必须撤销旧 client，不自造或发现 authority。 */
-export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort {
+export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsCognitionPort {
   private readonly client: grpc.Client;
   private readonly inflight = new Set<grpc.ClientUnaryCall>();
   private closed = false;
@@ -143,6 +151,14 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public reconcilePlanning(request: ReconcilePlanningJobRequest, signal?: AbortSignal): Promise<ReconcilePlanningJobResponse> {
     return this.call('ReconcilePlanningJob', ReconcilePlanningJobRequestSchema, ReconcilePlanningJobResponseSchema,
       create(ReconcilePlanningJobRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public acceptPlanningCommitment(request: AcceptPlanningCommitmentRequest, signal?: AbortSignal): Promise<AcceptPlanningCommitmentResponse> {
+    return this.call('AcceptPlanningCommitment', AcceptPlanningCommitmentRequestSchema, AcceptPlanningCommitmentResponseSchema,
+      create(AcceptPlanningCommitmentRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public executePlanning(request: ExecutePlanningJobRequest, signal?: AbortSignal): Promise<ExecutePlanningJobResponse> {
+    return this.call('ExecutePlanningJob', ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
+      create(ExecutePlanningJobRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

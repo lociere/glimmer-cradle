@@ -164,6 +164,19 @@ planning_applied = ReconcilePlanningJobResponse(result=PlanningJobResult(identit
             scope_id=planning_source.scope_id, revision=9007199254740991, content_digest="a" * 64)])))
 assert ReconcilePlanningJobResponse.FromString(planning_applied.SerializeToString()) == planning_applied
 assert planning_applied.result.receipt.identity.attempt == 1 and not planning_applied.result.receipt.completed
+planning_accept = cognition_pb.AcceptPlanningCommitmentRequest(call=planning_read.call, commitment_id="承诺:一",
+    plan_id="计划:一", plan_version=9007199254740991, goal_id="目标:一", goal_version=9007199254740991,
+    text="核对事实", completion_condition="真实证据已接纳", steps=["检查实际资料"],
+    source_moment_id="moment:原来源", due_at_ms=9007199254740991)
+planning_accepted = cognition_pb.AcceptPlanningCommitmentResponse(commitment_id=planning_accept.commitment_id,
+    plan_id=planning_accept.plan_id, plan_version=planning_accept.plan_version, revision=9007199254740991,
+    status="accepted", scope_id="conversation:一")
+planning_execute = cognition_pb.ExecutePlanningJobRequest(call=planning_read.call,
+    identity=planning_query.identity, request_id=planning_source.request_id)
+planning_executed = cognition_pb.ExecutePlanningJobResponse(result=planning_applied.result)
+for message in (planning_accept, planning_accepted, planning_execute, planning_executed):
+    assert type(message).FromString(message.SerializeToString()) == message
+assert not cognition_pb.ExecutePlanningJobResponse.FromString(b"").HasField("result")
 planning_applied.result.resolution = PLANNING_JOB_RESOLUTION_NOT_APPLIED
 planning_applied.result.ClearField("receipt")
 assert not ReconcilePlanningJobResponse.FromString(planning_applied.SerializeToString()).result.HasField("receipt")

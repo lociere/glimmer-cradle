@@ -218,19 +218,19 @@ Plan/Synthesis 不随其删除。`PlanningDecisionSnapshot` 只读旧 `planning_
 从真实 Worker/Jobs 重启恢复。独立字典 transport `JobClient` 并非此生产链路，不能据其存在
 宣称通用 broker 完成。精确 wire 边界见[协议参考](../../reference/protocol.md#planning-jobs-源接纳)。
 
-Jobs 接纳不把承诺标为 completed。尚未装配 Planning handler，scheduler 不 claim 此 kind；
+Jobs 接纳不把承诺标为 completed。默认 Host 尚未注册 Planning handler，scheduler 不 claim 此 kind；
 queued/attempt 0 和未 ACK 状态事件保持，持久待办使 Host 报 `jobs_handler_pending`，Memory
-状态只消费自己的 kind。handler 的受监督执行、Cognition 依据实际证据评估完成条件、通知/
-下一次调度，以及撤销/恢复链路仍待接线，不认作完整长期承诺执行链路。
+状态只消费自己的 kind。显式执行已接真实评估与业务 receipt；逐任务调度接纳、状态接收、通知/
+下一次调度，以及撤销链路仍待接线，不认作完整长期承诺执行链路。
 
 Core `PlanningController.evaluate_job` 已提供评估的业务接纳边界：先从真实源 outbox 核验持久
 Job ACK、原 request/plan/goal/scope，登记原 attempt/epoch/token/owner/lease，再进入有界评估。
 较新 authority/attempt 在等待模型锁之前登记并封口旧执行，不被旧模型阻塞；同 Job 已提交 receipt
 跨重开/新 attempt 返回原事实，不重复评估。总在途请求最多 128，同 controller 的模型评估串行。
 
-canonical `ports/job_port.py` 的 `PlanningEvidencePort` 只接收中立 goal ID/version、scope 与检索用
+canonical `ports/job_port.py` 的 `PlanningEvidencePort` 只接收中立 goal ID/version、来源绑定、scope 与检索用
 完成条件，不反向 import Planning。它要求 App 从实际 Conversation/Knowledge/Execution owner 收集有权限的
-材料，返回 scope、修订、SHA-256 与真实文本，并复验当前访问资格；尚无生产实现，不能由模型
+材料，返回 scope、修订、SHA-256 与真实文本，并复验当前访问资格；Worker 生产 Adapter 已实现，不能由模型
 构造 evidence。Core 限最多 64 项、每项 16 KiB、总输入 64 KiB，拒绝跨 scope/重复引用/内容 hash
 冲突，模型前后均复验。语义评估是 Planning 内部策略，不交给 Jobs 或外部证据 owner；
 `ModelPlanningCompletionEvaluator` 经 ModelPort 根据接受的完成条件
@@ -255,10 +255,23 @@ reconciliation 事务；配置 Host 对 Memory/Planning unknown 分别有界分�
 未应用。源/receipt/身份冲突不降为假成功，状态 outbox 仍保留待实际 Planning receiver 接纳。
 字段、摘要和错误语义归[协议参考](../../reference/protocol.md#planning-原-attempt-持久对账)。
 
-生产 factory 仍未注册 Planning handler。当前 GoalVersion.scope_id 是不透明分区标识，不足以
-推出 Conversation/actor/recall/disclosure/model-tier 权限；字段相等不能当作真实访问资格。
-Core 评估仅由 Port fixture/实际 SQLite 验证。生产证据选择/隐私域绑定、执行 wire、状态接收、
-通知 durable receipt、pending 的下一次源请求、撤销与产品消费都须接线后才可解除 handler 降级。
+Worker `PlanningEvidenceAdapter` 在显式接纳时绑定真实持久 Perception 的 ID、完整 Moment 摘要和
+当时 model tier；scope 来自实际 Conversation，不采信 wire 自报权限。原生 Perception 保存独立
+`source_provider_id`，ACTION 验证真实父来源、provider/actor/隐私域并保留 privacy_class，
+ACTION_RESULT 从原 ACTION 继承 provider。旧记录缺绑定事实不从 origin 猜测，也不自动升级资格。
+证据只取同 provider/scene/conversation/continuity/thread、recall/disclosure owner 与 privacy_class
+的实际 Perception/ActionResult，以及已接纳 config/受当前资源授权约束的 Knowledge。
+候选 Conversation 最近 128 项，最多采用 48 项；全部材料文本合计限 24 KiB。Log 当前 recent 查询
+内部仍会扫描 packs，此限制不是 SQL/存储 IO 上界。Knowledge 复验当前修订、hash、enabled；
+资源还复验原 scope/principal/短寿命访问证明。配置资料不套外部 grant，但必须来自真实已接纳配置。
+
+生产 factory 将同一实际 LLMEngine ModelPort 接入 `PlanningModelAdapter`；接受时与调用前后的
+当前 tier 都必须 cloud_allowed，敏感来源不得送云。local_only/none 拒绝，不提供假本地 fallback。
+即使空材料也复验政策；调用后撤权阻止提交，但不能撤回先前合法发送的数据，也不是分布式原子权限。
+typed Accept/Execute RPC 与 Host `PlanningJobAdapter` 已接真实 store/controller/receipt，实际 TS Jobs
+与 Python Worker 双库重启和响应丢失验证不重复评估；确定性模型 fixture 不代表真实 provider 语义质量。
+默认 Host 尚未注册该 handler：逐任务接纳闸必须先避免旧未绑定目标或不适用 tier 消耗 claim/重试预算。
+该闸、Planning 状态接收、通知 durable receipt、pending 下一次源请求、撤销与产品消费仍待接线。
 
 ## 上下文与推理
 

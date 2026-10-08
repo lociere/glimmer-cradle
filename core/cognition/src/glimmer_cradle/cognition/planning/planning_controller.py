@@ -112,7 +112,9 @@ class PlanningController:
                     return work
                 goal = work.plan.goal
                 materials = await evidence.collect(goal_id=goal.goal_id, goal_version=goal.version,
-                                                    scope_id=goal.scope_id, completion_condition=goal.completion_condition)
+                                                    scope_id=goal.scope_id, completion_condition=goal.completion_condition,
+                                                    source_moment_id=goal.source_moment_id, source_digest=goal.source_digest,
+                                                    model_tier=goal.model_tier)
                 if not isinstance(materials, tuple) or len(materials) > 64 or any(
                     not isinstance(item, PlanningEvidence) or item.reference.scope_id != identity.scope_id
                     for item in materials

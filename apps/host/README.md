@@ -38,7 +38,7 @@ receiver 的手工装配仍保留待确认事实。取消/unknown 不代表 Memo
 [协议参考](../../docs/reference/protocol.md#memory-jobs-状态投递)。
 配置启动也默认接入 `PlanningJobSourceAdapter`，经实际 Worker RPC 扫描 Planning store，并在
 Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一 Jobs Document，重启不
-改写首次政策。尚无 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
+改写首次政策。默认尚未注册 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
 `degraded/jobs_handler_pending`，Planning 状态事件保留未 ACK，不阻塞 Memory 状态投递。
 同一 Adapter 已接原 attempt 持久对账，配置 Host 独立分页恢复 Planning unknown；封口或真实
 评估回执经校验后交给 Jobs，不把 completed=false 改成目标完成，不注册未就绪 handler。
@@ -59,7 +59,10 @@ Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 Hos
 不自动续期/重新授权；定义替换、移除或失败保持拒绝。session.knowledge 仅投影来源状态和
 最后实际接纳修订，不暴露正文/证明，也不代表全部材料此刻 current。详情见上述采集边界。
 实际测试覆盖生产 Worker/SQLite 重启、通知合并、刷新中再次更新、停机迟到读取、停用与源冲突。
-Tool/Skill gateway、完整配置 catalog、产品状态投影消费、Planning 执行/完成评估及产品启动迁移尚未完成；
+`PlanningJobAdapter` 已通过实际 Execute RPC 消费持久评估 receipt，并以独立 RPC 对账取消后的
+原 attempt；真实 Jobs/Worker 双库重启与完成响应丢失已验证，不把 completed=false 当目标完成。
+默认注册仍待逐任务来源/model-tier 接纳闸，避免不适用目标消耗重试；状态接收、通知和再调度未完成。
+Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
 完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。

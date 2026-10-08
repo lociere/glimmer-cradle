@@ -104,7 +104,12 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 普通启动只核验已有窗口，不建表；长期 schema 1 与历史 journal 不变。这是明确功能操作的增量
 初始化，不隐式升级既有版本；未知/部分/孤立窗口拒绝自动修复。封口、receipt、authority 和时钟
 high-water 同属不可再生状态，不能只删除 attempt 后重放模型或回滚时间复活过期 lease；其一致
-备份须与整个 Planning/源 outbox/Jobs 共同保护。生产 handler 尚未接线，未操作用户库。
+备份须与整个 Planning/源 outbox/Jobs 共同保护。显式评估已接生产 Worker/Host Adapter，默认
+scheduler 尚未注册 handler，未操作用户库。
+新接纳 GoalVersion 增量保存 `source_moment_id`、`source_digest` 和 `model_tier`，三字段必须完整；
+digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可变版本缺三字段时保持原 JSON
+与 active work 摘要字节语义，不改写 schema 1，也不补造权限；新绑定必须是显式新版本。
+来源仍由 Conversation Log 拥有，备份必须保留实际锚点，不能仅恢复摘要后假称材料可用。
 完整产品恢复仍归阶段 14。本候选只使用临时测试数据，未迁移用户库。
 
 | 路径 | owner | 说明 |

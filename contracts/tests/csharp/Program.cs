@@ -168,6 +168,22 @@ var planningApplied = new ReconcilePlanningJobResponse { Result = new PlanningJo
             ScopeId = planningSource.ScopeId, Revision = 9007199254740991, ContentDigest = new string('a', 64) } } } } };
 if (!ReconcilePlanningJobResponse.Parser.ParseFrom(planningApplied.ToByteArray()).Equals(planningApplied))
     throw new InvalidOperationException("Planning business receipt/committer precision roundtrip failed");
+var planningAccept = new AcceptPlanningCommitmentRequest { Call = planningRead.Call, CommitmentId = "承诺:一",
+    PlanId = "计划:一", PlanVersion = 9007199254740991, GoalId = "目标:一", GoalVersion = 9007199254740991,
+    Text = "核对事实", CompletionCondition = "真实证据已接纳", Steps = { "检查实际资料" },
+    SourceMomentId = "moment:原来源", DueAtMs = 9007199254740991 };
+var planningAccepted = new AcceptPlanningCommitmentResponse { CommitmentId = planningAccept.CommitmentId,
+    PlanId = planningAccept.PlanId, PlanVersion = planningAccept.PlanVersion, Revision = 9007199254740991,
+    Status = "accepted", ScopeId = "conversation:一" };
+var planningExecute = new ExecutePlanningJobRequest { Call = planningRead.Call,
+    Identity = planningQuery.Identity, RequestId = planningSource.RequestId };
+var planningExecuted = new ExecutePlanningJobResponse { Result = planningApplied.Result };
+if (!AcceptPlanningCommitmentRequest.Parser.ParseFrom(planningAccept.ToByteArray()).Equals(planningAccept)
+    || !AcceptPlanningCommitmentResponse.Parser.ParseFrom(planningAccepted.ToByteArray()).Equals(planningAccepted)
+    || !ExecutePlanningJobRequest.Parser.ParseFrom(planningExecute.ToByteArray()).Equals(planningExecute)
+    || !ExecutePlanningJobResponse.Parser.ParseFrom(planningExecuted.ToByteArray()).Equals(planningExecuted)
+    || ExecutePlanningJobResponse.Parser.ParseFrom(Array.Empty<byte>()).Result != null)
+    throw new InvalidOperationException("Planning accept/execute source/precision/presence roundtrip failed");
 planningApplied.Result.Resolution = PlanningJobResolution.NotApplied;
 planningApplied.Result.Receipt = null;
 if (ReconcilePlanningJobResponse.Parser.ParseFrom(planningApplied.ToByteArray()).Result.Receipt != null)

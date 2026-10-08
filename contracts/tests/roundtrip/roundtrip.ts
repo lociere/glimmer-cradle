@@ -26,7 +26,8 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   AcknowledgeMemoryJobRequestRequestSchema, ReadPlanningJobRequestsRequestSchema,
   ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestRequestSchema,
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
-  ReconcilePlanningJobResponseSchema, PlanningJobResolution } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+  ReconcilePlanningJobResponseSchema, PlanningJobResolution, AcceptPlanningCommitmentRequestSchema,
+  AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -186,6 +187,24 @@ if (appliedRoundtrip.result?.receipt?.identity?.attempt !== 1n || appliedRoundtr
   || appliedRoundtrip.result.receipt.commitmentRevision !== 9007199254740991n
   || appliedRoundtrip.result.receipt.evidence[0].revision !== 9007199254740991n) {
   throw new Error('Planning business receipt/committer precision roundtrip failed');
+}
+const planningAccept = create(AcceptPlanningCommitmentRequestSchema, { call: planningRead.call,
+  commitmentId: '承诺:一', planId: '计划:一', planVersion: 9007199254740991n, goalId: '目标:一',
+  goalVersion: 9007199254740991n, text: '核对事实', completionCondition: '真实证据已接纳',
+  steps: ['检查实际资料'], sourceMomentId: 'moment:原来源', dueAtMs: 9007199254740991n });
+const planningAccepted = create(AcceptPlanningCommitmentResponseSchema, { commitmentId: planningAccept.commitmentId,
+  planId: planningAccept.planId, planVersion: planningAccept.planVersion, revision: 9007199254740991n,
+  status: 'accepted', scopeId: 'conversation:一' });
+const planningExecute = create(ExecutePlanningJobRequestSchema, { call: planningRead.call,
+  identity: planningQuery.identity, requestId: planningSource.requestId });
+const planningExecuted = create(ExecutePlanningJobResponseSchema, { result: planningApplied.result });
+if (fromBinary(AcceptPlanningCommitmentRequestSchema, toBinary(AcceptPlanningCommitmentRequestSchema, planningAccept)).sourceMomentId !== 'moment:原来源'
+  || fromBinary(AcceptPlanningCommitmentRequestSchema, toBinary(AcceptPlanningCommitmentRequestSchema, planningAccept)).goalVersion !== 9007199254740991n
+  || fromBinary(AcceptPlanningCommitmentResponseSchema, toBinary(AcceptPlanningCommitmentResponseSchema, planningAccepted)).revision !== 9007199254740991n
+  || fromBinary(ExecutePlanningJobRequestSchema, toBinary(ExecutePlanningJobRequestSchema, planningExecute)).identity?.fencingToken !== 9007199254740991n
+  || fromBinary(ExecutePlanningJobResponseSchema, toBinary(ExecutePlanningJobResponseSchema, planningExecuted)).result?.receipt?.completed !== false
+  || fromBinary(ExecutePlanningJobResponseSchema, new Uint8Array()).result !== undefined) {
+  throw new Error('Planning accept/execute source/precision/presence roundtrip failed');
 }
 planningApplied.result!.resolution = PlanningJobResolution.NOT_APPLIED;
 planningApplied.result!.receipt = undefined;

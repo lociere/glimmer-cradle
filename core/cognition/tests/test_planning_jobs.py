@@ -34,7 +34,8 @@ class _PlanningEvidenceSource:
         self.current = True
         self.calls = 0
 
-    async def collect(self, *, goal_id, goal_version, scope_id, completion_condition):
+    async def collect(self, *, goal_id, goal_version, scope_id, completion_condition,
+                      source_moment_id=None, source_digest=None, model_tier=None):
         self.calls += 1
         return self.materials
 
@@ -538,6 +539,41 @@ def _counts(path: Path) -> tuple[int, ...]:
                 "planning_job_outbox",
             )
         )
+
+
+@pytest.mark.parametrize("bound", [False, True])
+async def test_goal_binding_is_immutable_and_legacy_work_digest_keeps_original_bytes(tmp_path, bound):
+    store, _, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        if bound:
+            # 旧版本不补造绑定；真实绑定必须建立新目标/计划版本。
+            plan = _long_plan(version=2)
+            plan = replace(plan, goal=replace(plan.goal, source_moment_id="moment:源", source_digest="a" * 64,
+                                             model_tier="cloud_allowed"))
+            await store.accept_commitment("commitment-2", plan, due_at=1)
+            source = (await store.pending_job_requests())[0]
+            identity = replace(identity, job_id="planning:" + source.request_id)
+            await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+        work = await store.prepare_evaluation(identity, source.request_id)
+        document = asdict(work)
+        if not bound:
+            for key in ("source_moment_id", "source_digest", "model_tier"):
+                document["plan"]["goal"].pop(key)
+        payload = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as observer:
+            assert observer.execute("SELECT work_digest FROM planning_evaluation_attempt WHERE job_id=?", (identity.job_id,)).fetchone()[0] == hashlib.sha256(payload.encode()).hexdigest()
+            goal_json = observer.execute("SELECT payload_json FROM planning_goal_version WHERE version=?", (2 if bound else 1,)).fetchone()[0]
+            assert ("source_moment_id" in json.loads(goal_json)) is bound
+        await store.close()
+        await store.connect()
+        assert await store.prepare_evaluation(identity, source.request_id) == work
+        assert (await store.load_plan(work.plan.plan_id, work.plan.version)).goal == work.plan.goal
+        if bound:
+            with pytest.raises(PlanningConflictError):
+                await store.accept_commitment("commitment-2", replace(work.plan,
+                    goal=replace(work.plan.goal, source_digest="b" * 64)), due_at=1)
+    finally:
+        await store.close()
 
 
 async def test_accepted_commitment_and_source_survive_restart_without_completing_goal(

@@ -10,12 +10,16 @@ from glimmer.capabilities.v1 import capabilities_pb2 as pb
 from glimmer_cradle.cognition.ports import CapabilityInvocation
 from glimmer_cradle.cognition_worker.adapters import CapabilityClient
 from glimmer_cradle.cognition_worker.rpc_service import KernelGrpcClient
-from glimmer_cradle.conversation import ExecutionResultFact, MomentKind
+from glimmer_cradle.conversation import (
+    ExecutionResultFact,
+    MomentKind,
+    SourceDescriptor,
+)
 from google.protobuf.json_format import ParseDict
 
 
 @pytest.mark.parametrize(
-    "failure", ["none", "failed", "missing_receipt", "wrong_identity", "wrong_state", "unexposed"]
+    "failure", ["none", "failed", "missing_receipt", "wrong_identity", "wrong_state", "unexposed", "wrong_provider", "wrong_actor"]
 )
 @pytest.mark.parametrize("kind", ["tool", "skill", "resource"])
 async def test_native_typed_rpc_requires_original_action_and_durable_result(
@@ -35,6 +39,15 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
         "disclosure_scope": "conversation_private",
         "actor_id": "external-actor",
     }
+    parent = recorder.record(MomentKind.PERCEPTION, {"text": "敏感请求", "source_provider_id": "provider"},
+        **{key: value for key, value in context.items() if key != "source_provider_id"},
+        origin=SourceDescriptor(privacy_class="sensitive"))
+    await recorder.flush()
+    context["experience_moment_id"] = parent.moment_id
+    if failure == "wrong_provider":
+        context["source_provider_id"] = "foreign"
+    elif failure == "wrong_actor":
+        context["actor_id"] = "foreign"
 
     async def expose(request, _context):
         assert (
@@ -72,6 +85,8 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
         assert source is not None and source.kind == MomentKind.ACTION
         assert source.content["definition_revision"] == "revision"
         assert source.continuity_id == "continuity"
+        assert source.origin.privacy_class == "sensitive"
+        assert source.content["source_provider_id"] == "provider"
         assert request.call.idempotency_key == "run:call"
         event_id = hashlib.sha256(
             json.dumps(["run:call", 4], separators=(",", ":")).encode()
@@ -180,6 +195,8 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
             else:
                 assert result.output["content_utf8"] == "资源原文"
             assert result.status == ("failed" if failure == "failed" else "succeeded")
+            fact = recorder.log.get_moment(result.result_fact_id)
+            assert fact.origin.privacy_class == "sensitive" and fact.content["source_provider_id"] == "provider"
             if failure == "failed":
                 assert result.error == "authorization_denied"
             assert (await client.invoke(call)) == result
@@ -187,7 +204,7 @@ async def test_native_typed_rpc_requires_original_action_and_durable_result(
         else:
             with pytest.raises((ValueError, RuntimeError)):
                 await client.invoke(call)
-        if failure == "unexposed":
+        if failure in {"unexposed", "wrong_provider", "wrong_actor"}:
             assert dispatched == []
     finally:
         await channel.close()

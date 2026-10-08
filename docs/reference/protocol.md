@@ -135,7 +135,29 @@ INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响
 
 当前配置 Host 已接入上述源投递，但未注册 Planning 执行器：Job 保持 queued/attempt 0，
 Host 报 `degraded/jobs_handler_pending`，状态 outbox 不交给 Memory receiver，也不假 ACK。
-完成评估、通知和再调度未完成；Job accepted 不改变承诺 accepted/revision。
+显式评估已接实际执行 Adapter；逐任务调度接纳、状态接收、通知和再调度未完成。
+Job accepted 不改变承诺 accepted/revision。
+
+### Planning 显式接纳与执行
+
+`AcceptPlanningCommitment` 接受 commitment/plan/goal ID 和正 JS safe 版本、目标正文、完成条件、
+steps、实际 `source_moment_id` 与非负 JS safe due；总请求不超过 64 KiB，身份字符串不超过
+4096 UTF-8 bytes。调用方不能自报 scope、source digest 或 model tier；Worker flush 后读取真实
+Perception，绑定完整 Conversation context、隐私/保留分类、完整 Moment SHA-256 和当时活动政策。
+响应是实际 commitment 的 status/revision/scope，重复完整版本保持原 tier 和 due，不代表执行。
+缺失/不完整来源或不适用政策为 PERMISSION_DENIED；非法预算/字段为 INVALID_REQUEST；不可变版本
+冲突为 CONFLICT。旧目标没有来源绑定不得自动扩权，须显式新版本；普通模型回复不会调用该入口。
+
+`ExecutePlanningJob` 使用 Jobs 唯一 `JobExecutionIdentity` 和原 `request_id`，范围与 Reconcile 相同；
+要求本代业务 ready 和实际 Planning/Conversation/Knowledge/Activity/Model owner。Core 核验实际
+源 ACK、原计划与 live lease，再由生产 Evidence Adapter 收集当前受控材料和 ModelPort 评估。
+接受时及模型调用前后当前 tier 都必须 cloud_allowed；sensitive、local_only/none 不送云，也不假装
+本地推理可用。来源/政策拒绝为 PERMISSION_DENIED，原源/attempt/提交冲突为 RECOVERY_REQUIRED。
+取消/异常先独立封口，再交还调用者；响应复用持久 `PlanningJobResult`，不另建完成事实。
+来源选择、预算及 live 复验归[认知核实现](../architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
+
+Host `PlanningJobAdapter` 验持久 receipt 后返回 Jobs succeeded，不把评估值改成 true；取消后用
+独立非取消 signal 的有界 Reconcile 调用封口。默认 scheduler 尚未注册，须先完成逐任务接纳闸。
 
 ### Planning 原 attempt 持久对账
 
@@ -157,7 +179,7 @@ RECOVERY_REQUIRED。该调用会封口，不是只读查询；推理未 ready/st
 Host 验原请求/承诺、查询 identity、摘要、原提交者、时间与证据组合后，交给 Jobs 唯一
 reconciliation 事务；配置入口按独立有界分页恢复 Planning unknown，不复用 Memory receiver。
 该恢复链没有注册 Planning handler、没有新建权限、没有假 ACK 状态事件；自动执行、
-证据完整隐私域绑定、状态接纳、通知与后继调度仍未完成。
+逐任务调度接纳、状态接纳、通知与后继调度仍未完成。
 
 ## 生成与兼容
 

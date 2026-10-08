@@ -753,6 +753,7 @@ class PerceptionAppraiser:
                 content={
                     "text": text,
                     "semantic_text": semantic_text,
+                    "source_provider_id": content.get("source_provider_id"),
                     "parts": self._moment_parts(content.get("model_input")),
                     "legacy_media_unrecoverable": self._legacy_media_unrecoverable(content.get("model_input")),
                     "address_mode": content.get("address_mode", "direct"),

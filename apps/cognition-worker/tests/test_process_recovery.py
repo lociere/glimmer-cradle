@@ -211,7 +211,7 @@ async def test_production_worker_waits_for_first_state_projection_before_ready(
                                load=nothing, load_persisted=nothing)
 
     components = SimpleNamespace(
-        conversation_recorder=component(), state_store=component(), planning_store=component(),
+        conversation_recorder=component(), state_store=component(), planning_store=component(), planning_model=None,
         knowledge_store=component(), checkpoint_store=component(), cognition_database=component(),
         turn_controller=component(), conversation_controller=component(), memory_substrate=component(),
         knowledge_base=component(), maintenance_scheduler=component(),

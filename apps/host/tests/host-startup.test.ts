@@ -18,8 +18,9 @@ import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
   PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
-  AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { PlanningJobSourceAdapter } from '../src/composition/cognition-job-adapter.js';
+  AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
+  AcceptPlanningCommitmentRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
 import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
@@ -398,6 +399,53 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
   }, 30_000);
 });
 describe('Planning 源真实 wire/Jobs 接纳', () => {
+  it.each(['complete', 'incomplete', 'lost-response'] as const)('真实 Planning 执行 %s，双库重开不重复推理或伪造目标完成', async mode => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-execute-'));
+    let service = await worker(root, `planning-execute-${mode}`);
+    let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let controller = new JobController(store, clock, policy);
+    let lost: { mockRestore(): void } | undefined;
+    try {
+      store.activateAuthority(1, clock.now());
+      const database = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      let sourceMomentId: string;
+      try { sourceMomentId = JSON.parse((database.prepare('SELECT payload_json FROM planning_goal_version').get() as { payload_json: string }).payload_json).source_moment_id; }
+      finally { database.close(); }
+      expect(await service.client.acceptPlanningCommitment(create(AcceptPlanningCommitmentRequestSchema, {
+        commitmentId: 'commitment:跨语言', planId: 'plan:跨语言', planVersion: 1n, goalId: 'goal:跨语言', goalVersion: 1n,
+        text: '核对实际来源', completionCondition: '跨语言评估实际事实', steps: ['检查真实来源'], sourceMomentId, dueAtMs: 0n,
+      }))).toMatchObject({ status: 'accepted', revision: 1n, scopeId: 'conversation:planning' });
+      await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+      if (mode === 'lost-response') {
+        const execute = service.client.executePlanning.bind(service.client);
+        lost = vi.spyOn(service.client, 'executePlanning').mockImplementationOnce(async (...args: Parameters<CognitionClient['executePlanning']>) => {
+          await execute(...args); throw new Error('fixture completion response loss');
+        });
+      }
+      controller.register(new PlanningJobAdapter(service.client));
+      const claim = store.claim(1, 'host:原执行者', clock.now(), 60_000, PLANNING_JOB_KIND)!;
+      expect(await controller.execute(claim)).toMatchObject({ status: mode === 'lost-response' ? 'unknown' : 'succeeded' });
+      lost?.mockRestore(); lost = undefined;
+      await controller.stop(); store.close(); await service.stop();
+      service = await worker(root, `planning-execute-restarted-${mode}`);
+      store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      store.activateAuthority(2, clock.now());
+      controller = new JobController(store, clock, policy);
+      const adapter = new PlanningJobAdapter(service.client);
+      if (mode === 'lost-response') expect(await new JobRecoveryController(store, clock, 2, policy)
+        .reconcile(claim.job.job_id, adapter)).toMatchObject({ status: 'accepted', job: { status: 'succeeded', attempt: 1 } });
+      const proof = await adapter.query(store.load(claim.job.job_id)!, store.listAttempts(claim.job.job_id)[0]);
+      expect(proof).toMatchObject({ resolution: 'applied', result: { assessment: { completed: mode !== 'incomplete' },
+        identity: { owner_id: 'host:原执行者', authority_epoch: 1 } } });
+      expect(store.claim(2, 'host:接任者', clock.now(), 60_000, PLANNING_JOB_KIND)).toBeNull();
+      const persisted = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      try {
+        expect(persisted.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: mode === 'incomplete' ? 'accepted' : 'completed', revision: 2 });
+        expect(persisted.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
+      } finally { persisted.close(); }
+    } finally { lost?.mockRestore(); await controller.stop(); store.close(); await service.stop(); }
+  }, 30_000);
+
   it('真实原 attempt 在双库/Worker 重开后封口，Host 自动对账而不启动未就绪 handler', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-reconciliation-'));
     let service = await worker(root, 'planning-reconciliation-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));

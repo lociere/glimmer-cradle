@@ -77,7 +77,7 @@ function jobExecutionIdentity(job: Job, attempt?: JobAttempt): JobExecutionIdent
     leaseUntilMs: BigInt(positive(original.lease_until)) });
 }
 
-export function planningJobIdentity(job: Job, attempt: JobAttempt): JobExecutionIdentity {
+export function planningJobIdentity(job: Job, attempt?: JobAttempt): JobExecutionIdentity {
   const request = job.payload.source_request_id;
   if (typeof job.payload.plan_version !== 'number' || typeof job.payload.goal_version !== 'number'
     || job.idempotency_key !== request) throw new JobConflictError('Planning 原源版本/去重身份无效');
@@ -85,7 +85,7 @@ export function planningJobIdentity(job: Job, attempt: JobAttempt): JobExecution
   const expected = createHash('sha256').update(JSON.stringify([PLANNING_JOB_KIND,
     text(job.payload.commitment_id), text(job.payload.plan_id), positive(Number(job.payload.plan_version))])).digest('hex');
   if (job.kind !== PLANNING_JOB_KIND || request !== expected || job.job_id !== `planning:${request}`
-    || attempt.job_id !== job.job_id) throw new JobConflictError('Planning 原 Job/source identity 无效');
+    || attempt !== undefined && attempt.job_id !== job.job_id) throw new JobConflictError('Planning 原 Job/source identity 无效');
   return jobExecutionIdentity(job, attempt);
 }
 

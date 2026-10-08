@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，Core 证据评估/业务 receipt/attempt 封口已实现，缺生产证据 Adapter/执行 wire/handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、显式执行 wire/Host Adapter 和 Core 业务 receipt 已实现；默认 scheduler 待逐任务接纳闸，状态接收、产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -619,6 +619,41 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 5/7 Planning 来源绑定与实际执行（2026-10-08 当前候选）
+
+输入 `a0df5068`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。本切片把目标接纳绑定到
+真实持久 Perception 与当前 Activity policy，不从不透明 scope/origin 推出 provider/actor 权限。
+沿既有目标文件增量保存 source Moment ID/完整摘要/model tier；旧目标 JSON/active work 摘要
+保持字节语义，不回写用户历史或给旧目标补造执行资格。原生 Perception 保存 canonical provider，
+ACTION 验父 Perception 的 provider/actor/上下文，ACTION_RESULT 继承真实 provider/privacy。
+
+唯一 Contract Spine 增量定义 AcceptPlanningCommitment/ExecutePlanningJob，生成三语言 DTO。
+Worker 生产 factory 接同一真实 LLMEngine、Conversation/Knowledge/Activity 和 Planning owner，
+每执行独占 Evidence Adapter；完整来源与隐私域匹配、配置/资源 live 修订和访问证明复验，
+当前及接受时 tier 约束在模型前后检查，local_only/none/sensitive 不升级为云。资料只作为
+untrusted/data，评估仍由 Core 语义 owner，原 source ACK/attempt/fencing/lease/receipt 不变。
+Host 实际执行 Adapter 验 receipt 后交还 Jobs，响应丢失可双库重开对账，不重复模型或伪造完成。
+跨 owner 复验不是分布式原子授权；已合法提交给 provider 的数据不能因随后撤权撤回。
+
+默认 Host 尚未注册该 handler，原降级与未 ACK 状态保持。下一依赖是通用逐任务接纳闸：
+实际来源缺失或当前 tier 不适用时不 claim/消耗重试，不能用空 handler/配置开关假称默认链完成。
+之后继续 Planning 状态 inbox/ACK、通知 durable receipt、pending 后继请求、撤销/重评与产品入口。
+证据材料上限不代表当前 Log pack 查询有 SQL/IO 上界，该 bounded reader 仍待收束。
+测试均使用临时库与确定性 Model/Resource fixture，没有付费 provider 调用、用户数据迁移、推送或发布。
+最终物理清单和整体重构未完成，独立审查仍留完整固定候选收尾。
+
+候选验证：Core 446、Worker 206、Host 160、Jobs 39、Conversation TS 12/Python 22 项 PASS；
+Worker 新增 32 项绑定/执行真实 SQL/gRPC 用例和 6 项 native provider/actor 反例，含缺 owner/旧代/
+未 ready/stopping、跨隐私域资料排除、云政策撤销、接受时 local_only 后不扩权、来源删除、
+配置更新/停用、Resource proof 撤销、取消封口与重复实际 receipt。Host 新增 3 项真实双库/
+Python Worker 重启用例，覆盖 completed=false 和持久提交后响应丢失。Core 新增 7 项验证旧 JSON/
+work digest 兼容与 config live 复验，原生感知测试补 canonical provider 持久事实断言。
+契约 22 项门、三语言回环、生成一致/兼容、根 typecheck/build、111 页 docs/encoding、
+architecture、target-layout specification 和 diff PASS；未刷新兼容基线，清单未增文件。
+新 mapper/Worker 测试全规则 Ruff PASS，修改 Python I/F PASS；rpc_service 47 条既有诊断
+与输入提交逐项相同，没有 suppression。全量启动夹具补齐 planning_model 装配字段，Worker
+深层导入改公开 Ports API；未弱化任何 gate。Windows/Node 24.18.0/pnpm 11.13.0/uv workspace。
 
 ### 阶段 5/7 Planning 生产持久对账（2026-10-08）
 

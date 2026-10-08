@@ -75,6 +75,8 @@ class PlanningEvidence:
 class PlanningEvidencePort(Protocol):
     """Planning Job 的消费方需求；App 从实际 owner 收集并复验 scope/修订/hash/权限。"""
 
-    async def collect(self, *, goal_id: str, goal_version: int, scope_id: str, completion_condition: str) -> tuple[PlanningEvidence, ...]: ...
+    async def collect(self, *, goal_id: str, goal_version: int, scope_id: str, completion_condition: str,
+                      source_moment_id: str | None = None, source_digest: str | None = None,
+                      model_tier: str | None = None) -> tuple[PlanningEvidence, ...]: ...
 
     async def is_current(self, reference: PlanningEvidenceReference) -> bool: ...

@@ -1544,6 +1544,275 @@ async def _seed_planning_source(store: SqlitePlanningStore, *, due_at: int | Non
             ("核对受控来源", "评估完成条件")), due_at=due_at if due_at is not None else int(time.time() * 1000) + 3_600_000)
 
 
+@pytest.fixture
+async def bound_planning_service(tmp_path):
+    from glimmer_cradle.cognition.adapters.persistence import SqliteKnowledgeStore
+    from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+    from glimmer_cradle.cognition.state import CognitiveActivityController
+
+    recorder = build_test_recorder(tmp_path / "conversation")
+    await recorder.start()
+    moment = recorder.record(MomentKind.PERCEPTION, {"text": "完成条件：已有实际来源记录", "source_provider_id": "surface:test"},
+        scene_id="scene:planning", conversation_id="conversation:planning", continuity_id="continuity:planning",
+        thread_id="main", actor_id="actor:planning", interaction_id="interaction:planning")
+    await recorder.flush()
+    store = SqlitePlanningStore(tmp_path / "planning.sqlite")
+    knowledge_store = SqliteKnowledgeStore(tmp_path / "knowledge.sqlite")
+    await store.connect()
+    await knowledge_store.connect()
+    knowledge = KnowledgeIndex(observability=NullObservability())
+    knowledge.bind_repository(knowledge_store)
+    await knowledge.load_persisted()
+    activity = CognitiveActivityController(experience_recorder=recorder, affect_activation_provider=lambda: 0.0,
+        clock=FixedClock(), observability=NullObservability())
+    await activity.start()
+    activity.engage()
+
+    class Model:
+        def __init__(self):
+            self.requests = []
+            self.completed = True
+            self.entered, self.release = asyncio.Event(), asyncio.Event()
+            self.wait = False
+
+        async def generate(self, request):
+            self.requests.append(request)
+            document = json.loads(request.messages[1].content)
+            self.entered.set()
+            if self.wait:
+                await self.release.wait()
+            return json.dumps({"completed": self.completed, "evidence_ids": [item["reference"]["evidence_id"] for item in document["evidence"]], "reason": "核对实际候选来源"})
+
+    model = Model()
+    host = CognitionGrpcHost(generation="bound-planning-1", inbound=None, queue=None, activity=activity,
+        cycle=None, shutdown=lambda: asyncio.sleep(0), operations=None, workspace=None,
+        planning=store, planning_model=model, conversation=recorder, knowledge=knowledge)
+    await host.start()
+    host.mark_ready()
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    accept = _call(channel, "AcceptPlanningCommitment", cognition_pb.AcceptPlanningCommitmentRequest, cognition_pb.AcceptPlanningCommitmentResponse)
+    read = _call(channel, "ReadPlanningJobRequests", cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse)
+    ack = _call(channel, "AcknowledgePlanningJobRequest", cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse)
+    execute = _call(channel, "ExecutePlanningJob", cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse)
+    reconcile = _call(channel, "ReconcilePlanningJob", cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse)
+    request = cognition_pb.AcceptPlanningCommitmentRequest(call=_metadata("bound-planning-1", "bound-planning"),
+        commitment_id="commitment:绑定", plan_id="plan:绑定", plan_version=1, goal_id="goal:绑定", goal_version=1,
+        text="核对来源记录", completion_condition="持久来源记录实际存在", steps=["核对实际证据"], source_moment_id=moment.moment_id, due_at_ms=0)
+
+    async def prepare():
+        receipt = await accept(request, timeout=2)
+        assert receipt.status == "accepted" and receipt.scope_id == moment.conversation_id
+        source = (await read(cognition_pb.ReadPlanningJobRequestsRequest(call=request.call, limit=1), timeout=2)).requests[0]
+        await ack(cognition_pb.AcknowledgePlanningJobRequestRequest(call=request.call, request=source,
+            job_id=f"planning:{source.request_id}", job_revision=1), timeout=2)
+        return cognition_pb.ExecutePlanningJobRequest(call=request.call, request_id=source.request_id,
+            identity=jobs_pb.JobExecutionIdentity(job_id=f"planning:{source.request_id}", scope_id=source.scope_id,
+                attempt=1, authority_epoch=1, fencing_token=1, owner_id="host:实际提交", lease_until_ms=int(time.time() * 1000) + 60_000))
+
+    try:
+        yield host, recorder, store, knowledge, activity, model, request, accept, prepare, execute, reconcile
+    finally:
+        model.release.set()
+        await host.stop()
+        await channel.close()
+        await activity.stop()
+        await recorder.stop()
+        await knowledge_store.close()
+        await store.close()
+
+
+@pytest.mark.parametrize("completed", [False, True])
+async def test_bound_planning_executes_actual_conversation_evidence_and_reuses_receipt(bound_planning_service, completed):
+    _, recorder, store, _, _, model, accepted, accept, prepare, execute, reconcile = bound_planning_service
+    model.completed = completed
+    request = await prepare()
+    assert not model.requests  # 显式接纳不推理或执行普通聊天。
+    plan = await store.load_plan(accepted.plan_id, accepted.plan_version)
+    assert plan.goal.source_moment_id == accepted.source_moment_id and plan.goal.model_tier == "cloud_allowed"
+    recorder.record(MomentKind.PERCEPTION, {"text": "foreign secret", "source_provider_id": "other"},
+        scene_id="scene:planning", conversation_id="foreign", continuity_id="other", thread_id="main")
+    from glimmer_cradle.conversation import SourceDescriptor
+    for context in ({"thread_id": "foreign"}, {"continuity_id": "foreign"},
+                    {"recall_scope": "actor_private", "actor_id": "foreign"}, {"disclosure_scope": "public"},
+                    {"origin": SourceDescriptor(privacy_class="sensitive")}):
+        fields = {"scene_id": "scene:planning", "conversation_id": "conversation:planning",
+                  "continuity_id": "continuity:planning", "thread_id": "main", **context}
+        recorder.record(MomentKind.PERCEPTION, {"text": "foreign secret", "source_provider_id": "surface:test"}, **fields)
+    await recorder.flush()
+    response = (await execute(request, timeout=2)).result
+    assert response.receipt.completed is completed and response.receipt.identity == request.identity
+    assert response.receipt.evidence[0].source_owner == "conversation"
+    assert len(model.requests) == 1 and "foreign secret" not in model.requests[0].messages[1].content
+    assert (await store.load_commitment(accepted.commitment_id)).status.value == ("completed" if completed else "accepted")
+    repeated = (await execute(request, timeout=2)).result
+    assert repeated.receipt == response.receipt and len(model.requests) == 1
+    replay = await accept(accepted, timeout=2)
+    assert replay.revision == 2 and len(model.requests) == 1
+    proof = await reconcile(cognition_pb.ReconcilePlanningJobRequest(call=request.call,
+        identity=request.identity, request_id=request.request_id), timeout=2)
+    assert proof.result.receipt == response.receipt
+
+
+@pytest.mark.parametrize("method", ["accept", "execute"])
+@pytest.mark.parametrize("fault", ["generation", "unready", "stopping", "planning", "conversation", "knowledge", "activity"])
+async def test_bound_planning_rpc_requires_actual_owners_generation_and_ready(bound_planning_service, method, fault):
+    host, _, store, _, _, model, accepted, accept, prepare, execute, _ = bound_planning_service
+    request = accepted if method == "accept" else await prepare()
+    call = accept if method == "accept" else execute
+    if fault == "generation":
+        request.call.generation = "old-generation"
+    elif fault == "unready":
+        host._readiness_tracker.mark_degraded("domain", "fixture unready")
+    elif fault == "stopping":
+        host._readiness_tracker.begin_shutdown()
+    else:
+        setattr(host, "_" + fault, None)
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await call(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == (common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else common_pb.SERVICE_ERROR_CODE_NOT_READY)
+    assert not model.requests
+    commitment = await store.load_commitment(accepted.commitment_id)
+    assert (commitment is None) if method == "accept" else commitment.revision == 1
+
+
+@pytest.mark.parametrize("sensitive", [False, True])
+async def test_bound_planning_local_acceptance_never_upgrades_to_cloud_when_activity_engages(bound_planning_service, sensitive):
+    from glimmer_cradle.cognition.state import CognitiveActivityState
+    from glimmer_cradle.conversation import SourceDescriptor
+
+    _, recorder, store, _, activity, model, accepted, _, prepare, execute, reconcile = bound_planning_service
+    activity._state = CognitiveActivityState.AMBIENT
+    if sensitive:
+        source = recorder.record(MomentKind.PERCEPTION, {"text": "本地敏感资料", "source_provider_id": "surface:test"},
+            scene_id="scene:planning", conversation_id="conversation:planning", continuity_id="continuity:planning", thread_id="main",
+            origin=SourceDescriptor(privacy_class="sensitive"))
+        accepted.source_moment_id = source.moment_id
+    request = await prepare()
+    assert (await store.load_plan(accepted.plan_id, accepted.plan_version)).goal.model_tier == "local_only"
+    activity.engage()
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await execute(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED and not model.requests
+    proof = await reconcile(cognition_pb.ReconcilePlanningJobRequest(call=request.call,
+        identity=request.identity, request_id=request.request_id), timeout=2)
+    assert proof.result.resolution == cognition_pb.PLANNING_JOB_RESOLUTION_NOT_APPLIED
+
+
+@pytest.mark.parametrize("fault", ["missing-source", "no-provider", "sensitive", "scope", "overflow", "too-large"])
+async def test_bound_planning_acceptance_rejects_missing_or_untrusted_source_before_persist(bound_planning_service, fault):
+    _, recorder, store, _, _, model, request, accept, _, _, _ = bound_planning_service
+    if fault == "missing-source":
+        request.source_moment_id = "missing"
+    elif fault == "overflow":
+        request.plan_version = 2**63
+    elif fault == "too-large":
+        request.text = "x" * 65537
+    else:
+        from glimmer_cradle.conversation import SourceDescriptor
+        source = recorder.record(MomentKind.PERCEPTION, {"text": "拒绝来源", **({} if fault == "no-provider" else {"source_provider_id": "surface:test"})},
+            scene_id="scene:planning", conversation_id="conversation:planning", continuity_id="continuity:planning",
+            origin=SourceDescriptor(privacy_class="sensitive" if fault == "sensitive" else "private"),
+            recall_scope="unknown" if fault == "scope" else "conversation_private")
+        request.source_moment_id = source.moment_id
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await accept(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == (common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"overflow", "too-large"} else common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED)
+    assert await store.load_commitment(request.commitment_id) is None and not model.requests
+
+
+@pytest.mark.parametrize("fault", ["tier-before", "tier-during", "source-deleted", "cancel"])
+async def test_bound_planning_live_policy_or_source_change_seals_original_attempt(bound_planning_service, fault):
+    import sqlite3
+
+    from glimmer_cradle.cognition.state import CognitiveActivityState
+
+    _, recorder, store, _, activity, model, accepted, _, prepare, execute, reconcile = bound_planning_service
+    request = await prepare()
+    if fault == "tier-before":
+        activity._state = CognitiveActivityState.AMBIENT
+    else:
+        model.wait = True
+    call = execute(request, timeout=5)
+    if fault != "tier-before":
+        await asyncio.wait_for(model.entered.wait(), 2)
+        if fault == "tier-during":
+            activity._state = CognitiveActivityState.AMBIENT
+        elif fault == "source-deleted":
+            for pack in recorder.log._pack_paths():
+                with sqlite3.connect(pack) as connection:
+                    connection.execute("DELETE FROM moments WHERE moment_id=?", (accepted.source_moment_id,))
+        else:
+            call.cancel()
+        model.release.set()
+    if fault == "cancel":
+        with pytest.raises(asyncio.CancelledError):
+            await call
+    else:
+        with pytest.raises(grpc.aio.AioRpcError) as denied:
+            await call
+        detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+        assert detail.code == common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED
+    proof = await reconcile(cognition_pb.ReconcilePlanningJobRequest(call=request.call,
+        identity=request.identity, request_id=request.request_id), timeout=2)
+    assert proof.result.resolution == cognition_pb.PLANNING_JOB_RESOLUTION_NOT_APPLIED
+    assert not proof.result.HasField("receipt") and (await store.load_commitment(accepted.commitment_id)).revision == 1
+    assert len(model.requests) == (0 if fault == "tier-before" else 1)
+
+
+@pytest.mark.parametrize("fault", ["none", "config-update", "config-disable", "resource-revoke"])
+async def test_bound_planning_revalidates_actual_knowledge_during_model(bound_planning_service, fault):
+    from glimmer_cradle.cognition.knowledge.source import KnowledgeResourceSource
+    from glimmer_cradle.cognition.ports import (
+        ResourceAccess,
+        ResourceScope,
+        ResourceSnapshot,
+    )
+
+    _, _, store, knowledge, _, model, accepted, _, prepare, execute, reconcile = bound_planning_service
+    scope = ResourceScope("surface:test", "scene:planning", "conversation:planning")
+
+    class Resource:
+        current = True
+
+        async def read(self, resource_id, *, source_id, definition_revision, principal_id, scope):
+            content = "持久来源记录实际存在：Resource 资料".encode()
+            return ResourceSnapshot(resource_id, hashlib.sha256(content).hexdigest(), "text/plain", content,
+                {"definition_revision": definition_revision}, ResourceAccess("access:test", source_id,
+                    principal_id, "permission:test", 1, 9007199254740991))
+
+        async def is_current(self, snapshot, *, principal_id, scope):
+            return self.current and snapshot.access.principal_id == principal_id
+
+    resource = Resource()
+    knowledge.bind_resource_port(resource, principal_id="cognition:test")
+    await knowledge._repo.replace_config_entries([{"entry_id": "manual", "content": "持久来源记录实际存在：配置资料"}])
+    await knowledge.load_persisted()
+    await knowledge.register_resource_source(KnowledgeResourceSource("manual", "document", "definition:1", scope, 4))
+    await knowledge.collect_resource("manual")
+    model.wait = True
+    request = await prepare()
+    call = execute(request, timeout=5)
+    await asyncio.wait_for(model.entered.wait(), 2)
+    assert "Resource 资料" in model.requests[0].messages[1].content and "配置资料" in model.requests[0].messages[1].content
+    if fault.startswith("config-"):
+        await knowledge._repo.replace_config_entries([{"entry_id": "manual", "content": "变更资料", "enabled": fault != "config-disable"}])
+    elif fault == "resource-revoke":
+        resource.current = False
+    model.release.set()
+    if fault == "none":
+        assert (await call).result.receipt.completed
+    else:
+        with pytest.raises(grpc.aio.AioRpcError):
+            await call
+    proof = await reconcile(cognition_pb.ReconcilePlanningJobRequest(call=request.call,
+        identity=request.identity, request_id=request.request_id), timeout=2)
+    assert proof.result.resolution == (cognition_pb.PLANNING_JOB_RESOLUTION_APPLIED if fault == "none" else cognition_pb.PLANNING_JOB_RESOLUTION_NOT_APPLIED)
+    assert (await store.load_commitment(accepted.commitment_id)).revision == (2 if fault == "none" else 1)
+
+
 async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     """Host 跨语言验收入口；业务库/Log/RPC 都是真实 owner，模型为确定性 fixture。"""
     recorder = build_test_recorder(root / "conversation")
@@ -1562,6 +1831,10 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
 
     class Llm:
         async def generate(self, _request):
+            if _request.metadata.get("purpose") == "planning-completion.v1":
+                document = json.loads(_request.messages[1].content)
+                return json.dumps({"completed": not generation.endswith("incomplete"),
+                    "evidence_ids": [item["reference"]["evidence_id"] for item in document["evidence"]], "reason": "核对真实来源"})
             if generation == "waiting-model":
                 await asyncio.Event().wait()
             return json.dumps({"decisions": [{"operation": "add", "kind": "semantic", "content": "跨进程事实",
@@ -1573,15 +1846,44 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     await coordinator.consolidate(force_seal=True)
     planning = SqlitePlanningStore(root / "planning.sqlite")
     await planning.connect()
-    if generation.startswith("planning-"):
+    knowledge_store = None
+    knowledge = None
+    activity = None
+    if generation.startswith("planning-execute"):
+        from glimmer_cradle.cognition.adapters.persistence import SqliteKnowledgeStore
+        from glimmer_cradle.cognition.knowledge import KnowledgeIndex
+        from glimmer_cradle.cognition.state import CognitiveActivityController
+        from glimmer_cradle.cognition_worker.adapters.job_client import (
+            PlanningEvidenceAdapter,
+        )
+
+        knowledge_store = SqliteKnowledgeStore(root / "knowledge.sqlite")
+        await knowledge_store.connect()
+        knowledge = KnowledgeIndex(observability=NullObservability())
+        knowledge.bind_repository(knowledge_store)
+        await knowledge.load_persisted()
+        activity = CognitiveActivityController(experience_recorder=recorder, affect_activation_provider=lambda: 0.0,
+            clock=FixedClock(), observability=NullObservability())
+        await activity.start()
+        activity.engage()
+        existing = await planning.load_plan("plan:跨语言", 1)
+        if existing is None:
+            source = recorder.record(MomentKind.PERCEPTION, {"text": "跨语言评估实际事实", "source_provider_id": "surface:test"},
+                scene_id="scene:planning", conversation_id="conversation:planning", continuity_id="continuity:planning", thread_id="main")
+            goal = await PlanningEvidenceAdapter(recorder, knowledge, activity.get_state).bind_goal(
+                goal_id="goal:跨语言", version=1, text="核对实际来源", completion_condition="跨语言评估实际事实",
+                source_moment_id=source.moment_id)
+            await planning.accept_commitment("commitment:跨语言", PlanVersion("plan:跨语言", 1, goal, ("检查真实来源",)), due_at=0)
+    elif generation.startswith("planning-"):
         await _seed_planning_source(planning, due_at=0 if generation.startswith("planning-reconciliation") else None)
 
     async def shutdown():
         return None
 
     # 非 Memory RPC 不在该 fixture 的验收范围；不构造第二套业务实现。
-    host = CognitionGrpcHost(generation=generation, inbound=None, queue=None, activity=None, cycle=None,
-        shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator, planning=planning)
+    host = CognitionGrpcHost(generation=generation, inbound=None, queue=None, activity=activity, cycle=None,
+        shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator, planning=planning,
+        planning_model=Llm(), conversation=recorder, knowledge=knowledge)
     await host.start()
     host.mark_ready()
     print(json.dumps({"endpoint": host.endpoint, "generation": generation}), flush=True)
@@ -1590,7 +1892,11 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     finally:
         await host.stop()
         await coordinator.stop()
+        if activity is not None:
+            await activity.stop()
         await recorder.stop()
+        if knowledge_store is not None:
+            await knowledge_store.close()
         await database.close()
         await planning.close()
 

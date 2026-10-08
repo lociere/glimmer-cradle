@@ -345,6 +345,7 @@ class CognitionComponents:
     activity_controller: CognitiveActivityController
     state_store: SqliteStateStore
     planning_store: SqlitePlanningStore
+    planning_model: ModelPort
     cognition_database: SqliteMemoryStore
     conversation_controller: ConversationController
     turn_controller: TurnController
@@ -610,6 +611,7 @@ def compose_cognition(
         activity_controller=activity_controller,
         state_store=state_store,
         planning_store=planning_store,
+        planning_model=llm_engine,
         cognition_database=cognition_database,
         conversation_controller=conversation_controller,
         turn_controller=turn_controller,

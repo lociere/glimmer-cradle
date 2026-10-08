@@ -14,6 +14,7 @@ from glimmer_cradle.cognition.context.source import KnowledgeSource
 from glimmer_cradle.cognition.knowledge import (
     KnowledgeConflictError,
     KnowledgeIndex,
+    KnowledgeRevision,
     require_authorized_source,
 )
 from glimmer_cradle.cognition.knowledge.ingestion import resource_capture_from
@@ -40,6 +41,28 @@ def test_model_and_memory_cannot_mutate_curated_knowledge() -> None:
 
 
 PRIVATE = ResourceScope("provider", "scene", "conversation")
+
+
+@pytest.mark.parametrize("fault", ["none", "revision", "disable", "digest", "source"])
+async def test_accepted_config_evidence_uses_live_owner_revision_not_external_grant(tmp_path, fault):
+    store = SqliteKnowledgeStore(tmp_path / "config.sqlite")
+    await store.connect()
+    index = KnowledgeIndex(observability=OBSERVABILITY)
+    index.bind_repository(store)
+    try:
+        await store.replace_config_entries([{"entry_id": "manual", "content": "持久配置资料"}])
+        await index.load_persisted()
+        entry = (await index.get_knowledge(scope=PRIVATE))[0]
+        reference = KnowledgeRevision(entry.entry_id, entry.revision, entry.source, entry.content_digest)
+        if fault in {"revision", "disable"}:
+            await store.replace_config_entries([{"entry_id": "manual", "content": "新资料", "enabled": fault != "disable"}])
+        elif fault == "digest":
+            reference = replace(reference, content_digest="b" * 64)
+        elif fault == "source":
+            reference = replace(reference, source="editor")
+        assert await index.is_context_current((reference,), scope=PRIVATE) is (fault == "none")
+    finally:
+        await store.close()
 
 
 class _Resource:

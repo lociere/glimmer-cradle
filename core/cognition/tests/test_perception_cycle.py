@@ -66,6 +66,7 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
     """主路径：入队 → CycleController tick → 产出 reply intent。"""
     queue = ObservationQueue(max_size=10)
     queue.put(Observation(
+        source_provider_id="provider:actual",
         scene_id="napcat:group:1",
         conversation_id="conversation:napcat:group:1",
         continuity_id="continuity:user:1",
@@ -108,6 +109,9 @@ async def test_end_to_end_perception_to_intent(tmp_path) -> None:
         assert intent.type.value == "reply"
         # 阶段 7.2：回复文本来自 Deliberate 生成（非回显输入）
         assert intent.payload["text"] == "你好呀，我在"
+        await recorder.flush()
+        perception = next(moment for moment in recorder.iter_moments_since(None) if moment.kind == "perception")
+        assert perception.content["source_provider_id"] == "provider:actual"
     finally:
         await recorder.stop()
 

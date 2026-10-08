@@ -478,6 +478,40 @@ message ReconcilePlanningJobRequest {
   string request_id = 3;
 }
 
+// 可信 App 显式接纳；普通模型回复/工具调用不自动成为长期承诺。
+message AcceptPlanningCommitmentRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string commitment_id = 2;
+  string plan_id = 3;
+  uint64 plan_version = 4;
+  string goal_id = 5;
+  uint64 goal_version = 6;
+  string text = 7;
+  string completion_condition = 8;
+  repeated string steps = 9;
+  string source_moment_id = 10;
+  uint64 due_at_ms = 11;
+}
+
+message AcceptPlanningCommitmentResponse {
+  string commitment_id = 1;
+  string plan_id = 2;
+  uint64 plan_version = 3;
+  uint64 revision = 4;
+  string status = 5;
+  string scope_id = 6;
+}
+
+message ExecutePlanningJobRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobExecutionIdentity identity = 2;
+  string request_id = 3;
+}
+
+message ExecutePlanningJobResponse {
+  PlanningJobResult result = 1;
+}
+
 enum PlanningJobResolution {
   PLANNING_JOB_RESOLUTION_UNSPECIFIED = 0;
   PLANNING_JOB_RESOLUTION_APPLIED = 1;
@@ -555,4 +589,6 @@ service CognitionService {
   rpc AcknowledgePlanningJobRequest(AcknowledgePlanningJobRequestRequest) returns (AcknowledgePlanningJobRequestResponse);
   // 独立封口与提交共享 Planning 事务锁；可在 stopping 时完成，不调用模型或收集证据。
   rpc ReconcilePlanningJob(ReconcilePlanningJobRequest) returns (ReconcilePlanningJobResponse);
+  rpc AcceptPlanningCommitment(AcceptPlanningCommitmentRequest) returns (AcceptPlanningCommitmentResponse);
+  rpc ExecutePlanningJob(ExecutePlanningJobRequest) returns (ExecutePlanningJobResponse);
 }

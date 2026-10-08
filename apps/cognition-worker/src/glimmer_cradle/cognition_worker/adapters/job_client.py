@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
+from dataclasses import asdict
 from typing import Protocol
 
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
 from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
-from glimmer_cradle.cognition.planning import PlanningJobIdentity, PlanningJobResult
-from glimmer_cradle.cognition.ports import JobReceipt, JobRequest
+from glimmer_cradle.cognition.inference import ModelPort, ModelRequest
+from glimmer_cradle.cognition.knowledge import KnowledgeIndex, KnowledgeRevision
+from glimmer_cradle.cognition.planning import (
+    GoalVersion,
+    PlanningJobIdentity,
+    PlanningJobResult,
+)
+from glimmer_cradle.cognition.ports import (
+    JobReceipt,
+    JobRequest,
+    PlanningEvidence,
+    PlanningEvidenceReference,
+    ResourceScope,
+)
+from glimmer_cradle.conversation import ConversationRecorder, Moment, MomentKind
 
 
 class JobRequestTransport(Protocol):
@@ -177,3 +192,155 @@ def planning_result_to_wire(result: PlanningJobResult, request_id: str) -> cogni
     if wire.ByteSize() > 65_536:
         raise ValueError("Planning 对账响应超过预算")
     return wire
+
+
+def _moment_document(moment: Moment) -> str:
+    return json.dumps(asdict(moment), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def planning_source_digest(moment: Moment) -> str:
+    return hashlib.sha256(_moment_document(moment).encode("utf-8")).hexdigest()
+
+
+def _source_context(moment: Moment) -> tuple[str, ...]:
+    provider = moment.content.get("source_provider_id")
+    values = (provider, moment.scene_id, moment.conversation_id, moment.continuity_id, moment.thread_id)
+    if any(not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096 for value in values):
+        raise PermissionError("Planning 实际来源缺少完整 Conversation context")
+    if moment.retention_ceiling not in {"experience", "memory_candidate"}:
+        raise PermissionError("Planning 来源不允许持久保留")
+    if moment.origin.privacy_class not in {"public", "private", "sensitive"}:
+        raise PermissionError("Planning 来源隐私分类无效")
+    owners = {"public": "public", "conversation_private": moment.conversation_id, "actor_private": moment.actor_id,
+              "space_local": moment.scene_id, "character_internal": moment.continuity_id}
+    if any(scope not in owners or not owners[scope] for scope in (moment.recall_scope, moment.disclosure_scope)):
+        raise PermissionError("Planning 来源隐私域不完整或未支持")
+    return (*values, moment.recall_scope, str(owners[moment.recall_scope]),
+            moment.disclosure_scope, str(owners[moment.disclosure_scope]), moment.origin.privacy_class)
+
+
+class PlanningEvidenceAdapter:
+    """每次执行独占的材料接线；来源锚与 live owner 核验，缓存不充当授权。"""
+
+    def __init__(self, recorder: ConversationRecorder, knowledge: KnowledgeIndex,
+                 activity: Callable[[], dict[str, object]]) -> None:
+        self._recorder, self._knowledge, self._activity = recorder, knowledge, activity
+        self._source_id: str | None = None
+        self._source_digest: str | None = None
+        self._scope_id: str | None = None
+        self._model_tier: str | None = None
+        self._knowledge_references: dict[str, KnowledgeRevision] = {}
+
+    async def bind_goal(self, *, goal_id: str, version: int, text: str,
+                        completion_condition: str, source_moment_id: str, accepted_tier: str | None = None) -> GoalVersion:
+        await self._recorder.flush()
+        source = self._recorder.log.get_moment(source_moment_id)
+        if source is None or source.kind != MomentKind.PERCEPTION.value or not self._recorder.enabled:
+            raise PermissionError("Planning 接纳缺少实际持久 Perception")
+        _source_context(source)
+        policy = self._activity().get("policy")
+        tier = accepted_tier if accepted_tier is not None else policy.get("model_tier") if isinstance(policy, dict) else None
+        if tier not in {"local_only", "cloud_allowed"} or source.origin.privacy_class == "sensitive" and tier == "cloud_allowed":
+            raise PermissionError("Planning 接纳没有适用的推理政策")
+        return GoalVersion(goal_id, source.conversation_id, version, text, completion_condition,
+                           source.moment_id, planning_source_digest(source), tier)
+
+    def assert_model_policy(self) -> None:
+        source = self._source()
+        policy = self._activity().get("policy")
+        tier = policy.get("model_tier") if isinstance(policy, dict) else None
+        # 当前生产装配只有云 ModelPort；local_only/none 不升级为云，也不提供假本地 fallback。
+        if self._model_tier != "cloud_allowed" or tier != "cloud_allowed" or source.origin.privacy_class == "sensitive":
+            raise PermissionError("Planning 当前或接受时推理政策不允许已装配模型")
+
+    def _source(self) -> Moment:
+        if not self._recorder.enabled or self._source_id is None:
+            raise PermissionError("Planning 目标未绑定实际来源")
+        source = self._recorder.log.get_moment(self._source_id)
+        if source is None or source.kind != MomentKind.PERCEPTION.value or source.conversation_id != self._scope_id \
+                or planning_source_digest(source) != self._source_digest:
+            raise PermissionError("Planning 原来源已缺失、修订或越域")
+        _source_context(source)
+        return source
+
+    def _resource_scope(self) -> ResourceScope:
+        source = self._source()
+        return ResourceScope(source.content["source_provider_id"], source.scene_id, source.conversation_id)
+
+    async def collect(self, *, goal_id: str, goal_version: int, scope_id: str, completion_condition: str,
+                      source_moment_id: str | None = None, source_digest: str | None = None,
+                      model_tier: str | None = None) -> tuple[PlanningEvidence, ...]:
+        # Core 提供不可变 goal 绑定；不从 scope_id 猜 Actor/Provider 或创建第二个权限 registry。
+        self._source_id, self._source_digest, self._scope_id, self._model_tier = source_moment_id, source_digest, scope_id, model_tier
+        self._knowledge_references.clear()
+        self.assert_model_policy()
+        source = self._source()
+        domain = _source_context(source)
+        await self._recorder.flush()
+        materials: list[PlanningEvidence] = []
+        budget = 0
+        for moment in reversed(self._recorder.log.recent(limit=128, scene_id=source.scene_id)):
+            if moment.kind not in {MomentKind.PERCEPTION.value, MomentKind.ACTION_RESULT.value}:
+                continue
+            try:
+                if _source_context(moment) != domain:
+                    continue
+            except PermissionError:
+                continue
+            text = _moment_document(moment)
+            size = len(text.encode("utf-8"))
+            if size > 16_384 or budget + size > 24_576 or len(materials) >= 48:
+                continue
+            reference = PlanningEvidenceReference(f"conversation:{moment.moment_id}", "conversation", scope_id,
+                int(moment.seq), hashlib.sha256(text.encode("utf-8")).hexdigest())
+            materials.append(PlanningEvidence(reference, text))
+            budget += size
+        for entry in await self._knowledge.get_knowledge(completion_condition, scope=self._resource_scope()):
+            if entry.source not in {"config", "resource"}:
+                continue
+            text = entry.content.strip()
+            size = len(text.encode("utf-8"))
+            if size > 16_384 or budget + size > 24_576 or len(materials) >= 64:
+                continue
+            evidence_id = f"knowledge:{entry.entry_id}"
+            reference = PlanningEvidenceReference(evidence_id, "knowledge", scope_id, entry.revision, entry.content_digest)
+            self._knowledge_references[evidence_id] = KnowledgeRevision(entry.entry_id, entry.revision, entry.source, entry.content_digest)
+            materials.append(PlanningEvidence(reference, text))
+            budget += size
+        self.assert_model_policy()
+        return tuple(materials)
+
+    async def is_current(self, reference: PlanningEvidenceReference) -> bool:
+        self.assert_model_policy()
+        if reference.scope_id != self._scope_id:
+            return False
+        if reference.source_owner == "conversation" and reference.evidence_id.startswith("conversation:"):
+            moment = self._recorder.log.get_moment(reference.evidence_id.removeprefix("conversation:"))
+            if moment is None or moment.kind not in {MomentKind.PERCEPTION.value, MomentKind.ACTION_RESULT.value}:
+                return False
+            try:
+                return (_source_context(moment) == _source_context(self._source()) and int(moment.seq) == reference.revision
+                        and planning_source_digest(moment) == reference.content_digest)
+            except PermissionError:
+                return False
+        if reference.source_owner == "knowledge":
+            actual = self._knowledge_references.get(reference.evidence_id)
+            if actual is None or (actual.revision, actual.content_digest) != (reference.revision, reference.content_digest):
+                return False
+            return await self._knowledge.is_context_current((actual,), scope=self._resource_scope())
+        return False
+
+
+class PlanningModelAdapter:
+    """同一真实 ModelPort 的政策闸；即使没有材料，也在实际 provider 调用前后复验。"""
+
+    def __init__(self, model: ModelPort, evidence: PlanningEvidenceAdapter) -> None:
+        self._model, self._evidence = model, evidence
+
+    async def generate(self, request: ModelRequest, provider_key: str | None = None) -> str:
+        if provider_key is not None:
+            raise PermissionError("Planning 不允许调用方切换未绑定 provider")
+        self._evidence.assert_model_policy()
+        result = await self._model.generate(request)
+        self._evidence.assert_model_policy()
+        return result

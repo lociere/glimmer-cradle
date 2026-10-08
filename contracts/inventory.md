@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Planning 显式接纳/评估同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`AcceptPlanningCommitmentRequest`、`AcceptPlanningCommitmentResponse`、`ExecutePlanningJobRequest`、
+`ExecutePlanningJobResponse`，同一 `CognitionService` 增加 `AcceptPlanningCommitment` / `ExecutePlanningJob`。
+App 仅引用真实 Perception；scope、来源摘要和推理政策由 Worker 从实际 owner 绑定，不接受客户端
+自报权限。执行复用 Jobs identity 与 PlanningJobResult，不建立第二份 receipt/证据或 DTO。
+
 Planning 持久对账继续由 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
 `ReconcilePlanningJobRequest`、`ReconcilePlanningJobResponse`、`PlanningJobResolution`、
 `PlanningJobResult`、`PlanningEvaluationReceipt`、`PlanningEvidenceReference`；同一
