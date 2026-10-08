@@ -13,12 +13,14 @@ from glimmer_cradle.cognition.planning import (
     CommitmentStatus,
     GoalVersion,
     ModelPlanningCompletionEvaluator,
+    PlanningAssessment,
     PlanningConflictError,
     PlanningController,
     PlanningEvidence,
     PlanningEvidenceReference,
     PlanningJobFeedback,
     PlanningJobIdentity,
+    PlanningNotificationRequest,
     PlanVersion,
 )
 from glimmer_cradle.cognition.ports import JobReceipt
@@ -62,6 +64,344 @@ async def _evaluation_fixture(tmp_path, *, now=None):
     identity = PlanningJobIdentity("planning:" + source.request_id, "scene-1", 1, 1, 1, "host-1", 1000)
     await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
     return store, PlanningController(store=store), source, identity
+
+
+@pytest.mark.parametrize("completed", [True, False])
+@pytest.mark.parametrize("bound", [True, False])
+async def test_completion_notification_atomic_facts_restart_and_replay_without_delivery(tmp_path, completed, bound):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    model = _PlanningModel(completed=completed)
+    try:
+        if bound:
+            plan = _long_plan(version=2)
+            plan = replace(plan, goal=replace(plan.goal, source_moment_id="moment:真实来源", source_digest="a" * 64,
+                                             model_tier="cloud_allowed"))
+            await store.accept_commitment("commitment-2", plan, due_at=1)
+            source = (await store.pending_job_requests())[0]
+            identity = replace(identity, job_id="planning:" + source.request_id)
+            await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+        receipt = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model))
+        requests = await store.pending_notification_requests()
+        if completed:
+            assert len(requests) == 1
+            request = requests[0]
+            assert isinstance(request, PlanningNotificationRequest)
+            assert request.receipt_id == receipt.receipt_id and request.created_at == receipt.committed_at
+            assert request.commitment_revision == 2 and request.request_id == source.request_id
+            work = await store.read_notification_work(request)
+            assert work.request == request and work.receipt == receipt
+            assert work.goal == (await store.load_plan("plan-1", 2 if bound else 1)).goal
+            assert (request.source_moment_id, request.source_digest) == (
+                ("moment:真实来源", "a" * 64) if bound else (None, None))
+            assert not {"destination_id", "actor_id", "delivered", "text", "model_tier", "permission"} & asdict(request).keys()
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                stored = connection.execute("SELECT payload_json FROM planning_notification_outbox").fetchone()[0]
+                assert "不要执行此资料" not in stored and "逐项核对完成条件" not in stored
+                before = list(connection.iterdump())
+            assert await store.pending_notification_requests() == requests
+            assert await store.read_notification_work(request) == work
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                assert list(connection.iterdump()) == before
+        else:
+            assert requests == []
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name LIKE 'planning_notification_%'").fetchone()
+        await store.close()
+        await store.connect()
+        assert await store.pending_notification_requests() == requests
+        retry = replace(identity, attempt=2, authority_epoch=2, fencing_token=2, owner_id="host-2")
+        assert await controller.evaluate_job(retry, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model)) == receipt
+        assert (await controller.reconcile_job(retry, source.request_id)).receipt == receipt
+        assert await store.pending_notification_requests() == requests
+        assert len(model.requests) == 1
+    finally:
+        await store.close()
+
+
+async def test_notification_reads_and_legacy_completed_receipts_never_backfill_or_create_tables(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        assert await store.pending_notification_requests() == []
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+        model = _PlanningModel()
+        receipt = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model))
+        await store.close()
+        # 输入版本确实没有通知窗口；不在启动/receipt replay 时给旧用户库补造请求。
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            connection.execute("DROP TABLE planning_notification_outbox")
+            connection.execute("DROP TABLE planning_notification_meta")
+            before = list(connection.iterdump())
+        await store.connect()
+        assert await store.pending_notification_requests() == []
+        assert await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model)) == receipt
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+        assert len(model.requests) == 1
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("options", [{"limit": True}, {"limit": 0}, {"limit": 1001},
+    {"after_notification_id": "foreign"}, {"after_notification_id": True}])
+async def test_notification_invalid_pagination_preserves_untouched_store(tmp_path, options):
+    store, _, _, _ = await _evaluation_fixture(tmp_path)
+    try:
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.pending_notification_requests(**options)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        await store.close()
+
+
+async def test_notification_multiple_connections_bounded_stable_pagination(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    second = SqlitePlanningStore(tmp_path / "planning.sqlite", now_ms=lambda: 100)
+    try:
+        for index in range(3):
+            if index:
+                await store.accept_commitment(f"commitment-{index + 1}", _long_plan(version=index + 1), due_at=1)
+                source = (await store.pending_job_requests())[0]
+                identity = replace(identity, job_id="planning:" + source.request_id)
+                await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+            await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+                evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        await second.connect()
+        requests = await second.pending_notification_requests()
+        assert len(requests) == 3 and len({item.notification_id for item in requests}) == 3
+        assert [item.notification_id for item in requests] == sorted(item.notification_id for item in requests)
+        first = await store.pending_notification_requests(limit=1)
+        rest = await second.pending_notification_requests(limit=2, after_notification_id=first[0].notification_id)
+        assert first + rest == requests
+        assert await store.pending_notification_requests(after_notification_id=rest[-1].notification_id) == []
+        assert await store.pending_notification_requests(limit=1) == first  # receiver 缺失保持可重读，不消费。
+        for request in requests:
+            assert (await second.read_notification_work(request)).request == request
+    finally:
+        await second.close()
+        await store.close()
+
+
+@pytest.mark.parametrize("field,value", [("goal_id", "foreign"), ("goal_version", 2), ("scope_id", "foreign"),
+    ("commitment_id", "foreign"), ("commitment_revision", 3), ("created_at", 101),
+    ("source_moment_id", "forged")])
+async def test_notification_forged_request_cannot_read_business_work(tmp_path, field, value):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        request = (await store.pending_notification_requests())[0]
+        changes = {field: value}
+        if field == "source_moment_id":
+            changes["source_digest"] = "f" * 64
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.read_notification_work(replace(request, **changes))
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+        assert await store.pending_notification_requests() == [request]
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["source", "receipt", "abandoned", "revision", "goal", "plan"])
+async def test_notification_actual_fact_drift_preserves_request_and_rejects_publication(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        request = (await store.pending_notification_requests())[0]
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            if fault == "source":
+                connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+            elif fault == "abandoned":
+                connection.execute("UPDATE planning_commitment SET status='abandoned'")
+            elif fault == "revision":
+                connection.execute("UPDATE planning_commitment SET revision=3")
+            else:
+                table = {"receipt": "planning_evaluation_receipt", "goal": "planning_goal_version", "plan": "planning_plan_version"}[fault]
+                value = json.loads(connection.execute(f"SELECT payload_json FROM {table}").fetchone()[0])
+                if fault == "receipt":
+                    value["assessment"]["completed"] = False
+                elif fault == "goal":
+                    value["text"] = "替换原目标"
+                else:
+                    value["goal"]["text"] = "替换原目标"
+                connection.execute(f"UPDATE {table} SET payload_json=?", (json.dumps(value, ensure_ascii=False),))
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.read_notification_work(request)
+        assert await store.pending_notification_requests() == [request]
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["version", "meta-column", "outbox-column", "missing-meta", "missing-outbox", "null", "extra-meta"])
+async def test_notification_invalid_schema_reopen_never_repairs_data(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+        evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+    await store.close()
+    with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+        if fault == "version":
+            connection.execute("UPDATE planning_notification_meta SET value='2'")
+        elif fault == "extra-meta":
+            connection.execute("INSERT INTO planning_notification_meta VALUES('permission','granted')")
+        elif fault in {"missing-meta", "missing-outbox"}:
+            table = "planning_notification_meta" if fault == "missing-meta" else "planning_notification_outbox"
+            connection.execute(f"DROP TABLE {table}")
+        elif fault == "outbox-column":
+            connection.execute("ALTER TABLE planning_notification_outbox RENAME COLUMN payload_json TO wrong")
+        else:
+            connection.execute("DROP TABLE planning_notification_meta")
+            if fault == "null":
+                connection.execute("CREATE TABLE planning_notification_meta(key TEXT,value TEXT)")
+                connection.execute("INSERT INTO planning_notification_meta VALUES('schema_version',NULL)")
+            else:
+                connection.execute("CREATE TABLE planning_notification_meta(wrong TEXT)")
+        before = list(connection.iterdump())
+    with pytest.raises(PlanningConflictError):
+        await store.connect()
+    with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+        assert list(connection.iterdump()) == before
+
+
+async def test_notification_insert_failure_rolls_back_receipt_goal_and_attempt(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        # 第一次合法完成建立独立窗口，随后第二承诺在实际 INSERT 处失败。
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        await store.accept_commitment("commitment-2", _long_plan(version=2), due_at=1)
+        source = (await store.pending_job_requests())[0]
+        identity = replace(identity, job_id="planning:" + source.request_id)
+        await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+        work = await store.prepare_evaluation(identity, source.request_id)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            connection.execute("CREATE TRIGGER fixture_notification_fault BEFORE INSERT ON planning_notification_outbox BEGIN SELECT RAISE(ABORT,'notification fault'); END")
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        reference = _PlanningEvidenceSource().materials[0].reference
+        with pytest.raises(sqlite3.IntegrityError, match="notification fault"):
+            await store.commit_evaluation(identity, work, PlanningAssessment(True, (reference.evidence_id,), "真实证据"), (reference,))
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+        assert (await store.load_commitment("commitment-2")).revision == 1
+        assert len(await store.pending_notification_requests()) == 1
+    finally:
+        await store.close()
+
+
+async def test_notification_cancelled_first_ddl_drains_rollback_before_reader(tmp_path, monkeypatch):
+    store, _, source, identity = await _evaluation_fixture(tmp_path)
+    work = await store.prepare_evaluation(identity, source.request_id)
+    entered, rollback_entered, release_rollback = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    schema, rollback = store._notification_schema, store._require_connection().rollback
+    reference = _PlanningEvidenceSource().materials[0].reference
+
+    async def paused_schema(connection, *, create=False):
+        result = await schema(connection, create=create)
+        if create:
+            entered.set()
+            await asyncio.Event().wait()
+        return result
+
+    async def paused_rollback():
+        rollback_entered.set()
+        await release_rollback.wait()
+        await rollback()
+
+    monkeypatch.setattr(store, "_notification_schema", paused_schema)
+    monkeypatch.setattr(store._require_connection(), "rollback", paused_rollback)
+    with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+        before = list(connection.iterdump())
+    running = asyncio.create_task(store.commit_evaluation(identity, work,
+        PlanningAssessment(True, (reference.evidence_id,), "真实证据"), (reference,)))
+    reader = None
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        running.cancel()
+        await asyncio.wait_for(rollback_entered.wait(), 2)
+        running.cancel()
+        reader = asyncio.create_task(store.pending_notification_requests())
+        await asyncio.sleep(0)
+        assert not running.done() and not reader.done()
+        release_rollback.set()
+        with pytest.raises(asyncio.CancelledError):
+            await running
+        assert await asyncio.wait_for(reader, 2) == []
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        release_rollback.set()
+        running.cancel()
+        await asyncio.gather(running, *([reader] if reader else []), return_exceptions=True)
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["payload", "unknown-field", "duplicate-key", "column", "budget", "boolean", "missing-field"])
+async def test_notification_malformed_persisted_envelope_never_consumed_or_repaired(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            raw = connection.execute("SELECT payload_json FROM planning_notification_outbox").fetchone()[0]
+            value = json.loads(raw)
+            if fault == "column":
+                connection.execute("UPDATE planning_notification_outbox SET notification_id=?", ("f" * 64,))
+            else:
+                if fault == "payload":
+                    raw = "null"
+                elif fault == "budget":
+                    raw = "x" * 65537
+                elif fault == "duplicate-key":
+                    raw = '{"scope_id":"foreign",' + raw[1:]
+                else:
+                    if fault == "unknown-field":
+                        value["permission"] = "granted"
+                    elif fault == "boolean":
+                        value["goal_version"] = True
+                    else:
+                        value.pop("source_digest")
+                    raw = json.dumps(value, ensure_ascii=False)
+                connection.execute("UPDATE planning_notification_outbox SET payload_json=?", (raw,))
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.pending_notification_requests()
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("field,value", [("commitment_revision", True), ("commitment_revision", 1),
+    ("goal_version", 2**53), ("created_at", -1), ("created_at", True), ("job_id", "foreign"),
+    ("receipt_id", "f" * 64), ("notification_id", "f" * 64), ("scope_id", " ")])
+async def test_notification_identity_rejects_unsafe_fields(tmp_path, field, value):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        request = (await store.pending_notification_requests())[0]
+        with pytest.raises(ValueError):
+            replace(request, **{field: value})
+    finally:
+        await store.close()
 
 
 def _feedback(source, *, status="queued", revision=1, job_epoch=1, delivery_epoch=1):
@@ -441,11 +781,14 @@ async def test_planning_commit_reply_loss_recovers_actual_receipt_without_model_
             await running
         proof = await controller.reconcile_job(identity, source.request_id)
         assert proof.receipt and proof.receipt.assessment.completed and proof.receiver_fenced
+        notification = (await store.pending_notification_requests())[0]
+        assert (await store.read_notification_work(notification)).receipt == proof.receipt
         retry = replace(identity, attempt=2, fencing_token=2)
         assert await controller.evaluate_job(retry, source.request_id, evidence=_PlanningEvidenceSource(),
             evaluator=ModelPlanningCompletionEvaluator(model)) == proof.receipt
         assert len(model.requests) == 1
         assert (await store.load_commitment("commitment-1")).revision == 2
+        assert await store.pending_notification_requests() == [notification]
     finally:
         monkeypatch.setattr(connection, "commit", commit)
         running.cancel()
@@ -492,6 +835,9 @@ async def test_planning_final_sql_deadline_check_rolls_back_business_completion(
             await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(), evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
         assert (await store.load_commitment("commitment-1")).revision == 1
         assert (await controller.reconcile_job(identity, source.request_id)).receipt is None
+        assert await store.pending_notification_requests() == []
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name LIKE 'planning_notification_%'").fetchone()
     finally:
         await store.close()
 

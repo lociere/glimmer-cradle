@@ -7,6 +7,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.planning.goal import (
     GoalVersion,
@@ -22,6 +23,7 @@ from glimmer_cradle.cognition.planning.planning_store import (
     PlanningConflictError,
     PlanningDecisionSnapshot,
     PlanningEvaluationWork,
+    PlanningNotificationWork,
     PlanningStore,
 )
 from glimmer_cradle.cognition.ports.job_port import (
@@ -46,8 +48,10 @@ __all__ = [
     "PlanningEvidence",
     "PlanningEvidencePort",
     "PlanningEvidenceReference",
+    "PlanningJobFeedback",
     "PlanningJobIdentity",
     "PlanningJobResult",
-    "PlanningJobFeedback",
+    "PlanningNotificationRequest",
+    "PlanningNotificationWork",
     "PlanningStore",
 ]

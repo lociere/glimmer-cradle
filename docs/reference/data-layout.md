@@ -112,6 +112,13 @@ scheduler；只读接纳不建评估表/attempt 或修改 high-water。未操作
 queued 状态不建评估表或改变承诺；普通启动只核验既有窗口，未知/部分/孤立窗口拒绝自动修复。
 评估 epoch 与反馈 delivery high-water 都拒绝旧投递主；inbox/投影/源与实际评估 receipt 一并备份。
 Jobs outbox ACK 后可清 body，但上述最小接收事实不能删除来“重置”投递；当前仅验证临时库。
+首次新的 completed=true 评估提交再增建独立版本 1 的 `planning_notification_meta` 和
+`planning_notification_outbox`（notification ID、唯一实际 receipt/source request 引用与规范 JSON）。
+请求与业务 receipt/承诺/attempt 同事务接纳，通知信封上限 64 KiB；只保存不可变目标/来源绑定
+引用，不复制证据正文或评估理由。completed=false、普通启动、只读分页或旧 receipt replay 不建表，
+旧已完成记录不自动补发。未知/部分/孤立/结构异常窗口拒绝自动修复；没有真实投递 receiver/ACK
+之前请求一直保留，不因 Jobs body retention 或业务完成删除。通知不可再生事实须随整个 Planning、
+Conversation 原来源及后续实际 Delivery 接收事实建立一致备份切点，不能只回滚 outbox 重新发送。
 新接纳 GoalVersion 增量保存 `source_moment_id`、`source_digest` 和 `model_tier`，三字段必须完整；
 digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可变版本缺三字段时保持原 JSON
 与 active work 摘要字节语义，不改写 schema 1，也不补造权限；新绑定必须是显式新版本。
@@ -125,7 +132,7 @@ digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可�
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
 | `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 与显式 Resource 来源/采集、原始材料/权限时效/parser/chunk provenance、不可变正文修订和派生向量；owner `0x47434B4E`、schema 2，v1 只允许先备份的显式迁移，不隐式修复或导入 |
-| `data/state/cognition/planning.sqlite` | Cognition Planning | 旧决策只读 journal；长期目标/计划版本、完成条件、承诺状态与 request outbox/接纳；显式评估的 receipt、attempt fencing/封口与 high-water |
+| `data/state/cognition/planning.sqlite` | Cognition Planning | 旧决策只读 journal；长期目标/计划版本、完成条件、承诺状态与 request outbox/接纳；显式评估的 receipt、attempt fencing/封口、high-water 与新完成通知引用 |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |

@@ -1631,6 +1631,17 @@ async def test_planning_feedback_rpc_actual_receipt_identity_and_atomic_inbox(bo
     await execute(execution, timeout=2)
     with sqlite3.connect(store._path) as connection:
         result = json.loads(connection.execute("SELECT payload_json FROM planning_evaluation_receipt").fetchone()[0])
+    notifications = await store.pending_notification_requests()
+    if model.completed:
+        assert len(notifications) == 1
+        notification_work = await store.read_notification_work(notifications[0])
+        assert notification_work.request.receipt_id == result["receipt_id"]
+        assert notification_work.request.request_id == execution.request_id
+        assert notification_work.request.source_moment_id == accepted.source_moment_id
+        assert notification_work.goal.source_digest == notification_work.request.source_digest
+        assert notification_work.receipt.assessment.completed is True
+    else:
+        assert notifications == []
     event = jobs_pb.JobStateEvent(job_id=execution.identity.job_id, scope_id=execution.identity.scope_id,
         goal_id=accepted.goal_id, kind="planning.evaluate", revision=3, status=jobs_pb.JOB_STATUS_SUCCEEDED,
         attempt=1, authority_epoch=1, fencing_token=1, updated_at_ms=int(time.time() * 1000))

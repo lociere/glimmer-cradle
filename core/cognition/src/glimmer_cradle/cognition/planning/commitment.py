@@ -70,6 +70,46 @@ class PlanningJobResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanningNotificationRequest:
+    """完成事实的持久发布意图；引用不是目的地、发送权限或送达证明。"""
+
+    notification_id: str
+    receipt_id: str
+    job_id: str
+    request_id: str
+    commitment_id: str
+    commitment_revision: int
+    goal_id: str
+    goal_version: int
+    scope_id: str
+    source_moment_id: str | None
+    source_digest: str | None
+    created_at: int
+
+    def __post_init__(self) -> None:
+        if any(not isinstance(value, str) or not value.strip()
+               for value in (self.commitment_id, self.goal_id, self.scope_id)):
+            raise ValueError("Planning 通知语义身份无效")
+        if any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value)
+               for value in (self.notification_id, self.receipt_id, self.request_id)):
+            raise ValueError("Planning 通知持久身份无效")
+        receipt_id = hashlib.sha256(f"planning-evaluation.v1:{self.request_id}".encode()).hexdigest()
+        notification_id = hashlib.sha256(f"planning-completion.v1:{receipt_id}".encode()).hexdigest()
+        if self.receipt_id != receipt_id or self.notification_id != notification_id or self.job_id != f"planning:{self.request_id}":
+            raise ValueError("Planning 通知/receipt/Job 身份冲突")
+        if (type(self.commitment_revision) is not int or not 2 <= self.commitment_revision <= 2**53 - 1
+            or type(self.goal_version) is not int or not 1 <= self.goal_version <= 2**53 - 1
+            or type(self.created_at) is not int or not 0 <= self.created_at <= 2**53 - 1):
+            raise ValueError("Planning 通知版本/时钟无效")
+        if (self.source_moment_id is not None or self.source_digest is not None) and (
+            not isinstance(self.source_moment_id, str) or not self.source_moment_id.strip()
+            or len(self.source_moment_id.encode("utf-8")) > 4096
+            or not isinstance(self.source_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", self.source_digest)
+        ):
+            raise ValueError("Planning 通知来源绑定无效")
+
+
+@dataclass(frozen=True, slots=True)
 class PlanningJobFeedback:
     """Planning 消费方状态输入；不拥有 Jobs 调度，不从外部状态推断目标完成。"""
 

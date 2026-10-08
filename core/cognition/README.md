@@ -23,8 +23,9 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 - Planning 已持有不可变 GoalVersion/PlanVersion、显式 accepted 承诺和同事务 Job request outbox；
   JobPort 接纳只结束源投递，不代表完成条件成立。普通回复或工具调用不自动成为长期承诺；短程 ActionPlan 已删除，旧决策只读恢复。
   生产长期 Jobs 源 wire 已接线；Core 评估现有严格模型输出、scope/live 证据复验、原 attempt 封口
-  与同事务业务 receipt/承诺 revision。生产证据 Adapter、执行 wire/handler、通知与下一次调度
-  仍未装配，不把测试 Port fixture 当作生产完成链路，详见
+  与同事务业务 receipt/承诺 revision。生产证据 Adapter、执行 wire/handler、默认接纳调度与状态
+  inbox/ACK 已接线；新完成的评估同事务产生持久通知引用，重启/重放不重复产生。
+  通知真实投递/回执与下一次调度仍未装配，不把业务完成或测试 Port fixture 当作外部送达，详见
   [认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 - Conversation Log 是交互事实 owner；Cognition 只消费事实并写入受控认知投影。
 - Memory schema 6 的 dispatch 绑定只用于旧巩固队列迁移屏障，不承担 Jobs authority 或新调度；

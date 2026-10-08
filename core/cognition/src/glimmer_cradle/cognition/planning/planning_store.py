@@ -11,8 +11,9 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationRequest,
 )
-from glimmer_cradle.cognition.planning.goal import PlanningAssessment
+from glimmer_cradle.cognition.planning.goal import GoalVersion, PlanningAssessment
 from glimmer_cradle.cognition.planning.plan import PlanVersion
 from glimmer_cradle.cognition.ports.job_port import (
     JobReceipt,
@@ -48,6 +49,15 @@ class PlanningEvaluationWork:
     plan: PlanVersion
 
 
+@dataclass(frozen=True, slots=True)
+class PlanningNotificationWork:
+    """只读业务事实；App 还须复验实际来源、完整隐私域与真实投递 receiver。"""
+
+    request: PlanningNotificationRequest
+    goal: GoalVersion
+    receipt: PlanningEvaluationReceipt
+
+
 class PlanningCompletionEvaluator(Protocol):
     """Cognition 内部语义策略；外部模型需求另由既有 ModelPort 拥有。"""
 
@@ -80,6 +90,12 @@ class PlanningStore(Protocol):
     async def read_evaluation_work(self, *, job_id: str, scope_id: str, request_id: str) -> PlanningEvaluationWork: ...
 
     async def accept_job_feedback(self, feedback: PlanningJobFeedback, result: dict | None) -> bool: ...
+
+    async def pending_notification_requests(
+        self, *, limit: int = 64, after_notification_id: str | None = None,
+    ) -> list[PlanningNotificationRequest]: ...
+
+    async def read_notification_work(self, request: PlanningNotificationRequest) -> PlanningNotificationWork: ...
 
     async def prepare_evaluation(
         self, identity: PlanningJobIdentity, request_id: str

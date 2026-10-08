@@ -241,7 +241,7 @@ completed 必须有支持条件的证据。引用检查不证明模型语义判�
 验收仍须后续生产评估；没有评估器不提供假成功 fallback。
 
 `SqlitePlanningStore` 在一个 IMMEDIATE 事务中复验原输入、承诺 revision、接收端 high-water 与
-lease，接纳 assessment receipt、承诺 revision + 1 和 applied attempt；最后 SQLite 写入再次检查
+lease，接纳 assessment receipt、承诺 revision + 1、completed=true 的通知引用和 applied attempt；最后 SQLite 写入再次检查
 deadline。completed=false 的业务 receipt 只表示这次评估已接纳，承诺仍 accepted；Job success
 不能代替它。receipt 仅保留引用/hash/评估理由，不复制证据正文。原 attempt reconcile 与提交共用
 SQL 锁，空结果先持久 sealed 才证明未应用；取消等待独立封口完成，丢失提交响应恢复实际 receipt。
@@ -286,7 +286,26 @@ goal/scope/request、投递 epoch 和实际评估 receipt，再保存独立版�
 拒旧投递。queued 接收不建评估窗口、不调用模型；普通启动只核验既有状态窗口，不新增表。
 配置 Host 独立投递 Planning kind，实际 inbox commit 后才 ACK，之后可按既有 retention 清理 Jobs
 body；源/inbox/投影/评估 receipt 仍保留。ACK 前后丢失可双库重启恢复，状态失败不假 ready。
-协议字段见上述参考，备份边界见数据目录。通知 durable receipt、pending 下一次源请求、撤销与产品消费仍待接线。
+协议字段见上述参考，备份边界见数据目录。通知真实投递/回执、pending 下一次源请求、撤销与产品消费仍待接线。
+
+完成通知的 Core 持久请求已落在既有 `planning/commitment.py`：`PlanningNotificationRequest`
+引用原源 request/Job、实际 evaluation receipt、承诺 revision、不可变 goal ID/version/scope 与原
+Moment ID/digest；不复制目标正文、证据或评估理由，不存目的地、人格、model-tier 或发送权限。
+notification ID 为 `planning-completion.v1:<receipt_id>` 的 UTF-8 SHA-256；同 Job 的 receipt 恢复
+不会再次评估或新增通知。completed=false 不生成完成通知，也不自动创建后继评估。
+
+首次新的完成提交在同一 IMMEDIATE 事务创建独立版本 1 通知窗口并写入请求；最终 lease/deadline
+失败、通知写失败或取消回滚连同 receipt/承诺/attempt 一起撤销。普通启动、分页读和既有 receipt
+重放均不增建窗口，不给旧用户库的已完成记录自动补造通知；历史待办需要后续受控迁移。
+`pending_notification_requests` 按稳定 ID 有界分页，允许越过暂不可投递的来源；读不消费请求。
+`read_notification_work` 同一事务核验原请求、源 ACK、原计划与唯一 goal 版本、completed receipt、
+承诺状态/revision，再返回原目标和原评估事实。伪造引用、事实漂移、非规范/未知字段或超预算
+信封失败关闭，保留待办；这些 Core 只读事实不是 App 的隐私或外部发送资格。
+
+此候选没有通知 wire、投递 receiver 或可清理请求的 ACK 入口。App 后续须从实际 Conversation
+Log 复验完整来源/隐私域和当前权限，并复用 Conversation output generation/真实 delivery receipt；
+PublishAction 接纳、模型完成和本地读成功均不表示外部已送达。缺接收方、撤权、取消或 unknown
+保留请求，不能用空回调补齐链路。通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
 
 ## 上下文与推理
 

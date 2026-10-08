@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳、默认 scheduler 与状态 inbox/投影/ACK 已实现；产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳、默认 scheduler、状态 inbox/投影/ACK 与新完成通知原子请求已实现；产品入口/完整 catalog、产品状态投影、Planning 通知真实投递/回执/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -620,7 +620,35 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 5/7 Planning 状态 inbox 与真实 ACK（2026-10-08 当前候选）
+### 阶段 5/7 Planning 完成通知的原子持久请求（2026-10-08 当前候选）
+
+输入 `45a69ad6`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按 Skill 的 owner/事实与
+风险验证约束，先落实通知源端的不可再生事实，不将缺少默认 receiver 的链路报告为已送达。
+既有 Planning 文件新增 `PlanningNotificationRequest`/只读 work；notification ID 从唯一实际
+evaluation receipt 稳定派生，绑定原 request/Job、承诺 revision、goal 版本/scope 和原 Moment
+ID/digest，不复制正文、评估理由或 model-tier，不补造目的地、发送权限、人格与接收方。
+
+新 completed=true 提交同一事务接纳 receipt、承诺 revision、通知 outbox 与 applied attempt；
+最终 SQL deadline 继续位于新增写入之后。独立版本 1 窗口只在实际新完成操作时创建，普通
+启动/只读/旧 receipt replay 不建表或回填历史记录；false 评估不通知或擅自重调度。稳定 ID
+有界分页不消费请求，允许后续消费者跳过暂不可投递目标；只读 work 核验真实源 ACK、唯一
+目标版本、原计划、completed receipt 与当前承诺 revision，冲突保留待办并拒绝发布。
+
+定向验证已覆盖 true/false、绑定/旧未绑定、重开/新主/重放不重复模型、两连接分页、引用/事实
+漂移、非规范/未知字段/重复键/布尔/预算信封、schema 异常不修复、实际 INSERT 故障全事务
+rollback、首次 DDL 后重复取消排空、commit 回复丢失恢复通知与最终 deadline rollback。
+全量 Core 537（新增 49 项）、Worker 247、Host 179 项 PASS；实际 Worker Execute/状态 RPC 的
+19 项反例增加原通知/真实来源/receipt 引用断言，定向和全量均通过。根 typecheck/build、111 页
+docs、encoding、architecture、target-layout specification 与 diff PASS；修改 Python 全规则 Ruff
+PASS。Contracts/Jobs/Conversation 源未改，复用输入契约 22 门、Jobs 47、Conversation TS 12/Python
+22 项证据，不将其算作本轮重跑。无新文件/目录，规格检查不代表物理 final 已完成。
+
+本切片没有通知 wire/外部投递/ACK；后继由 App 复验真实完整 Conversation 来源/隐私域，
+复用 output generation 和真实 delivery receipt，不创建第二 Delivery 状态机。无接收方、撤权、
+取消、unknown 保留待办；历史完成通知只允许后续受控迁移。仍未处理用户库、调用付费模型、
+推送或发布，未新增清单文件；完整后继调度/撤销、产品切换、其余 v2.1 阶段与物理 final 未完成。
+
+### 阶段 5/7 Planning 状态 inbox 与真实 ACK（2026-10-08）
 
 输入 `3684e64a`，当前会话唯一写入 owner，完整 v2.1 目标保持 active。唯一 Cognition Service
 增量 PublishPlanningJobState，复用 Jobs JobStateEvent 与 generation/取消/drain，不另造 wire

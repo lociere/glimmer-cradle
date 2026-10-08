@@ -90,7 +90,8 @@ Planning 已持久保存不可变目标/计划版本、完成条件、显式 acc
 默认 handler 和逐任务接纳 scheduler 已接通，不适用目标等待且不消耗 attempt；状态由真实 Planning inbox/投影提交后 ACK，未清 backlog 如实降级。Core 已实现有证据引用/live 复验的
 语义评估、原 attempt 封口、同事务业务 receipt/承诺 revision；生产证据 Adapter、来源摘要/隐私域与
 model-tier 绑定、显式接纳/执行/只读接纳/状态 wire 和 Host Adapter 已接真实 owner。状态投影核验实际评估 receipt，取消/unknown 不伪报回滚或目标完成；
-通知与再调度仍待接线，不能认作完整长期承诺链路。
+新完成评估已同事务生成持久通知引用；分页/只读事实核验不消费请求、不推断发送权限或外部送达。
+通知真实投递/回执与再调度仍待接线，不能认作完整长期承诺链路。
 持久对账 RPC 已接真实 Planning store；Host 分页恢复原 unknown，sealed/真实 receipt 驱动
 Jobs 对账，保留原提交者和 completed=false。对账不依赖模型或扩大隐私权限；接纳检查不替代执行时复验。
 详见[认知核实现](../../implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
