@@ -73,7 +73,10 @@ Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 Hos
 默认监督链在真实通知待办存在时显示 `degraded/planning_notifications_pending`，重启不清除；
 Prepare client 已接内部 Conversation Reply/Turn 持久接纳，返回原事实/摘要/完整隐私域，
 生产 CLI 重启保持同一事实而不重复模型或 attempt；内部 accepted 不解除上述 pending。
-真实通知投递 receiver/ACK 和再调度仍未完成，精确边界见上述协议参考。
+`acknowledgeDeliveredPlanningNotification` 只读实际 Conversation Delivery owner 的已持久
+confirmed receipt，再核验原 Reply/Turn/digest/目的地并提交源确认，不接收自报 delivered。
+生产 CLI fixture 用真实 Delivery SQLite 接纳测试回执，验证确认后待办清空与再重启幂等；
+它不是默认通知 sender/真实渠道接收证明。默认 receiver 和再调度仍未完成，精确边界见上述协议参考。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

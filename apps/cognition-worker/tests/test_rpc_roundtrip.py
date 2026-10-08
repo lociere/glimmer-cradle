@@ -1792,6 +1792,189 @@ async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_mode
     with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
 
 
+@pytest.mark.parametrize("fault", ["none", "playback", "source-gone", "no-model", "missing", "confirmation", "receipt",
+    "reason", "zero", "overflow", "started", "unknown", "sent", "failed", "progress", "duration", "destination", "turn",
+    "content", "position", "reply", "goal", "digest", "abandoned", "turn-state", "reply-gone", "reply-body", "reply-reference", "reply-time-bool", "planning", "conversation",
+    "turns", "disabled", "unready", "stopping", "generation", "budget"])
+async def test_planning_notification_ack_requires_original_durable_reply_turn_and_full_confirmation(bound_planning_service, fault):
+    import sqlite3
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, _, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        prepared = await _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest,
+            cognition_pb.PreparePlanningNotificationResponse)(cognition_pb.PreparePlanningNotificationRequest(
+                call=execution.call, request=planning_notification_to_wire(notification)), timeout=2)
+        request = cognition_pb.AcknowledgePlanningNotificationRequest(call=execution.call, request=prepared.request,
+            confirmation=cognition_pb.PlanningNotificationDeliveryConfirmation(turn_id=prepared.turn_id,
+                reply_moment_id=prepared.reply_moment_id, log_position=prepared.log_position, content_digest=prepared.content_digest))
+        receipt = request.confirmation.receipt
+        receipt.output_id, receipt.destination_id, receipt.authority_epoch = "reply:" + prepared.turn_id, prepared.context.scene_id, "epoch:actual"
+        receipt.generation, receipt.receipt_id, receipt.kind, receipt.received_at = 1, "receipt:actual", "delivered", "2026-10-08T00:00:00Z"
+        if fault == "playback": receipt.kind, receipt.heard_through_ms, receipt.duration_ms = "playback_completed", 125, 300
+        elif fault == "source-gone" or fault == "reply-gone":
+            for pack in recorder.log._pack_paths():
+                with sqlite3.connect(pack) as connection:
+                    connection.execute("DELETE FROM moments WHERE moment_id=?", (notification.source_moment_id if fault == "source-gone" else prepared.reply_moment_id,))
+        elif fault == "no-model": host._planning_model = None
+        elif fault in {"reply-body", "reply-reference", "reply-time-bool"}:
+            content = dict(recorder.log.get_moment(prepared.reply_moment_id).content)
+            if fault == "reply-body": content = []
+            elif fault == "reply-reference": content["notification"] = []
+            else: content["notification"] = {**content["notification"], "created_at_ms": True}
+            for pack in recorder.log._pack_paths():
+                with sqlite3.connect(pack) as connection:
+                    connection.execute("UPDATE moments SET content_json=? WHERE moment_id=?",
+                        (json.dumps(content, ensure_ascii=False), prepared.reply_moment_id))
+            # 即使调用者跟着重算摘要，也不能把损坏的原引用当作真实通知确认。
+            request.confirmation.content_digest = hashlib.sha256(json.dumps(content, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        elif fault == "missing": request.ClearField("request")
+        elif fault == "confirmation": request.ClearField("confirmation")
+        elif fault == "receipt": request.confirmation.ClearField("receipt")
+        elif fault == "reason": receipt.reason = "self-reported"
+        elif fault == "zero": receipt.generation = 0
+        elif fault == "overflow": receipt.generation = 2**53
+        elif fault in {"started", "unknown", "sent", "failed"}: receipt.kind = "playback_started" if fault == "started" else fault
+        elif fault == "progress": receipt.heard_through_ms = 1
+        elif fault == "duration": receipt.duration_ms = 1
+        elif fault == "destination": receipt.destination_id = "foreign"
+        elif fault == "turn": request.confirmation.turn_id = "f" * 64
+        elif fault == "content": request.confirmation.content_digest = "f" * 64
+        elif fault == "position": request.confirmation.log_position += 1
+        elif fault == "reply": request.confirmation.reply_moment_id = "foreign"
+        elif fault == "goal": request.request.goal_id = "foreign"
+        elif fault == "digest": request.request.source_digest = "f" * 64
+        elif fault == "abandoned":
+            with sqlite3.connect(store._path) as connection: connection.execute("UPDATE planning_commitment SET status='abandoned'")
+        elif fault == "turn-state":
+            with sqlite3.connect(store._path.parent / "turns.db") as connection: connection.execute("UPDATE conversation_turns SET status='interrupted'")
+        elif fault in {"planning", "conversation", "turns"}: setattr(host, "_" + fault, None)
+        elif fault == "disabled": recorder._enabled = False
+        elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+        elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+        elif fault == "generation": request.call.generation = "old"
+        elif fault == "budget": receipt.receipt_id = "x" * 65537
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        before_log = recorder.log.query()
+        operation = _call(channel, "AcknowledgePlanningNotification", cognition_pb.AcknowledgePlanningNotificationRequest,
+            cognition_pb.AcknowledgePlanningNotificationResponse)
+        if fault in {"none", "playback", "source-gone", "no-model"}:
+            response = await operation(request, timeout=2)
+            assert response.accepted and response.notification_id == notification.notification_id
+            assert await store.pending_notification_requests() == []
+            request.confirmation.receipt.received_at = "2026-10-09T00:00:00Z"
+            assert await operation(request, timeout=2) == response
+            with sqlite3.connect(store._path) as connection: accepted = list(connection.iterdump())
+            request.confirmation.receipt.receipt_id = "foreign"
+            with pytest.raises(grpc.aio.AioRpcError): await operation(request, timeout=2)
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == accepted
+            assert (await store.read_notification_work(notification)).receipt.assessment.completed
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await operation(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            invalid = {"missing", "confirmation", "receipt", "reason", "zero", "overflow", "started", "unknown", "sent", "failed", "progress", "duration", "turn", "budget"}
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"planning", "conversation", "turns", "disabled", "unready", "stopping"}
+                else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in invalid else common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED)
+            assert detail.code == expected
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+            assert await store.pending_notification_requests() == [notification]
+        assert recorder.log.query() == before_log and len(model.requests) == 1
+
+
+@pytest.mark.parametrize("phase", ["window", "committed"])
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
+async def test_planning_notification_ack_cancellation_drains_and_reconciles_actual_commit(
+    bound_planning_service, monkeypatch, phase, termination,
+):
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, _, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        prepared = await _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest,
+            cognition_pb.PreparePlanningNotificationResponse)(cognition_pb.PreparePlanningNotificationRequest(
+                call=execution.call, request=planning_notification_to_wire(notification)), timeout=2)
+        request = cognition_pb.AcknowledgePlanningNotificationRequest(call=execution.call, request=prepared.request,
+            confirmation=cognition_pb.PlanningNotificationDeliveryConfirmation(turn_id=prepared.turn_id,
+                reply_moment_id=prepared.reply_moment_id, log_position=prepared.log_position, content_digest=prepared.content_digest))
+        receipt = request.confirmation.receipt
+        receipt.output_id, receipt.destination_id, receipt.authority_epoch = "reply:" + prepared.turn_id, prepared.context.scene_id, "epoch:actual"
+        receipt.generation, receipt.receipt_id, receipt.kind, receipt.received_at = 1, "receipt:actual", "delivered", "2026-10-08T00:00:00Z"
+        entered, rollback_entered, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        connection = store._require_connection()
+        schema, commit, rollback = store._notification_delivery_schema, connection.commit, connection.rollback
+        async def paused_schema(conn, *, create=False):
+            result = await schema(conn, create=create)
+            if create and phase == "window":
+                entered.set()
+                await asyncio.Event().wait()
+            return result
+        async def paused_commit():
+            await commit()
+            # _ack 前的业务只读事务也 commit；只有实际 ACK 已持久时才制造响应丢失。
+            rows = await (await connection.execute("SELECT name FROM sqlite_master WHERE name='planning_notification_delivery_receipt'")).fetchall()
+            if rows and await (await connection.execute("SELECT 1 FROM planning_notification_delivery_receipt")).fetchone():
+                entered.set()
+                await asyncio.Event().wait()
+        async def paused_rollback():
+            rollback_entered.set()
+            await release.wait()
+            await rollback()
+        monkeypatch.setattr(store, "_notification_delivery_schema", paused_schema)
+        if phase == "committed": monkeypatch.setattr(connection, "commit", paused_commit)
+        monkeypatch.setattr(connection, "rollback", paused_rollback)
+        operation = _call(channel, "AcknowledgePlanningNotification", cognition_pb.AcknowledgePlanningNotificationRequest,
+            cognition_pb.AcknowledgePlanningNotificationResponse)
+        running = operation(request, timeout=0.2 if termination == "deadline" else 5)
+        stopping = None
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            if termination == "cancel":
+                running.cancel()
+                with pytest.raises(asyncio.CancelledError): await running
+            elif termination == "deadline":
+                with pytest.raises(grpc.aio.AioRpcError) as expired: await running
+                assert expired.value.code() is grpc.StatusCode.DEADLINE_EXCEEDED
+            else:
+                stopping = asyncio.create_task(host.stop())
+            await asyncio.wait_for(rollback_entered.wait(), 2)
+            assert host._inflight
+            if stopping is not None: assert not stopping.done()
+            monkeypatch.setattr(connection, "commit", commit)
+            release.set()
+            if stopping is not None: await asyncio.wait_for(stopping, 2)
+            for _ in range(100):
+                if not host._inflight: break
+                await asyncio.sleep(0.01)
+            assert not host._inflight
+            monkeypatch.setattr(store, "_notification_delivery_schema", schema)
+            monkeypatch.setattr(connection, "rollback", rollback)
+            assert await store.pending_notification_requests() == ([] if phase == "committed" else [notification])
+            from glimmer_cradle.cognition_worker.adapters.job_client import (
+                planning_notification_delivery_from_wire,
+            )
+            delivery = planning_notification_delivery_from_wire(notification.notification_id, request.confirmation)
+            assert await store.acknowledge_notification(notification, delivery) is (phase == "window")
+            assert await store.pending_notification_requests() == []
+            assert len(model.requests) == 1 and len([item for item in recorder.log.query() if item.kind == "reply"]) == 1
+        finally:
+            release.set()
+            running.cancel()
+            if stopping is not None: await stopping
+
+
 @pytest.mark.parametrize("phase", ["flush", "turn-commit"])
 @pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
 async def test_planning_notification_prepare_cancellation_drains_real_writes_and_reconciles_same_facts(

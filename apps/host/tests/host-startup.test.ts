@@ -10,6 +10,7 @@ import { createInterface } from 'node:readline';
 import path from 'node:path';
 import os from 'node:os';
 import Database from 'better-sqlite3';
+import { DeliveryController, SqliteDeliveryStore } from '@glimmer-cradle/conversation';
 import { create, fromBinary, toBinary, type DescMessage, type Message } from '@bufbuild/protobuf';
 import { PublishStateResponseSchema, PublishStateRequestSchema, PublishActionRequestSchema, PublishActionResponseSchema,
   RegisterCognitionRequestSchema, RegisterCognitionResponseSchema } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
@@ -200,6 +201,33 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({
         status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
       { timeout: 5000, interval: 25 });
+      if (preparedNotification) {
+        // 真实 Delivery SQLite owner 接纳回执；fixture 不宣称已有默认通知 sender/Renderer。
+        const deliveryStore = new SqliteDeliveryStore(path.join(root, 'delivery-fixture.db'));
+        const delivery = new DeliveryController(deliveryStore, 'epoch:receipt-fixture');
+        const outputId = 'reply:' + preparedNotification.turnId;
+        try {
+          delivery.begin({ output_id: outputId, turn_id: preparedNotification.turnId,
+            destination_id: preparedNotification.context!.sceneId, content_digest: preparedNotification.contentDigest });
+          delivery.queue(outputId); delivery.sent(outputId);
+          await expect(client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).rejects.toThrow('已持久送达');
+          expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
+          expect(delivery.applyReceipt({ output_id: outputId, destination_id: preparedNotification.context!.sceneId,
+            authority_epoch: 'epoch:receipt-fixture', generation: 1, received_at: new Date().toISOString(),
+            receipt: { receipt_id: 'receipt:planning-fixture', kind: 'delivered' } })).toEqual({ accepted: true });
+          const ack = await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery);
+          expect(ack).toMatchObject({ accepted: true, notificationId: notifications.requests[0].notificationId });
+          expect(await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).toEqual(ack);
+          expect((await client.readPlanningNotifications(notificationRequest)).requests).toEqual([]);
+          await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({ status: 'ready', error_code: null }),
+            { timeout: 5000, interval: 25 });
+          client.close(); client = undefined; await owner.stop();
+          owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+          client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
+          expect(await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).toEqual(ack);
+          expect((await client.readPlanningNotifications(notificationRequest)).requests).toEqual([]);
+        } finally { deliveryStore.close(); }
+      }
       const planning = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
       try {
         expect(planning.prepare('SELECT status,revision FROM planning_commitment').get())

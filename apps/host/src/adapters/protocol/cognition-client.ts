@@ -4,6 +4,8 @@ import { create, fromBinary, toBinary, type DescMessage, type MessageShape } fro
 import { fromJson, type JsonValue } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import type { ExecutionResultEvent, ExecutionResultReceipt } from '@glimmer-cradle/capabilities';
+import { validateDeliveryReceipt, type DeliveryController } from '@glimmer-cradle/conversation';
+import { DeliveryReceiptCommandSchema } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import { ExecutionResultState, ExecutionSideEffects } from '@glimmer-cradle/contracts/glimmer/capabilities/v1/capabilities_pb';
 import { CallMetadataSchema, ServiceErrorDetailSchema, ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
@@ -24,6 +26,9 @@ import {
   ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
   PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+  AcknowledgePlanningNotificationRequestSchema, AcknowledgePlanningNotificationResponseSchema,
+  PlanningNotificationDeliveryConfirmationSchema,
+  type AcknowledgePlanningNotificationResponse,
   type ReadPlanningNotificationsRequest, type ReadPlanningNotificationsResponse,
   type ResolvePlanningNotificationRequest, type ResolvePlanningNotificationResponse,
   type PreparePlanningNotificationRequest, type PreparePlanningNotificationResponse,
@@ -76,6 +81,8 @@ export interface PlanningNotificationsCognitionPort {
   readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse>;
   resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse>;
   preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse>;
+  acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,
+    delivery: DeliveryController, signal?: AbortSignal): Promise<AcknowledgePlanningNotificationResponse>;
 }
 
 export class HostCognitionError extends Error {
@@ -197,6 +204,37 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse> {
     return this.call('PreparePlanningNotification', PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
       create(PreparePlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  /** 只从唯一 Delivery owner 读取历史确认；调用方不能传入 delivered 布尔值或自报回执。 */
+  public async acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,
+    delivery: DeliveryController, signal?: AbortSignal): Promise<AcknowledgePlanningNotificationResponse> {
+    signal?.throwIfAborted();
+    const fact = delivery.confirmedReceipt(outputId);
+    if (!prepared.accepted || !prepared.request || !prepared.context || !fact) {
+      throw new Error('Planning 通知没有真实内部接纳/已持久送达回执');
+    }
+    validateDeliveryReceipt(fact.envelope);
+    const envelope = fact.envelope, receipt = envelope.receipt;
+    if (envelope.output_id !== outputId || fact.turn_id !== prepared.turnId || fact.content_digest !== prepared.contentDigest
+      || envelope.destination_id !== prepared.context.sceneId || !['delivered', 'playback_completed'].includes(receipt.kind)
+      || prepared.turnRevision !== 2n || prepared.logPosition <= 0n || prepared.logPosition > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error('Planning 通知实际送达回执与原 Reply/Turn/目的地冲突');
+    }
+    const response = await this.call('AcknowledgePlanningNotification', AcknowledgePlanningNotificationRequestSchema,
+      AcknowledgePlanningNotificationResponseSchema, create(AcknowledgePlanningNotificationRequestSchema, {
+        call: this.metadata(), request: prepared.request,
+        confirmation: create(PlanningNotificationDeliveryConfirmationSchema, { turnId: fact.turn_id,
+          replyMomentId: prepared.replyMomentId, logPosition: prepared.logPosition, contentDigest: fact.content_digest,
+          receipt: create(DeliveryReceiptCommandSchema, { outputId: envelope.output_id,
+            destinationId: envelope.destination_id, authorityEpoch: envelope.authority_epoch, generation: BigInt(envelope.generation),
+            receiptId: receipt.receipt_id, kind: receipt.kind, receivedAt: envelope.received_at,
+            ...('heard_through_ms' in receipt ? { heardThroughMs: BigInt(receipt.heard_through_ms),
+              ...(receipt.duration_ms === undefined ? {} : { durationMs: BigInt(receipt.duration_ms) }) } : {}) }) }),
+      }), signal);
+    if (!response.accepted || response.notificationId !== prepared.request.notificationId) {
+      throw new Error('Planning 通知源确认响应与原引用冲突');
+    }
+    return response;
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

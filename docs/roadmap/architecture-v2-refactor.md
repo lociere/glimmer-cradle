@@ -620,7 +620,53 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 4/5/7 通知内部 Reply 与持久 Turn 接纳（2026-10-08 当前候选）
+### 阶段 4/5/7 通知真实回执源确认（2026-10-08 当前候选）
+
+输入 `e30177b2`，本会话继续作为唯一写入 owner。内部 accepted 不能清除通知；本切片先接
+既有 Conversation Delivery 完整已确认事实到 Planning 源 ACK。Host 必须从实际 Delivery
+owner 查询 confirmed receipt，不能接受调用者自报 delivered 布尔值、发送回调或 unknown。
+Worker 复验原完整通知、实际已提交 Reply/Turn、正文摘要与目的地绑定，再让 Planning 同一
+事务持久记录完整回执/源确认。保留原通知与评估引用，不删除或回写历史完成事实。
+
+使用唯一 Contract Spine，复用 Surface 的回执 wire，不复制第二回执类型；Core 持有中立
+的接收确认语义。首次显式确认才建立独立版本窗口；普通打开/扫描不补造历史 ACK。相同
+通知/回执重投幂等，语义漂移、部分/未知版本窗口、取消和提交后响应丢失需真实 SQLite/
+RPC 回归。实际通知发送入口、当前目的地权限与默认产品接线仍需后继切片，不提前宣称完成。
+
+上述计划已落实：Host 的实际 client 从 Conversation Delivery 查询完整已确认回执，核验
+原 output/Turn/content digest/scene 目的地后映射唯一 Surface receipt wire；不接收自报
+delivered 或发送回调。当前 Delivery owner 可查询前代真实历史确认完成对账，已退出 owner
+被拒绝，这不是重新激活旧发送权限。Worker ACK 不调用 Prepare，不补造 Reply/Turn；核验
+原完成 work、已提交 Reply/Turn、全部 context、原因果/通知引用/输入/正文摘要与 position。
+即使调用者重新计算损坏 Reply 的摘要，错误引用或布尔时间仍拒绝。原来源后来不可读时，
+历史送达绑定仍可确认；新发送权限不从这个历史 ACK 推导。
+
+Planning 同一 IMMEDIATE 事务接纳完整确认和首次时间，独立 schema 1 窗口只在显式确认
+时建立；保留原通知/业务 receipt/承诺不改写。重投只忽略到达时间，其余语义漂移冲突。
+扫描核验已确认记录并跳过它们，不以已确认的首个空页隐藏后续待办；部分/未知版本/
+重复 meta/结构/事实损坏 fail closed，没有自动修复或历史回填。跨库并不原子：实际
+Delivery 先提交，原源 ACK 后提交，丢失响应沿原完整确认恢复，不重新生成或再次评估。
+精确协议与恢复纪律分别归[协议](../reference/protocol.md#planning-通知真实回执源确认)和
+[数据目录](../reference/data-layout.md)，本候选没有新文件/数据库路径。
+
+最终证据：Cognition 全量 574 项 PASS（新增 37 项，含完整首次确认/重启、语义漂移、非法
+kind/整数/预算、损坏窗口、已确认行分页、真实 DDL 取消/回滚排空和提交后响应丢失）；Worker
+全量 370 项 PASS（新增 43 项，含完整 wire/原持久 Reply/Turn/绑定/错误码、损坏 Reply、
+来源后来删除、不重复模型，以及真实窗口/commit 各自 cancel/deadline/shutdown 排空）。
+Host 全量 198 项 PASS（新增 19 项实际 Delivery owner mapper 反例/历史 owner 对账，生产
+CLI fixture 增加真实 Delivery SQLite→Worker 确认、仅 sent 不 ACK、第三次启动恢复同一
+确认/原评估一次）。测试回执不冒充真实 Renderer/渠道接收；默认 sender 仍未装配。
+Contract Spine 22 gate、兼容、工具链、三语言回环和连续生成 clean PASS，未刷新基线；
+根 typecheck/build、111 页 docs、encoding、architecture、target-layout specification 与
+diff PASS。改动的 Planning/Store/mapper/测试全规则 Ruff PASS，RPC I/F PASS，47 条既有
+全规则诊断按 code/message/column 与输入一致。依赖锁仅增加 Host→Conversation workspace
+引用；无依赖版本漂移。Core、Worker、Host 最终运行回归顺序执行，未与契约生成或根构建重叠。
+
+仅临时 SQLite/本地确定性 provider；没有生产库迁移、付费模型、推送或发布。完整目标仍
+active；实际 sender/当前发送权限、默认 receiver/产品入口、再调度/撤销和完整目录 final
+仍未完成，固定最终候选独立审查仍留整体收尾。
+
+### 阶段 4/5/7 通知内部 Reply 与持久 Turn 接纳（2026-10-08）
 
 输入 `e930ccbd`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按 Cognition/协议/数据
 Skill，把真实通知引用衔接到 Conversation 的实际 Reply/Turn，不使用发送回调、空 handler

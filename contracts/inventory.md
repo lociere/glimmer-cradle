@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Planning 通知源确认仍归 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`PlanningNotificationDeliveryConfirmation`、`AcknowledgePlanningNotificationRequest`、
+`AcknowledgePlanningNotificationResponse` 与 `AcknowledgePlanningNotification`。回执复用 Surface
+唯一 `DeliveryReceiptCommand`，可信 Host 读取实际 Delivery 已持久确认后映射；Worker 核验原
+Reply/Turn/content digest/目的地，Planning 同事务保留完整确认与原 outbox，不建立第二 Delivery。
+
 Planning 通知的内部接纳仍归 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `PreparePlanningNotificationRequest`、`PreparePlanningNotificationResponse` 与
 `PreparePlanningNotification`。Cognition 形成表达，Conversation 实际 Reply flush 与持久 Turn
@@ -9,7 +15,7 @@ Planning 完成通知的读取/来源解析同属 `proto/glimmer/cognition/v1/co
 `PlanningNotificationRequest`、`ReadPlanningNotificationsRequest`、`ReadPlanningNotificationsResponse`、
 `ResolvePlanningNotificationRequest`、`ResolvePlanningNotificationResponse` 与
 `ReadPlanningNotifications` / `ResolvePlanningNotification`。真实持久请求和业务事实只读，完整来源
-与隐私 owner 从实际 Conversation Log 复验；不新增通知 ACK 或第二 Delivery 状态机。
+与隐私 owner 从实际 Conversation Log 复验；读取/解析不执行通知 ACK 或第二 Delivery 状态机。
 
 Planning 状态投递同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `PublishPlanningJobStateRequest`、`PublishPlanningJobStateResponse` 与同一 CognitionService 的

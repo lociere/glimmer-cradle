@@ -20,6 +20,7 @@ from glimmer_cradle.cognition.planning import (
     PlanningEvidenceReference,
     PlanningJobFeedback,
     PlanningJobIdentity,
+    PlanningNotificationDelivery,
     PlanningNotificationRequest,
     PlanVersion,
 )
@@ -56,14 +57,201 @@ class _PlanningModel:
         return self.output
 
 
-async def _evaluation_fixture(tmp_path, *, now=None):
+async def _evaluation_fixture(tmp_path, *, now=None, bound=False):
     store = SqlitePlanningStore(tmp_path / "planning.sqlite", now_ms=now or (lambda: 100))
     await store.connect()
-    await store.accept_commitment("commitment-1", _long_plan(), due_at=1)
+    plan = _long_plan()
+    if bound:
+        plan = replace(plan, goal=replace(plan.goal, source_moment_id="moment:真实来源", source_digest="a" * 64,
+            model_tier="cloud_allowed"))
+    await store.accept_commitment("commitment-1", plan, due_at=1)
     source = (await store.pending_job_requests())[0]
     identity = PlanningJobIdentity("planning:" + source.request_id, "scene-1", 1, 1, 1, "host-1", 1000)
     await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
     return store, PlanningController(store=store), source, identity
+
+
+def _notification_delivery(request, **changes):
+    turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{request.notification_id}".encode()).hexdigest()
+    return PlanningNotificationDelivery(**{
+        "notification_id": request.notification_id, "receipt_id": "delivery:actual", "output_id": "reply:" + turn_id,
+        "turn_id": turn_id, "reply_moment_id": "moment:reply", "log_position": 2, "content_digest": "f" * 64,
+        "destination_id": "scene-1", "authority_epoch": "epoch:actual", "generation": 1, "kind": "delivered",
+        "received_at": "2026-10-08T00:00:00Z", **changes,
+    })
+
+
+@pytest.mark.parametrize("kind", ["delivered", "playback_completed"])
+async def test_notification_confirmation_keeps_original_facts_and_first_receipt_across_restart(tmp_path, kind):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        delivery = _notification_delivery(notification, kind=kind,
+            **({"heard_through_ms": 250, "duration_ms": 300} if kind == "playback_completed" else {}))
+        with sqlite3.connect(store._path) as connection:
+            before = connection.execute("SELECT payload_json FROM planning_notification_outbox").fetchone()[0]
+        assert await store.acknowledge_notification(notification, delivery)
+        assert not await store.acknowledge_notification(notification, replace(delivery, received_at="2026-10-09T00:00:00Z"))
+        assert await store.pending_notification_requests() == []
+        assert (await store.read_notification_work(notification)).receipt.assessment.completed
+        await store.close()
+        await store.connect()
+        assert not await store.acknowledge_notification(notification, delivery)
+        with sqlite3.connect(store._path) as connection:
+            assert connection.execute("SELECT payload_json FROM planning_notification_outbox").fetchone()[0] == before
+            payload, acknowledged_at = connection.execute("SELECT payload_json,acknowledged_at_ms FROM planning_notification_delivery_receipt").fetchone()
+            assert json.loads(payload) == asdict(delivery) and acknowledged_at == 100
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("field,value", [("receipt_id", "other"), ("output_id", "other"), ("destination_id", "other"),
+    ("content_digest", "e" * 64), ("reply_moment_id", "other"), ("log_position", 3), ("authority_epoch", "other"),
+    ("generation", 2), ("kind", "playback_completed")])
+async def test_notification_confirmation_identity_drift_never_overwrites_or_reopens(tmp_path, field, value):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        delivery = _notification_delivery(notification)
+        await store.acknowledge_notification(notification, delivery)
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.acknowledge_notification(notification, replace(delivery, **{field: value}))
+        with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+        assert await store.pending_notification_requests() == []
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["partial", "version", "payload", "meta-column", "receipt-column", "extra-meta", "duplicate-meta", "null"])
+async def test_notification_confirmation_window_damage_fails_closed_without_repair(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        await store.acknowledge_notification(notification, _notification_delivery(notification))
+        with sqlite3.connect(store._path) as connection:
+            if fault == "partial": connection.execute("DROP TABLE planning_notification_delivery_receipt")
+            elif fault == "version": connection.execute("UPDATE planning_notification_delivery_meta SET value='99'")
+            elif fault == "meta-column": connection.execute("ALTER TABLE planning_notification_delivery_meta RENAME COLUMN key TO wrong")
+            elif fault == "receipt-column": connection.execute("ALTER TABLE planning_notification_delivery_receipt RENAME COLUMN payload_json TO wrong")
+            elif fault == "extra-meta": connection.execute("INSERT INTO planning_notification_delivery_meta VALUES('permission','granted')")
+            elif fault in {"duplicate-meta", "null"}:
+                connection.execute("DROP TABLE planning_notification_delivery_meta")
+                connection.execute("CREATE TABLE planning_notification_delivery_meta(key TEXT,value TEXT)")
+                if fault == "null": connection.execute("INSERT INTO planning_notification_delivery_meta VALUES('schema_version',NULL)")
+                else: connection.executemany("INSERT INTO planning_notification_delivery_meta VALUES('schema_version','1')", [(), ()])
+            else: connection.execute("UPDATE planning_notification_delivery_receipt SET payload_json='{}'")
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError): await store.pending_notification_requests()
+        with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+        if fault != "payload":
+            await store.close()
+            with pytest.raises(PlanningConflictError): await store.connect()
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("field,value", [("kind", "sent"), ("kind", "unknown"), ("kind", "playback_started"),
+    ("kind", "failed"), ("generation", True), ("generation", 0), ("log_position", 0), ("log_position", 2**53),
+    ("content_digest", "x"), ("turn_id", "a" * 64), ("destination_id", " "), ("receipt_id", "x" * 4097),
+    ("received_at", "not-a-time"), ("heard_through_ms", 1), ("duration_ms", 1)])
+async def test_notification_confirmation_rejects_non_confirmation_and_invalid_values(tmp_path, field, value):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        with pytest.raises(ValueError): _notification_delivery(notification, **{field: value})
+        assert await store.pending_notification_requests() == [notification]
+        with sqlite3.connect(store._path) as connection:
+            assert not connection.execute("SELECT name FROM sqlite_master WHERE name LIKE 'planning_notification_delivery_%'").fetchall()
+    finally:
+        await store.close()
+
+
+async def test_notification_confirmed_rows_do_not_hide_later_pending_pages(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        for index in range(4):
+            if index:
+                plan = _long_plan(version=index + 1)
+                plan = replace(plan, goal=replace(plan.goal, source_moment_id="moment:真实来源", source_digest="a" * 64, model_tier="cloud_allowed"))
+                await store.accept_commitment(f"commitment-{index + 1}", plan, due_at=1)
+                source = (await store.pending_job_requests())[0]
+                identity = replace(identity, job_id="planning:" + source.request_id)
+                await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+            await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+                evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        requests = await store.pending_notification_requests()
+        for index in (0, 2):
+            await store.acknowledge_notification(requests[index], _notification_delivery(requests[index], receipt_id=f"receipt:{index}"))
+        first = await store.pending_notification_requests(limit=1)
+        second = await store.pending_notification_requests(limit=1, after_notification_id=first[0].notification_id)
+        assert first + second == [requests[1], requests[3]]
+        assert await store.pending_notification_requests(limit=1, after_notification_id=second[0].notification_id) == []
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("phase", ["window", "committed"])
+async def test_notification_confirmation_cancel_drains_and_replays_original_commit(tmp_path, monkeypatch, phase):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+        evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+    notification = (await store.pending_notification_requests())[0]
+    delivery = _notification_delivery(notification)
+    entered, rollback_entered, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    connection = store._require_connection()
+    schema, commit, rollback = store._notification_delivery_schema, connection.commit, connection.rollback
+    async def paused_schema(conn, *, create=False):
+        result = await schema(conn, create=create)
+        if create and phase == "window":
+            entered.set()
+            await asyncio.Event().wait()
+        return result
+    async def paused_commit():
+        await commit()
+        entered.set()
+        await asyncio.Event().wait()
+    async def paused_rollback():
+        rollback_entered.set()
+        await release.wait()
+        await rollback()
+    monkeypatch.setattr(store, "_notification_delivery_schema", paused_schema)
+    if phase == "committed": monkeypatch.setattr(connection, "commit", paused_commit)
+    monkeypatch.setattr(connection, "rollback", paused_rollback)
+    with sqlite3.connect(store._path) as conn: before = list(conn.iterdump())
+    running = asyncio.create_task(store.acknowledge_notification(notification, delivery))
+    reader = None
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        running.cancel()
+        await asyncio.wait_for(rollback_entered.wait(), 2)
+        running.cancel()
+        reader = asyncio.create_task(store.pending_notification_requests())
+        await asyncio.sleep(0)
+        assert not running.done() and not reader.done()
+        monkeypatch.setattr(connection, "commit", commit)
+        release.set()
+        with pytest.raises(asyncio.CancelledError): await running
+        assert await asyncio.wait_for(reader, 2) == ([] if phase == "committed" else [notification])
+        if phase == "window":
+            with sqlite3.connect(store._path) as conn: assert list(conn.iterdump()) == before
+        monkeypatch.setattr(store, "_notification_delivery_schema", schema)
+        assert await store.acknowledge_notification(notification, delivery) is (phase == "window")
+        assert await store.pending_notification_requests() == []
+    finally:
+        release.set()
+        running.cancel()
+        await asyncio.gather(running, *([reader] if reader else []), return_exceptions=True)
+        await store.close()
 
 
 @pytest.mark.parametrize("completed", [True, False])

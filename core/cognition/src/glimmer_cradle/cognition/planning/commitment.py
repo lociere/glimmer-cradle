@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
 from glimmer_cradle.cognition.planning.goal import PlanningAssessment
@@ -107,6 +108,54 @@ class PlanningNotificationRequest:
             or not isinstance(self.source_digest, str) or not re.fullmatch(r"[a-f0-9]{64}", self.source_digest)
         ):
             raise ValueError("Planning 通知来源绑定无效")
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningNotificationDelivery:
+    """可信 App 从唯一 Delivery owner 接纳的历史确认；不授予新发送权限。"""
+
+    notification_id: str
+    receipt_id: str
+    output_id: str
+    turn_id: str
+    reply_moment_id: str
+    log_position: int
+    content_digest: str
+    destination_id: str
+    authority_epoch: str
+    generation: int
+    kind: str
+    received_at: str
+    heard_through_ms: int = 0
+    duration_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        for value in (self.notification_id, self.turn_id, self.content_digest):
+            if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+                raise ValueError("Planning 通知确认身份/摘要无效")
+        expected_turn = hashlib.sha256(f"conversation-notification-turn.v1:{self.notification_id}".encode()).hexdigest()
+        if self.turn_id != expected_turn:
+            raise ValueError("Planning 通知确认不是原通知 Turn")
+        for value in (self.receipt_id, self.output_id, self.reply_moment_id, self.destination_id, self.authority_epoch, self.received_at):
+            if not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096:
+                raise ValueError("Planning 通知确认信封无效")
+        for value in (self.log_position, self.generation):
+            if type(value) is not int or not 1 <= value <= 2**53 - 1:
+                raise ValueError("Planning 通知确认 position/generation 无效")
+        if self.kind not in {"delivered", "playback_completed"}:
+            raise ValueError("Planning 通知没有真实送达/播放完成回执")
+        if type(self.heard_through_ms) is not int or not 0 <= self.heard_through_ms <= 2**53 - 1:
+            raise ValueError("Planning 通知已听范围无效")
+        if self.duration_ms is not None and (type(self.duration_ms) is not int
+            or not self.heard_through_ms <= self.duration_ms <= 2**53 - 1):
+            raise ValueError("Planning 通知播放时长无效")
+        if self.kind == "delivered" and (self.heard_through_ms != 0 or self.duration_ms is not None):
+            raise ValueError("Planning 文本回执不能附带播放范围")
+        datetime.fromisoformat(self.received_at)
+
+    def identity(self) -> tuple:
+        # 传输到达时间可变；源确认只接受原完整语义，首次信封保留供恢复。
+        return tuple(getattr(self, name) for name in self.__dataclass_fields__ if name != "received_at")
 
 
 @dataclass(frozen=True, slots=True)

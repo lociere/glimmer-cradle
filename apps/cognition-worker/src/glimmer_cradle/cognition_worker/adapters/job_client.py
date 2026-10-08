@@ -17,6 +17,7 @@ from glimmer_cradle.cognition.planning import (
     PlanningEvaluationReceipt,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationDelivery,
     PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.ports import (
@@ -186,6 +187,20 @@ def planning_notification_to_wire(request: PlanningNotificationRequest) -> cogni
         goal_id=request.goal_id, goal_version=request.goal_version, scope_id=request.scope_id,
         source_moment_id=request.source_moment_id, source_digest=request.source_digest, created_at_ms=request.created_at,
     )
+
+
+def planning_notification_delivery_from_wire(
+    notification_id: str, confirmation: cognition_pb.PlanningNotificationDeliveryConfirmation,
+) -> PlanningNotificationDelivery:
+    if not confirmation.HasField("receipt") or confirmation.receipt.reason:
+        raise ValueError("Planning 通知确认没有完整送达回执")
+    receipt = confirmation.receipt
+    return PlanningNotificationDelivery(notification_id=notification_id, receipt_id=receipt.receipt_id,
+        output_id=receipt.output_id, turn_id=confirmation.turn_id, reply_moment_id=confirmation.reply_moment_id,
+        log_position=confirmation.log_position, content_digest=confirmation.content_digest,
+        destination_id=receipt.destination_id, authority_epoch=receipt.authority_epoch, generation=receipt.generation,
+        kind=receipt.kind, received_at=receipt.received_at, heard_through_ms=receipt.heard_through_ms,
+        duration_ms=receipt.duration_ms if receipt.HasField("duration_ms") else None)
 
 
 def planning_receipt_to_wire(receipt: PlanningEvaluationReceipt) -> cognition_pb.PlanningEvaluationReceipt:

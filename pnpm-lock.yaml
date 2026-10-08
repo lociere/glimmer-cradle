@@ -49,6 +49,9 @@ importers:
       '@glimmer-cradle/contracts':
         specifier: workspace:*
         version: link:../../contracts
+      '@glimmer-cradle/conversation':
+        specifier: workspace:*
+        version: link:../../core/conversation
       '@glimmer-cradle/jobs':
         specifier: workspace:*
         version: link:../../core/jobs

@@ -1,14 +1,78 @@
 import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { DeliveryController, SqliteDeliveryStore } from '@glimmer-cradle/conversation';
 import { create } from '@bufbuild/protobuf';
 import { it, expect, vi } from 'vitest';
 import type { Job } from '@glimmer-cradle/jobs';
 import { JobExecutionIdentitySchema } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { PlanningJobResultSchema, PlanningJobResolution, PlanningJobSourceRequestSchema, GetPlanningJobAdmissionResponseSchema,
   type PlanningJobResult, type GetPlanningJobAdmissionRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { PreparePlanningNotificationResponseSchema, AcknowledgePlanningNotificationResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { CognitionClient } from '../src/adapters/protocol/cognition-client.js';
 import { planningJobEvidence, planningJobRequest } from '../src/adapters/protocol/job-mapper.js';
 import { PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
 
 const requestId = 'a'.repeat(64), commitmentId = '承诺:一';
+
+it.each(['delivered', 'completed', 'new-owner', 'generated', 'queued', 'sent', 'unknown', 'playing', 'stale-owner',
+  'turn', 'digest', 'destination', 'accepted', 'request', 'context', 'revision', 'position', 'overflow', 'response'] as const)
+('Planning 源确认只读实际 Delivery owner，拒绝无确认/错绑定 %s', async mode => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-notification-receipt-'));
+  const store = new SqliteDeliveryStore(path.join(root, 'delivery.db'));
+  const original = new DeliveryController(store, 'epoch:first');
+  let delivery = original;
+  const receiptId = createHash('sha256').update(`planning-evaluation.v1:${requestId}`).digest('hex');
+  const notificationId = createHash('sha256').update(`planning-completion.v1:${receiptId}`).digest('hex');
+  const turnId = createHash('sha256').update(`conversation-notification-turn.v1:${notificationId}`).digest('hex');
+  const prepared = create(PreparePlanningNotificationResponseSchema, { accepted: true, turnId, turnRevision: 2n,
+    replyMomentId: 'moment:original', logPosition: 2n, contentDigest: 'f'.repeat(64), context: { sceneId: 'scene:private' },
+    request: { notificationId, receiptId, requestId, jobId: `planning:${requestId}`, commitmentId, commitmentRevision: 2n,
+      goalId: 'goal:original', goalVersion: 1n, scopeId: 'conversation:original', sourceMomentId: 'moment:source', sourceDigest: 'e'.repeat(64) } });
+  const outputId = 'reply:' + turnId;
+  const client = new CognitionClient('grpc://127.0.0.1:1', 'generation:current', 500);
+  // 这里只验证实际 SQLite→Host mapper；真实 RPC/Worker/重启另由 production CLI fixture 覆盖。
+  const call = vi.spyOn(client as unknown as { call: (...args: unknown[]) => Promise<unknown> }, 'call')
+    .mockResolvedValue(create(AcknowledgePlanningNotificationResponseSchema, { accepted: true,
+      notificationId: mode === 'response' ? 'foreign' : notificationId }));
+  try {
+    delivery.begin({ output_id: outputId, turn_id: mode === 'turn' ? 'foreign' : turnId,
+      destination_id: mode === 'destination' ? 'foreign' : 'scene:private', content_digest: mode === 'digest' ? 'e'.repeat(64) : 'f'.repeat(64) });
+    if (mode !== 'generated') delivery.queue(outputId);
+    if (mode !== 'generated' && mode !== 'queued') delivery.sent(outputId);
+    if (mode === 'unknown') delivery.unknown(outputId, 'actual_disconnect');
+    else if (!['generated', 'queued', 'sent'].includes(mode)) {
+      if (mode === 'completed') delivery.applyReceipt({ output_id: outputId, destination_id: 'scene:private',
+        authority_epoch: 'epoch:first', generation: 1, received_at: '2026-10-08T00:00:00Z',
+        receipt: { receipt_id: 'receipt:started', kind: 'playback_started' } });
+      expect(delivery.applyReceipt({ output_id: outputId, destination_id: mode === 'destination' ? 'foreign' : 'scene:private',
+        authority_epoch: 'epoch:first', generation: 1, received_at: '2026-10-08T00:00:00Z',
+        receipt: mode === 'playing' ? { receipt_id: 'receipt:actual', kind: 'playback_started' }
+          : mode === 'completed' ? { receipt_id: 'receipt:actual', kind: 'playback_completed', heard_through_ms: 125, duration_ms: 300 }
+          : { receipt_id: 'receipt:actual', kind: 'delivered' } })).toEqual({ accepted: true });
+    }
+    if (mode === 'new-owner') delivery = new DeliveryController(store, 'epoch:next');
+    if (mode === 'stale-owner') new DeliveryController(store, 'epoch:next');
+    if (mode === 'accepted') prepared.accepted = false;
+    if (mode === 'request') prepared.request = undefined;
+    if (mode === 'context') prepared.context = undefined;
+    if (mode === 'revision') prepared.turnRevision = 3n;
+    if (mode === 'position') prepared.logPosition = 0n;
+    if (mode === 'overflow') prepared.logPosition = 9007199254740992n;
+    if (['delivered', 'completed', 'new-owner'].includes(mode)) {
+      expect(await client.acknowledgeDeliveredPlanningNotification(prepared, outputId, delivery)).toMatchObject({ accepted: true, notificationId });
+      expect(call).toHaveBeenCalledOnce();
+      const request = call.mock.calls[0][3] as { confirmation: { receipt: { kind: string; authorityEpoch: string }; contentDigest: string } };
+      expect(request.confirmation.contentDigest).toBe('f'.repeat(64));
+      expect(request.confirmation.receipt.authorityEpoch).toBe('epoch:first');
+      expect(request.confirmation.receipt.kind).toBe(mode === 'completed' ? 'playback_completed' : 'delivered');
+    } else {
+      await expect(client.acknowledgeDeliveredPlanningNotification(prepared, outputId, delivery)).rejects.toThrow();
+      expect(call).toHaveBeenCalledTimes(mode === 'response' ? 1 : 0);
+    }
+  } finally { client.close(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});
 const identity = create(JobExecutionIdentitySchema, { jobId: `planning:${requestId}`, scopeId: '对话:私有',
   attempt: 2n, authorityEpoch: 2n, fencingToken: 2n, ownerId: '接任者', leaseUntilMs: 1000n });
 function sign(result: PlanningJobResult) {

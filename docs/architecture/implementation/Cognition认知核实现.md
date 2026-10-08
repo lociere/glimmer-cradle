@@ -310,8 +310,13 @@ notification ID 为 `planning-completion.v1:<receipt_id>` 的 UTF-8 SHA-256；�
 Prepare RPC 让 Conversation 持久接纳稳定 Reply 和已结束的内部 Turn，返回原 Moment/position/
 内容摘要与完整隐私域。它不调用模型或平台 IO，不在 Kernel 拼人格文本；同引用重启不重复形成
 Reply/Turn，内部接纳仍不消费通知。原业务/来源在跨 await 后复验，外部发送资格不从历史 Reply 推定。
-精确分页、预算、reason/error 与生命周期见上述协议参考。本候选仍无投递 receiver 或可清理请求
-的 ACK 入口；App 后续须复验真实目的地和当前权限，并复用 Conversation output generation/真实 delivery receipt；
+`PlanningNotificationDelivery` 接纳可信 App 从唯一 Delivery owner 查询的完整历史确认；Worker
+复验原持久 Reply/Turn/位置/context/实际内容摘要，不调用 Prepare 补造事实。Planning 的
+`acknowledge_notification` 同事务保存确认与首次时间，保留原请求，待办扫描越过已确认项。
+重投保留首次信封，绑定漂移拒绝；部分/未知版本窗口不修复。历史 ACK 不重新获得发送权限，
+也不因原来源后来不可读而伪造另一次发送。具体 wire 与边界见[协议参考](../../reference/protocol.md#planning-通知真实回执源确认)。
+精确分页、预算、reason/error 与生命周期见上述协议参考。本候选仍无默认投递 receiver；
+App 后续须复验真实目的地和当前权限，并复用 Conversation output generation/真实 delivery receipt；
 PublishAction 接纳、模型完成和本地读成功均不表示外部已送达。缺接收方、撤权、取消或 unknown
 保留请求，不能用空回调补齐链路。通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
 

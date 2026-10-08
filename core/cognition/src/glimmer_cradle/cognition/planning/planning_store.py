@@ -11,6 +11,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationDelivery,
     PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.planning.goal import GoalVersion, PlanningAssessment
@@ -96,6 +97,10 @@ class PlanningStore(Protocol):
     ) -> list[PlanningNotificationRequest]: ...
 
     async def read_notification_work(self, request: PlanningNotificationRequest) -> PlanningNotificationWork: ...
+
+    async def acknowledge_notification(
+        self, request: PlanningNotificationRequest, delivery: PlanningNotificationDelivery,
+    ) -> bool: ...
 
     async def prepare_evaluation(
         self, identity: PlanningJobIdentity, request_id: str

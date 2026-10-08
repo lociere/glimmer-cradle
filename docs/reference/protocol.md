@@ -247,6 +247,36 @@ PERMISSION_DENIED，未 ready/owner 缺失/drain 为 NOT_READY，旧代为 GENER
 RPC，生产 CLI 双重启恢复同一 Reply/Turn/digest；默认监督仍显示通知 pending。App 后续必须
 复验真实目的地与当前权限，再用唯一 Conversation Delivery 和实际接收回执完成源确认。
 
+### Planning 通知真实回执源确认
+
+`AcknowledgePlanningNotification` 在同一 Cognition Service 中接收原完整通知引用和
+`PlanningNotificationDeliveryConfirmation`，后者复用 Surface 唯一 `DeliveryReceiptCommand`，
+另绑定原 Turn、Reply Moment、Log position 与实际 content digest。请求限 64 KiB，只接受
+`delivered` / `playback_completed`；sent、unknown、失败和播放开始均不是源确认。
+
+可信 Host 的 `acknowledgeDeliveredPlanningNotification` 不接收调用者自报回执，而从实际
+Conversation Delivery owner 查询已持久 confirmed receipt，核验原 output、Turn、摘要和
+scene 目的地，再映射到 wire。已退出 owner 不能查询/确认；当前 owner 可读取前代真实历史
+回执以完成对账，这不授权前代继续发送。此 RPC 仅供受管 Host→Worker 内部边界，不向 UI/
+Extension 暴露；CallMetadata 代际/就绪检查不替代未来远端身份与权限认证。
+
+Worker 只读已有真实 Reply/已完成 revision=2 的 Turn，核验完整通知引用、原因果/来源摘要、
+输入摘要、Log position、全部 Turn context、正文摘要和 scene 目的地。ACK 不调用 Prepare，
+不补造 Reply/Turn，不重新读取已删除源正文或重新获得发送许可。历史投递已发生且绑定仍有效
+时，原来源后来不可读不抹去送达事实；新发送仍须独立验证当前来源/目的地权限。
+
+Planning 在同一事务持久保存完整确认与首次接纳时间，保留原 outbox/业务 receipt；扫描只
+返回未确认请求，越过已确认项后仍能找到后续分页。相同确认只忽略传输到达时间、保持首次
+信封；同通知的回执身份、output、epoch/generation、已听范围或其他绑定漂移拒绝覆盖。
+窗口版本/恢复纪律见[数据目录](./data-layout.md)。无原持久事实/业务绑定冲突为
+RECOVERY_REQUIRED，非法组合/预算为 INVALID_REQUEST，缺 owner/停机为 NOT_READY，旧代
+为 GENERATION_MISMATCH。取消、deadline、shutdown 排空实际 rollback；提交后响应丢失
+保留原确认供同一请求重投，不再次评估或生成 Reply。
+
+当前只有实际 Delivery→源确认入口，默认 Host 尚无通知 sender/receiver 装配。生产 CLI
+fixture 用真实 Delivery SQLite owner 接纳测试回执，并验证源确认/重启；它不证明真实
+Renderer 或外部渠道已收到通知。没有真实接收回执的默认待办仍如实 pending。
+
 ### Planning 原 attempt 持久对账
 
 `ReconcilePlanningJob` 复用 Jobs 唯一 `JobExecutionIdentity`，另携原源 `request_id`；请求总量

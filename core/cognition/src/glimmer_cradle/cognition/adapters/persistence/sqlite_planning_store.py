@@ -20,6 +20,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationDelivery,
     PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.planning.goal import GoalVersion, PlanningAssessment
@@ -107,6 +108,15 @@ _NOTIFICATION_SCHEMA = (
      "FOREIGN KEY(request_id) REFERENCES planning_job_outbox(request_id))"),
 )
 
+# 只在显式真实回执接纳时建立；原 outbox 留存，不补造历史送达。
+_NOTIFICATION_DELIVERY_TABLES = ("planning_notification_delivery_meta", "planning_notification_delivery_receipt")
+_NOTIFICATION_DELIVERY_SCHEMA = (
+    "CREATE TABLE planning_notification_delivery_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+    ("CREATE TABLE planning_notification_delivery_receipt (notification_id TEXT PRIMARY KEY,"
+     "receipt_id TEXT NOT NULL UNIQUE,payload_json TEXT NOT NULL,acknowledged_at_ms INTEGER NOT NULL,"
+     "FOREIGN KEY(notification_id) REFERENCES planning_notification_outbox(notification_id))"),
+)
+
 
 def _matches_feedback_result(actual: object, expected: object) -> bool:
     # protobuf Struct 的安全整数经 JSON mapper 成 float；bool 不可冒充数字或完成值。
@@ -184,6 +194,7 @@ class SqlitePlanningStore:
                 await self._evaluation_schema(connection)
                 await self._feedback_schema(connection)
                 await self._notification_schema(connection)
+                await self._notification_delivery_schema(connection)
                 cursor = await connection.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 )
@@ -724,38 +735,125 @@ class SqlitePlanningStore:
         async with self._transaction() as connection:
             if not await self._notification_schema(connection):
                 return []
+            delivered = await self._notification_delivery_schema(connection)
             rows = await (await connection.execute(
                 "SELECT * FROM planning_notification_outbox WHERE notification_id>? ORDER BY notification_id LIMIT ?",
                 (after_notification_id or "", limit),
             )).fetchall()
-            return [self._read_notification(row) for row in rows]
+            result: list[PlanningNotificationRequest] = []
+            # 已确认的原请求仍留存；分页前进越过它们，不让短页/空页隐藏后续待办。
+            while rows:
+                for row in rows:
+                    request = self._read_notification(row)
+                    confirmation = await self._notification_delivery(connection, request) if delivered else None
+                    if confirmation is None:
+                        result.append(request)
+                        if len(result) == limit:
+                            return result
+                rows = await (await connection.execute(
+                    "SELECT * FROM planning_notification_outbox WHERE notification_id>? ORDER BY notification_id LIMIT ?",
+                    (rows[-1]["notification_id"], limit),
+                )).fetchall()
+            return result
 
     async def read_notification_work(self, request: PlanningNotificationRequest) -> PlanningNotificationWork:
         if not isinstance(request, PlanningNotificationRequest):
             raise PlanningConflictError("Planning 通知请求无效")
         async with self._transaction() as connection:
-            if not await self._notification_schema(connection):
-                raise PlanningConflictError("Planning 通知不存在")
-            row = await (await connection.execute(
-                "SELECT * FROM planning_notification_outbox WHERE notification_id=?", (request.notification_id,),
-            )).fetchone()
-            if row is None or self._read_notification(row) != request:
-                raise PlanningConflictError("Planning 原通知引用冲突")
-            work = await self._evaluation_work(connection, request.job_id, request.scope_id, request.request_id)
-            receipt = await self._evaluation_receipt(connection, request.job_id)
-            goal_row = await (await connection.execute(
-                "SELECT payload_json FROM planning_goal_version WHERE goal_id=? AND version=?",
-                (work.plan.goal.goal_id, work.plan.goal.version),
-            )).fetchone()
-            if (receipt is None or not receipt.assessment.completed
-                or receipt.request_id != work.request_id or receipt.commitment_id != work.commitment.commitment_id
-                or receipt.identity.scope_id != work.plan.goal.scope_id
-                or work.commitment.status != CommitmentStatus.COMPLETED
-                or work.commitment.revision != receipt.commitment_revision
-                or goal_row is None or goal_row[0] != _canonical(_goal_document(work.plan.goal))
-                or self._notification_request(work, receipt) != request):
-                raise PlanningConflictError("Planning 通知/完成事实已改变；不得投递")
-            return PlanningNotificationWork(request, work.plan.goal, receipt)
+            return await self._notification_work(connection, request)
+
+    async def _notification_work(self, connection: aiosqlite.Connection, request: PlanningNotificationRequest) -> PlanningNotificationWork:
+        if not await self._notification_schema(connection):
+            raise PlanningConflictError("Planning 通知不存在")
+        row = await (await connection.execute(
+            "SELECT * FROM planning_notification_outbox WHERE notification_id=?", (request.notification_id,),
+        )).fetchone()
+        if row is None or self._read_notification(row) != request:
+            raise PlanningConflictError("Planning 原通知引用冲突")
+        work = await self._evaluation_work(connection, request.job_id, request.scope_id, request.request_id)
+        receipt = await self._evaluation_receipt(connection, request.job_id)
+        goal_row = await (await connection.execute(
+            "SELECT payload_json FROM planning_goal_version WHERE goal_id=? AND version=?",
+            (work.plan.goal.goal_id, work.plan.goal.version),
+        )).fetchone()
+        if (receipt is None or not receipt.assessment.completed
+            or receipt.request_id != work.request_id or receipt.commitment_id != work.commitment.commitment_id
+            or receipt.identity.scope_id != work.plan.goal.scope_id
+            or work.commitment.status != CommitmentStatus.COMPLETED
+            or work.commitment.revision != receipt.commitment_revision
+            or goal_row is None or goal_row[0] != _canonical(_goal_document(work.plan.goal))
+            or self._notification_request(work, receipt) != request):
+            raise PlanningConflictError("Planning 通知/完成事实已改变；不得投递")
+        return PlanningNotificationWork(request, work.plan.goal, receipt)
+
+    async def acknowledge_notification(self, request: PlanningNotificationRequest, delivery: PlanningNotificationDelivery) -> bool:
+        if not isinstance(request, PlanningNotificationRequest) or not isinstance(delivery, PlanningNotificationDelivery):
+            raise PlanningConflictError("Planning 通知确认类型无效")
+        # 即使是进程内输入也按完整模型复验，不把被修改的对象当作可信确认。
+        delivery = PlanningNotificationDelivery(**asdict(delivery))
+        if delivery.notification_id != request.notification_id or request.source_moment_id is None:
+            raise PlanningConflictError("Planning 通知确认引用冲突")
+        payload = _canonical(asdict(delivery))
+        async with self._transaction() as connection:
+            await self._notification_work(connection, request)
+            exists = await self._notification_delivery_schema(connection)
+            original = await self._notification_delivery(connection, request) if exists else None
+            if original is not None:
+                if original.identity() != delivery.identity():
+                    raise PlanningConflictError("Planning 通知原送达事实冲突")
+                return False
+            await self._notification_delivery_schema(connection, create=True)
+            try:
+                await connection.execute("INSERT INTO planning_notification_delivery_receipt VALUES(?,?,?,?)",
+                    (request.notification_id, delivery.receipt_id, payload, self._clock_now()))
+            except aiosqlite.IntegrityError as error:
+                raise PlanningConflictError("Planning 通知回执已绑定其他通知") from error
+            return True
+
+    @staticmethod
+    async def _notification_delivery(connection: aiosqlite.Connection, request: PlanningNotificationRequest) -> PlanningNotificationDelivery | None:
+        row = await (await connection.execute(
+            "SELECT * FROM planning_notification_delivery_receipt WHERE notification_id=?", (request.notification_id,),
+        )).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row["payload_json"])
+            if _canonical(payload) != row["payload_json"]:
+                raise ValueError("confirmation canonical form")
+            receipt = PlanningNotificationDelivery(**payload)
+            if (receipt.notification_id != request.notification_id or receipt.receipt_id != row["receipt_id"]
+                or type(row["acknowledged_at_ms"]) is not int or not 0 <= row["acknowledged_at_ms"] <= 2**53 - 1):
+                raise ValueError("confirmation binding")
+            return receipt
+        except (ValueError, TypeError, KeyError) as error:
+            raise PlanningConflictError("Planning 通知确认事实损坏；须受控恢复") from error
+
+    @staticmethod
+    async def _notification_delivery_schema(connection: aiosqlite.Connection, *, create: bool = False) -> bool:
+        rows = await (await connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)", _NOTIFICATION_DELIVERY_TABLES,
+        )).fetchall()
+        tables = {row[0] for row in rows}
+        if not tables:
+            if not create:
+                return False
+            if not await SqlitePlanningStore._notification_schema(connection):
+                raise PlanningConflictError("Planning 通知确认没有原通知 owner")
+            for statement in _NOTIFICATION_DELIVERY_SCHEMA:
+                await connection.execute(statement)
+            await connection.execute("INSERT INTO planning_notification_delivery_meta VALUES('schema_version','1')")
+            return True
+        if tables != set(_NOTIFICATION_DELIVERY_TABLES) or not await SqlitePlanningStore._notification_schema(connection):
+            raise PlanningConflictError("Planning 通知确认窗口不完整；须受控恢复")
+        try:
+            rows = await (await connection.execute("SELECT key,value FROM planning_notification_delivery_meta")).fetchall()
+            if len(rows) != 1 or dict(rows) != {"schema_version": "1"}:
+                raise PlanningConflictError("Planning 通知确认窗口版本无效；须受控恢复")
+            await connection.execute("SELECT notification_id,receipt_id,payload_json,acknowledged_at_ms FROM planning_notification_delivery_receipt LIMIT 0")
+        except aiosqlite.DatabaseError as error:
+            raise PlanningConflictError("Planning 通知确认窗口结构无效；须受控恢复") from error
+        return True
 
     @staticmethod
     async def _notification_schema(connection: aiosqlite.Connection, *, create: bool = False) -> bool:

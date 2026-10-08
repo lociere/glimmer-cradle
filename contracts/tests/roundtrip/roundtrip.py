@@ -202,6 +202,16 @@ notification_prepared = cognition_pb.PreparePlanningNotificationResponse(request
     turn_id="turn:通知", turn_revision=9007199254740991, reply_moment_id="reply:通知", log_position=9007199254740991,
     content_digest="f" * 64, context=notification_resolved.context, actor_id="actor:一", privacy_class="private",
     recall_owner_id="actor:一", disclosure_owner_id="conversation:一", text="根据真实证据形成的通知。")
+notification_ack = cognition_pb.AcknowledgePlanningNotificationRequest(request=notification,
+    confirmation=cognition_pb.PlanningNotificationDeliveryConfirmation(turn_id=notification_prepared.turn_id,
+        reply_moment_id=notification_prepared.reply_moment_id, log_position=9007199254740991, content_digest="f" * 64,
+        receipt=DeliveryReceiptCommand(output_id="reply:通知", destination_id="scene:一", authority_epoch="epoch:一",
+            generation=9007199254740991, receipt_id="receipt:一", kind="playback_completed",
+            heard_through_ms=125, duration_ms=300, received_at="2026-10-08T00:00:00Z")))
+notification_ack_response = cognition_pb.AcknowledgePlanningNotificationResponse(notification_id=notification.notification_id, accepted=True)
+for message in (notification_ack, notification_ack_response):
+    assert type(message).FromString(message.SerializeToString()) == message
+assert not cognition_pb.AcknowledgePlanningNotificationRequest.FromString(b"").HasField("confirmation")
 for message in (notification_prepare, notification_prepared):
     assert type(message).FromString(message.SerializeToString()) == message
 assert not cognition_pb.PreparePlanningNotificationResponse.FromString(b"").HasField("actor_id")

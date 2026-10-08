@@ -210,6 +210,17 @@ var notificationPrepared = new PreparePlanningNotificationResponse { Request = n
     TurnId = "turn:通知", TurnRevision = 9007199254740991UL, ReplyMomentId = "reply:通知", LogPosition = 9007199254740991UL,
     ContentDigest = new string('f', 64), Context = notificationResolved.Context, ActorId = "actor:一", PrivacyClass = "private",
     RecallOwnerId = "actor:一", DisclosureOwnerId = "conversation:一", Text = "根据真实证据形成的通知。" };
+var notificationAck = new AcknowledgePlanningNotificationRequest { Request = notification,
+    Confirmation = new PlanningNotificationDeliveryConfirmation { TurnId = notificationPrepared.TurnId,
+        ReplyMomentId = notificationPrepared.ReplyMomentId, LogPosition = 9007199254740991UL, ContentDigest = new string('f', 64),
+        Receipt = new SurfaceV1.DeliveryReceiptCommand { OutputId = "reply:通知", DestinationId = "scene:一", AuthorityEpoch = "epoch:一",
+            Generation = 9007199254740991UL, ReceiptId = "receipt:一", Kind = "playback_completed", HeardThroughMs = 125,
+            DurationMs = 300, ReceivedAt = "2026-10-08T00:00:00Z" } } };
+var notificationAckResponse = new AcknowledgePlanningNotificationResponse { NotificationId = notification.NotificationId, Accepted = true };
+if (!AcknowledgePlanningNotificationRequest.Parser.ParseFrom(notificationAck.ToByteArray()).Equals(notificationAck)
+    || !AcknowledgePlanningNotificationResponse.Parser.ParseFrom(notificationAckResponse.ToByteArray()).Equals(notificationAckResponse)
+    || AcknowledgePlanningNotificationRequest.Parser.ParseFrom(Array.Empty<byte>()).Confirmation != null)
+    throw new InvalidOperationException("Planning notification full Delivery confirmation/precision/presence roundtrip failed");
 if (!PreparePlanningNotificationRequest.Parser.ParseFrom(notificationPrepare.ToByteArray()).Equals(notificationPrepare)
     || !PreparePlanningNotificationResponse.Parser.ParseFrom(notificationPrepared.ToByteArray()).Equals(notificationPrepared)
     || PreparePlanningNotificationResponse.Parser.ParseFrom(Array.Empty<byte>()).HasActorId)

@@ -7,6 +7,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationDelivery,
     PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.planning.goal import (
@@ -51,6 +52,7 @@ __all__ = [
     "PlanningJobFeedback",
     "PlanningJobIdentity",
     "PlanningJobResult",
+    "PlanningNotificationDelivery",
     "PlanningNotificationRequest",
     "PlanningNotificationWork",
     "PlanningStore",

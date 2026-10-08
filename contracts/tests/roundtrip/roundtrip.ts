@@ -31,6 +31,7 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
 import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+  AcknowledgePlanningNotificationRequestSchema, AcknowledgePlanningNotificationResponseSchema,
   PlanningNotificationRequestSchema, ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
@@ -240,6 +241,19 @@ const notificationPrepared = create(PreparePlanningNotificationResponseSchema, {
   contentDigest: 'f'.repeat(64), context: notificationResolved.context, actorId: 'actor:一', privacyClass: 'private',
   recallOwnerId: 'actor:一', disclosureOwnerId: 'conversation:一', text: '根据真实证据形成的通知。' });
 const preparedRoundtrip = fromBinary(PreparePlanningNotificationResponseSchema, toBinary(PreparePlanningNotificationResponseSchema, notificationPrepared));
+const notificationAck = create(AcknowledgePlanningNotificationRequestSchema, { request: notification, confirmation: {
+  turnId: notificationPrepared.turnId, replyMomentId: notificationPrepared.replyMomentId,
+  logPosition: 9007199254740991n, contentDigest: notificationPrepared.contentDigest,
+  receipt: { outputId: 'reply:通知', destinationId: 'scene:一', authorityEpoch: 'epoch:一', generation: 9007199254740991n,
+    receiptId: 'receipt:一', kind: 'playback_completed', heardThroughMs: 125n, durationMs: 300n, receivedAt: '2026-10-08T00:00:00Z' } } });
+const ackRoundtrip = fromBinary(AcknowledgePlanningNotificationRequestSchema, toBinary(AcknowledgePlanningNotificationRequestSchema, notificationAck));
+const notificationAckResponse = create(AcknowledgePlanningNotificationResponseSchema, { notificationId: notification.notificationId, accepted: true });
+if (ackRoundtrip.confirmation?.receipt?.generation !== 9007199254740991n || ackRoundtrip.confirmation?.logPosition !== 9007199254740991n
+  || ackRoundtrip.confirmation?.receipt?.durationMs !== 300n || ackRoundtrip.confirmation?.receipt?.receiptId !== 'receipt:一'
+  || !fromBinary(AcknowledgePlanningNotificationResponseSchema, toBinary(AcknowledgePlanningNotificationResponseSchema, notificationAckResponse)).accepted
+  || fromBinary(AcknowledgePlanningNotificationRequestSchema, new Uint8Array()).confirmation !== undefined) {
+  throw new Error('Planning notification full Delivery confirmation/precision/presence roundtrip failed');
+}
 if (fromBinary(PreparePlanningNotificationRequestSchema, toBinary(PreparePlanningNotificationRequestSchema, notificationPrepare)).request?.notificationId !== notification.notificationId
   || preparedRoundtrip.logPosition !== 9007199254740991n || preparedRoundtrip.turnRevision !== 9007199254740991n
   || !preparedRoundtrip.accepted || preparedRoundtrip.text !== notificationPrepared.text || preparedRoundtrip.contentDigest !== 'f'.repeat(64)
