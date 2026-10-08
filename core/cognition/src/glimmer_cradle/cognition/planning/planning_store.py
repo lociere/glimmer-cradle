@@ -5,9 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from glimmer_cradle.cognition.planning.commitment import Commitment
+from glimmer_cradle.cognition.planning.commitment import (
+    Commitment,
+    PlanningEvaluationReceipt,
+    PlanningJobIdentity,
+    PlanningJobResult,
+)
+from glimmer_cradle.cognition.planning.goal import PlanningAssessment
 from glimmer_cradle.cognition.planning.plan import PlanVersion
-from glimmer_cradle.cognition.ports.job_port import JobReceipt, JobRequest
+from glimmer_cradle.cognition.ports.job_port import (
+    JobReceipt,
+    JobRequest,
+    PlanningEvidence,
+    PlanningEvidenceReference,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +38,19 @@ class PlanningDecisionSnapshot:
 
 class PlanningConflictError(ValueError):
     """持久语义、版本或请求身份冲突；不能把冲突当新工作重试。"""
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningEvaluationWork:
+    request_id: str
+    commitment: Commitment
+    plan: PlanVersion
+
+
+class PlanningCompletionEvaluator(Protocol):
+    """Cognition 内部语义策略；外部模型需求另由既有 ModelPort 拥有。"""
+
+    async def assess(self, work: PlanningEvaluationWork, evidence: tuple[PlanningEvidence, ...]) -> PlanningAssessment: ...
 
 
 class PlanningStore(Protocol):
@@ -51,3 +75,16 @@ class PlanningStore(Protocol):
     async def acknowledge_job_request(
         self, request: JobRequest, receipt: JobReceipt
     ) -> None: ...
+
+    async def prepare_evaluation(
+        self, identity: PlanningJobIdentity, request_id: str
+    ) -> PlanningEvaluationWork | PlanningEvaluationReceipt: ...
+
+    async def commit_evaluation(
+        self, identity: PlanningJobIdentity, work: PlanningEvaluationWork,
+        assessment: PlanningAssessment, evidence: tuple[PlanningEvidenceReference, ...],
+    ) -> PlanningEvaluationReceipt: ...
+
+    async def reconcile_evaluation(
+        self, identity: PlanningJobIdentity, request_id: str
+    ) -> PlanningJobResult: ...

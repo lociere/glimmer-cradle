@@ -27,6 +27,9 @@ from glimmer_cradle.cognition.ports.job_port import (
     JobReceipt,
     JobRequest,
     JobRequestStatus,
+    PlanningEvidence,
+    PlanningEvidencePort,
+    PlanningEvidenceReference,
 )
 from glimmer_cradle.cognition.ports.resource_port import (
     ResourceAccess,
@@ -299,6 +302,9 @@ __all__ = [
     "JobReceipt",
     "JobRequest",
     "JobRequestStatus",
+    "PlanningEvidence",
+    "PlanningEvidencePort",
+    "PlanningEvidenceReference",
     "KernelRequestPort",
     "KernelEventPort",
     "AgentPlanInput",

@@ -223,6 +223,34 @@ queued/attempt 0 和未 ACK 状态事件保持，持久待办使 Host 报 `jobs_
 状态只消费自己的 kind。handler 的受监督执行、Cognition 依据实际证据评估完成条件、通知/
 下一次调度，以及撤销/恢复链路仍待接线，不认作完整长期承诺执行链路。
 
+Core `PlanningController.evaluate_job` 已提供评估的业务接纳边界：先从真实源 outbox 核验持久
+Job ACK、原 request/plan/goal/scope，登记原 attempt/epoch/token/owner/lease，再进入有界评估。
+较新 authority/attempt 在等待模型锁之前登记并封口旧执行，不被旧模型阻塞；同 Job 已提交 receipt
+跨重开/新 attempt 返回原事实，不重复评估。总在途请求最多 128，同 controller 的模型评估串行。
+
+canonical `ports/job_port.py` 的 `PlanningEvidencePort` 只接收中立 goal ID/version、scope 与检索用
+完成条件，不反向 import Planning。它要求 App 从实际 Conversation/Knowledge/Execution owner 收集有权限的
+材料，返回 scope、修订、SHA-256 与真实文本，并复验当前访问资格；尚无生产实现，不能由模型
+构造 evidence。Core 限最多 64 项、每项 16 KiB、总输入 64 KiB，拒绝跨 scope/重复引用/内容 hash
+冲突，模型前后均复验。语义评估是 Planning 内部策略，不交给 Jobs 或外部证据 owner；
+`ModelPlanningCompletionEvaluator` 经 ModelPort 根据接受的完成条件
+做语义判断，材料只作为 untrusted/data 放入 user JSON，不进入 system 指令；没有工具/聊天回复
+通路。输出限 16 KiB，严格拒绝重复键、非有限值、未知字段、非布尔 completed 和未提供的证据 ID；
+completed 必须有支持条件的证据。引用检查不证明模型语义判断必然正确，真实 provider/任务质量
+验收仍须后续生产评估；没有评估器不提供假成功 fallback。
+
+`SqlitePlanningStore` 在一个 IMMEDIATE 事务中复验原输入、承诺 revision、接收端 high-water 与
+lease，接纳 assessment receipt、承诺 revision + 1 和 applied attempt；最后 SQLite 写入再次检查
+deadline。completed=false 的业务 receipt 只表示这次评估已接纳，承诺仍 accepted；Job success
+不能代替它。receipt 仅保留引用/hash/评估理由，不复制证据正文。原 attempt reconcile 与提交共用
+SQL 锁，空结果先持久 sealed 才证明未应用；取消等待独立封口完成，丢失提交响应恢复实际 receipt。
+来源 live 复验是跨 owner 的采样，不宣称分布式原子权限事务或未来修订不会纠错；证据更正/撤销
+后的语义重评与产品通知仍待后续链路。版本窗口与备份范围见上述数据目录。
+
+当前这些边界仅由 Core 实现与 Port fixture/实际 SQLite 验证，未开放新的 Service RPC，也未在
+生产 factory 注册 Planning handler。生产证据选择/隐私 scope 解析、执行/对账 wire、状态接收、
+通知 durable receipt、pending 的下一次源请求、撤销与产品消费都须接线后才可解除 handler 降级。
+
 ## 上下文与推理
 
 ```text

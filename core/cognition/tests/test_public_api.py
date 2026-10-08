@@ -2,8 +2,8 @@ import json
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
-import glimmer_cradle.cognition as cognition
 import pytest
+from glimmer_cradle import cognition
 from glimmer_cradle.cognition import ports
 from glimmer_cradle.cognition.inference import InferenceSettings
 from glimmer_cradle.cognition.knowledge import KnowledgeSourceRecord
@@ -63,6 +63,9 @@ def test_consumer_owned_ports_are_explicit() -> None:
         "JobReceipt",
         "JobRequest",
         "JobRequestStatus",
+        "PlanningEvidence",
+        "PlanningEvidencePort",
+        "PlanningEvidenceReference",
         "KernelRequestPort",
         "KernelEventPort",
         "AgentPlanInput",
@@ -87,6 +90,8 @@ def test_consumer_owned_ports_are_explicit() -> None:
         "ResourceSnapshot",
         "SpanPort",
     ]
+    for name in ("PlanningEvidence", "PlanningEvidencePort", "PlanningEvidenceReference"):
+        assert getattr(ports, name).__module__ == "glimmer_cradle.cognition.ports.job_port"
 
 
 def test_method_port_models_are_immutable_and_separate_from_tools() -> None:

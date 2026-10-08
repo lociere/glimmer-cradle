@@ -97,6 +97,14 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 自动修复，原数据保留。备份/恢复须在 Planning drain 后与 Jobs/authority 建立一致切点，不允许
 只回滚源请求重新生成承诺。配置 Host 已真实接纳源到 Jobs，源 ACK 只结束投递，不修改承诺
 状态；未装配 Planning handler 的 queued Job 与未 ACK 状态仍须备份，不能按“未执行”丢弃。
+首次显式评估/对账已被源 ACK 接纳的 Job 时，在同一事务增建独立版本 1 的评估窗口：
+`planning_evaluation_meta`（schema/authority epoch/已观测时钟 high-water）、
+`planning_evaluation_attempt`（原 attempt/owner/token/lease、输入摘要、active/sealed/applied 与 receipt 引用）、
+`planning_evaluation_receipt`（每 Job 唯一的业务评估、承诺 revision、证据引用/hash，不复制正文）。
+普通启动只核验已有窗口，不建表；长期 schema 1 与历史 journal 不变。这是明确功能操作的增量
+初始化，不隐式升级既有版本；未知/部分/孤立窗口拒绝自动修复。封口、receipt、authority 和时钟
+high-water 同属不可再生状态，不能只删除 attempt 后重放模型或回滚时间复活过期 lease；其一致
+备份须与整个 Planning/源 outbox/Jobs 共同保护。生产 handler 尚未接线，未操作用户库。
 完整产品恢复仍归阶段 14。本候选只使用临时测试数据，未迁移用户库。
 
 | 路径 | owner | 说明 |
@@ -106,7 +114,7 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 | `data/state/content/assets/<asset-id>/{blob,metadata.json}` | Kernel / Content | 不可变原始媒体；随机 ID、媒体类型、字节数和 SHA-256，随 Experience 一起备份；Cognition 只读校验 |
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
 | `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 与显式 Resource 来源/采集、原始材料/权限时效/parser/chunk provenance、不可变正文修订和派生向量；owner `0x47434B4E`、schema 2，v1 只允许先备份的显式迁移，不隐式修复或导入 |
-| `data/state/cognition/planning.sqlite` | Cognition Planning | 本拍行动 journal；显式长期承诺的目标/计划版本、完成条件、accepted 状态与 request outbox/接纳记录 |
+| `data/state/cognition/planning.sqlite` | Cognition Planning | 旧决策只读 journal；长期目标/计划版本、完成条件、承诺状态与 request outbox/接纳；显式评估的 receipt、attempt fencing/封口与 high-water |
 | `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |

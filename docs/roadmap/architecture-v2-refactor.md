@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，缺 handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 执行/完成评估与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 目标/计划版本、accepted 承诺和原子源请求已接生产 Worker RPC/Jobs 接纳，Core 证据评估/业务 receipt/attempt 封口已实现，缺生产证据 Adapter/执行 wire/handler 如实降级；产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -619,6 +619,55 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 5/7 Planning 证据评估与业务接纳（2026-10-07—08）
+
+输入 `6a7f60f0`，当前会话唯一写入 owner；上一 goal turn 已提交真实 Resource 更新链路，属于
+progress，本轮完整目标继续 active。调查确认生产 Planning 源只排队，若直接注册 handler 会缺
+语义评估、durable receipt 与接收端封口。本切片在清单已有 Planning 文件落实这些必需事实，
+不以空 handler 或模型自己的成功声明解除 Host 降级。
+
+明确接受的完成条件、consumer-owned Evidence Port 与 Cognition 内语义评估器分开：材料有 source owner、
+scope、修订/hash，模型输入前/后 live 复验，严格预算和引用约束；实际 ModelPort 评估器只产生
+语义提案，不执行步骤/IO/聊天。受控提案经真实 Planning 源 ACK/原计划核验、attempt 身份与
+authority/lease、承诺 revision 同事务接纳为业务 receipt。completed=false 时仅评估完成，承诺
+仍 accepted；completed=true 必须有实际候选证据引用。引用存在不证明模型判断必然正确，
+生产 provider/任务质量仍需验收，不能把 Port fixture 宣称为真实生产证据 owner。
+
+显式评估/对账原子增建版本 1 评估窗口，旧长期 schema 1 与只读 journal 不变；普通启动只核验
+已有窗口。每 Job 唯一 receipt 不复制证据正文，重开/新 attempt 恢复原事实、不再次调用模型。
+新的 authority/attempt 先登记并封口旧执行，再等待评估锁；提交最终 SQL 再查 deadline。
+空对账先同锁持久 sealed 才返回未应用，重复取消等独立封口完成，已提交但丢失响应保持 applied。
+接收端 high-water 不拥有或创建 Jobs authority；仅约束可信 App 传入的实际 lease。数据事实归
+[数据布局](../reference/data-layout.md#用户状态与记忆)，业务与未完成生产边界归
+[Cognition 实现](../architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
+
+Planning 58 项覆盖严格 JSON/虚构引用、scope/权限失效、
+模型期间证据变更、两个真实 SQL connection 的新旧 authority 交错、跨 Job 封口、重复取消、
+每个业务写入点故障回滚、提交后响应丢失、restart receipt、持久过期/时钟回拨、最终 SQL deadline、
+未 ACK 来源不创建评估窗口、伪造完成条件、非法安全整数及部分/未知版本不修复。
+这些是 Core/Port 与真实 SQLite 证据，不是生产完成链路或模型语义正确率的证明；未调用收费模型。
+固定候选为输入提交加本条对应 Core 八个源码文件/Planning 与公开 API 测试及权威文档；Core 439、
+Worker 143、Host 4 文件/122 PASS。Host 使用实际生产 Worker/SQLite/SSE 验证启动、逆序退出和
+知识更新/旧 Context 门，未以历史 Host 测试代替新的 Python 装配输入。公开 API 最后追加 canonical
+owner 断言定向重验 7 PASS。Contracts/生成物、配置定义、锁文件与 TS/Kernel
+源未改，沿用 `c3cc6d02` 的完整契约/Kernel 门证据；不重复生成干扰运行验证。
+根 typecheck/build、111 页 docs、encoding、architecture、target-layout specification 和 diff PASS；
+纯 Python 收尾后根基线再次收束，规格门不代替 final 物理清单。新/受影响 Python 文件全规则 Ruff
+PASS，ports/__init__.py 的 9 个旧问题逐项与输入提交核对一致（pass/implicit Optional/固定旧导出顺序）；
+全部修改 Python I/F PASS，无新增抑制或 weakened gate。Windows/Node 24.18.0/pnpm 11.13.0/根 uv
+workspace，Core/Worker 使用 uv run --no-sync；先完成 root build 再运行 Host fixture，避免资源争用。
+10-08 中断恢复时旧执行句柄已不存在，未沿用缺少完成结果的输出；当前候选重新运行根
+typecheck/build 并观察到退出码 0，文档/编码/架构/布局规格/diff 也重新通过。
+
+生产 Evidence Adapter（含完整隐私 scope 解析）、执行/对账 RPC、真实 handler/状态 ACK、
+通知 receipt、pending 的后继源请求、撤销/语义重评和产品消费仍待继续接线；默认产品入口、
+用户库与旧队列没有切换。没有新增第二契约源、目录壳或孤立平台 owner，不推送/发布。
+架构门先识别了误放在 Planning 的 Port，再识别 TYPE_CHECKING 仍形成的跨 owner import cycle；
+纠正为 ports/job_port 的中立证据投影/consumer Port 与 Planning 内部语义策略，未修改或削弱检查器。
+公开 API 清单按新增三项精确同步，保持旧顺序和显式 owner 验证。已观测过期的首次 attempt 也
+持久封口，不能通过随后延长 deadline 复活。
+高风险独立审查留整体最终固定候选，完整物理清单/安装/恢复/主链门仍未完成，不缩小整体目标。
 
 ### 阶段 5/9 Resource 更新通知与受监督 Knowledge 重采集（2026-10-07）
 
