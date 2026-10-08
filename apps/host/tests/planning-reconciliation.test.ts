@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
+import type { Job } from '@glimmer-cradle/jobs';
 import { JobExecutionIdentitySchema } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
-import { PlanningJobResultSchema, PlanningJobResolution, type PlanningJobResult } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { planningJobEvidence } from '../src/adapters/protocol/job-mapper.js';
+import { PlanningJobResultSchema, PlanningJobResolution, PlanningJobSourceRequestSchema, GetPlanningJobAdmissionResponseSchema,
+  type PlanningJobResult, type GetPlanningJobAdmissionRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { planningJobEvidence, planningJobRequest } from '../src/adapters/protocol/job-mapper.js';
+import { PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
 
 const requestId = 'a'.repeat(64), commitmentId = '承诺:一';
 const identity = create(JobExecutionIdentitySchema, { jobId: `planning:${requestId}`, scopeId: '对话:私有',
@@ -84,4 +87,41 @@ it.each(['missing', 'id', 'request', 'commitment', 'revision', 'committer', 'dea
   if (mode === 'budget') receipt.reason = 'x'.repeat(65537);
   sign(value);
   expect(() => planningJobEvidence(value, identity, requestId, commitmentId)).toThrow();
+});
+
+it.each(['ready', 'unbound', 'source', 'policy', 'model', 'request', 'job', 'scope', 'unknown-reason',
+  'true-with-waiting', 'false-with-ready', 'cancel-before', 'cancel-during', 'source-drift'] as const)
+('Planning 调度接纳 %s 不伪造 attempt，错身份/组合与取消失败关闭', async mode => {
+  const source = create(PlanningJobSourceRequestSchema, { commitmentId, planId: 'plan:一', planVersion: 1n,
+    goalId: 'goal:一', goalVersion: 1n, scopeId: identity.scopeId, dueAtMs: 0n,
+    requestId: createHash('sha256').update(JSON.stringify(['planning.evaluate', commitmentId, 'plan:一', 1])).digest('hex') });
+  const job: Job = { ...planningJobRequest(source, 3), status: 'queued', revision: 1, attempt: 0,
+    authority_epoch: 1, fencing_token: 0, lease_owner: null, lease_until: null, result: null,
+    error_code: null, created_at: 0, updated_at: 0 };
+  const reason = { ready: 'planning_ready', unbound: 'planning_source_unbound', source: 'planning_source_unavailable',
+    policy: 'planning_model_policy', model: 'planning_model_unavailable' };
+  const response = create(GetPlanningJobAdmissionResponseSchema, { requestId: source.requestId, jobId: job.job_id,
+    scopeId: job.scope_id, eligible: mode === 'ready' || mode === 'true-with-waiting',
+    reasonCode: mode in reason ? reason[mode as keyof typeof reason] : 'planning_source_unbound' });
+  if (mode === 'request') response.requestId = 'b'.repeat(64);
+  if (mode === 'job') response.jobId = 'foreign';
+  if (mode === 'scope') response.scopeId = 'foreign';
+  if (mode === 'unknown-reason') response.reasonCode = 'future-ready';
+  if (mode === 'false-with-ready') response.reasonCode = 'planning_ready';
+  const signal = new AbortController();
+  const getPlanningAdmission = vi.fn(async (request: GetPlanningJobAdmissionRequest) => {
+    expect(request).toMatchObject({ requestId: source.requestId, jobId: job.job_id, scopeId: job.scope_id });
+    expect(request).not.toHaveProperty('identity');
+    if (mode === 'cancel-during') signal.abort();
+    return response;
+  });
+  if (mode === 'cancel-before') signal.abort();
+  const executePlanning = vi.fn(), reconcilePlanning = vi.fn();
+  const adapter = new PlanningJobAdapter({ getPlanningAdmission, executePlanning, reconcilePlanning });
+  const candidate = mode === 'source-drift' ? { ...job, payload: { ...job.payload, plan_version: 2 } } : job;
+  if (mode in reason) expect(await adapter.isEligible(job, signal.signal)).toBe(mode === 'ready');
+  else await expect(adapter.isEligible(candidate, signal.signal)).rejects.toThrow();
+  expect(getPlanningAdmission).toHaveBeenCalledTimes(mode === 'cancel-before' || mode === 'source-drift' ? 0 : 1);
+  expect(executePlanning).not.toHaveBeenCalled(); expect(reconcilePlanning).not.toHaveBeenCalled();
+  expect(job.attempt).toBe(0); expect(job.revision).toBe(1);
 });

@@ -362,10 +362,10 @@ class SqlitePlanningStore:
             raise PlanningConflictError("Planning 评估身份/来源无效")
 
     @staticmethod
-    async def _evaluation_work(connection: aiosqlite.Connection, identity: PlanningJobIdentity, request_id: str) -> PlanningEvaluationWork:
+    async def _evaluation_work(connection: aiosqlite.Connection, job_id: str, scope_id: str, request_id: str) -> PlanningEvaluationWork:
         cursor = await connection.execute("SELECT * FROM planning_job_outbox WHERE request_id=?", (request_id,))
         source = await cursor.fetchone()
-        if source is None or source["accepted_job_id"] != identity.job_id:
+        if source is None or source["accepted_job_id"] != job_id:
             raise PlanningConflictError("Planning Job 未被源持久接纳")
         request = JobRequest(**json.loads(source["payload_json"]))
         cursor = await connection.execute("SELECT * FROM planning_commitment WHERE commitment_id=?", (source["commitment_id"],))
@@ -383,13 +383,23 @@ class SqlitePlanningStore:
         expected_id = hashlib.sha256(json.dumps(["planning.evaluate", commitment.commitment_id, plan.plan_id, plan.version],
                                                ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
         if (request.request_id != request_id or request.idempotency_key != request_id or request_id != expected_id
-            or request.kind != "planning.evaluate" or request.scope_id != identity.scope_id or plan.goal.scope_id != identity.scope_id
+            or request.kind != "planning.evaluate" or request.scope_id != scope_id or plan.goal.scope_id != scope_id
             or request.goal_id != plan.goal.goal_id or request.payload != {
                 "commitment_id": commitment.commitment_id, "plan_id": plan.plan_id,
                 "plan_version": plan.version, "goal_version": plan.goal.version,
             }):
             raise PlanningConflictError("Planning 原来源/计划/scope 冲突")
         return PlanningEvaluationWork(request_id, commitment, plan)
+
+    async def read_evaluation_work(self, *, job_id: str, scope_id: str, request_id: str) -> PlanningEvaluationWork:
+        """只读取真实已 ACK 来源；不伪造 attempt，也不初始化或封口评估窗口。"""
+        if not isinstance(request_id, str) or not re.fullmatch(r"[a-f0-9]{64}", request_id) \
+                or job_id != f"planning:{request_id}" or not isinstance(scope_id, str) or not scope_id.strip():
+            raise PlanningConflictError("Planning 接纳查询身份无效")
+        async with self._transaction() as connection:
+            if not await self._commitment_schema(connection):
+                raise PlanningConflictError("Planning 源不存在")
+            return await self._evaluation_work(connection, job_id, scope_id, request_id)
 
     @staticmethod
     async def _evaluation_row(connection: aiosqlite.Connection, identity: PlanningJobIdentity) -> aiosqlite.Row | None:
@@ -470,7 +480,7 @@ class SqlitePlanningStore:
         async with self._transaction() as connection:
             if not await self._commitment_schema(connection):
                 raise PlanningConflictError("Planning 源不存在")
-            work = await self._evaluation_work(connection, identity, request_id)
+            work = await self._evaluation_work(connection, identity.job_id, identity.scope_id, request_id)
             await self._evaluation_schema(connection, create=True)
             now = await self._evaluation_time(connection)
             row = await self._evaluation_row(connection, identity)
@@ -528,7 +538,7 @@ class SqlitePlanningStore:
         async with self._transaction() as connection:
             if not await self._evaluation_schema(connection):
                 raise PlanningConflictError("Planning attempt 未登记")
-            current = await self._evaluation_work(connection, identity, work.request_id)
+            current = await self._evaluation_work(connection, identity.job_id, identity.scope_id, work.request_id)
             row = await self._evaluation_row(connection, identity)
             if row is None:
                 raise PlanningConflictError("Planning attempt 未登记")
@@ -560,7 +570,7 @@ class SqlitePlanningStore:
         async with self._transaction() as connection:
             if not await self._commitment_schema(connection):
                 raise PlanningConflictError("Planning 源不存在")
-            await self._evaluation_work(connection, identity, request_id)
+            await self._evaluation_work(connection, identity.job_id, identity.scope_id, request_id)
             await self._evaluation_schema(connection, create=True)
             now = await self._evaluation_time(connection)
             row = await self._evaluation_row(connection, identity)

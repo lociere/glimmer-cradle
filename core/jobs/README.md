@@ -14,6 +14,10 @@ due/max-attempts 与 Job/outbox 同事务接纳。ACK 丢失后重投沿用首�
 retry mode；不会用当前 retry due 或新配置重算。普通 `enqueue` 的完整请求冲突规则不变。
 
 App 注册 handler 并显式驱动 `JobScheduler.runDue`；handler 接收 AbortSignal 和 lease。
+可按 kind 注入中立 `JobAdmissionPort`：`listDue` 在当前 authority 下按稳定 Job ID 有界分页，
+接纳 await 不持有 SQL 事务；严格 eligible 后以候选 ID/revision CAS claim，取消/竞争更新/切代
+不能将旧判断用于另一 Job。等待项仍推进 cursor 并最终回绕，不修改 due/attempt/重试预算。
+每轮最多扫描 limit 项；该检查不是执行授权，业务 handler 必须再次核验自己的真实政策。
 取消先持久撤销租约，再通知在途 handler，晚到结果无法覆写终态。停止 controller 时拒绝新执行并等待
 在途 handler 收尾，之后才能关闭 store。handler 必须合作响应取消；Host 的超时回收不属于本包。
 只有同时在请求与 handler 声明 idempotent 的工作可自动重试；其他未确认副作用进入 unknown。
@@ -51,8 +55,8 @@ v1/v2/v3 库需显式迁移，不把用户旧数据库当成空库。产品数�
 Scheduler 可限定已装配的 kind，避免提前判死其他 owner 的工作；App 的 signal 取消后不再 claim。
 真实 Memory 源 outbox、fencing/receipt、App handler/query 与持续调度已通过跨 Worker/Jobs 的临时库验证，
 当前进度和生产 cutover 门见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
-目标 Host 已接真实 Worker 监督、authority/config、Memory 状态接收及 Planning 源接纳；尚待
-完整 catalog/产品入口切换、Planning 执行/完成评估及安装恢复主链。默认产品仍使用旧巩固队列，
+目标 Host 已接真实 Worker 监督、authority/config、Memory 状态接收、Planning 源接纳和逐任务
+接纳后的真实评估调度；尚待完整 catalog/产品入口切换、Planning 状态接收/通知/再调度及安装恢复主链。默认产品仍使用旧巩固队列，
 目标 Host 不代表产品 cutover；目录存在不代表阶段 7 完成。
 
 ```powershell

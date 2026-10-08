@@ -1,5 +1,10 @@
 # M12 Contract Spine Inventory
 
+Planning claim 前只读接纳同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`GetPlanningJobAdmissionRequest`、`GetPlanningJobAdmissionResponse` 与同一 CognitionService 的
+`GetPlanningJobAdmission`。真实 source ACK/目标/来源/当前政策决定 eligible；不创建 attempt、
+评估窗口、封口或推理，不是授权证明，执行仍独立复验。
+
 Planning 显式接纳/评估同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `AcceptPlanningCommitmentRequest`、`AcceptPlanningCommitmentResponse`、`ExecutePlanningJobRequest`、
 `ExecutePlanningJobResponse`，同一 `CognitionService` 增加 `AcceptPlanningCommitment` / `ExecutePlanningJob`。

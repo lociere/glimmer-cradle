@@ -28,6 +28,7 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
   ReconcilePlanningJobResponseSchema, PlanningJobResolution, AcceptPlanningCommitmentRequestSchema,
   AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -197,6 +198,15 @@ const planningAccepted = create(AcceptPlanningCommitmentResponseSchema, { commit
   status: 'accepted', scopeId: 'conversation:一' });
 const planningExecute = create(ExecutePlanningJobRequestSchema, { call: planningRead.call,
   identity: planningQuery.identity, requestId: planningSource.requestId });
+const admissionRequest = create(GetPlanningJobAdmissionRequestSchema, { call: planningRead.call,
+  jobId: planningQuery.identity!.jobId, scopeId: 'conversation:一', requestId: planningSource.requestId });
+const admissionResponse = create(GetPlanningJobAdmissionResponseSchema, { jobId: admissionRequest.jobId,
+  scopeId: admissionRequest.scopeId, requestId: admissionRequest.requestId, eligible: false, reasonCode: 'planning_model_policy' });
+if (fromBinary(GetPlanningJobAdmissionRequestSchema, toBinary(GetPlanningJobAdmissionRequestSchema, admissionRequest)).call?.generation !== 'planning-1'
+  || fromBinary(GetPlanningJobAdmissionResponseSchema, toBinary(GetPlanningJobAdmissionResponseSchema, admissionResponse)).eligible
+  || fromBinary(GetPlanningJobAdmissionResponseSchema, toBinary(GetPlanningJobAdmissionResponseSchema, admissionResponse)).reasonCode !== 'planning_model_policy') {
+  throw new Error('Planning read-only admission identity/policy roundtrip failed');
+}
 const planningExecuted = create(ExecutePlanningJobResponseSchema, { result: planningApplied.result });
 if (fromBinary(AcceptPlanningCommitmentRequestSchema, toBinary(AcceptPlanningCommitmentRequestSchema, planningAccept)).sourceMomentId !== 'moment:原来源'
   || fromBinary(AcceptPlanningCommitmentRequestSchema, toBinary(AcceptPlanningCommitmentRequestSchema, planningAccept)).goalVersion !== 9007199254740991n

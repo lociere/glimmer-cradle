@@ -19,6 +19,8 @@ import {
   type ReconcilePlanningJobRequest, type ReconcilePlanningJobResponse,
   AcceptPlanningCommitmentRequestSchema, AcceptPlanningCommitmentResponseSchema,
   ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
+  GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
+  type GetPlanningJobAdmissionRequest, type GetPlanningJobAdmissionResponse,
   type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
   type ExecutePlanningJobRequest, type ExecutePlanningJobResponse,
   type ReadPlanningJobRequestsRequest, type ReadPlanningJobRequestsResponse,
@@ -58,6 +60,7 @@ export interface PlanningJobsReconciliationPort {
 
 export interface PlanningJobsCognitionPort extends PlanningJobsReconciliationPort {
   executePlanning(request: ExecutePlanningJobRequest, signal?: AbortSignal): Promise<ExecutePlanningJobResponse>;
+  getPlanningAdmission(request: GetPlanningJobAdmissionRequest, signal?: AbortSignal): Promise<GetPlanningJobAdmissionResponse>;
 }
 
 export class HostCognitionError extends Error {
@@ -159,6 +162,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public executePlanning(request: ExecutePlanningJobRequest, signal?: AbortSignal): Promise<ExecutePlanningJobResponse> {
     return this.call('ExecutePlanningJob', ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
       create(ExecutePlanningJobRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public getPlanningAdmission(request: GetPlanningJobAdmissionRequest, signal?: AbortSignal): Promise<GetPlanningJobAdmissionResponse> {
+    return this.call('GetPlanningJobAdmission', GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
+      create(GetPlanningJobAdmissionRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

@@ -96,7 +96,7 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 仍保留首次请求、Job ID/revision 和 due time，不因 ACK 删除或重建。未知版本、部分表或孤立表拒绝
 自动修复，原数据保留。备份/恢复须在 Planning drain 后与 Jobs/authority 建立一致切点，不允许
 只回滚源请求重新生成承诺。配置 Host 已真实接纳源到 Jobs，源 ACK 只结束投递，不修改承诺
-状态；未装配 Planning handler 的 queued Job 与未 ACK 状态仍须备份，不能按“未执行”丢弃。
+状态；接纳等待的 queued Job 与未 ACK 状态仍须备份，不能按“未执行”丢弃。
 首次显式评估/对账已被源 ACK 接纳的 Job 时，在同一事务增建独立版本 1 的评估窗口：
 `planning_evaluation_meta`（schema/authority epoch/已观测时钟 high-water）、
 `planning_evaluation_attempt`（原 attempt/owner/token/lease、输入摘要、active/sealed/applied 与 receipt 引用）、
@@ -104,8 +104,8 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 普通启动只核验已有窗口，不建表；长期 schema 1 与历史 journal 不变。这是明确功能操作的增量
 初始化，不隐式升级既有版本；未知/部分/孤立窗口拒绝自动修复。封口、receipt、authority 和时钟
 high-water 同属不可再生状态，不能只删除 attempt 后重放模型或回滚时间复活过期 lease；其一致
-备份须与整个 Planning/源 outbox/Jobs 共同保护。显式评估已接生产 Worker/Host Adapter，默认
-scheduler 尚未注册 handler，未操作用户库。
+备份须与整个 Planning/源 outbox/Jobs 共同保护。评估已接生产 Worker/Host Adapter 与默认接纳
+scheduler；只读接纳不建评估表/attempt 或修改 high-water。未操作用户库。
 新接纳 GoalVersion 增量保存 `source_moment_id`、`source_digest` 和 `model_tier`，三字段必须完整；
 digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可变版本缺三字段时保持原 JSON
 与 active work 摘要字节语义，不改写 schema 1，也不补造权限；新绑定必须是显式新版本。

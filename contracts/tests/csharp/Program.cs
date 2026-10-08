@@ -177,6 +177,13 @@ var planningAccepted = new AcceptPlanningCommitmentResponse { CommitmentId = pla
     Status = "accepted", ScopeId = "conversation:一" };
 var planningExecute = new ExecutePlanningJobRequest { Call = planningRead.Call,
     Identity = planningQuery.Identity, RequestId = planningSource.RequestId };
+var admissionRequest = new GetPlanningJobAdmissionRequest { Call = planningRead.Call,
+    JobId = planningQuery.Identity.JobId, ScopeId = "conversation:一", RequestId = planningSource.RequestId };
+var admissionResponse = new GetPlanningJobAdmissionResponse { JobId = admissionRequest.JobId,
+    ScopeId = admissionRequest.ScopeId, RequestId = admissionRequest.RequestId, Eligible = false, ReasonCode = "planning_model_policy" };
+if (!GetPlanningJobAdmissionRequest.Parser.ParseFrom(admissionRequest.ToByteArray()).Equals(admissionRequest)
+    || !GetPlanningJobAdmissionResponse.Parser.ParseFrom(admissionResponse.ToByteArray()).Equals(admissionResponse))
+    throw new InvalidOperationException("Planning read-only admission identity/policy roundtrip failed");
 var planningExecuted = new ExecutePlanningJobResponse { Result = planningApplied.Result };
 if (!AcceptPlanningCommitmentRequest.Parser.ParseFrom(planningAccept.ToByteArray()).Equals(planningAccept)
     || !AcceptPlanningCommitmentResponse.Parser.ParseFrom(planningAccepted.ToByteArray()).Equals(planningAccepted)

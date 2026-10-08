@@ -1473,6 +1473,7 @@ class CognitionGrpcHost:
             "ReconcilePlanningJob": self._method(self._reconcile_planning_job, cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse),
             "AcceptPlanningCommitment": self._method(self._accept_planning_commitment, cognition_pb.AcceptPlanningCommitmentRequest, cognition_pb.AcceptPlanningCommitmentResponse),
             "ExecutePlanningJob": self._method(self._execute_planning_job, cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse),
+            "GetPlanningJobAdmission": self._method(self._get_planning_job_admission, cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1913,6 +1914,27 @@ class CognitionGrpcHost:
         if self._conversation is None or self._knowledge is None or self._activity is None:
             raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 实际证据 owner 未装配")
         return PlanningEvidenceAdapter(self._conversation, self._knowledge, self._activity.get_state)
+
+    async def _get_planning_job_admission(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if request.ByteSize() > 16_384 or not re.fullmatch(r"[a-f0-9]{64}", request.request_id) \
+                    or request.job_id != f"planning:{request.request_id}" or any(
+                        not value.strip() or len(value.encode("utf-8")) > 4096 for value in (request.job_id, request.scope_id)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 接纳查询身份/预算无效")
+            try:
+                work = await source.read_evaluation_work(job_id=request.job_id, scope_id=request.scope_id, request_id=request.request_id)
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 已 ACK 来源/目标绑定冲突") from error
+            if work.plan.goal.source_moment_id is None:
+                reason = "planning_source_unbound"
+            elif self._planning_model is None:
+                reason = "planning_model_unavailable"
+            else:
+                reason = self._planning_evidence().admission_reason(work.plan.goal)
+            return cognition_pb.GetPlanningJobAdmissionResponse(request_id=request.request_id, job_id=request.job_id,
+                scope_id=request.scope_id, eligible=reason == "planning_ready", reason_code=reason)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _accept_planning_commitment(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:

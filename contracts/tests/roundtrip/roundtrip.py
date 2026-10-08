@@ -173,6 +173,12 @@ planning_accepted = cognition_pb.AcceptPlanningCommitmentResponse(commitment_id=
     status="accepted", scope_id="conversation:一")
 planning_execute = cognition_pb.ExecutePlanningJobRequest(call=planning_read.call,
     identity=planning_query.identity, request_id=planning_source.request_id)
+admission_request = cognition_pb.GetPlanningJobAdmissionRequest(call=planning_read.call,
+    job_id=planning_query.identity.job_id, scope_id="conversation:一", request_id=planning_source.request_id)
+admission_response = cognition_pb.GetPlanningJobAdmissionResponse(job_id=admission_request.job_id,
+    scope_id=admission_request.scope_id, request_id=admission_request.request_id, eligible=False, reason_code="planning_model_policy")
+assert type(admission_request).FromString(admission_request.SerializeToString()) == admission_request
+assert type(admission_response).FromString(admission_response.SerializeToString()) == admission_response
 planning_executed = cognition_pb.ExecutePlanningJobResponse(result=planning_applied.result)
 for message in (planning_accept, planning_accepted, planning_execute, planning_executed):
     assert type(message).FromString(message.SerializeToString()) == message

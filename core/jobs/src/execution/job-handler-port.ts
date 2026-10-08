@@ -21,6 +21,12 @@ export interface JobHandlerPort {
   execute(context: JobExecutionContext, payload: Job['payload']): Promise<JobHandlerResult>;
 }
 
+/** App 查询实际领域 owner 的当前可执行性；只是 claim 前筛选，不授予执行权限。 */
+export interface JobAdmissionPort {
+  readonly kind: string;
+  isEligible(job: Job, signal?: AbortSignal): Promise<boolean>;
+}
+
 /** App 注入可信结果查询；必须核验接收 owner 的持久 receipt，不接受模型自报结果。 */
 export interface JobReconciliationPort {
   readonly kind: string;

@@ -2,12 +2,12 @@ import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
   ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
-  ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema, GetPlanningJobAdmissionRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
-  type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
+  type JobHandlerPort, type JobHandlerResult, type JobAdmissionPort, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
 import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort, PlanningJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
-  memoryJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobEvidence,
+  memoryJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobRequestId, planningJobEvidence,
   type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
@@ -84,7 +84,7 @@ export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPor
   }
 }
 
-/** 真实生产源接纳；尚未注册 Planning handler 时只排队，不模拟执行或状态 ACK。 */
+/** 真实生产源接纳；先 Jobs commit 后 ACK，不模拟执行或状态 ACK。 */
 export class PlanningJobSourceAdapter implements JobReconciliationPort {
   public readonly kind = PLANNING_JOB_KIND;
   public constructor(private readonly cognition: PlanningJobsSourcePort & PlanningJobsReconciliationPort) {}
@@ -118,11 +118,23 @@ export class PlanningJobSourceAdapter implements JobReconciliationPort {
   }
 }
 
-/** 实际 Planning 业务执行；默认 scheduler 接纳闸完成前不批量 claim 未绑定历史目标。 */
-export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort {
+/** 实际 Planning 接纳/执行/对账；claim 前采样不替代 Execute 的 live 政策复验。 */
+export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort, JobAdmissionPort {
   public readonly kind = PLANNING_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;
   public constructor(private readonly cognition: PlanningJobsCognitionPort) {}
+  public async isEligible(job: Job, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted();
+    const requestId = planningJobRequestId(job);
+    const response = await this.cognition.getPlanningAdmission(create(GetPlanningJobAdmissionRequestSchema,
+      { requestId, jobId: job.job_id, scopeId: job.scope_id }), signal);
+    signal?.throwIfAborted();
+    const waiting = ['planning_source_unbound', 'planning_source_unavailable', 'planning_model_policy', 'planning_model_unavailable'];
+    if (response.requestId !== requestId || response.jobId !== job.job_id || response.scopeId !== job.scope_id
+      || response.eligible !== (response.reasonCode === 'planning_ready')
+      || !response.eligible && !waiting.includes(response.reasonCode)) throw new JobConflictError('Planning 接纳响应身份/状态无效');
+    return response.eligible;
+  }
   public async execute(context: JobExecutionContext, payload: Job['payload']): Promise<JobHandlerResult> {
     context.assertLease();
     const identity = planningJobIdentity(context.job), requestId = String(payload.source_request_id);

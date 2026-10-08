@@ -133,9 +133,9 @@ Host 接纳到 `planning:<request_id>`，kind 为 `planning.evaluate`，source �
 INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响应丢失不撤销已接纳 Job，
 重投沿用首次记录。源已提交但回复丢失时，下次不再返回该请求。
 
-当前配置 Host 已接入上述源投递，但未注册 Planning 执行器：Job 保持 queued/attempt 0，
-Host 报 `degraded/jobs_handler_pending`，状态 outbox 不交给 Memory receiver，也不假 ACK。
-显式评估已接实际执行 Adapter；逐任务调度接纳、状态接收、通知和再调度未完成。
+当前配置 Host 已接源投递、真实执行器与逐任务接纳后调度；不适用目标等待且不消耗 attempt。
+Host 按本轮等待/未 ACK 状态分别报告 `jobs_admission_pending`/`jobs_state_feedback_pending`，
+状态 outbox 不交给 Memory receiver，也不假 ACK。状态接收、通知和再调度未完成。
 Job accepted 不改变承诺 accepted/revision。
 
 ### Planning 显式接纳与执行
@@ -157,7 +157,22 @@ Perception，绑定完整 Conversation context、隐私/保留分类、完整 Mo
 来源选择、预算及 live 复验归[认知核实现](../architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 
 Host `PlanningJobAdapter` 验持久 receipt 后返回 Jobs succeeded，不把评估值改成 true；取消后用
-独立非取消 signal 的有界 Reconcile 调用封口。默认 scheduler 尚未注册，须先完成逐任务接纳闸。
+独立非取消 signal 的有界 Reconcile 调用封口。配置 Host 默认经下面的接纳闸驱动独立 scheduler。
+
+### Planning 逐任务调度接纳
+
+`GetPlanningJobAdmission` 只携 `request_id`、`job_id`、`scope_id` 和本代 call，不伪造 attempt。
+总请求不超过 16 KiB，request 为 SHA-256，job 必须为 `planning:<request_id>`；job/scope 非空且
+不超过 4096 UTF-8 bytes。非法输入为 INVALID_REQUEST，非真实已 ACK 源/计划/范围为
+RECOVERY_REQUIRED；缺 owner、业务未 ready 或 drain 为 NOT_READY，旧代为 GENERATION_MISMATCH。
+调用参与 deadline/取消/drain；返回同一 request/job/scope、eligible 和 reason_code，不带目标或证据正文。
+只读实际持久输入，不登记 attempt、建评估表、封口、改变承诺/时钟 high-water 或调用模型。
+
+`planning_ready` 唯一对应 eligible=true；`planning_source_unbound`、`planning_source_unavailable`、
+`planning_model_policy`、`planning_model_unavailable` 对应等待。旧无绑定版本可以安全返回等待，
+无需补造证据 owner；已绑定且模型已装配的目标缺 Conversation/Knowledge/Activity 则 NOT_READY。
+Host 校验响应身份及布尔/reason 组合，只 CAS 原候选 revision，等待仍前进分页并回绕。
+这不是执行资格持久授予或分布式原子授权；Execute 必须用新 Adapter 再复验当前来源/政策。
 
 ### Planning 原 attempt 持久对账
 
@@ -178,8 +193,8 @@ RECOVERY_REQUIRED。该调用会封口，不是只读查询；推理未 ready/st
 
 Host 验原请求/承诺、查询 identity、摘要、原提交者、时间与证据组合后，交给 Jobs 唯一
 reconciliation 事务；配置入口按独立有界分页恢复 Planning unknown，不复用 Memory receiver。
-该恢复链没有注册 Planning handler、没有新建权限、没有假 ACK 状态事件；自动执行、
-逐任务调度接纳、状态接纳、通知与后继调度仍未完成。
+该恢复链不依赖模型或扩大权限，不假 ACK 状态事件；默认执行另经逐任务接纳闸。
+状态接纳、通知与后继调度仍未完成。
 
 ## 生成与兼容
 

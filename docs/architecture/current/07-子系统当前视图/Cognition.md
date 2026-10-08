@@ -87,12 +87,12 @@ Planning 已持久保存不可变目标/计划版本、完成条件、显式 acc
 重复身份不创建第二份，首次 due time 与 scope 不可悄悄替换。通过 `JobPort` 得到持久接纳才结束源
 投递，回执不表示目标 completed；普通模型回复或工具调用不自动升级为长期承诺。目标配置 Host
 已通过生产 Worker RPC 接真实 Planning store 与 Jobs 接纳，原 due/首次预算和 ACK 丢失重启已验证；
-默认 handler 尚未注册，待办只排队、状态不假 ACK，Host 如实降级。Core 已实现有证据引用/live 复验的
+默认 handler 和逐任务接纳 scheduler 已接通，不适用目标等待且不消耗 attempt，状态不假 ACK，Host 如实降级。Core 已实现有证据引用/live 复验的
 语义评估、原 attempt 封口、同事务业务 receipt/承诺 revision；生产证据 Adapter、来源摘要/隐私域与
-model-tier 绑定、显式接纳/执行 wire 和 Host 执行 Adapter 已接真实 owner。逐任务调度接纳、状态接收、
+model-tier 绑定、显式接纳/执行/只读接纳 wire 和 Host 执行 Adapter 已接真实 owner。状态接收、
 通知与再调度仍待接线，不能认作完整长期承诺链路。
 持久对账 RPC 已接真实 Planning store；Host 分页恢复原 unknown，sealed/真实 receipt 驱动
-Jobs 对账，保留原提交者和 completed=false。此接线不开放模型或扩大隐私权限，不解除 handler 降级。
+Jobs 对账，保留原提交者和 completed=false。对账不依赖模型或扩大隐私权限；接纳检查不替代执行时复验。
 详见[认知核实现](../../implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 
 ## 记忆与连续性

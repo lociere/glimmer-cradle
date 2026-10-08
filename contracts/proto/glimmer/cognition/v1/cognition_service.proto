@@ -512,6 +512,23 @@ message ExecutePlanningJobResponse {
   PlanningJobResult result = 1;
 }
 
+// 只读 claim 前筛选；不产生 attempt/封口，不替代 Execute 的 live 复验。
+message GetPlanningJobAdmissionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string request_id = 2;
+  string job_id = 3;
+  string scope_id = 4;
+}
+
+message GetPlanningJobAdmissionResponse {
+  string request_id = 1;
+  string job_id = 2;
+  string scope_id = 3;
+  bool eligible = 4;
+  // planning_ready 或 planning_ 前缀的 source_unbound/source_unavailable/model_policy/model_unavailable。
+  string reason_code = 5;
+}
+
 enum PlanningJobResolution {
   PLANNING_JOB_RESOLUTION_UNSPECIFIED = 0;
   PLANNING_JOB_RESOLUTION_APPLIED = 1;
@@ -591,4 +608,5 @@ service CognitionService {
   rpc ReconcilePlanningJob(ReconcilePlanningJobRequest) returns (ReconcilePlanningJobResponse);
   rpc AcceptPlanningCommitment(AcceptPlanningCommitmentRequest) returns (AcceptPlanningCommitmentResponse);
   rpc ExecutePlanningJob(ExecutePlanningJobRequest) returns (ExecutePlanningJobResponse);
+  rpc GetPlanningJobAdmission(GetPlanningJobAdmissionRequest) returns (GetPlanningJobAdmissionResponse);
 }

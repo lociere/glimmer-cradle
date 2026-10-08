@@ -38,10 +38,13 @@ receiver 的手工装配仍保留待确认事实。取消/unknown 不代表 Memo
 [协议参考](../../docs/reference/protocol.md#memory-jobs-状态投递)。
 配置启动也默认接入 `PlanningJobSourceAdapter`，经实际 Worker RPC 扫描 Planning store，并在
 Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一 Jobs Document，重启不
-改写首次政策。默认尚未注册 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
-`degraded/jobs_handler_pending`，Planning 状态事件保留未 ACK，不阻塞 Memory 状态投递。
+改写首次政策。默认注册真实 `PlanningJobAdapter` 与独立 kind scheduler；逐任务调用只读接纳 RPC，
+来源未绑定/不可用或模型政策不适用的目标保持等待，不 claim、不消耗 attempt/预算，也不重算 due。
+有界分页持续前进并回绕，适用目标不会被前面的等待目标饿死；接纳后仅 CAS 原候选 revision。
+等待扫描如实报告 `degraded/jobs_admission_pending`；未 ACK Planning 状态报告
+`degraded/jobs_state_feedback_pending`，不阻塞 Memory 状态投递。
 同一 Adapter 已接原 attempt 持久对账，配置 Host 独立分页恢复 Planning unknown；封口或真实
-评估回执经校验后交给 Jobs，不把 completed=false 改成目标完成，不注册未就绪 handler。
+评估回执经校验后交给 Jobs，不把 completed=false 改成目标完成。
 两种源接纳都不代表长期目标完成，精确边界见[协议参考](../../docs/reference/protocol.md#planning-jobs-源接纳)。
 `HostResourceContributions` 可显式注入 WorkerSupervisor 的 typed CapabilityService；真实资源读取
 消费 Host 短寿命授权、Core 独立 ResourceRegistry 和 Execution journal/outbox，经生成
@@ -61,7 +64,8 @@ Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 Hos
 实际测试覆盖生产 Worker/SQLite 重启、通知合并、刷新中再次更新、停机迟到读取、停用与源冲突。
 `PlanningJobAdapter` 已通过实际 Execute RPC 消费持久评估 receipt，并以独立 RPC 对账取消后的
 原 attempt；真实 Jobs/Worker 双库重启与完成响应丢失已验证，不把 completed=false 当目标完成。
-默认注册仍待逐任务来源/model-tier 接纳闸，避免不适用目标消耗重试；状态接收、通知和再调度未完成。
+接纳不是授权快照，执行仍复验实际来源与当前政策。配置 Host/生产 CLI/同一 LLMEngine 的本地 HTTP
+测试覆盖默认评估与重启去重；不代表真实模型语义质量。状态接收、通知和再调度未完成。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

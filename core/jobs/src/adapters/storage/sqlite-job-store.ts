@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobAttempt,
   type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent } from '../../execution/job.js';
-import type { JobClaim, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
+import type { JobClaim, JobClaimCandidate, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
 import { initialScheduleDue, scheduledOccurrence } from '../../scheduling/schedule.js';
@@ -195,6 +195,20 @@ export class SqliteJobStore implements JobStorePort {
     }).deferred();
   }
 
+  public listDue(epoch: number, kind: string, now: number, limit: number, afterJobId = ''): Job[] {
+    assertTimestamp(now);
+    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || typeof afterJobId !== 'string') {
+      throw new JobConflictError('Job due 接纳扫描范围无效');
+    }
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const rows = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait')
+        AND kind=? AND due_at<=? AND attempt<max_attempts AND job_id>? ORDER BY job_id LIMIT ?`)
+        .all(kind, now, afterJobId, limit) as JobRow[];
+      return rows.map(row => this.decode(row));
+    }).deferred();
+  }
+
   public acknowledgeOutbox(eventId: string, epoch: number, now: number): boolean {
     assertTimestamp(now);
     return this.database.transaction(() => {
@@ -266,15 +280,19 @@ export class SqliteJobStore implements JobStorePort {
     }).immediate();
   }
 
-  public claim(epoch: number, ownerId: string, now: number, leaseMs: number, kind?: string): JobClaim | null {
+  public claim(epoch: number, ownerId: string, now: number, leaseMs: number, kind?: string, candidate?: JobClaimCandidate): JobClaim | null {
     validateLeaseWindow(now, leaseMs);
     if (!ownerId.trim()) throw new Error('Job lease owner 不得为空');
     if (kind !== undefined && !kind.trim()) throw new JobConflictError('Job claim kind 无效');
+    if (candidate !== undefined && (typeof candidate.job_id !== 'string' || !candidate.job_id.trim()
+      || !Number.isSafeInteger(candidate.revision) || candidate.revision < 1)) throw new JobConflictError('Job claim 候选无效');
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
       const row = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait') AND due_at<=?
-        AND attempt<max_attempts AND (? IS NULL OR kind=?) ORDER BY due_at,created_at,job_id LIMIT 1`)
-        .get(now, kind ?? null, kind ?? null) as JobRow | undefined;
+        AND attempt<max_attempts AND (? IS NULL OR kind=?) AND (? IS NULL OR job_id=?)
+        AND (? IS NULL OR revision=?) ORDER BY due_at,created_at,job_id LIMIT 1`)
+        .get(now, kind ?? null, kind ?? null, candidate?.job_id ?? null, candidate?.job_id ?? null,
+          candidate?.revision ?? null, candidate?.revision ?? null) as JobRow | undefined;
       if (!row) return null;
       this.database.prepare(`UPDATE jobs SET status='running',revision=revision+1,attempt=attempt+1,
         fencing_token=fencing_token+1,authority_epoch=?,lease_owner=?,lease_until=?,updated_at=? WHERE job_id=?`)

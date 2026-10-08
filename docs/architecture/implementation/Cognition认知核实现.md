@@ -218,9 +218,10 @@ Plan/Synthesis 不随其删除。`PlanningDecisionSnapshot` 只读旧 `planning_
 从真实 Worker/Jobs 重启恢复。独立字典 transport `JobClient` 并非此生产链路，不能据其存在
 宣称通用 broker 完成。精确 wire 边界见[协议参考](../../reference/protocol.md#planning-jobs-源接纳)。
 
-Jobs 接纳不把承诺标为 completed。默认 Host 尚未注册 Planning handler，scheduler 不 claim 此 kind；
-queued/attempt 0 和未 ACK 状态事件保持，持久待办使 Host 报 `jobs_handler_pending`，Memory
-状态只消费自己的 kind。显式执行已接真实评估与业务 receipt；逐任务调度接纳、状态接收、通知/
+Jobs 接纳不把承诺标为 completed。默认 Host 注册真实 Planning handler 和独立 kind scheduler，
+先调用逐任务只读接纳 RPC，再 CAS 原候选 revision；等待项不消耗 attempt、不改变 due/预算。
+Host 分别以 `jobs_admission_pending`/`jobs_state_feedback_pending` 呈现本轮等待与未 ACK 状态，Memory
+状态只消费自己的 kind。默认执行已接真实评估与业务 receipt；状态接收、通知/
 下一次调度，以及撤销链路仍待接线，不认作完整长期承诺执行链路。
 
 Core `PlanningController.evaluate_job` 已提供评估的业务接纳边界：先从真实源 outbox 核验持久
@@ -270,8 +271,13 @@ ACTION_RESULT 从原 ACTION 继承 provider。旧记录缺绑定事实不从 ori
 即使空材料也复验政策；调用后撤权阻止提交，但不能撤回先前合法发送的数据，也不是分布式原子权限。
 typed Accept/Execute RPC 与 Host `PlanningJobAdapter` 已接真实 store/controller/receipt，实际 TS Jobs
 与 Python Worker 双库重启和响应丢失验证不重复评估；确定性模型 fixture 不代表真实 provider 语义质量。
-默认 Host 尚未注册该 handler：逐任务接纳闸必须先避免旧未绑定目标或不适用 tier 消耗 claim/重试预算。
-该闸、Planning 状态接收、通知 durable receipt、pending 下一次源请求、撤销与产品消费仍待接线。
+`read_evaluation_work` 只读验证实际已 ACK 源/版本/范围，既不造 attempt，也不初始化评估窗口。
+Worker `GetPlanningJobAdmission` 从实际来源和接受时/当前 tier 判断，模型未装配时保持等待；
+未绑定旧版本拒绝扩权。Host 默认注册真实 handler 和接纳 scheduler，有界稳定 ID 分页绕过等待项，
+异步检查后仅 CAS 原候选；执行另建 Adapter 复验，不缓存接纳作为授权。协议与等待 reason 见上述参考。
+生产 CLI、实际 Perception/SQLite Log、同一 LLMEngine 与本地 HTTP 模型协议的测试覆盖默认调度及
+completed=false/双库重启去重，仍不代表付费 provider 质量验收或产品入口切换。
+Planning 状态接收、通知 durable receipt、pending 下一次源请求、撤销与产品消费仍待接线。
 
 ## 上下文与推理
 
@@ -493,7 +499,7 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
 [协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
-Planning 执行/完成评估与旧队列/旧数据切换仍待完成。
+Planning 状态接收/通知/再调度与旧队列/旧数据切换仍待完成；目标评估与接纳后默认调度见本页长期承诺章节。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

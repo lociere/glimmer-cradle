@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
+import { createServer } from 'node:http';
 import * as grpc from '@grpc/grpc-js';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
@@ -12,7 +13,7 @@ import Database from 'better-sqlite3';
 import { create, fromBinary, toBinary, type DescMessage, type Message } from '@bufbuild/protobuf';
 import { PublishStateResponseSchema, PublishStateRequestSchema, PublishActionRequestSchema, PublishActionResponseSchema,
   RegisterCognitionRequestSchema, RegisterCognitionResponseSchema } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
-import type { RegisterCognitionRequest, RegisterCognitionResponse } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
+import type { RegisterCognitionRequest, RegisterCognitionResponse, PublishActionRequest } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
 import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
   MemoryJobResultSchema, MemoryJobResolution } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
@@ -20,9 +21,12 @@ import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequ
   PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
   AcceptPlanningCommitmentRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy,
+  RetentionCeiling, PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
 import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
+import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry } from '@glimmer-cradle/capabilities';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
 import { PublishMemoryJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
@@ -31,6 +35,7 @@ import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
   WorkerSupervisor, HostCognitionJobsOwner, ConfiguredHostCognitionJobsOwner, HostDataPaths, type WorkerSupervisorOptions,
   memoryJobIdentity, memoryJobEvidence, memoryJobRequest } from '../src/index.js';
+import { HostResourceContributions, PermissionBroker } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
@@ -61,7 +66,112 @@ function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts =
 }
 
 describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
-  it('生产 CLI 接纳实际 Planning 源，缺 handler 如实降级且不 ACK 状态，不阻塞 Memory 投递', async () => {
+  it.each([true, false])('生产 CLI 自动评估实际目标 completed=%s，重启不重复调用同一模型或消耗 attempt', async completed => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-model-'));
+    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const seeded = await productionWorker(paths.data_root);
+    const assessments: Array<{ goal: { source_moment_id: string; model_tier: string }; evidence: Array<{ reference: { evidence_id: string }; text: string }> }> = [];
+    const provider = createServer((request, response) => {
+      let body = ''; request.setEncoding('utf8'); request.on('data', chunk => { body += chunk; });
+      request.on('end', () => {
+        const payload = JSON.parse(body);
+        if (payload.stream) {
+          response.writeHead(200, { 'content-type': 'text/event-stream' });
+          response.end(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: '已记录实际来源。' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`);
+        } else {
+          const document = JSON.parse(payload.messages.find((message: { role: string }) => message.role === 'user').content);
+          assessments.push(document);
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ completed,
+            evidence_ids: document.evidence.map((item: { reference: { evidence_id: string } }) => item.reference.evidence_id),
+            reason: completed ? '实际记录满足完成条件' : '实际记录不足以证明完成' }) } }] }));
+        }
+      });
+    });
+    await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', resolve));
+    seeded.input.runtime_document.llm = { api_type: 'deepseek', api_key: 'fixture-only',
+      base_url: `http://127.0.0.1:${(provider.address() as { port: number }).port}`, models: { chat: 'fixture' } };
+    const memory = { ...seeded.input.runtime_document.memory,
+      consolidation: { ...seeded.input.runtime_document.memory.consolidation, enabled: false, debounce_seconds: 60 } };
+    writeConfiguration(paths, memory);
+    const journal = new SqliteExecutionJournal(path.join(paths.data_root, 'state/capabilities/execution.sqlite'));
+    let client: CognitionClient | undefined;
+    const resources = new HostResourceContributions({ host_id: 'host', target_location: 'host:local',
+      permissions: new PermissionBroker(Date.now, () => {}), resources: new ResourceRegistry(),
+      execution: new ExecutionController(journal), outbox: new ExecutionResultOutbox(journal, {
+        accept: (event, signal) => {
+          if (!client) throw new Error('测试接收 client 未 ready');
+          return client.acceptExecutionResult(event, signal);
+        },
+      }) });
+    const options = { paths, clock, owner_id: 'planning-actual-model', worker: { python_executable: seeded.input.python_executable,
+      runtime_document: seeded.input.runtime_document, capability_service: resources,
+      accept_state: async (request: Parameters<WorkerSupervisorOptions['accept_state']>[0]) =>
+        create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' }),
+      accept_action: async (request: PublishActionRequest) =>
+        create(PublishActionResponseSchema, { operationId: request.call!.idempotencyKey, status: 'action_published' }) } };
+    let owner = new ConfiguredHostCognitionJobsOwner(options);
+    try {
+      await owner.start();
+      const session = owner.snapshot.session!.worker;
+      client = new CognitionClient(session.endpoint!, session.generation!, 5000);
+      const accepted = await client.submitPerception(create(SubmitPerceptionRequestSchema, {
+        call: { traceId: 'planning-native', idempotencyKey: 'planning-native', causationId: 'planning-native' },
+        perceptionId: 'planning-native', sensoryType: 'chat', source: 'fixture', timestampMs: Date.now(), familiarity: 1,
+        addressMode: AddressMode.DIRECT, responsePolicy: ResponsePolicy.REPLY_ALLOWED, retentionCeiling: RetentionCeiling.EXPERIENCE,
+        conversation: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation:actual-planning',
+          continuityId: 'continuity', threadId: 'main', interactionId: 'planning-native-turn',
+          recallScope: 'conversation_private', disclosureScope: 'conversation_private' },
+        origin: { providerKind: 'core', providerId: 'provider', sourceEventId: 'planning-native', schemaRef: 'fixture',
+          trustTier: 'host_verified', privacyClass: 'private', cognitiveEffect: 'observation' },
+        content: { text: '核对这条实际来源记录', actorId: 'planning-user' },
+      }));
+      await vi.waitFor(async () => expect(await client!.perceptionOperation(create(GetPerceptionOperationRequestSchema,
+        { operationId: accepted.operationId }))).toMatchObject({ state: PerceptionOperationState.SUCCEEDED, terminal: true }),
+      { timeout: 10000, interval: 25 });
+      let sourceMomentId = '';
+      // 只读实际 Log pack；既不补写来源，也不猜测未返回的 Moment ID。
+      const packs = path.join(paths.data_root, 'state/cognition/experience/packs');
+      await vi.waitFor(() => {
+        for (const relative of readdirSync(packs, { recursive: true }).filter(file => String(file).endsWith('.experience.db'))) {
+          const db = new Database(path.join(packs, String(relative)), { readonly: true });
+          try { sourceMomentId ||= (db.prepare('SELECT moment_id FROM moments WHERE interaction_id=? AND kind=?')
+            .get('planning-native-turn', 'perception') as { moment_id: string } | undefined)?.moment_id ?? ''; }
+          finally { db.close(); }
+        }
+        expect(sourceMomentId).not.toBe('');
+      }, { timeout: 5000, interval: 25 });
+      expect(await client.acceptPlanningCommitment(create(AcceptPlanningCommitmentRequestSchema, {
+        commitmentId: 'commitment:actual-planning', planId: 'plan:actual-planning', planVersion: 1n,
+        goalId: 'goal:actual-planning', goalVersion: 1n, text: '核对实际来源', completionCondition: '实际来源记录已经存在',
+        steps: ['核对事实'], sourceMomentId, dueAtMs: 0n,
+      }))).toMatchObject({ status: 'accepted', scopeId: 'conversation:actual-planning' });
+      const db = new Database(paths.jobs_database, { readonly: true });
+      try {
+        await vi.waitFor(() => expect(db.prepare('SELECT status,attempt FROM jobs WHERE kind=?').get(PLANNING_JOB_KIND))
+          .toEqual({ status: 'succeeded', attempt: 1 }), { timeout: 10000, interval: 25 });
+      } finally { db.close(); }
+      expect(assessments).toHaveLength(1);
+      expect(assessments[0].goal).toMatchObject({ source_moment_id: sourceMomentId, model_tier: 'cloud_allowed' });
+      expect(assessments[0].evidence.length).toBeGreaterThan(0);
+      expect(JSON.stringify(assessments)).toContain('核对这条实际来源记录');
+      expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({ status: 'degraded', error_code: 'jobs_state_feedback_pending' });
+      client.close(); client = undefined; await owner.stop();
+      owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
+      expect(owner.snapshot.session!.jobs!.lease!.epoch).toBe(2);
+      const planning = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
+      try {
+        expect(planning.prepare('SELECT status,revision FROM planning_commitment').get())
+          .toEqual({ status: completed ? 'completed' : 'accepted', revision: 2 });
+        expect(planning.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
+      } finally { planning.close(); }
+      expect(assessments).toHaveLength(1);
+    } finally {
+      client?.close(); await owner.stop(); await resources.stop(); journal.close(); provider.closeAllConnections();
+      await new Promise<void>((resolve, reject) => provider.close(error => error ? reject(error) : resolve()));
+    }
+  }, 40_000);
+  it('生产 CLI 接纳实际 Planning 源，未绑定目标不执行且状态反馈如实降级，不阻塞 Memory 投递', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-'));
     const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root, {}, true);
@@ -76,7 +186,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       for (const epoch of [1, 2]) {
         if (epoch === 2) { writeConfiguration(paths, memory, 9); owner = new ConfiguredHostCognitionJobsOwner(options); }
         expect(await owner.start()).toMatchObject({ phase: 'active', session: { worker: { state: 'ready' },
-          jobs: { lease: { epoch }, jobs: { status: 'degraded', error_code: 'jobs_handler_pending' } } } });
+          jobs: { lease: { epoch }, jobs: { status: 'degraded', error_code: 'jobs_state_feedback_pending' } } } });
         const db = new Database(paths.jobs_database, { readonly: true });
         try {
           const job = db.prepare('SELECT * FROM jobs WHERE kind=?').get(PLANNING_JOB_KIND) as Job;
@@ -446,7 +556,7 @@ describe('Planning 源真实 wire/Jobs 接纳', () => {
     } finally { lost?.mockRestore(); await controller.stop(); store.close(); await service.stop(); }
   }, 30_000);
 
-  it('真实原 attempt 在双库/Worker 重开后封口，Host 自动对账而不启动未就绪 handler', async () => {
+  it('真实原 attempt 在双库/Worker 重开后封口，Host 自动对账而未绑定目标不消耗新 attempt', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-reconciliation-'));
     let service = await worker(root, 'planning-reconciliation-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
     let host: HostJobsController | undefined;
@@ -462,7 +572,8 @@ describe('Planning 源真实 wire/Jobs 接纳', () => {
         // 本场景只对账 Planning；Memory 原源按其独立 debounce 保留，避免引入另一评估任务。
         poll_interval_ms: 60_000, batch_size: 8, lease_ms: 60_000, submission_policy: { ...submissionPolicy, debounce_ms: 3_600_000 },
         retry_policy: policy, planning_sources: true });
-      expect(await host.start()).toMatchObject({ status: 'degraded', error_code: 'jobs_handler_pending' });
+      expect(await host.start()).toMatchObject({ status: 'degraded' });
+      expect(['jobs_admission_pending', 'jobs_state_feedback_pending']).toContain(host.snapshot.error_code);
       expect(store.load(claim.job.job_id)).toMatchObject({ status: 'retry_wait', attempt: 1, authority_epoch: 2 });
       const attempt = store.listAttempts(claim.job.job_id)[0];
       const proof = await new PlanningJobSourceAdapter(service.client).query(store.load(claim.job.job_id)!, attempt);

@@ -253,6 +253,22 @@ class PlanningEvidenceAdapter:
         if self._model_tier != "cloud_allowed" or tier != "cloud_allowed" or source.origin.privacy_class == "sensitive":
             raise PermissionError("Planning 当前或接受时推理政策不允许已装配模型")
 
+    def admission_reason(self, goal: GoalVersion) -> str:
+        """实际来源/政策采样，不读知识正文、不调用模型、不授予未来执行权限。"""
+        self._source_id, self._source_digest, self._scope_id, self._model_tier = (
+            goal.source_moment_id, goal.source_digest, goal.scope_id, goal.model_tier)
+        if self._source_id is None:
+            return "planning_source_unbound"
+        try:
+            self._source()
+        except PermissionError:
+            return "planning_source_unavailable"
+        try:
+            self.assert_model_policy()
+        except PermissionError:
+            return "planning_model_policy"
+        return "planning_ready"
+
     def _source(self) -> Moment:
         if not self._recorder.enabled or self._source_id is None:
             raise PermissionError("Planning 目标未绑定实际来源")

@@ -83,6 +83,8 @@ async def test_planning_assessment_receipt_restart_and_retry_never_repeat_model(
             assert evidence.materials[0].text not in payload
             assert json.loads(payload)["evidence"][0]["content_digest"] == evidence.materials[0].reference.content_digest
         await store.close()
+
+
         reopened = SqlitePlanningStore(tmp_path / "planning.sqlite", now_ms=lambda: 101)
         await reopened.connect()
         try:
@@ -95,6 +97,31 @@ async def test_planning_assessment_receipt_restart_and_retry_never_repeat_model(
             assert len(model.requests) == 1
         finally:
             await reopened.close()
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["none", "scope", "job", "request", "unacked"])
+async def test_planning_admission_read_only_actual_source_never_creates_attempt_window(tmp_path, fault):
+    store, _, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        if fault == "unacked":
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        arguments = {"job_id": identity.job_id, "scope_id": identity.scope_id, "request_id": source.request_id}
+        if fault in {"scope", "job", "request"}:
+            arguments[{"scope": "scope_id", "job": "job_id", "request": "request_id"}[fault]] = "foreign"
+        if fault == "none":
+            work = await store.read_evaluation_work(**arguments)
+            assert work.plan == _long_plan() and work.commitment.revision == 1
+        else:
+            with pytest.raises(PlanningConflictError):
+                await store.read_evaluation_work(**arguments)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+            assert not connection.execute("SELECT name FROM sqlite_master WHERE name='planning_evaluation_attempt'").fetchall()
     finally:
         await store.close()
 

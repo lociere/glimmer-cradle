@@ -1621,6 +1621,103 @@ async def bound_planning_service(tmp_path):
         await store.close()
 
 
+@pytest.mark.parametrize("fault", ["none", "legacy", "legacy-no-evidence", "tier", "source", "model", "planning", "knowledge", "activity", "generation", "scope", "job", "request", "budget", "unready", "stopping"])
+async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_model(bound_planning_service, fault):
+    import sqlite3
+
+    from glimmer_cradle.cognition.state import CognitiveActivityState
+
+    host, recorder, store, _, activity, model, _, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    request = cognition_pb.GetPlanningJobAdmissionRequest(call=execution.call, request_id=execution.request_id,
+        job_id=execution.identity.job_id, scope_id=execution.identity.scope_id)
+    if fault.startswith("legacy"):
+        await store.accept_commitment("commitment:legacy", PlanVersion("plan:legacy", 1,
+            GoalVersion("goal:legacy", "conversation:legacy", 1, "旧不可变目标", "核对实际来源"), ("核对",)), due_at=0)
+        source = (await store.pending_job_requests())[0]
+        await store.acknowledge_job_request(source, JobReceipt(f"planning:{source.request_id}", "accepted", 1))
+        request.request_id, request.job_id, request.scope_id = source.request_id, f"planning:{source.request_id}", source.scope_id
+        if fault == "legacy-no-evidence":
+            host._planning_model = host._knowledge = host._activity = host._conversation = None
+    if fault == "tier": activity._state = CognitiveActivityState.AMBIENT
+    elif fault == "source":
+        for pack in recorder.log._pack_paths():
+            with sqlite3.connect(pack) as connection: connection.execute("DELETE FROM moments")
+    elif fault in {"model", "planning", "knowledge", "activity"}:
+        setattr(host, "_planning_model" if fault == "model" else "_" + fault, None)
+    elif fault == "generation": request.call.generation = "old"
+    elif fault in {"scope", "job", "request"}: setattr(request, fault + "_id", "foreign")
+    elif fault == "budget": request.scope_id = "x" * 16385
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture unready")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        get = _call(channel, "GetPlanningJobAdmission", cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse)
+        reasons = {"none": "planning_ready", "legacy": "planning_source_unbound", "legacy-no-evidence": "planning_source_unbound",
+            "tier": "planning_model_policy", "source": "planning_source_unavailable", "model": "planning_model_unavailable"}
+        if fault in reasons:
+            response = await get(request, timeout=2)
+            assert (response.request_id, response.job_id, response.scope_id) == (request.request_id, request.job_id, request.scope_id)
+            assert response.eligible is (fault == "none") and response.reason_code == reasons[fault]
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await get(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED if fault == "scope" else
+                common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"job", "request", "budget"} else common_pb.SERVICE_ERROR_CODE_NOT_READY)
+            assert detail.code == expected
+    assert not model.requests
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+
+
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
+async def test_planning_admission_cancellation_drains_readonly_transaction(bound_planning_service, monkeypatch, termination):
+    import sqlite3
+
+    host, _, store, _, _, model, accepted, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    entered, finished = asyncio.Event(), asyncio.Event()
+    original = store._evaluation_work
+
+    async def waiting_work(*args):
+        work = await original(*args)
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            finished.set()
+        return work
+
+    monkeypatch.setattr(store, "_evaluation_work", waiting_work)
+    with sqlite3.connect(store._path) as connection:
+        before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        get = _call(channel, "GetPlanningJobAdmission", cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse)
+        call = get(cognition_pb.GetPlanningJobAdmissionRequest(call=execution.call, request_id=execution.request_id,
+            job_id=execution.identity.job_id, scope_id=execution.identity.scope_id), timeout=0.5 if termination == "deadline" else 5)
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            assert host._inflight
+            if termination == "cancel":
+                call.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await call
+            elif termination == "deadline":
+                with pytest.raises(grpc.aio.AioRpcError) as expired:
+                    await call
+                assert expired.value.code() == grpc.StatusCode.DEADLINE_EXCEEDED
+            else:
+                await host.stop()
+            await asyncio.wait_for(finished.wait(), 2)
+            # shutdown 是 drain 屏障；普通取消的事务 finally 必须先完成，再取同一连接。
+            assert (await store.load_commitment(accepted.commitment_id)).revision == 1
+            assert not model.requests
+            with sqlite3.connect(store._path) as connection:
+                assert list(connection.iterdump()) == before
+        finally:
+            call.cancel()
+
+
 @pytest.mark.parametrize("completed", [False, True])
 async def test_bound_planning_executes_actual_conversation_evidence_and_reuses_receipt(bound_planning_service, completed):
     _, recorder, store, _, _, model, accepted, accept, prepare, execute, reconcile = bound_planning_service

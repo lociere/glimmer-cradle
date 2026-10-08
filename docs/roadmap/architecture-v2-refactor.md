@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、显式执行 wire/Host Adapter 和 Core 业务 receipt 已实现；默认 scheduler 待逐任务接纳闸，状态接收、产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳与默认 scheduler 已实现；Planning 状态接收、产品入口/完整 catalog、产品状态投影、通知/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -619,6 +619,44 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 失败启动新增自身进程树回收。已按命令行/创建时间/测试临时根核对并回收那三组残留 Python
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
+
+### 阶段 5/7 Planning 逐任务接纳与默认调度（2026-10-08 当前候选）
+
+输入 `72e8fc3b`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。Jobs 增加中立的有界 due 分页和具体候选 revision CAS
+claim；Scheduler 经 App 注入接纳 Port，检查后仅 claim 原候选，取消/切代/另一 writer 的更新拒绝旧
+判断。拒绝候选仍前进分页并回绕，不把首个旧目标当全队列闸，也不修改 due/预算/attempt。
+Worker typed 只读接纳 RPC 读取真实已 ACK 源/目标版本，不生成 attempt、封口、评估窗口或模型调用；
+实际来源完整且接受时/当前 tier 适用才 eligible。接纳不充当授权，Execute 继续复验全部来源/政策。
+Host 默认注册真实 Planning Adapter 和独立 kind scheduler，保留独立对账；状态 receiver 尚未实现
+时以 `jobs_state_feedback_pending` 如实降级，本轮有等待候选则 `jobs_admission_pending`，不再使用
+过时的 handler pending。Memory 状态投递独立按 kind，不假 ACK Planning。默认生产 CLI/实际
+Perception/SQLite Log/同一 LLMEngine/本地 HTTP 协议测试已通过，分别完成 true/false 评估并双库
+重开，固定原 receipt/承诺 revision，不重复模型。首次失败来自测试未装配真实 Capability exposure
+owner，按日志接实际空 ResourceRegistry/Execution graph 后通过，未改成假 exposure/ACK。
+
+Core 只读工作查询校验源 ACK/原目标/范围，成功与错误完整 SQL dump 不变。Worker 覆盖等待旧版本
+（包括证据 owner 缺失）、当前 tier/来源失效、模型 owner 缺失、错代/范围/预算/未 ready/drain；
+取消/deadline/shutdown 等待真实事务 finally，零 attempt/评估表/模型调用。Jobs 覆盖公平分页/回绕和
+接纳 await 中取消/另一 claim/切代/stop/abort/时钟回退，不能把旧判断转给未接纳 Job；Host 校验
+响应 request/job/scope、严格 bool/reason 组合、源漂移和取消。Execute 保留独立新 Adapter 复验。
+
+当前验证：Core 451、Worker 225、Jobs 47 项全量 PASS；Worker 新增 19 项只读 RPC/取消/旧源用例，
+Core 新增 5 项只读反例，Jobs 新增 8 项分页/race 用例。契约 22 项门、三语言回环、兼容/生成一致，
+根 typecheck/build、111 页 docs、encoding、architecture、target-layout specification、diff PASS。
+修改 mapper/Worker/Core 测试全规则 Ruff PASS，修改 Python I/F PASS；RPC 47 条既有 Ruff 诊断
+逐项与输入相同。Host 176 项全量 PASS，新增 2 项生产默认调度/双库重启和 14 项接纳响应/取消反例。
+所有数据与 HTTP provider 均为
+临时测试 fixture；未调用付费 provider、未迁移用户数据、未推送/发布。未新增目标清单文件。
+下一步接 Planning 状态 inbox/ACK、通知 durable receipt 与 pending 后继请求，再接撤销/重评和产品消费。
+阶段 5/7 与整体重构未完成，独立审查仍留完整固定候选收尾。
+
+后继状态接收切片计划：复用唯一 Jobs `JobStateEvent`，经 Cognition Service 增量 typed 投递；
+Planning 验真实已 ACK 源、job/scope/goal/kind、event/revision 与投递 epoch，独立 inbox/最新状态
+projection 同事务保存后 ACK。Job result 必须核对原持久评估 receipt，不采信外部 completed；
+取消/unknown 不抹去已提交评估，不把 succeeded 自动转换为目标完成。旧/重复/迟到事件、ACK 前后
+丢失、投递切代、取消 drain 与 schema 损坏都需临时双库验证；状态 owner 不另造执行队列或模型调用。
+Host 分 kind 投递真实 Planning receiver，正常反馈提交后才解除 `jobs_state_feedback_pending`；
+待来源/model-tier 的目标仍显示 `jobs_admission_pending`。通知/后继请求与撤销链路随后推进。
 
 ### 阶段 5/7 Planning 来源绑定与实际执行（2026-10-08 当前候选）
 
