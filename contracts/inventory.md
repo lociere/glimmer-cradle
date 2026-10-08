@@ -1,5 +1,10 @@
 # M12 Contract Spine Inventory
 
+Planning 状态投递同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`PublishPlanningJobStateRequest`、`PublishPlanningJobStateResponse` 与同一 CognitionService 的
+`PublishPlanningJobState`。复用 Jobs 唯一 `JobStateEvent`；真实 source/receipt 核验、持久 inbox/投影
+提交后 ACK，不是另一个目标完成入口。
+
 Planning claim 前只读接纳同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `GetPlanningJobAdmissionRequest`、`GetPlanningJobAdmissionResponse` 与同一 CognitionService 的
 `GetPlanningJobAdmission`。真实 source ACK/目标/来源/当前政策决定 eligible；不创建 attempt、

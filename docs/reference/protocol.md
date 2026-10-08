@@ -135,7 +135,7 @@ INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响
 
 当前配置 Host 已接源投递、真实执行器与逐任务接纳后调度；不适用目标等待且不消耗 attempt。
 Host 按本轮等待/未 ACK 状态分别报告 `jobs_admission_pending`/`jobs_state_feedback_pending`，
-状态 outbox 不交给 Memory receiver，也不假 ACK。状态接收、通知和再调度未完成。
+状态 outbox 独立投递 Planning receiver，不交给 Memory；真实 inbox commit 后才 ACK。通知和再调度未完成。
 Job accepted 不改变承诺 accepted/revision。
 
 ### Planning 显式接纳与执行
@@ -174,6 +174,23 @@ RECOVERY_REQUIRED；缺 owner、业务未 ready 或 drain 为 NOT_READY，旧代
 Host 校验响应身份及布尔/reason 组合，只 CAS 原候选 revision，等待仍前进分页并回绕。
 这不是执行资格持久授予或分布式原子授权；Execute 必须用新 Adapter 再复验当前来源/政策。
 
+### Planning Jobs 状态投递
+
+`PublishPlanningJobState` 复用 Jobs 的 `JobStateEvent`，携本代 call 和正 JS safe
+`delivery_authority_epoch`；总请求不超过 64 KiB，字符串身份不超过 4096 UTF-8 bytes。
+job 为 `planning:<request_id>`，kind 为 `planning.evaluate`，event ID 为紧凑 UTF-8 JSON
+`[job_id,revision]` 的 SHA-256；revision/job epoch 为正 JS safe integer，attempt/token/updated time
+为非负 JS safe integer。running/retry_wait/succeeded/unknown 要求非零 attempt/token。
+错误 kind/枚举/身份/整数/预算为 INVALID_REQUEST，缺 owner/未 ready/drain 为 NOT_READY，旧代为
+GENERATION_MISMATCH；源未 ACK、goal/scope 冲突、旧投递主、同 event 内容漂移或错 receipt 为 RECOVERY_REQUIRED。
+
+Worker 以实际 wire event 摘要映射消费方反馈，不以模型/外部 result 创造事实。succeeded 的 result
+须逐字段匹配原持久评估 receipt（保持 completed=false）；其他状态不得携 result，但投影保留
+真实已提交业务 receipt，取消/unknown 不代表回滚。projection 不改变承诺 revision/status。
+投递 high-water 和已观测评估 epoch 拒绝旧主；当前主可投递旧 epoch 事实，重复/迟到事件不回退
+最新 revision。新事件 inbox/投影同事务提交后返回同 event_id、accepted=true、duplicate；Jobs 才 ACK。
+取消/deadline/shutdown drain 事务，响应丢失重投原事件，不自造确认；retention 不删除接收 owner 的事实。
+
 ### Planning 原 attempt 持久对账
 
 `ReconcilePlanningJob` 复用 Jobs 唯一 `JobExecutionIdentity`，另携原源 `request_id`；请求总量
@@ -194,7 +211,7 @@ RECOVERY_REQUIRED。该调用会封口，不是只读查询；推理未 ready/st
 Host 验原请求/承诺、查询 identity、摘要、原提交者、时间与证据组合后，交给 Jobs 唯一
 reconciliation 事务；配置入口按独立有界分页恢复 Planning unknown，不复用 Memory receiver。
 该恢复链不依赖模型或扩大权限，不假 ACK 状态事件；默认执行另经逐任务接纳闸。
-状态接纳、通知与后继调度仍未完成。
+状态接纳另经上述独立 inbox 链；通知与后继调度仍未完成。
 
 ## 生成与兼容
 

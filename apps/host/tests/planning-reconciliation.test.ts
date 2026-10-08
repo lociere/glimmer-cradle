@@ -117,7 +117,7 @@ it.each(['ready', 'unbound', 'source', 'policy', 'model', 'request', 'job', 'sco
   });
   if (mode === 'cancel-before') signal.abort();
   const executePlanning = vi.fn(), reconcilePlanning = vi.fn();
-  const adapter = new PlanningJobAdapter({ getPlanningAdmission, executePlanning, reconcilePlanning });
+  const adapter = new PlanningJobAdapter({ getPlanningAdmission, executePlanning, reconcilePlanning, publishPlanningState: vi.fn() });
   const candidate = mode === 'source-drift' ? { ...job, payload: { ...job.payload, plan_version: 2 } } : job;
   if (mode in reason) expect(await adapter.isEligible(job, signal.signal)).toBe(mode === 'ready');
   else await expect(adapter.isEligible(candidate, signal.signal)).rejects.toThrow();

@@ -4,6 +4,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     Commitment,
     CommitmentStatus,
     PlanningEvaluationReceipt,
+    PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
 )
@@ -47,5 +48,6 @@ __all__ = [
     "PlanningEvidenceReference",
     "PlanningJobIdentity",
     "PlanningJobResult",
+    "PlanningJobFeedback",
     "PlanningStore",
 ]

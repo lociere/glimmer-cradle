@@ -8,6 +8,7 @@ from typing import Protocol
 from glimmer_cradle.cognition.planning.commitment import (
     Commitment,
     PlanningEvaluationReceipt,
+    PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
 )
@@ -77,6 +78,8 @@ class PlanningStore(Protocol):
     ) -> None: ...
 
     async def read_evaluation_work(self, *, job_id: str, scope_id: str, request_id: str) -> PlanningEvaluationWork: ...
+
+    async def accept_job_feedback(self, feedback: PlanningJobFeedback, result: dict | None) -> bool: ...
 
     async def prepare_evaluation(
         self, identity: PlanningJobIdentity, request_id: str

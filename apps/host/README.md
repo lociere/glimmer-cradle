@@ -42,7 +42,7 @@ Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一
 来源未绑定/不可用或模型政策不适用的目标保持等待，不 claim、不消耗 attempt/预算，也不重算 due。
 有界分页持续前进并回绕，适用目标不会被前面的等待目标饿死；接纳后仅 CAS 原候选 revision。
 等待扫描如实报告 `degraded/jobs_admission_pending`；未 ACK Planning 状态报告
-`degraded/jobs_state_feedback_pending`，不阻塞 Memory 状态投递。
+`degraded/jobs_state_feedback_pending`；各自分 kind 投递真实 receiver，不阻塞 Memory 状态投递。
 同一 Adapter 已接原 attempt 持久对账，配置 Host 独立分页恢复 Planning unknown；封口或真实
 评估回执经校验后交给 Jobs，不把 completed=false 改成目标完成。
 两种源接纳都不代表长期目标完成，精确边界见[协议参考](../../docs/reference/protocol.md#planning-jobs-源接纳)。
@@ -65,7 +65,10 @@ Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 Hos
 `PlanningJobAdapter` 已通过实际 Execute RPC 消费持久评估 receipt，并以独立 RPC 对账取消后的
 原 attempt；真实 Jobs/Worker 双库重启与完成响应丢失已验证，不把 completed=false 当目标完成。
 接纳不是授权快照，执行仍复验实际来源与当前政策。配置 Host/生产 CLI/同一 LLMEngine 的本地 HTTP
-测试覆盖默认评估与重启去重；不代表真实模型语义质量。状态接收、通知和再调度未完成。
+测试覆盖默认评估与重启去重；不代表真实模型语义质量。Planning 状态投递经同一生成 Service，
+接收 owner 验真实源/评估 receipt，inbox/投影同事务提交后才 ACK；ACK 前后丢失可重启恢复。
+取消/unknown 保留真实业务 receipt，completed=false 不被覆盖；反馈 backlog 清空后才能解除对应
+降级，等待目标仍显示 admission pending。通知和再调度未完成。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

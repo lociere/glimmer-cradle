@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳与默认 scheduler 已实现；Planning 状态接收、产品入口/完整 catalog、产品状态投影、通知/再调度与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳、默认 scheduler 与状态 inbox/投影/ACK 已实现；产品入口/完整 catalog、产品状态投影、Planning 通知/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -620,7 +620,43 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 5/7 Planning 逐任务接纳与默认调度（2026-10-08 当前候选）
+### 阶段 5/7 Planning 状态 inbox 与真实 ACK（2026-10-08 当前候选）
+
+输入 `3684e64a`，当前会话唯一写入 owner，完整 v2.1 目标保持 active。唯一 Cognition Service
+增量 PublishPlanningJobState，复用 Jobs JobStateEvent 与 generation/取消/drain，不另造 wire
+状态或执行队列。Planning 消费方反馈在真实已 ACK 源、goal/scope/request 与实际评估 receipt
+核验后，同事务保存独立 schema 1 的 inbox/最新状态 projection/delivery high-water；普通启动
+只核验既有窗口，queued 接纳不建评估表或改变承诺。succeeded 必须逐字段匹配实际 receipt，
+保持 completed=false，Struct 安全整数可以规范化，但 bool 不得冒充数字。取消/unknown 保留
+已提交业务引用，不用 Job success 推出目标完成，也不重新模型评估。
+
+投递主 high-water 与实际评估 epoch 拒旧投递；当前主可交付旧 epoch 事实，同 event 内容漂移
+拒绝，duplicate/迟到 revision 不回退 projection。接收事务 commit 后返回实际 ACK，Host 默认
+分 kind 投递 Planning receiver，清空反馈 backlog 才解除 feedback pending；不适用 due 目标
+仍 admission pending。ACK 前后丢失双库重开恢复后允许 Jobs retention，最小源/inbox/投影与
+评估 receipt 持续保留。生产 CLI/同一 LLMEngine HTTP 默认评估测试增加实际状态投影断言。
+
+定向证据：Core Planning 102 项、Worker 新状态 RPC 22 项和 Host 默认调度/源/原 attempt/状态
+ACK 双库恢复 6 项 PASS；评估已提交后本地取消的真实 Host 反例随全量回归 PASS。Core 覆盖
+7 状态/true-false 业务回执、重复/迟到/重开/旧主、来源/内容/非布尔/预算冲突全事务 rollback，
+未知/部分/孤立/非法 epoch schema 保留原数据；Worker 覆盖当前/旧代、owner/readiness/drain、
+wire 身份/枚举/预算、错源/receipt/投递主、取消/deadline/shutdown 真实事务排空。
+全量 Core 488、Worker 247、Host 179 项 PASS，分别新增 37/22/3 项；契约 22 项门、三语言回环、
+兼容/生成一致、根 typecheck/build、111 页 docs、encoding、architecture、target-layout specification
+与 diff PASS。修改模型/测试全规则 Ruff、修改 Python I/F PASS；RPC 47 条既有诊断逐项与输入相同，
+未增加 suppression 或刷新兼容基线。Jobs Core/Conversation 源未改，复用输入候选已验证的 47 项
+Jobs 与此前 Conversation TS 12/Python 22 项证据，不将其算成本轮重跑。Windows/uv workspace。
+仅临时数据和确定性 provider fixture；不调用付费模型、不迁移用户库、不推送/发布，未新增清单文件。
+下一依赖是通知 durable receipt/真实投递、pending 后继请求以及撤销/重评；整体重构与物理 final
+仍未完成，独立审查留完整固定候选收尾。
+
+后继通知切片先接 Planning 评估 receipt 同事务产生的持久通知请求/ACK，再接真实发布 receiver。
+通知必须引用实际目标/源/评估事实和完整 Conversation 隐私域；普通 PublishAction 的业务回调成功
+不等于外部已送达。复用 Conversation 的 output generation/receipt 与真实投递 owner，不建立第二
+Delivery 状态机；默认接收方缺失、撤权、取消或 unknown 均保留待办，不假确认。后继调度须有明确
+接纳的政策和稳定 occurrence，不能靠 pending 状态凭空重试模型或按新配置重算旧请求 due/预算。
+
+### 阶段 5/7 Planning 逐任务接纳与默认调度（2026-10-08）
 
 输入 `72e8fc3b`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。Jobs 增加中立的有界 due 分页和具体候选 revision CAS
 claim；Scheduler 经 App 注入接纳 Port，检查后仅 claim 原候选，取消/切代/另一 writer 的更新拒绝旧

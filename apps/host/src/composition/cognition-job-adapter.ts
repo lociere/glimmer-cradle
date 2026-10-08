@@ -2,12 +2,13 @@ import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
   ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
-  ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema, GetPlanningJobAdmissionRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema, GetPlanningJobAdmissionRequestSchema,
+  PublishPlanningJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
   type JobHandlerPort, type JobHandlerResult, type JobAdmissionPort, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
 import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort, PlanningJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
-  memoryJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobRequestId, planningJobEvidence,
+  memoryJobState, planningJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobRequestId, planningJobEvidence,
   type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
@@ -123,6 +124,17 @@ export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort
   public readonly kind = PLANNING_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;
   public constructor(private readonly cognition: PlanningJobsCognitionPort) {}
+  public stateReceiver(epoch: number): JobStateReceiverPort {
+    if (!Number.isSafeInteger(epoch) || epoch < 1) throw new JobConflictError('Planning 状态投递主无效');
+    return { accept: async (event, signal) => {
+      signal?.throwIfAborted();
+      const response = await this.cognition.publishPlanningState(create(PublishPlanningJobStateRequestSchema,
+        { event: planningJobState(event), deliveryAuthorityEpoch: BigInt(epoch) }), signal);
+      signal?.throwIfAborted();
+      if (!response.accepted || response.eventId !== event.event_id) throw new JobConflictError('Planning 状态 ACK 身份不匹配');
+      return { event_id: response.eventId, accepted: true };
+    } };
+  }
   public async isEligible(job: Job, signal?: AbortSignal): Promise<boolean> {
     signal?.throwIfAborted();
     const requestId = planningJobRequestId(job);

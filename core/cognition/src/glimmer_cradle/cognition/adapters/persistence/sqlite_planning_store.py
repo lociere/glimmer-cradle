@@ -17,6 +17,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     Commitment,
     CommitmentStatus,
     PlanningEvaluationReceipt,
+    PlanningJobFeedback,
     PlanningJobIdentity,
     PlanningJobResult,
 )
@@ -82,6 +83,31 @@ _EVALUATION_SCHEMA = (
     "CREATE TABLE planning_evaluation_receipt (job_id TEXT PRIMARY KEY,receipt_id TEXT NOT NULL UNIQUE,payload_json TEXT NOT NULL)",
 )
 
+# 状态接纳的独立增量窗口；queued 反馈不创建评估 attempt 或改写承诺。
+_FEEDBACK_TABLES = ("planning_job_feedback_meta", "planning_job_feedback_inbox", "planning_job_projection")
+_FEEDBACK_SCHEMA = (
+    "CREATE TABLE planning_job_feedback_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+    ("CREATE TABLE planning_job_feedback_inbox (event_id TEXT PRIMARY KEY,event_digest TEXT NOT NULL,"
+     "request_id TEXT NOT NULL,FOREIGN KEY(request_id) REFERENCES planning_job_outbox(request_id))"),
+    ("CREATE TABLE planning_job_projection (request_id TEXT PRIMARY KEY,job_id TEXT NOT NULL UNIQUE,"
+     "revision INTEGER NOT NULL,job_epoch INTEGER NOT NULL,status TEXT NOT NULL,receipt_id TEXT,"
+     "updated_at INTEGER NOT NULL,business_outcome TEXT NOT NULL CHECK(business_outcome IN ('committed','unknown')),"
+     "FOREIGN KEY(request_id) REFERENCES planning_job_outbox(request_id))"),
+)
+
+
+def _matches_feedback_result(actual: object, expected: object) -> bool:
+    # protobuf Struct 的安全整数经 JSON mapper 成 float；bool 不可冒充数字或完成值。
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            _matches_feedback_result(actual[key], value) for key, value in expected.items())
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(
+            _matches_feedback_result(left, right) for left, right in zip(actual, expected, strict=True))
+    if type(expected) is int:
+        return type(actual) in {int, float} and actual == expected
+    return type(actual) is type(expected) and actual == expected
+
 
 def _canonical(value: object) -> str:
     payload = json.dumps(
@@ -144,6 +170,7 @@ class SqlitePlanningStore:
                 await connection.create_function("planning_now_ms", 0, self._clock_now)
                 await self._commitment_schema(connection)
                 await self._evaluation_schema(connection)
+                await self._feedback_schema(connection)
                 cursor = await connection.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 )
@@ -400,6 +427,85 @@ class SqlitePlanningStore:
             if not await self._commitment_schema(connection):
                 raise PlanningConflictError("Planning 源不存在")
             return await self._evaluation_work(connection, job_id, scope_id, request_id)
+
+    async def accept_job_feedback(self, feedback: PlanningJobFeedback, result: dict | None) -> bool:
+        if not isinstance(feedback, PlanningJobFeedback):
+            raise PlanningConflictError("Planning 状态输入无效")
+        if result is not None:
+            try:
+                _canonical(result)
+            except (TypeError, ValueError, RecursionError) as error:
+                raise PlanningConflictError("Planning 状态结果格式/预算无效") from error
+        async with self._transaction() as connection:
+            if not await self._commitment_schema(connection):
+                raise PlanningConflictError("Planning 状态源不存在")
+            work = await self._evaluation_work(connection, feedback.job_id, feedback.scope_id, feedback.request_id)
+            if work.plan.goal.goal_id != feedback.goal_id:
+                raise PlanningConflictError("Planning 状态 goal 与真实来源冲突")
+            has_evaluation = await self._evaluation_schema(connection)
+            receipt = await self._evaluation_receipt(connection, feedback.job_id) if has_evaluation else None
+            if feedback.status == "succeeded":
+                expected = json.loads(_canonical(asdict(receipt))) if receipt is not None else None
+                if receipt is None or result is None or not _matches_feedback_result(result, expected) \
+                        or receipt.identity.attempt > feedback.attempt or receipt.identity.authority_epoch > feedback.job_epoch \
+                        or receipt.identity.fencing_token > feedback.fencing_token \
+                        or receipt.identity.attempt == feedback.attempt and (
+                            receipt.identity.authority_epoch != feedback.job_epoch or receipt.identity.fencing_token != feedback.fencing_token):
+                    raise PlanningConflictError("Planning 成功状态缺少匹配的持久评估 receipt")
+            elif result is not None:
+                raise PlanningConflictError("Planning 非成功状态不能自报业务结果")
+            await self._feedback_schema(connection, create=True)
+            high = int((await (await connection.execute(
+                "SELECT value FROM planning_job_feedback_meta WHERE key='delivery_epoch'")).fetchone())[0])
+            evaluation_epoch = await self._evaluation_epoch(connection) if has_evaluation else 0
+            if feedback.delivery_epoch < max(high, evaluation_epoch) or feedback.job_epoch > feedback.delivery_epoch:
+                raise PlanningConflictError("Planning 状态投递主已失效")
+            prior = await (await connection.execute(
+                "SELECT event_digest FROM planning_job_feedback_inbox WHERE event_id=?", (feedback.event_id,))).fetchone()
+            if prior is not None and prior[0] != feedback.event_digest:
+                raise PlanningConflictError("Planning 状态事件内容冲突")
+            current = await (await connection.execute(
+                "SELECT revision,job_epoch FROM planning_job_projection WHERE request_id=?", (feedback.request_id,))).fetchone()
+            if current is not None and feedback.revision > current[0] and feedback.job_epoch < current[1]:
+                raise PlanningConflictError("Planning 状态 authority 回退")
+            await connection.execute("UPDATE planning_job_feedback_meta SET value=? WHERE key='delivery_epoch'", (str(feedback.delivery_epoch),))
+            if prior is None:
+                await connection.execute("INSERT INTO planning_job_feedback_inbox VALUES(?,?,?)", (
+                    feedback.event_id, feedback.event_digest, feedback.request_id))
+                # 取消/unknown 是执行意图/不确定性；投影保留真实已提交的评估，不改写承诺。
+                await connection.execute("""INSERT INTO planning_job_projection VALUES(?,?,?,?,?,?,?,?)
+                    ON CONFLICT(request_id) DO UPDATE SET revision=excluded.revision,job_epoch=excluded.job_epoch,
+                    status=excluded.status,receipt_id=COALESCE(excluded.receipt_id,planning_job_projection.receipt_id),
+                    updated_at=excluded.updated_at,business_outcome=CASE WHEN COALESCE(excluded.receipt_id,
+                    planning_job_projection.receipt_id) IS NOT NULL THEN 'committed' ELSE 'unknown' END
+                    WHERE excluded.revision>planning_job_projection.revision""", (
+                    feedback.request_id, feedback.job_id, feedback.revision, feedback.job_epoch, feedback.status,
+                    receipt.receipt_id if receipt else None, feedback.updated_at, "committed" if receipt else "unknown"))
+            return prior is not None
+
+    @staticmethod
+    async def _feedback_schema(connection: aiosqlite.Connection, *, create: bool = False) -> bool:
+        tables = {row[0] for row in await (await connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?,?)", _FEEDBACK_TABLES)).fetchall()}
+        if not tables:
+            if not create:
+                return False
+            if not await SqlitePlanningStore._commitment_schema(connection):
+                raise PlanningConflictError("Planning 状态源不存在")
+            for statement in _FEEDBACK_SCHEMA:
+                await connection.execute(statement)
+            await connection.executemany("INSERT INTO planning_job_feedback_meta VALUES(?,?)", [("schema_version", "1"), ("delivery_epoch", "0")])
+            return True
+        if tables != set(_FEEDBACK_TABLES) or not await SqlitePlanningStore._commitment_schema(connection):
+            raise PlanningConflictError("Planning 状态接收库不完整；须受控恢复")
+        values = dict(await (await connection.execute("SELECT key,value FROM planning_job_feedback_meta")).fetchall())
+        if values.get("schema_version") != "1" or not re.fullmatch(r"0|[1-9][0-9]*", values.get("delivery_epoch", "")) \
+                or int(values["delivery_epoch"]) > 2**53 - 1:
+            raise PlanningConflictError("Planning 状态接收版本/authority 无效；须受控恢复")
+        for statement in ("SELECT event_id,event_digest,request_id FROM planning_job_feedback_inbox LIMIT 0",
+                          "SELECT request_id,job_id,revision,job_epoch,status,receipt_id,updated_at,business_outcome FROM planning_job_projection LIMIT 0"):
+            await connection.execute(statement)
+        return True
 
     @staticmethod
     async def _evaluation_row(connection: aiosqlite.Connection, identity: PlanningJobIdentity) -> aiosqlite.Row | None:

@@ -150,8 +150,9 @@ export class HostJobsController {
       signal.throwIfAborted();
       await this.scheduler.runDue(batch_size, signal);
       await this.planningScheduler?.runDue(batch_size, signal);
-      // 当前实际 receiver 只拥有 Memory；Planning 事实保留待接纳，不能阻塞该 owner 的投递。
+      // 各源 owner 独立消费其 kind；只有真实 inbox 提交回执才能确认 Jobs outbox。
       if (state_receiver) await this.recovery.deliverOutbox(state_receiver, batch_size, signal, MEMORY_JOB_KIND);
+      if (this.planningAdapter) await this.recovery.deliverOutbox(this.planningAdapter.stateReceiver(epoch), batch_size, signal, PLANNING_JOB_KIND);
       signal.throwIfAborted();
       if (this.options.terminal_retention_ms !== undefined) this.retention.prune(this.options.terminal_retention_ms);
       const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0

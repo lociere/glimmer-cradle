@@ -6,11 +6,18 @@ import { MemoryJobResolution, PlanningJobResolution, PlanningJobResultSchema, Pl
 import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence, type JobStateEvent } from '@glimmer-cradle/jobs';
 
 export function memoryJobState(event: JobStateEvent) {
+  return jobState(event, MEMORY_JOB_KIND);
+}
+export function planningJobState(event: JobStateEvent) {
+  if (!/^planning:[a-f0-9]{64}$/.test(event.job_id)) throw new JobConflictError('Planning 状态 Job 身份无效');
+  return jobState(event, PLANNING_JOB_KIND);
+}
+function jobState(event: JobStateEvent, kind: string) {
   const statuses = { queued: JobStatus.QUEUED, running: JobStatus.RUNNING, retry_wait: JobStatus.RETRY_WAIT,
     succeeded: JobStatus.SUCCEEDED, cancelled: JobStatus.CANCELLED, dead_letter: JobStatus.DEAD_LETTER, unknown: JobStatus.UNKNOWN };
-  if (event.kind !== MEMORY_JOB_KIND || !Object.hasOwn(statuses, event.status)
+  if (event.kind !== kind || !Object.hasOwn(statuses, event.status)
     || ![event.attempt, event.fencing_token, event.updated_at].every(value => Number.isSafeInteger(value) && value >= 0)) {
-    throw new JobConflictError('Memory Job 状态事实无效');
+    throw new JobConflictError('Job 状态事实无效');
   }
   return create(JobStateEventSchema, { eventId: text(event.event_id), jobId: text(event.job_id), scopeId: text(event.scope_id),
     goalId: text(event.goal_id), kind: event.kind, revision: BigInt(positive(event.revision)), status: statuses[event.status],

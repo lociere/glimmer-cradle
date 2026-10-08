@@ -29,6 +29,7 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   ReconcilePlanningJobResponseSchema, PlanningJobResolution, AcceptPlanningCommitmentRequestSchema,
   AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -226,6 +227,16 @@ const stateRequest = create(PublishMemoryJobStateRequestSchema, { deliveryAuthor
     revision: 9007199254740991n, status: JobStatus.CANCELLED, attempt: 2n, authorityEpoch: 7n, fencingToken: 8n,
     updatedAtMs: 1900000000000n, errorCode: 'cancelled' } });
 const restoredState = fromBinary(PublishMemoryJobStateRequestSchema, toBinary(PublishMemoryJobStateRequestSchema, stateRequest));
+const planningState = create(PublishPlanningJobStateRequestSchema, { deliveryAuthorityEpoch: 9007199254740991n,
+  event: { ...stateRequest.event!, kind: 'planning.evaluate', result: { assessment: { completed: false } } } });
+const planningStateAck = create(PublishPlanningJobStateResponseSchema, { eventId: 'event:one', accepted: true, duplicate: true });
+const restoredPlanningState = fromBinary(PublishPlanningJobStateRequestSchema, toBinary(PublishPlanningJobStateRequestSchema, planningState));
+if (restoredPlanningState.deliveryAuthorityEpoch !== 9007199254740991n || restoredPlanningState.event?.revision !== 9007199254740991n
+  || (restoredPlanningState.event.result?.assessment as { completed: boolean }).completed !== false
+  || !fromBinary(PublishPlanningJobStateResponseSchema, toBinary(PublishPlanningJobStateResponseSchema, planningStateAck)).duplicate
+  || fromBinary(PublishPlanningJobStateRequestSchema, new Uint8Array()).event !== undefined) {
+  throw new Error('Planning state precision/completed=false/ACK/presence roundtrip failed');
+}
 if (restoredState.deliveryAuthorityEpoch !== 9007199254740991n || restoredState.event?.revision !== 9007199254740991n
   || restoredState.event.status !== JobStatus.CANCELLED || restoredState.event.result !== undefined
   || restoredState.event.errorCode !== 'cancelled') throw new Error('Job state precision/presence roundtrip failed');

@@ -106,6 +106,12 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 high-water 同属不可再生状态，不能只删除 attempt 后重放模型或回滚时间复活过期 lease；其一致
 备份须与整个 Planning/源 outbox/Jobs 共同保护。评估已接生产 Worker/Host Adapter 与默认接纳
 scheduler；只读接纳不建评估表/attempt 或修改 high-water。未操作用户库。
+首次显式状态接纳另外建立独立版本 1 的 `planning_job_feedback_meta`（schema/delivery epoch）、
+`planning_job_feedback_inbox`（event ID/完整 wire digest/原源 request）和 `planning_job_projection`
+（原 request/job、最新 revision/原 job epoch/status、真实 receipt 引用、updated time/business outcome）。
+queued 状态不建评估表或改变承诺；普通启动只核验既有窗口，未知/部分/孤立窗口拒绝自动修复。
+评估 epoch 与反馈 delivery high-water 都拒绝旧投递主；inbox/投影/源与实际评估 receipt 一并备份。
+Jobs outbox ACK 后可清 body，但上述最小接收事实不能删除来“重置”投递；当前仅验证临时库。
 新接纳 GoalVersion 增量保存 `source_moment_id`、`source_digest` 和 `model_tier`，三字段必须完整；
 digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可变版本缺三字段时保持原 JSON
 与 active work 摘要字节语义，不改写 schema 1，也不补造权限；新绑定必须是显式新版本。

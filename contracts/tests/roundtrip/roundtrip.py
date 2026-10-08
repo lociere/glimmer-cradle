@@ -192,6 +192,13 @@ state = PublishMemoryJobStateRequest(delivery_authority_epoch=9007199254740991, 
     revision=9007199254740991, status=JOB_STATUS_CANCELLED, attempt=2, authority_epoch=7, fencing_token=8,
     updated_at_ms=1900000000000, error_code="cancelled"))
 restored_state = PublishMemoryJobStateRequest.FromString(state.SerializeToString())
+planning_state = cognition_pb.PublishPlanningJobStateRequest(delivery_authority_epoch=9007199254740991, event=state.event)
+planning_state.event.kind = "planning.evaluate"
+planning_state.event.result.update({"assessment": {"completed": False}})
+planning_state_ack = cognition_pb.PublishPlanningJobStateResponse(event_id="event:one", accepted=True, duplicate=True)
+assert type(planning_state).FromString(planning_state.SerializeToString()) == planning_state
+assert type(planning_state_ack).FromString(planning_state_ack.SerializeToString()) == planning_state_ack
+assert not cognition_pb.PublishPlanningJobStateRequest.FromString(b"").HasField("event")
 assert restored_state.delivery_authority_epoch == restored_state.event.revision == 9007199254740991
 assert restored_state.event.status == JOB_STATUS_CANCELLED and restored_state.event.error_code == "cancelled"
 assert not restored_state.event.HasField("result")

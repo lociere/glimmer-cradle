@@ -1621,6 +1621,113 @@ async def bound_planning_service(tmp_path):
         await store.close()
 
 
+@pytest.mark.parametrize("fault", ["none", "incomplete", "missing-event", "kind", "status", "event-id", "scope", "goal", "overflow", "generation", "source", "receipt", "completed", "result-type", "budget", "owner", "unready", "stopping", "old-delivery"])
+async def test_planning_feedback_rpc_actual_receipt_identity_and_atomic_inbox(bound_planning_service, fault):
+    import sqlite3
+
+    host, _, store, _, _, model, accepted, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    model.completed = fault != "incomplete"
+    await execute(execution, timeout=2)
+    with sqlite3.connect(store._path) as connection:
+        result = json.loads(connection.execute("SELECT payload_json FROM planning_evaluation_receipt").fetchone()[0])
+    event = jobs_pb.JobStateEvent(job_id=execution.identity.job_id, scope_id=execution.identity.scope_id,
+        goal_id=accepted.goal_id, kind="planning.evaluate", revision=3, status=jobs_pb.JOB_STATUS_SUCCEEDED,
+        attempt=1, authority_epoch=1, fencing_token=1, updated_at_ms=int(time.time() * 1000))
+    event.event_id = hashlib.sha256(json.dumps([event.job_id, event.revision], separators=(",", ":")).encode()).hexdigest()
+    event.result.update(result)
+    request = cognition_pb.PublishPlanningJobStateRequest(call=execution.call, event=event, delivery_authority_epoch=1)
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        publish = _call(channel, "PublishPlanningJobState", cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse)
+        if fault == "missing-event": request.ClearField("event")
+        elif fault == "kind": request.event.kind = "memory.consolidate"
+        elif fault == "status": request.event.status = 99
+        elif fault == "event-id": request.event.event_id = "forged"
+        elif fault in {"scope", "goal"}: setattr(request.event, fault + "_id", "foreign")
+        elif fault == "overflow": request.event.authority_epoch = 9007199254740992
+        elif fault == "generation": request.call.generation = "old"
+        elif fault == "source":
+            with sqlite3.connect(store._path) as connection:
+                connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+        elif fault in {"receipt", "completed", "result-type", "budget"}:
+            if fault == "receipt": result["receipt_id"] = "forged"
+            elif fault == "completed": result["assessment"]["completed"] = not model.completed
+            elif fault == "result-type": result["assessment"]["completed"] = 1
+            else: result["assessment"]["reason"] = "x" * 65537
+            request.event.result.Clear(); request.event.result.update(result)
+        elif fault == "owner": host._planning = None
+        elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+        elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+        elif fault == "old-delivery":
+            request.delivery_authority_epoch = 2
+            await publish(request, timeout=2)
+            request.delivery_authority_epoch = 1
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        if fault in {"none", "incomplete"}:
+            response = await publish(request, timeout=2)
+            assert response.accepted and not response.duplicate and response.event_id == request.event.event_id
+            assert (await publish(request, timeout=2)).duplicate
+            with sqlite3.connect(store._path) as connection:
+                assert connection.execute("SELECT status,receipt_id,business_outcome FROM planning_job_projection").fetchone() == (
+                    "succeeded", result["receipt_id"], "committed")
+                assert connection.execute("SELECT count(*) FROM planning_job_feedback_inbox").fetchone() == (1,)
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await publish(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"owner", "unready", "stopping"} else
+                common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"missing-event", "kind", "status", "event-id", "overflow", "budget"}
+                else common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED)
+            assert detail.code == expected
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert len(model.requests) == 1
+    assert (await store.load_commitment(accepted.commitment_id)).status.value == ("accepted" if fault == "incomplete" else "completed")
+
+
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
+async def test_planning_feedback_rpc_cancellation_drains_atomic_schema_and_inbox(bound_planning_service, monkeypatch, termination):
+    import sqlite3
+
+    host, _, store, _, _, model, accepted, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    entered, finished = asyncio.Event(), asyncio.Event()
+    original = store._feedback_schema
+
+    async def waiting_schema(connection, *, create=False):
+        value = await original(connection, create=create)
+        if create:
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                finished.set()
+        return value
+
+    monkeypatch.setattr(store, "_feedback_schema", waiting_schema)
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    event = jobs_pb.JobStateEvent(job_id=execution.identity.job_id, goal_id=accepted.goal_id,
+        scope_id=execution.identity.scope_id, kind="planning.evaluate", revision=1, status=jobs_pb.JOB_STATUS_QUEUED, authority_epoch=1)
+    event.event_id = hashlib.sha256(json.dumps([event.job_id, 1], separators=(",", ":")).encode()).hexdigest()
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        publish = _call(channel, "PublishPlanningJobState", cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse)
+        call = publish(cognition_pb.PublishPlanningJobStateRequest(call=execution.call, event=event, delivery_authority_epoch=1),
+            timeout=0.5 if termination == "deadline" else 5)
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            if termination == "cancel":
+                call.cancel()
+                with pytest.raises(asyncio.CancelledError): await call
+            elif termination == "deadline":
+                with pytest.raises(grpc.aio.AioRpcError): await call
+            else: await host.stop()
+            await asyncio.wait_for(finished.wait(), 2)
+            assert (await store.load_commitment(accepted.commitment_id)).revision == 1
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+            assert not model.requests
+        finally:
+            call.cancel()
+
+
 @pytest.mark.parametrize("fault", ["none", "legacy", "legacy-no-evidence", "tier", "source", "model", "planning", "knowledge", "activity", "generation", "scope", "job", "request", "budget", "unready", "stopping"])
 async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_model(bound_planning_service, fault):
     import sqlite3

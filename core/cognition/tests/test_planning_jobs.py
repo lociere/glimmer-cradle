@@ -17,6 +17,7 @@ from glimmer_cradle.cognition.planning import (
     PlanningController,
     PlanningEvidence,
     PlanningEvidenceReference,
+    PlanningJobFeedback,
     PlanningJobIdentity,
     PlanVersion,
 )
@@ -61,6 +62,119 @@ async def _evaluation_fixture(tmp_path, *, now=None):
     identity = PlanningJobIdentity("planning:" + source.request_id, "scene-1", 1, 1, 1, "host-1", 1000)
     await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
     return store, PlanningController(store=store), source, identity
+
+
+def _feedback(source, *, status="queued", revision=1, job_epoch=1, delivery_epoch=1):
+    job_id = f"planning:{source.request_id}"
+    event_id = hashlib.sha256(json.dumps([job_id, revision], separators=(",", ":")).encode()).hexdigest()
+    digest = hashlib.sha256(f"{event_id}:{status}:{job_epoch}".encode()).hexdigest()
+    return PlanningJobFeedback(source.request_id, job_id, source.goal_id, source.scope_id, event_id, digest,
+        revision, status, 0 if status == "queued" else 1, 0 if status == "queued" else 1, job_epoch, delivery_epoch, 100)
+
+
+@pytest.mark.parametrize("completed", [True, False])
+@pytest.mark.parametrize("status", ["queued", "running", "retry_wait", "succeeded", "cancelled", "dead_letter", "unknown"])
+async def test_planning_feedback_real_receipt_atomic_inbox_and_restart_never_changes_goal(tmp_path, completed, status):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    model = _PlanningModel(completed=completed)
+    try:
+        receipt = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model))
+        feedback = _feedback(source, status=status, revision=3)
+        result = json.loads(json.dumps(asdict(receipt))) if status == "succeeded" else None
+        assert not await store.accept_job_feedback(feedback, result)
+        assert await store.accept_job_feedback(feedback, result)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert connection.execute("SELECT status,revision,receipt_id,business_outcome FROM planning_job_projection").fetchone() == (
+                status, 3, receipt.receipt_id, "committed")
+            assert connection.execute("SELECT count(*) FROM planning_job_feedback_inbox").fetchone() == (1,)
+        await store.close()
+        await store.connect()
+        assert await store.accept_job_feedback(replace(feedback, delivery_epoch=2), result)
+        assert not await store.accept_job_feedback(_feedback(source, delivery_epoch=2), None)
+        with pytest.raises(PlanningConflictError):
+            await store.accept_job_feedback(feedback, result)  # 原投递主不能借 duplicate 复活。
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert connection.execute("SELECT status,revision FROM planning_job_projection").fetchone() == (status, 3)
+            assert connection.execute("SELECT count(*) FROM planning_job_feedback_inbox").fetchone() == (2,)
+        actual = await store.load_commitment(source.payload["commitment_id"])
+        assert actual.revision == 2 and actual.status == (CommitmentStatus.COMPLETED if completed else CommitmentStatus.ACCEPTED)
+        assert len(model.requests) == 1
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("status", ["queued", "running", "retry_wait", "succeeded", "cancelled", "dead_letter", "unknown"])
+async def test_planning_feedback_without_evaluation_never_creates_attempt_or_completion(tmp_path, status):
+    store, _, source, _ = await _evaluation_fixture(tmp_path)
+    try:
+        if status == "succeeded":
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                before = list(connection.iterdump())
+            with pytest.raises(PlanningConflictError):
+                await store.accept_job_feedback(_feedback(source, status=status), {})
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                assert list(connection.iterdump()) == before
+        else:
+            assert not await store.accept_job_feedback(_feedback(source, status=status), None)
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                assert connection.execute("SELECT receipt_id,business_outcome FROM planning_job_projection").fetchone() == (None, "unknown")
+                assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name='planning_evaluation_attempt'").fetchone()
+        assert (await store.load_commitment(source.payload["commitment_id"])).revision == 1
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["goal", "scope", "unacked", "receipt", "completed", "bool-number", "fields", "non-success", "digest", "epoch", "nan", "budget"])
+async def test_planning_feedback_conflicts_rollback_entire_inbox_and_projection(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        receipt = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        feedback, result = _feedback(source, status="succeeded", revision=3), json.loads(json.dumps(asdict(receipt)))
+        if fault in {"goal", "scope"}: feedback = replace(feedback, **{fault + "_id": "foreign"})
+        elif fault == "unacked":
+            with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+                connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+        elif fault == "receipt": result["receipt_id"] = "forged"
+        elif fault == "completed": result["assessment"]["completed"] = 1
+        elif fault == "bool-number": result["identity"]["attempt"] = True
+        elif fault == "fields": result["fake_permission"] = True
+        elif fault == "non-success": feedback = replace(feedback, status="cancelled")
+        elif fault == "digest":
+            await store.accept_job_feedback(feedback, result)
+            feedback = replace(feedback, event_digest="f" * 64)
+        elif fault == "epoch":
+            await store.accept_job_feedback(replace(feedback, delivery_epoch=2), result)
+        elif fault == "nan": result["committed_at"] = float("nan")
+        elif fault == "budget": result["reason"] = "x" * 65537
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError):
+            await store.accept_job_feedback(feedback, result)
+        with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["version", "partial", "orphan", "epoch"])
+async def test_planning_feedback_corrupt_schema_reopen_preserves_data(tmp_path, fault):
+    store, _, source, _ = await _evaluation_fixture(tmp_path)
+    await store.accept_job_feedback(_feedback(source), None)
+    await store.close()
+    with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+        if fault == "version": connection.execute("UPDATE planning_job_feedback_meta SET value='99' WHERE key='schema_version'")
+        elif fault == "partial": connection.execute("DROP TABLE planning_job_projection")
+        elif fault == "orphan":
+            connection.execute("DROP TABLE planning_job_feedback_meta")
+            connection.execute("DROP TABLE planning_job_projection")
+        else: connection.execute("UPDATE planning_job_feedback_meta SET value='-1' WHERE key='delivery_epoch'")
+        before = list(connection.iterdump())
+    with pytest.raises(PlanningConflictError):
+        await store.connect()
+    with sqlite3.connect(tmp_path / "planning.sqlite") as connection:
+        assert list(connection.iterdump()) == before
 
 
 @pytest.mark.parametrize("completed", [True, False])

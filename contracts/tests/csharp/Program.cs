@@ -202,6 +202,14 @@ var stateRequest = new PublishMemoryJobStateRequest { DeliveryAuthorityEpoch = 9
         Status = JobsV1.JobStatus.Cancelled, Attempt = 2, AuthorityEpoch = 7, FencingToken = 8,
         UpdatedAtMs = 1900000000000, ErrorCode = "cancelled" } };
 var restoredState = PublishMemoryJobStateRequest.Parser.ParseFrom(stateRequest.ToByteArray());
+var planningState = new PublishPlanningJobStateRequest { DeliveryAuthorityEpoch = 9007199254740991, Event = stateRequest.Event.Clone() };
+planningState.Event.Kind = "planning.evaluate";
+planningState.Event.Result = Google.Protobuf.WellKnownTypes.Struct.Parser.ParseJson("{\"assessment\":{\"completed\":false}}");
+var planningStateAck = new PublishPlanningJobStateResponse { EventId = "event:one", Accepted = true, Duplicate = true };
+if (!PublishPlanningJobStateRequest.Parser.ParseFrom(planningState.ToByteArray()).Equals(planningState)
+    || !PublishPlanningJobStateResponse.Parser.ParseFrom(planningStateAck.ToByteArray()).Equals(planningStateAck)
+    || PublishPlanningJobStateRequest.Parser.ParseFrom(Array.Empty<byte>()).Event != null)
+    throw new InvalidOperationException("Planning state precision/completed=false/ACK/presence roundtrip failed");
 if (restoredState.DeliveryAuthorityEpoch != 9007199254740991 || restoredState.Event.Revision != 9007199254740991
     || restoredState.Event.Status != JobsV1.JobStatus.Cancelled || restoredState.Event.Result != null
     || !restoredState.Event.HasErrorCode || restoredState.Event.ErrorCode != "cancelled")

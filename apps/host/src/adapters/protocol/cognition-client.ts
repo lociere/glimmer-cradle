@@ -20,6 +20,8 @@ import {
   AcceptPlanningCommitmentRequestSchema, AcceptPlanningCommitmentResponseSchema,
   ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
   GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
+  PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
+  type PublishPlanningJobStateRequest, type PublishPlanningJobStateResponse,
   type GetPlanningJobAdmissionRequest, type GetPlanningJobAdmissionResponse,
   type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
   type ExecutePlanningJobRequest, type ExecutePlanningJobResponse,
@@ -61,6 +63,7 @@ export interface PlanningJobsReconciliationPort {
 export interface PlanningJobsCognitionPort extends PlanningJobsReconciliationPort {
   executePlanning(request: ExecutePlanningJobRequest, signal?: AbortSignal): Promise<ExecutePlanningJobResponse>;
   getPlanningAdmission(request: GetPlanningJobAdmissionRequest, signal?: AbortSignal): Promise<GetPlanningJobAdmissionResponse>;
+  publishPlanningState(request: PublishPlanningJobStateRequest, signal?: AbortSignal): Promise<PublishPlanningJobStateResponse>;
 }
 
 export class HostCognitionError extends Error {
@@ -166,6 +169,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public getPlanningAdmission(request: GetPlanningJobAdmissionRequest, signal?: AbortSignal): Promise<GetPlanningJobAdmissionResponse> {
     return this.call('GetPlanningJobAdmission', GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
       create(GetPlanningJobAdmissionRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public publishPlanningState(request: PublishPlanningJobStateRequest, signal?: AbortSignal): Promise<PublishPlanningJobStateResponse> {
+    return this.call('PublishPlanningJobState', PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
+      create(PublishPlanningJobStateRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

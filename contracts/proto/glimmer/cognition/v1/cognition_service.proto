@@ -529,6 +529,19 @@ message GetPlanningJobAdmissionResponse {
   string reason_code = 5;
 }
 
+// 只接纳实际源及持久评估回执的状态投影，不由 Job succeeded 推断目标完成。
+message PublishPlanningJobStateRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobStateEvent event = 2;
+  uint64 delivery_authority_epoch = 3;
+}
+
+message PublishPlanningJobStateResponse {
+  string event_id = 1;
+  bool accepted = 2;
+  bool duplicate = 3;
+}
+
 enum PlanningJobResolution {
   PLANNING_JOB_RESOLUTION_UNSPECIFIED = 0;
   PLANNING_JOB_RESOLUTION_APPLIED = 1;
@@ -609,4 +622,5 @@ service CognitionService {
   rpc AcceptPlanningCommitment(AcceptPlanningCommitmentRequest) returns (AcceptPlanningCommitmentResponse);
   rpc ExecutePlanningJob(ExecutePlanningJobRequest) returns (ExecutePlanningJobResponse);
   rpc GetPlanningJobAdmission(GetPlanningJobAdmissionRequest) returns (GetPlanningJobAdmissionResponse);
+  rpc PublishPlanningJobState(PublishPlanningJobStateRequest) returns (PublishPlanningJobStateResponse);
 }

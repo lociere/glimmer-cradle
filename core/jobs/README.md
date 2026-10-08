@@ -56,7 +56,7 @@ Scheduler 可限定已装配的 kind，避免提前判死其他 owner 的工作�
 真实 Memory 源 outbox、fencing/receipt、App handler/query 与持续调度已通过跨 Worker/Jobs 的临时库验证，
 当前进度和生产 cutover 门见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
 目标 Host 已接真实 Worker 监督、authority/config、Memory 状态接收、Planning 源接纳和逐任务
-接纳后的真实评估调度；尚待完整 catalog/产品入口切换、Planning 状态接收/通知/再调度及安装恢复主链。默认产品仍使用旧巩固队列，
+接纳后的真实评估调度及 Planning 状态 inbox/ACK；尚待完整 catalog/产品入口切换、Planning 通知/再调度及安装恢复主链。默认产品仍使用旧巩固队列，
 目标 Host 不代表产品 cutover；目录存在不代表阶段 7 完成。
 
 ```powershell

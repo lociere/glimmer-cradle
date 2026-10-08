@@ -29,7 +29,8 @@ import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry } from '@glimmer-cradle/capabilities';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
-import { PublishMemoryJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { PublishMemoryJobStateRequestSchema, PublishPlanningJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { planningJobState } from '../src/adapters/protocol/job-mapper.js';
 import { JobStatus as WireJobStatus } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
@@ -155,7 +156,8 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       expect(assessments[0].goal).toMatchObject({ source_moment_id: sourceMomentId, model_tier: 'cloud_allowed' });
       expect(assessments[0].evidence.length).toBeGreaterThan(0);
       expect(JSON.stringify(assessments)).toContain('核对这条实际来源记录');
-      expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({ status: 'degraded', error_code: 'jobs_state_feedback_pending' });
+      await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({ status: 'ready', error_code: null }),
+        { timeout: 5000, interval: 25 });
       client.close(); client = undefined; await owner.stop();
       owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
       expect(owner.snapshot.session!.jobs!.lease!.epoch).toBe(2);
@@ -164,6 +166,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         expect(planning.prepare('SELECT status,revision FROM planning_commitment').get())
           .toEqual({ status: completed ? 'completed' : 'accepted', revision: 2 });
         expect(planning.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
+        expect(planning.prepare('SELECT status,business_outcome FROM planning_job_projection').get()).toEqual({ status: 'succeeded', business_outcome: 'committed' });
       } finally { planning.close(); }
       expect(assessments).toHaveLength(1);
     } finally {
@@ -171,7 +174,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       await new Promise<void>((resolve, reject) => provider.close(error => error ? reject(error) : resolve()));
     }
   }, 40_000);
-  it('生产 CLI 接纳实际 Planning 源，未绑定目标不执行且状态反馈如实降级，不阻塞 Memory 投递', async () => {
+  it('生产 CLI 接纳实际 Planning 源，未到期目标不执行且状态真实 ACK，不阻塞 Memory 投递', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-'));
     const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root, {}, true);
@@ -186,7 +189,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       for (const epoch of [1, 2]) {
         if (epoch === 2) { writeConfiguration(paths, memory, 9); owner = new ConfiguredHostCognitionJobsOwner(options); }
         expect(await owner.start()).toMatchObject({ phase: 'active', session: { worker: { state: 'ready' },
-          jobs: { lease: { epoch }, jobs: { status: 'degraded', error_code: 'jobs_state_feedback_pending' } } } });
+          jobs: { lease: { epoch }, jobs: { status: 'ready', error_code: null } } } });
         const db = new Database(paths.jobs_database, { readonly: true });
         try {
           const job = db.prepare('SELECT * FROM jobs WHERE kind=?').get(PLANNING_JOB_KIND) as Job;
@@ -199,13 +202,15 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
           const memoryEvents = events.filter(event => JSON.parse(event.event_json).kind === 'memory.consolidate');
           expect(planningEvents.length).toBeGreaterThan(0);
           expect(memoryEvents.length).toBeGreaterThan(0);
-          expect(planningEvents.every(event => event.acknowledged_at === null)).toBe(true);
+          expect(planningEvents.every(event => event.acknowledged_at !== null)).toBe(true);
           expect(memoryEvents.every(event => event.acknowledged_at !== null)).toBe(true);
         } finally { db.close(); }
         const source = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
         try {
           expect(source.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'accepted', revision: 1 });
           expect(source.prepare('SELECT COUNT(*) AS count FROM planning_job_outbox WHERE accepted_job_id IS NULL').get()).toEqual({ count: 0 });
+          expect(source.prepare('SELECT status,business_outcome FROM planning_job_projection').get()).toEqual({ status: 'queued', business_outcome: 'unknown' });
+          expect(source.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name='planning_evaluation_attempt'").get()).toEqual({ count: 0 });
         } finally { source.close(); }
         await owner.stop(); expect(owner.snapshot.phase).toBe('stopped');
       }
@@ -509,6 +514,76 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
   }, 30_000);
 });
 describe('Planning 源真实 wire/Jobs 接纳', () => {
+  it('本地取消晚于 Planning 实际评估提交，状态投影保留真实 receipt 而非伪报回滚', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-feedback-cancel-'));
+    const service = await worker(root, 'planning-execute-complete'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    const controller = new JobController(store, clock, policy), execute = service.client.executePlanning.bind(service.client);
+    const cancel = vi.spyOn(service.client, 'executePlanning').mockImplementation(async (...args: Parameters<CognitionClient['executePlanning']>) => {
+      const result = await execute(...args), job = store.load(args[0].identity!.jobId)!;
+      expect(controller.cancel(job.job_id, 1, job.revision)?.status).toBe('cancelled');
+      return result;
+    });
+    try {
+      store.activateAuthority(1, clock.now());
+      await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+      const adapter = new PlanningJobAdapter(service.client); controller.register(adapter);
+      expect(await controller.execute(store.claim(1, 'cancel-owner', clock.now(), 60000, PLANNING_JOB_KIND)!))
+        .toMatchObject({ status: 'cancelled', result: null });
+      await new JobRecoveryController(store, clock, 1, policy).deliverOutbox(adapter.stateReceiver(1), 100, undefined, PLANNING_JOB_KIND);
+      const db = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      try {
+        expect(db.prepare('SELECT status,receipt_id,business_outcome FROM planning_job_projection').get())
+          .toMatchObject({ status: 'cancelled', receipt_id: expect.any(String), business_outcome: 'committed' });
+        expect(db.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'completed', revision: 2 });
+        expect(db.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
+      } finally { db.close(); }
+    } finally { cancel.mockRestore(); await controller.stop(); store.close(); await service.stop(); }
+  }, 30_000);
+
+  it.each(['before-commit', 'after-commit'] as const)('Planning 状态 ACK %s 丢失后真实双库重开，提交 inbox 后 ACK 并允许 retention', async mode => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-feedback-'));
+    let service = await worker(root, 'planning-execute-complete'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let controller = new JobController(store, clock, policy), loss: { mockRestore(): void } | undefined;
+    try {
+      store.activateAuthority(1, clock.now());
+      await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+      const adapter = new PlanningJobAdapter(service.client); controller.register(adapter);
+      await controller.execute(store.claim(1, 'feedback-owner', clock.now(), 60000, PLANNING_JOB_KIND)!);
+      const events = store.readOutbox(1, 100, PLANNING_JOB_KIND), succeeded = events.find(event => event.status === 'succeeded')!;
+      const publish = service.client.publishPlanningState.bind(service.client);
+      loss = vi.spyOn(service.client, 'publishPlanningState').mockImplementation(async (...args: Parameters<CognitionClient['publishPlanningState']>) => {
+        if (args[0].event!.eventId !== succeeded.event_id) return publish(...args);
+        if (mode === 'after-commit') await publish(...args);
+        throw new Error('Planning state ACK lost');
+      });
+      await expect(new JobRecoveryController(store, clock, 1, policy).deliverOutbox(adapter.stateReceiver(1), 100, undefined, PLANNING_JOB_KIND))
+        .rejects.toThrow('ACK lost');
+      expect(store.readOutbox(1, 100, PLANNING_JOB_KIND)).toEqual([succeeded]);
+      expect(new JobRetentionController(store, clock, 1).prune(0)).toBe(0);
+      loss.mockRestore(); loss = undefined; await controller.stop(); store.close(); await service.stop();
+      service = await worker(root, 'planning-execute-restarted-complete'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      store.activateAuthority(2, clock.now()); controller = new JobController(store, clock, policy);
+      const receiver = new PlanningJobAdapter(service.client).stateReceiver(2);
+      expect(await new JobRecoveryController(store, clock, 2, policy).deliverOutbox(receiver, 100, undefined, PLANNING_JOB_KIND)).toBe(1);
+      expect(store.readOutbox(2, 100, PLANNING_JOB_KIND)).toEqual([]);
+      const request = (event: JobStateEvent, epoch = 2) => create(PublishPlanningJobStateRequestSchema,
+        { event: planningJobState(event), deliveryAuthorityEpoch: BigInt(epoch) });
+      expect(await service.client.publishPlanningState(request(succeeded))).toMatchObject({ accepted: true, duplicate: true });
+      expect(await service.client.publishPlanningState(request(events[0]))).toMatchObject({ duplicate: true });
+      await expect(service.client.publishPlanningState(request({ ...succeeded, result: { ...succeeded.result!, commitment_revision: 999 } })))
+        .rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      await expect(service.client.publishPlanningState(request(succeeded, 1))).rejects.toMatchObject({ code: ServiceErrorCode.RECOVERY_REQUIRED });
+      expect(new JobRetentionController(store, clock, 2).prune(0)).toBe(1);
+      const db = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      try {
+        expect(db.prepare('SELECT status,business_outcome FROM planning_job_projection').get()).toEqual({ status: 'succeeded', business_outcome: 'committed' });
+        expect(db.prepare('SELECT COUNT(*) AS count FROM planning_job_feedback_inbox').get()).toEqual({ count: events.length });
+        expect(db.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
+        expect(db.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'completed', revision: 2 });
+      } finally { db.close(); }
+    } finally { loss?.mockRestore(); await controller.stop(); store.close(); await service.stop(); }
+  }, 30_000);
+
   it.each(['complete', 'incomplete', 'lost-response'] as const)('真实 Planning 执行 %s，双库重开不重复推理或伪造目标完成', async mode => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-execute-'));
     let service = await worker(root, `planning-execute-${mode}`);
@@ -570,10 +645,11 @@ describe('Planning 源真实 wire/Jobs 接纳', () => {
       service = await worker(root, 'planning-reconciliation-restarted'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
       host = new HostJobsController({ store, clock, epoch: 2, owner_id: 'host:接任者', cognition: service.client,
         // 本场景只对账 Planning；Memory 原源按其独立 debounce 保留，避免引入另一评估任务。
-        poll_interval_ms: 60_000, batch_size: 8, lease_ms: 60_000, submission_policy: { ...submissionPolicy, debounce_ms: 3_600_000 },
+        poll_interval_ms: 10, batch_size: 8, lease_ms: 60_000, submission_policy: { ...submissionPolicy, debounce_ms: 3_600_000 },
         retry_policy: policy, planning_sources: true });
-      expect(await host.start()).toMatchObject({ status: 'degraded' });
-      expect(['jobs_admission_pending', 'jobs_state_feedback_pending']).toContain(host.snapshot.error_code);
+      await host.start();
+      await vi.waitFor(() => expect(host!.snapshot).toMatchObject({ status: 'degraded', error_code: 'jobs_admission_pending' }),
+        { timeout: 5000, interval: 25 });
       expect(store.load(claim.job.job_id)).toMatchObject({ status: 'retry_wait', attempt: 1, authority_epoch: 2 });
       const attempt = store.listAttempts(claim.job.job_id)[0];
       const proof = await new PlanningJobSourceAdapter(service.client).query(store.load(claim.job.job_id)!, attempt);
@@ -585,7 +661,7 @@ describe('Planning 源真实 wire/Jobs 接纳', () => {
           .toEqual({ state: 'sealed', owner_id: 'host:原提交者', authority_epoch: 1 });
         expect(database.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 0 });
       } finally { database.close(); }
-      expect(store.readOutbox(2, 100, PLANNING_JOB_KIND).length).toBeGreaterThan(0);
+      expect(store.readOutbox(2, 100, PLANNING_JOB_KIND)).toHaveLength(0);
       const cancelled = new AbortController(); cancelled.abort();
       await expect(new PlanningJobSourceAdapter(service.client).query(store.load(claim.job.job_id)!, attempt, cancelled.signal)).rejects.toThrow();
       const stale = new CognitionClient(service.endpoint, 'planning-reconciliation-first', 2000);

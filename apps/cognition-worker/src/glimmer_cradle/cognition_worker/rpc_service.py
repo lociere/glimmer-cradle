@@ -55,6 +55,7 @@ from glimmer_cradle.cognition.planning import (
     ModelPlanningCompletionEvaluator,
     PlanningConflictError,
     PlanningController,
+    PlanningJobFeedback,
     PlanningStore,
     PlanVersion,
 )
@@ -1474,6 +1475,7 @@ class CognitionGrpcHost:
             "AcceptPlanningCommitment": self._method(self._accept_planning_commitment, cognition_pb.AcceptPlanningCommitmentRequest, cognition_pb.AcceptPlanningCommitmentResponse),
             "ExecutePlanningJob": self._method(self._execute_planning_job, cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse),
             "GetPlanningJobAdmission": self._method(self._get_planning_job_admission, cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse),
+            "PublishPlanningJobState": self._method(self._publish_planning_job_state, cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1934,6 +1936,31 @@ class CognitionGrpcHost:
                 reason = self._planning_evidence().admission_reason(work.plan.goal)
             return cognition_pb.GetPlanningJobAdmissionResponse(request_id=request.request_id, job_id=request.job_id,
                 scope_id=request.scope_id, eligible=reason == "planning_ready", reason_code=reason)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _publish_planning_job_state(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if not request.HasField("event") or request.ByteSize() > 65_536:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 状态事实缺失或超出上限")
+            event = request.event
+            statuses = {jobs_pb.JOB_STATUS_QUEUED: "queued", jobs_pb.JOB_STATUS_RUNNING: "running",
+                jobs_pb.JOB_STATUS_RETRY_WAIT: "retry_wait", jobs_pb.JOB_STATUS_SUCCEEDED: "succeeded",
+                jobs_pb.JOB_STATUS_CANCELLED: "cancelled", jobs_pb.JOB_STATUS_DEAD_LETTER: "dead_letter", jobs_pb.JOB_STATUS_UNKNOWN: "unknown"}
+            if event.kind != "planning.evaluate" or event.status not in statuses:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 状态 kind/枚举无效")
+            try:
+                feedback = PlanningJobFeedback(event.job_id.removeprefix("planning:"), event.job_id, event.goal_id,
+                    event.scope_id, event.event_id, hashlib.sha256(event.SerializeToString(deterministic=True)).hexdigest(),
+                    event.revision, statuses[event.status], event.attempt, event.fencing_token,
+                    event.authority_epoch, request.delivery_authority_epoch, event.updated_at_ms)
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 状态 identity/整数无效") from error
+            try:
+                duplicate = await source.accept_job_feedback(feedback, MessageToDict(event.result) if event.HasField("result") else None)
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 状态源/receipt/投递身份冲突") from error
+            return cognition_pb.PublishPlanningJobStateResponse(event_id=event.event_id, accepted=True, duplicate=duplicate)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _accept_planning_commitment(self, request: Any, context: Any) -> Any:

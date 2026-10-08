@@ -66,8 +66,9 @@ startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监
 非法组合均以不含输入内容的 owner 错误拒绝，无静默 fallback。配置全验通过后才创建 Jobs/authority
 库。每个实例持有冻结政策；更改须 drain 后以新实例重启，目前未接 Control Center 编辑或热更新。
 该入口装配 Worker/Jobs 及显式可选 Knowledge controller，不替代产品默认 Kernel 或完整角色/provider 配置加载。
-配置启动默认使用实际 Memory 状态 receiver；源 inbox/投影提交后才 ACK，精确语义见
-[协议参考](protocol.md#memory-jobs-状态投递)。手工装配仍须显式提供接收方，不静默确认 outbox。
+配置启动默认使用实际 Memory 与 Planning 状态 receiver，各自按 kind 投递，源 inbox/投影提交后才 ACK；
+精确语义见[Memory 状态](protocol.md#memory-jobs-状态投递)与[Planning 状态](protocol.md#planning-jobs-状态投递)。
+手工 Memory 装配仍须显式提供接收方；开启 Planning 源装配会接同一实际 Planning receiver，不静默确认 outbox。
 
 Knowledge 每项审批必须有 source_id（非空、最多 4096 UTF-8 bytes）、source_revision（正安全整数）、
 declaration_digest（64 位小写 SHA-256 hex）、arguments（固定 JSON object、最多 32 KiB、嵌套
