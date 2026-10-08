@@ -1788,6 +1788,275 @@ async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_mode
     with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
 
 
+@pytest.mark.parametrize("fault", ["none", "no-model", "no-knowledge", "tier", "source", "disabled", "goal", "scope", "digest",
+    "abandoned", "missing", "pair", "overflow", "generation", "planning", "conversation", "unready", "stopping", "budget"])
+async def test_planning_notification_rpc_resolves_real_source_without_sending_or_model(bound_planning_service, fault):
+    import sqlite3
+
+    from glimmer_cradle.cognition.state import CognitiveActivityState
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, activity, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    request = cognition_pb.ResolvePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+    if fault == "no-model": host._planning_model = None
+    elif fault == "no-knowledge": host._knowledge = None
+    elif fault == "tier": activity._state = CognitiveActivityState.AMBIENT
+    elif fault == "source":
+        for pack in recorder.log._pack_paths():
+            with sqlite3.connect(pack) as connection: connection.execute("DELETE FROM moments")
+    elif fault == "disabled": recorder._enabled = False
+    elif fault in {"goal", "scope"}: setattr(request.request, fault + "_id", "foreign")
+    elif fault == "digest": request.request.source_digest = "f" * 64
+    elif fault == "abandoned":
+        with sqlite3.connect(store._path) as connection: connection.execute("UPDATE planning_commitment SET status='abandoned'")
+    elif fault == "missing": request.ClearField("request")
+    elif fault == "pair": request.request.ClearField("source_digest")
+    elif fault == "overflow": request.request.goal_version = 9007199254740992
+    elif fault == "generation": request.call.generation = "old"
+    elif fault in {"planning", "conversation"}: setattr(host, "_" + fault, None)
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    elif fault == "budget": request.request.goal_id = "x" * 65537
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        resolve = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
+        if fault in {"none", "no-model", "no-knowledge", "tier", "source", "disabled"}:
+            response = await resolve(request, timeout=2)
+            assert response.request == request.request
+            assert response.available is (fault not in {"source", "disabled"})
+            assert response.reason_code == ("planning_notification_source_unavailable" if fault in {"source", "disabled"}
+                else "planning_notification_source_ready")
+            if response.available:
+                assert response.context == cognition_pb.ConversationContext(source_provider_id="surface:test", scene_id="scene:planning",
+                    conversation_id="conversation:planning", continuity_id="continuity:planning", thread_id="main",
+                    interaction_id="interaction:planning", recall_scope="conversation_private", disclosure_scope="conversation_private")
+                assert response.actor_id == "actor:planning" and response.privacy_class == "private"
+                assert response.recall_owner_id == response.disclosure_owner_id == notification.scope_id
+                assert response.receipt.receipt_id == notification.receipt_id and response.receipt.completed
+                assert response.goal_text == "核对来源记录"
+                assert await resolve(request, timeout=2) == response
+            else:
+                assert not response.HasField("context") and not response.HasField("receipt") and not response.HasField("actor_id")
+                assert not response.goal_text and not response.privacy_class and not response.recall_owner_id and not response.disclosure_owner_id
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await resolve(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"planning", "conversation", "unready", "stopping"}
+                else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"missing", "pair", "overflow", "budget"}
+                else common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED)
+            assert detail.code == expected
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert await store.pending_notification_requests() == [notification]
+    assert len(model.requests) == 1
+
+
+@pytest.mark.parametrize("fault", ["none", "zero", "limit", "cursor", "empty-cursor", "generation", "planning", "unready", "stopping", "budget", "metadata"])
+async def test_planning_notification_rpc_readonly_scan_never_creates_windows(bound_planning_service, fault):
+    import sqlite3
+
+    host, _, store, _, _, model, _, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    request = cognition_pb.ReadPlanningNotificationsRequest(call=execution.call, limit=1)
+    if fault == "zero": request.limit = 0
+    elif fault == "limit": request.limit = 1001
+    elif fault == "cursor": request.after_notification_id = "foreign"
+    elif fault == "empty-cursor": request.after_notification_id = ""
+    elif fault == "generation": request.call.generation = "old"
+    elif fault == "planning": host._planning = None
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    elif fault == "budget": request.after_notification_id = "x" * 65537
+    elif fault == "metadata": request.call.trace_id = "x" * 65537
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        read = _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse)
+        if fault == "none":
+            assert not (await read(request, timeout=2)).requests
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await read(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"planning", "unready", "stopping"} else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST)
+            assert detail.code == expected
+            if fault == "metadata": assert not detail.HasField("call")
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert not model.requests
+
+
+@pytest.mark.parametrize("method", ["read", "resolve"])
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
+async def test_planning_notification_rpc_cancellation_tracks_and_drains_read_transaction(bound_planning_service, monkeypatch, method, termination):
+    import sqlite3
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, _, store, _, _, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    entered, finished = asyncio.Event(), asyncio.Event()
+    original = store._notification_schema
+
+    async def waiting_schema(connection, *, create=False):
+        result = await original(connection, create=create)
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            finished.set()
+        return result
+
+    monkeypatch.setattr(store, "_notification_schema", waiting_schema)
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        if method == "read":
+            operation = _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse)
+            request = cognition_pb.ReadPlanningNotificationsRequest(call=execution.call, limit=1)
+        else:
+            operation = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
+            request = cognition_pb.ResolvePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+        running = operation(request, timeout=0.5 if termination == "deadline" else 5)
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            assert host._inflight
+            if termination == "cancel":
+                running.cancel()
+                with pytest.raises(asyncio.CancelledError): await running
+            elif termination == "deadline":
+                with pytest.raises(grpc.aio.AioRpcError) as expired: await running
+                assert expired.value.code() == grpc.StatusCode.DEADLINE_EXCEEDED
+            else:
+                await host.stop()
+            await asyncio.wait_for(finished.wait(), 2)
+            monkeypatch.setattr(store, "_notification_schema", original)
+            assert await store.pending_notification_requests() == [notification]
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+            assert len(model.requests) == 1
+        finally:
+            running.cancel()
+
+
+@pytest.mark.parametrize("scope,owner", [("public", "public"), ("conversation_private", "conversation:planning"),
+    ("actor_private", "actor:planning"), ("space_local", "scene:planning"), ("character_internal", "continuity:planning")])
+async def test_planning_notification_source_maps_actual_privacy_owner_not_model_policy(bound_planning_service, monkeypatch, scope, owner):
+    from dataclasses import replace
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_source,
+        planning_source_digest,
+    )
+
+    _, recorder, store, _, _, _, _, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    goal = (await store.read_evaluation_work(job_id=execution.identity.job_id, scope_id=execution.identity.scope_id,
+        request_id=execution.request_id)).plan.goal
+    original = recorder.log.get_moment(goal.source_moment_id)
+    moment = replace(original, recall_scope=scope, disclosure_scope=scope)
+    # App helper 的边界 fixture；不是给生产不可变目标换绑或建立权限。
+    monkeypatch.setattr(recorder.log, "get_moment", lambda _identity: moment)
+    source, domain = planning_notification_source(recorder, replace(goal, source_digest=planning_source_digest(moment)))
+    assert source == moment and domain[6] == domain[8] == owner
+
+
+@pytest.mark.parametrize("fault", ["provider", "continuity", "thread", "interaction", "actor", "actor-number", "actor-blank",
+    "actor-budget", "privacy", "retention", "scope"])
+async def test_planning_notification_source_rejects_incomplete_actual_domain_even_with_matching_digest(bound_planning_service, monkeypatch, fault):
+    from dataclasses import replace
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_source,
+        planning_source_digest,
+    )
+
+    _, recorder, store, _, _, _, _, _, prepare, _, _ = bound_planning_service
+    execution = await prepare()
+    goal = (await store.read_evaluation_work(job_id=execution.identity.job_id, scope_id=execution.identity.scope_id,
+        request_id=execution.request_id)).plan.goal
+    moment = recorder.log.get_moment(goal.source_moment_id)
+    if fault == "provider": moment = replace(moment, content={**moment.content, "source_provider_id": ""})
+    elif fault in {"continuity", "thread", "interaction"}: moment = replace(moment, **{fault + "_id": ""})
+    elif fault == "actor": moment = replace(moment, actor_id=None, recall_scope="actor_private")
+    elif fault == "actor-number": moment = replace(moment, actor_id=123, recall_scope="actor_private")
+    elif fault == "actor-blank": moment = replace(moment, actor_id=" ", recall_scope="actor_private")
+    elif fault == "actor-budget": moment = replace(moment, actor_id="x" * 4097, recall_scope="actor_private")
+    elif fault == "privacy": moment = replace(moment, origin=replace(moment.origin, privacy_class="unknown"))
+    elif fault == "retention": moment = replace(moment, retention_ceiling="transient")
+    else: moment = replace(moment, disclosure_scope="unsupported")
+    monkeypatch.setattr(recorder.log, "get_moment", lambda _identity: moment)
+    with pytest.raises(PermissionError):
+        planning_notification_source(recorder, replace(goal, source_digest=planning_source_digest(moment)))
+
+
+async def test_planning_notification_legacy_unbound_work_keeps_body_private_and_pending(bound_planning_service):
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, _, store, _, _, _, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    original = (await store.read_notification_work((await store.pending_notification_requests())[0])).receipt
+    # 旧 Core 消费者可有未绑定目标；实际生产 Accept RPC 不允许伪造来源。
+    await store.accept_commitment("commitment:legacy", PlanVersion("plan:legacy", 1,
+        GoalVersion("goal:legacy", original.identity.scope_id, 1, "旧目标正文", "实际证据"), ("核对",)), due_at=0)
+    source = (await store.pending_job_requests())[0]
+    await store.acknowledge_job_request(source, JobReceipt(f"planning:{source.request_id}", "accepted", 1))
+    from dataclasses import replace
+    identity = replace(original.identity, job_id=f"planning:{source.request_id}")
+    work = await store.prepare_evaluation(identity, source.request_id)
+    receipt = await store.commit_evaluation(identity, work, original.assessment, original.evidence)
+    requests = await store.pending_notification_requests()
+    notification = next(item for item in requests if item.receipt_id == receipt.receipt_id)
+    host._conversation = host._planning_model = host._knowledge = None
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        resolve = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
+        response = await resolve(cognition_pb.ResolvePlanningNotificationRequest(call=execution.call,
+            request=planning_notification_to_wire(notification)), timeout=2)
+        assert not response.available and response.reason_code == "planning_notification_source_unbound"
+        assert not response.HasField("context") and not response.HasField("receipt") and not response.goal_text
+    assert await store.pending_notification_requests() == requests
+
+
+async def test_planning_notification_wire_budget_pagination_preserves_all_original_requests(bound_planning_service):
+    from dataclasses import replace
+
+    host, _, store, _, _, _, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    original = (await store.read_notification_work((await store.pending_notification_requests())[0])).receipt
+    for index in range(34):
+        goal_id = f"goal:{index}:" + "x" * 32_000
+        await store.accept_commitment(f"commitment:wide:{index}", PlanVersion(f"plan:wide:{index}", 1,
+            GoalVersion(goal_id, original.identity.scope_id, 1, "目标", "真实证据"), ("核对",)), due_at=0)
+        source = (await store.pending_job_requests())[0]
+        identity = replace(original.identity, job_id=f"planning:{source.request_id}")
+        await store.acknowledge_job_request(source, JobReceipt(identity.job_id, "accepted", 1))
+        work = await store.prepare_evaluation(identity, source.request_id)
+        await store.commit_evaluation(identity, work, original.assessment, original.evidence)
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        read = _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse)
+        request = cognition_pb.ReadPlanningNotificationsRequest(call=execution.call, limit=1000)
+        found, sizes = [], []
+        while True:
+            page = await read(request, timeout=2)
+            assert page.ByteSize() <= 1_048_576
+            if not page.requests: break
+            sizes.append(len(page.requests))
+            found.extend(item.notification_id for item in page.requests)
+            request.after_notification_id = page.requests[-1].notification_id
+        expected = [item.notification_id for item in await store.pending_notification_requests()]
+        assert found == expected and len(found) == 35 and len(sizes) > 1
+        assert 1 <= sizes[0] < 35
+
+
 @pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
 async def test_planning_admission_cancellation_drains_readonly_transaction(bound_planning_service, monkeypatch, termination):
     import sqlite3

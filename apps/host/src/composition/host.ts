@@ -1,4 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { create } from '@bufbuild/protobuf';
+import { ReadPlanningNotificationsRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobController, JobRecoveryController, JobRetentionController, JobScheduler, type JobClockPort,
   type JobStorePort, type JobStateReceiverPort, type RetryPolicy } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
@@ -27,7 +29,7 @@ export interface HostJobsOptions {
 export interface HostJobsSnapshot {
   readonly status: 'idle' | 'starting' | 'ready' | 'degraded' | 'failed' | 'stopping' | 'stopped';
   readonly completed_cycles: number;
-  readonly error_code: 'cognition_unavailable' | 'jobs_recovery_pending' | 'jobs_admission_pending' | 'jobs_state_feedback_pending' | 'jobs_cycle_failed' | null;
+  readonly error_code: 'cognition_unavailable' | 'jobs_recovery_pending' | 'jobs_admission_pending' | 'jobs_state_feedback_pending' | 'planning_notifications_pending' | 'jobs_cycle_failed' | null;
 }
 
 /** 监督实际已装配链路；逐任务接纳和缺状态 receiver 如实降级，不代表整个产品 ready。 */
@@ -159,9 +161,15 @@ export class HostJobsController {
         || !!this.planningSource && store.listUnknown(epoch, PLANNING_JOB_KIND, 1).length > 0;
       const admissionPending = (this.planningScheduler?.waitingCount ?? 0) > 0;
       const feedbackPending = !!this.planningSource && store.readOutbox(epoch, 1, PLANNING_JOB_KIND).length > 0;
-      this.state = { status: degraded || pending || admissionPending || feedbackPending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
+      // 尚无真实通知 receiver；只观察实际 durable 待办，不能以 Jobs ACK 或空回调清除。
+      const notifications = this.planningSource ? await this.options.cognition.readPlanningNotifications(
+        create(ReadPlanningNotificationsRequestSchema, { limit: 1 }), signal) : undefined;
+      signal.throwIfAborted();
+      if (notifications && notifications.requests.length > 1) throw new Error('Planning 通知扫描响应越界');
+      const notificationPending = !!notifications?.requests.length;
+      this.state = { status: degraded || pending || admissionPending || feedbackPending || notificationPending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
         error_code: degraded ? 'cognition_unavailable' : pending ? 'jobs_recovery_pending' : admissionPending
-          ? 'jobs_admission_pending' : feedbackPending ? 'jobs_state_feedback_pending' : null };
+          ? 'jobs_admission_pending' : feedbackPending ? 'jobs_state_feedback_pending' : notificationPending ? 'planning_notifications_pending' : null };
     } catch (error) {
       if (signal.aborted || !this.unavailable(error)) throw error;
       this.state = { ...this.state, status: 'degraded', error_code: 'cognition_unavailable' };

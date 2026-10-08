@@ -21,6 +21,7 @@ import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequ
   PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
   AcceptPlanningCommitmentRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy,
   RetentionCeiling, PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
@@ -156,11 +157,29 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       expect(assessments[0].goal).toMatchObject({ source_moment_id: sourceMomentId, model_tier: 'cloud_allowed' });
       expect(assessments[0].evidence.length).toBeGreaterThan(0);
       expect(JSON.stringify(assessments)).toContain('核对这条实际来源记录');
-      await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({ status: 'ready', error_code: null }),
+      const notificationRequest = create(ReadPlanningNotificationsRequestSchema, { limit: 1 });
+      const notifications = await client.readPlanningNotifications(notificationRequest);
+      expect(notifications.requests).toHaveLength(completed ? 1 : 0);
+      if (completed) {
+        expect(await client.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request: notifications.requests[0] })))
+          .toMatchObject({ available: true, reasonCode: 'planning_notification_source_ready', goalText: '核对实际来源',
+            privacyClass: 'private', recallOwnerId: 'conversation:actual-planning', disclosureOwnerId: 'conversation:actual-planning',
+            context: { sourceProviderId: 'provider', sceneId: 'scene', conversationId: 'conversation:actual-planning',
+              continuityId: 'continuity', threadId: 'main', interactionId: 'planning-native-turn',
+              recallScope: 'conversation_private', disclosureScope: 'conversation_private' },
+            receipt: { completed: true, receiptId: notifications.requests[0].receiptId } });
+      }
+      await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({
+        status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
         { timeout: 5000, interval: 25 });
       client.close(); client = undefined; await owner.stop();
       owner = new ConfiguredHostCognitionJobsOwner(options); await owner.start();
       expect(owner.snapshot.session!.jobs!.lease!.epoch).toBe(2);
+      client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
+      expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
+      await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({
+        status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
+      { timeout: 5000, interval: 25 });
       const planning = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
       try {
         expect(planning.prepare('SELECT status,revision FROM planning_commitment').get())

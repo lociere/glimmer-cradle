@@ -183,6 +183,25 @@ planning_executed = cognition_pb.ExecutePlanningJobResponse(result=planning_appl
 for message in (planning_accept, planning_accepted, planning_execute, planning_executed):
     assert type(message).FromString(message.SerializeToString()) == message
 assert not cognition_pb.ExecutePlanningJobResponse.FromString(b"").HasField("result")
+notification = cognition_pb.PlanningNotificationRequest(notification_id="d" * 64, receipt_id="e" * 64,
+    request_id=planning_source.request_id, job_id=planning_ack.job_id, commitment_id=planning_source.commitment_id,
+    commitment_revision=9007199254740991, goal_id=planning_source.goal_id, goal_version=9007199254740991,
+    scope_id=planning_source.scope_id, source_moment_id="moment:原来源", source_digest="a" * 64, created_at_ms=0)
+notification_read = cognition_pb.ReadPlanningNotificationsRequest(limit=1, after_notification_id="b" * 64)
+notification_page = cognition_pb.ReadPlanningNotificationsResponse(requests=[notification])
+notification_resolve = cognition_pb.ResolvePlanningNotificationRequest(request=notification)
+notification_resolved = cognition_pb.ResolvePlanningNotificationResponse(request=notification, available=True,
+    reason_code="planning_notification_source_ready", goal_text="目标:一", actor_id="actor:一", privacy_class="private",
+    recall_owner_id="actor:一", disclosure_owner_id="conversation:一",
+    context=cognition_pb.ConversationContext(source_provider_id="provider:一", scene_id="scene:一", conversation_id="conversation:一",
+        continuity_id="continuity:一", thread_id="main", interaction_id="interaction:一", recall_scope="actor_private",
+        disclosure_scope="conversation_private"), receipt=planning_applied.result.receipt)
+notification_resolved.receipt.completed = True
+for message in (notification, notification_read, notification_page, notification_resolve, notification_resolved):
+    assert type(message).FromString(message.SerializeToString()) == message
+assert not cognition_pb.PlanningNotificationRequest.FromString(b"").HasField("source_moment_id")
+assert not cognition_pb.ResolvePlanningNotificationResponse.FromString(b"").HasField("context")
+assert not cognition_pb.ResolvePlanningNotificationResponse.FromString(b"").HasField("receipt")
 planning_applied.result.resolution = PLANNING_JOB_RESOLUTION_NOT_APPLIED
 planning_applied.result.ClearField("receipt")
 assert not ReconcilePlanningJobResponse.FromString(planning_applied.SerializeToString()).result.HasField("receipt")

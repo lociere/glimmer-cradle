@@ -14,8 +14,10 @@ from glimmer_cradle.cognition.inference import ModelPort, ModelRequest
 from glimmer_cradle.cognition.knowledge import KnowledgeIndex, KnowledgeRevision
 from glimmer_cradle.cognition.planning import (
     GoalVersion,
+    PlanningEvaluationReceipt,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.ports import (
     JobReceipt,
@@ -168,6 +170,35 @@ def planning_identity_to_wire(identity: PlanningJobIdentity) -> jobs_pb.JobExecu
         lease_until_ms=identity.lease_until)
 
 
+def planning_notification_from_wire(request: cognition_pb.PlanningNotificationRequest) -> PlanningNotificationRequest:
+    return PlanningNotificationRequest(
+        request.notification_id, request.receipt_id, request.job_id, request.request_id,
+        request.commitment_id, request.commitment_revision, request.goal_id, request.goal_version,
+        request.scope_id, request.source_moment_id if request.HasField("source_moment_id") else None,
+        request.source_digest if request.HasField("source_digest") else None, request.created_at_ms,
+    )
+
+
+def planning_notification_to_wire(request: PlanningNotificationRequest) -> cognition_pb.PlanningNotificationRequest:
+    return cognition_pb.PlanningNotificationRequest(
+        notification_id=request.notification_id, receipt_id=request.receipt_id, job_id=request.job_id,
+        request_id=request.request_id, commitment_id=request.commitment_id, commitment_revision=request.commitment_revision,
+        goal_id=request.goal_id, goal_version=request.goal_version, scope_id=request.scope_id,
+        source_moment_id=request.source_moment_id, source_digest=request.source_digest, created_at_ms=request.created_at,
+    )
+
+
+def planning_receipt_to_wire(receipt: PlanningEvaluationReceipt) -> cognition_pb.PlanningEvaluationReceipt:
+    return cognition_pb.PlanningEvaluationReceipt(receipt_id=receipt.receipt_id,
+        identity=planning_identity_to_wire(receipt.identity), request_id=receipt.request_id,
+        commitment_id=receipt.commitment_id, commitment_revision=receipt.commitment_revision,
+        completed=receipt.assessment.completed, evidence_ids=receipt.assessment.evidence_ids,
+        reason=receipt.assessment.reason, evidence=[cognition_pb.PlanningEvidenceReference(
+            evidence_id=item.evidence_id, source_owner=item.source_owner, scope_id=item.scope_id,
+            revision=item.revision, content_digest=item.content_digest) for item in receipt.evidence],
+        committed_at_ms=receipt.committed_at)
+
+
 def planning_result_to_wire(result: PlanningJobResult, request_id: str) -> cognition_pb.PlanningJobResult:
     """原查询 identity 与真实提交 identity 分开；新 attempt 不篡改旧业务 receipt。"""
     identity, receipt = result.identity, result.receipt
@@ -181,14 +212,7 @@ def planning_result_to_wire(result: PlanningJobResult, request_id: str) -> cogni
         evidence_id=hashlib.sha256(json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest(),
         observed_at_ms=result.observed_at)
     if receipt is not None:
-        wire.receipt.CopyFrom(cognition_pb.PlanningEvaluationReceipt(receipt_id=receipt.receipt_id,
-            identity=planning_identity_to_wire(receipt.identity), request_id=receipt.request_id,
-            commitment_id=receipt.commitment_id, commitment_revision=receipt.commitment_revision,
-            completed=receipt.assessment.completed, evidence_ids=receipt.assessment.evidence_ids,
-            reason=receipt.assessment.reason, evidence=[cognition_pb.PlanningEvidenceReference(
-                evidence_id=item.evidence_id, source_owner=item.source_owner, scope_id=item.scope_id,
-                revision=item.revision, content_digest=item.content_digest) for item in receipt.evidence],
-            committed_at_ms=receipt.committed_at))
+        wire.receipt.CopyFrom(planning_receipt_to_wire(receipt))
     if wire.ByteSize() > 65_536:
         raise ValueError("Planning 对账响应超过预算")
     return wire
@@ -213,10 +237,29 @@ def _source_context(moment: Moment) -> tuple[str, ...]:
         raise PermissionError("Planning 来源隐私分类无效")
     owners = {"public": "public", "conversation_private": moment.conversation_id, "actor_private": moment.actor_id,
               "space_local": moment.scene_id, "character_internal": moment.continuity_id}
-    if any(scope not in owners or not owners[scope] for scope in (moment.recall_scope, moment.disclosure_scope)):
+    if any(scope not in owners or not isinstance(owners[scope], str) or not owners[scope].strip()
+           or len(owners[scope].encode("utf-8")) > 4096 for scope in (moment.recall_scope, moment.disclosure_scope)):
         raise PermissionError("Planning 来源隐私域不完整或未支持")
-    return (*values, moment.recall_scope, str(owners[moment.recall_scope]),
-            moment.disclosure_scope, str(owners[moment.disclosure_scope]), moment.origin.privacy_class)
+    return (*values, moment.recall_scope, owners[moment.recall_scope],
+            moment.disclosure_scope, owners[moment.disclosure_scope], moment.origin.privacy_class)
+
+
+def planning_notification_source(recorder: ConversationRecorder, goal: GoalVersion) -> tuple[Moment, tuple[str, ...]]:
+    """仅复验实际来源；IO 需求不借用 model-tier 放行或要求 Knowledge/模型装配。"""
+    if not recorder.enabled or goal.source_moment_id is None:
+        raise PermissionError("Planning 通知来源不可用")
+    source = recorder.log.get_moment(goal.source_moment_id)
+    if (source is None or source.kind != MomentKind.PERCEPTION.value or source.conversation_id != goal.scope_id
+        or planning_source_digest(source) != goal.source_digest):
+        raise PermissionError("Planning 通知原来源已缺失、修订或越域")
+    domain = _source_context(source)
+    if not isinstance(source.interaction_id, str) or not source.interaction_id.strip() \
+            or len(source.interaction_id.encode("utf-8")) > 4096:
+        raise PermissionError("Planning 通知来源交互身份不完整")
+    if source.actor_id is not None and (not isinstance(source.actor_id, str) or not source.actor_id.strip()
+                                      or len(source.actor_id.encode("utf-8")) > 4096):
+        raise PermissionError("Planning 通知来源 actor 身份无效")
+    return source, domain
 
 
 class PlanningEvidenceAdapter:

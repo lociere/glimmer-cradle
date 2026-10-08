@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Planning 完成通知的读取/来源解析同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`PlanningNotificationRequest`、`ReadPlanningNotificationsRequest`、`ReadPlanningNotificationsResponse`、
+`ResolvePlanningNotificationRequest`、`ResolvePlanningNotificationResponse` 与
+`ReadPlanningNotifications` / `ResolvePlanningNotification`。真实持久请求和业务事实只读，完整来源
+与隐私 owner 从实际 Conversation Log 复验；不新增通知 ACK 或第二 Delivery 状态机。
+
 Planning 状态投递同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `PublishPlanningJobStateRequest`、`PublishPlanningJobStateResponse` 与同一 CognitionService 的
 `PublishPlanningJobState`。复用 Jobs 唯一 `JobStateEvent`；真实 source/receipt 核验、持久 inbox/投影

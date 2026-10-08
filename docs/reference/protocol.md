@@ -191,6 +191,37 @@ Worker 以实际 wire event 摘要映射消费方反馈，不以模型/外部 re
 最新 revision。新事件 inbox/投影同事务提交后返回同 event_id、accepted=true、duplicate；Jobs 才 ACK。
 取消/deadline/shutdown drain 事务，响应丢失重投原事件，不自造确认；retention 不删除接收 owner 的事实。
 
+### Planning 完成通知读取与来源解析
+
+`ReadPlanningNotifications` / `ResolvePlanningNotification` 同属 Cognition Service，消费 Core 同事务
+产生的 `PlanningNotificationRequest`；不是通知发送/ACK 接口，不增加第二 Delivery 状态机。
+请求引用 notification/receipt/request/Job、承诺 revision、goal ID/version/scope、可选成对 Moment
+ID/digest 和 created time，稳定 ID 与 Core 规则一致；字符串 optional 的缺失不当成空字符串绑定。
+所有版本/时间保持 JS safe，原未知/未绑定目标不补造来源。请求总量不超过 64 KiB。
+
+Read 的 limit 为 1 至 1000，optional after ID 必须是 64 位小写 SHA-256；按稳定 ID 前向分页。
+单次实际至多 64 项、wire 响应至多 1 MiB，预算可使非空页少于 limit，消费者须沿最后 ID
+继续直到空页，不以短页判定扫描完毕。读取不创建通知/评估窗口、改写高水位或清除请求。
+
+Resolve 先核验真实源 ACK、不可变目标/计划、已完成 receipt 与当前承诺 revision，再从实际
+Conversation Log 复验原完整来源摘要、保留资格、provider/scene/conversation/continuity/thread/
+interaction、privacy class、recall/disclosure scope 与实际 owner。actor_private 的 owner 是实际
+Actor，不将 actor 当平台 User 或从 scope 猜目的地。返回 available=true 只表示当前内部来源可读；
+不是外部发送资格。IO 解析不调用模型，不要求 Knowledge/ModelPort 或 cloud model-tier。
+可读时携原 goal text、原业务 receipt、完整 context、可选 actor 与隐私 owner；响应至多 256 KiB。
+
+未绑定/来源不可用分别返回 `planning_notification_source_unbound` / `planning_notification_source_unavailable`，
+available=false，只有原 request/reason，不返回正文、context、actor 或 receipt；可读 reason 为
+`planning_notification_source_ready`。非法身份/整数/分页/预算为 INVALID_REQUEST，来源引用/业务
+事实冲突或响应超预算为 RECOVERY_REQUIRED；缺持久/Conversation owner、未 ready/drain 为
+NOT_READY，旧代为 GENERATION_MISMATCH。取消/deadline/shutdown 排空只读事务，待办不消费。
+
+Worker 的共享调用边界限 CallMetadata 4 KiB，超限在 trace context/inflight 之前拒绝；错误 detail
+不回显超限 metadata，避免突破 gRPC trailer 预算丢失结构化错误码。合法调用仍保持原 call。
+Host 实际 client 接通上述 RPC；默认监督链观察持久待办，没有真实投递 receiver 时显示
+`degraded/planning_notifications_pending`，Jobs 状态 ACK 不抹去通知或假 ready。后续 App 必须
+复验真实目的地/权限，复用 Conversation output generation 与实际 delivery receipt 后才能接 ACK。
+
 ### Planning 原 attempt 持久对账
 
 `ReconcilePlanningJob` 复用 Jobs 唯一 `JobExecutionIdentity`，另携原源 `request_id`；请求总量

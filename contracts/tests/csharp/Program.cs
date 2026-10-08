@@ -191,6 +191,29 @@ if (!AcceptPlanningCommitmentRequest.Parser.ParseFrom(planningAccept.ToByteArray
     || !ExecutePlanningJobResponse.Parser.ParseFrom(planningExecuted.ToByteArray()).Equals(planningExecuted)
     || ExecutePlanningJobResponse.Parser.ParseFrom(Array.Empty<byte>()).Result != null)
     throw new InvalidOperationException("Planning accept/execute source/precision/presence roundtrip failed");
+var notification = new PlanningNotificationRequest { NotificationId = new string('d', 64), ReceiptId = new string('e', 64),
+    RequestId = planningSource.RequestId, JobId = planningAck.JobId, CommitmentId = planningSource.CommitmentId,
+    CommitmentRevision = 9007199254740991, GoalId = planningSource.GoalId, GoalVersion = 9007199254740991,
+    ScopeId = planningSource.ScopeId, SourceMomentId = "moment:原来源", SourceDigest = new string('a', 64), CreatedAtMs = 0 };
+var notificationRead = new ReadPlanningNotificationsRequest { Limit = 1, AfterNotificationId = new string('b', 64) };
+var notificationPage = new ReadPlanningNotificationsResponse { Requests = { notification } };
+var notificationResolve = new ResolvePlanningNotificationRequest { Request = notification };
+var notificationResolved = new ResolvePlanningNotificationResponse { Request = notification, Available = true,
+    ReasonCode = "planning_notification_source_ready", GoalText = "目标:一", ActorId = "actor:一", PrivacyClass = "private",
+    RecallOwnerId = "actor:一", DisclosureOwnerId = "conversation:一", Receipt = planningApplied.Result.Receipt.Clone(),
+    Context = new ConversationContext { SourceProviderId = "provider:一", SceneId = "scene:一", ConversationId = "conversation:一",
+        ContinuityId = "continuity:一", ThreadId = "main", InteractionId = "interaction:一", RecallScope = "actor_private",
+        DisclosureScope = "conversation_private" } };
+notificationResolved.Receipt.Completed = true;
+if (!PlanningNotificationRequest.Parser.ParseFrom(notification.ToByteArray()).Equals(notification)
+    || !ReadPlanningNotificationsRequest.Parser.ParseFrom(notificationRead.ToByteArray()).Equals(notificationRead)
+    || !ReadPlanningNotificationsResponse.Parser.ParseFrom(notificationPage.ToByteArray()).Equals(notificationPage)
+    || !ResolvePlanningNotificationRequest.Parser.ParseFrom(notificationResolve.ToByteArray()).Equals(notificationResolve)
+    || !ResolvePlanningNotificationResponse.Parser.ParseFrom(notificationResolved.ToByteArray()).Equals(notificationResolved)
+    || PlanningNotificationRequest.Parser.ParseFrom(Array.Empty<byte>()).HasSourceMomentId
+    || ResolvePlanningNotificationResponse.Parser.ParseFrom(Array.Empty<byte>()).Context != null
+    || ResolvePlanningNotificationResponse.Parser.ParseFrom(Array.Empty<byte>()).Receipt != null)
+    throw new InvalidOperationException("Planning notification context/receipt/precision/presence roundtrip failed");
 planningApplied.Result.Resolution = PlanningJobResolution.NotApplied;
 planningApplied.Result.Receipt = null;
 if (ReconcilePlanningJobResponse.Parser.ParseFrom(planningApplied.ToByteArray()).Result.Receipt != null)

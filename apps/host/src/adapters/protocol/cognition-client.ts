@@ -21,6 +21,10 @@ import {
   ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
   GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
   PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
+  ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
+  ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
+  type ReadPlanningNotificationsRequest, type ReadPlanningNotificationsResponse,
+  type ResolvePlanningNotificationRequest, type ResolvePlanningNotificationResponse,
   type PublishPlanningJobStateRequest, type PublishPlanningJobStateResponse,
   type GetPlanningJobAdmissionRequest, type GetPlanningJobAdmissionResponse,
   type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
@@ -66,12 +70,17 @@ export interface PlanningJobsCognitionPort extends PlanningJobsReconciliationPor
   publishPlanningState(request: PublishPlanningJobStateRequest, signal?: AbortSignal): Promise<PublishPlanningJobStateResponse>;
 }
 
+export interface PlanningNotificationsCognitionPort {
+  readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse>;
+  resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse>;
+}
+
 export class HostCognitionError extends Error {
   public constructor(public readonly code: ServiceErrorCode) { super('受监督 Cognition Service 请求失败'); }
 }
 
 /** 端点及 generation 由监督 owner 注入；切代必须撤销旧 client，不自造或发现 authority。 */
-export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsCognitionPort {
+export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsCognitionPort, PlanningNotificationsCognitionPort {
   private readonly client: grpc.Client;
   private readonly inflight = new Set<grpc.ClientUnaryCall>();
   private closed = false;
@@ -173,6 +182,14 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public publishPlanningState(request: PublishPlanningJobStateRequest, signal?: AbortSignal): Promise<PublishPlanningJobStateResponse> {
     return this.call('PublishPlanningJobState', PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
       create(PublishPlanningJobStateRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse> {
+    return this.call('ReadPlanningNotifications', ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
+      create(ReadPlanningNotificationsRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse> {
+    return this.call('ResolvePlanningNotification', ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
+      create(ResolvePlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

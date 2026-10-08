@@ -17,6 +17,6 @@ export { HostConfigurationError, loadHostCognitionJobsConfiguration } from './ad
 export type { HostCognitionJobsConfiguration } from './adapters/platform/host-configuration.js';
 export { SqliteAuthorityStore } from './adapters/platform/authority-store.js';
 export { CognitionClient, HostCognitionError } from './adapters/protocol/cognition-client.js';
-export type { MemoryJobsCognitionPort } from './adapters/protocol/cognition-client.js';
+export type { MemoryJobsCognitionPort, PlanningNotificationsCognitionPort } from './adapters/protocol/cognition-client.js';
 export { MEMORY_JOB_KIND, memoryJobRequest, memoryJobIdentity, memoryJobEvidence } from './adapters/protocol/job-mapper.js';
 export type { MemoryJobSubmissionPolicy } from './adapters/protocol/job-mapper.js';

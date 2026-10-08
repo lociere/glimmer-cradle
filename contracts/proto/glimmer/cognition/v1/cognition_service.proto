@@ -542,6 +542,54 @@ message PublishPlanningJobStateResponse {
   bool duplicate = 3;
 }
 
+// Core 原子产生的发布意图；不是目的地、投递权限或已送达证明。
+message PlanningNotificationRequest {
+  string notification_id = 1;
+  string receipt_id = 2;
+  string job_id = 3;
+  string request_id = 4;
+  string commitment_id = 5;
+  uint64 commitment_revision = 6;
+  string goal_id = 7;
+  uint64 goal_version = 8;
+  string scope_id = 9;
+  optional string source_moment_id = 10;
+  optional string source_digest = 11;
+  uint64 created_at_ms = 12;
+}
+
+message ReadPlanningNotificationsRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  uint32 limit = 2;
+  optional string after_notification_id = 3;
+}
+
+// 稳定 ID 前向分页；只读，不 ACK。响应最多 1 MiB，可少于 limit；非空页须继续读取。
+message ReadPlanningNotificationsResponse {
+  repeated PlanningNotificationRequest requests = 1;
+}
+
+message ResolvePlanningNotificationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningNotificationRequest request = 2;
+}
+
+// available 只证明当前来源及 Core 业务事实可读；App 必须另验真实目的地、权限与 Delivery receiver。
+// false 时只有 request/reason_code，不披露正文/context/receipt；响应最多 256 KiB。
+message ResolvePlanningNotificationResponse {
+  PlanningNotificationRequest request = 1;
+  bool available = 2;
+  // planning_notification_source_ready/source_unbound/source_unavailable。
+  string reason_code = 3;
+  ConversationContext context = 4;
+  optional string actor_id = 5;
+  string privacy_class = 6;
+  string recall_owner_id = 7;
+  string disclosure_owner_id = 8;
+  string goal_text = 9;
+  PlanningEvaluationReceipt receipt = 10;
+}
+
 enum PlanningJobResolution {
   PLANNING_JOB_RESOLUTION_UNSPECIFIED = 0;
   PLANNING_JOB_RESOLUTION_APPLIED = 1;
@@ -591,6 +639,7 @@ message ReconcilePlanningJobResponse {
   PlanningJobResult result = 1;
 }
 
+// Worker 接收的 CallMetadata 最多 4 KiB；超限为 INVALID_REQUEST，错误 detail 不回显该 metadata。
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -623,4 +672,6 @@ service CognitionService {
   rpc ExecutePlanningJob(ExecutePlanningJobRequest) returns (ExecutePlanningJobResponse);
   rpc GetPlanningJobAdmission(GetPlanningJobAdmissionRequest) returns (GetPlanningJobAdmissionResponse);
   rpc PublishPlanningJobState(PublishPlanningJobStateRequest) returns (PublishPlanningJobStateResponse);
+  rpc ReadPlanningNotifications(ReadPlanningNotificationsRequest) returns (ReadPlanningNotificationsResponse);
+  rpc ResolvePlanningNotification(ResolvePlanningNotificationRequest) returns (ResolvePlanningNotificationResponse);
 }

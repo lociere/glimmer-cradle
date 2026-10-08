@@ -302,8 +302,12 @@ notification ID 为 `planning-completion.v1:<receipt_id>` 的 UTF-8 SHA-256；�
 承诺状态/revision，再返回原目标和原评估事实。伪造引用、事实漂移、非规范/未知字段或超预算
 信封失败关闭，保留待办；这些 Core 只读事实不是 App 的隐私或外部发送资格。
 
-此候选没有通知 wire、投递 receiver 或可清理请求的 ACK 入口。App 后续须从实际 Conversation
-Log 复验完整来源/隐私域和当前权限，并复用 Conversation output generation/真实 delivery receipt；
+通知读取/来源解析的生成 wire 与 Worker/Host client 已接线。Worker 复验实际 Conversation Log
+的原完整来源/保留资格/context/隐私 owner；无绑定或来源不可用只返回原引用和原因，不披露
+目标正文或 receipt。该 IO 采样独立于 model-tier，不调用模型或要求 Knowledge 装配；read/resolve
+不改写或消费通知。Host 默认观察实际待办，无真实 receiver 时显示 `planning_notifications_pending`。
+精确分页、预算、reason/error 与生命周期见上述协议参考。本候选仍无投递 receiver 或可清理请求
+的 ACK 入口；App 后续须复验真实目的地和当前权限，并复用 Conversation output generation/真实 delivery receipt；
 PublishAction 接纳、模型完成和本地读成功均不表示外部已送达。缺接收方、撤权、取消或 unknown
 保留请求，不能用空回调补齐链路。通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
 

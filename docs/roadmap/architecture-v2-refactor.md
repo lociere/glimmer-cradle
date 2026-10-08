@@ -620,7 +620,44 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 5/7 Planning 完成通知的原子持久请求（2026-10-08 当前候选）
+### 阶段 5/7 Planning 通知 wire 与实际来源解析（2026-10-08 当前候选）
+
+输入 `d44c53e3`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按协议 Skill 在唯一
+Contract Spine 新增 typed 通知引用、Read/Resolve RPC，生成 TS/Python/C#，不手写 wire 镜像或
+新增 ACK。Worker 消费实际 Core outbox/work，稳定 ID 分页限 64 项/1 MiB，非空短页仍前进到空页；
+Resolve 同事务核验原业务事实后复验实际 Conversation 来源全摘要、保留资格、完整 context/
+interaction、隐私 class 与 recall/disclosure owner。actor_private 使用实际 Actor，不推造 User、
+目的地或发送资格；非法/空白/超预算 owner 拒绝，不能通过字符串化数字伪造身份。
+
+来源未绑定/不可用只返回原请求和 reason，不披露 goal text/context/receipt；当前内部可读才返
+原目标、原实际业务 receipt 与完整隐私域。IO 读取独立于 model-tier，不调用模型或要求 Knowledge/
+ModelPort；未 ready、旧代、drain、取消/deadline/shutdown 保持既有监督与事务排空。Host 真实
+client 接同一生成 Service，默认监督链从持久通知待办报告 `degraded/planning_notifications_pending`；
+Jobs 状态 ACK 不能解除通知 pending，双重启恢复原请求且不重复模型/attempt。
+
+首轮超大 trace 反例发现错误 trailer 回显原 metadata 会越过 gRPC header 预算并丢失结构化 code。
+Worker 共享边界现限 CallMetadata 4 KiB，在 trace context/inflight 前拒绝，错误 detail 不回显超限
+metadata；合法调用保留原 call。契约门初次暴露 inventory 新符号未登记，已补清单；随后
+clean gate 因生成物未暂存而报告相对 index 差异，核对该 gate 的连续生成/字节比较后暂存真实
+生成候选并重跑全门通过，未修改检查器、生成物或兼容基线。
+
+Worker 全量 301 项 PASS（新增 54 项），覆盖真实源/无模型/当前 tier 变化、来源丢失与缺 owner、
+完整隐私域的 5 类 owner、不可读不披露、引用/业务撤销/预算冲突全 dump 不变、分页 wire 预算不
+丢请求、两 RPC 各自取消/deadline/shutdown。契约 22 gate、兼容/工具链、TS/Python/C# 精度/
+optional/context/receipt 回环与连续生成 clean PASS。Core 全量 537、Host 全量 179 项 PASS，实际
+生产 CLI/同一 LLMEngine 的 true/false fixture 增加完整来源解析、默认通知 pending 与二次启动
+原通知/模型去重断言。根 typecheck/build、111 页 docs、encoding、architecture、target-layout
+specification 与 diff PASS；adapter/Worker 测试全规则 Ruff PASS，RPC I/F PASS，47 条既有全
+规则诊断按 code/message/column 与输入相同。Roundtrip Python 既有 4 条 import 诊断未增加。
+Jobs/Conversation 源未改，复用输入 Jobs 47 与 Conversation TS 12/Python 22 项证据，不算本轮重跑。
+
+仍无实际通知发布 receiver/Delivery receipt/源 ACK；available 是内部可读事实，不是外部权限。
+下一步接真正 Conversation Turn/目的地/投递 owner，复用 output generation/receipt，完整 App
+权限与恢复校验后才解除待办；不借旧 PublishAction 回调制造送达。后继调度/撤销、产品入口、
+其他阶段和物理 final 未完成；仅临时数据/本地确定性 provider，不调用付费模型、不迁移用户库、
+不推送/发布、不新增清单文件。完整固定候选独立审查留整体重构收尾。
+
+### 阶段 5/7 Planning 完成通知的原子持久请求（2026-10-08）
 
 输入 `45a69ad6`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按 Skill 的 owner/事实与
 风险验证约束，先落实通知源端的不可再生事实，不将缺少默认 receiver 的链路报告为已送达。

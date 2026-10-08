@@ -68,7 +68,10 @@ Knowledge DB。配置启动显式装配同一 Resource graph 时读取唯一 Hos
 测试覆盖默认评估与重启去重；不代表真实模型语义质量。Planning 状态投递经同一生成 Service，
 接收 owner 验真实源/评估 receipt，inbox/投影同事务提交后才 ACK；ACK 前后丢失可重启恢复。
 取消/unknown 保留真实业务 receipt，completed=false 不被覆盖；反馈 backlog 清空后才能解除对应
-降级，等待目标仍显示 admission pending。通知和再调度未完成。
+降级，等待目标仍显示 admission pending。通知读取/来源解析已接同一生成 Service，恢复原请求
+与完整实际 Conversation 隐私域；不借模型 tier 授予 IO，不生成目的地或把 available 当送达。
+默认监督链在真实通知待办存在时显示 `degraded/planning_notifications_pending`，重启不清除；
+真实通知投递 receiver/ACK 和再调度仍未完成，精确边界见上述协议参考。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

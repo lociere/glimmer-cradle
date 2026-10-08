@@ -83,6 +83,10 @@ from glimmer_cradle.cognition_worker.adapters.job_client import (
     PlanningEvidenceAdapter,
     PlanningModelAdapter,
     planning_identity_from_wire,
+    planning_notification_from_wire,
+    planning_notification_source,
+    planning_notification_to_wire,
+    planning_receipt_to_wire,
     planning_result_to_wire,
     planning_source_from_wire,
     planning_source_to_wire,
@@ -1476,6 +1480,8 @@ class CognitionGrpcHost:
             "ExecutePlanningJob": self._method(self._execute_planning_job, cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse),
             "GetPlanningJobAdmission": self._method(self._get_planning_job_admission, cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse),
             "PublishPlanningJobState": self._method(self._publish_planning_job_state, cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse),
+            "ReadPlanningNotifications": self._method(self._read_planning_notifications, cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse),
+            "ResolvePlanningNotification": self._method(self._resolve_planning_notification, cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1520,8 +1526,8 @@ class CognitionGrpcHost:
         )
 
     def _assert_call(self, call: common_pb.CallMetadata | None) -> str:
-        if call is None or not call.trace_id:
-            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "缺少调用 trace metadata")
+        if call is None or not call.trace_id or call.ByteSize() > 4096:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "调用 trace metadata 缺失或超出预算")
         if call.generation != self.generation:
             raise ServiceFault(common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH, "Kernel 调用世代已失效")
         return call.trace_id
@@ -1558,7 +1564,8 @@ class CognitionGrpcHost:
         detail = common_pb.ServiceErrorDetail(code=code, safe_message=message, retryable=retryable)
         if code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED:
             detail.recovery_actions.append(common_pb.SERVICE_RECOVERY_ACTION_CONFIRM_SIDE_EFFECT_STATE)
-        if call is not None:
+        # 拒绝的 metadata 不能原样塞入 trailer，突破 gRPC header 预算并丢失错误码。
+        if call is not None and call.ByteSize() <= 4096:
             detail.call.CopyFrom(call)
         context.set_trailing_metadata(((_ERROR_KEY, detail.SerializeToString()),))
         await context.abort(_grpc_status(code), message)
@@ -1861,6 +1868,66 @@ class CognitionGrpcHost:
         if self._planning is None:
             raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 源持久 owner 未装配")
         return self._planning
+
+    async def _read_planning_notifications(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if (request.ByteSize() > 65_536 or not 1 <= request.limit <= 1000 or request.HasField("after_notification_id")
+                and not re.fullmatch(r"[a-f0-9]{64}", request.after_notification_id)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知扫描预算/游标无效")
+            try:
+                requests = await source.pending_notification_requests(limit=min(request.limit, 64),
+                    after_notification_id=request.after_notification_id if request.HasField("after_notification_id") else None)
+                response = cognition_pb.ReadPlanningNotificationsResponse()
+                for item in requests:
+                    response.requests.append(planning_notification_to_wire(item))
+                    if response.ByteSize() > 1_048_576:
+                        del response.requests[-1]
+                        break
+                return response
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 持久通知无效；须受控恢复") from error
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _resolve_planning_notification(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if request.ByteSize() > 65_536 or not request.HasField("request"):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知请求缺失或超出预算")
+            try:
+                item = planning_notification_from_wire(request.request)
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知引用/版本无效") from error
+            try:
+                work = await source.read_notification_work(item)
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知原来源/业务事实冲突") from error
+            response = cognition_pb.ResolvePlanningNotificationResponse(request=planning_notification_to_wire(item))
+            if work.goal.source_moment_id is None:
+                response.reason_code = "planning_notification_source_unbound"
+                return response
+            if self._conversation is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 通知 Conversation owner 未装配")
+            try:
+                moment, domain = planning_notification_source(self._conversation, work.goal)
+            except PermissionError:
+                response.reason_code = "planning_notification_source_unavailable"
+                return response
+            response.available = True
+            response.reason_code = "planning_notification_source_ready"
+            response.context.CopyFrom(cognition_pb.ConversationContext(
+                source_provider_id=domain[0], scene_id=domain[1], conversation_id=domain[2],
+                continuity_id=domain[3], thread_id=domain[4], interaction_id=moment.interaction_id,
+                recall_scope=domain[5], disclosure_scope=domain[7]))
+            if moment.actor_id is not None:
+                response.actor_id = moment.actor_id
+            response.recall_owner_id, response.disclosure_owner_id, response.privacy_class = domain[6], domain[8], domain[9]
+            response.goal_text = work.goal.text
+            response.receipt.CopyFrom(planning_receipt_to_wire(work.receipt))
+            if response.ByteSize() > 262_144:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知事实响应超出预算")
+            return response
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _read_planning_job_requests(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:

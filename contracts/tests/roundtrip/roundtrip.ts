@@ -30,6 +30,8 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+import { PlanningNotificationRequestSchema, ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
+  ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -216,6 +218,29 @@ if (fromBinary(AcceptPlanningCommitmentRequestSchema, toBinary(AcceptPlanningCom
   || fromBinary(ExecutePlanningJobResponseSchema, toBinary(ExecutePlanningJobResponseSchema, planningExecuted)).result?.receipt?.completed !== false
   || fromBinary(ExecutePlanningJobResponseSchema, new Uint8Array()).result !== undefined) {
   throw new Error('Planning accept/execute source/precision/presence roundtrip failed');
+}
+const notification = create(PlanningNotificationRequestSchema, { notificationId: 'd'.repeat(64), receiptId: 'e'.repeat(64),
+  requestId: planningSource.requestId, jobId: planningAck.jobId, commitmentId: planningSource.commitmentId,
+  commitmentRevision: 9007199254740991n, goalId: planningSource.goalId, goalVersion: 9007199254740991n,
+  scopeId: planningSource.scopeId, sourceMomentId: 'moment:原来源', sourceDigest: 'a'.repeat(64), createdAtMs: 0n });
+const notificationRead = create(ReadPlanningNotificationsRequestSchema, { limit: 1, afterNotificationId: 'b'.repeat(64) });
+const notificationPage = create(ReadPlanningNotificationsResponseSchema, { requests: [notification] });
+const notificationResolve = create(ResolvePlanningNotificationRequestSchema, { request: notification });
+const notificationResolved = create(ResolvePlanningNotificationResponseSchema, { request: notification, available: true,
+  reasonCode: 'planning_notification_source_ready', goalText: '目标:一', actorId: 'actor:一', privacyClass: 'private',
+  recallOwnerId: 'actor:一', disclosureOwnerId: 'conversation:一',
+  context: { sourceProviderId: 'provider:一', sceneId: 'scene:一', conversationId: 'conversation:一', continuityId: 'continuity:一',
+    threadId: 'main', interactionId: 'interaction:一', recallScope: 'actor_private', disclosureScope: 'conversation_private' },
+  receipt: { ...planningApplied.result!.receipt!, completed: true } });
+const notificationRestored = fromBinary(ResolvePlanningNotificationResponseSchema, toBinary(ResolvePlanningNotificationResponseSchema, notificationResolved));
+if (fromBinary(PlanningNotificationRequestSchema, toBinary(PlanningNotificationRequestSchema, notification)).goalVersion !== 9007199254740991n
+  || fromBinary(ReadPlanningNotificationsRequestSchema, toBinary(ReadPlanningNotificationsRequestSchema, notificationRead)).afterNotificationId !== 'b'.repeat(64)
+  || fromBinary(ReadPlanningNotificationsResponseSchema, toBinary(ReadPlanningNotificationsResponseSchema, notificationPage)).requests[0].createdAtMs !== 0n
+  || fromBinary(ResolvePlanningNotificationRequestSchema, toBinary(ResolvePlanningNotificationRequestSchema, notificationResolve)).request?.sourceMomentId !== 'moment:原来源'
+  || !notificationRestored.receipt?.completed || notificationRestored.recallOwnerId !== 'actor:一'
+  || fromBinary(ResolvePlanningNotificationResponseSchema, new Uint8Array()).context !== undefined
+  || fromBinary(PlanningNotificationRequestSchema, new Uint8Array()).sourceMomentId !== undefined) {
+  throw new Error('Planning notification context/receipt/precision/presence roundtrip failed');
 }
 planningApplied.result!.resolution = PlanningJobResolution.NOT_APPLIED;
 planningApplied.result!.receipt = undefined;
