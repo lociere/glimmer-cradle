@@ -620,6 +620,36 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/7 Planning 生产持久对账（2026-10-08）
+
+输入 `e5b74f40`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。调查确认不透明
+scope_id 不足以推出 Conversation/Knowledge 隐私域或 model-tier 权限，未以字段相等开放
+自动评估。本切片先完成不依赖模型/材料授权的原 attempt 封口与业务回执生产对账。
+
+Contract Spine 增加 typed ReconcilePlanningJob；复用 Jobs 唯一 JobExecutionIdentity，查询者
+与真实提交者分开。Worker 接真实 Planning SQL owner，未 ACK 来源或 identity/receipt 冲突
+失败关闭；否定结果先同锁 sealed，肯定结果只来自持久 receipt，重开/新 attempt 不改写原
+事实。Host 验证身份、原源/承诺、摘要、时间、引用组合与预算后交给 Jobs 唯一 reconciliation
+事务；配置入口独立有界分页处理 Planning unknown，保留状态 outbox，不创建假 handler/ACK。
+推理降级/stopping 下可独立封口，generation/取消/drain 继续有效，取消响应不是否定证明。
+
+验证范围为原 attempt 的真实 SQLite/RPC 与 TS Jobs 消费链；生产证据 Adapter、完整隐私域绑定、
+Execute RPC、handler/状态接收、通知与后继调度仍待推进。未调用付费模型、未处理生产用户数据、
+未推送/发布；物理 final 清单与整个重构未完成。完整回归与交付门结果如下。
+
+本轮 Worker 新增 25 项真实 SQL/gRPC 对账测试：未装配 owner、错代/身份/范围/原源、
+尚未 ACK 或绑定冲突、推理降级/stopping、原提交/否定封口重开、新 attempt 不重写 receipt、
+取消事务 drain、提交后响应丢失及 applied receipt 损坏拒绝。TS 新增 34 项回执/证据边界测试，
+实际 Worker/Jobs 双库重启场景验证配置 Host 从旧 unknown 对账至 retry_wait，仍如实报告
+handler pending、不产生模型成功或状态 ACK。三语言回环覆盖整数精度、receipt presence、
+原提交者和 completed=false；契约 22 项门、生成/验证与兼容检查 PASS，未刷新 Proto/Document
+基线。Core 439、Worker 168、Jobs 39、根 typecheck/build、111 页 docs、encoding、architecture、
+target-layout specification 与 diff PASS；Host 5 文件/157 项全量回归 PASS（含真实生产
+CLI/SQLite/SSE 与逆序退出）。新 mapper/Worker 测试
+全规则 Ruff PASS，rpc_service.py 47 条既有诊断与输入提交逐项匹配；修改文件 I/F PASS，
+未引入抑制或弱化门禁。Windows/Node 24.18.0/pnpm 11.13.0/uv workspace，生成与运行测试、
+根构建与 Host fixture 顺序执行；独立审查仍归完整重构的固定候选收尾，本条不表示发布批准。
+
 ### 阶段 5/7 Planning 证据评估与业务接纳（2026-10-07—08）
 
 输入 `6a7f60f0`，当前会话唯一写入 owner；上一 goal turn 已提交真实 Resource 更新链路，属于

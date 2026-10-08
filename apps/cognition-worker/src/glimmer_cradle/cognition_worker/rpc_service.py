@@ -72,6 +72,8 @@ from glimmer_cradle.cognition_worker.adapters.conversation_mapper import (
     history_result_to_wire,
 )
 from glimmer_cradle.cognition_worker.adapters.job_client import (
+    planning_identity_from_wire,
+    planning_result_to_wire,
     planning_source_from_wire,
     planning_source_to_wire,
 )
@@ -1456,6 +1458,7 @@ class CognitionGrpcHost:
             "PublishMemoryJobState": self._method(self._publish_memory_job_state, cognition_pb.PublishMemoryJobStateRequest, cognition_pb.PublishMemoryJobStateResponse),
             "ReadPlanningJobRequests": self._method(self._read_planning_job_requests, cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse),
             "AcknowledgePlanningJobRequest": self._method(self._acknowledge_planning_job_request, cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse),
+            "ReconcilePlanningJob": self._method(self._reconcile_planning_job, cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1872,6 +1875,25 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 源接纳内容或 Job 绑定冲突") from error
             return cognition_pb.AcknowledgePlanningJobRequestResponse(request_id=item.request_id, job_id=request.job_id, accepted=True)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _reconcile_planning_job(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if not request.HasField("identity") or request.ByteSize() > 16_384:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 原 attempt identity 缺失或超过预算")
+            try:
+                identity = planning_identity_from_wire(request.identity)
+                if not re.fullmatch(r"[a-f0-9]{64}", request.request_id) or identity.job_id != f"planning:{request.request_id}":
+                    raise ValueError("Planning 原请求 identity 无效")
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 原 attempt identity/请求无效") from error
+            try:
+                result = await source.reconcile_evaluation(identity, request.request_id)
+                return cognition_pb.ReconcilePlanningJobResponse(result=planning_result_to_wire(result, request.request_id))
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 原 attempt/持久源/receipt 对账冲突") from error
+        # 对账本身会封口；不要求认知推理 ready，但必须保留 generation/deadline/取消与 drain。
+        return await self._invoke(request, context, operation, track=True, allow_stopping=True)
 
     async def _shutdown_rpc(self, request: Any, context: Any) -> Any:
         async def operation(trace_id: str) -> Any:

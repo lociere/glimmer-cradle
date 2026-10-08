@@ -18,9 +18,9 @@ import { ReadMemoryJobRequestsRequestSchema, ExecuteMemoryJobRequestSchema,
 import { ReadMemoryJobRequestsResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
   PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
-  AcknowledgePlanningJobRequestResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PlanningJobSourceAdapter } from '../src/composition/cognition-job-adapter.js';
-import { planningJobRequest, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
+import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
@@ -398,6 +398,46 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
   }, 30_000);
 });
 describe('Planning 源真实 wire/Jobs 接纳', () => {
+  it('真实原 attempt 在双库/Worker 重开后封口，Host 自动对账而不启动未就绪 handler', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-reconciliation-'));
+    let service = await worker(root, 'planning-reconciliation-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    let host: HostJobsController | undefined;
+    try {
+      store.activateAuthority(1, clock.now());
+      const adapter = new PlanningJobSourceAdapter(service.client);
+      await adapter.deliverRequests(store, clock, 1, 3, 8);
+      const claim = store.claim(1, 'host:原提交者', clock.now(), 60_000, PLANNING_JOB_KIND)!;
+      expect(claim).not.toBeNull();
+      store.close(); await service.stop();
+      service = await worker(root, 'planning-reconciliation-restarted'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+      host = new HostJobsController({ store, clock, epoch: 2, owner_id: 'host:接任者', cognition: service.client,
+        // 本场景只对账 Planning；Memory 原源按其独立 debounce 保留，避免引入另一评估任务。
+        poll_interval_ms: 60_000, batch_size: 8, lease_ms: 60_000, submission_policy: { ...submissionPolicy, debounce_ms: 3_600_000 },
+        retry_policy: policy, planning_sources: true });
+      expect(await host.start()).toMatchObject({ status: 'degraded', error_code: 'jobs_handler_pending' });
+      expect(store.load(claim.job.job_id)).toMatchObject({ status: 'retry_wait', attempt: 1, authority_epoch: 2 });
+      const attempt = store.listAttempts(claim.job.job_id)[0];
+      const proof = await new PlanningJobSourceAdapter(service.client).query(store.load(claim.job.job_id)!, attempt);
+      expect(proof).toMatchObject({ resolution: 'not_applied', receiver_fenced: true, authority_epoch: 1, owner_id: 'host:原提交者' });
+      const database = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+      try {
+        expect(database.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'accepted', revision: 1 });
+        expect(database.prepare('SELECT state,owner_id,authority_epoch FROM planning_evaluation_attempt').get())
+          .toEqual({ state: 'sealed', owner_id: 'host:原提交者', authority_epoch: 1 });
+        expect(database.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 0 });
+      } finally { database.close(); }
+      expect(store.readOutbox(2, 100, PLANNING_JOB_KIND).length).toBeGreaterThan(0);
+      const cancelled = new AbortController(); cancelled.abort();
+      await expect(new PlanningJobSourceAdapter(service.client).query(store.load(claim.job.job_id)!, attempt, cancelled.signal)).rejects.toThrow();
+      const stale = new CognitionClient(service.endpoint, 'planning-reconciliation-first', 2000);
+      try {
+        await expect(stale.reconcilePlanning(create(ReconcilePlanningJobRequestSchema, {
+          identity: planningJobIdentity(store.load(claim.job.job_id)!, attempt), requestId: String(claim.job.payload.source_request_id) })))
+          .rejects.toMatchObject({ code: ServiceErrorCode.GENERATION_MISMATCH });
+      } finally { stale.close(); }
+    } finally { await host?.stop(); await service.stop(); store.close(); }
+  }, 30_000);
+
   it.each(['before-commit', 'after-commit'] as const)('源 ACK %s 丢失后重开原源/Job，不重算 due/预算或标为 completed', async mode => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-wire-'));
     let service = await worker(root, 'planning-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));

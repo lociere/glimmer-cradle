@@ -1,5 +1,13 @@
 # M12 Contract Spine Inventory
 
+Planning 持久对账继续由 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
+`ReconcilePlanningJobRequest`、`ReconcilePlanningJobResponse`、`PlanningJobResolution`、
+`PlanningJobResult`、`PlanningEvaluationReceipt`、`PlanningEvidenceReference`；同一
+`CognitionService` 增加 `ReconcilePlanningJob`。复用 `glimmer.jobs.v1.JobExecutionIdentity`，
+查询者与实际提交者分别保存；否定证明在实际 Planning SQL 事务封口后返回，肯定证明引用
+真实业务 receipt。`completed=false` 是已接纳评估，不等于长期目标完成；只返回证据引用，
+不复制 source 正文。Proto 兼容基线未刷新；生成物仍由三语言统一生成链产生。
+
 Knowledge 来源管理由同一 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
 `KnowledgeResourceSource`、`KnowledgeResourceSourceState`、`GetKnowledgeResourceSourceRequest`、
 `GetKnowledgeResourceSourceResponse`、`RegisterKnowledgeResourceSourceRequest`、

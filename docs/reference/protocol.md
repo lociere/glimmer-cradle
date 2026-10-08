@@ -137,6 +137,28 @@ INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响
 Host 报 `degraded/jobs_handler_pending`，状态 outbox 不交给 Memory receiver，也不假 ACK。
 完成评估、通知和再调度未完成；Job accepted 不改变承诺 accepted/revision。
 
+### Planning 原 attempt 持久对账
+
+`ReconcilePlanningJob` 复用 Jobs 唯一 `JobExecutionIdentity`，另携原源 `request_id`；请求总量
+不超过 16 KiB，job ID 必须为 `planning:<request_id>`，身份字符串不超过 4096 UTF-8 bytes，
+attempt/epoch/token/deadline 为正 JS safe integer。仅本代可信 App 可调用，缺 owner 为 NOT_READY，
+非法 wire 为 INVALID_REQUEST，未 ACK 源、错绑定、scope/原 attempt 或持久 receipt 冲突为
+RECOVERY_REQUIRED。该调用会封口，不是只读查询；推理未 ready/stopping 时仍可独立完成，
+在途调用参与取消和 drain。取消/断连没有得到响应不能自行推断 not-applied，须重放原对账身份。
+
+`PlanningJobResult` 保留查询身份、原请求、`cognition.planning`、接收端封口、观测时间和
+确定性对账摘要。摘要按 IDL 指定的紧凑 UTF-8 JSON 计算，包含原 lease 与观测时间；摘要是
+身份核对，不替代 gRPC generation/可信 App 边界或访问授权。响应不超过 64 KiB。not-applied
+必须先由真实 Planning SQL 同事务 sealed，且禁止带 receipt；applied 必须带持久
+`PlanningEvaluationReceipt`，其中实际提交 identity 不因新 attempt 查询而改写。
+回执含承诺/revision、completed、受控证据 ID/owner/scope/revision/hash、理由和实际提交时间；
+没有 source 正文。completed=false 仍是已接纳的评估，Jobs succeeded 不能替代目标完成。
+
+Host 验原请求/承诺、查询 identity、摘要、原提交者、时间与证据组合后，交给 Jobs 唯一
+reconciliation 事务；配置入口按独立有界分页恢复 Planning unknown，不复用 Memory receiver。
+该恢复链没有注册 Planning handler、没有新建权限、没有假 ACK 状态事件；自动执行、
+证据完整隐私域绑定、状态接纳、通知与后继调度仍未完成。
+
 ## 生成与兼容
 
 ```powershell

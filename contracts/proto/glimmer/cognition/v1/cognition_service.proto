@@ -472,6 +472,61 @@ message AcknowledgePlanningJobRequestResponse {
   bool accepted = 3;
 }
 
+message ReconcilePlanningJobRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  glimmer.jobs.v1.JobExecutionIdentity identity = 2;
+  string request_id = 3;
+}
+
+enum PlanningJobResolution {
+  PLANNING_JOB_RESOLUTION_UNSPECIFIED = 0;
+  PLANNING_JOB_RESOLUTION_APPLIED = 1;
+  PLANNING_JOB_RESOLUTION_NOT_APPLIED = 2;
+}
+
+// 受控引用，不复制 Conversation/Knowledge/Execution 证据正文。
+message PlanningEvidenceReference {
+  string evidence_id = 1;
+  string source_owner = 2;
+  string scope_id = 3;
+  uint64 revision = 4;
+  string content_digest = 5;
+}
+
+message PlanningEvaluationReceipt {
+  string receipt_id = 1;
+  // 实际提交者；新 attempt 复用 receipt 时不重写原 identity。
+  glimmer.jobs.v1.JobExecutionIdentity identity = 2;
+  string request_id = 3;
+  string commitment_id = 4;
+  uint64 commitment_revision = 5;
+  // Job applied 仅表示已接纳评估；completed=false 仍是有效业务结果。
+  bool completed = 6;
+  repeated string evidence_ids = 7;
+  string reason = 8;
+  repeated PlanningEvidenceReference evidence = 9;
+  uint64 committed_at_ms = 10;
+}
+
+message PlanningJobResult {
+  glimmer.jobs.v1.JobExecutionIdentity identity = 1;
+  string request_id = 2;
+  PlanningJobResolution resolution = 3;
+  // not-applied 禁止携带 receipt；applied 必须引用真实持久 receipt。
+  PlanningEvaluationReceipt receipt = 4;
+  string source_id = 5;
+  bool receiver_fenced = 6;
+  // SHA-256(紧凑 UTF-8 JSON ["planning-reconciliation.v1", job_id, scope_id,
+  // attempt, authority_epoch, fencing_token, owner_id, lease_until_ms, request_id,
+  // "applied"|"not_applied", receipt_id|"sealed", observed_at_ms])。
+  string evidence_id = 7;
+  uint64 observed_at_ms = 8;
+}
+
+message ReconcilePlanningJobResponse {
+  PlanningJobResult result = 1;
+}
+
 service CognitionService {
   rpc SubmitPerception(SubmitPerceptionRequest) returns (SubmitPerceptionResponse);
   rpc CancelPerception(CancelPerceptionRequest) returns (CancelPerceptionResponse);
@@ -498,4 +553,6 @@ service CognitionService {
   // 显式 Planning 持久 owner ready 后开放；与 Memory 旧队列选择独立。
   rpc ReadPlanningJobRequests(ReadPlanningJobRequestsRequest) returns (ReadPlanningJobRequestsResponse);
   rpc AcknowledgePlanningJobRequest(AcknowledgePlanningJobRequestRequest) returns (AcknowledgePlanningJobRequestResponse);
+  // 独立封口与提交共享 Planning 事务锁；可在 stopping 时完成，不调用模型或收集证据。
+  rpc ReconcilePlanningJob(ReconcilePlanningJobRequest) returns (ReconcilePlanningJobResponse);
 }

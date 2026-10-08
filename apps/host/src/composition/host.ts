@@ -42,6 +42,7 @@ export class HostJobsController {
   private readonly cancellation = new AbortController();
   private state: HostJobsSnapshot = { status: 'idle', completed_cycles: 0, error_code: null };
   private cursor = '';
+  private planningCursor = '';
   private starting?: Promise<HostJobsSnapshot>;
   private loop?: Promise<void>;
   private stopping?: Promise<void>;
@@ -129,13 +130,23 @@ export class HostJobsController {
       }
       // 即使一个 owner 暂不可查询，也前进分页；下一轮回绕，不让首个 unknown 饿死其他工作。
       if (unknown.length < batch_size) this.cursor = '';
+      if (this.planningSource) {
+        const planningUnknown = store.listUnknown(epoch, PLANNING_JOB_KIND, batch_size, this.planningCursor);
+        for (const job of planningUnknown) {
+          this.planningCursor = job.job_id;
+          try { await this.recovery.reconcile(job.job_id, this.planningSource, signal); }
+          catch (error) { if (this.unavailable(error)) degraded = true; else throw error; }
+        }
+        if (planningUnknown.length < batch_size) this.planningCursor = '';
+      }
       signal.throwIfAborted();
       await this.scheduler.runDue(batch_size, signal);
       // 当前实际 receiver 只拥有 Memory；Planning 事实保留待接纳，不能阻塞该 owner 的投递。
       if (state_receiver) await this.recovery.deliverOutbox(state_receiver, batch_size, signal, MEMORY_JOB_KIND);
       signal.throwIfAborted();
       if (this.options.terminal_retention_ms !== undefined) this.retention.prune(this.options.terminal_retention_ms);
-      const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0;
+      const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0
+        || !!this.planningSource && store.listUnknown(epoch, PLANNING_JOB_KIND, 1).length > 0;
       const handlerPending = !!this.planningSource && store.hasPendingKind(epoch, PLANNING_JOB_KIND);
       this.state = { status: degraded || pending || handlerPending ? 'degraded' : 'ready', completed_cycles: this.state.completed_cycles + 1,
         error_code: degraded ? 'cognition_unavailable' : pending ? 'jobs_recovery_pending' : handlerPending ? 'jobs_handler_pending' : null };

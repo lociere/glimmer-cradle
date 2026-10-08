@@ -40,6 +40,8 @@ receiver 的手工装配仍保留待确认事实。取消/unknown 不代表 Memo
 Jobs commit 后 ACK 源；原 due 不套用 Memory debounce，预算来自唯一 Jobs Document，重启不
 改写首次政策。尚无 Planning handler：待办保持 queued/attempt 0，持久待办查询使 Host 如实报告
 `degraded/jobs_handler_pending`，Planning 状态事件保留未 ACK，不阻塞 Memory 状态投递。
+同一 Adapter 已接原 attempt 持久对账，配置 Host 独立分页恢复 Planning unknown；封口或真实
+评估回执经校验后交给 Jobs，不把 completed=false 改成目标完成，不注册未就绪 handler。
 两种源接纳都不代表长期目标完成，精确边界见[协议参考](../../docs/reference/protocol.md#planning-jobs-源接纳)。
 `HostResourceContributions` 可显式注入 WorkerSupervisor 的 typed CapabilityService；真实资源读取
 消费 Host 短寿命授权、Core 独立 ResourceRegistry 和 Execution journal/outbox，经生成

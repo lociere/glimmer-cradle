@@ -247,8 +247,17 @@ SQL 锁，空结果先持久 sealed 才证明未应用；取消等待独立封�
 来源 live 复验是跨 owner 的采样，不宣称分布式原子权限事务或未来修订不会纠错；证据更正/撤销
 后的语义重评与产品通知仍待后续链路。版本窗口与备份范围见上述数据目录。
 
-当前这些边界仅由 Core 实现与 Port fixture/实际 SQLite 验证，未开放新的 Service RPC，也未在
-生产 factory 注册 Planning handler。生产证据选择/隐私 scope 解析、执行/对账 wire、状态接收、
+原 attempt 对账现由同一 CognitionService `ReconcilePlanningJob` 接通真实 Planning store；
+生产 factory 已持有该 store，不需要模型或证据 Adapter 来查询/封口。Worker 保持原查询 identity
+与 receipt 实际提交 identity，Host `PlanningJobSourceAdapter.query()` 验证后交给 Jobs 唯一
+reconciliation 事务；配置 Host 对 Memory/Planning unknown 分别有界分页。推理降级/stopping
+不阻断独立封口，调用仍受 generation、取消和 drain 约束；否定证明不是空查询，断连也不证明
+未应用。源/receipt/身份冲突不降为假成功，状态 outbox 仍保留待实际 Planning receiver 接纳。
+字段、摘要和错误语义归[协议参考](../../reference/protocol.md#planning-原-attempt-持久对账)。
+
+生产 factory 仍未注册 Planning handler。当前 GoalVersion.scope_id 是不透明分区标识，不足以
+推出 Conversation/actor/recall/disclosure/model-tier 权限；字段相等不能当作真实访问资格。
+Core 评估仅由 Port fixture/实际 SQLite 验证。生产证据选择/隐私域绑定、执行 wire、状态接收、
 通知 durable receipt、pending 的下一次源请求、撤销与产品消费都须接线后才可解除 handler 降级。
 
 ## 上下文与推理

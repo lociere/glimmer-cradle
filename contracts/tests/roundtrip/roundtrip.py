@@ -21,6 +21,9 @@ from glimmer.cognition.v1.cognition_service_pb2 import (  # noqa: E402
     AcknowledgeMemoryJobRequestRequest, MemoryJobSourceRequest, PublishMemoryJobStateRequest,
     PlanningJobSourceRequest, ReadPlanningJobRequestsRequest, ReadPlanningJobRequestsResponse,
     AcknowledgePlanningJobRequestRequest, AcknowledgePlanningJobRequestResponse,
+    ReconcilePlanningJobRequest, ReconcilePlanningJobResponse, PlanningJobResult,
+    PlanningEvaluationReceipt, PlanningEvidenceReference, PLANNING_JOB_RESOLUTION_APPLIED,
+    PLANNING_JOB_RESOLUTION_NOT_APPLIED,
     PlanRequest, PlanResponse,
 )
 from glimmer.surface.v1.surface_gateway_pb2 import (  # noqa: E402
@@ -143,6 +146,27 @@ planning_receipt = AcknowledgePlanningJobRequestResponse(
 )
 assert AcknowledgePlanningJobRequestResponse.FromString(planning_receipt.SerializeToString()) == planning_receipt
 assert not AcknowledgePlanningJobRequestRequest.FromString(b"").HasField("request")
+
+planning_query = ReconcilePlanningJobRequest(call=planning_read.call, request_id=planning_source.request_id,
+    identity=JobExecutionIdentity(job_id=planning_ack.job_id, scope_id=planning_source.scope_id,
+        attempt=2, authority_epoch=7, fencing_token=9007199254740991, owner_id="host:接任者", lease_until_ms=1900000000000))
+assert ReconcilePlanningJobRequest.FromString(planning_query.SerializeToString()) == planning_query
+committer = JobExecutionIdentity()
+committer.CopyFrom(planning_query.identity)
+committer.attempt, committer.owner_id = 1, "原提交者"
+planning_applied = ReconcilePlanningJobResponse(result=PlanningJobResult(identity=planning_query.identity,
+    request_id=planning_source.request_id, resolution=PLANNING_JOB_RESOLUTION_APPLIED,
+    source_id="cognition.planning", receiver_fenced=True, evidence_id="c" * 64, observed_at_ms=100,
+    receipt=PlanningEvaluationReceipt(identity=committer, receipt_id="r" * 64, request_id=planning_source.request_id,
+        commitment_id=planning_source.commitment_id, commitment_revision=9007199254740991,
+        completed=False, reason="条件尚未满足", committed_at_ms=90, evidence_ids=["事实:一"],
+        evidence=[PlanningEvidenceReference(evidence_id="事实:一", source_owner="conversation",
+            scope_id=planning_source.scope_id, revision=9007199254740991, content_digest="a" * 64)])))
+assert ReconcilePlanningJobResponse.FromString(planning_applied.SerializeToString()) == planning_applied
+assert planning_applied.result.receipt.identity.attempt == 1 and not planning_applied.result.receipt.completed
+planning_applied.result.resolution = PLANNING_JOB_RESOLUTION_NOT_APPLIED
+planning_applied.result.ClearField("receipt")
+assert not ReconcilePlanningJobResponse.FromString(planning_applied.SerializeToString()).result.HasField("receipt")
 
 state = PublishMemoryJobStateRequest(delivery_authority_epoch=9007199254740991, event=JobStateEvent(
     event_id="event:one", job_id="job:one", scope_id="scope:one", goal_id="source:one", kind="memory.consolidate",

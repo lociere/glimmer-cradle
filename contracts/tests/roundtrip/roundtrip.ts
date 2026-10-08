@@ -25,7 +25,8 @@ import { RegisterKnowledgeResourceSourceRequestSchema, RegisterKnowledgeResource
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, MemoryJobResolution,
   AcknowledgeMemoryJobRequestRequestSchema, ReadPlanningJobRequestsRequestSchema,
   ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestRequestSchema,
-  AcknowledgePlanningJobRequestResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
+  AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
+  ReconcilePlanningJobResponseSchema, PlanningJobResolution } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
   DeliveryReceiptCommandSchema,
@@ -165,6 +166,32 @@ if (fromBinary(AcknowledgePlanningJobRequestRequestSchema, new Uint8Array()).req
 
 const jobIdentity = { jobId: 'job:one', scopeId: 'scope:one', attempt: 2n, authorityEpoch: 7n,
   fencingToken: 9007199254740991n, ownerId: 'host:one', leaseUntilMs: 1900000000000n };
+const planningQuery = create(ReconcilePlanningJobRequestSchema, { call: planningRead.call,
+  identity: { ...jobIdentity, jobId: planningAck.jobId }, requestId: planningSource.requestId });
+const queryRoundtrip = fromBinary(ReconcilePlanningJobRequestSchema, toBinary(ReconcilePlanningJobRequestSchema, planningQuery));
+if (queryRoundtrip.identity?.fencingToken !== 9007199254740991n || queryRoundtrip.requestId !== planningSource.requestId) {
+  throw new Error('Planning original attempt/request precision roundtrip failed');
+}
+const planningApplied = create(ReconcilePlanningJobResponseSchema, { result: {
+  identity: planningQuery.identity, requestId: planningSource.requestId, resolution: PlanningJobResolution.APPLIED,
+  sourceId: 'cognition.planning', receiverFenced: true, evidenceId: 'c'.repeat(64), observedAtMs: 100n,
+  receipt: { identity: { ...planningQuery.identity!, attempt: 1n, ownerId: '原提交者' }, receiptId: 'r'.repeat(64),
+    requestId: planningSource.requestId, commitmentId: planningSource.commitmentId, commitmentRevision: 9007199254740991n,
+    completed: false, reason: '条件尚未满足', committedAtMs: 90n, evidenceIds: ['事实:一'],
+    evidence: [{ evidenceId: '事实:一', sourceOwner: 'conversation', scopeId: jobIdentity.scopeId,
+      revision: 9007199254740991n, contentDigest: 'a'.repeat(64) }] },
+} });
+const appliedRoundtrip = fromBinary(ReconcilePlanningJobResponseSchema, toBinary(ReconcilePlanningJobResponseSchema, planningApplied));
+if (appliedRoundtrip.result?.receipt?.identity?.attempt !== 1n || appliedRoundtrip.result.receipt.completed
+  || appliedRoundtrip.result.receipt.commitmentRevision !== 9007199254740991n
+  || appliedRoundtrip.result.receipt.evidence[0].revision !== 9007199254740991n) {
+  throw new Error('Planning business receipt/committer precision roundtrip failed');
+}
+planningApplied.result!.resolution = PlanningJobResolution.NOT_APPLIED;
+planningApplied.result!.receipt = undefined;
+if (fromBinary(ReconcilePlanningJobResponseSchema, toBinary(ReconcilePlanningJobResponseSchema, planningApplied)).result?.receipt !== undefined) {
+  throw new Error('Planning negative result gained receipt presence');
+}
 const stateRequest = create(PublishMemoryJobStateRequestSchema, { deliveryAuthorityEpoch: 9007199254740991n,
   event: { eventId: 'event:one', jobId: 'job:one', scopeId: 'scope:one', goalId: 'source:one', kind: 'memory.consolidate',
     revision: 9007199254740991n, status: JobStatus.CANCELLED, attempt: 2n, authorityEpoch: 7n, fencingToken: 8n,

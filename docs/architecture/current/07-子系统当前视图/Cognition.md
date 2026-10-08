@@ -90,6 +90,8 @@ Planning 已持久保存不可变目标/计划版本、完成条件、显式 acc
 handler 尚未装配，待办只排队、状态不假 ACK，Host 如实降级。Core 已实现有证据引用/live 复验的
 语义评估、原 attempt 封口、同事务业务 receipt/承诺 revision；生产证据 Adapter、执行 wire、
 通知与再调度仍未装配，不能认作完整长期承诺链路。
+持久对账 RPC 已接真实 Planning store；Host 分页恢复原 unknown，sealed/真实 receipt 驱动
+Jobs 对账，保留原提交者和 completed=false。此接线不开放模型或扩大隐私权限，不解除 handler 降级。
 详见[认知核实现](../../implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 
 ## 记忆与连续性

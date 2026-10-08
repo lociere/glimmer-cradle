@@ -1,12 +1,14 @@
 import { create } from '@bufbuild/protobuf';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
-  ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
+  ReconcilePlanningJobRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
   type JobHandlerPort, type JobHandlerResult, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
-import type { MemoryJobsCognitionPort, PlanningJobsSourcePort } from '../adapters/protocol/cognition-client.js';
-import { MEMORY_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
-  memoryJobState, planningJobRequest, planningJobSource, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
+import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort } from '../adapters/protocol/cognition-client.js';
+import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
+  memoryJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobEvidence,
+  type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
 export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPort {
@@ -83,8 +85,17 @@ export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPor
 }
 
 /** 真实生产源接纳；尚未注册 Planning handler 时只排队，不模拟执行或状态 ACK。 */
-export class PlanningJobSourceAdapter {
-  public constructor(private readonly cognition: PlanningJobsSourcePort) {}
+export class PlanningJobSourceAdapter implements JobReconciliationPort {
+  public readonly kind = PLANNING_JOB_KIND;
+  public constructor(private readonly cognition: PlanningJobsSourcePort & PlanningJobsReconciliationPort) {}
+  public async query(job: Job, attempt: JobAttempt, signal?: AbortSignal): Promise<JobReconciliationEvidence> {
+    signal?.throwIfAborted();
+    const identity = planningJobIdentity(job, attempt), requestId = String(job.payload.source_request_id);
+    const response = await this.cognition.reconcilePlanning(create(ReconcilePlanningJobRequestSchema,
+      { identity, requestId }), signal);
+    signal?.throwIfAborted();
+    return planningJobEvidence(response.result, identity, requestId, String(job.payload.commitment_id));
+  }
   public async deliverRequests(store: JobStorePort, clock: JobClockPort, epoch: number,
     maxAttempts: number, limit: number, signal?: AbortSignal): Promise<number> {
     signal?.throwIfAborted();

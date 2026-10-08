@@ -48,7 +48,11 @@ from glimmer_cradle.cognition.perception import (
     ObservationQueue,
     PerceptionOperationRegistry,
 )
-from glimmer_cradle.cognition.planning import GoalVersion, PlanVersion
+from glimmer_cradle.cognition.planning import (
+    GoalVersion,
+    PlanningAssessment,
+    PlanVersion,
+)
 from glimmer_cradle.cognition.ports import (
     AgentPlanInput,
     AgentPlanResult,
@@ -57,6 +61,7 @@ from glimmer_cradle.cognition.ports import (
     ContentReference,
     ConversationHistoryEntry,
     ConversationHistoryResult,
+    JobReceipt,
     JobRequest,
     SkillToolDescriptor,
     SkillToolSuggestion,
@@ -1320,11 +1325,223 @@ async def test_planning_source_rpc_tracks_ack_until_drain_and_preserves_cancelle
         await planning.close()
 
 
-async def _seed_planning_source(store: SqlitePlanningStore) -> None:
+@pytest.fixture
+async def planning_job_service(service, tmp_path):
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_identity_from_wire,
+    )
+
+    host, channel, _, _ = service
+    database = tmp_path / "planning.sqlite"
+    planning = SqlitePlanningStore(database, now_ms=lambda: 100)
+    await planning.connect()
+    await _seed_planning_source(planning)
+    source = (await planning.pending_job_requests())[0]
+    await planning.acknowledge_job_request(source, JobReceipt(f"planning:{source.request_id}", "accepted", 1))
+    host._planning = planning
+    reconcile = _call(channel, "ReconcilePlanningJob", cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse)
+    request = cognition_pb.ReconcilePlanningJobRequest(call=_metadata("generation-1", "planning-reconcile"),
+        request_id=source.request_id, identity=jobs_pb.JobExecutionIdentity(job_id=f"planning:{source.request_id}",
+            scope_id=source.scope_id, attempt=1, authority_epoch=1, fencing_token=1, owner_id="host:原提交者", lease_until_ms=500))
+    try:
+        yield host, database, planning, request, reconcile, planning_identity_from_wire(request.identity)
+    finally:
+        if host._planning is not None and host._planning is not planning:
+            await host._planning.close()
+        host._planning = None
+        await planning.close()
+
+
+@pytest.mark.parametrize("completed", [None, False, True])
+async def test_planning_reconciliation_rpc_uses_durable_seal_or_receipt_after_reopen(planning_job_service, completed):
+    from glimmer_cradle.cognition.ports import PlanningEvidenceReference
+
+    host, database, planning, request, reconcile, identity = planning_job_service
+    if completed is not None:
+        work = await planning.prepare_evaluation(identity, request.request_id)
+        reference = PlanningEvidenceReference("moment:真实引用", "conversation", identity.scope_id, 1, "a" * 64)
+        await planning.commit_evaluation(identity, work, PlanningAssessment(completed, (reference.evidence_id,), "受控条件核验"), (reference,))
+    # 推理降级/stopping 不阻断独立对账，但不启动模型或把 Job 当完成条件。
+    host._readiness_tracker.mark_degraded("domain", "fixture unready")
+    first = (await reconcile(request, timeout=2)).result
+    assert first.identity == request.identity and first.receiver_fenced
+    assert first.request_id == request.request_id and first.source_id == "cognition.planning"
+    assert first.resolution == (cognition_pb.PLANNING_JOB_RESOLUTION_NOT_APPLIED if completed is None else cognition_pb.PLANNING_JOB_RESOLUTION_APPLIED)
+    assert first.HasField("receipt") is (completed is not None)
+    if completed is not None:
+        assert first.receipt.identity == request.identity
+        assert first.receipt.completed is completed and first.receipt.commitment_revision == 2
+        assert first.receipt.evidence[0].evidence_id == "moment:真实引用"
+    else:
+        with pytest.raises(ValueError, match="已失效"):
+            await planning.prepare_evaluation(identity, request.request_id)
+    await planning.close()
+    reopened = SqlitePlanningStore(database, now_ms=lambda: 150)
+    await reopened.connect()
+    host._planning = reopened
+    host._readiness_tracker.begin_shutdown()
+    recovered = (await reconcile(request, timeout=2)).result
+    assert recovered == first
+    newer = cognition_pb.ReconcilePlanningJobRequest()
+    newer.CopyFrom(request)
+    newer.identity.attempt = 2
+    newer.identity.authority_epoch = 2
+    newer.identity.fencing_token = 2
+    newer.identity.owner_id = "host:接任者"
+    replay = (await reconcile(newer, timeout=2)).result
+    assert replay.identity == newer.identity and replay.observed_at_ms == 150
+    assert replay.resolution == first.resolution
+    if completed is not None:
+        assert replay.receipt == first.receipt  # 不把原 receipt 的提交者改成查询者。
+    assert (await reopened.load_commitment("commitment:长期计划")).revision == (1 if completed is None else 2)
+
+
+@pytest.mark.parametrize("mode", ["missing", "attempt", "epoch", "token", "owner", "scope", "lease", "overflow", "request", "job", "budget", "generation"])
+async def test_planning_reconciliation_rpc_rejects_invalid_identity_before_creating_attempt(planning_job_service, mode):
+    _, database, planning, request, reconcile, _ = planning_job_service
+    if mode == "missing":
+        request.ClearField("identity")
+    elif mode in {"attempt", "lease", "epoch", "token", "overflow"}:
+        field = {"lease": "lease_until_ms", "epoch": "authority_epoch", "token": "fencing_token", "overflow": "attempt"}.get(mode, mode)
+        setattr(request.identity, field, 2**53 if mode == "overflow" else 0)
+    elif mode in {"owner", "scope"}:
+        setattr(request.identity, f"{mode}_id", " ")
+    elif mode == "request":
+        request.request_id = "forged"
+    elif mode == "job":
+        request.identity.job_id = "wrong"
+    elif mode == "budget":
+        request.identity.owner_id = "x" * 16385
+    else:
+        request.call.generation = "stale"
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await reconcile(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == (common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if mode == "generation" else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST)
+    assert len(await planning.pending_job_requests()) == 0
+    # 非法 wire 不启动 evaluation 数据窗口，也不以空查询构造否定证明。
+    import sqlite3
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT count(*) FROM sqlite_master WHERE name='planning_evaluation_attempt'").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("mode", ["scope", "unacked", "binding", "owner"])
+async def test_planning_reconciliation_rpc_requires_actual_source_and_original_binding(planning_job_service, mode):
+    _, database, planning, request, reconcile, identity = planning_job_service
+    if mode == "scope":
+        request.identity.scope_id = "foreign"
+    elif mode in {"unacked", "binding"}:
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.execute("UPDATE planning_job_outbox SET accepted_job_id=?,accepted_revision=?",
+                (None, None) if mode == "unacked" else ("wrong", 1))
+    else:
+        await planning.prepare_evaluation(identity, request.request_id)
+        request.identity.owner_id = "different-owner"
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await reconcile(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED
+
+
+async def test_planning_reconciliation_rpc_requires_owner(planning_job_service):
+    host, _, _, request, reconcile, _ = planning_job_service
+    host._planning = None
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await reconcile(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_NOT_READY
+
+
+async def test_planning_reconciliation_rpc_cancellation_drains_real_transaction(planning_job_service, monkeypatch):
+    import sqlite3
+
+    host, database, planning, request, reconcile, _ = planning_job_service
+    entered, finished = asyncio.Event(), asyncio.Event()
+    original = planning._evaluation_work
+
+    async def waiting_work(*args):
+        work = await original(*args)
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            finished.set()
+        return work
+
+    monkeypatch.setattr(planning, "_evaluation_work", waiting_work)
+    call = reconcile(request, timeout=5)
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        assert host._inflight
+        await host.stop()
+        await asyncio.wait_for(finished.wait(), 2)
+        assert not host._inflight
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT count(*) FROM sqlite_master WHERE name='planning_evaluation_attempt'").fetchone()[0] == 0
+        assert (await planning.load_commitment("commitment:长期计划")).revision == 1
+    finally:
+        call.cancel()
+
+
+@pytest.mark.parametrize("completed", [None, False, True])
+async def test_planning_reconciliation_rpc_lost_response_preserves_committed_proof(planning_job_service, monkeypatch, completed):
+    from glimmer_cradle.cognition.ports import PlanningEvidenceReference
+
+    _, _, planning, request, reconcile, identity = planning_job_service
+    if completed is not None:
+        work = await planning.prepare_evaluation(identity, request.request_id)
+        reference = PlanningEvidenceReference("moment:已提交", "conversation", identity.scope_id, 1, "a" * 64)
+        await planning.commit_evaluation(identity, work, PlanningAssessment(completed, (reference.evidence_id,), "已核验"), (reference,))
+    entered, finished = asyncio.Event(), asyncio.Event()
+    original = planning.reconcile_evaluation
+    proof = None
+
+    async def lose_response(*args):
+        nonlocal proof
+        proof = await original(*args)  # 接收端已 commit，响应尚未到达 Host。
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(planning, "reconcile_evaluation", lose_response)
+    call = reconcile(request, timeout=5)
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        call.cancel()
+        await asyncio.wait_for(finished.wait(), 2)
+    finally:
+        call.cancel()
+        monkeypatch.setattr(planning, "reconcile_evaluation", original)
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_result_to_wire,
+    )
+    assert proof is not None
+    assert (await reconcile(request, timeout=2)).result == planning_result_to_wire(proof, request.request_id)
+    assert (await planning.load_commitment("commitment:长期计划")).revision == (1 if completed is None else 2)
+
+
+async def test_planning_reconciliation_rpc_missing_applied_receipt_requires_recovery(planning_job_service):
+    import sqlite3
+
+    _, database, planning, request, reconcile, identity = planning_job_service
+    work = await planning.prepare_evaluation(identity, request.request_id)
+    await planning.commit_evaluation(identity, work, PlanningAssessment(False, (), "无足够证据"), ())
+    with sqlite3.connect(database) as connection:
+        connection.execute("DELETE FROM planning_evaluation_receipt")
+    with pytest.raises(grpc.aio.AioRpcError) as denied:
+        await reconcile(request, timeout=2)
+    detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+    assert detail.code == common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED
+
+
+async def _seed_planning_source(store: SqlitePlanningStore, *, due_at: int | None = None) -> None:
     if await store.load_commitment("commitment:长期计划") is None:
         await store.accept_commitment("commitment:长期计划", PlanVersion("plan:评估", 1,
             GoalVersion("goal:长期承诺", "conversation:planning", 1, "核对变化并通知", "实际观察到变化且通知已提交"),
-            ("核对受控来源", "评估完成条件")), due_at=int(time.time() * 1000) + 3_600_000)
+            ("核对受控来源", "评估完成条件")), due_at=due_at if due_at is not None else int(time.time() * 1000) + 3_600_000)
 
 
 async def _host_memory_job_fixture(root: Path, generation: str) -> None:
@@ -1357,7 +1574,7 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     planning = SqlitePlanningStore(root / "planning.sqlite")
     await planning.connect()
     if generation.startswith("planning-"):
-        await _seed_planning_source(planning)
+        await _seed_planning_source(planning, due_at=0 if generation.startswith("planning-reconciliation") else None)
 
     async def shutdown():
         return None

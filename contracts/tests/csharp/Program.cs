@@ -151,6 +151,28 @@ if (!AcknowledgePlanningJobRequestResponse.Parser.ParseFrom(planningReceipt.ToBy
 if (AcknowledgePlanningJobRequestRequest.Parser.ParseFrom(Array.Empty<byte>()).Request != null)
     throw new InvalidOperationException("Planning source ACK absent request gained presence");
 
+var planningQuery = new ReconcilePlanningJobRequest { Call = planningRead.Call, RequestId = planningSource.RequestId,
+    Identity = new JobsV1.JobExecutionIdentity { JobId = planningAck.JobId, ScopeId = planningSource.ScopeId,
+        Attempt = 2, AuthorityEpoch = 7, FencingToken = 9007199254740991, OwnerId = "host:接任者", LeaseUntilMs = 1900000000000 } };
+if (!ReconcilePlanningJobRequest.Parser.ParseFrom(planningQuery.ToByteArray()).Equals(planningQuery))
+    throw new InvalidOperationException("Planning original attempt/request precision roundtrip failed");
+var committer = planningQuery.Identity.Clone();
+committer.Attempt = 1; committer.OwnerId = "原提交者";
+var planningApplied = new ReconcilePlanningJobResponse { Result = new PlanningJobResult {
+    Identity = planningQuery.Identity, RequestId = planningSource.RequestId, Resolution = PlanningJobResolution.Applied,
+    SourceId = "cognition.planning", ReceiverFenced = true, EvidenceId = new string('c', 64), ObservedAtMs = 100,
+    Receipt = new PlanningEvaluationReceipt { Identity = committer, ReceiptId = new string('r', 64),
+        RequestId = planningSource.RequestId, CommitmentId = planningSource.CommitmentId, CommitmentRevision = 9007199254740991,
+        Completed = false, Reason = "条件尚未满足", CommittedAtMs = 90, EvidenceIds = { "事实:一" },
+        Evidence = { new PlanningEvidenceReference { EvidenceId = "事实:一", SourceOwner = "conversation",
+            ScopeId = planningSource.ScopeId, Revision = 9007199254740991, ContentDigest = new string('a', 64) } } } } };
+if (!ReconcilePlanningJobResponse.Parser.ParseFrom(planningApplied.ToByteArray()).Equals(planningApplied))
+    throw new InvalidOperationException("Planning business receipt/committer precision roundtrip failed");
+planningApplied.Result.Resolution = PlanningJobResolution.NotApplied;
+planningApplied.Result.Receipt = null;
+if (ReconcilePlanningJobResponse.Parser.ParseFrom(planningApplied.ToByteArray()).Result.Receipt != null)
+    throw new InvalidOperationException("Planning negative result gained receipt presence");
+
 var stateRequest = new PublishMemoryJobStateRequest { DeliveryAuthorityEpoch = 9007199254740991,
     Event = new JobsV1.JobStateEvent { EventId = "event:one", JobId = "job:one", ScopeId = "scope:one",
         GoalId = "source:one", Kind = "memory.consolidate", Revision = 9007199254740991,

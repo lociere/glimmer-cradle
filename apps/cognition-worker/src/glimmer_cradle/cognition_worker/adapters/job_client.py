@@ -7,6 +7,8 @@ import json
 from typing import Protocol
 
 from glimmer.cognition.v1 import cognition_service_pb2 as cognition_pb
+from glimmer.jobs.v1 import jobs_pb2 as jobs_pb
+from glimmer_cradle.cognition.planning import PlanningJobIdentity, PlanningJobResult
 from glimmer_cradle.cognition.ports import JobReceipt, JobRequest
 
 
@@ -136,3 +138,42 @@ def planning_source_to_wire(
     if planning_source_from_wire(source) != request:
         raise ValueError("Planning 持久源 kind/去重身份无效")
     return source
+
+
+def planning_identity_from_wire(identity: jobs_pb.JobExecutionIdentity) -> PlanningJobIdentity:
+    return PlanningJobIdentity(identity.job_id, identity.scope_id, identity.attempt,
+                               identity.authority_epoch, identity.fencing_token,
+                               identity.owner_id, identity.lease_until_ms)
+
+
+def planning_identity_to_wire(identity: PlanningJobIdentity) -> jobs_pb.JobExecutionIdentity:
+    return jobs_pb.JobExecutionIdentity(job_id=identity.job_id, scope_id=identity.scope_id,
+        attempt=identity.attempt, authority_epoch=identity.authority_epoch,
+        fencing_token=identity.fencing_token, owner_id=identity.owner_id,
+        lease_until_ms=identity.lease_until)
+
+
+def planning_result_to_wire(result: PlanningJobResult, request_id: str) -> cognition_pb.PlanningJobResult:
+    """原查询 identity 与真实提交 identity 分开；新 attempt 不篡改旧业务 receipt。"""
+    identity, receipt = result.identity, result.receipt
+    resolution = "applied" if receipt is not None else "not_applied"
+    document = ["planning-reconciliation.v1", identity.job_id, identity.scope_id,
+        identity.attempt, identity.authority_epoch, identity.fencing_token, identity.owner_id,
+        identity.lease_until, request_id, resolution, receipt.receipt_id if receipt else "sealed", result.observed_at]
+    wire = cognition_pb.PlanningJobResult(identity=planning_identity_to_wire(identity),
+        request_id=request_id, resolution=cognition_pb.PLANNING_JOB_RESOLUTION_APPLIED if receipt else cognition_pb.PLANNING_JOB_RESOLUTION_NOT_APPLIED,
+        source_id="cognition.planning", receiver_fenced=result.receiver_fenced,
+        evidence_id=hashlib.sha256(json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest(),
+        observed_at_ms=result.observed_at)
+    if receipt is not None:
+        wire.receipt.CopyFrom(cognition_pb.PlanningEvaluationReceipt(receipt_id=receipt.receipt_id,
+            identity=planning_identity_to_wire(receipt.identity), request_id=receipt.request_id,
+            commitment_id=receipt.commitment_id, commitment_revision=receipt.commitment_revision,
+            completed=receipt.assessment.completed, evidence_ids=receipt.assessment.evidence_ids,
+            reason=receipt.assessment.reason, evidence=[cognition_pb.PlanningEvidenceReference(
+                evidence_id=item.evidence_id, source_owner=item.source_owner, scope_id=item.scope_id,
+                revision=item.revision, content_digest=item.content_digest) for item in receipt.evidence],
+            committed_at_ms=receipt.committed_at))
+    if wire.ByteSize() > 65_536:
+        raise ValueError("Planning 对账响应超过预算")
+    return wire
