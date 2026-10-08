@@ -197,6 +197,14 @@ notification_resolved = cognition_pb.ResolvePlanningNotificationResponse(request
         continuity_id="continuity:一", thread_id="main", interaction_id="interaction:一", recall_scope="actor_private",
         disclosure_scope="conversation_private"), receipt=planning_applied.result.receipt)
 notification_resolved.receipt.completed = True
+notification_prepare = cognition_pb.PreparePlanningNotificationRequest(request=notification)
+notification_prepared = cognition_pb.PreparePlanningNotificationResponse(request=notification, accepted=True,
+    turn_id="turn:通知", turn_revision=9007199254740991, reply_moment_id="reply:通知", log_position=9007199254740991,
+    content_digest="f" * 64, context=notification_resolved.context, actor_id="actor:一", privacy_class="private",
+    recall_owner_id="actor:一", disclosure_owner_id="conversation:一", text="根据真实证据形成的通知。")
+for message in (notification_prepare, notification_prepared):
+    assert type(message).FromString(message.SerializeToString()) == message
+assert not cognition_pb.PreparePlanningNotificationResponse.FromString(b"").HasField("actor_id")
 for message in (notification, notification_read, notification_page, notification_resolve, notification_resolved):
     assert type(message).FromString(message.SerializeToString()) == message
 assert not cognition_pb.PlanningNotificationRequest.FromString(b"").HasField("source_moment_id")

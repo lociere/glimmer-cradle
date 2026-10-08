@@ -159,3 +159,17 @@ class ExecutionResultFact:
     result: object | None
     error_code: str
     updated_at_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationReplyFact:
+    """领域已形成的通知表达；Conversation 不推断业务完成或外部发送权限。"""
+
+    notification_id: str
+    producer_id: str
+    scope_id: str
+    source_fact_id: str
+    source_digest: str
+    input_digest: str
+    text: str
+    created_at_ms: int

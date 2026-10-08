@@ -41,6 +41,14 @@ Turn；能力请求保持 running，直到原 Action/已接纳 Execution Result/
 只保存一拍内的 perception、原生结果事实引用、reply、intent 和 arbitration，并引用持久 Turn；
 短程 ActionPlan 已删除，模型推理 Step 留在 Cognition Loop，不把 Turn 和 Step 当同一种状态。
 
+领域完成通知使用 owner-neutral `NotificationReplyFact`；Cognition 先形成表达，Recorder 核验真实
+原 Perception/完整摘要/context/隐私域，接纳稳定 Reply 并 flush。`TurnController.accept_notification_reply`
+随后从已结束的内部表达事实接纳 completed/revision=2 的持久 Turn，不创建伪用户 Perception，
+不把内部完成解释为外部投递。Reply 先提交而 Turn 失败时，重投同一事实补确认；没有原 Reply
+的既有普通 Turn、不同输入摘要或 interrupted/failed 不允许嫁接/复活。该用例不放宽普通 Turn
+转换。共享 Turn SQLite 连接的读写、IMMEDIATE 事务和取消 cleanup 有同一串行 owner；取消时
+等实际 commit/rollback 排空，读者不能确认别的请求未提交的状态。wire 归[协议参考](../../reference/protocol.md#planning-通知内部-reply-与-turn-接纳)。
+
 ## Interaction 与 Delivery
 
 TypeScript `InteractionController` 以 provider event 去重键和内容摘要接纳输入；同键同内容合并为一次处理，
@@ -105,7 +113,8 @@ Cognition 的 Episode、Relationship、Activity、Recent Experience 与 Memory c
 
 `adapters/persistence/history_store.py` 只按 Log position 增量投影 user/assistant Message、Chapter、Segment 和 Conversation State。
 `history/projection.py` 在读取前通过 commit barrier 推进 checkpoint；`history/history_reader.py` 只从投影恢复 Working Set。
-`conversations.db` 是可删除重建的 projection，不是第二事实源。
+History 表可从 Log 重建，不是第二事实源；同一 `conversations.db` 还持有 Python Turn 状态，
+不能整库删除后把重建 History 当作恢复了 Turn。必须保护原 Turn、Log 与相关待确认事实的一致切点。
 
 当前兼容路径为 `data/state/cognition/conversations/conversations.db`；阶段 14 迁移前保持不变。History
 schema v4 以 `(conversation_id, thread_id)` 区分线程；同一线程的 scene 与权限域漂移时投影 fail closed，

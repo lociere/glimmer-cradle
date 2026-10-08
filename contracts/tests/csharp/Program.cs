@@ -205,6 +205,15 @@ var notificationResolved = new ResolvePlanningNotificationResponse { Request = n
         ContinuityId = "continuity:一", ThreadId = "main", InteractionId = "interaction:一", RecallScope = "actor_private",
         DisclosureScope = "conversation_private" } };
 notificationResolved.Receipt.Completed = true;
+var notificationPrepare = new PreparePlanningNotificationRequest { Request = notification };
+var notificationPrepared = new PreparePlanningNotificationResponse { Request = notification, Accepted = true,
+    TurnId = "turn:通知", TurnRevision = 9007199254740991UL, ReplyMomentId = "reply:通知", LogPosition = 9007199254740991UL,
+    ContentDigest = new string('f', 64), Context = notificationResolved.Context, ActorId = "actor:一", PrivacyClass = "private",
+    RecallOwnerId = "actor:一", DisclosureOwnerId = "conversation:一", Text = "根据真实证据形成的通知。" };
+if (!PreparePlanningNotificationRequest.Parser.ParseFrom(notificationPrepare.ToByteArray()).Equals(notificationPrepare)
+    || !PreparePlanningNotificationResponse.Parser.ParseFrom(notificationPrepared.ToByteArray()).Equals(notificationPrepared)
+    || PreparePlanningNotificationResponse.Parser.ParseFrom(Array.Empty<byte>()).HasActorId)
+    throw new InvalidOperationException("Planning notification accepted Reply/Turn/digest/precision/presence roundtrip failed");
 if (!PlanningNotificationRequest.Parser.ParseFrom(notification.ToByteArray()).Equals(notification)
     || !ReadPlanningNotificationsRequest.Parser.ParseFrom(notificationRead.ToByteArray()).Equals(notificationRead)
     || !ReadPlanningNotificationsResponse.Parser.ParseFrom(notificationPage.ToByteArray()).Equals(notificationPage)

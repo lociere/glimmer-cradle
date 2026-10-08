@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
+import threading
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
-
 from glimmer_cradle.conversation import (
     ConversationTurn,
     SqliteTurnStore,
@@ -149,3 +150,99 @@ async def test_legacy_turn_without_digest_is_migrated_and_fails_closed(
     with pytest.raises(TurnConflictError, match="已绑定不同上下文"):
         await controller.accept(candidate("turn:legacy"))
     await controller.close()
+
+
+async def test_turn_cancelled_sql_statement_drains_rollback_before_reader_or_next_write(tmp_path):
+    store = SqliteTurnStore(tmp_path / "turns.db")
+    await store.connect()
+    entered, release = asyncio.Event(), threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def wait():
+        loop.call_soon_threadsafe(entered.set)
+        if not release.wait(5):
+            raise RuntimeError("fixture wait timeout")
+        return 1
+
+    await store._conn.create_function("fixture_wait", 0, wait)
+    await store._conn.execute("CREATE TRIGGER fixture_wait BEFORE INSERT ON conversation_turns BEGIN SELECT fixture_wait(); END")
+    await store._conn.commit()
+    task = asyncio.create_task(store.create(candidate().accepted(Clock().value)))
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        task.cancel()
+        reader = asyncio.create_task(store.load("turn:1"))
+        await asyncio.sleep(0.02)
+        assert not task.done() and not reader.done()
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert await reader is None
+        assert not store._conn.in_transaction
+        await store._conn.execute("DROP TRIGGER fixture_wait")
+        await store._conn.commit()
+        assert await store.create(candidate().accepted(Clock().value)) == candidate().accepted(Clock().value)
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await store.close()
+
+
+async def test_turn_cancelled_commit_is_drained_and_actual_committed_fact_remains_replayable(tmp_path, monkeypatch):
+    store = SqliteTurnStore(tmp_path / "turns.db")
+    await store.connect()
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = store._conn.commit
+
+    async def commit():
+        await original()
+        entered.set()
+        await release.wait()
+
+    monkeypatch.setattr(store._conn, "commit", commit)
+    accepted = candidate().accepted(Clock().value)
+    task = asyncio.create_task(store.create(accepted))
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        task.cancel()
+        reader = asyncio.create_task(store.load("turn:1"))
+        await asyncio.sleep(0.02)
+        assert not reader.done() and not task.done()
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert await reader == accepted
+        monkeypatch.setattr(store._conn, "commit", original)
+        assert await store.create(accepted) == accepted
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+        await store.close()
+
+
+async def test_turn_controller_cancelled_recovery_releases_connection_and_can_reconnect(tmp_path, monkeypatch):
+    store = SqliteTurnStore(tmp_path / "turns.db")
+    controller = TurnController(store, clock=Clock())
+    entered = asyncio.Event()
+    original = store.recover_active
+
+    async def recover_active(**kwargs):
+        await original(**kwargs)
+        entered.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(store, "recover_active", recover_active)
+    task = asyncio.create_task(controller.connect())
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not controller._connected and store._conn is None
+        monkeypatch.setattr(store, "recover_active", original)
+        assert await controller.connect() == 0
+        assert await controller.accept(candidate())
+    finally:
+        await controller.close()

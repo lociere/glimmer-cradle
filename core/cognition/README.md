@@ -25,6 +25,8 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
   生产长期 Jobs 源 wire 已接线；Core 评估现有严格模型输出、scope/live 证据复验、原 attempt 封口
   与同事务业务 receipt/承诺 revision。生产证据 Adapter、执行 wire/handler、默认接纳调度与状态
   inbox/ACK 已接线；新完成的评估同事务产生持久通知引用，重启/重放不重复产生。
+  通知基础表达由 Cognition 形成，Worker 接入 Conversation 的真实 Reply flush 与持久 Turn，
+  内部接纳不消费通知、不替代发送许可或真实回执。
   通知真实投递/回执与下一次调度仍未装配，不把业务完成或测试 Port fixture 当作外部送达，详见
   [认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
 - Conversation Log 是交互事实 owner；Cognition 只消费事实并写入受控认知投影。

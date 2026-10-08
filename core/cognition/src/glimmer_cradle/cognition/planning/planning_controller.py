@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from dataclasses import asdict
 
@@ -12,6 +13,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningEvaluationReceipt,
     PlanningJobIdentity,
     PlanningJobResult,
+    PlanningNotificationRequest,
 )
 from glimmer_cradle.cognition.planning.goal import PlanningAssessment
 from glimmer_cradle.cognition.planning.plan import PlanVersion
@@ -26,6 +28,7 @@ from glimmer_cradle.cognition.ports import (
     PlanningEvidence,
     PlanningEvidencePort,
 )
+from glimmer_cradle.conversation import NotificationReplyFact
 
 
 class ModelPlanningCompletionEvaluator:
@@ -93,6 +96,18 @@ class PlanningController:
             await self._store.acknowledge_job_request(request, receipt)
             delivered += 1
         return delivered
+
+    async def notification_reply(self, request: PlanningNotificationRequest) -> NotificationReplyFact:
+        """只表达持久完成评估；不调用模型、不选择目的地、不接纳发送权限或 ACK。"""
+        work = await self._store.read_notification_work(request)
+        if work.goal.source_moment_id is None or work.goal.source_digest is None:
+            raise PlanningConflictError("Planning 通知没有完整来源绑定")
+        input_digest = hashlib.sha256(json.dumps(asdict(work.request), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+        return NotificationReplyFact(notification_id=request.notification_id, producer_id="planning",
+            scope_id=work.goal.scope_id, source_fact_id=work.goal.source_moment_id, source_digest=work.goal.source_digest,
+            input_digest=input_digest, text=f"根据已接纳的证据，长期目标的完成条件已满足：{work.goal.text}",
+            created_at_ms=request.created_at)
 
     async def evaluate_job(
         self, identity: PlanningJobIdentity, request_id: str, *,

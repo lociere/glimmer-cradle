@@ -23,8 +23,10 @@ import {
   PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
   ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
+  PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
   type ReadPlanningNotificationsRequest, type ReadPlanningNotificationsResponse,
   type ResolvePlanningNotificationRequest, type ResolvePlanningNotificationResponse,
+  type PreparePlanningNotificationRequest, type PreparePlanningNotificationResponse,
   type PublishPlanningJobStateRequest, type PublishPlanningJobStateResponse,
   type GetPlanningJobAdmissionRequest, type GetPlanningJobAdmissionResponse,
   type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
@@ -73,6 +75,7 @@ export interface PlanningJobsCognitionPort extends PlanningJobsReconciliationPor
 export interface PlanningNotificationsCognitionPort {
   readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse>;
   resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse>;
+  preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse>;
 }
 
 export class HostCognitionError extends Error {
@@ -190,6 +193,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse> {
     return this.call('ResolvePlanningNotification', ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
       create(ResolvePlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse> {
+    return this.call('PreparePlanningNotification', PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+      create(PreparePlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readPlanningRequests(request: ReadPlanningJobRequestsRequest, signal?: AbortSignal): Promise<ReadPlanningJobRequestsResponse> {
     return this.call('ReadPlanningJobRequests', ReadPlanningJobRequestsRequestSchema, ReadPlanningJobRequestsResponseSchema,

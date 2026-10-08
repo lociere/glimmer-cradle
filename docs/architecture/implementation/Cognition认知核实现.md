@@ -306,6 +306,10 @@ notification ID 为 `planning-completion.v1:<receipt_id>` 的 UTF-8 SHA-256；�
 的原完整来源/保留资格/context/隐私 owner；无绑定或来源不可用只返回原引用和原因，不披露
 目标正文或 receipt。该 IO 采样独立于 model-tier，不调用模型或要求 Knowledge 装配；read/resolve
 不改写或消费通知。Host 默认观察实际待办，无真实 receiver 时显示 `planning_notifications_pending`。
+`PlanningController.notification_reply` 从同一真实完成 work 形成基础表达；Worker 的
+Prepare RPC 让 Conversation 持久接纳稳定 Reply 和已结束的内部 Turn，返回原 Moment/position/
+内容摘要与完整隐私域。它不调用模型或平台 IO，不在 Kernel 拼人格文本；同引用重启不重复形成
+Reply/Turn，内部接纳仍不消费通知。原业务/来源在跨 await 后复验，外部发送资格不从历史 Reply 推定。
 精确分页、预算、reason/error 与生命周期见上述协议参考。本候选仍无投递 receiver 或可清理请求
 的 ACK 入口；App 后续须复验真实目的地和当前权限，并复用 Conversation output generation/真实 delivery receipt；
 PublishAction 接纳、模型完成和本地读成功均不表示外部已送达。缺接收方、撤权、取消或 unknown

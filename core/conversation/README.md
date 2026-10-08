@@ -10,6 +10,9 @@ History 投影和输出 Delivery。认知内容由 Cognition 决定；平台地�
 - `contracts/` 仍是跨进程 wire 唯一来源，本包不手写 generated DTO。
 - `ConversationRecorder.accept_execution_result` 绑定已存在的原 ACTION 与 Execution result identity，
   继承其线程/隐私上下文，刷盘后才返回原 Moment/position；重复接纳不产生第二份交互事实。
+- 通知表达由 Cognition 提供 `NotificationReplyFact`；Recorder 核验真实原 Perception 并 flush 稳定
+  Reply，TurnController 再接纳对应已结束的内部 Turn。重启沿原 Reply 补确认，不覆盖普通 Turn，
+  不把内部接纳当外部送达或源 ACK。
 
 ## 持久状态
 

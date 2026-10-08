@@ -30,7 +30,8 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
-import { PlanningNotificationRequestSchema, ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
+import { PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+  PlanningNotificationRequestSchema, ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import {
   AudioPlayEventSchema,
@@ -233,6 +234,19 @@ const notificationResolved = create(ResolvePlanningNotificationResponseSchema, {
     threadId: 'main', interactionId: 'interaction:一', recallScope: 'actor_private', disclosureScope: 'conversation_private' },
   receipt: { ...planningApplied.result!.receipt!, completed: true } });
 const notificationRestored = fromBinary(ResolvePlanningNotificationResponseSchema, toBinary(ResolvePlanningNotificationResponseSchema, notificationResolved));
+const notificationPrepare = create(PreparePlanningNotificationRequestSchema, { request: notification });
+const notificationPrepared = create(PreparePlanningNotificationResponseSchema, { request: notification, accepted: true,
+  turnId: 'turn:通知', turnRevision: 9007199254740991n, replyMomentId: 'reply:通知', logPosition: 9007199254740991n,
+  contentDigest: 'f'.repeat(64), context: notificationResolved.context, actorId: 'actor:一', privacyClass: 'private',
+  recallOwnerId: 'actor:一', disclosureOwnerId: 'conversation:一', text: '根据真实证据形成的通知。' });
+const preparedRoundtrip = fromBinary(PreparePlanningNotificationResponseSchema, toBinary(PreparePlanningNotificationResponseSchema, notificationPrepared));
+if (fromBinary(PreparePlanningNotificationRequestSchema, toBinary(PreparePlanningNotificationRequestSchema, notificationPrepare)).request?.notificationId !== notification.notificationId
+  || preparedRoundtrip.logPosition !== 9007199254740991n || preparedRoundtrip.turnRevision !== 9007199254740991n
+  || !preparedRoundtrip.accepted || preparedRoundtrip.text !== notificationPrepared.text || preparedRoundtrip.contentDigest !== 'f'.repeat(64)
+  || preparedRoundtrip.context?.recallScope !== 'actor_private' || preparedRoundtrip.disclosureOwnerId !== 'conversation:一'
+  || fromBinary(PreparePlanningNotificationResponseSchema, new Uint8Array()).actorId !== undefined) {
+  throw new Error('Planning notification accepted Reply/Turn/digest/precision/presence roundtrip failed');
+}
 if (fromBinary(PlanningNotificationRequestSchema, toBinary(PlanningNotificationRequestSchema, notification)).goalVersion !== 9007199254740991n
   || fromBinary(ReadPlanningNotificationsRequestSchema, toBinary(ReadPlanningNotificationsRequestSchema, notificationRead)).afterNotificationId !== 'b'.repeat(64)
   || fromBinary(ReadPlanningNotificationsResponseSchema, toBinary(ReadPlanningNotificationsResponseSchema, notificationPage)).requests[0].createdAtMs !== 0n

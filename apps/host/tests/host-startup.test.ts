@@ -21,7 +21,8 @@ import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequ
   PlanningJobSourceRequestSchema, ReadPlanningJobRequestsResponseSchema,
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
   AcceptPlanningCommitmentRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema,
+  PreparePlanningNotificationRequestSchema, type PreparePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy,
   RetentionCeiling, PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
@@ -159,6 +160,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       expect(JSON.stringify(assessments)).toContain('核对这条实际来源记录');
       const notificationRequest = create(ReadPlanningNotificationsRequestSchema, { limit: 1 });
       const notifications = await client.readPlanningNotifications(notificationRequest);
+      let preparedNotification: PreparePlanningNotificationResponse | undefined;
       expect(notifications.requests).toHaveLength(completed ? 1 : 0);
       if (completed) {
         expect(await client.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request: notifications.requests[0] })))
@@ -168,6 +170,16 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
               continuityId: 'continuity', threadId: 'main', interactionId: 'planning-native-turn',
               recallScope: 'conversation_private', disclosureScope: 'conversation_private' },
             receipt: { completed: true, receiptId: notifications.requests[0].receiptId } });
+        preparedNotification = await client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema,
+          { request: notifications.requests[0] }));
+        expect(preparedNotification).toMatchObject({ accepted: true, turnRevision: 2n,
+          text: '根据已接纳的证据，长期目标的完成条件已满足：核对实际来源',
+          privacyClass: 'private', recallOwnerId: 'conversation:actual-planning', disclosureOwnerId: 'conversation:actual-planning',
+          context: { sourceProviderId: 'provider', conversationId: 'conversation:actual-planning', interactionId: preparedNotification.turnId } });
+        expect(preparedNotification.replyMomentId).not.toBe('');
+        expect(preparedNotification.logPosition).toBeGreaterThan(0n);
+        expect(preparedNotification.contentDigest).toMatch(/^[a-f0-9]{64}$/u);
+        expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
       }
       await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({
         status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
@@ -177,6 +189,14 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       expect(owner.snapshot.session!.jobs!.lease!.epoch).toBe(2);
       client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
       expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
+      if (preparedNotification) {
+        expect(await client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema,
+          { request: notifications.requests[0] }))).toEqual(preparedNotification);
+        const turns = new Database(path.join(paths.data_root, 'state/cognition/conversations/conversations.db'), { readonly: true });
+        try { expect(turns.prepare('SELECT status,revision FROM conversation_turns WHERE turn_id=?').get(preparedNotification.turnId))
+          .toEqual({ status: 'completed', revision: 2 }); }
+        finally { turns.close(); }
+      }
       await vi.waitFor(() => expect(owner.snapshot.session!.jobs!.jobs).toMatchObject({
         status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
       { timeout: 5000, interval: 25 });

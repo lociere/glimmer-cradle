@@ -7,19 +7,24 @@ import hashlib
 import json
 import sqlite3
 import threading
+import uuid
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-import uuid
 
 import pytest
-
 from glimmer_cradle.conversation import (
     ConversationController,
     ConversationStore,
+    ConversationTurn,
     ExecutionResultFact,
     MomentKind,
+    NotificationReplyFact,
+    SourceDescriptor,
+    SqliteTurnStore,
+    TurnConflictError,
+    TurnController,
     build_conversation_recorder,
 )
 
@@ -86,6 +91,210 @@ def execution_fact(source):
         definition_revision="actual", request_digest="a" * 64, state="succeeded", side_effects="confirmed",
         result={"text": "实际结果"}, error_code="", updated_at_ms=1,
     )
+
+
+def notification_source(owner, *, scope="actor_private", actor="actor:one", privacy="sensitive"):
+    return owner.record(MomentKind.PERCEPTION, {"text": "原始目标输入", "source_provider_id": "surface:one"},
+        scene_id="scene:one", conversation_id="conversation:one", continuity_id="continuity:one", thread_id="thread:one",
+        interaction_id="original:interaction", actor_id=actor, actor_name="原始角色", recall_scope=scope,
+        disclosure_scope=scope, origin=SourceDescriptor(privacy_class=privacy))
+
+
+def notification_fact(source):
+    return NotificationReplyFact("a" * 64, "planning", source.conversation_id, source.moment_id,
+        hashlib.sha256(json.dumps(asdict(source), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False).encode()).hexdigest(),
+        "b" * 64, "根据真实评估形成的通知", 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["actor", "scope", "privacy", "provider", "retention", "context"])
+async def test_notification_incomplete_actual_source_never_forms_reply_or_turn(tmp_path, fault):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        source = notification_source(owner, actor=None if fault == "actor" else "actor:one",
+            scope="unknown_scope" if fault == "scope" else "actor_private", privacy="unknown" if fault == "privacy" else "private")
+        if fault in {"provider", "retention", "context"}:
+            source = owner.log.append(replace(source, seq=0, moment_id="malformed:source",
+                **({"content": {"source_provider_id": True}} if fault == "provider" else
+                   {"retention_ceiling": "transient"} if fault == "retention" else {"interaction_id": ""})))
+        await owner.flush()
+        before = owner.log.query()
+        with pytest.raises(ValueError):
+            await turns.accept_notification_reply(notification_fact(source), recorder=owner)
+        assert owner.log.query() == before
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            assert db.execute("SELECT count(*) FROM conversation_turns").fetchone()[0] == 0
+    finally:
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["accepted", "completed", "interrupted", "failed"])
+async def test_notification_cannot_graft_reply_onto_preexisting_ordinary_turn(tmp_path, status):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        source = notification_source(owner)
+        fact = notification_fact(source)
+        turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{fact.notification_id}".encode()).hexdigest()
+        turn = await turns.accept(ConversationTurn(turn_id=turn_id, scene_id=source.scene_id,
+            conversation_id=source.conversation_id, continuity_id=source.continuity_id,
+            thread_id=source.thread_id, payload_digest=fact.input_digest))
+        if status == "completed": turn = await turns.complete(turn_id, expected_revision=turn.revision)
+        elif status == "interrupted": turn = await turns.interrupt(turn_id, expected_revision=turn.revision, reason="original cancelled")
+        elif status == "failed": turn = await turns.fail(turn_id, expected_revision=turn.revision, reason="original failed")
+        await owner.flush()
+        before = owner.log.query()
+        with pytest.raises(TurnConflictError):
+            await turns.accept_notification_reply(fact, recorder=owner)
+        assert await turns.load(turn_id) == turn
+        assert owner.log.query() == before
+    finally:
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["public", "conversation_private", "actor_private", "space_local", "character_internal"])
+async def test_notification_reply_turn_and_full_privacy_survive_restart(tmp_path, scope):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        source = notification_source(owner, scope=scope)
+        fact = notification_fact(source)
+        turn, reply = await turns.accept_notification_reply(fact, recorder=owner)
+        assert turn.status == "completed" and turn.revision == 2 and turn.payload_digest == fact.input_digest
+        assert reply.kind == "reply" and reply.causation_ids == (source.moment_id,)
+        assert (reply.scene_id, reply.conversation_id, reply.continuity_id, reply.thread_id) == (
+            source.scene_id, source.conversation_id, source.continuity_id, source.thread_id)
+        assert reply.interaction_id == turn.turn_id != source.interaction_id
+        assert (reply.actor_id, reply.actor_name, reply.recall_scope, reply.disclosure_scope) == (
+            source.actor_id, source.actor_name, scope, scope)
+        assert reply.origin.privacy_class == "sensitive" and reply.retention_ceiling == "experience"
+        assert reply.content["text"] == fact.text and reply.content["source_provider_id"] == "surface:one"
+        assert reply.content["notification"]["input_digest"] == fact.input_digest
+        await owner.stop()
+        await turns.close()
+        owner = recorder(tmp_path / "log")
+        turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+        await owner.start()
+        assert await turns.connect() == 0
+        assert await turns.accept_notification_reply(fact, recorder=owner) == (turn, reply)
+        assert len(owner.log.query()) == 2
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            assert db.execute("SELECT count(*) FROM conversation_turns").fetchone()[0] == 1
+    finally:
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["text", "input_digest", "producer_id", "source_fact_id", "scope_id"])
+async def test_notification_same_identity_changed_facts_never_overwrite_reply_or_turn(tmp_path, change):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        fact = notification_fact(notification_source(owner))
+        accepted = await turns.accept_notification_reply(fact, recorder=owner)
+        before = owner.log.query()
+        value = "c" * 64 if change == "input_digest" else "changed"
+        with pytest.raises((ValueError, RuntimeError)):
+            await turns.accept_notification_reply(replace(fact, **{change: value}), recorder=owner)
+        assert owner.log.query() == before
+        assert await turns.load(accepted[0].turn_id) == accepted[0]
+    finally:
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", [
+    {"notification_id": "wrong"}, {"source_digest": "wrong"}, {"input_digest": "wrong"},
+    {"text": " "}, {"text": "x" * 16385}, {"producer_id": " "}, {"scope_id": True},
+    {"created_at_ms": True}, {"created_at_ms": -1}, {"created_at_ms": 253402300800000},
+])
+async def test_invalid_notification_rejected_before_reply_or_turn_write(tmp_path, change):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        fact = notification_fact(notification_source(owner))
+        await owner.flush()
+        before = owner.log.query()
+        with pytest.raises(ValueError):
+            await turns.accept_notification_reply(replace(fact, **change), recorder=owner)
+        assert owner.log.query() == before
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            assert db.execute("SELECT count(*) FROM conversation_turns").fetchone()[0] == 0
+    finally:
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+async def test_notification_flush_failure_keeps_turn_unconfirmed_and_exact_retry_recovers(tmp_path):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    original = owner.log._write_batch
+    try:
+        fact = notification_fact(notification_source(owner))
+        await owner.flush()
+        owner.log._write_batch = lambda _batch: (_ for _ in ()).throw(RuntimeError("fixture flush failure"))
+        with pytest.raises(RuntimeError, match="fixture flush failure"):
+            await turns.accept_notification_reply(fact, recorder=owner)
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            assert db.execute("SELECT count(*) FROM conversation_turns").fetchone()[0] == 0
+        owner.log._write_batch = original
+        turn, reply = await turns.accept_notification_reply(fact, recorder=owner)
+        assert turn.status == "completed" and reply.seq == 2
+        assert len(owner.log.query()) == 2
+    finally:
+        owner.log._write_batch = original
+        await turns.close()
+        await owner.stop()
+
+
+@pytest.mark.asyncio
+async def test_notification_reply_committed_turn_insert_failed_reopens_without_second_reply(tmp_path):
+    owner = recorder(tmp_path / "log")
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+    await owner.start()
+    await turns.connect()
+    try:
+        fact = notification_fact(notification_source(owner))
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            db.execute("CREATE TRIGGER fixture_failure BEFORE INSERT ON conversation_turns BEGIN SELECT RAISE(ABORT,'fixture failure'); END")
+        with pytest.raises(RuntimeError, match="Turn identity"):
+            await turns.accept_notification_reply(fact, recorder=owner)
+        reply = owner.recorded_fact(f"notification-reply:{fact.notification_id}")
+        assert reply is not None and await turns.load(reply.interaction_id) is None
+        await owner.stop()
+        await turns.close()
+        with sqlite3.connect(tmp_path / "turns.db") as db:
+            db.execute("DROP TRIGGER fixture_failure")
+        owner = recorder(tmp_path / "log")
+        turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=Clock())
+        await owner.start()
+        await turns.connect()
+        restored, replay = await turns.accept_notification_reply(fact, recorder=owner)
+        assert replay == reply and restored.status == "completed" and len(owner.log.query()) == 2
+    finally:
+        await turns.close()
+        await owner.stop()
 
 
 @pytest.mark.asyncio

@@ -222,6 +222,31 @@ Host 实际 client 接通上述 RPC；默认监督链观察持久待办，没有
 `degraded/planning_notifications_pending`，Jobs 状态 ACK 不抹去通知或假 ready。后续 App 必须
 复验真实目的地/权限，复用 Conversation output generation 与实际 delivery receipt 后才能接 ACK。
 
+### Planning 通知内部 Reply 与 Turn 接纳
+
+`PreparePlanningNotification` 仍由同一 Cognition Service 承载，唯一 IDL 定义
+`PreparePlanningNotificationRequest` / `PreparePlanningNotificationResponse`。输入只有原完整通知引用
+和 CallMetadata，不接受调用者自报的正文、context、actor、Turn 或完成结论；请求限 64 KiB。
+Cognition 从真实完成评估/不可变目标形成基础通知表达，不调用模型或平台 IO。Worker 复验实际
+原 Perception 的完整摘要、保留资格、上下文和隐私域，再让 Conversation 接纳稳定 Reply。
+
+Reply 的 causation 指向原 Perception，保留实际 actor/隐私域，使用独立稳定通知 interaction；
+不是伪造的新用户输入。正文限 16 KiB，完整内容限 64 KiB。只有实际 Log flush 完成后，才从
+该 Reply 接纳已结束的内部 Turn（completed/revision=2）；普通已存在 Turn 不能被通知覆盖，
+interrupted/failed 不复活。Reply 已提交而 Turn 插入失败/响应丢失时，原 identity 重试补确认，
+不新增第二 Reply。内部 Turn 完成并不表示任何接收方已见到文字或听到声音。
+
+响应 accepted=true 同时携原 request、持久 Turn/revision、原 Reply Moment/Log position、实际
+Reply content 的排序键紧凑 UTF-8 JSON SHA-256、正文、完整 context、可选 actor 与隐私 owner；
+响应限 256 KiB，position/revision 必须 JS safe。跨 await 后再次复验业务事实/实际来源，未知
+引用/预算为 INVALID_REQUEST，持久绑定冲突为 RECOVERY_REQUIRED，来源不可读为
+PERMISSION_DENIED，未 ready/owner 缺失/drain 为 NOT_READY，旧代为 GENERATION_MISMATCH。
+取消/deadline/shutdown 等到实际 flush/commit/rollback 排空，不返回伪确认；已提交事实保留供原请求对账。
+
+该操作是内部接纳，不是通知发布、外部权限、Delivery receipt 或源 ACK。Host client 已接真实
+RPC，生产 CLI 双重启恢复同一 Reply/Turn/digest；默认监督仍显示通知 pending。App 后续必须
+复验真实目的地与当前权限，再用唯一 Conversation Delivery 和实际接收回执完成源确认。
+
 ### Planning 原 attempt 持久对账
 
 `ReconcilePlanningJob` 复用 Jobs 唯一 `JobExecutionIdentity`，另携原源 `request_id`；请求总量

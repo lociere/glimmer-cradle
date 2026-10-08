@@ -1,5 +1,10 @@
 # M12 Contract Spine Inventory
 
+Planning 通知的内部接纳仍归 `proto/glimmer/cognition/v1/cognition_service.proto`：
+`PreparePlanningNotificationRequest`、`PreparePlanningNotificationResponse` 与
+`PreparePlanningNotification`。Cognition 形成表达，Conversation 实际 Reply flush 与持久 Turn
+提交后才返回 accepted、原 Reply/position/content digest 和完整权限域；不代表外部 delivered/源 ACK。
+
 Planning 完成通知的读取/来源解析同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `PlanningNotificationRequest`、`ReadPlanningNotificationsRequest`、`ReadPlanningNotificationsResponse`、
 `ResolvePlanningNotificationRequest`、`ResolvePlanningNotificationResponse` 与

@@ -101,7 +101,7 @@ from glimmer_cradle.cognition_worker.shutdown import (
     cancel_task,
     worker_shutdown_steps,
 )
-from glimmer_cradle.conversation import ConversationRecorder
+from glimmer_cradle.conversation import ConversationRecorder, TurnController
 from google.protobuf.json_format import MessageToDict, ParseDict
 from structlog.stdlib import ProcessorFormatter
 
@@ -1422,6 +1422,7 @@ class CognitionGrpcHost:
         planning: PlanningStore | None = None,
         planning_model: ModelPort | None = None,
         conversation: ConversationRecorder | None = None,
+        turns: TurnController | None = None,
         knowledge: KnowledgeIndex | None = None,
     ) -> None:
         self.generation = generation
@@ -1437,6 +1438,7 @@ class CognitionGrpcHost:
         self._planning_controller = PlanningController(store=planning) if planning is not None else None
         self._planning_model = planning_model
         self._conversation = conversation
+        self._turns = turns
         self._knowledge = knowledge
         self._server: grpc.aio.Server | None = None
         self._endpoint: str | None = None
@@ -1482,6 +1484,7 @@ class CognitionGrpcHost:
             "PublishPlanningJobState": self._method(self._publish_planning_job_state, cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse),
             "ReadPlanningNotifications": self._method(self._read_planning_notifications, cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse),
             "ResolvePlanningNotification": self._method(self._resolve_planning_notification, cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse),
+            "PreparePlanningNotification": self._method(self._prepare_planning_notification, cognition_pb.PreparePlanningNotificationRequest, cognition_pb.PreparePlanningNotificationResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(
@@ -1633,7 +1636,7 @@ class CognitionGrpcHost:
 
     async def _accept_execution_result(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
-            if self._conversation is None or not self._conversation.accepts_execution_results:
+            if self._conversation is None or not self._conversation.accepts_durable_facts:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Conversation 结果接收 owner 未 ready", retryable=True)
             try:
                 if not request.HasField("event"):
@@ -1926,6 +1929,47 @@ class CognitionGrpcHost:
             response.receipt.CopyFrom(planning_receipt_to_wire(work.receipt))
             if response.ByteSize() > 262_144:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知事实响应超出预算")
+            return response
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _prepare_planning_notification(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if request.ByteSize() > 65_536 or not request.HasField("request"):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知请求缺失或超出预算")
+            try:
+                item = planning_notification_from_wire(request.request)
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知引用/版本无效") from error
+            if self._conversation is None or not self._conversation.accepts_durable_facts or self._turns is None:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 通知 Conversation 接收 owner 未 ready")
+            try:
+                work = await source.read_notification_work(item)
+                moment, domain = planning_notification_source(self._conversation, work.goal)
+                fact = await self._planning_controller.notification_reply(item)
+                turn, reply = await self._turns.accept_notification_reply(fact, recorder=self._conversation)
+                # 接纳是内部历史事实；跨 await 后再次核验当前业务与原来源，不把陈旧事实当发送许可。
+                await source.read_notification_work(item)
+                planning_notification_source(self._conversation, work.goal)
+            except PermissionError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Planning 通知原来源不可读") from error
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知/Turn/Reply 持久绑定冲突") from error
+            if not 1 <= reply.seq <= 9007199254740991 or not 1 <= turn.revision <= 9007199254740991:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知 Log/Turn 修订不可表示")
+            response = cognition_pb.PreparePlanningNotificationResponse(request=planning_notification_to_wire(item),
+                turn_id=turn.turn_id, turn_revision=turn.revision, reply_moment_id=reply.moment_id,
+                log_position=int(reply.seq), text=reply.content["text"], accepted=True,
+                content_digest=hashlib.sha256(json.dumps(reply.content, ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest(),
+                privacy_class=domain[9], recall_owner_id=domain[6], disclosure_owner_id=domain[8])
+            response.context.CopyFrom(cognition_pb.ConversationContext(source_provider_id=domain[0], scene_id=domain[1],
+                conversation_id=domain[2], continuity_id=domain[3], thread_id=domain[4], interaction_id=turn.turn_id,
+                recall_scope=domain[5], disclosure_scope=domain[7]))
+            if moment.actor_id is not None:
+                response.actor_id = moment.actor_id
+            if response.ByteSize() > 262_144:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知实际 Reply 响应超出预算")
             return response
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
@@ -2393,6 +2437,7 @@ class CognitionHost:
                 planning=components.planning_store,
                 planning_model=components.planning_model,
                 conversation=components.conversation_recorder,
+                turns=components.turn_controller,
                 knowledge=components.knowledge_base,
             )
 

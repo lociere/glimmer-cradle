@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
+from dataclasses import replace
 from typing import Protocol
 
+from glimmer_cradle.conversation.log.record import (
+    Moment,
+    MomentKind,
+    NotificationReplyFact,
+)
 from glimmer_cradle.conversation.turns.turn import ConversationTurn, TurnStatus
 from glimmer_cradle.conversation.turns.turn_store_port import (
     TurnConflictError,
@@ -14,6 +22,12 @@ from glimmer_cradle.conversation.turns.turn_store_port import (
 
 class ClockPort(Protocol):
     def now_iso(self) -> str: ...
+
+
+class NotificationReplyRecorderPort(Protocol):
+    async def accept_notification_reply(self, fact: NotificationReplyFact) -> Moment: ...
+
+    def recorded_fact(self, idempotency_key: str) -> Moment | None: ...
 
 _TRANSITIONS: dict[TurnStatus, frozenset[TurnStatus]] = {
     "accepted": frozenset({"running", "completed", "interrupted", "failed"}),
@@ -40,15 +54,19 @@ class TurnController:
                 interrupted_at=self._clock.now_iso(),
                 reason="process_restarted",
             )
-        except Exception:
-            await self._store.close()
-            self._connected = False
+        except BaseException:
+            try:
+                await self._store.close()
+            finally:
+                self._connected = False
             raise
 
     async def close(self) -> None:
         if self._connected:
-            await self._store.close()
-            self._connected = False
+            try:
+                await self._store.close()
+            finally:
+                self._connected = False
 
     async def accept(self, candidate: ConversationTurn) -> ConversationTurn:
         self._require_connected()
@@ -61,6 +79,51 @@ class TurnController:
 
     async def start(self, turn_id: str, *, expected_revision: int) -> ConversationTurn:
         return await self._transition(turn_id, "running", expected_revision=expected_revision)
+
+    async def accept_notification_reply(
+        self, fact: NotificationReplyFact, *, recorder: NotificationReplyRecorderPort,
+    ) -> tuple[ConversationTurn, Moment]:
+        self._require_connected()
+        if not isinstance(fact, NotificationReplyFact) or not isinstance(fact.notification_id, str):
+            raise TurnConflictError("Conversation 通知类型/身份无效")
+        turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{fact.notification_id}".encode()).hexdigest()
+        existing = await self._store.load(turn_id)
+        if existing is not None and (existing.status != "completed" or existing.revision != 2
+            or existing.payload_digest != fact.input_digest
+            or recorder.recorded_fact(f"notification-reply:{fact.notification_id}") is None):
+            raise TurnConflictError("Conversation 通知不能覆盖原 Turn 或补造原 Reply")
+        reply = await recorder.accept_notification_reply(fact)
+        return await self._accept_recorded_notification(reply), reply
+
+    async def _accept_recorded_notification(self, reply: Moment) -> ConversationTurn:
+        """从已 flush 的通知 Reply 接纳已结束的内部 Turn；不确认外部送达。
+
+        调用 owner 必须先越过 Recorder barrier。无 active Turn 的崩溃窗口只留下可重投的 Reply，
+        重试沿同一事实补接纳，不复活 interrupted/failed 或覆盖既有普通输入 Turn。
+        """
+        self._require_connected()
+        reference = reply.content.get("notification")
+        if (reply.kind != MomentKind.REPLY.value or reply.seq <= 0 or not isinstance(reference, dict)
+            or not isinstance(reference.get("notification_id"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", reference["notification_id"])
+            or not isinstance(reference.get("input_digest"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", reference["input_digest"])
+            or reply.origin.source_event_id != reference["notification_id"]
+            or reply.interaction_id != hashlib.sha256(
+                f"conversation-notification-turn.v1:{reference['notification_id']}".encode()).hexdigest()):
+            raise TurnConflictError("Conversation 通知 Turn 没有对应的真实 Reply 绑定")
+        candidate = ConversationTurn(turn_id=reply.interaction_id, scene_id=reply.scene_id,
+            conversation_id=reply.conversation_id, continuity_id=reply.continuity_id, thread_id=reply.thread_id,
+            recall_scope=reply.recall_scope, disclosure_scope=reply.disclosure_scope,
+            payload_digest=reference["input_digest"])
+        self._validate_identity(candidate)
+        completed = replace(candidate.accepted(reply.occurred_at), status="completed", revision=2)
+        existing = await self._store.load(candidate.turn_id)
+        if existing is not None:
+            if existing != completed:
+                raise TurnConflictError("Conversation 已有 Turn 与已提交通知 Reply 冲突")
+            return existing
+        return await self._store.create(completed)
 
     async def complete(self, turn_id: str, *, expected_revision: int) -> ConversationTurn:
         return await self._transition(turn_id, "completed", expected_revision=expected_revision)

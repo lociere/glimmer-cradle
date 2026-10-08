@@ -16,6 +16,7 @@ from glimmer_cradle.conversation.log.record import (
     ExecutionResultFact,
     Moment,
     MomentKind,
+    NotificationReplyFact,
     SourceDescriptor,
 )
 
@@ -101,7 +102,7 @@ class ConversationRecorder:
         return self._enabled
 
     @property
-    def accepts_execution_results(self) -> bool:
+    def accepts_durable_facts(self) -> bool:
         return self._enabled and self._running
 
     @property
@@ -244,6 +245,59 @@ class ConversationRecorder:
             idempotency_key=f"execution-result:{fact.event_id}")
         if moment is None:
             raise RuntimeError("Conversation 未接纳持久结果")
+        await self.flush()
+        return moment
+
+    async def accept_notification_reply(self, fact: NotificationReplyFact) -> Moment:
+        """保存稳定 Reply 后跨过 flush barrier；这不是外部 delivered 或 Planning ACK。"""
+        if not self._enabled or not self._running:
+            raise RuntimeError("Conversation 通知接收 owner 未 ready")
+        if not isinstance(fact, NotificationReplyFact):
+            raise TypeError("Conversation 通知表达类型无效")
+        for value in (fact.notification_id, fact.source_digest, fact.input_digest):
+            if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+                raise ValueError("Conversation 通知身份/摘要无效")
+        for value in (fact.producer_id, fact.scope_id, fact.source_fact_id):
+            if not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096:
+                raise ValueError("Conversation 通知来源身份无效")
+        if not isinstance(fact.text, str) or not fact.text.strip() or len(fact.text.encode("utf-8")) > 16_384:
+            raise ValueError("Conversation 通知正文无效或超过预算")
+        if type(fact.created_at_ms) is not int or not 0 <= fact.created_at_ms <= 253402300799999:
+            raise ValueError("Conversation 通知 UTC 时间无效")
+        source = self._log.get_moment(fact.source_fact_id)
+        if (source is None or source.kind != MomentKind.PERCEPTION.value or source.conversation_id != fact.scope_id
+            or hashlib.sha256(json.dumps(asdict(source), ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest() != fact.source_digest):
+            raise ValueError("Conversation 通知原 Perception 缺失/摘要或权限域冲突")
+        provider = source.content.get("source_provider_id")
+        values = (provider, source.scene_id, source.conversation_id, source.continuity_id, source.thread_id, source.interaction_id)
+        owners = {"public": "public", "conversation_private": source.conversation_id, "actor_private": source.actor_id,
+                  "space_local": source.scene_id, "character_internal": source.continuity_id}
+        if (any(not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096 for value in values)
+            or source.retention_ceiling not in {"experience", "memory_candidate"}
+            or source.origin.privacy_class not in {"public", "private", "sensitive"}
+            or any(scope not in owners or not isinstance(owners[scope], str) or not owners[scope].strip()
+                or len(owners[scope].encode("utf-8")) > 4096 for scope in (source.recall_scope, source.disclosure_scope))
+            or source.actor_id is not None and (not isinstance(source.actor_id, str) or not source.actor_id.strip()
+                or len(source.actor_id.encode("utf-8")) > 4096)):
+            raise ValueError("Conversation 通知原 context/隐私域不完整")
+        reference = asdict(fact)
+        del reference["text"]
+        content = {"text": fact.text, "source_provider_id": provider, "notification": reference}
+        if len(json.dumps(content, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")) > 65_536:
+            raise ValueError("Conversation 通知完整事实超过 64 KiB")
+        turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{fact.notification_id}".encode()).hexdigest()
+        # 只表达已形成的通知；不伪造用户输入，不复制目标/评估正文为第二业务事实源。
+        moment = self.record(MomentKind.REPLY, content, causation_ids=(source.moment_id,),
+            scene_id=source.scene_id, conversation_id=source.conversation_id, continuity_id=source.continuity_id,
+            thread_id=source.thread_id, interaction_id=turn_id, actor_id=source.actor_id, actor_name=source.actor_name,
+            recall_scope=source.recall_scope, disclosure_scope=source.disclosure_scope, retention_ceiling="experience",
+            trace_id=turn_id, origin=SourceDescriptor(provider_kind="cognition", provider_id=fact.producer_id,
+                source_event_id=fact.notification_id, schema_ref="glimmer://conversation/notification-reply/v1",
+                privacy_class=source.origin.privacy_class, cognitive_effect="reply"),
+            idempotency_key=f"notification-reply:{fact.notification_id}")
+        if moment is None:
+            raise RuntimeError("Conversation 未接纳通知 Reply")
         await self.flush()
         return moment
 

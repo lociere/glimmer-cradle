@@ -37,6 +37,12 @@ Kernel composition 通过 resolver 打开 `${DataRoot}/state/conversation/delive
 Planning 通知、Jobs/authority 保持一致切点，包含完整 SQLite/WAL 快照。不可只回滚 outbox
 或丢弃已退出 epoch/完整回执后重新发送。完整跨库恢复和路径迁移留阶段 14，本轮只验证临时库。
 
+通知内部接纳不增加平行队列/数据库：稳定 Reply 与原来源/输入摘要引用仍在 canonical Log，
+实际通知 Turn 仍在既有 `conversations.db` 的 `conversation_turns`。Reply flush 后才确认 Turn，
+两库不声称原子提交；中间失败用原 ID/首次 Reply 补确认，不删除或改写原材料。该库的 History
+表可重建，Turn 状态须保留，禁止整库删除后仅从 History 猜测完成。通知/Log/Turn/后续 Delivery
+receipt 须与 Planning/Jobs/authority 一致备份，不能只恢复 Reply 正文或只清 Planning 待办。
+
 生产 Kernel composition 通过 resolver 打开 `${DataRoot}/state/capabilities/execution.sqlite`，由
 Capabilities 持久化，schema version 2、owner `0x47434558`。稳定 invocation/scope/key、请求摘要、
 实际目标定义、授权、派发 owner/attempt、结果/副作用状态与未 ACK outbox 都是不可再生执行事实；
@@ -146,7 +152,7 @@ digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可�
 | `data/state/cognition/memory.sqlite` | Cognition | 当前 Worker composition 的 Memory、revision、evidence、巩固结果 receipt/input 索引、relationship、intention 与 embedding；Knowledge 使用独立 owner 库 |
 | `data/state/cognition/knowledge.sqlite` | Cognition Knowledge | 配置 Vault 与显式 Resource 来源/采集、原始材料/权限时效/parser/chunk provenance、不可变正文修订和派生向量；owner `0x47434B4E`、schema 2，v1 只允许先备份的显式迁移，不隐式修复或导入 |
 | `data/state/cognition/planning.sqlite` | Cognition Planning | 旧决策只读 journal；长期目标/计划版本、完成条件、承诺状态与 request outbox/接纳；显式评估的 receipt、attempt fencing/封口、high-water 与新完成通知引用 |
-| `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 从 Conversation Log 可重建的消息、Chapter、Segment、Conversation State 与投影 checkpoint；路径迁移留阶段 14 |
+| `data/state/cognition/conversations/conversations.db` | Conversation（兼容路径） | 可重建 History 表与必须保留的持久 Turn 状态/输入摘要；不可整库当缓存删除，路径迁移留阶段 14 |
 | `data/state/cognition/projections/episodes.db` | Cognition Memory | Episode 派生投影、checkpoint 与同事务源请求 outbox；存在请求时不可整体删除重建，必须备份并保留原投递身份 |
 | `data/state/kernel/kernel.db` | Kernel | Kernel 基础设施库，只保存 Host/Extension 基础设施状态，不保存角色会话或认知记录 |
 | `data/state/capabilities/execution.sqlite` | Capabilities Execution | invocation/授权/派发/结果与待 ACK outbox；不是可重建的诊断缓存 |

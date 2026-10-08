@@ -1549,6 +1549,7 @@ async def bound_planning_service(tmp_path):
     from glimmer_cradle.cognition.adapters.persistence import SqliteKnowledgeStore
     from glimmer_cradle.cognition.knowledge import KnowledgeIndex
     from glimmer_cradle.cognition.state import CognitiveActivityController
+    from glimmer_cradle.conversation import SqliteTurnStore, TurnController
 
     recorder = build_test_recorder(tmp_path / "conversation")
     await recorder.start()
@@ -1584,9 +1585,11 @@ async def bound_planning_service(tmp_path):
             return json.dumps({"completed": self.completed, "evidence_ids": [item["reference"]["evidence_id"] for item in document["evidence"]], "reason": "核对实际候选来源"})
 
     model = Model()
+    turns = TurnController(SqliteTurnStore(tmp_path / "turns.db"), clock=FixedClock())
+    await turns.connect()
     host = CognitionGrpcHost(generation="bound-planning-1", inbound=None, queue=None, activity=activity,
         cycle=None, shutdown=lambda: asyncio.sleep(0), operations=None, workspace=None,
-        planning=store, planning_model=model, conversation=recorder, knowledge=knowledge)
+        planning=store, planning_model=model, conversation=recorder, turns=turns, knowledge=knowledge)
     await host.start()
     host.mark_ready()
     channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
@@ -1615,6 +1618,7 @@ async def bound_planning_service(tmp_path):
         model.release.set()
         await host.stop()
         await channel.close()
+        await turns.close()
         await activity.stop()
         await recorder.stop()
         await knowledge_store.close()
@@ -1786,6 +1790,162 @@ async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_mode
             assert detail.code == expected
     assert not model.requests
     with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+
+
+@pytest.mark.parametrize("phase", ["flush", "turn-commit"])
+@pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
+async def test_planning_notification_prepare_cancellation_drains_real_writes_and_reconciles_same_facts(
+    bound_planning_service, monkeypatch, phase, termination,
+):
+    import sqlite3
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, _, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    fact = await host._planning_controller.notification_reply(notification)
+    entered, release, finished = asyncio.Event(), threading.Event(), asyncio.Event()
+    loop = asyncio.get_running_loop()
+    if phase == "flush":
+        original = recorder.log._write_batch
+
+        def write_batch(batch):
+            original(batch)
+            loop.call_soon_threadsafe(entered.set)
+            assert release.wait(5)
+            loop.call_soon_threadsafe(finished.set)
+
+        monkeypatch.setattr(recorder.log, "_write_batch", write_batch)
+    else:
+        original = host._turns._store._conn.commit
+
+        async def commit():
+            await original()
+            entered.set()
+            await asyncio.to_thread(release.wait, 5)
+            finished.set()
+
+        monkeypatch.setattr(host._turns._store._conn, "commit", commit)
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        operation = _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest, cognition_pb.PreparePlanningNotificationResponse)
+        request = cognition_pb.PreparePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+        running = operation(request, timeout=0.2 if termination == "deadline" else 5)
+        stopping = None
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            assert host._inflight
+            if termination == "cancel":
+                running.cancel()
+                with pytest.raises(asyncio.CancelledError): await running
+            elif termination == "deadline":
+                with pytest.raises(grpc.aio.AioRpcError) as expired: await running
+                assert expired.value.code() is grpc.StatusCode.DEADLINE_EXCEEDED
+            else:
+                stopping = asyncio.create_task(host.stop())
+            await asyncio.sleep(0.02)
+            assert not finished.is_set()
+            if stopping is not None: assert not stopping.done()
+            release.set()
+            await asyncio.wait_for(finished.wait(), 2)
+            if stopping is not None: await asyncio.wait_for(stopping, 2)
+            for _ in range(100):
+                if not host._inflight: break
+                await asyncio.sleep(0.01)
+            assert not host._inflight
+            monkeypatch.setattr(recorder.log if phase == "flush" else host._turns._store._conn,
+                "_write_batch" if phase == "flush" else "commit", original)
+            original_reply = recorder.recorded_fact(f"notification-reply:{notification.notification_id}")
+            assert original_reply is not None
+            original_turn = await host._turns.load(original_reply.interaction_id)
+            if phase == "flush": assert original_turn is None
+            else: assert original_turn.status == "completed"
+            turn, reply = await host._turns.accept_notification_reply(fact, recorder=recorder)
+            assert reply == original_reply and turn.status == "completed"
+            assert len([item for item in recorder.log.query() if item.moment_id == reply.moment_id]) == 1
+            assert await store.pending_notification_requests() == [notification] and len(model.requests) == 1
+            with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+        finally:
+            release.set()
+            running.cancel()
+            if stopping is not None: await stopping
+
+
+@pytest.mark.parametrize("fault", ["none", "no-model", "no-knowledge", "tier", "source", "disabled", "goal", "scope", "digest",
+    "abandoned", "missing", "pair", "overflow", "generation", "planning", "conversation", "turns", "unready", "stopping", "budget"])
+async def test_planning_notification_prepare_actual_reply_turn_and_pending_source(bound_planning_service, fault):
+    import sqlite3
+
+    from glimmer_cradle.cognition.state import CognitiveActivityState
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, activity, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    request = cognition_pb.PreparePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+    if fault == "no-model": host._planning_model = None
+    elif fault == "no-knowledge": host._knowledge = None
+    elif fault == "tier": activity._state = CognitiveActivityState.AMBIENT
+    elif fault == "source":
+        for pack in recorder.log._pack_paths():
+            with sqlite3.connect(pack) as connection: connection.execute("DELETE FROM moments")
+    elif fault == "disabled": recorder._enabled = False
+    elif fault in {"goal", "scope"}: setattr(request.request, fault + "_id", "foreign")
+    elif fault == "digest": request.request.source_digest = "f" * 64
+    elif fault == "abandoned":
+        with sqlite3.connect(store._path) as connection: connection.execute("UPDATE planning_commitment SET status='abandoned'")
+    elif fault == "missing": request.ClearField("request")
+    elif fault == "pair": request.request.ClearField("source_digest")
+    elif fault == "overflow": request.request.goal_version = 9007199254740992
+    elif fault == "generation": request.call.generation = "old"
+    elif fault in {"planning", "conversation", "turns"}: setattr(host, "_" + fault, None)
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    elif fault == "budget": request.request.goal_id = "x" * 65537
+    turns_path = store._path.parent / "turns.db"
+    before_log = recorder.log.query()
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    with sqlite3.connect(turns_path) as connection: before_turns = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        accept = _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest, cognition_pb.PreparePlanningNotificationResponse)
+        if fault in {"none", "no-model", "no-knowledge", "tier"}:
+            response = await accept(request, timeout=2)
+            assert response.accepted and response.request == request.request and response.turn_revision == 2
+            reply = recorder.log.get_moment(response.reply_moment_id)
+            turn = await host._turns.load(response.turn_id)
+            assert turn.status == "completed" and reply.seq == response.log_position and reply.interaction_id == turn.turn_id
+            assert response.context == cognition_pb.ConversationContext(source_provider_id="surface:test", scene_id="scene:planning",
+                conversation_id="conversation:planning", continuity_id="continuity:planning", thread_id="main",
+                interaction_id=turn.turn_id, recall_scope="conversation_private", disclosure_scope="conversation_private")
+            assert response.actor_id == "actor:planning" and response.privacy_class == "private"
+            assert response.recall_owner_id == response.disclosure_owner_id == notification.scope_id
+            assert response.text == reply.content["text"] and "核对来源记录" in response.text
+            assert response.content_digest == hashlib.sha256(json.dumps(reply.content, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+            assert reply.causation_ids == (notification.source_moment_id,)
+            assert await accept(request, timeout=2) == response
+            assert len(recorder.log.query()) == len(before_log) + 1
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await accept(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED if fault == "source" else
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"planning", "conversation", "turns", "disabled", "unready", "stopping"}
+                else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"missing", "pair", "overflow", "budget"}
+                else common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED)
+            assert detail.code == expected
+            assert recorder.log.query() == before_log
+            with sqlite3.connect(turns_path) as connection: assert list(connection.iterdump()) == before_turns
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert await store.pending_notification_requests() == [notification]
+    assert len(model.requests) == 1
 
 
 @pytest.mark.parametrize("fault", ["none", "no-model", "no-knowledge", "tier", "source", "disabled", "goal", "scope", "digest",

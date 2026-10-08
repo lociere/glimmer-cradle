@@ -596,6 +596,29 @@ enum PlanningJobResolution {
   PLANNING_JOB_RESOLUTION_NOT_APPLIED = 2;
 }
 
+message PreparePlanningNotificationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningNotificationRequest request = 2;
+}
+
+// accepted 表示内部 Reply 已 flush 且 Conversation Turn 已持久确认；不是外部 delivered/源 ACK。
+message PreparePlanningNotificationResponse {
+  PlanningNotificationRequest request = 1;
+  string turn_id = 2;
+  uint64 turn_revision = 3;
+  string reply_moment_id = 4;
+  uint64 log_position = 5;
+  // 实际 Reply content 的排序键紧凑 UTF-8 JSON SHA-256；供唯一 Delivery 绑定，不复制事实库。
+  string content_digest = 6;
+  ConversationContext context = 7;
+  optional string actor_id = 8;
+  string privacy_class = 9;
+  string recall_owner_id = 10;
+  string disclosure_owner_id = 11;
+  string text = 12;
+  bool accepted = 13;
+}
+
 // 受控引用，不复制 Conversation/Knowledge/Execution 证据正文。
 message PlanningEvidenceReference {
   string evidence_id = 1;
@@ -674,4 +697,5 @@ service CognitionService {
   rpc PublishPlanningJobState(PublishPlanningJobStateRequest) returns (PublishPlanningJobStateResponse);
   rpc ReadPlanningNotifications(ReadPlanningNotificationsRequest) returns (ReadPlanningNotificationsResponse);
   rpc ResolvePlanningNotification(ResolvePlanningNotificationRequest) returns (ResolvePlanningNotificationResponse);
+  rpc PreparePlanningNotification(PreparePlanningNotificationRequest) returns (PreparePlanningNotificationResponse);
 }

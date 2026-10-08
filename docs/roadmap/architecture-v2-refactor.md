@@ -107,7 +107,7 @@ Python AST 扫描 Cognition 130 个模块、346 条内部依赖（包含 TYPE_CH
 | 4 | Conversation log/history/binding/Turn/interaction/delivery 唯一 owner | 进行中：v2.0 owner 与单写者已收束；按 v2.1 补持久 Turn、interaction/delivery、工具调用恢复及目标物理路径 |
 | 5 | native iterative Loop、Context budget/trust、Memory/Persona/Observation | 进行中：Context、Perception Observation、Attention、Inference、State、Planning、Memory、Knowledge、Loop controller/checkpoint、原生 ToolCall 迭代、消费方 Ports、回复上下文/正文处理与版本化 Persona canonical owner 已落位；Cognition Worker adapters 接线、其余 Loop helpers 及 Memory Jobs/projection checkpoint 解耦仍待迁移 |
 | 6 | Tool/Skill/Resource 分离、Step Surface 与 execution | 进行中：三 Registry、User 方法与持久 Execution/真实 receipt 已接生产；逐 Step 曝光、typed Capability RPC 与 Worker Log adapter 已实现；默认 native caller/provider、完整权限 broker、持久 Run 预算、外部 fencing/对账和行动恢复待完成 |
-| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳、默认 scheduler、状态 inbox/投影/ACK 与新完成通知原子请求已实现；产品入口/完整 catalog、产品状态投影、Planning 通知真实投递/回执/再调度与旧数据切换待完成 |
+| 7 | Durable Jobs persistence/recovery/cancellation | 进行中：独立 Jobs SQLite、scope 幂等、源接纳与首次政策快照、持久 trigger/attempt、lease/fencing、取消、unknown 对账、状态 outbox/ACK 与 retention 已实现；Memory receipt/源 outbox、Host handler/query/持续调度、authority/handover、真实 Worker CLI/唯一配置/三根路径/拥有两库的启动与 Memory 状态 wire/inbox 已验证；Planning 源接纳/持久对账、实际来源与 model-tier 绑定、生产证据 Adapter、执行 wire/Host Adapter、Core 业务 receipt、逐任务只读接纳、默认 scheduler、状态 inbox/投影/ACK、新完成通知原子请求与真实 Reply/持久 Turn 内部接纳已实现；产品入口/完整 catalog、产品状态投影、Planning 通知真实投递/回执/再调度与旧数据切换待完成 |
 | 8 | Embodiment semantic model 与 renderer 隔离 | 待执行 |
 | 9 | SDK public contracts、brokered Extension Host | 待执行 |
 | 10 | MCP Tool/Resource/Prompt normalization | 待执行 |
@@ -620,7 +620,46 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
-### 阶段 4/7 Delivery 完整回执与持久 owner fencing（2026-10-08 当前候选）
+### 阶段 4/5/7 通知内部 Reply 与持久 Turn 接纳（2026-10-08 当前候选）
+
+输入 `e930ccbd`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按 Cognition/协议/数据
+Skill，把真实通知引用衔接到 Conversation 的实际 Reply/Turn，不使用发送回调、空 handler
+或模型完成作为外部送达。`PlanningController.notification_reply` 只从核验后的原完成 work
+形成基础表达；Core Conversation 消费 owner-neutral `NotificationReplyFact`，没有 Planning
+依赖或第二业务事实源。Cognition 不选择目的地、不做平台 IO，不重复模型评估。
+
+唯一 Contract Spine 增加 Prepare request/response/RPC，生成 TS/Python/C#；Worker 复验原
+Perception 全摘要/保留/context/隐私 owner，接纳稳定 Reply/原 causation，再跨实际 Log flush
+barrier 接纳已结束的内部通知 Turn。completed/revision=2 是内部表达已结束，不是 delivered；
+普通 Turn 终态规则未放宽，不嫁接已有输入 Turn 或复活 interrupted/failed。Reply 已提交而
+Turn 插入失败/回复丢失沿原身份补确认，首次时间/position 不变、不新增 Reply。跨 await 后
+复验业务/来源；返回原 Reply/Turn/完整权限域和实际内容摘要，非法或不可读不放行。
+Host client 与生产 factory 接通，内部 accepted 后默认仍报告原通知 pending，没有源 ACK。
+
+Turn Store 共享连接现由同一读写锁和 IMMEDIATE 事务 owner 管理；等待者取消会排空实际
+commit/rollback 后才交还连接，其他读者不能把未提交行当作确认。恢复取消/失败关闭连接并
+清除 Controller ready，普通旧 Turn 迁移规则未改变。不建立新通知数据库/队列或平行 schema；
+同时修正权威页中把整个 `conversations.db` 当可删除 History 缓存的过时描述，它还持有持久
+Turn，须与 Log/Planning/Delivery/Jobs/authority 保持一致备份切点，不能整库删除后猜测恢复。
+
+Conversation Python 全量 57 项 PASS（新增 35 项）：五种实际隐私域、重启精确重投、原事实
+漂移/非法类型/UTF-8 预算/时间、flush 与 Turn 写失败恢复、原 Turn 嫁接拒绝、SQLite 线程
+执行中重复取消/提交后响应丢失/读隔离和恢复取消。Cognition 全量 537 项 PASS；Worker
+全量 327 项 PASS（新增 26 项）：实际引用/来源/无模型/当前 tier/owner/ready/代际/预算、
+完整 Reply/Turn/digest、待办不消费，真实 flush/Turn commit 各自取消/deadline/shutdown
+排空与原事实补确认。Host 全量 179 项 PASS，生产 CLI 的完成/未完成 fixture 扩展内部接纳
+与双重启原事实/模型一次/attempt 一次断言。契约 22 gate、兼容/工具链/三语言回环与连续
+生成 clean PASS，未刷新基线。根 typecheck/build、111 页 docs、encoding、architecture、
+target-layout specification 与 diff PASS；改动的 Turn Store/Controller/Planning Controller/
+Worker 测试全规则 Ruff PASS，RPC I/F PASS，47 条既有全规则诊断按 code/message/column
+与输入一致；Log record/writer 与历史测试的既有规则诊断未作为全 lint PASS。
+
+下一步复用实际 Reply/Turn/digest，接真正 App 目的地/当前发送权限、唯一 Delivery/真实
+receiver 和源 ACK，避免未知发送的重复投递。当前仍无默认通知投递 receiver/ACK，后继调度/
+撤销、产品入口和其他阶段/完整物理 final 未完成。仅临时库/本地确定性 provider；没有迁移
+用户库、调用付费模型、推送或发布，没有新增清单文件。完整固定候选独立审查仍留整体收尾。
+
+### 阶段 4/7 Delivery 完整回执与持久 owner fencing（2026-10-08）
 
 输入 `2616b784`，当前会话唯一写入 owner，完整 v2.1 目标继续 active。按数据与路径 Skill 的
 不可再生事实/恢复边界补齐 Conversation Delivery，而不是先用发布回调解除 Planning 待办。
