@@ -18,8 +18,10 @@ LifecycleCoordinator 在调用 start 前登记资源 owner，失败启动也必�
 开始关闭后拒绝新阶段/模块，等待已接纳的启动和 observer 回调，再按接纳逆序停止。
 stop/observer 异常汇总上抛且不跳过其他释放；成功释放即移除 owner，失败释放保留供 stop 重试。
 并发 stop 共用实际排空 Promise；关闭后的 coordinator 不复用，重新装配另建实例。
-observer 负责产品通知/投影，不能同步等待当前 coordinator 的 stop，否则构成自等待；
-当前尚无通用启动取消/超时和 observer 自等待检测，P02A 仍未接受。
+observer 负责产品通知/投影。LifecycleCallbackGuard 按实例跟踪活跃回调及其返回 Promise；
+回调内重入所属启动/停止会明确拒绝，避免自等待，外部并发调用仍加入真实过程。
+回调 settle 后的异步后续任务、另一个 coordinator 的生命周期均可正常执行。
+当前尚无通用启动取消/超时，P02A 仍未接受。
 
 `pnpm test:platform` 运行实际 Node 测试；包 `typecheck` 包含 source、authority、生命周期与公开 API 测试。
 物理迁移、hybrid/offline、完整生命周期故障回收与产品装配仍按

@@ -22,7 +22,7 @@ export type {
   RuntimeModule,
   RuntimeModuleStartDetails,
 } from './lifecycle/runtime-module.js';
-export { LifecycleCoordinator } from './lifecycle/supervisor.js';
+export { LifecycleCallbackGuard, LifecycleCoordinator } from './lifecycle/supervisor.js';
 export { ConfigurationValidator } from './configuration/index.js';
 export type { ConfigurationValidation } from './configuration/index.js';
 export { AuthorityConflictError, isAuthorityCurrent, validateAuthorityLease, validateAuthorityWindow } from './topology/authority-lease.js';

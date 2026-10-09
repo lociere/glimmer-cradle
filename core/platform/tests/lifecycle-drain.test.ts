@@ -157,3 +157,59 @@ test('a phase observer delayed across closing cannot acquire a module after drai
   assert.deepEqual(events, []);
   assert.deepEqual(coordinator.owned, []);
 });
+
+test('startup observer awaiting the same coordinator stop is rejected instead of blocking drain', async () => {
+  const events: string[] = [];
+  const coordinator = new LifecycleCoordinator(clock(0), {
+    moduleStarted: async () => { await coordinator.stopStarted(context); },
+  });
+  await assert.rejects(coordinator.startPhase({ name: 'observed', modules: [runtime('owned', events)] }, context), /自等待/);
+  await coordinator.stopStarted(context);
+  assert.deepEqual(events, ['start:owned', 'stop:owned']);
+  assert.deepEqual(coordinator.owned, []);
+});
+
+test('stopping observer awaiting its own stop reports failure after releasing every owner', async () => {
+  const events: string[] = [];
+  const coordinator = new LifecycleCoordinator(clock(0), {
+    moduleStopped: async () => { await coordinator.stopStarted(context); },
+  });
+  await coordinator.startPhase({ name: 'observed', modules: [runtime('first', events), runtime('second', events)] }, context);
+  await assert.rejects(coordinator.stopStarted(context), (error: AggregateError) => {
+    assert.equal(error.errors.length, 2);
+    assert.ok(error.errors.every(error => /自等待/.test(error.message)));
+    return true;
+  });
+  assert.deepEqual(events.slice(-2), ['stop:second', 'stop:first']);
+  assert.deepEqual(coordinator.owned, []);
+});
+
+test('a later async descendant of a settled callback may stop while unrelated concurrent callers join', async () => {
+  const events: string[] = [];
+  let releaseLater!: () => void;
+  const gate = new Promise<void>(resolve => { releaseLater = resolve; });
+  let laterStop!: Promise<void>;
+  const coordinator = new LifecycleCoordinator(clock(0), {
+    moduleStarted() {
+      laterStop = gate.then(() => coordinator.stopStarted(context));
+    },
+  });
+  await coordinator.startPhase({ name: 'started', modules: [runtime('owned', events)] }, context);
+  releaseLater();
+  await laterStop;
+  assert.deepEqual(events, ['start:owned', 'stop:owned']);
+});
+
+test('a module may drain a different coordinator without being mistaken for self-wait', async () => {
+  const events: string[] = [];
+  const child = new LifecycleCoordinator(clock(0));
+  const parent = new LifecycleCoordinator(clock(0));
+  await child.startPhase({ name: 'child', modules: [runtime('child', events)] }, context);
+  await parent.startPhase({ name: 'parent', modules: [{ ...runtime('parent', events),
+    async stop() { events.push('stop:parent'); await child.stopStarted(context); },
+  }] }, context);
+  await parent.stopStarted(context);
+  assert.deepEqual(events, ['start:child', 'start:parent', 'stop:parent', 'stop:child']);
+  assert.deepEqual(parent.owned, []);
+  assert.deepEqual(child.owned, []);
+});

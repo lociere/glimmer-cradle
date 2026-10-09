@@ -9,7 +9,7 @@ describe('ApplicationRuntime resource lifecycle', () => {
   function controlledApp(options: {
     startGate?: Promise<void>; stopGate?: Promise<void>; stopError?: () => boolean; eventError?: boolean;
     application?: ApplicationRuntime; transportError?: boolean;
-    onPublish?: (type: string) => void; onCloseIngress?: () => void;
+    onPublish?: (type: string) => void | Promise<void>; onCloseIngress?: () => void | Promise<void>;
   } = {}) {
     const order: string[] = [];
     const module = (name: string) => ({ name,
@@ -26,13 +26,13 @@ describe('ApplicationRuntime resource lifecycle', () => {
         close: () => { order.push('observability-close'); } } as never,
       { publish: (event: { type: string }) => {
         order.push(event.type);
-        options.onPublish?.(event.type);
         if (options.eventError && event.type === 'AppStoppingEvent') throw new Error('stopping observer failed');
+        return options.onPublish?.(event.type);
       }, shutdown: () => { order.push('eventbus-close'); } } as never,
       { replaceModuleSnapshots: vi.fn(), clear: vi.fn() } as never, { monotonicNowMs: () => 1 } as never,
       { ...module('bootstrap'), config: {} } as never,
       () => ({ transport: { ...module('transport'), openIngress, closeIngress: () => {
-        order.push('close-ingress'); options.onCloseIngress?.();
+        order.push('close-ingress'); return options.onCloseIngress?.();
       } },
         application: options.application ?? module('application'), presentation: [module('presentation')], coreReadiness: [],
         organism: module('organism'), recovery: module('recovery') }) as never);
@@ -187,22 +187,29 @@ describe('ApplicationRuntime resource lifecycle', () => {
     await app.stop();
   });
 
-  it('synchronous product callbacks reenter the same installed startup/stop outcome', async () => {
-    let reentrantStart: Promise<void> | undefined;
-    let reentrantStop: Promise<void> | undefined;
+  it('AppStarting observer awaiting its own startup fails explicitly and cleanup still closes resources', async () => {
     const { app, order } = controlledApp({
-      onPublish: type => { if (type === 'AppStartingEvent') reentrantStart = app.start(); },
-      onCloseIngress: () => { reentrantStop = app.stop(); },
+      onPublish: async type => { if (type === 'AppStartingEvent') await app.start(); },
     });
-    const starting = app.start();
-    expect(reentrantStart).toBe(starting);
-    await starting;
-    const stopping = app.stop();
-    expect(reentrantStop).toBe(stopping);
-    await stopping;
-    expect(order.filter(value => value === 'close-ingress')).toHaveLength(1);
-    expect(order.filter(value => value === 'AppStoppedEvent')).toHaveLength(1);
+    await expect(app.start()).rejects.toThrow('自等待');
+    expect(app.state).toBe(AppLifecycleState.STOPPED);
+    expect(order.filter(value => value.startsWith('start:'))).toEqual([]);
+    expect(order.slice(-2)).toEqual(['eventbus-close', 'observability-close']);
   });
+
+  it.each(['AppStoppingEvent', 'ModuleStoppedEvent', 'close-ingress'])(
+    'observer awaiting its own App.stop (%s) fails without skipping other resource release', async (callback) => {
+      const { app, order } = controlledApp({
+        onPublish: async type => { if (type === callback) await app.stop(); },
+        onCloseIngress: async () => { if (callback === 'close-ingress') await app.stop(); },
+      });
+      await app.start();
+      await expect(app.stop()).rejects.toThrow('应用停止时存在资源释放失败');
+      expect(order.filter(value => value.startsWith('stop:'))).toHaveLength(6);
+      expect(order.slice(-2)).toEqual(['eventbus-close', 'observability-close']);
+      expect(app.state).toBe(AppLifecycleState.ERROR);
+    },
+  );
 
   it('stop immediately after start closes admission before any module can start', async () => {
     const { app, order, openIngress } = controlledApp();

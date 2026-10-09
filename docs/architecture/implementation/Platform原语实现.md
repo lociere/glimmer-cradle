@@ -45,8 +45,11 @@
 - 停机事件异常仍继续排空；未释放 owner 保留，状态 ERROR，可再次 stop 重试。
   Application 在 provider 未停止时保留其依赖，每个成功释放 provider/resource 从重试集合移除；
   全部资源释放后才发送 AppStopped 并关闭总线/diagnostics，失败中间态保持 observer 可用。
-- observer 不能同步等待当前 coordinator 的 stop（会自等待）；通用取消/超时与自等待检测
-  尚待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
+- LifecycleCallbackGuard 按实例跟踪 module/observer 活跃回调，回调内调用所属
+  start/stop 会明确拒绝，避免等待当前操作自身；外部并发调用仍共享真实 Promise。
+  同步回调返回立刻退出，异步回调 settle 后退出，后续异步任务与其他 coordinator 不受误拒。
+  App 的事件与资源释放回调也消费同一公开机制，自等待错误不跳过其余资源释放。
+  通用取消/超时尚待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
 
 ## 事件、配置与数据边界
 

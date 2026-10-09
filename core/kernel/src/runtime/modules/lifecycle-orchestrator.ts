@@ -54,6 +54,7 @@ export class LifecycleOrchestrator {
   }
 
   public get owned(): readonly RuntimeModule[] { return this.coordinator.owned; }
+  public assertExternalCall(): void { this.coordinator.assertExternalCall(); }
 
   public get startupReport(): RuntimeStartupRecord[] {
     return this.coordinator.startupReport.map((record) => ({

@@ -5,7 +5,7 @@ import type { KernelConfiguration } from '../ports/configuration.port';
 import type { KernelEventBusPort } from '../ports/event-bus.port';
 import type { Logger as KernelLoggerPort, Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
 import type { RuntimeProjectionInputPort } from '../ports/kernel-lifecycle.port';
-import type { RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
+import { LifecycleCallbackGuard, type RuntimeModule } from '@glimmer-cradle/platform/lifecycle';
 import type { Clock as KernelClockPort } from '@glimmer-cradle/platform/time';
 import { LifecycleOrchestrator } from '../runtime/modules/lifecycle-orchestrator';
 import { KernelBootstrapRuntime } from '../runtime/modules/kernel-bootstrap-runtime';
@@ -106,6 +106,7 @@ export class App {
   private closing = false;
   private constructionApplication: ApplicationRuntime | null = null;
   private starting: Promise<void> | undefined;
+  private readonly callbacks = new LifecycleCallbackGuard();
 
   public constructor(
     private readonly logger: KernelLoggerPort,
@@ -120,6 +121,8 @@ export class App {
   public get state(): AppLifecycleState { return this.stateValue; }
 
   public start(): Promise<void> {
+    try { this.callbacks.assertExternalCall(); this.orchestrator?.assertExternalCall(); }
+    catch (error) { return Promise.reject(error); }
     if (this.closing) return Promise.reject(new Error('应用已关闭，重新启动需要全新承载实例'));
     if (this.starting) return this.starting;
     if (this.stateValue !== AppLifecycleState.UNINITIALIZED) return Promise.resolve();
@@ -140,7 +143,7 @@ export class App {
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
     try {
-      await this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context));
+      await this.callbacks.run(() => this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context)));
       await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context);
       const config = this.bootstrap.config;
       const plan = this.createOperationalPlan(config, (code = 0) => this.stop(code));
@@ -161,7 +164,7 @@ export class App {
       const startupTimeMs = Math.max(0, this.clock.monotonicNowMs() - startedAt);
       this.stateValue = AppLifecycleState.RUNNING;
       this.observability.histogram('app.startup_ms', startupTimeMs);
-      await this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context));
+      await this.callbacks.run(() => this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context)));
       this.logger.info('应用启动完成，当前角色已就绪', { total_startup_time_ms: startupTimeMs });
     } catch (error) {
       if (this.state !== AppLifecycleState.STOPPING && this.state !== AppLifecycleState.STOPPED) {
@@ -174,6 +177,8 @@ export class App {
   }
 
   public stop(exitCode = 0): Promise<void> {
+    try { this.callbacks.assertExternalCall(); this.orchestrator?.assertExternalCall(); }
+    catch (error) { return Promise.reject(error); }
     this.closing = true;
     if (this.stopping) return this.stopping;
     if (this.stateValue === AppLifecycleState.STOPPED) return Promise.resolve();
@@ -191,7 +196,7 @@ export class App {
     const context = this.observability.createTraceContext();
     const failures: unknown[] = [];
     const release = async (action: () => unknown): Promise<void> => {
-      try { await action(); } catch (error) { failures.push(error); }
+      try { await this.callbacks.run(action); } catch (error) { failures.push(error); }
     };
     // Transfer construction ownership before closing the coordinator; after drain its
     // successful owner may already be removed, so checking ownership later would double-close.
