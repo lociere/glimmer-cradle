@@ -26,6 +26,7 @@ from glimmer_cradle.cognition.planning.planning_store import (
     PlanningDecisionSnapshot,
     PlanningEvaluationWork,
     PlanningNotificationWork,
+    PlanningNotificationProjection,
     PlanningStore,
 )
 from glimmer_cradle.cognition.ports.job_port import (
@@ -57,5 +58,6 @@ __all__ = [
     "PlanningNotificationDelivery",
     "PlanningNotificationRequest",
     "PlanningNotificationWork",
+    "PlanningNotificationProjection",
     "PlanningStore",
 ]

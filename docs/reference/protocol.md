@@ -152,6 +152,22 @@ epoch，读取前后复验实际 grant 与 live authority；取消、换主、�
 available 表示当前装配可用，各源仍须独立业务接纳和执行授权。当前 route 与配置 Host owner
 已接通，完整产品 HTTP/UI ingress 和安装组合仍归后续步骤。
 
+公开响应的 `notifications` 由 Jobs IDL 的 `JobNotificationProjection` / `JobNotificationState`
+定义，按当前页原 Planning Job 返回 notification ID、pending/acknowledged/revoked、独立 revoked
+事实和创建/确认时钟、实际确认 kind。没有通知返回空集合；owner 未就绪/冲突/读取失败拒绝整次
+读取，不用空集合冒充成功。acknowledged 只来自 Planning 接纳的真实 Delivery 确认；Job success、
+内部 Prepare、发布许可或 transport sent 都不足以成立。确认后撤销保留 acknowledged 与 revoked
+两项事实，不改写已送达历史。响应不携正文、原 Perception/Reply/Turn 或发布 owner。
+
+内部 `ReadPlanningJobNotificationStates` 由唯一 Cognition IDL 拥有，仅携本代 call、原 scope
+与 1–1000 个去重的 `planning:<request_id>`；请求限 128 KiB，响应限 256 KiB。Worker 复验
+真实原源/计划/scope、原通知与完整确认窗口，只读且不建表、不推理；ACK 尚未到达但原源存在
+时没有完成通知。未知/损坏窗口失败关闭，非法范围/预算为 INVALID_REQUEST，原源/scope冲突
+为 RECOVERY_REQUIRED，缺 owner/未 ready/drain 按真实边界拒绝。Host 异步读取前后复验
+已认证 Principal 的精确 scope grant、live lease/epoch 与取消；只接受本页原 Job 的稳定通知
+身份与有效状态/时钟，不从客户端指定任意原 owner。
+Jobs 与 Planning 分别读取各自持久快照，不宣称跨库原子读；该投影不授予发送或执行权限。
+
 ## Planning Jobs 源接纳
 
 `PlanningJobSourceRequest` 携带 request/commitment/plan/goal/scope 身份、目标/计划版本与原

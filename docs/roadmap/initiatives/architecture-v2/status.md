@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B.3：实现Planning通知受控公开状态，当前Jobs投影尚不包含真实通知状态；从原Planning源/通知outbox与确认只读重建，按精确scope/Jobs权限/当前epoch读取，不复制正文或创建第二writer。上一Memory子链已完成并独立P2复核关闭：domain81、Worker32、HostMemory18+原配置/retention2+新缺模型/生产CLI2+证据恢复2+wire5、契约22门/三语/clean、Hosttypecheck/docs/架构/编码通过；相关dirty准备逻辑提交。无后台进程，未推送；P07B整体in-progress，P07B.4分页公平/retention引用随后，根大型/产品UI/旧队列切换待后续。
+下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B.4：核验分页公平和retention原恢复引用。上一通知公开状态子链完成/独立只读无阻塞：Core222有效(221既有+新clock反例)、RPC21、Host24、契约22门/三语/clean、Hosttypecheck/架构/编码；通知真实确认后才acknowledged，后撤销保留历史，异步授权/epoch/取消围栏生效。候选f2e9ee4d+本任务dirty准备逻辑提交，待最终docs/diff收束，无后台，未推送。重点调查持续新增高ID是否导致低ID等候源永久不回绕，并证明Jobs终态清理后source receipt/attempt/tombstone、Planning通知真实恢复与原回执链仍完整；不盲目新增保留策略。P07B整体in-progress，根大型/产品UI/旧队列切换待后续。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

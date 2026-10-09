@@ -604,9 +604,9 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         const original = jobs.prepare('SELECT job_id,scope_id FROM jobs').get() as { job_id: string; scope_id: string };
         const query = create(ReadJobsProjectionRequestSchema, { call: { traceId: 'actual-configured-read', generation: principal.generation },
           scopeId: original.scope_id, limit: 10 });
-        expect(() => controls.read(principal, query)).toThrow('权限');
+        await expect(controls.read(principal, query)).rejects.toThrow('权限');
         broker.grant(controls.permissionRequest(principal, original.scope_id), clock.now() + 1000);
-        const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, controls.read(principal, query)));
+        const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, await controls.read(principal, query)));
         expect(result.jobs).toHaveLength(1);
         expect(result.jobs[0]).toMatchObject({ jobId: original.job_id, scopeId: original.scope_id, status: JobStatus.QUEUED,
           attempt: 0n, stateFeedbackPending: false });
@@ -1281,6 +1281,99 @@ it.each(['stale', 'domain'] as const)('Memory 已ACK证据损坏 %s 明确失败
     expect(memoryCounts(root)).toEqual([1, 1, 1]);
     expect(episodes.prepare('SELECT accepted_job_id FROM memory_request_outbox').get()).toEqual({ accepted_job_id: source.accepted_job_id });
   } finally { await restored?.stop(); await host.stop(); admission.mockRestore(); execute.mockRestore(); episodes.close(); store.close(); await service.stop(); }
+}, 30_000);
+
+it.each(['scope', 'job', 'notification', 'duplicate', 'state', 'confirmation', 'revoked', 'unsafe'] as const)
+('公开Jobs通知wire损坏 %s 从实际Worker响应拒绝，不更改原业务状态', async fault => {
+  const { JobNotificationState } = await import('@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-jobs-notification-wire-'));
+  const service = await worker(root, 'planning-execute-projection');
+  const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests[0];
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const host = new HostJobsController({ store, clock, epoch: 1, owner_id: 'projection', cognition: service.client,
+    planning_sources: true, poll_interval_ms: 1000, batch_size: 8, lease_ms: 60000,
+    submission_policy: submissionPolicy, retry_policy: policy });
+  const permissions = new PermissionBroker(Date.now, () => undefined);
+  let read: { mockRestore(): void } | undefined;
+  try {
+    await host.start();
+    const original = store.load('planning:' + source.requestId);
+    const principal = permissions.registerPrincipal({ principal_id: 'projection-user', host_id: 'host', generation: 'ui:one', kind: 'user' });
+    const controls = new HostJobControlRoutes(host, permissions);
+    permissions.grant(controls.permissionRequest(principal, source.scopeId), Date.now() + 60000);
+    const actual = service.client.readPlanningJobNotificationStates.bind(service.client);
+    read = vi.spyOn(service.client, 'readPlanningJobNotificationStates').mockImplementation(async (...args: Parameters<CognitionClient['readPlanningJobNotificationStates']>) => {
+      const response = await actual(...args), item = response.notifications[0];
+      if (fault === 'scope') response.scopeId = 'foreign';
+      else if (fault === 'job') item.jobId = 'planning:' + 'a'.repeat(64);
+      else if (fault === 'notification') item.notificationId = 'a'.repeat(64);
+      else if (fault === 'duplicate') response.notifications.push(item);
+      else if (fault === 'state') item.state = JobNotificationState.UNSPECIFIED;
+      else if (fault === 'confirmation') item.state = JobNotificationState.ACKNOWLEDGED;
+      else if (fault === 'revoked') item.revoked = true;
+      else item.createdAtMs = BigInt(Number.MAX_SAFE_INTEGER) + 1n;
+      return response;
+    });
+    await expect(controls.read(principal, create(ReadJobsProjectionRequestSchema, { call: { traceId: 'corrupt-notification',
+      generation: principal.generation }, scopeId: source.scopeId, limit: 8 }))).rejects.toThrow('Planning 通知投影');
+    expect(store.load('planning:' + source.requestId)).toEqual(original);
+    expect((await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+  } finally { read?.mockRestore(); await host.stop(); store.close(); await service.stop(); }
+}, 30_000);
+
+it('公开Jobs通知状态只读实际Planning/Delivery确认；sent仍pending，确认后撤销保留历史', async () => {
+  const { JobNotificationState } = await import('@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb');
+  const { CancelPlanningCommitmentRequestSchema } = await import('@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-jobs-notification-projection-'));
+  const service = await worker(root, 'planning-execute-projection');
+  const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 8 }))).requests[0];
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const deliveryStore = new SqliteDeliveryStore(path.join(root, 'delivery.sqlite'));
+  const delivery = new DeliveryController(deliveryStore, 'epoch:projection');
+  const permissions = new PermissionBroker(Date.now, () => undefined);
+  const routes = new HostConversationRoutes(permissions, delivery, Date.now);
+  const host = new HostJobsController({ store, clock, epoch: 1, owner_id: 'projection', cognition: service.client,
+    planning_sources: true, poll_interval_ms: 1000, batch_size: 8, lease_ms: 60000,
+    submission_policy: submissionPolicy, retry_policy: policy });
+  const frames: SurfaceGatewayServiceStreamResponse[] = [];
+  const stream = new Writable({ objectMode: true, write(frame: SurfaceGatewayServiceStreamResponse, _encoding, callback) { frames.push(frame); callback(); } });
+  try {
+    await host.start();
+    const principal = permissions.registerPrincipal({ principal_id: 'projection-user', host_id: 'host', generation: 'ui:one', kind: 'user' });
+    const controls = new HostJobControlRoutes(host, permissions);
+    permissions.grant(controls.permissionRequest(principal, source.scopeId), Date.now() + 60000);
+    const query = create(ReadJobsProjectionRequestSchema, { call: { traceId: 'notification-status', generation: principal.generation }, scopeId: source.scopeId, limit: 8 });
+    const read = async () => fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, await controls.read(principal, query)));
+    const pending = await read();
+    expect(pending.jobs).toHaveLength(1);
+    expect(pending.jobs[0]).toMatchObject({ jobId: 'planning:' + source.requestId, status: JobStatus.SUCCEEDED, attempt: 1n });
+    expect(pending.notifications).toEqual([expect.objectContaining({ jobId: pending.jobs[0].jobId, state: JobNotificationState.PENDING, revoked: false })]);
+    const item = (await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema, { limit: 1 }))).requests[0];
+    const prepared = await service.client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema, { request: item }));
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.receive'), Date.now() + 60000);
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.notify'), Date.now() + 60000);
+    const recipient = routes.attach(principal, prepared, stream as grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>);
+    const adapter = new PlanningNotificationAdapter(service.client, routes, () => undefined);
+    await adapter.deliver(8);
+    expect(frames).toHaveLength(1);
+    expect((await read()).notifications).toEqual(pending.notifications);
+    const output = delivery.current('reply:' + prepared.turnId)!;
+    expect(output.status).toBe('sent');
+    expect(routes.receiveReceipt(recipient, create(DeliveryReceiptCommandSchema, { outputId: output.output_id,
+      destinationId: output.destination_id, authorityEpoch: output.authority_epoch, generation: BigInt(output.generation),
+      receiptId: 'projection-actual-confirmation', kind: 'delivered', receivedAt: new Date().toISOString() }))).toEqual({ accepted: true });
+    await adapter.deliver(8);
+    await adapter.deliver(8); // 前向cursor先读到空页回绕，再按原身份接纳刚到达的真实确认。
+    const confirmed = await read();
+    expect(confirmed.notifications).toEqual([expect.objectContaining({ notificationId: item.notificationId,
+      state: JobNotificationState.ACKNOWLEDGED, revoked: false, deliveryKind: 'delivered', acknowledgedAtMs: expect.any(BigInt) })]);
+    expect(await service.client.cancelPlanningCommitment(create(CancelPlanningCommitmentRequestSchema,
+      { commitmentId: item.commitmentId, expectedRevision: 2n, scopeId: item.scopeId }))).toMatchObject({ status: 'abandoned', revision: 3n });
+    const revoked = await read();
+    expect(revoked.notifications).toEqual([{ ...confirmed.notifications[0], revoked: true }]);
+    expect(frames).toHaveLength(1);
+    expect(JSON.stringify(revoked.notifications, (_key, value) => typeof value === 'bigint' ? String(value) : value)).not.toContain('sourceMomentId');
+  } finally { await host.stop(); routes.stop(); stream.destroy(); deliveryStore.close(); store.close(); await service.stop(); }
 }, 30_000);
 
 it('Memory 实际模型缺失或配置停用只等待；跨进程恢复执行原 Job 一次且不耗提前 attempt', async () => {

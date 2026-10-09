@@ -7,6 +7,10 @@ Memory claim前只读接纳仍由 `proto/glimmer/cognition/v1/cognition_service.
 
 Jobs 控制面受控投影归 `proto/glimmer/jobs/v1/jobs.proto` 唯一拥有：`JobProjection`、
 `JobHandlerProjection`、`ReadJobsProjectionRequest`、`ReadJobsProjectionResponse`。
+`JobNotificationState` 与 `JobNotificationProjection` 也由该 Jobs IDL 拥有；只公开原通知状态、
+撤销事实、创建/确认时钟与实际确认 kind，不含正文/发布权限。内部读取归同一 Cognition IDL 的
+`ReadPlanningJobNotificationStatesRequest`、`ReadPlanningJobNotificationStatesResponse` 与
+`ReadPlanningJobNotificationStates`，Worker 按原 Job/scope 查真实源/通知/确认，Host 复验实际读取权限。
 Host 以已认证主体和当前精确 scope grant 读取；不公开 payload/result、lease owner、原 attempt
 证据正文。catalog 来自实际 handler 注册，available 不替代各源的逐任务业务接纳。
 

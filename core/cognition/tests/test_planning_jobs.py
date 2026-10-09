@@ -354,6 +354,78 @@ def _notification_delivery(request, **changes):
     })
 
 
+@pytest.mark.parametrize("state", ["none", "unacked", "pending", "acknowledged", "revoked", "acknowledged-revoked"])
+async def test_job_notification_projection_reads_original_history_without_writes_or_model(tmp_path, state):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    model = _PlanningModel()
+    try:
+        if state == "unacked":
+            with sqlite3.connect(store._path) as connection:
+                connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+        if state not in {"none", "unacked"}:
+            await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(), evaluator=ModelPlanningCompletionEvaluator(model))
+            notification = (await store.pending_notification_requests())[0]
+            if state.startswith("acknowledged"): await store.acknowledge_notification(notification, _notification_delivery(notification))
+            if state.endswith("revoked"): await store.cancel_commitment("commitment-1", expected_revision=2, scope_id=identity.scope_id)
+        await store.close()
+        await store.connect()
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        calls = len(model.requests)
+        projection = await store.read_job_notification_states(identity.scope_id, (identity.job_id,))
+        if state in {"none", "unacked"}: assert projection == []
+        else:
+            assert len(projection) == 1
+            item = projection[0]
+            assert item.job_id == identity.job_id and item.notification_id == notification.notification_id
+            assert item.state == ("acknowledged" if state.startswith("acknowledged") else state)
+            assert item.revoked == state.endswith("revoked")
+            assert item.created_at_ms == 100
+            assert item.acknowledged_at_ms == (100 if state.startswith("acknowledged") else None)
+            assert item.delivery_kind == ("delivered" if state.startswith("acknowledged") else None)
+            assert "source_moment_id" not in asdict(item) and "content" not in asdict(item)
+        with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+        assert len(model.requests) == calls
+    finally: await store.close()
+
+
+@pytest.mark.parametrize("fault", ["scope", "job", "missing", "duplicate", "empty", "budget", "receipt", "partial"])
+async def test_job_notification_projection_scope_and_damaged_history_fail_without_effects(tmp_path, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(), evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        await store.acknowledge_notification(notification, _notification_delivery(notification))
+        if fault in {"receipt", "partial"}:
+            with sqlite3.connect(store._path) as connection:
+                if fault == "receipt": connection.execute("UPDATE planning_notification_delivery_receipt SET payload_json='{}'")
+                else: connection.execute("DROP TABLE planning_notification_delivery_meta")
+        args = ("foreign" if fault == "scope" else identity.scope_id,
+            () if fault == "empty" else (identity.job_id,) * (1001 if fault == "budget" else 2 if fault == "duplicate" else 1))
+        if fault == "job": args = (identity.scope_id, ("invalid",))
+        elif fault == "missing": args = (identity.scope_id, ("planning:" + "a" * 64,))
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        with pytest.raises(PlanningConflictError): await store.read_job_notification_states(*args)
+        with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    finally: await store.close()
+
+
+async def test_job_notification_projection_preserves_real_ack_after_restart_clock_rollback(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(), evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        await store.close()
+        reopened = SqlitePlanningStore(store._path, now_ms=lambda: 50)
+        await reopened.connect()
+        try:
+            await reopened.acknowledge_notification(notification, _notification_delivery(notification))
+            projection = (await reopened.read_job_notification_states(identity.scope_id, (identity.job_id,)))[0]
+            assert projection.created_at_ms == 100 and projection.acknowledged_at_ms == 50
+            assert projection.state == "acknowledged" and projection.delivery_kind == "delivered"
+        finally: await reopened.close()
+    finally: await store.close()
+
+
 @pytest.mark.parametrize("kind", ["delivered", "playback_completed"])
 async def test_notification_confirmation_keeps_original_facts_and_first_receipt_across_restart(tmp_path, kind):
     store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)

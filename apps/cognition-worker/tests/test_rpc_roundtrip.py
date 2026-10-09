@@ -1828,6 +1828,51 @@ async def test_planning_feedback_rpc_cancellation_drains_atomic_schema_and_inbox
             call.cancel()
 
 
+@pytest.mark.parametrize("fault", ["none", "unacked", "pending", "revoked", "scope", "job", "missing", "duplicate", "empty", "budget", "generation", "owner", "unready", "stopping"])
+async def test_planning_job_notification_states_rpc_reads_scope_history_without_effects(bound_planning_service, fault):
+    import sqlite3
+
+    host, _, store, _, _, model, accepted, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    if fault == "unacked":
+        with sqlite3.connect(store._path) as connection: connection.execute("UPDATE planning_job_outbox SET accepted_job_id=NULL,accepted_revision=NULL")
+    if fault in {"pending", "revoked"}: await execute(execution, timeout=2)
+    if fault == "revoked": await store.cancel_commitment(accepted.commitment_id, expected_revision=2, scope_id=execution.identity.scope_id)
+    request = cognition_pb.ReadPlanningJobNotificationStatesRequest(call=execution.call, scope_id=execution.identity.scope_id, job_ids=[execution.identity.job_id])
+    if fault == "scope": request.scope_id = "foreign"
+    elif fault == "job": request.job_ids[0] = "invalid"
+    elif fault == "missing": request.job_ids[0] = "planning:" + "a" * 64
+    elif fault == "duplicate": request.job_ids.append(execution.identity.job_id)
+    elif fault == "empty": del request.job_ids[:]
+    elif fault == "budget": request.call.trace_id = "x" * 131_072
+    elif fault == "generation": request.call.generation = "old"
+    elif fault == "owner": host._planning = None
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    calls = len(model.requests)
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        read = _call(channel, "ReadPlanningJobNotificationStates", cognition_pb.ReadPlanningJobNotificationStatesRequest, cognition_pb.ReadPlanningJobNotificationStatesResponse)
+        if fault in {"none", "unacked", "pending", "revoked"}:
+            response = await read(request, timeout=2)
+            assert response.scope_id == execution.identity.scope_id
+            if fault in {"none", "unacked"}: assert not response.notifications
+            else:
+                assert len(response.notifications) == 1
+                item = response.notifications[0]
+                assert item.job_id == execution.identity.job_id and item.state == (jobs_pb.JOB_NOTIFICATION_STATE_PENDING if fault == "pending" else jobs_pb.JOB_NOTIFICATION_STATE_REVOKED)
+                assert item.revoked == (fault == "revoked") and not item.HasField("acknowledged_at_ms") and not item.HasField("delivery_kind")
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as rejected: await read(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(rejected.value.trailing_metadata())["glimmer-error-bin"])
+            expected = (common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED if fault in {"scope", "missing"} else
+                common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"job", "duplicate", "empty", "budget"} else
+                common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else common_pb.SERVICE_ERROR_CODE_NOT_READY)
+            assert detail.code == expected
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert len(model.requests) == calls and not host._inflight
+
+
 @pytest.mark.parametrize("fault", ["none", "legacy", "legacy-no-evidence", "tier", "source", "model", "planning", "knowledge", "activity", "generation", "scope", "job", "request", "budget", "unready", "stopping"])
 async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_model(bound_planning_service, fault):
     import sqlite3
@@ -2039,6 +2084,13 @@ async def test_planning_notification_ack_requires_original_durable_reply_turn_an
             assert await store.pending_notification_requests() == []
             request.confirmation.receipt.received_at = "2026-10-09T00:00:00Z"
             assert await operation(request, timeout=2) == response
+            projected = await _call(channel, "ReadPlanningJobNotificationStates", cognition_pb.ReadPlanningJobNotificationStatesRequest,
+                cognition_pb.ReadPlanningJobNotificationStatesResponse)(cognition_pb.ReadPlanningJobNotificationStatesRequest(
+                    call=execution.call, scope_id=execution.identity.scope_id, job_ids=[execution.identity.job_id]), timeout=2)
+            assert len(projected.notifications) == 1
+            item = projected.notifications[0]
+            assert item.state == jobs_pb.JOB_NOTIFICATION_STATE_ACKNOWLEDGED and not item.revoked
+            assert item.delivery_kind == receipt.kind and item.HasField("acknowledged_at_ms")
             with sqlite3.connect(store._path) as connection: accepted = list(connection.iterdump())
             request.confirmation.receipt.receipt_id = "foreign"
             with pytest.raises(grpc.aio.AioRpcError): await operation(request, timeout=2)
@@ -2400,7 +2452,7 @@ async def test_planning_notification_rpc_readonly_scan_never_creates_windows(bou
     assert not model.requests
 
 
-@pytest.mark.parametrize("method", ["read", "resolve", "history"])
+@pytest.mark.parametrize("method", ["read", "resolve", "history", "projection"])
 @pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
 async def test_planning_notification_rpc_cancellation_tracks_and_drains_read_transaction(bound_planning_service, monkeypatch, method, termination):
     import sqlite3
@@ -2434,6 +2486,9 @@ async def test_planning_notification_rpc_cancellation_tracks_and_drains_read_tra
         elif method == "resolve":
             operation = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
             request = cognition_pb.ResolvePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+        elif method == "projection":
+            operation = _call(channel, "ReadPlanningJobNotificationStates", cognition_pb.ReadPlanningJobNotificationStatesRequest, cognition_pb.ReadPlanningJobNotificationStatesResponse)
+            request = cognition_pb.ReadPlanningJobNotificationStatesRequest(call=execution.call, scope_id=execution.identity.scope_id, job_ids=[execution.identity.job_id])
         else:
             operation = _call(channel, "GetPreparedPlanningNotification", cognition_pb.GetPreparedPlanningNotificationRequest, cognition_pb.GetPreparedPlanningNotificationResponse)
             request = cognition_pb.GetPreparedPlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))

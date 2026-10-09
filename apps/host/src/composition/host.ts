@@ -1,6 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { createHash } from 'node:crypto';
 import { create } from '@bufbuild/protobuf';
-import { ReadPlanningNotificationsRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { ReadPlanningNotificationsRequestSchema, ReadPlanningJobNotificationStatesRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import { JobNotificationState, type JobNotificationProjection } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { JobController, JobRecoveryController, JobRetentionController, JobScheduler, type JobClockPort,
   type JobStorePort, type JobStateReceiverPort, type RetryPolicy, type JobProjection } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
@@ -39,6 +41,7 @@ export interface HostJobsProjectionPort {
   readonly authorityEpoch: number;
   readonly handlerCatalog: ReadonlyArray<{ readonly kind: string; readonly retry_mode: 'idempotent' | 'reconcile'; readonly available: boolean }>;
   readJobStates(scopeId: string, limit: number, afterJobId?: string): JobProjection[];
+  readNotificationStates(scopeId: string, jobs: ReadonlyArray<JobProjection>, signal?: AbortSignal): Promise<JobNotificationProjection[]>;
 }
 
 /** 监督实际已装配链路；逐任务接纳和缺状态 receiver 如实降级，不代表整个产品 ready。 */
@@ -105,6 +108,35 @@ export class HostJobsController {
     if (!['ready', 'degraded'].includes(this.state.status) || this.cancellation.signal.aborted) throw new Error('Host Jobs 状态读取尚未就绪');
     this.options.clock.now(); // authority owner 注入的 live lease 围栏，不能只信快照 phase。
     return this.options.store.listProjection(this.options.epoch, scopeId, limit, afterJobId);
+  }
+
+  public async readNotificationStates(scopeId: string, jobs: ReadonlyArray<JobProjection>, signal?: AbortSignal): Promise<JobNotificationProjection[]> {
+    const epoch = this.authorityEpoch;
+    if (!['ready', 'degraded'].includes(this.state.status) || this.cancellation.signal.aborted) throw new Error('Host Jobs 状态读取尚未就绪');
+    const cancellation = signal ? AbortSignal.any([signal, this.cancellation.signal]) : this.cancellation.signal;
+    cancellation.throwIfAborted();
+    const ids = new Set(jobs.filter(job => job.kind === PLANNING_JOB_KIND).map(job => job.job_id));
+    if (!ids.size) return [];
+    if (!this.planningSource || jobs.some(job => job.scope_id !== scopeId)) throw new Error('Planning 通知投影装配/scope冲突');
+    const response = await this.options.cognition.readPlanningJobNotificationStates(create(ReadPlanningJobNotificationStatesRequestSchema,
+      { scopeId, jobIds: [...ids] }), cancellation);
+    cancellation.throwIfAborted();
+    if (this.authorityEpoch !== epoch || response.scopeId !== scopeId || response.notifications.length > ids.size) throw new Error('Planning 通知投影响应范围/authority冲突');
+    const observed = new Set<string>();
+    for (const notification of response.notifications) {
+      const acknowledged = notification.state === JobNotificationState.ACKNOWLEDGED;
+      const receiptId = createHash('sha256').update(`planning-evaluation.v1:${notification.jobId.slice('planning:'.length)}`).digest('hex');
+      const notificationId = createHash('sha256').update(`planning-completion.v1:${receiptId}`).digest('hex');
+      if (!ids.has(notification.jobId) || observed.has(notification.jobId) || notification.notificationId !== notificationId
+        || ![JobNotificationState.PENDING, JobNotificationState.ACKNOWLEDGED, JobNotificationState.REVOKED].includes(notification.state)
+        || notification.createdAtMs > BigInt(Number.MAX_SAFE_INTEGER) || notification.createdAtMs < 0n
+        || (notification.state === JobNotificationState.REVOKED) !== (notification.revoked && !acknowledged)
+        || (notification.acknowledgedAtMs !== undefined) !== acknowledged || (notification.deliveryKind !== undefined) !== acknowledged
+        || acknowledged && (notification.acknowledgedAtMs! < 0n || notification.acknowledgedAtMs! > BigInt(Number.MAX_SAFE_INTEGER)
+          || !['delivered', 'playback_completed'].includes(notification.deliveryKind!))) throw new Error('Planning 通知投影身份/状态无效');
+      observed.add(notification.jobId);
+    }
+    return response.notifications;
   }
 
   public get handlerCatalog() {

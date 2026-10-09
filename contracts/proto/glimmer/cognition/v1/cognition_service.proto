@@ -392,6 +392,17 @@ message ReconcileMemoryJobResponse {
 }
 
 // claim 前只读业务接纳，不授予执行权限，也不产生 receipt/receiver fence。
+message ReadPlanningJobNotificationStatesRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string scope_id = 2;
+  repeated string job_ids = 3;
+}
+
+message ReadPlanningJobNotificationStatesResponse {
+  string scope_id = 1;
+  repeated glimmer.jobs.v1.JobNotificationProjection notifications = 2;
+}
+
 message GetMemoryJobAdmissionRequest {
   glimmer.common.v1.CallMetadata call = 1;
   string request_id = 2;
@@ -799,6 +810,7 @@ service CognitionService {
   rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
   rpc ExecuteMemoryJob(ExecuteMemoryJobRequest) returns (ExecuteMemoryJobResponse);
   rpc GetMemoryJobAdmission(GetMemoryJobAdmissionRequest) returns (GetMemoryJobAdmissionResponse);
+  rpc ReadPlanningJobNotificationStates(ReadPlanningJobNotificationStatesRequest) returns (ReadPlanningJobNotificationStatesResponse);
   // 此调用会持久封口原 attempt；不是只读查询。空结果不得返回 not-applied。
   rpc ReconcileMemoryJob(ReconcileMemoryJobRequest) returns (ReconcileMemoryJobResponse);
   // 仅在外部 Jobs owner 模式开放；不能与旧巩固队列双消费。

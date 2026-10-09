@@ -92,21 +92,33 @@ function notificationRoutes() {
     time: (value: number) => { now = value; }, close: () => { routes.stop(); stream.destroy(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
-it.each(['read', 'foreign-scope', 'generation', 'expired', 'revoked-during-read', 'epoch-during-read', 'oversize', 'invalid-limit', 'abort', 'storage'] as const)
-('Host Jobs 公开投影 %s 经实际权限/SQL复验，不公开正文或失效读取', mode => {
+it.each(['read', 'foreign-scope', 'generation', 'expired', 'revoked-during-read', 'epoch-during-read',
+  'revoked-during-await', 'epoch-during-await', 'abort-during-await', 'notification-storage', 'oversize', 'invalid-limit', 'abort', 'storage'] as const)
+('Host Jobs 公开投影 %s 经实际权限/SQL复验，不公开正文或失效读取', async mode => {
   const h = notificationRoutes(), store = new SqliteJobStore(path.join(h.root, 'jobs.sqlite'));
   const scope = 'scope:protected';
+  let grantId = '';
+  const cancellation = new AbortController(), failure = new Error('injected storage failure');
   const port = { get authorityEpoch() {
     if (store.loadAuthorityEpoch() !== 1) throw new Error('authority changed'); return 1;
   }, handlerCatalog: [{ kind: 'registered.kind', retry_mode: 'reconcile' as const, available: true }],
-  readJobStates: (scopeId: string, limit: number, cursor?: string) => store.listProjection(1, scopeId, limit, cursor) };
-  const route = new HostJobControlRoutes(port, h.broker), cancellation = new AbortController();
+  readJobStates: (scopeId: string, limit: number, cursor?: string) => store.listProjection(1, scopeId, limit, cursor),
+  readNotificationStates: async () => {
+    await Promise.resolve();
+    if (mode === 'revoked-during-await') h.broker.revokeGrant(grantId);
+    else if (mode === 'epoch-during-await') store.activateAuthority(2, 100);
+    else if (mode === 'abort-during-await') cancellation.abort();
+    else if (mode === 'notification-storage') throw failure;
+    return [];
+  } };
+  const route = new HostJobControlRoutes(port, h.broker);
   try {
     store.activateAuthority(1, 100);
     for (const id of ['a', 'b', 'foreign']) store.enqueue({ job_id: id, idempotency_key: id, scope_id: id === 'foreign' ? 'other' : scope,
       goal_id: 'goal', kind: 'registered.kind', due_at: 1000, retry_mode: 'reconcile', max_attempts: 3,
       payload: { private_text: 'must not leave owner' } }, 1, 100);
     const grant = h.broker.grant(route.permissionRequest(h.principal, scope), 1000);
+    grantId = grant.grant_id;
     const query = create(ReadJobsProjectionRequestSchema, { call: { traceId: 'trace', generation: h.principal.generation }, scopeId: scope, limit: 1 });
     if (mode === 'foreign-scope') query.scopeId = 'other';
     if (mode === 'generation') query.call!.generation = 'old';
@@ -115,7 +127,6 @@ it.each(['read', 'foreign-scope', 'generation', 'expired', 'revoked-during-read'
     if (mode === 'invalid-limit') query.limit = 1001;
     if (mode === 'abort') cancellation.abort();
     const read = store.listProjection.bind(store);
-    const failure = new Error('injected storage failure');
     if (mode === 'storage') vi.spyOn(store, 'listProjection').mockImplementationOnce(() => { throw failure; });
     if (mode === 'revoked-during-read' || mode === 'epoch-during-read') vi.spyOn(store, 'listProjection').mockImplementationOnce((...args: Parameters<SqliteJobStore['listProjection']>) => {
       const result = read(...args);
@@ -124,15 +135,15 @@ it.each(['read', 'foreign-scope', 'generation', 'expired', 'revoked-during-read'
       return result;
     });
     if (mode === 'read') {
-      const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, route.read(h.principal, query)));
+      const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, await route.read(h.principal, query)));
       expect(result.jobs.map(value => value.jobId)).toEqual(['a']); expect(result.nextAfterJobId).toBe('a');
       expect(JSON.stringify(result.jobs, (_key, value) => typeof value === 'bigint' ? String(value) : value)).not.toContain('private_text');
       query.afterJobId = result.nextAfterJobId;
-      expect(route.read(h.principal, query).jobs.map(value => value.jobId)).toEqual(['b']);
-      query.afterJobId = 'b'; expect(route.read(h.principal, query).jobs).toEqual([]);
-      expect(route.read(h.principal, query).nextAfterJobId).toBeUndefined();
-    } else if (mode === 'storage') expect(() => route.read(h.principal, query)).toThrow(failure);
-    else expect(() => route.read(h.principal, query, cancellation.signal)).toThrow();
+      expect((await route.read(h.principal, query)).jobs.map(value => value.jobId)).toEqual(['b']);
+      query.afterJobId = 'b'; expect((await route.read(h.principal, query)).jobs).toEqual([]);
+      expect((await route.read(h.principal, query)).nextAfterJobId).toBeUndefined();
+    } else if (mode === 'storage' || mode === 'notification-storage') await expect(route.read(h.principal, query)).rejects.toThrow(failure);
+    else await expect(route.read(h.principal, query, cancellation.signal)).rejects.toThrow();
     expect(store.load('a')).toMatchObject({ status: 'queued', attempt: 0 });
   } finally { store.close(); h.close(); }
 });

@@ -1475,6 +1475,7 @@ class CognitionGrpcHost:
             "Shutdown": self._method(self._shutdown_rpc, cognition_pb.ShutdownRequest, cognition_pb.ShutdownResponse),
             "ExecuteMemoryJob": self._method(self._execute_memory_job, cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse),
             "GetMemoryJobAdmission": self._method(self._get_memory_job_admission, cognition_pb.GetMemoryJobAdmissionRequest, cognition_pb.GetMemoryJobAdmissionResponse),
+            "ReadPlanningJobNotificationStates": self._method(self._read_planning_job_notification_states, cognition_pb.ReadPlanningJobNotificationStatesRequest, cognition_pb.ReadPlanningJobNotificationStatesResponse),
             "ReconcileMemoryJob": self._method(self._reconcile_memory_job, cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
             "ReadMemoryJobRequests": self._method(self._read_memory_job_requests, cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
             "AcknowledgeMemoryJobRequest": self._method(self._acknowledge_memory_job_request, cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
@@ -1823,6 +1824,29 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory 已ACK原源/作用域冲突") from error
             return cognition_pb.GetMemoryJobAdmissionResponse(request_id=request.request_id, job_id=request.job_id,
                 scope_id=request.scope_id, eligible=reason == "memory_ready", reason_code=reason)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _read_planning_job_notification_states(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            store = self._planning_jobs_source()
+            if (request.ByteSize() > 131_072 or not request.scope_id.strip() or len(request.scope_id.encode("utf-8")) > 4096
+                or not 1 <= len(request.job_ids) <= 1000 or len(set(request.job_ids)) != len(request.job_ids)
+                or any(not re.fullmatch(r"planning:[a-f0-9]{64}", job_id) for job_id in request.job_ids)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知投影查询身份/预算无效")
+            try:
+                states = await store.read_job_notification_states(request.scope_id, tuple(request.job_ids))
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知投影原事实冲突") from error
+            response = cognition_pb.ReadPlanningJobNotificationStatesResponse(scope_id=request.scope_id)
+            for state in states:
+                item = response.notifications.add(job_id=state.job_id, notification_id=state.notification_id,
+                    state={"pending": jobs_pb.JOB_NOTIFICATION_STATE_PENDING, "acknowledged": jobs_pb.JOB_NOTIFICATION_STATE_ACKNOWLEDGED,
+                           "revoked": jobs_pb.JOB_NOTIFICATION_STATE_REVOKED}[state.state], revoked=state.revoked, created_at_ms=state.created_at_ms)
+                if state.acknowledged_at_ms is not None: item.acknowledged_at_ms = state.acknowledged_at_ms
+                if state.delivery_kind is not None: item.delivery_kind = state.delivery_kind
+            if response.ByteSize() > 262_144:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知投影响应超过预算")
+            return response
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     def _external_memory_jobs(self) -> ConsolidationCoordinator:

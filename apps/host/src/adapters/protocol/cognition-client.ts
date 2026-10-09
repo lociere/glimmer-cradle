@@ -11,6 +11,8 @@ import { CallMetadataSchema, ServiceErrorDetailSchema, ServiceErrorCode } from '
 import {
   ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
   GetMemoryJobAdmissionRequestSchema, GetMemoryJobAdmissionResponseSchema,
+  ReadPlanningJobNotificationStatesRequestSchema, ReadPlanningJobNotificationStatesResponseSchema,
+  type ReadPlanningJobNotificationStatesRequest, type ReadPlanningJobNotificationStatesResponse,
   type GetMemoryJobAdmissionRequest, type GetMemoryJobAdmissionResponse,
   ReconcileMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema,
   ReadMemoryJobRequestsRequestSchema, ReadMemoryJobRequestsResponseSchema,
@@ -163,6 +165,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
       || receipt.revision !== BigInt(invocation.revision) || !receipt.momentId.trim()
       || receipt.logPosition < 1n || receipt.logPosition > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('Conversation durable receipt 无效');
     return { event_id: receipt.eventId, invocation_id: receipt.invocationId, revision: Number(receipt.revision), accepted: true };
+  }
+  public readPlanningJobNotificationStates(request: ReadPlanningJobNotificationStatesRequest, signal?: AbortSignal): Promise<ReadPlanningJobNotificationStatesResponse> {
+    return this.call('ReadPlanningJobNotificationStates', ReadPlanningJobNotificationStatesRequestSchema, ReadPlanningJobNotificationStatesResponseSchema,
+      create(ReadPlanningJobNotificationStatesRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public readiness(signal?: AbortSignal) {
     return this.call('GetReadiness', GetReadinessRequestSchema, GetReadinessResponseSchema,

@@ -32,6 +32,7 @@ from glimmer_cradle.cognition.planning.planning_store import (
     PlanningDecisionSnapshot,
     PlanningEvaluationWork,
     PlanningNotificationWork,
+    PlanningNotificationProjection,
 )
 from glimmer_cradle.cognition.ports.job_port import (
     JobReceipt,
@@ -906,6 +907,45 @@ class SqlitePlanningStore:
                     (rows[-1]["notification_id"], limit),
                 )).fetchall()
             return result
+
+    async def read_job_notification_states(self, scope_id: str, job_ids: tuple[str, ...]) -> list[PlanningNotificationProjection]:
+        if (not isinstance(scope_id, str) or not scope_id.strip() or len(scope_id.encode("utf-8")) > 4096
+            or not 1 <= len(job_ids) <= 1000 or len(set(job_ids)) != len(job_ids)
+            or any(not isinstance(job_id, str) or not re.fullmatch(r"planning:[a-f0-9]{64}", job_id) for job_id in job_ids)):
+            raise PlanningConflictError("Planning 通知投影查询身份/范围无效")
+        result = []
+        async with self._transaction() as connection:
+            if not await self._commitment_schema(connection):
+                raise PlanningConflictError("Planning 原源不存在")
+            notifications = await self._notification_schema(connection)
+            deliveries = await self._notification_delivery_schema(connection)
+            for job_id in job_ids:
+                request_id = job_id.removeprefix("planning:")
+                source = await (await connection.execute("SELECT accepted_job_id,payload_json FROM planning_job_outbox WHERE request_id=?", (request_id,))).fetchone()
+                if source is None:
+                    raise PlanningConflictError("Planning 通知投影原源不存在")
+                request = JobRequest(**json.loads(source["payload_json"]))
+                if request.scope_id != scope_id or request.request_id != request_id or request.idempotency_key != request_id \
+                        or request.kind != "planning.evaluate" or source["accepted_job_id"] not in {None, job_id}:
+                    raise PlanningConflictError("Planning 通知投影原源/scope冲突")
+                if source["accepted_job_id"] is not None:
+                    await self._evaluation_work(connection, job_id, scope_id, request_id)
+                row = await (await connection.execute("SELECT * FROM planning_notification_outbox WHERE request_id=?", (request_id,))).fetchone() if notifications else None
+                if row is None:
+                    continue
+                notification = self._read_notification(row)
+                await self._notification_work(connection, notification, historical=True)
+                revoked = await self._notification_revoked(connection, notification)
+                confirmation = await self._notification_delivery(connection, notification) if deliveries else None
+                acknowledged_at = None
+                if confirmation is not None:
+                    acknowledged_at = (await (await connection.execute("SELECT acknowledged_at_ms FROM planning_notification_delivery_receipt WHERE notification_id=?", (notification.notification_id,))).fetchone())[0]
+                    if type(acknowledged_at) is not int or not 0 <= acknowledged_at <= 2**53 - 1:
+                        raise PlanningConflictError("Planning 通知确认时钟无效")
+                result.append(PlanningNotificationProjection(job_id, notification.notification_id,
+                    "acknowledged" if confirmation else "revoked" if revoked else "pending", revoked,
+                    notification.created_at, acknowledged_at, confirmation.kind if confirmation else None))
+        return sorted(result, key=lambda item: (item.job_id, item.notification_id))
 
     async def read_notification_work(self, request: PlanningNotificationRequest, *, historical: bool = False) -> PlanningNotificationWork:
         if not isinstance(request, PlanningNotificationRequest):

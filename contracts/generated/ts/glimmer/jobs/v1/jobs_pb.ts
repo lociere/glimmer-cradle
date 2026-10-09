@@ -13,7 +13,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file glimmer/jobs/v1/jobs.proto.
  */
 export const file_glimmer_jobs_v1_jobs: GenFile = /*@__PURE__*/
-  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIskCCg1Kb2JTdGF0ZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg4KBmpvYl9pZBgCIAEoCRIQCghzY29wZV9pZBgDIAEoCRIPCgdnb2FsX2lkGAQgASgJEgwKBGtpbmQYBSABKAkSEAoIcmV2aXNpb24YBiABKAQSKgoGc3RhdHVzGAcgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIPCgdhdHRlbXB0GAggASgEEhcKD2F1dGhvcml0eV9lcG9jaBgJIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAogASgEEicKBnJlc3VsdBgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKZXJyb3JfY29kZRgMIAEoCUgAiAEBEhUKDXVwZGF0ZWRfYXRfbXMYDSABKARCDQoLX2Vycm9yX2NvZGUiowEKFEpvYkV4ZWN1dGlvbklkZW50aXR5Eg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdhdHRlbXB0GAMgASgEEhcKD2F1dGhvcml0eV9lcG9jaBgEIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAUgASgEEhAKCG93bmVyX2lkGAYgASgJEhYKDmxlYXNlX3VudGlsX21zGAcgASgEIpECCg1Kb2JQcm9qZWN0aW9uEg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdnb2FsX2lkGAMgASgJEgwKBGtpbmQYBCABKAkSKgoGc3RhdHVzGAUgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIQCghyZXZpc2lvbhgGIAEoBBIPCgdhdHRlbXB0GAcgASgEEhEKCWR1ZV9hdF9tcxgIIAEoBBIXCgplcnJvcl9jb2RlGAkgASgJSACIAQESFQoNdXBkYXRlZF9hdF9tcxgKIAEoBBIeChZzdGF0ZV9mZWVkYmFja19wZW5kaW5nGAsgASgIQg0KC19lcnJvcl9jb2RlIksKFEpvYkhhbmRsZXJQcm9qZWN0aW9uEgwKBGtpbmQYASABKAkSEgoKcmV0cnlfbW9kZRgCIAEoCRIRCglhdmFpbGFibGUYAyABKAgilwEKGVJlYWRKb2JzUHJvamVjdGlvblJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIQCghzY29wZV9pZBgCIAEoCRINCgVsaW1pdBgDIAEoDRIZCgxhZnRlcl9qb2JfaWQYBCABKAlIAIgBAUIPCg1fYWZ0ZXJfam9iX2lkItIBChpSZWFkSm9ic1Byb2plY3Rpb25SZXNwb25zZRIXCg9hdXRob3JpdHlfZXBvY2gYASABKAQSLAoEam9icxgCIAMoCzIeLmdsaW1tZXIuam9icy52MS5Kb2JQcm9qZWN0aW9uEjcKCGhhbmRsZXJzGAMgAygLMiUuZ2xpbW1lci5qb2JzLnYxLkpvYkhhbmRsZXJQcm9qZWN0aW9uEh4KEW5leHRfYWZ0ZXJfam9iX2lkGAQgASgJSACIAQFCFAoSX25leHRfYWZ0ZXJfam9iX2lkKtkBCglKb2JTdGF0dXMSGgoWSk9CX1NUQVRVU19VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFUVVNfUVVFVUVEEAESFgoSSk9CX1NUQVRVU19SVU5OSU5HEAISGQoVSk9CX1NUQVRVU19SRVRSWV9XQUlUEAMSGAoUSk9CX1NUQVRVU19TVUNDRUVERUQQBBIYChRKT0JfU1RBVFVTX0NBTkNFTExFRBAFEhoKFkpPQl9TVEFUVVNfREVBRF9MRVRURVIQBhIWChJKT0JfU1RBVFVTX1VOS05PV04QB0IqqgInR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Kb2JzLlYxYgZwcm90bzM", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
+  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIskCCg1Kb2JTdGF0ZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg4KBmpvYl9pZBgCIAEoCRIQCghzY29wZV9pZBgDIAEoCRIPCgdnb2FsX2lkGAQgASgJEgwKBGtpbmQYBSABKAkSEAoIcmV2aXNpb24YBiABKAQSKgoGc3RhdHVzGAcgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIPCgdhdHRlbXB0GAggASgEEhcKD2F1dGhvcml0eV9lcG9jaBgJIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAogASgEEicKBnJlc3VsdBgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKZXJyb3JfY29kZRgMIAEoCUgAiAEBEhUKDXVwZGF0ZWRfYXRfbXMYDSABKARCDQoLX2Vycm9yX2NvZGUiowEKFEpvYkV4ZWN1dGlvbklkZW50aXR5Eg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdhdHRlbXB0GAMgASgEEhcKD2F1dGhvcml0eV9lcG9jaBgEIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAUgASgEEhAKCG93bmVyX2lkGAYgASgJEhYKDmxlYXNlX3VudGlsX21zGAcgASgEIpECCg1Kb2JQcm9qZWN0aW9uEg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdnb2FsX2lkGAMgASgJEgwKBGtpbmQYBCABKAkSKgoGc3RhdHVzGAUgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIQCghyZXZpc2lvbhgGIAEoBBIPCgdhdHRlbXB0GAcgASgEEhEKCWR1ZV9hdF9tcxgIIAEoBBIXCgplcnJvcl9jb2RlGAkgASgJSACIAQESFQoNdXBkYXRlZF9hdF9tcxgKIAEoBBIeChZzdGF0ZV9mZWVkYmFja19wZW5kaW5nGAsgASgIQg0KC19lcnJvcl9jb2RlIksKFEpvYkhhbmRsZXJQcm9qZWN0aW9uEgwKBGtpbmQYASABKAkSEgoKcmV0cnlfbW9kZRgCIAEoCRIRCglhdmFpbGFibGUYAyABKAgilwEKGVJlYWRKb2JzUHJvamVjdGlvblJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIQCghzY29wZV9pZBgCIAEoCRINCgVsaW1pdBgDIAEoDRIZCgxhZnRlcl9qb2JfaWQYBCABKAlIAIgBAUIPCg1fYWZ0ZXJfam9iX2lkIogCChlKb2JOb3RpZmljYXRpb25Qcm9qZWN0aW9uEg4KBmpvYl9pZBgBIAEoCRIXCg9ub3RpZmljYXRpb25faWQYAiABKAkSNAoFc3RhdGUYAyABKA4yJS5nbGltbWVyLmpvYnMudjEuSm9iTm90aWZpY2F0aW9uU3RhdGUSDwoHcmV2b2tlZBgEIAEoCBIVCg1jcmVhdGVkX2F0X21zGAUgASgEEh8KEmFja25vd2xlZGdlZF9hdF9tcxgGIAEoBEgAiAEBEhoKDWRlbGl2ZXJ5X2tpbmQYByABKAlIAYgBAUIVChNfYWNrbm93bGVkZ2VkX2F0X21zQhAKDl9kZWxpdmVyeV9raW5kIpUCChpSZWFkSm9ic1Byb2plY3Rpb25SZXNwb25zZRIXCg9hdXRob3JpdHlfZXBvY2gYASABKAQSLAoEam9icxgCIAMoCzIeLmdsaW1tZXIuam9icy52MS5Kb2JQcm9qZWN0aW9uEjcKCGhhbmRsZXJzGAMgAygLMiUuZ2xpbW1lci5qb2JzLnYxLkpvYkhhbmRsZXJQcm9qZWN0aW9uEh4KEW5leHRfYWZ0ZXJfam9iX2lkGAQgASgJSACIAQESQQoNbm90aWZpY2F0aW9ucxgFIAMoCzIqLmdsaW1tZXIuam9icy52MS5Kb2JOb3RpZmljYXRpb25Qcm9qZWN0aW9uQhQKEl9uZXh0X2FmdGVyX2pvYl9pZCrZAQoJSm9iU3RhdHVzEhoKFkpPQl9TVEFUVVNfVU5TUEVDSUZJRUQQABIVChFKT0JfU1RBVFVTX1FVRVVFRBABEhYKEkpPQl9TVEFUVVNfUlVOTklORxACEhkKFUpPQl9TVEFUVVNfUkVUUllfV0FJVBADEhgKFEpPQl9TVEFUVVNfU1VDQ0VFREVEEAQSGAoUSk9CX1NUQVRVU19DQU5DRUxMRUQQBRIaChZKT0JfU1RBVFVTX0RFQURfTEVUVEVSEAYSFgoSSk9CX1NUQVRVU19VTktOT1dOEAcqrwEKFEpvYk5vdGlmaWNhdGlvblN0YXRlEiYKIkpPQl9OT1RJRklDQVRJT05fU1RBVEVfVU5TUEVDSUZJRUQQABIiCh5KT0JfTk9USUZJQ0FUSU9OX1NUQVRFX1BFTkRJTkcQARInCiNKT0JfTk9USUZJQ0FUSU9OX1NUQVRFX0FDS05PV0xFREdFRBACEiIKHkpPQl9OT1RJRklDQVRJT05fU1RBVEVfUkVWT0tFRBADQiqqAidHbGltbWVyQ3JhZGxlLkNvbnRyYWN0cy5HbGltbWVyLkpvYnMuVjFiBnByb3RvMw", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
 
 /**
  * Jobs outbox 的不可变事实。取消只表示调度意图撤销，不证明领域副作用回滚。
@@ -277,6 +277,57 @@ export const ReadJobsProjectionRequestSchema: GenMessage<ReadJobsProjectionReque
   messageDesc(file_glimmer_jobs_v1_jobs, 4);
 
 /**
+ * 由通知 owner 的原请求与真实确认重建；不从 Job success 或 transport sent 推断送达。
+ *
+ * @generated from message glimmer.jobs.v1.JobNotificationProjection
+ */
+export type JobNotificationProjection = Message<"glimmer.jobs.v1.JobNotificationProjection"> & {
+  /**
+   * @generated from field: string job_id = 1;
+   */
+  jobId: string;
+
+  /**
+   * @generated from field: string notification_id = 2;
+   */
+  notificationId: string;
+
+  /**
+   * @generated from field: glimmer.jobs.v1.JobNotificationState state = 3;
+   */
+  state: JobNotificationState;
+
+  /**
+   * 已确认的历史可能后来撤销；两项事实同时保留。
+   *
+   * @generated from field: bool revoked = 4;
+   */
+  revoked: boolean;
+
+  /**
+   * @generated from field: uint64 created_at_ms = 5;
+   */
+  createdAtMs: bigint;
+
+  /**
+   * @generated from field: optional uint64 acknowledged_at_ms = 6;
+   */
+  acknowledgedAtMs?: bigint | undefined;
+
+  /**
+   * @generated from field: optional string delivery_kind = 7;
+   */
+  deliveryKind?: string | undefined;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.JobNotificationProjection.
+ * Use `create(JobNotificationProjectionSchema)` to create a new message.
+ */
+export const JobNotificationProjectionSchema: GenMessage<JobNotificationProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 5);
+
+/**
  * @generated from message glimmer.jobs.v1.ReadJobsProjectionResponse
  */
 export type ReadJobsProjectionResponse = Message<"glimmer.jobs.v1.ReadJobsProjectionResponse"> & {
@@ -301,6 +352,11 @@ export type ReadJobsProjectionResponse = Message<"glimmer.jobs.v1.ReadJobsProjec
    * @generated from field: optional string next_after_job_id = 4;
    */
   nextAfterJobId?: string | undefined;
+
+  /**
+   * @generated from field: repeated glimmer.jobs.v1.JobNotificationProjection notifications = 5;
+   */
+  notifications: JobNotificationProjection[];
 };
 
 /**
@@ -308,7 +364,7 @@ export type ReadJobsProjectionResponse = Message<"glimmer.jobs.v1.ReadJobsProjec
  * Use `create(ReadJobsProjectionResponseSchema)` to create a new message.
  */
 export const ReadJobsProjectionResponseSchema: GenMessage<ReadJobsProjectionResponse> = /*@__PURE__*/
-  messageDesc(file_glimmer_jobs_v1_jobs, 5);
+  messageDesc(file_glimmer_jobs_v1_jobs, 6);
 
 /**
  * @generated from enum glimmer.jobs.v1.JobStatus
@@ -360,3 +416,34 @@ export enum JobStatus {
  */
 export const JobStatusSchema: GenEnum<JobStatus> = /*@__PURE__*/
   enumDesc(file_glimmer_jobs_v1_jobs, 0);
+
+/**
+ * @generated from enum glimmer.jobs.v1.JobNotificationState
+ */
+export enum JobNotificationState {
+  /**
+   * @generated from enum value: JOB_NOTIFICATION_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: JOB_NOTIFICATION_STATE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: JOB_NOTIFICATION_STATE_ACKNOWLEDGED = 2;
+   */
+  ACKNOWLEDGED = 2,
+
+  /**
+   * @generated from enum value: JOB_NOTIFICATION_STATE_REVOKED = 3;
+   */
+  REVOKED = 3,
+}
+
+/**
+ * Describes the enum glimmer.jobs.v1.JobNotificationState.
+ */
+export const JobNotificationStateSchema: GenEnum<JobNotificationState> = /*@__PURE__*/
+  enumDesc(file_glimmer_jobs_v1_jobs, 1);

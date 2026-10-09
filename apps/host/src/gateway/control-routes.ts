@@ -17,16 +17,20 @@ export class HostJobControlRoutes {
       target_location: identity.host_id };
   }
 
-  public read(principal: Principal, request: ReadJobsProjectionRequest, signal?: AbortSignal) {
+  public async read(principal: Principal, request: ReadJobsProjectionRequest, signal?: AbortSignal) {
     signal?.throwIfAborted();
     const identity = snapshotPrincipal(principal);
     if (!request.call?.traceId.trim() || request.call.generation !== identity.generation
       || toBinary(ReadJobsProjectionRequestSchema, request).byteLength > 16384) throw new Error('Jobs 控制面请求身份/预算无效');
     const permission = this.permissionRequest(identity, request.scopeId), epoch = this.jobs.authorityEpoch;
     const decision = this.permissions.authorize(permission);
-    if (!decision.allowed || !this.permissions.isCurrent(decision.grant)) throw new Error('Jobs 读取权限不足');
+    if (!decision.allowed || permission.resource_revision !== `jobs:${epoch}` || !this.permissions.isCurrent(decision.grant)) throw new Error('Jobs 读取权限不足');
     const states = this.jobs.readJobStates(request.scopeId, request.limit, request.afterJobId);
+    signal?.throwIfAborted();
+    if (this.jobs.authorityEpoch !== epoch || !this.permissions.isCurrent(decision.grant)) throw new Error('Jobs 读取期间权限或authority已撤销');
+    const notifications = await this.jobs.readNotificationStates(request.scopeId, states, signal);
     const response = create(ReadJobsProjectionResponseSchema, { authorityEpoch: BigInt(epoch),
+      notifications,
       jobs: states.map(jobProjectionToWire), handlers: this.jobs.handlerCatalog.map(handler => ({ kind: handler.kind,
         retryMode: handler.retry_mode, available: handler.available })), nextAfterJobId: states.at(-1)?.job_id });
     signal?.throwIfAborted();

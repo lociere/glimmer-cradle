@@ -77,10 +77,30 @@ message ReadJobsProjectionRequest {
   optional string after_job_id = 4;
 }
 
+enum JobNotificationState {
+  JOB_NOTIFICATION_STATE_UNSPECIFIED = 0;
+  JOB_NOTIFICATION_STATE_PENDING = 1;
+  JOB_NOTIFICATION_STATE_ACKNOWLEDGED = 2;
+  JOB_NOTIFICATION_STATE_REVOKED = 3;
+}
+
+// 由通知 owner 的原请求与真实确认重建；不从 Job success 或 transport sent 推断送达。
+message JobNotificationProjection {
+  string job_id = 1;
+  string notification_id = 2;
+  JobNotificationState state = 3;
+  // 已确认的历史可能后来撤销；两项事实同时保留。
+  bool revoked = 4;
+  uint64 created_at_ms = 5;
+  optional uint64 acknowledged_at_ms = 6;
+  optional string delivery_kind = 7;
+}
+
 message ReadJobsProjectionResponse {
   uint64 authority_epoch = 1;
   repeated JobProjection jobs = 2;
   repeated JobHandlerProjection handlers = 3;
   // 稳定原 Job ID；空页不返回 cursor，短非空页仍可继续读取。
   optional string next_after_job_id = 4;
+  repeated JobNotificationProjection notifications = 5;
 }

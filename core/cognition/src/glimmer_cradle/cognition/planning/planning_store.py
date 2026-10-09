@@ -60,6 +60,19 @@ class PlanningNotificationWork:
     receipt: PlanningEvaluationReceipt
 
 
+@dataclass(frozen=True, slots=True)
+class PlanningNotificationProjection:
+    """由原通知与真实确认重建的元数据；不包含正文或发布权限。"""
+
+    job_id: str
+    notification_id: str
+    state: Literal["pending", "acknowledged", "revoked"]
+    revoked: bool
+    created_at_ms: int
+    acknowledged_at_ms: int | None = None
+    delivery_kind: str | None = None
+
+
 class PlanningCompletionEvaluator(Protocol):
     """Cognition 内部语义策略；外部模型需求另由既有 ModelPort 拥有。"""
 
@@ -104,6 +117,8 @@ class PlanningStore(Protocol):
     ) -> list[PlanningNotificationRequest]: ...
 
     async def read_notification_work(self, request: PlanningNotificationRequest, *, historical: bool = False) -> PlanningNotificationWork: ...
+
+    async def read_job_notification_states(self, scope_id: str, job_ids: tuple[str, ...]) -> list[PlanningNotificationProjection]: ...
 
     async def claim_notification_publication(self, request: PlanningNotificationRequest, *, owner_id: str, not_sent: bool = False) -> Literal["accepted", "revoked", "recovery_pending"]: ...
 

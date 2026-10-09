@@ -327,6 +327,13 @@ receive/notify grant 复验后才写出；背压不建立第二队列，sent 不
 完整产品 ingress 仍未切换，不能以 PublishAction/模型完成或空回调制造送达。
 通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
 
+`SqlitePlanningStore.read_job_notification_states()` 在现有串行事务内按原 Job/scope 重建只读
+通知元数据，复验完整通知/业务 receipt 与确认；不初始化状态窗口或追加推理。没有通知与尚未
+ACK 的原源不制造 completed；真实确认与后来撤销两项事实同时保留。Worker 的独立投影 RPC
+由唯一 IDL 生成，Host 公开 Jobs 路由在异步读取前后检查原 principal/grant/live epoch，拒绝
+损坏身份、过大时钟和 self-reported 状态。此读取不调用 Prepare/发布/源 ACK，精确字段、
+预算与错误语义归[Jobs 受控投影](../../reference/protocol.md#jobs-受控状态投影)。
+
 承诺撤销以原 scope/revision CAS 更新 abandoned，封口正在评估的 attempt 并取消同一 Controller
 中的模型任务；不可变计划、已有 receipt 和已送达历史保留。原源取消 outbox 在 Jobs 原 inbox
 接纳/同步取消后才 ACK；尚未调度的源同样保留去重墓碑，unknown 先对账原 attempt，再封口，
