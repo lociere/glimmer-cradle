@@ -2566,6 +2566,49 @@ async def test_bound_planning_executes_actual_conversation_evidence_and_reuses_r
     assert proof.result.receipt == response.receipt
 
 
+async def test_bound_planning_successor_wire_restart_identity_and_completion(bound_planning_service):
+    host, _, store, _, _, model, accepted, _, prepare, execute, _ = bound_planning_service
+    model.completed = False
+    first = await prepare()
+    initial = (await execute(first, timeout=2)).result.receipt
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    read = _call(channel, "ReadPlanningJobRequests", cognition_pb.ReadPlanningJobRequestsRequest, cognition_pb.ReadPlanningJobRequestsResponse)
+    ack = _call(channel, "AcknowledgePlanningJobRequest", cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse)
+    try:
+        request = cognition_pb.ReadPlanningJobRequestsRequest(call=accepted.call, limit=8)
+        before = (await read(request, timeout=2)).requests
+        assert len(before) == 1
+        successor = before[0]
+        expected = hashlib.sha256(json.dumps(["planning.evaluate", accepted.commitment_id,
+            accepted.plan_id, accepted.plan_version, 2], ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+        assert successor.commitment_revision == initial.commitment_revision == 2
+        assert successor.request_id == expected and successor.request_id != first.request_id
+        assert successor.due_at_ms == initial.committed_at_ms + 60_000
+        await store.close()
+        await store.connect()
+        assert (await read(request, timeout=2)).requests == before
+        ack_request = cognition_pb.AcknowledgePlanningJobRequestRequest(call=accepted.call, request=successor,
+            job_id="planning:" + expected, job_revision=1)
+        assert (await ack(ack_request, timeout=2)).accepted
+        # 丢失 ACK 的发送者重放同一源信封；源不会回到 pending 或生成新的 request。
+        ack_request.duplicate = True
+        assert (await ack(ack_request, timeout=2)).accepted
+        assert not (await read(request, timeout=2)).requests
+        model.completed = True
+        next_request = cognition_pb.ExecutePlanningJobRequest(call=accepted.call, request_id=expected,
+            identity=jobs_pb.JobExecutionIdentity(job_id="planning:" + expected, scope_id=successor.scope_id,
+                attempt=1, authority_epoch=1, fencing_token=2, owner_id="host:实际提交", lease_until_ms=int(time.time() * 1000) + 60_000))
+        result = (await execute(next_request, timeout=2)).result.receipt
+        assert result.request_id == expected and result.commitment_revision == 3 and result.completed
+        assert len(model.requests) == 2
+        assert (await execute(first, timeout=2)).result.receipt == initial
+        assert (await execute(next_request, timeout=2)).result.receipt == result
+        assert len(model.requests) == 2
+        assert not (await read(request, timeout=2)).requests
+    finally:
+        await channel.close()
+
+
 @pytest.mark.parametrize("method", ["accept", "execute"])
 @pytest.mark.parametrize("fault", ["generation", "unready", "stopping", "planning", "conversation", "knowledge", "activity"])
 async def test_bound_planning_rpc_requires_actual_owners_generation_and_ready(bound_planning_service, method, fault):

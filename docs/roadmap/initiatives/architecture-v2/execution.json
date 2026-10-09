@@ -174,10 +174,10 @@
       "dependsOn": [
         "A00"
       ],
-      "status": "ready",
+      "status": "in-progress",
       "mode": "implementation",
       "card": "execution-order.md#step-p07a",
-      "owner": null,
+      "owner": "本会话执行 owner（唯一写入负责人）",
       "scope": "当前与目标集中在 core/cognition/ 的 planning 与 persistence、core/jobs/、apps/host/ 和 apps/cognition-worker/ 的既有接线。",
       "acceptance": [
         "G0",
@@ -188,9 +188,11 @@
         "G5",
         "G6"
       ],
-      "evidence": [],
+      "evidence": [
+        "evidence/2026-10-09-P07A.md"
+      ],
       "blockedReason": null,
-      "nextAction": "P07A.2：在 Planning 评估事务中提交后继意图、追加兼容身份字段；实现撤销/revision CAS 与持久取消传播；复用原 attempt/lease/通知 ACK 链。准备映射已核对。",
+      "nextAction": "P07A.4：后继事务/兼容wire/恢复已实施并定向通过，独立P2复核关闭；接续承诺撤销CAS和持久Jobs取消传播，覆盖执行中/待通知/晚到结果。上一完成动作：后继子链定向测试与独立审查通过，准备局部提交；无后台验证进程，根大型门待最终集中验收。",
       "mapping": [
         {
           "action": "retain",
@@ -310,6 +312,13 @@
           "target": "protocol/proto/glimmer/cognition/v1/cognition.proto",
           "owner": "Contract Spine",
           "exitCondition": "P07A 仅修改现行 contracts 唯一源并生成；路径原子切换与 contracts 删除留 P11A，禁止创建第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/implementation/Cognition认知核实现.md",
+          "target": "docs/architecture/implementation/Cognition认知核实现.md",
+          "owner": "Documentation",
+          "exitCondition": "后继/撤销实际接线与未完成范围保持准确。"
         }
       ],
       "commands": [

@@ -23,11 +23,11 @@ const expectedLock = {
     },
     {
       "path": "docs/architecture/target/physical-layout.md",
-      "sha256": "a04daab403d9ac460e4b983f52f6968db8caedbdf66e29e8b55cccaedb0df1c0"
+      "sha256": "590c703b414e2c1821dee69aaca6bd73296e49946016cb7a15d1252a4b98de34"
     },
     {
       "path": "docs/architecture/target/files.json",
-      "sha256": "4cd7af65eaecce2a391aa2b6504a33599610fa50be68b482ff3085f6d659aa57"
+      "sha256": "4fb2873a680a7d87ccb8d83ec6c22cbcd494c922571ac4df3af060caa2907253"
     },
     {
       "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",
@@ -43,7 +43,7 @@ const expectedLock = {
     },
     {
       "path": "docs/governance/documentation-architecture.md",
-      "sha256": "8c4f13b378b81a4f6e9a44e6b666f91811a0ac869fb85659a056f2ee9ca88451"
+      "sha256": "e517f8ffb24e4a203e4d3839b234fa95cf396916c153421d32c3b06962fea06f"
     },
     {
       "path": "docs/guides/development/architecture-refactoring.md",

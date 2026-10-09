@@ -27,6 +27,84 @@ from glimmer_cradle.cognition.planning import (
 from glimmer_cradle.cognition.ports import JobReceipt
 
 
+async def test_successor_atomic_identity_reopen_lost_ack_and_completion(tmp_path):
+    clock = [100]
+    store, _, source, identity = await _evaluation_fixture(tmp_path, now=lambda: clock[0])
+    controller = PlanningController(store=store, reassessment_delay_ms=500)
+    model = _PlanningModel(completed=False)
+    try:
+        first = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model))
+        successor = (await store.pending_job_requests())[0]
+        assert successor.request_id != source.request_id and successor.due_at == 600
+        assert successor.payload["commitment_revision"] == first.commitment_revision == 2
+        assert len(model.requests) == 1
+        await store.close()
+        await store.connect()
+        assert await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(model)) == first
+        assert await store.pending_job_requests() == [successor] and len(model.requests) == 1
+        # Jobs 已接纳但 ACK 未送到源；源重启仍投递完全相同信封，首次承诺重放也不能取错后继。
+        await store.accept_commitment("commitment-1", _long_plan(), due_at=1)
+        await store.close()
+        await store.connect()
+        assert await store.pending_job_requests() == [successor]
+        second_identity = replace(identity, job_id="planning:" + successor.request_id, fencing_token=2)
+        await store.acknowledge_job_request(successor, JobReceipt(second_identity.job_id, "duplicate", 1))
+        clock[0] = 600
+        completed = _PlanningModel()
+        second = await controller.evaluate_job(second_identity, successor.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(completed))
+        assert second.commitment_revision == 3 and second.assessment.completed
+        assert await store.pending_job_requests() == []
+        assert len(await store.pending_notification_requests()) == 1
+        assert len(completed.requests) == 1
+        assert await controller.evaluate_job(second_identity, successor.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(completed)) == second
+        assert len(completed.requests) == 1
+        with sqlite3.connect(store._path) as db:
+            assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+            assert db.execute("SELECT COUNT(*) FROM planning_job_outbox").fetchone()[0] == 2
+            assert db.execute("SELECT COUNT(*) FROM planning_evaluation_receipt").fetchone()[0] == 2
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["copy", "drop", "rename", "insert", "final-deadline"])
+async def test_successor_schema_and_intent_failure_restore_original_v1(tmp_path, monkeypatch, fault):
+    store, _, source, identity = await _evaluation_fixture(tmp_path)
+    work = await store.prepare_evaluation(identity, source.request_id)
+    connection = store._require_connection()
+    execute = connection.execute
+    targets = {"copy": "INSERT INTO planning_job_outbox_v2", "drop": "DROP TABLE planning_job_outbox",
+        "rename": "ALTER TABLE planning_job_outbox_v2", "insert": "INSERT INTO planning_job_outbox(request_id",
+        "final-deadline": "UPDATE planning_evaluation_attempt SET state='applied'"}
+    with sqlite3.connect(store._path) as db:
+        before = list(db.iterdump())
+
+    async def failing(sql, *args, **kwargs):
+        result = await execute(sql, *args, **kwargs)
+        if sql.startswith(targets[fault]):
+            raise sqlite3.OperationalError("successor crash window")
+        return result
+
+    monkeypatch.setattr(connection, "execute", failing)
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="successor crash window"):
+            await store.commit_evaluation(identity, work, PlanningAssessment(False, (), "尚未完成"), ())
+        with sqlite3.connect(store._path) as db:
+            assert list(db.iterdump()) == before
+            assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+        monkeypatch.setattr(connection, "execute", execute)
+        await store.close()
+        await store.connect()
+        assert (await store.load_commitment("commitment-1")).revision == 1
+        assert (await store.reconcile_evaluation(identity, source.request_id)).receipt is None
+        assert await store.pending_job_requests() == []
+    finally:
+        await store.close()
+
+
 class _PlanningEvidenceSource:
     """consumer Port 反例 fixture；不冒充已落位的生产 Conversation/Knowledge Adapter。"""
 

@@ -546,7 +546,9 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
 [协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
-Planning 通知的完整产品接收入口、再调度与旧队列/旧数据切换仍待完成；
+Planning 未完成评估已同事务保存后继源意图，Controller 复评间隔默认 60,000 ms；后继追加承诺
+revision，首次 identity/历史 receipt 保持不变。具体持久升级和 wire 规则见[数据布局](../../reference/data-layout.md)与[协议参考](../../reference/protocol.md#planning-jobs-源接纳)。
+Planning 承诺撤销传播、通知的完整产品接收入口与旧队列/旧数据切换仍待完成；
 目标评估、接纳后默认调度、状态接收与可注入定向通知链见本页长期承诺章节。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

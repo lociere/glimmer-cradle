@@ -109,6 +109,7 @@ class PlanningStore(Protocol):
     async def commit_evaluation(
         self, identity: PlanningJobIdentity, work: PlanningEvaluationWork,
         assessment: PlanningAssessment, evidence: tuple[PlanningEvidenceReference, ...],
+        *, reassessment_delay_ms: int = 60_000,
     ) -> PlanningEvaluationReceipt: ...
 
     async def reconcile_evaluation(

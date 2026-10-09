@@ -447,6 +447,8 @@ message PlanningJobSourceRequest {
   string scope_id = 7;
   // 源 owner 的首次 due；重投不可按当前时间或 Memory debounce 重算。
   uint64 due_at_ms = 8;
+  // 0 表示旧首次请求（revision 1）。后继为 >1，身份追加此 revision；首次身份保持不变。
+  uint64 commitment_revision = 9;
 }
 
 message ReadPlanningJobRequestsRequest {

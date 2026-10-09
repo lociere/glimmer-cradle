@@ -124,6 +124,9 @@ attempt/token 可为零；Memory 执行状态需要非零 attempt/token。未知
 `due_at_ms`，不复制目标正文、完成条件或平台命令。request ID 为紧凑 UTF-8 JSON
 `["planning.evaluate",commitment_id,plan_id,plan_version]` 的 SHA-256；版本为正 JS safe integer，
 due 为非负 JS safe integer，单个源消息不超过 64 KiB。扫描 limit 为 1 至 1000。
+追加 `commitment_revision`：0 保留旧首次请求（revision 1）的四项身份与原 payload；后继为大于 1
+的 JS safe integer，request hash 的数组末尾追加该 revision，Core payload 同样保存它。显式 1
+或越界值拒绝。两端 mapper 保留首次 identity/源 digest，不给旧请求补字段或重算 due。
 两条 RPC 要求本代 generation、真实 Planning store 和 Worker 业务 ready；缺 owner、降级或
 drain 时返回 NOT_READY。Planning 无旧私有执行队列，不继承 Memory 的 legacy/external 选择门。
 
@@ -135,7 +138,8 @@ INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响
 
 当前配置 Host 已接源投递、真实执行器与逐任务接纳后调度；不适用目标等待且不消耗 attempt。
 Host 按本轮等待/未 ACK 状态分别报告 `jobs_admission_pending`/`jobs_state_feedback_pending`，
-状态 outbox 独立投递 Planning receiver，不交给 Memory；真实 inbox commit 后才 ACK。通知和再调度未完成。
+状态 outbox 独立投递 Planning receiver，不交给 Memory；真实 inbox commit 后才 ACK。完成通知与
+未完成评估的持久后继调度已接此链；承诺撤销传播及完整产品切换仍待 P07A/P12。
 Job accepted 不改变承诺 accepted/revision。
 
 ### Planning 显式接纳与执行

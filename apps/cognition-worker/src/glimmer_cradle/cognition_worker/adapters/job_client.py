@@ -90,7 +90,7 @@ def planning_source_from_wire(
             source.commitment_id,
             source.plan_id,
             source.plan_version,
-        ],
+        ] + ([source.commitment_revision] if source.commitment_revision > 1 else []),
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -110,6 +110,7 @@ def planning_source_from_wire(
             for value in (source.plan_version, source.goal_version)
         )
         or not 0 <= source.due_at_ms <= 9007199254740991
+        or source.commitment_revision == 1 or source.commitment_revision > 9007199254740991
         or source.request_id != hashlib.sha256(identity.encode("utf-8")).hexdigest()
     ):
         raise ValueError("Planning 源请求 identity/版本/due 无效")
@@ -122,6 +123,7 @@ def planning_source_from_wire(
             "plan_id": source.plan_id,
             "plan_version": source.plan_version,
             "goal_version": source.goal_version,
+            **({"commitment_revision": source.commitment_revision} if source.commitment_revision > 1 else {}),
         },
         idempotency_key=source.request_id,
         scope_id=source.scope_id,
@@ -135,6 +137,9 @@ def planning_source_to_wire(
     payload = request.payload
     if (
         set(payload) != {"commitment_id", "plan_id", "plan_version", "goal_version"}
+            | ({"commitment_revision"} if "commitment_revision" in payload else set())
+        or "commitment_revision" in payload and (type(payload["commitment_revision"]) is not int
+            or not 2 <= payload["commitment_revision"] <= 9007199254740991)
         or not all(
             type(payload.get(key)) is int for key in ("plan_version", "goal_version")
         )
@@ -152,6 +157,7 @@ def planning_source_to_wire(
         goal_version=payload["goal_version"],
         scope_id=request.scope_id,
         due_at_ms=request.due_at,
+        commitment_revision=payload.get("commitment_revision", 0),
     )
     if planning_source_from_wire(source) != request:
         raise ValueError("Planning 持久源 kind/去重身份无效")

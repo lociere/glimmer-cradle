@@ -124,6 +124,14 @@ Planning `planning.sqlite` 保留既有 `planning_decision` journal。首次显�
 high-water 同属不可再生状态，不能只删除 attempt 后重放模型或回滚时间复活过期 lease；其一致
 备份须与整个 Planning/源 outbox/Jobs 共同保护。评估已接生产 Worker/Host Adapter 与默认接纳
 scheduler；只读接纳不建评估表/attempt 或修改 high-water。未操作用户库。
+
+未完成评估现在与 receipt/承诺 revision/attempt 同事务产生一个后继源请求。首次请求保留原四项
+身份与信封；后继在身份和 payload 中追加新的 `commitment_revision`，due 固定为本次提交时间加
+Planning Controller 的复评间隔（默认 60,000 ms），ACK 丢失和重启不得重算。首次后继提交显式将
+长期 schema 1 升为 2：去掉 outbox 的 commitment 唯一约束，逐列保留原请求、due 和 ACK，事务内
+重建后检查完整外键闭包，再恢复即时约束。普通启动只核验 v1/v2 与索引结构，不自动升级；
+失败全部回滚原库，历史 journal、评估/通知窗口版本及稳定 identity 不变。隔离故障测试覆盖复制、
+替换、后继插入和最终 deadline；完整安装备份/恢复仍待 P14A，未操作用户数据库。
 首次显式状态接纳另外建立独立版本 1 的 `planning_job_feedback_meta`（schema/delivery epoch）、
 `planning_job_feedback_inbox`（event ID/完整 wire digest/原源 request）和 `planning_job_projection`
 （原 request/job、最新 revision/原 job epoch/status、真实 receipt 引用、updated time/business outcome）。

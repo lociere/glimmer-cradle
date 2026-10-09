@@ -29,20 +29,26 @@ function jobState(event: JobStateEvent, kind: string) {
 export const MEMORY_JOB_KIND = 'memory.consolidate';
 export const PLANNING_JOB_KIND = 'planning.evaluate';
 export function planningJobSource(source: PlanningJobSourceRequest): JobSource {
+  const envelope = [source.requestId, source.commitmentId, source.planId, source.planVersion.toString(),
+    source.goalId, source.goalVersion.toString(), source.scopeId, source.dueAtMs.toString()];
+  if (source.commitmentRevision > 1n) envelope.push(source.commitmentRevision.toString());
   return { source_id: 'cognition.planning', source_request_id: source.requestId,
-    input_digest: createHash('sha256').update(JSON.stringify([source.requestId, source.commitmentId, source.planId,
-      source.planVersion.toString(), source.goalId, source.goalVersion.toString(), source.scopeId, source.dueAtMs.toString()])).digest('hex') };
+    input_digest: createHash('sha256').update(JSON.stringify(envelope)).digest('hex') };
 }
 export function planningJobRequest(source: PlanningJobSourceRequest, maxAttempts: number): JobRequest {
   if (toBinary(PlanningJobSourceRequestSchema, source).byteLength > 65536) throw new JobConflictError('Planning 源请求超过大小限制');
   const planVersion = positive(Number(source.planVersion)), goalVersion = positive(Number(source.goalVersion));
   const commitment = text(source.commitmentId), plan = text(source.planId), goal = text(source.goalId), scope = text(source.scopeId);
   const due = Number(source.dueAtMs);
-  const expected = createHash('sha256').update(JSON.stringify([PLANNING_JOB_KIND, commitment, plan, planVersion])).digest('hex');
+  const revision = Number(source.commitmentRevision);
+  if (!Number.isSafeInteger(revision) || revision < 0 || revision === 1) throw new JobConflictError('Planning 源承诺 revision 无效');
+  const expected = createHash('sha256').update(JSON.stringify([PLANNING_JOB_KIND, commitment, plan, planVersion,
+    ...(revision > 1 ? [revision] : [])])).digest('hex');
   if (source.requestId !== expected || !Number.isSafeInteger(due) || due < 0) throw new JobConflictError('Planning 源 request identity/due 无效');
   return { job_id: `planning:${source.requestId}`, goal_id: goal, scope_id: scope, kind: PLANNING_JOB_KIND,
     idempotency_key: source.requestId, payload: { source_request_id: source.requestId, commitment_id: commitment,
-      plan_id: plan, plan_version: planVersion, goal_version: goalVersion }, due_at: due,
+      plan_id: plan, plan_version: planVersion, goal_version: goalVersion,
+      ...(revision > 1 ? { commitment_revision: revision } : {}) }, due_at: due,
     retry_mode: 'reconcile', max_attempts: positive(maxAttempts) };
 }
 export interface MemoryJobSubmissionPolicy { readonly debounce_ms: number; readonly max_attempts: number; }
@@ -89,8 +95,13 @@ export function planningJobRequestId(job: Job): string {
   if (typeof job.payload.plan_version !== 'number' || typeof job.payload.goal_version !== 'number'
     || job.idempotency_key !== request) throw new JobConflictError('Planning 原源版本/去重身份无效');
   positive(job.payload.goal_version);
+  const revision = job.payload.commitment_revision;
+  if (revision !== undefined && (typeof revision !== 'number' || !Number.isSafeInteger(revision) || revision < 2)) {
+    throw new JobConflictError('Planning 原承诺 revision 无效');
+  }
   const expected = createHash('sha256').update(JSON.stringify([PLANNING_JOB_KIND,
-    text(job.payload.commitment_id), text(job.payload.plan_id), positive(Number(job.payload.plan_version))])).digest('hex');
+    text(job.payload.commitment_id), text(job.payload.plan_id), positive(Number(job.payload.plan_version)),
+    ...(revision === undefined ? [] : [revision])])).digest('hex');
   if (job.kind !== PLANNING_JOB_KIND || request !== expected || job.job_id !== `planning:${request}`) {
     throw new JobConflictError('Planning 原 Job/source identity 无效');
   }

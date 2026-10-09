@@ -7,7 +7,7 @@ import os from 'node:os';
 import { DeliveryController, SqliteDeliveryStore } from '@glimmer-cradle/conversation';
 import { create, fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
 import { it, expect, vi } from 'vitest';
-import type { Job } from '@glimmer-cradle/jobs';
+import { SqliteJobStore, type Job } from '@glimmer-cradle/jobs';
 import { JobExecutionIdentitySchema } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { PlanningJobResultSchema, PlanningJobResolution, PlanningJobSourceRequestSchema, GetPlanningJobAdmissionResponseSchema,
   type PlanningJobResult, type GetPlanningJobAdmissionRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
@@ -21,8 +21,42 @@ import { SurfaceGatewayServiceStreamRequestSchema, SurfaceGatewayServiceStreamRe
 import { PermissionBroker, HostConversationRoutes } from '../src/index.js';
 import { CognitionClient, HostCognitionError } from '../src/adapters/protocol/cognition-client.js';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
-import { planningJobEvidence, planningJobRequest } from '../src/adapters/protocol/job-mapper.js';
-import { PlanningJobAdapter, PlanningNotificationAdapter } from '../src/composition/cognition-job-adapter.js';
+import { planningJobEvidence, planningJobRequest, planningJobRequestId } from '../src/adapters/protocol/job-mapper.js';
+import { PlanningJobAdapter, PlanningNotificationAdapter, PlanningJobSourceAdapter } from '../src/composition/cognition-job-adapter.js';
+import { ReadPlanningJobRequestsResponseSchema, AcknowledgePlanningJobRequestResponseSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+
+it.each([0n, 2n])('Planning 源 revision=%s 保留 wire identity；Jobs commit 后 ACK 丢失只重放首次信封', async revision => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-successor-'));
+  let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const identity = ['planning.evaluate', 'commitment', 'plan', 1, ...(revision > 1n ? [Number(revision)] : [])];
+  const requestId = createHash('sha256').update(JSON.stringify(identity)).digest('hex');
+  const source = create(PlanningJobSourceRequestSchema, { requestId, commitmentId: 'commitment', planId: 'plan',
+    planVersion: 1n, goalId: 'goal', goalVersion: 1n, scopeId: 'scope', dueAtMs: 900n, commitmentRevision: revision });
+  const clock = { now: () => 100 };
+  const cognition = {
+    readPlanningRequests: vi.fn(async () => create(ReadPlanningJobRequestsResponseSchema, { requests: [source] })),
+    acknowledgePlanning: vi.fn(async () => create(AcknowledgePlanningJobRequestResponseSchema,
+      { requestId, jobId: 'planning:' + requestId, accepted: true })),
+    reconcilePlanning: vi.fn(),
+  };
+  try {
+    store.activateAuthority(1, 100);
+    cognition.acknowledgePlanning.mockRejectedValueOnce(new Error('lost schedule ACK'));
+    const adapter = new PlanningJobSourceAdapter(cognition);
+    await expect(adapter.deliverRequests(store, clock, 1, 3, 8)).rejects.toThrow('lost schedule ACK');
+    const original = store.load('planning:' + requestId)!;
+    expect(planningJobRequestId(original)).toBe(requestId);
+    expect(original).toMatchObject({ status: 'queued', attempt: 0, due_at: 900, max_attempts: 3 });
+    expect(original.payload.commitment_revision).toBe(revision > 1n ? Number(revision) : undefined);
+    store.close(); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    store.activateAuthority(2, 101);
+    expect(await adapter.deliverRequests(store, clock, 2, 9, 8)).toBe(1);
+    expect(store.load(original.job_id)).toMatchObject({ payload: original.payload, due_at: 900, max_attempts: 3, attempt: 0 });
+    const changed = create(PlanningJobSourceRequestSchema, { ...source, commitmentRevision: 3n });
+    expect(() => planningJobRequest(changed, 3)).toThrow();
+    expect(() => planningJobRequest(create(PlanningJobSourceRequestSchema, { ...source, commitmentRevision: 1n }), 3)).toThrow();
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
 
 function notification(seed = 'a', scene = 'scene:private'): PreparePlanningNotificationResponse {
   const notificationId = seed.repeat(64), turnId = createHash('sha256').update(`conversation-notification-turn.v1:${notificationId}`).digest('hex');

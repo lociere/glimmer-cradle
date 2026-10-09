@@ -77,8 +77,11 @@ class ModelPlanningCompletionEvaluator:
 class PlanningController:
     """显式接纳长期计划；接纳和投递都以持久回执为准。"""
 
-    def __init__(self, *, store: PlanningStore) -> None:
+    def __init__(self, *, store: PlanningStore, reassessment_delay_ms: int = 60_000) -> None:
+        if type(reassessment_delay_ms) is not int or not 1 <= reassessment_delay_ms <= 2**53 - 1:
+            raise ValueError("Planning 后继评估间隔无效")
         self._store = store
+        self._reassessment_delay_ms = reassessment_delay_ms
         self._evaluation_lock = asyncio.Lock()
         self._pending_evaluations = 0
 
@@ -152,7 +155,8 @@ class PlanningController:
                     if await evidence.is_current(item.reference) is not True:
                         raise PlanningConflictError("Planning 评估期间证据已失效")
                 return await self._store.commit_evaluation(
-                    identity, work, assessment, tuple(item.reference for item in materials)
+                    identity, work, assessment, tuple(item.reference for item in materials),
+                    reassessment_delay_ms=self._reassessment_delay_ms,
                 )
         except BaseException as original:
             # 空查询不代表未提交；独立封口与提交共用 SQL 锁，取消也等到封口结束。

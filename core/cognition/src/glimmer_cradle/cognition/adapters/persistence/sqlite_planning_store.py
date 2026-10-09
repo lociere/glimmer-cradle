@@ -302,8 +302,8 @@ class SqlitePlanningStore:
             existing = await cursor.fetchone()
             if existing is not None:
                 cursor = await connection.execute(
-                    "SELECT request_id,payload_json FROM planning_job_outbox WHERE commitment_id=?",
-                    (commitment_id,),
+                    "SELECT request_id,payload_json FROM planning_job_outbox WHERE request_id=?",
+                    (request_id,),
                 )
                 source = await cursor.fetchone()
                 if (
@@ -431,14 +431,21 @@ class SqlitePlanningStore:
             raise PlanningConflictError("Planning 计划版本丢失")
         payload = json.loads(plan_row[0])
         plan = PlanVersion(payload["plan_id"], payload["version"], GoalVersion(**payload["goal"]), tuple(payload["steps"]))
-        expected_id = hashlib.sha256(json.dumps(["planning.evaluate", commitment.commitment_id, plan.plan_id, plan.version],
+        request_revision = request.payload.get("commitment_revision", 1)
+        if type(request_revision) is not int or not 1 <= request_revision <= 2**53 - 1:
+            raise PlanningConflictError("Planning 源承诺 revision 无效")
+        identity_parts = ["planning.evaluate", commitment.commitment_id, plan.plan_id, plan.version]
+        if request_revision > 1:
+            identity_parts.append(request_revision)
+        expected_payload = {"commitment_id": commitment.commitment_id, "plan_id": plan.plan_id,
+                            "plan_version": plan.version, "goal_version": plan.goal.version}
+        if request_revision > 1:
+            expected_payload["commitment_revision"] = request_revision
+        expected_id = hashlib.sha256(json.dumps(identity_parts,
                                                ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
         if (request.request_id != request_id or request.idempotency_key != request_id or request_id != expected_id
             or request.kind != "planning.evaluate" or request.scope_id != scope_id or plan.goal.scope_id != scope_id
-            or request.goal_id != plan.goal.goal_id or request.payload != {
-                "commitment_id": commitment.commitment_id, "plan_id": plan.plan_id,
-                "plan_version": plan.version, "goal_version": plan.goal.version,
-            }):
+            or request.goal_id != plan.goal.goal_id or request.payload != expected_payload):
             raise PlanningConflictError("Planning 原来源/计划/scope 冲突")
         return PlanningEvaluationWork(request_id, commitment, plan)
 
@@ -643,7 +650,11 @@ class SqlitePlanningStore:
                                              (identity.lease_until, identity.job_id, identity.attempt))
                 else:
                     await self._assert_new_evaluation(connection, identity)
-                    if receipt is None and work.commitment.status != CommitmentStatus.ACCEPTED:
+                    source = await (await connection.execute(
+                        "SELECT payload_json FROM planning_job_outbox WHERE request_id=?", (request_id,))).fetchone()
+                    source_revision = json.loads(source[0])["payload"].get("commitment_revision", 1)
+                    if receipt is None and (work.commitment.status != CommitmentStatus.ACCEPTED
+                                            or source_revision != work.commitment.revision):
                         raise PlanningConflictError("Planning 承诺不可评估")
                     await self._fence_evaluation(connection, identity, now)
                     await connection.execute("INSERT INTO planning_evaluation_attempt VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (
@@ -657,9 +668,11 @@ class SqlitePlanningStore:
         return result
 
     async def commit_evaluation(self, identity: PlanningJobIdentity, work: PlanningEvaluationWork,
-                                assessment: PlanningAssessment, evidence: tuple[PlanningEvidenceReference, ...]) -> PlanningEvaluationReceipt:
+                                assessment: PlanningAssessment, evidence: tuple[PlanningEvidenceReference, ...],
+                                *, reassessment_delay_ms: int = 60_000) -> PlanningEvaluationReceipt:
         self._evaluation_identity(identity, work.request_id)
-        if (not isinstance(assessment, PlanningAssessment) or not isinstance(evidence, tuple) or len(evidence) > 64
+        if (type(reassessment_delay_ms) is not int or not 1 <= reassessment_delay_ms <= 2**53 - 1
+            or not isinstance(assessment, PlanningAssessment) or not isinstance(evidence, tuple) or len(evidence) > 64
             or any(not isinstance(item, PlanningEvidenceReference) or item.scope_id != identity.scope_id for item in evidence)
             or len({item.evidence_id for item in evidence}) != len(evidence)
             or not set(assessment.evidence_ids).issubset(item.evidence_id for item in evidence)):
@@ -692,6 +705,23 @@ class SqlitePlanningStore:
                 await connection.execute("INSERT INTO planning_notification_outbox VALUES(?,?,?,?)", (
                     notification.notification_id, receipt_id, work.request_id, _canonical(asdict(notification)),
                 ))
+            else:
+                # 后继意图与评估同事务。独立 Jobs commit/ACK 丢失只重放该持久信封，不能再调用模型生成新身份。
+                revision = receipt.commitment_revision
+                due = now + reassessment_delay_ms
+                if revision > 2**53 - 1 or due > 2**53 - 1:
+                    raise PlanningConflictError("Planning 后继 revision/due 超过预算")
+                await self._successor_schema(connection)
+                request_id = hashlib.sha256(json.dumps(
+                    ["planning.evaluate", work.commitment.commitment_id, work.plan.plan_id, work.plan.version, revision],
+                    ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+                request = JobRequest(request_id, work.plan.goal.goal_id, "planning.evaluate",
+                    {"commitment_id": work.commitment.commitment_id, "plan_id": work.plan.plan_id,
+                     "plan_version": work.plan.version, "goal_version": work.plan.goal.version,
+                     "commitment_revision": revision}, request_id, work.plan.goal.scope_id, due)
+                await connection.execute(
+                    "INSERT INTO planning_job_outbox(request_id,commitment_id,payload_json) VALUES(?,?,?)",
+                    (request_id, work.commitment.commitment_id, _canonical(asdict(request))))
             # 所有业务写入（含通知）之后再采样 deadline；不能留下完成或孤立通知。
             cursor = await connection.execute("UPDATE planning_evaluation_attempt SET state='applied',receipt_id=?,observed_at=? "
                                              "WHERE job_id=? AND attempt=? AND state='active' AND lease_until>planning_now_ms()",
@@ -1027,7 +1057,7 @@ class SqlitePlanningStore:
             "SELECT value FROM planning_long_term_meta WHERE key='schema_version'"
         )
         row = await cursor.fetchone()
-        if row is None or row[0] != "1":
+        if row is None or row[0] not in {"1", "2"}:
             raise PlanningConflictError("Planning 长期库版本不受支持；须受控迁移")
         for statement in (
             "SELECT goal_id,version,scope_id,payload_json FROM planning_goal_version LIMIT 0",
@@ -1036,7 +1066,34 @@ class SqlitePlanningStore:
             "SELECT request_id,commitment_id,payload_json,accepted_job_id,accepted_revision FROM planning_job_outbox LIMIT 0",
         ):
             await connection.execute(statement)
+        unique_commitment = False
+        for index in await (await connection.execute("PRAGMA index_list(planning_job_outbox)")).fetchall():
+            columns = await (await connection.execute("SELECT name FROM pragma_index_info(?)", (index["name"],))).fetchall()
+            if index["unique"] and [column[0] for column in columns] == ["commitment_id"]:
+                unique_commitment = True
+        if unique_commitment != (row[0] == "1"):
+            raise PlanningConflictError("Planning 长期版本与 outbox 结构冲突；须受控恢复")
         return True
+
+    @staticmethod
+    async def _successor_schema(connection: aiosqlite.Connection) -> None:
+        version = (await (await connection.execute(
+            "SELECT value FROM planning_long_term_meta WHERE key='schema_version'")).fetchone())[0]
+        if version == "2":
+            return
+        # 仅显式提交后继时升级。事务内重建父表保留所有原信封/ACK；不关闭 foreign_keys。
+        # SQLite 的 DROP 留下延迟约束计数，重建后必须检查完整闭包再恢复即时约束。
+        await connection.execute("PRAGMA defer_foreign_keys=ON")
+        await connection.execute(_COMMITMENT_SCHEMA[-1].replace(
+            "planning_job_outbox (", "planning_job_outbox_v2 (").replace(
+            "commitment_id TEXT NOT NULL UNIQUE", "commitment_id TEXT NOT NULL"))
+        await connection.execute("INSERT INTO planning_job_outbox_v2 SELECT * FROM planning_job_outbox")
+        await connection.execute("DROP TABLE planning_job_outbox")
+        await connection.execute("ALTER TABLE planning_job_outbox_v2 RENAME TO planning_job_outbox")
+        if await (await connection.execute("PRAGMA foreign_key_check")).fetchone() is not None:
+            raise PlanningConflictError("Planning 后继升级引用闭包失败；回滚原库")
+        await connection.execute("PRAGMA defer_foreign_keys=OFF")
+        await connection.execute("UPDATE planning_long_term_meta SET value='2' WHERE key='schema_version'")
 
     @asynccontextmanager
     async def _transaction(self) -> AsyncIterator[aiosqlite.Connection]:
