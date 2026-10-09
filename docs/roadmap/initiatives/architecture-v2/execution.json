@@ -142,10 +142,10 @@
         "P00"
       ],
       "dependsOn": [],
-      "status": "ready",
+      "status": "in-progress",
       "mode": "discovery",
       "card": "execution-order.md#step-a00",
-      "owner": null,
+      "owner": "本会话执行 owner（唯一写入负责人）",
       "scope": "docs/roadmap/initiatives/architecture-v2；只读核对现行 Planning/Host/Worker，填写 P07A 映射，不改产品。",
       "acceptance": [
         "G0",
@@ -153,7 +153,7 @@
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "A00.1：比较 dc59181e 与当前 HEAD；区分产品改动和文档整合，不能因为 HEAD 更新就重做已完成原身份恢复。",
+      "nextAction": "A00.2：已确认 dc59181e 后为文档/治理整合，rpc_service.py 仅文档路径变动；读取 Planning SQL、Host/Worker 真实接线并固定 P07A 映射。策略同步正在验证，HEAD 48a80b2f，dirty 仅本轮规范/锁/状态。",
       "inputPaths": [
         "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
         "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",

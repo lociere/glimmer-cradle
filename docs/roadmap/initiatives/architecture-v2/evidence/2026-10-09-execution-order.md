@@ -34,3 +34,19 @@
 
 任务顺序/路由、规则、生成器、目标清单或规范正文改变时，重验对应门。
 本次未启动产品重构、未操作生产数据、未进行真实设备/外部平台或最终成品验收。
+# 本轮执行策略同步（2026-10-09）
+
+用户本轮明确授权必要重构修改、隔离验证、自动中文提交和独立子智能体只读审查；期间不推送，全部重构、最终验收和必要审查通过后正常推送当前分支，禁止强推。发布、付费、生产数据和用户会话管理未授权。
+
+输入：HEAD `48a80b2f`，起始工作区干净；本次 dirty 为 AGENTS、项目 Skill/测试卡、宪章、执行指南、任务书、验收矩阵及同步摘要/状态。仅改变执行时机和提交授权，产品 baseline、requirements、行为场景和 Gate 必需产物不变。
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm check:docs --write` / `pnpm check:docs` | PASS，exit 0 |
+| `pnpm check:encoding` | PASS，exit 0 |
+| `pnpm check:architecture` | PASS，exit 0 |
+| repo-checks `baseline-lock.test.mjs` / `documentation-structure.test.mjs` | PASS，8 tests，exit 0；覆盖冻结锁与执行状态反例 |
+| `git diff --check` | PASS，exit 0 |
+| 根 typecheck/build、全量行为、打包/平台矩阵 | NOT-RUN，待最终固定候选集中验收；本次仅规范及相应摘要同步，无运行逻辑变动 |
+
+失效条件：执行规范、摘要或状态规则再次改变时重验对应检查。自动提交仅保存本轮进度，不代表产品完成；当前继续 A00。

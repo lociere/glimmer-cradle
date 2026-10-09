@@ -15,7 +15,9 @@
 本页采用[目标基线](../../../architecture/target/baseline.md)的既定设计；
 [files.json](../../../architecture/target/files.json)拥有全部目标文件，
 [验收矩阵](acceptance.md)拥有 Gate 和场景定义，[通用指南](../../../guides/development/architecture-refactoring.md)拥有状态字段与通用操作方法。
-本页不授予推送、发布、生产操作、另开会话或多智能体权限。
+本轮用户已授权必要修改、本地/隔离验证、逻辑完整节点自动提交和独立子智能体只读审查。
+重构期间不推送；全部任务、最终集中验收和必要独立审查通过后正常推送当前分支，禁止强推。
+正式发布、付费、生产数据操作和创建/切换/归档用户会话不在本轮授权内。
 
 ## 固定顺序
 
@@ -77,16 +79,24 @@
    mapping 仅描述本步触及的文件；不能把未来几步的缺项混入当前实现。
 4. **按本节序号实施**：每个编号完成一个连贯结果。涉及跨进程字段时依次改唯一 Schema、生成物、mapper、两端 consumer。
    每步同时维护公开入口、测试、实际装配和受影响事实文档；禁止空文件、空 exports 或无人调用的新模块。
-5. **验证**：先执行本节定向命令与反例；源码交付还必须依次运行 `pnpm typecheck`、`pnpm build`，
-   再运行 `pnpm check:architecture`、`pnpm check:docs`、`pnpm check:encoding`、`git diff --check`。
-   Schema 改动追加 `pnpm contracts:generate`、`pnpm contracts:verify`；工具改动追加 repo-checks 测试。
-   同一候选可复用未失效证据，不重复跑无关全量测试；不得并行运行根 typecheck/build 清理同一 dist。
+5. **验证**：采用日常定向验证、最终集中验收。实施期间执行本次改动必需的命令、真实调用链和失败反例；
+   按影响运行 architecture/docs/encoding、`git diff --check`，Schema 改动追加 generate/verify，工具改动追加 repo-checks 测试。
+   不因步骤完成或准备提交重复运行根 typecheck/build、全量测试、完整打包或跨平台安装矩阵。
+   跨模块接口、共享构建、依赖、权限、生命周期、数据迁移变化或定向证据不足时及时扩大范围；
+   关键安全、数据恢复和破坏性切换验证不得延后。复用输入及相关环境未变的有效证据。
+   未运行项明确记为待最终验证，不提前关闭依赖这些证据的门；最终固定候选集中完成全部大型验证，
+   包括顺序运行根 `pnpm typecheck`、`pnpm build`、完整行为链、契约、目录、安装、恢复及适用平台/设备门。
+   修复后仅重跑受影响验证；不得并行运行根 typecheck/build 清理同一 dist。
 6. **保存**：在已有 evidence 记录或本步证据文件写输入、命令、结果、未验项、删除证明及审查结论，链接到任务的 evidence。
    `nextAction` 写成“P07A.3：……；上一完成动作……；候选/dirty……”，中断时补进程句柄与阻断解除条件。
    不以第二份全局 TODO 或聊天总结维护进度。新增证据路径按普通清单维护登记，不改产品语义。
 7. **接受并前进**：测试通过先 verified；必要独立审查通过才 accepted。按本页顺序准备下一个依赖满足的任务，更新 nextTask。
    运行 `pnpm check:docs --write` 和 `pnpm check:docs`；持续实施授权有效时直接继续下一步。
    仅有文档编写授权时，停在可执行任务书交付，不开始产品代码迁移。
+
+逻辑完整且必要定向验证通过的节点自动提交，使用中文 commit message，仅纳入本轮相关改动。
+局部提交保存可追溯进度，不代表完整验收通过。任务接受记录逐项区分本步已满足门和待最终集中验收子项；
+后续依赖只能消费已验证的能力。最终推送须等待全部任务、全部必需验收和独立审查通过。
 
 状态、mapping、commands 与 evidence 字段契约见[状态推进](../../../guides/development/architecture-refactoring.md#状态推进)。
 本页各节即任务卡；`slices/` 只在需要记录特别复杂的局部映射时补充，不要求每项任务重写一遍计划。
@@ -411,6 +421,7 @@
    归档是有证据的最终操作，不能在前序门未过时提前执行。不得把归档理解为归档用户会话。
 5. 对归档变更运行 docs/encoding/architecture、repo-checks 与 final；涉及可执行工具则补根 typecheck/build。
    保存归档前后路径映射和最终报告，不遗留仍指向已移动 execution.json 的工具。
+6. 全部必需门与独立审查通过后，提交收尾结果并正常推送当前分支；禁止强推，记录推送结果。
 
 完成门：G6 与全部 G7 条件满足；最终报告区分重构完成、提交/推送、正式发布和生产验收。
 下一步：无。未授权的发布/生产操作保持未执行，不影响对已明确范围成果的真实描述。

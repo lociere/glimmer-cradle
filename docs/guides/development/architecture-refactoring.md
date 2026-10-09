@@ -73,13 +73,16 @@ discovery 任务可以先执行调查，输出一个真实实现卡。implementa
 从 initiative 的 acceptance.md 选择适用门；至少符合以下条件：
 
 - 文档：docs、encoding、目标规格/锁、引用与规则推演；文档代码工具变化追加工具反例。
-- 源码/依赖/构建：定向测试、根 typecheck/build、architecture/encoding，实际 producer/consumer 链路。
+- 源码/依赖/构建：日常定向测试、按影响 architecture/encoding 与真实 producer/consumer 链；根 typecheck/build、全量测试、完整打包和适用安装/平台/设备矩阵在最终固定候选集中验收，不因步骤完成或局部提交重复运行。
 - IDL/Schema：generate/verify、三语言 roundtrip、breaking/generated clean 和现有 consumer。
 - 数据/权限/生命周期：旧样本、重复/取消/重启/旧世代/拒权/关闭与高风险独立审查。
 - 制品：固定 artifact、inventory、安装/升级/回滚与目标平台；源代码编译不能代替。
 
 记录命令、cwd、exit code、输入 commit/tree 或 dirty 范围、环境、输出位置、未验项和失效条件。
 先验证得到 verified，再依据必需审查得到 accepted；提交和推送另记，不等于 accepted。
+跨模块接口、共享构建、依赖、权限、生命周期、数据迁移变化或定向证据不足时及时扩大验证；
+关键安全、恢复和破坏性切换所需证据不得延后。未运行项记为待最终验证，不提前关闭对应子门；
+任务接受记录明确本步已验证能力与最终待验项，依赖只能消费已验证能力。修复后只重跑受影响验证。
 没有独立审查授权/可用审查者时，高风险任务保留 verified/review-pending，
 不得假称独立通过；继续可独立开展的已授权工作。独立审查要求来自项目 Skill/AGENTS。
 
@@ -128,7 +131,7 @@ stage 的 legacyEvidence 只定位原始记录，stage accepted 另需本轮完�
 4. 按[宪章](../../governance/architecture-change-policy.md)复核规范变更理由，更新锁与预期值；
    规范摘要变更不能靠复制任意新哈希冒充授权。
 5. `pnpm check:docs`、`pnpm check:encoding`、`pnpm check:architecture`；
-   工具改动运行 repo-checks 测试与根 typecheck/build。
+   工具改动运行 repo-checks 定向测试；共享构建/接口变化或证据不足时扩大验证，根 typecheck/build 保留最终集中门。
 6. final 模式只在整体收尾必须 PASS；迁移期间保存精确差距，差距数量不代表可直接删除文件。
 
 ## 交付和下一步
@@ -137,3 +140,7 @@ stage 的 legacyEvidence 只定位原始记录，stage accepted 另需本轮完�
 将 accepted 的稳定事实写回 Current/Implementation/Reference。
 按实际依赖把后继任务准备为 ready，并给出 nextAction；在持续实施授权范围内继续，
 若当前请求只覆盖规划/文档，则交付可执行入口而不启动产品代码任务。
+
+架构 v2 本轮允许逻辑完整且必要定向验证通过后自动中文提交，排除无关用户改动；局部提交不代表成品验收。
+重构期间不推送；全部任务、最终验收和必要独立审查通过后正常推送当前分支，禁止强推。
+正式发布、付费、生产数据操作和用户会话管理不在本轮授权内。

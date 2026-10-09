@@ -24,6 +24,11 @@
 | G6 审查 | 高风险固定候选独立 findings 与关闭证据 | verified 不得提升 accepted |
 | G7 成品 | 零物理差距、基线 §13 的全部八条链、平台/安装/恢复矩阵与全部阶段接受 | 外部阻断单列，整体保持未完成 |
 
+执行采用日常定向验证、最终集中验收，全部 Gate 的产物和行为标准保持不变。
+日常只执行改动必需检查；接口、共享构建、依赖、权限、生命周期、数据迁移变化或证据不足时扩大范围，关键安全、恢复和破坏性切换门不得延后。
+未运行的大型检查明确记为待最终验证；本步接受只证明已验证能力，不提前关闭依赖这些检查的子门或成品门。
+最终固定候选集中运行全部必需大型验证；修复后只重验受影响证据。
+
 ## 行为场景
 
 每个场景在实现卡绑定真实测试位置；“会补测试”不能作为接受证据。
@@ -62,7 +67,7 @@
 | Desktop/UI | `pnpm --filter @glimmer-cradle/desktop test`；`pnpm test:ui` |
 | 现行 Kernel/Server | `pnpm --filter @glimmer-cradle/kernel test`；`pnpm --filter @glimmer-cradle/personal-server test` |
 | C#/Unity/native | `pnpm avatar:doctor`；`pnpm avatar:projector:test`；`pnpm avatar:composition:build`；`pnpm avatar:build`，需真实 Windows/Unity 工具环境 |
-| 源码交付基线 | `pnpm typecheck` 后运行 `pnpm build`，避免并行清理共同 dist |
+| 最终源码交付基线 | 固定候选集中运行 `pnpm typecheck` 后 `pnpm build`，避免并行清理共同 dist；局部提交不触发重复全量检查 |
 | 最终本地候选 | `pnpm check:pr`；`pnpm check:target-layout:final` |
 | Linux 安装恢复 | `pnpm test:release:linux`；`pnpm verify:personal-server-full-install:linux`，先准备隔离目标环境 |
 
