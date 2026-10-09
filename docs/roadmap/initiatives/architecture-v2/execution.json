@@ -1,0 +1,640 @@
+{
+  "schemaVersion": 1,
+  "initiative": "architecture-v2",
+  "baselineCommit": "dc59181e",
+  "reviewedAt": "2026-10-09",
+  "nextTask": "A00",
+  "stages": [
+    {
+      "id": "P00",
+      "title": "增量审计",
+      "status": "partial",
+      "summary": "历史初始审计已完成；截至 dc59181e 的后续证据已导入索引，需核对当前差距。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P01",
+      "title": "架构护栏",
+      "status": "partial",
+      "summary": "既有锁、AST 边界、例外和目标目录门已运行；最终规则尚待切换。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P02",
+      "title": "Platform",
+      "status": "partial",
+      "summary": "Clock/Identity/Observability/Lifecycle/配置机制、authority 部分已提取。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P03",
+      "title": "Content",
+      "status": "partial",
+      "summary": "旧范围 Content/AssetRef 已接受；最终目录及旧媒体恢复门继续适用。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P04",
+      "title": "Conversation",
+      "status": "partial",
+      "summary": "Log/History/持久 Turn 与 Delivery 回执已逐步落地；完整产品切换未完成。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P05",
+      "title": "Cognition",
+      "status": "partial",
+      "summary": "统一 Loop、Context、Memory、Knowledge、Planning 与 checkpoint 已有真实切片。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P06",
+      "title": "Capabilities",
+      "status": "partial",
+      "summary": "三 Registry、Step Exposure、持久 Execution 与真实 receipt 已接线。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P07",
+      "title": "Jobs 与长期 Planning",
+      "status": "partial",
+      "summary": "Jobs 持久链、Memory/Planning 源、真实通知与历史原身份确认已实现。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P08",
+      "title": "Embodiment",
+      "status": "planned",
+      "summary": "尚无完整最终阶段验收；既有 C#/Unity/native 仍为实际链路。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P09",
+      "title": "SDK 与 Extension Host",
+      "status": "partial",
+      "summary": "部分权限/Resource/typed wire 已接入；多语言公开面和 Host 最终迁移未完成。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P10",
+      "title": "外部能力",
+      "status": "planned",
+      "summary": "厂商适配仍在迁移期位置，独立制品接入待整体验证。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P11",
+      "title": "Contract Spine 原子迁移",
+      "status": "planned",
+      "summary": "现行 contracts 为唯一源，禁止提前建立第二 protocol 源。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P12",
+      "title": "Apps 与产品入口",
+      "status": "partial",
+      "summary": "目标 Host/Worker 和通知路由已有真实接线；完整产品仍依赖 Kernel ingress。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P13",
+      "title": "Topology 与 authority",
+      "status": "partial",
+      "summary": "本地 authority/Jobs handover 已验证，其他 owner 与跨机仍未闭合。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P14",
+      "title": "数据、版本与制品",
+      "status": "planned",
+      "summary": "历史旧样本和发布事实存在，完整目标安装/恢复矩阵待执行。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    },
+    {
+      "id": "P15",
+      "title": "最终收口",
+      "status": "planned",
+      "summary": "规格门和实现完成分开；最终物理核对仍有迁移差距。",
+      "evidence": [],
+      "legacyEvidence": "evidence/README.md"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "A00",
+      "title": "接手与差距核对",
+      "stageIds": [
+        "P00"
+      ],
+      "dependsOn": [],
+      "status": "ready",
+      "mode": "discovery",
+      "card": "slices/A00-reconcile.md",
+      "owner": null,
+      "scope": "docs/roadmap/initiatives/architecture-v2；只读现行 Planning/Host/Worker",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "核对实际 HEAD 后执行 A00 卡的步骤 1–7",
+      "inputPaths": [
+        "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
+        "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
+        "apps/host/src/gateway/conversation-routes.ts",
+        "apps/host/tests/planning-reconciliation.test.ts",
+        "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py"
+      ]
+    },
+    {
+      "id": "P07A",
+      "title": "Planning 后继调度与撤销",
+      "stageIds": [
+        "P05",
+        "P07"
+      ],
+      "dependsOn": [
+        "A00"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p07",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P07B",
+      "title": "Jobs 产品接纳、catalog 与状态投影",
+      "stageIds": [
+        "P07",
+        "P12"
+      ],
+      "dependsOn": [
+        "P07A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p07",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P02A",
+      "title": "剩余平台机制和关闭语义",
+      "stageIds": [
+        "P02"
+      ],
+      "dependsOn": [
+        "A00"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p02",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P03A",
+      "title": "Content 最终路径与媒体恢复差距",
+      "stageIds": [
+        "P03"
+      ],
+      "dependsOn": [
+        "A00"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p03",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P04A",
+      "title": "交互、中断与实际播放回执",
+      "stageIds": [
+        "P04"
+      ],
+      "dependsOn": [
+        "P03A",
+        "P02A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p04",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P05A",
+      "title": "Cognition IO、helper 和 checkpoint 解耦",
+      "stageIds": [
+        "P05"
+      ],
+      "dependsOn": [
+        "P07A",
+        "P04A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p05",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P06A",
+      "title": "Capability 权限、预算和未知结果对账",
+      "stageIds": [
+        "P06"
+      ],
+      "dependsOn": [
+        "P05A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p06",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P09A",
+      "title": "公开 SDK 与 broker 生命周期",
+      "stageIds": [
+        "P09"
+      ],
+      "dependsOn": [
+        "P06A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p09",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P08A",
+      "title": "具身语义与 C# 行为迁移",
+      "stageIds": [
+        "P08"
+      ],
+      "dependsOn": [
+        "P09A",
+        "P04A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p08",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P09B",
+      "title": "多语言 SDK 与独立模板验收",
+      "stageIds": [
+        "P09"
+      ],
+      "dependsOn": [
+        "P09A",
+        "P08A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p09",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P10A",
+      "title": "模型、语音、MCP 与渠道扩展",
+      "stageIds": [
+        "P10"
+      ],
+      "dependsOn": [
+        "P09B"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p10",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P10B",
+      "title": "Renderer 扩展与 native/Unity 真实链",
+      "stageIds": [
+        "P08",
+        "P10"
+      ],
+      "dependsOn": [
+        "P08A",
+        "P09B"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p10",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P11A",
+      "title": "Contract Spine 原子路径切换",
+      "stageIds": [
+        "P11"
+      ],
+      "dependsOn": [
+        "P10A",
+        "P10B"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p11",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P12A",
+      "title": "可信产品 ingress 与唯一 Host 接线",
+      "stageIds": [
+        "P12"
+      ],
+      "dependsOn": [
+        "P07B",
+        "P11A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p12",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P12B",
+      "title": "Desktop/控制面与打包监督迁移",
+      "stageIds": [
+        "P12"
+      ],
+      "dependsOn": [
+        "P12A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p12",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P13A",
+      "title": "全域 authority、离线与冲突恢复",
+      "stageIds": [
+        "P13"
+      ],
+      "dependsOn": [
+        "P12B",
+        "P02A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p13",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P14A",
+      "title": "旧队列及全域数据迁移恢复",
+      "stageIds": [
+        "P07",
+        "P14"
+      ],
+      "dependsOn": [
+        "P13A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p14",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P14B",
+      "title": "版本事实源与固定制品矩阵",
+      "stageIds": [
+        "P14"
+      ],
+      "dependsOn": [
+        "P14A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p14",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P01A",
+      "title": "清空迁移例外并启用最终护栏",
+      "stageIds": [
+        "P01"
+      ],
+      "dependsOn": [
+        "P14B"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p01",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P15A",
+      "title": "最终完整行为链与物理验收",
+      "stageIds": [
+        "P15"
+      ],
+      "dependsOn": [
+        "P01A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p15",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    },
+    {
+      "id": "P15B",
+      "title": "固定候选独立审查与归档",
+      "stageIds": [
+        "P15"
+      ],
+      "dependsOn": [
+        "P15A"
+      ],
+      "status": "planned",
+      "mode": "discovery",
+      "card": "plan.md#p15",
+      "owner": null,
+      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "acceptance": [
+        "G0",
+        "G5"
+      ],
+      "evidence": [],
+      "blockedReason": null,
+      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+    }
+  ]
+}

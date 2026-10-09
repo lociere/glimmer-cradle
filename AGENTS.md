@@ -7,10 +7,10 @@
 
 - 基线采用 [ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 的 v2.1；ADR-0021 的命名与兼容纪律继续有效。命名实施统一遵循 [命名规范](docs/guides/development/命名规范.md)，旧术语不得覆盖 v2 目标语义。
 
-- 用户指定的 [Architecture Baseline v2.1](docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
+- 用户指定的 [Architecture Baseline v2.1](docs/architecture/target/baseline.md)
   为唯一目标基线；[ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md)
   替代下文冲突的目标路径与 owner 约束。实际 `contracts/`、`packages/extension-sdk/` 等仍是当前事实，迁移前不得建立第二契约源。
-- 本次按 [执行记录](docs/roadmap/architecture-v2-refactor.md) 分阶段推进；旧目录删除以 consumer-zero、数据迁移与验证为条件。
+- 本次按 [执行记录](docs/roadmap/initiatives/architecture-v2/README.md) 分阶段推进；旧目录删除以 consumer-zero、数据迁移与验证为条件。
 
 ## 工作方式
 
@@ -41,8 +41,9 @@
 ## 事实源与操作入口
 
 - 项目任务先读 `.codex/skills/glimmer-cradle/SKILL.md`，再按任务路由读取必要卡片和事实源。当前上下文已完整读取且未变化的内容可直接复用；索引用于定位本次任务所需资料。
-- `docs/README.md` 是项目事实入口：Blueprint 保存长期不变量，Current 保存当前结构，Implementation 保存实现地图，Reference 保存精确契约，Guides 保存操作，Roadmap 保存未完成工作，ADR 保存长期取舍，History 保存历史证据。
-- 文档变更运行 `pnpm check:docs` 与编码检查；旧目标只归 History，v2 状态只归重构执行记录。链接通过不等于源码、设备或生产事实已验证。
+- `docs/README.md` 是项目事实入口：Target 保存长期不变量，Current 保存当前结构，Implementation 保存实现地图，Reference 保存精确契约，Guides 保存操作，Roadmap 保存未完成工作，ADR 保存长期取舍，History 保存历史证据。
+- 文档治理归 `docs/governance/`；重构从 `docs/roadmap/initiatives/architecture-v2/README.md` 接手，状态唯一源为 `execution.json`，`status.md` 由 `pnpm check:docs --write` 生成。步骤归 `docs/guides/development/architecture-refactoring.md`，历史日志不提供当前“下一步”。
+- 文档变更运行 `pnpm check:docs` 与编码检查；旧目标和已结束记录归 History。链接、状态和清单检查通过不等于源码、设备或生产事实已验证。
 - 代码、Schema、配置或脚本改变事实时，同一工作更新受影响的唯一权威页；链接而不复制正文。未改变事实不做装饰性文档更新，与代码不一致的文档是 bug。
 - `AGENTS.md` 保存共同约束；`.codex/skills/glimmer-cradle/references/` 保存唯一 agent 操作规则；`docs/` 保存项目事实和设计依据。项目采用单一 Codex 配置体系；增加其他厂商适配配置须取得专项授权。
-- `.codex/skills/glimmer-cradle/agents/` 是开发协作元数据，不属于运行时 `configs/`；修改它时同步检查 Skill 与本文件。工作流设计依据见 `docs/guides/development/智能体工作流设计.md`。
+- `.codex/skills/glimmer-cradle/agents/` 是开发协作元数据，不属于运行时 `configs/`；修改它时同步检查 Skill 与本文件。工作流设计依据见 `docs/governance/agent-workflow-design.md`。

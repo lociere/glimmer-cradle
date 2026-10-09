@@ -40,4 +40,4 @@ NapCat 的业务身份是 QQ 场景 Adapter：它把 OneBot 事件转换为 Glim
 - [ADR-0004 Extension 开放生态运行边界](./ADR-0004-Extension开放生态运行边界.md)
 - [ADR-0009 本地监督树与动态端点治理](./ADR-0009-本地监督树与动态端点治理.md)
 - [ADR-0010 产品组合与扩展仓库边界](./ADR-0010-产品组合与扩展仓库边界.md)
-- [M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](../../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)
+- [M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环](../../roadmap/initiatives/m11-delivery/README.md)

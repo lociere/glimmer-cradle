@@ -30,7 +30,7 @@ Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legac
 外部选择在 Memory schema 6 中持久绑定，未完成旧任务拒绝转交，外部绑定拒绝回退；
 这不是 Jobs 政策 Document，也不代表产品 Host 已切换。机制与临时窗口见
 [Worker 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化) 和
-[执行记录](../roadmap/architecture-v2-refactor.md)。
+[执行记录](../roadmap/initiatives/architecture-v2/README.md)。
 
 ## 变更规则
 
@@ -270,7 +270,7 @@ description: 帮助整理用户提供的笔记。
 的定义引用复验 scope、revision 与 readiness 后最多加载两份、合计 64 KiB UTF-8 正文；材料
 独立传入模型，不改写用户目标或绕过工具权限。正文加载不调用 Gateway，也不记录 Tool
 Execution；provider 停止后原方法引用失效。原生 Step/Loop 接线状态见
-[执行记录](../roadmap/architecture-v2-refactor.md)。
+[执行记录](../roadmap/initiatives/architecture-v2/README.md)。
 
 ## 环境变量边界
 

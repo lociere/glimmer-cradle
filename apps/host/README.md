@@ -89,4 +89,4 @@ Worker/Jobs 重启不自行建立第二 Delivery writer。生产 CLI 自动链�
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 
-完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
+完整进度与临时 owner 退出条件见 [架构迁移执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md)。

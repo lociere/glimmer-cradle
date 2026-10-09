@@ -78,7 +78,7 @@ unknown，清理终态后仍保留最小身份/审计。`job_source_receipts` �
 源与业务摘要、稳定 Job ID、首次 due/预算和接纳时间，不复制领域 payload；终态 body 清理不删除
 源快照，重投用首次政策验证原 tombstone。旧候选 v1/v2/v3 拒绝隐式升级，不能对旧 Memory 数据库
 直接应用 Jobs migration。产品入口切换、备份切点和跨库恢复仍须后续验证，参见
-[迁移地图](../architecture/current/11-物理拓扑差距与迁移地图.md)。
+[迁移地图](../roadmap/initiatives/architecture-v2/migration-map.md)。
 
 `HostDataPaths` 要求 AppRoot、ConfigRoot、DataRoot 均显式绝对路径，不读环境变量、cwd 或
 创建目录；配置启动 owner 在全量配置和恢复预检后打开两库，实际 Worker/Jobs drain 完成才关闭，

@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-export const manifestPath = 'docs/architecture/blueprint/architecture-target-v2.1.json';
-export const layoutPath = 'docs/architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md';
+export const manifestPath = 'docs/architecture/target/files.json';
+export const layoutPath = 'docs/architecture/target/physical-layout.md';
 const startMarker = '<!-- target-layout:start -->';
 const endMarker = '<!-- target-layout:end -->';
 

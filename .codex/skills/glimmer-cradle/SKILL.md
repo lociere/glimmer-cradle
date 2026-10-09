@@ -11,10 +11,12 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 基线规范修订与命名解释以 [ADR-0021](../../../docs/architecture/decisions/ADR-0021-架构基线规范修订与命名收束.md)
 为准；新增名称和迁移旧名先查 [命名规范](../../../docs/guides/development/命名规范.md)。
 
-当前架构重构目标以 [Architecture Baseline v2.1](../../../docs/architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
+当前架构重构目标以 [Architecture Baseline v2.1](../../../docs/architecture/target/baseline.md)
 和 [ADR-0023](../../../docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 为准。
 卡片中的旧路径是迁移前事实；冲突的目标规则由该 ADR 替代。继续工作前查阅
-[执行记录](../../../docs/roadmap/architecture-v2-refactor.md)，不得直接将旧 Kernel 搬为 Platform 或新增第二契约源。
+[重构项目](../../../docs/roadmap/initiatives/architecture-v2/README.md)与其生成状态，按
+[切片执行指南](../../../docs/guides/development/architecture-refactoring.md)选择 nextTask。
+状态只更新 execution.json；历史日志的“下一步”不能直接作为当前任务。不得直接将旧 Kernel 搬为 Platform 或新增第二契约源。
 
 本 Skill 提供项目操作方法与资料路由。目标、授权以用户请求为准，共同约束见根 `AGENTS.md`，当前实现与运行状态依据项目事实源核验。项目采用单一 canonical Skill。
 
@@ -51,4 +53,4 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 - 实际状态来自代码与环境，长期事实进入 `docs/`；临时任务状态由任务记录或对应 Roadmap 保存。
 - 交付说明成果、验证及未覆盖风险。完成本次范围后结束执行；下一 milestone/slice、推送或发布依据相应授权开展。
 
-整体设计与官方参考见 [智能体工作流设计](../../../docs/guides/development/智能体工作流设计.md)；仅在设计、评估或修改工作流时读取。
+整体设计与官方参考见 [智能体工作流设计](../../../docs/governance/agent-workflow-design.md)；仅在设计、评估或修改工作流时读取。

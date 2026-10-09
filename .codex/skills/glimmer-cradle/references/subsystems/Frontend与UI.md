@@ -9,7 +9,7 @@
 3. 设计语言：`docs/reference/ui-design-tokens.md`。
 4. 前端技术决策：`docs/architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md`。
 5. 产品边界：`docs/reference/product-compositions.md` 和对应 Current/Implementation。
-6. 当前承诺：涉及 M11 UI 时读取 `docs/roadmap/design-briefs/M11-Personal Server UI设计简报.md`、`docs/roadmap/manifests/M11-目标物理清单.md` 与 `docs/roadmap/now.md`；只在需要 Extension/NapCat/生产依赖时扩读完整 M11 milestone。
+6. 当前承诺：涉及 M11 UI 时读取 `docs/roadmap/initiatives/m11-delivery/M11-Personal Server UI设计简报.md`、`docs/roadmap/initiatives/m11-delivery/physical-layout.md` 与 `docs/roadmap/now.md`；只在需要 Extension/NapCat/生产依赖时扩读完整 M11 milestone。
 7. 只读取目标路由、页面、feature、shared UI、样式和测试；不要用 History、外部产品或外部 Skill 推断当前事实。
 8. 使用 AI 生成/迭代 UI、参考图、浏览器截图、Storybook/MCP 或社区前端 Skill 时，另读 `subsystems/AI前端开发.md` 与 `docs/guides/development/AI辅助前端开发.md`。
 

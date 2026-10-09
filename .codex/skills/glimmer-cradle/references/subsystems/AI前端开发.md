@@ -6,7 +6,7 @@
 
 1. 先读 `subsystems/Frontend与UI.md`。
 2. 再读 `docs/guides/development/AI辅助前端开发.md`、`docs/guides/development/前端开发与UI验收.md` 与 `docs/reference/ui-design-tokens.md`。
-3. M11 Personal Server 工作再读 `docs/roadmap/design-briefs/M11-Personal Server UI设计简报.md` 和 `docs/roadmap/manifests/M11-目标物理清单.md`；只有任务涉及 Extension/NapCat/生产依赖时才扩读完整 M11 milestone。
+3. M11 Personal Server 工作再读 `docs/roadmap/initiatives/m11-delivery/M11-Personal Server UI设计简报.md` 和 `docs/roadmap/initiatives/m11-delivery/physical-layout.md`；只有任务涉及 Extension/NapCat/生产依赖时才扩读完整 M11 milestone。
 4. 只读目标 route、feature、shared UI、样式、Playwright 场景和直接 API/Projection；工具或社区 Skill 不能替代这些事实源。
 
 ## 工作方式

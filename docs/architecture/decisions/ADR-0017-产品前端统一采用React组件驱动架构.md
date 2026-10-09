@@ -73,7 +73,7 @@ React 不能自动带来良好设计，也不能成为跨产品共享业务页�
 
 ### 7. 迁移与删除门
 
-Personal Server 按 [M11 目标物理清单](../../roadmap/manifests/M11-目标物理清单.md) 依次迁移 Shell/Router、shared UI、对话/概览、能力/活动和设置。每个垂直 slice 必须迁移真实 route、状态和测试，并删除对应旧 DOM owner；最终发行物不得保留双 Shell、双 Router 或长期 DOM/React 双栈。
+Personal Server 按 [M11 目标物理清单](../../roadmap/initiatives/m11-delivery/physical-layout.md) 依次迁移 Shell/Router、shared UI、对话/概览、能力/活动和设置。每个垂直 slice 必须迁移真实 route、状态和测试，并删除对应旧 DOM owner；最终发行物不得保留双 Shell、双 Router 或长期 DOM/React 双栈。
 
 Desktop 当前已使用 React，不做无收益重写；后续 UI 工作只需逐步对齐本 ADR 的状态 owner、语义 token、Storybook/Playwright 和可访问性要求。
 
@@ -113,4 +113,4 @@ React、React Router、React Aria、Storybook 与 addon 的精确版本由各实
 - Architecture：[Product Compositions](../../reference/product-compositions.md)
 - Reference：[UI Design Tokens Reference](../../reference/ui-design-tokens.md)
 - Guide：[AI 辅助前端开发](../../guides/development/AI辅助前端开发.md)、[前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md)
-- Roadmap：[M11](../../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 目标物理清单](../../roadmap/manifests/M11-目标物理清单.md)
+- Roadmap：[M11](../../roadmap/initiatives/m11-delivery/README.md)、[M11 目标物理清单](../../roadmap/initiatives/m11-delivery/physical-layout.md)

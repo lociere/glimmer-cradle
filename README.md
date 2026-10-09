@@ -74,7 +74,7 @@ Cognition ── Context / Attention / Memory / Experience / Reasoning
 - **Avatar**：属于角色呈现层；Renderer 只消费受控投影，不推断系统事实。
 - **Extension**：通过公开 SDK、Manifest、权限和 Host Port 接入，不依赖 Kernel 内部实现。
 
-长期设计原则和当前实现分别见 [架构蓝图](docs/architecture/blueprint/README.md) 与 [当前架构](docs/architecture/current/README.md)。
+长期设计原则和当前实现分别见 [架构蓝图](docs/architecture/target/README.md) 与 [当前架构](docs/architecture/current/README.md)。
 
 ## 开发环境
 
@@ -165,7 +165,7 @@ templates/    Extension 等开发模板
 
 从 [文档中心](docs/README.md) 进入完整事实源：
 
-- [架构蓝图](docs/architecture/blueprint/README.md)：长期不变量和设计原则。
+- [架构蓝图](docs/architecture/target/README.md)：长期不变量和设计原则。
 - [当前架构](docs/architecture/current/README.md)：现有系统结构和边界。
 - [实现地图](docs/architecture/implementation/README.md)：代码入口、组装和运行链路。
 - [Reference](docs/reference/README.md)：协议、配置、数据、SDK 与打包的精确事实。

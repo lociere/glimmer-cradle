@@ -25,7 +25,7 @@ live 检索与原生 Step/Reply 复验不放行撤权或未知证明。可信 Ap
 Worker 在建立 Conversation 单写者并连接 Memory 后、启动维护前绑定持久 dispatch：旧队列有非终态
 任务时拒绝转交；external 绑定后拒绝 legacy 重启和旧队列写入。四个 Memory Jobs RPC 只在外部
 装配开放。Memory schema 6 拒绝旧 v3/v4/v5 隐式升级，详见 [数据布局](../../docs/reference/data-layout.md)。
-该切换窗口与旧 repository 的退出条件见 [执行记录](../../docs/roadmap/architecture-v2-refactor.md)；
+该切换窗口与旧 repository 的退出条件见 [执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md)；
 生产 Host supervisor/config、旧数据迁移和队列删除门仍未完成，当前产品入口不自动切到 external。
 
 模型与云 Embedding HTTP 由 Worker 的异步 HTTPX adapter 承担；Core `ModelPort.generate`、

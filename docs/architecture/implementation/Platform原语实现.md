@@ -76,4 +76,4 @@ authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒�
 
 验证入口：Platform `test`，Kernel `kernel-physical-layout.test.ts`、`dlq-replay-ingress.test.ts`，
 根 typecheck/build 与架构门禁；真实组合验证用 Kernel `smoke:bootstrap`。
-阶段结果见 [执行记录](../../roadmap/architecture-v2-refactor.md)，当前 API 以源码 exports 为准。
+阶段结果见 [执行记录](../../roadmap/initiatives/architecture-v2/README.md)，当前 API 以源码 exports 为准。

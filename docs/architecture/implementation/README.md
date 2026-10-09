@@ -8,7 +8,7 @@
 
 真实目录与入口以 [当前物理拓扑](../current/10-当前物理拓扑.md) 为准。
 Implementation 只解释 current 路径如何装配和被消费，不保存 Blueprint target tree，
-也不把 [迁移地图](../current/11-物理拓扑差距与迁移地图.md) 中的 planned 路径写成已实现。
+也不把 [迁移地图](../../roadmap/initiatives/architecture-v2/migration-map.md) 中的 planned 路径写成已实现。
 
 每页必须至少包含：
 

@@ -42,7 +42,7 @@
 - 使用 Storybook React/Vite 暴露真实组件、stories、文档和组件测试；官方 MCP 仍是 React preview 能力，只能在固定版本、fallback 与退出条件后试点。Playwright 继续负责产品级路由、网络、截图和浏览器 E2E。
 - 代表页面与状态使用固定数据、固定视口、稳定字体和降动效设置，截图变化必须由人审查后更新。
 
-各产品的当前实现与迁移状态从代码、Implementation 和 Roadmap 核对，不在通用 Guide 复制。M11 的视觉输入、代表页面和选择门见 [M11 Personal Server UI 设计简报](../../roadmap/design-briefs/M11-Personal%20Server%20UI设计简报.md)。
+各产品的当前实现与迁移状态从代码、Implementation 和 Roadmap 核对，不在通用 Guide 复制。M11 的视觉输入、代表页面和选择门见 [M11 Personal Server UI 设计简报](../../roadmap/initiatives/m11-delivery/M11-Personal%20Server%20UI设计简报.md)。
 
 ### 有条件候选
 

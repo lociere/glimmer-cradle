@@ -33,7 +33,7 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 - Conversation Log 是交互事实 owner；Cognition 只消费事实并写入受控认知投影。
 - Memory schema 6 的 dispatch 绑定只用于旧巩固队列迁移屏障，不承担 Jobs authority 或新调度；
   非终态旧任务拒绝转交，外部绑定拒绝回退，旧 writer 同事务拒写。受控迁移与删除门见
-  [执行记录](../../docs/roadmap/architecture-v2-refactor.md)，当前不隐式升级旧 v3/v4/v5 库。
+  [执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md)，当前不隐式升级旧 v3/v4/v5 库。
 - Loop 的 Run/checkpoint 独立于 Conversation Turn 和 Job；原生 ToolCall 只可调用当步曝光的能力，并使用稳定幂等键。
 
 ## 验证

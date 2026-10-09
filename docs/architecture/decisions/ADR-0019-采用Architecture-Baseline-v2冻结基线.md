@@ -48,5 +48,5 @@
 
 ## Links
 
-- [审计与执行记录](../../roadmap/architecture-v2-refactor.md)
+- [审计与执行记录](../../roadmap/initiatives/architecture-v2/README.md)
 - [当前物理拓扑](../current/10-当前物理拓扑.md)

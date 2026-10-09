@@ -8,7 +8,8 @@
 
 | 命令 | owner 与结果 |
 |---|---|
-| `pnpm check:docs` | repo-checks `src/docs/cli.mjs`；活跃 Markdown 本地文件链接与入口可达性；0 通过、1 违规、2 无法运行 |
+| `pnpm check:docs` | repo-checks `src/docs/cli.mjs`；活跃链接/入口、精确 docs 清单、任务依赖/状态及生成视图；0 通过、1 违规、2 无法运行 |
+| `pnpm check:docs --write` | 重建 status.md 与 docs 物理树后检查；不改变 execution.json 中的任务状态 |
 | `pnpm check:architecture` | repo-checks；基线锁、依赖边界和精确 legacy exceptions |
 | `pnpm check:encoding` | repo-checks；tracked 与未忽略 untracked 文本的 UTF-8/BOM |
 | `pnpm check:pr` | 根薄编排；编码、文档、架构、测试、typecheck、build；PR workflow 调用同一入口 |
@@ -83,4 +84,4 @@ repository/source/signer。Personal Server 路径为
 `dist/desktop/<version>/windows-x64/`。制品和 derived report 不进入 Git。
 
 公共任务、精确 source/test/workflow 路径见
-[M13 完成态物理目录](../roadmap/manifests/M13-目标物理清单.md)。
+[M13 完成态物理目录](../history/milestones/manifests/M13-目标物理清单.md)。

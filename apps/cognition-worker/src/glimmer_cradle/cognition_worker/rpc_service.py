@@ -240,7 +240,7 @@ def _next_synthetic_trace_id(module_name: str) -> str:
     - boot_id 已确立 → ``run-{boot_id}-{n}``：与本次启动周期绑定，跨 run 不会撞。
     - boot_id 尚未确立（启动极早期）→ ``synthetic-{module}-{n}``：按模块对齐。
 
-    见 docs/architecture/blueprint/微光摇篮架构蓝图.md §6.2 / docs/architecture/current/log-fields-glossary.md §5.4。
+    见 docs/reference/observability.md 的日志与 trace 字段约定。
     """
     global _boot_synthetic_counter
     if _boot_id:

@@ -184,7 +184,7 @@ Platform authority，未实施外部 fencing/证据对账或自动接管；人�
 真实 SQLite 重开、双连接、事务故障；Gateway tests 验证真实撤销与稳定 ID 重放。仅 fixture
 可不注入 controller；生产组装始终注入，旧无 journal 分支在三 Registry/入口切换后 consumer-zero
 删除。resource 内容 revision/Knowledge ingest、完整 Step Exposure、native broker 与完整行动恢复
-仍待完成。目标与证据见[执行记录](../../roadmap/architecture-v2-refactor.md)。
+仍待完成。目标与证据见[执行记录](../../roadmap/initiatives/architecture-v2/README.md)。
 
 Gateway 当前实现位于 `skill-invocation-gateway.ts`。它对 tool/resource/prompt 统一执行：
 

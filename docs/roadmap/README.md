@@ -1,42 +1,14 @@
-# Roadmap
+# 路线图
 
-> 范围：记录当前承诺、候选事项、蓝图落地母路线、里程碑成果、风险和验收门；不保存已落地架构事实正文。
-> 事实依据：蓝图差距、Current/Implementation、测试结果、真实运行诊断和用户目标。
-> 维护触发：承诺范围、里程碑状态、验收门、风险、依赖、候选事项或完成归档变化。
+Roadmap 保存已承诺但尚未完成的工作。当前主线只由 [now.md](now.md) 选择。
 
-路线图回答“接下来承诺把什么做到什么验收状态”，以及“蓝图应该按哪些阶段落地”。它不是任务流水账、历史正文仓库或架构说明书。
-
-| 文件 | 用途 |
+| 入口 | 职责 |
 |---|---|
-| [now.md](./now.md) | 当前唯一活跃推进面、下一验收门和本次审阅日期 |
-| [architecture-v2-refactor.md](./architecture-v2-refactor.md) | 当前 v2 唯一阶段计划、审计、兼容窗口与验收证据 |
-| [milestones/](./milestones/) | 已承诺或进行中的里程碑，按成果写 |
-| [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) | M11 当前视觉输入、代表页面、候选方向与用户确认门 |
-| [manifests/](./manifests/README.md) | M11/M12/M13 的目标或完成态目录树、Current → Target 动作与删除门 |
-| [backlog.md](./backlog.md) | 有价值但未承诺的候选能力 |
+| [架构 v2 重构](initiatives/architecture-v2/README.md) | 目标落地的阶段、任务、文件映射、风险和验收 |
+| [M11 交付闭环](initiatives/m11-delivery/README.md) | 保留的跨仓分发、外部平台与生产验收范围 |
+| [Backlog](backlog.md) | 尚未承诺的候选 |
+| [已结束里程碑](../history/milestones/README.md) | 历史完成范围及证据 |
 
-M12 Contract Spine/runtime 物理重建与 M13 A～F/最终仓库工具收口均已完成。M11 的页面实现、Extension SDK public edge、NapCat `v0.1.0`、默认 Registry stable 指针与 Personal Server 首版重发已经落地；真实远端 Extension 恢复、external OneBot/QQ 和生产验收仍未完成。当前切片与验收状态由 [now.md](./now.md) 维护。
-
-## 状态规则
-
-| 状态 | 含义 |
-|---|---|
-| `planned` | 已决定进入路线图，但尚未开始 |
-| `in-progress` | 正在推进，有明确验收门 |
-| `at-risk` | 目标仍有效，但依赖、风险或验证阻塞 |
-| `candidate` | 与蓝图一致但尚未承诺，只能作为候选存在 |
-| `done` | 验收门已满足，当前事实已迁入 Architecture/Reference/Guide |
-
-进入 `done` 前必须满足所有验收门。完成后：
-
-- 当前事实进入 Architecture、Implementation、Reference 或 Guide。
-- 长期取舍进入 ADR。
-- 过程材料或被替代计划进入 History。
-- Roadmap 只保留完成摘要或从 `now.md` 移除。
-
-## 可执行里程碑门
-
-里程碑必须包含目标成果、范围、非范围、依赖、风险、验收门和完成后的归档位置。每个
-可执行 slice 还必须按 [文档维护规范](../文档维护规范.md#完成态物理目录门) 写出最终
-目录树、owner、Current → Target 动作和旧路径删除门；无法确定最终路径时只能处于
-discovery/design。历史 milestone 不追溯整改；M11 的目标物理形态由 [M11 目标物理清单](./manifests/M11-目标物理清单.md) 维护。ADR-0017 与 [M11 UI 设计简报](./design-briefs/M11-Personal%20Server%20UI设计简报.md) 的视觉方向已确认，后续按垂直 slice 完成实现与删除门。
+每个 initiative 有明确成果、范围、依赖、风险、验收与归档位置。
+通用执行方法见[切片执行指南](../guides/development/architecture-refactoring.md)。
+状态只能依据相应输入上的证据变更；代码存在、提交成功和生产发布是不同结论。

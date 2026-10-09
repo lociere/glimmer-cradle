@@ -14,4 +14,4 @@ Authority 按 aggregate 保留单调 epoch/token。Handover 先撤销入口，�
 
 `pnpm test:platform` 运行实际 Node 测试；`pnpm typecheck` 包含 source 与 authority 测试的类型检查。
 物理迁移、hybrid/offline、完整生命周期故障回收与产品装配仍按
-[执行记录](../../docs/roadmap/architecture-v2-refactor.md) 推进，当前目录不代表所有目标模块已完成。
+[执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md) 推进，当前目录不代表所有目标模块已完成。

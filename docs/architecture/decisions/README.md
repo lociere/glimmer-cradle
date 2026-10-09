@@ -8,6 +8,8 @@ ADR 记录仍影响当前项目的长期取舍。每一条使用 `ADR-XXXX-简�
 
 ## 当前 ADR
 
+- [ADR-0024 文档职责与重构执行体系整合](ADR-0024-文档职责与重构执行体系整合.md)（`accepted`；统一 Target/Governance/Guide/Initiative/History，产品目标保持 v2.1）
+
 - [ADR-0023 最终目标蓝图与物理目录契约](./ADR-0023-最终目标蓝图与物理目录契约.md)（`accepted`；v2.1 联合语义与逐文件目标，修正第三方与 Extension 分类）
 
 - [ADR-0022 Conversation Log 与 Experience 投影边界](./ADR-0022-ConversationLog与Experience投影边界.md)（`accepted`；Conversation 持有交互事实单写者，Cognition 只消费 Experience/Memory 投影）

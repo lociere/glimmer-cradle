@@ -75,7 +75,7 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 - 活动页由 `features/activity/Activity.module.css` 消费相同 token：原有筛选器保留为轻量半透明面板，选项与文本输入变化会自动刷新结果，不保留额外的应用按钮；日志条目进入独立的深色连续阅读窗，行内只保留轻高亮与打开详情，复制和按来源筛选进入详情层。暂停缓冲状态与详情仍归于页面内；深浅主题、宽窄屏列表/详情截图、320～1440 CSS px、键盘焦点与空态语义进入真实 Host 和 Storybook 回归。
 - 配置由 `features/configuration/Configuration.module.css` 消费相同 token，宽屏局部导航与窄屏分类浮层只列模型、语音、检索和记忆；Provider 选择也是轻量文字目录，不显示路由概览卡或大标题。能力目录属于 `/capabilities`，访问安全及存储维护属于 `/system/*`。字段、保存状态、一次性令牌及危险操作确认仍由同一配置 owner 持有。
 
-详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md) 维护。
+详细后续 feature React 化与状态矩阵验收门由 [M11](../roadmap/initiatives/m11-delivery/README.md) 维护。
 
 ### 当前实现的比较方式
 
@@ -119,7 +119,7 @@ Personal Server Web 当前由 `products/personal-server/src/web/` 装配：
 - 不使用全页同一透明度、统一亮边、强 glow、清晰背景干扰或渐变卡片墙；材质手段必须服从信息层级和长期阅读；
 - 深色与浅色是同一中性语义系统的两种映射，accent 再独立映射；不能把 accent 混入主题底色，也不能分别手调成两套无关主题。
 
-“青曜”的已确认视觉色阶以[实色色卡](../roadmap/design-briefs/reference-assets/m11-ui/accent-a-qingyao.svg)为视觉事实源：`#004052` deep、`#00687F` pressed、`#00AABC` core、`#00BFC5` hover、`#6AE2D4` glint。代码用途 token 必须从这五级映射，再按深浅主题与 WCAG 对比度选择用途；不表示每一级都可直接作为文字、图标或控件前景色。
+“青曜”的已确认视觉色阶以[实色色卡](../roadmap/initiatives/m11-delivery/reference-assets/m11-ui/accent-a-qingyao.svg)为视觉事实源：`#004052` deep、`#00687F` pressed、`#00AABC` core、`#00BFC5` hover、`#6AE2D4` glint。代码用途 token 必须从这五级映射，再按深浅主题与 WCAG 对比度选择用途；不表示每一级都可直接作为文字、图标或控件前景色。
 
 | 视觉级别 | OKLCH 基准 | sRGB 参考 | 预期角色 |
 |---|---|---|---|

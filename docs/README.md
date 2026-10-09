@@ -1,44 +1,31 @@
 # Glimmer Cradle 文档中心
 
-本次架构重构以 [Architecture Baseline v2.1 (Frozen)](architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)
-为唯一目标基线；[执行要求](architecture/blueprint/Glimmer_Cradle_Codex_Refactor_Prompt_v2.1.md)、
-[执行宪章](architecture/blueprint/Architecture_Baseline_v2.1_执行宪章.md)、
-[完整物理目录](./architecture/blueprint/Glimmer_Cradle_Target_Physical_Layout_v2.1.md)、[采用决策](./architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 和
-[审计与阶段状态](./roadmap/architecture-v2-refactor.md) 为当前重构入口。Current 继续描述实际源码，不能据目标树宣称已迁移。
+从要解决的问题进入文档。目标、当前事实、操作方法和任务进度分别维护，互相链接。
 
-Glimmer Cradle 使用“架构、参考、指南、路线、决策、历史”六类文档。Glimmer Cradle 是微光摇篮企划与运行平台；Selrena（月见）是当前默认角色与主线角色。先按你要完成的任务进入，不需要从头通读全部文档。
-
-| 你要做什么 | 从这里开始 |
+| 需要 | 唯一入口 |
 |---|---|
-| 理解企划平台、默认角色边界、架构审美或做跨层设计 | [architecture/blueprint/](./architecture/blueprint/README.md) |
-| 审查最终目标目录与模块边界 | [Architecture Baseline v2.1](architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md) / [执行宪章](architecture/blueprint/Architecture_Baseline_v2.1_执行宪章.md) |
-| 认识当前系统结构与边界 | [architecture/current/](./architecture/current/README.md) |
-| 核对当前真实路径或 Current → Target 迁移动作 | [当前物理拓扑](./architecture/current/10-当前物理拓扑.md) / [迁移地图](./architecture/current/11-物理拓扑差距与迁移地图.md) |
-| 理解真实代码如何实现某个子系统 | [architecture/implementation/](./architecture/implementation/README.md) |
-| 查协议、配置、数据或 SDK 的准确字段 | [reference/](./reference/README.md) |
-| 配环境、开发、调试、测试、打包 | [guides/](./guides/README.md) |
-| 确认当前承诺、下一验收门、蓝图落地阶段和候选事项 | [roadmap/](./roadmap/README.md) |
-| 理解某个重要取舍为什么存在 | [architecture/decisions/](./architecture/decisions/README.md) |
-| 追溯已结束阶段的原始材料 | [history/](./history/README.md) |
+| 接手当前重构、确定下一步 | [当前工作](roadmap/now.md) → [架构重构项目](roadmap/initiatives/architecture-v2/README.md) |
+| 理解最终产品、领域边界与物理结构 | [架构目标](architecture/target/README.md) |
+| 理解当前实际系统 | [当前架构](architecture/current/README.md) → [实现地图](architecture/implementation/README.md) |
+| 查询协议、配置、SDK、数据与制品规则 | [技术参考](reference/README.md) |
+| 搭建环境、开发、排障、验收与交付 | [操作指南](guides/README.md) |
+| 理解长期取舍及其替代关系 | [ADR](architecture/decisions/README.md) |
+| 维护文档、变更基线、设计协作流程 | [治理](governance/README.md) |
+| 查其他承诺、候选与历史证据 | [路线图](roadmap/README.md) / [历史](history/README.md) |
 
-## 文档契约
+## 阅读与事实契约
 
-- **Blueprint** 是 Glimmer Cradle 的架构宪法并拥有唯一 Target Physical Topology；**Current** 描述当前系统结构并拥有唯一 Current Physical Topology；**Implementation** 解释真实代码如何实现架构。
-- **Reference** 是字段、命令、目录和 API 的精确查表来源。
-- **Guides** 是完成特定任务的可执行步骤，不重复架构事实。
-- **Roadmap** 写当前承诺、候选事项、里程碑验收和蓝图落地阶段关系；历史正文仍归 `history/`。
-- **Decisions** 以 ADR 保存长期有效的取舍；`history/` 只保存已退出当前事实源的材料。
+- `architecture/target/` 拥有当前有效的 v2.1 目标；版本在正文与锁中声明，文件路径保持稳定。
+- `architecture/current/` 是当前系统视图；`implementation/` 解释代码入口。目标目录存在不能证明迁移完成。
+- `reference/` 描述精确技术契约；实际 Schema、源码与生成物是对应字段的事实依据。
+- `guides/` 回答如何操作；`governance/` 回答必须遵守哪些规则、为何如此组织。
+- `roadmap/initiatives/<id>/` 拥有一个跨切片工作的计划、状态、映射和证据索引。
+- `history/` 保留被替代设计与已结束记录，不提供当前执行指令。
+- `AGENTS.md` 与项目 Skill 拥有开发智能体共同约束和操作路由，引用 docs 中的项目事实。
 
-当前事实必须能追溯到代码、Schema、配置或自动生成物。不同文档间应链接而非复制正文。
+Codex 接手重构时读取项目 Skill、[项目入口](roadmap/initiatives/architecture-v2/README.md)和
+[切片执行指南](guides/development/architecture-refactoring.md)，按任务状态表选择步骤。
+规则冲突、缺少验收证据或未知数据迁移不能靠“继续”推定为通过。
 
-目标目录、当前真实树与迁移动作分别由
-[Architecture Baseline v2.1](architecture/blueprint/Glimmer_Cradle_Architecture_Baseline_v2.1_Frozen.md)、
-[当前物理拓扑](./architecture/current/10-当前物理拓扑.md) 和
-[迁移地图](./architecture/current/11-物理拓扑差距与迁移地图.md) 维护。
-
-## 维护
-
-文档入口、事实归属与验证边界见 [文档维护规范](./文档维护规范.md)。维护后运行 `pnpm check:docs`；
-该检查覆盖活跃 Markdown 的本地文件链接和入口可达性，语义与代码一致性仍须人工核对。
-
-修改前先阅读 [文档维护规范.md](./文档维护规范.md)。旧的架构、指南、扩展与路线图材料已归档到 `history/`，不再作为活跃入口或事实源。
+完整物理目录、分类规则和来源依据见[文档架构](governance/documentation-architecture.md)；
+编辑和验收标准见[文档维护规范](governance/documentation.md)。

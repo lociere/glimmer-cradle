@@ -27,7 +27,7 @@ Execution 已有真实 SQLite journal/controller，现行生产 Kernel Tool Gate
 重跑 handler。schema 2 保存 Conversation/原 ACTION 最小引用；旧 schema 1 拒绝隐式迁移。
 完整来源语义切换、Step 权限/预算/位置/协议过滤、外部 fencing/对账与 Speech 尚未完成，
 不能将当前切片当作完整授权或 native broker ready。
-进度见[执行记录](../../docs/roadmap/architecture-v2-refactor.md)。
+进度见[执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md)。
 
 ```powershell
 pnpm --filter @glimmer-cradle/capabilities test

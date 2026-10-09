@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { checkDocumentationStructure } from './documentation-structure.mjs';
 
 function markdownFiles(root) {
   if (!fs.existsSync(root)) return [];
@@ -32,7 +33,7 @@ export function checkDocs(repositoryRoot) {
   const root = path.resolve(repositoryRoot);
   const docs = path.join(root, 'docs');
   const active = markdownFiles(docs).filter(file => !path.relative(docs, file).split(path.sep).includes('history'));
-  const errors = [];
+  const errors = checkDocumentationStructure(root);
   const edges = new Map(active.map(file => [file, new Set()]));
   const label = file => path.relative(root, file).replaceAll('\\', '/');
   for (const file of active) {
