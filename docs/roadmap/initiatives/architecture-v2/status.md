@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A第一段固定clean63dd90b5独立复核完成；第二段callback自等待拒绝已实现，Platform19/KernelApp19及两包typecheck/架构通过，其他owner及settle后异步任务可正常drain，外部并发共享结果；增量审查无阻塞。本节点文档编码收束后保存候选。下一动作：通用取消/超时与受管进程真实退出，再迁日志/trace/配置读取/健康机制和实际consumer；完整P02A/D04及大型最终门未接受。唯一writer本会话，无后台，不推送。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：第一段固定63dd90b5、callback自等待段固定75a62c04独立复核通过；Platform19/KernelApp19+其他16输入未变有效/两包typecheck/架构文档编码已验。下一动作：迁core/kernel/src/adapters/process/process-supervisor.ts到Platform Node adapter，注入App logger/Clock，真实退出timeout/kill错误须失败上抛；同项修Cognition.finally、Audio.bootstrap/reset、Extension.error仍活进程owner丢失，撤销入口/保留句柄/阻止并行重启并补真实隔离Node与可控clock、consumer失败恢复反例。随后通用取消/超时和日志/trace/配置读取/健康剩余机制。完整P02A/D04与大型最终门仍未接受；唯一writer本会话，当前只规范/证据更新，无后台，不推送。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
