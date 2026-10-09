@@ -289,8 +289,18 @@ queued/unknown、终态或旧 epoch 无真实确认时保持恢复待办，不�
 配置 Host 可注入同一真实路由；Jobs 单 owner 有界前向扫描执行 Resolve → Prepare → 发送，
 已有 confirmed receipt 再调用上述源确认 helper。各 RPC 返回后重验取消与当前 Host lease；
 无接收方不创建新 Reply/Turn，短非空页继续前进直到空页回绕，首个无权限项不挡后续项。
-历史确认无需新 grant/接收实例；当前自动链仍需 Resolve/Prepare 读取原来源，来源后来不可读
-时保留待办，手持原 prepared 身份的历史 ACK 入口不受此限制，自动历史身份查询仍待补齐。
+历史确认无需新 grant/接收实例。已有实际 confirmed receipt 时自动链先调用只读
+`GetPreparedPlanningNotification`，不经 Resolve/Prepare，也不重发或读取后来已不可用的原
+Perception；无真实确认的新发送仍须完整来源解析/接纳和当前接收权限。
+
+历史查询请求限 64 KiB，原 request 完整身份经 Planning work 校验；Worker 与 ACK 共用原
+Reply/已完成 revision=2 Turn 的原因果/通知引用/输入/实际正文摘要、完整 context 和 origin
+校验。响应的 `original` 复用内部接纳身份与原持久隐私域，`text` 留空，不能作为通知发送正文。
+无 Reply 且无 Turn 时 original 缺席，不建立表/补造事实；只有一半或原事实损坏时为
+RECOVERY_REQUIRED，缺 owner/停机为 NOT_READY，旧代为 GENERATION_MISMATCH，非法请求/
+预算为 INVALID_REQUEST。查询参与取消/deadline/shutdown 排空，不调用模型、不源 ACK。
+Host 快照扫描项并按唯一 Schema 比较完整通知引用，不只比较 notification ID；查询完成后
+再次验当前 Host lease/取消，再由实际 Delivery helper 核验并提交历史确认。
 
 真实本地 gRPC stream/command fixture 覆盖实际收发，生产 CLI fixture 覆盖配置 Host 自动
 发送/回执源确认与重启去重；均不替代完整产品 UI/渠道认证验收。默认产品仍经旧 Kernel

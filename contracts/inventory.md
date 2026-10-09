@@ -1,5 +1,11 @@
 # M12 Contract Spine Inventory
 
+Planning 通知历史身份查询由同一 `proto/glimmer/cognition/v1/cognition_service.proto` 拥有：
+`GetPreparedPlanningNotificationRequest` / `GetPreparedPlanningNotificationResponse` /
+`GetPreparedPlanningNotification`。独立响应的 original 复用原内部接纳身份/context，正文
+留空；无完整历史不返回 original，部分或损坏历史拒绝。
+查询不调用 Prepare、不修改库、不获得新发送资格；Host 仅凭实际已确认 Delivery 走历史源 ACK。
+
 Planning 通知源确认仍归 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `PlanningNotificationDeliveryConfirmation`、`AcknowledgePlanningNotificationRequest`、
 `AcknowledgePlanningNotificationResponse` 与 `AcknowledgePlanningNotification`。回执复用 Surface

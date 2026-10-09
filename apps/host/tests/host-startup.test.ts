@@ -27,7 +27,8 @@ import { ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequ
   AcknowledgePlanningJobRequestResponseSchema, ReconcilePlanningJobRequestSchema,
   AcceptPlanningCommitmentRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema,
-  PreparePlanningNotificationRequestSchema, type PreparePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+  PreparePlanningNotificationRequestSchema, GetPreparedPlanningNotificationRequestSchema,
+  type PreparePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy,
   RetentionCeiling, PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
@@ -227,11 +228,30 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
           expect(frames[0].event?.event).toMatchObject({ case: 'reply', value: { text: preparedNotification.text, outputId } });
           await expect(client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).rejects.toThrow('已持久送达');
           expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
+          // 先 drain 调度，再接纳真实回执；确认提交前断点不能被运行中的下一轮抢先完成。
+          client.close(); client = undefined; await owner.stop();
           expect(routes.receiveReceipt(receiverId, create(DeliveryReceiptCommandSchema, { outputId, destinationId: preparedNotification.context!.sceneId,
             authorityEpoch: 'epoch:receipt-fixture', generation: 1n, receivedAt: new Date().toISOString(),
             receiptId: 'receipt:planning-fixture', kind: 'delivered' }))).toEqual({ accepted: true });
+          // 仅损坏临时 fixture 的原来源；原 Reply/Turn 与实际回执保留，不操作用户库。
+          for (const relative of readdirSync(packs, { recursive: true }).filter(file => String(file).endsWith('.experience.db'))) {
+            const pack = new Database(path.join(packs, String(relative)));
+            try { pack.prepare('DELETE FROM moments WHERE moment_id=?').run(sourceMomentId); } finally { pack.close(); }
+          }
+          permissions.revokePrincipal(principal.principal_id);
+          expect(stream.destroyed).toBe(true);
+          owner = new ConfiguredHostCognitionJobsOwner({ ...options, conversation_routes: routes }); await owner.start();
+          client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
           await vi.waitFor(async () => expect((await client!.readPlanningNotifications(notificationRequest)).requests).toEqual([]),
             { timeout: 5000, interval: 25 });
+          expect(await client.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request: notifications.requests[0] })))
+            .toMatchObject({ available: false, reasonCode: 'planning_notification_source_unavailable' });
+          await expect(client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema,
+            { request: notifications.requests[0] }))).rejects.toMatchObject({ code: ServiceErrorCode.PERMISSION_DENIED });
+          const original = (await client.getPreparedPlanningNotification(create(GetPreparedPlanningNotificationRequestSchema,
+            { request: notifications.requests[0] }))).original;
+          expect(original).toEqual({ ...preparedNotification, text: '' });
+          expect(() => routes.send(original!)).toThrow('Reply/Turn');
           const ack = await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery);
           expect(ack).toMatchObject({ accepted: true, notificationId: notifications.requests[0].notificationId });
           expect(await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).toEqual(ack);

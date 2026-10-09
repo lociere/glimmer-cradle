@@ -318,8 +318,10 @@ Reply/Turn，内部接纳仍不消费通知。原业务/来源在跨 await 后�
 也不因原来源后来不可读而伪造另一次发送。具体 wire 与边界见[协议参考](../../reference/protocol.md#planning-通知真实回执源确认)。
 Host `PlanningNotificationAdapter` 现按有界前向页接实际定向 Surface 路由，完整接收域与显式
 receive/notify grant 复验后才写出；背压不建立第二队列，sent 不确认，旧/未知输出不重发。
-真实回执确认后默认 Jobs 链调用源确认 helper，历史确认无需新 grant；当前自动链在原来源
-后来不可读时仍保留请求，历史 prepared 身份查询待补。精确分页、预算、reason/error 与
+真实回执确认后默认 Jobs 链调用源确认 helper，历史确认无需新 grant；自动链现以只读
+`GetPreparedPlanningNotification` 恢复原 Reply/Turn 身份，不读取后来不可用的原 Perception，
+不补造事实、不返回发送正文。历史查询与 ACK 共用完整原事实验证，部分/损坏历史拒绝确认。
+精确分页、预算、reason/error 与
 生命周期见上述协议参考。未装配接收路由或缺接收方、撤权、取消、unknown 时保留请求；
 完整产品 ingress 仍未切换，不能以 PublishAction/模型完成或空回调制造送达。
 通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
@@ -544,7 +546,7 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
 [协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
-Planning 通知的完整产品接收入口、历史自动恢复、再调度与旧队列/旧数据切换仍待完成；
+Planning 通知的完整产品接收入口、再调度与旧队列/旧数据切换仍待完成；
 目标评估、接纳后默认调度、状态接收与可注入定向通知链见本页长期承诺章节。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

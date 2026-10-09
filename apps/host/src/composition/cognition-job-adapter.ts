@@ -1,6 +1,7 @@
-import { create } from '@bufbuild/protobuf';
+import { create, clone, equals } from '@bufbuild/protobuf';
 import { createHash } from 'node:crypto';
-import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema,
+import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema, GetPreparedPlanningNotificationRequestSchema,
+  PlanningNotificationRequestSchema,
   PreparePlanningNotificationRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { PlanningNotificationsCognitionPort } from '../adapters/protocol/cognition-client.js';
 import { HostCognitionError } from '../adapters/protocol/cognition-client.js';
@@ -126,7 +127,6 @@ export class PlanningJobSourceAdapter implements JobReconciliationPort {
   }
 }
 
-/** 实际 Planning 接纳/执行/对账；claim 前采样不替代 Execute 的 live 政策复验。 */
 /** 前向有界页不因首个无接收方而停止；事实源 ACK 只由实际 Delivery receipt 驱动。 */
 export class PlanningNotificationAdapter {
   private cursor = '';
@@ -140,19 +140,29 @@ export class PlanningNotificationAdapter {
     signal?.throwIfAborted();
     if (page.requests.length > limit) throw new Error('Planning 通知分页响应越界');
     if (!page.requests.length) { this.cursor = ''; return; }
-    for (const request of page.requests) {
+    for (const value of page.requests) {
+      const request = clone(PlanningNotificationRequestSchema, value);
       this.assertCurrent();
       if (!/^[a-f0-9]{64}$/.test(request.notificationId) || request.notificationId <= this.cursor) throw new Error('Planning 通知分页身份无效');
       this.cursor = request.notificationId;
+      const turnId = createHash('sha256').update(`conversation-notification-turn.v1:${request.notificationId}`).digest('hex');
+      const outputId = `reply:${turnId}`;
+      if (this.routes.delivery.confirmedReceipt(outputId)) {
+        const { original } = await this.cognition.getPreparedPlanningNotification(create(GetPreparedPlanningNotificationRequestSchema, { request }), signal);
+        signal?.throwIfAborted(); this.assertCurrent();
+        if (!original?.accepted || !original.request || !equals(PlanningNotificationRequestSchema, original.request, request)
+          || original.text) throw new Error('Planning 通知原持久身份响应无效');
+        // 只核对/确认已经发生的实际送达，不经 Resolve/Prepare，不授予新的发送许可。
+        await this.cognition.acknowledgeDeliveredPlanningNotification(original, outputId, this.routes.delivery, signal);
+        continue;
+      }
       const resolved = await this.cognition.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request }), signal);
       signal?.throwIfAborted(); this.assertCurrent();
-      if (resolved.request?.notificationId !== request.notificationId) throw new Error('Planning 通知来源响应错绑定');
+      if (!resolved.request || !equals(PlanningNotificationRequestSchema, resolved.request, request)) throw new Error('Planning 通知来源响应错绑定');
       if (!resolved.available) continue;
       // 内部域合法但永不外送；缺接收方不产生新的 Reply/Turn。
       if ([resolved.context?.recallScope, resolved.context?.disclosureScope].includes('character_internal')) continue;
-      const turnId = createHash('sha256').update(`conversation-notification-turn.v1:${request.notificationId}`).digest('hex');
-      const confirmed = this.routes.delivery.confirmedReceipt(`reply:${turnId}`);
-      if (!confirmed && !this.routes.available(resolved)) continue;
+      if (!this.routes.available(resolved)) continue;
       let prepared;
       try { prepared = await this.cognition.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema, { request }), signal); }
       catch (error) {
@@ -162,7 +172,7 @@ export class PlanningNotificationAdapter {
         throw error;
       }
       signal?.throwIfAborted(); this.assertCurrent();
-      if (prepared.request?.notificationId !== request.notificationId) throw new Error('Planning 通知接纳响应错绑定');
+      if (!prepared.request || !equals(PlanningNotificationRequestSchema, prepared.request, request)) throw new Error('Planning 通知接纳响应错绑定');
       const result = this.routes.send(prepared, signal);
       if (result === 'confirmed') await this.cognition.acknowledgeDeliveredPlanningNotification(prepared,
         `reply:${prepared.turnId}`, this.routes.delivery, signal);
@@ -170,6 +180,7 @@ export class PlanningNotificationAdapter {
   }
 }
 
+/** 实际 Planning 接纳/执行/对账；claim 前采样不替代 Execute 的 live 政策复验。 */
 export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort, JobAdmissionPort {
   public readonly kind = PLANNING_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;

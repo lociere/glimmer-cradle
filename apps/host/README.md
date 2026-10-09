@@ -83,7 +83,9 @@ confirmed receipt，再核验原 Reply/Turn/digest/目的地并提交源确认�
 sent/背压/未知状态不确认或重发，撤权/断线撤实例；实际确认才清除通知源。
 路由与 Delivery 生命周期由外层装配 owner 拥有，须在关闭 Delivery Store 前停止路由；
 Worker/Jobs 重启不自行建立第二 Delivery writer。生产 CLI 自动链与本地 gRPC 实收发已覆盖，
-完整产品 ingress/远端认证、来源已删除后的自动历史身份查询和再调度仍未完成，精确边界见上述协议参考。
+已持久送达但源确认未完成时，自动链通过只读 `GetPreparedPlanningNotification` 恢复原身份，
+正文留空、不调用 Prepare；原来源后来删除/接收方撤销后仍可核验既有送达并确认，不重复发送。
+完整产品 ingress/远端认证和再调度仍未完成，精确边界见上述协议参考。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

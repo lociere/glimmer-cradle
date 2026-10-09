@@ -206,10 +206,19 @@ var notificationResolved = new ResolvePlanningNotificationResponse { Request = n
         DisclosureScope = "conversation_private" } };
 notificationResolved.Receipt.Completed = true;
 var notificationPrepare = new PreparePlanningNotificationRequest { Request = notification };
+var notificationHistory = new GetPreparedPlanningNotificationRequest { Request = notification };
+if (!GetPreparedPlanningNotificationRequest.Parser.ParseFrom(notificationHistory.ToByteArray()).Equals(notificationHistory)
+    || GetPreparedPlanningNotificationRequest.Parser.ParseFrom(Array.Empty<byte>()).Request != null)
+    throw new InvalidOperationException("Planning notification historical query precision/presence failed");
 var notificationPrepared = new PreparePlanningNotificationResponse { Request = notification, Accepted = true,
     TurnId = "turn:通知", TurnRevision = 9007199254740991UL, ReplyMomentId = "reply:通知", LogPosition = 9007199254740991UL,
     ContentDigest = new string('f', 64), Context = notificationResolved.Context, ActorId = "actor:一", PrivacyClass = "private",
     RecallOwnerId = "actor:一", DisclosureOwnerId = "conversation:一", Text = "根据真实证据形成的通知。" };
+var notificationHistoryResponse = new GetPreparedPlanningNotificationResponse { Original = notificationPrepared.Clone() };
+notificationHistoryResponse.Original.Text = "";
+if (!GetPreparedPlanningNotificationResponse.Parser.ParseFrom(notificationHistoryResponse.ToByteArray()).Equals(notificationHistoryResponse)
+    || GetPreparedPlanningNotificationResponse.Parser.ParseFrom(Array.Empty<byte>()).Original != null)
+    throw new InvalidOperationException("Planning historical identity precision/presence failed");
 var notificationAck = new AcknowledgePlanningNotificationRequest { Request = notification,
     Confirmation = new PlanningNotificationDeliveryConfirmation { TurnId = notificationPrepared.TurnId,
         ReplyMomentId = notificationPrepared.ReplyMomentId, LogPosition = 9007199254740991UL, ContentDigest = new string('f', 64),

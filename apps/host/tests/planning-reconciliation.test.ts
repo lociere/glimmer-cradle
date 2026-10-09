@@ -12,7 +12,7 @@ import { JobExecutionIdentitySchema } from '@glimmer-cradle/contracts/glimmer/jo
 import { PlanningJobResultSchema, PlanningJobResolution, PlanningJobSourceRequestSchema, GetPlanningJobAdmissionResponseSchema,
   type PlanningJobResult, type GetPlanningJobAdmissionRequest } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { PreparePlanningNotificationResponseSchema, AcknowledgePlanningNotificationResponseSchema,
-  ResolvePlanningNotificationResponseSchema, ReadPlanningNotificationsResponseSchema,
+  ResolvePlanningNotificationResponseSchema, ReadPlanningNotificationsResponseSchema, GetPreparedPlanningNotificationResponseSchema,
   type PreparePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SurfaceGatewayServiceStreamRequestSchema, SurfaceGatewayServiceStreamResponseSchema,
   SurfaceGatewayServiceCommandRequestSchema, SurfaceGatewayServiceCommandResponseSchema, DeliveryReceiptCommandSchema,
@@ -299,6 +299,8 @@ it('通知 Adapter 跨未授权首项前进，sent 不 ACK、真实回执才确�
         privacyClass: value.privacyClass, recallOwnerId: value.recallOwnerId, disclosureOwnerId: value.disclosureOwnerId, available: true });
     }),
     preparePlanningNotification: vi.fn(async (request: { request?: { notificationId: string } }) => { prepared.push(request.request!.notificationId); return second; }),
+    getPreparedPlanningNotification: vi.fn(async () => create(GetPreparedPlanningNotificationResponseSchema,
+      { original: create(PreparePlanningNotificationResponseSchema, { ...second, text: '' }) })),
     acknowledgeDeliveredPlanningNotification: vi.fn(async (value: PreparePlanningNotificationResponse, outputId: string, delivery: DeliveryController) => {
       expect(delivery.confirmedReceipt(outputId)?.turn_id).toBe(value.turnId); acknowledgements.push(value.request!.notificationId);
       return create(AcknowledgePlanningNotificationResponseSchema, { accepted: true, notificationId: value.request!.notificationId });
@@ -313,6 +315,36 @@ it('通知 Adapter 跨未授权首项前进，sent 不 ACK、真实回执才确�
     await adapter.deliver(10); await adapter.deliver(10); await adapter.deliver(10);
     expect(reads).toEqual(['', 'a'.repeat(64), 'b'.repeat(64), '', 'a'.repeat(64)]);
     expect(h.frames).toHaveLength(1); expect(acknowledgements).toEqual(['b'.repeat(64)]);
+    expect(client.getPreparedPlanningNotification).toHaveBeenCalledOnce();
+    expect(prepared).toEqual(['b'.repeat(64)]);
+  } finally { h.close(); }
+});
+it.each(['none', 'missing', 'wrong-id', 'wrong-goal', 'body', 'cancelled', 'lease'] as const)
+('实际回执后的历史对账不解析/重接纳/重发，历史身份 %s 须经确认', async mode => {
+  const h = notificationRoutes(), cancellation = new AbortController(); let current = true;
+  const client = {
+    readPlanningNotifications: vi.fn(async () => create(ReadPlanningNotificationsResponseSchema, { requests: [h.prepared.request!] })),
+    resolvePlanningNotification: vi.fn(), preparePlanningNotification: vi.fn(),
+    getPreparedPlanningNotification: vi.fn(async () => {
+      if (mode === 'cancelled') cancellation.abort();
+      if (mode === 'lease') current = false;
+      const original = create(PreparePlanningNotificationResponseSchema, { ...h.prepared, text: mode === 'body' ? '不可从历史查询发送的正文' : '' });
+      if (mode === 'wrong-id') original.request!.notificationId = 'b'.repeat(64);
+      if (mode === 'wrong-goal') original.request!.goalId = 'foreign';
+      return create(GetPreparedPlanningNotificationResponseSchema, mode === 'missing' ? {} : { original });
+    }),
+    acknowledgeDeliveredPlanningNotification: vi.fn(async () => create(AcknowledgePlanningNotificationResponseSchema,
+      { notificationId: h.prepared.request!.notificationId, accepted: true })),
+  };
+  const adapter = new PlanningNotificationAdapter(client, h.routes, () => { if (!current) throw new Error('lease lost'); });
+  try {
+    const id = h.attach(); h.routes.send(h.prepared); h.routes.receiveReceipt(id, h.receipt());
+    h.broker.revokePrincipal(h.principal.principal_id);
+    if (mode === 'none') await adapter.deliver(1, cancellation.signal);
+    else await expect(adapter.deliver(1, cancellation.signal)).rejects.toThrow();
+    expect(client.resolvePlanningNotification).not.toHaveBeenCalled(); expect(client.preparePlanningNotification).not.toHaveBeenCalled();
+    expect(client.acknowledgeDeliveredPlanningNotification).toHaveBeenCalledTimes(mode === 'none' ? 1 : 0);
+    expect(h.frames).toHaveLength(1);
   } finally { h.close(); }
 });
 it.each(['lease', 'abort', 'scope-changed', 'source-permission'] as const)('通知 Prepare 等待后复验 %s，不凭旧 Resolve 写出或源确认', async mode => {
@@ -329,6 +361,7 @@ it.each(['lease', 'abort', 'scope-changed', 'source-permission'] as const)('通�
       if (mode === 'source-permission') throw new HostCognitionError(ServiceErrorCode.PERMISSION_DENIED);
       return h.prepared;
     }),
+    getPreparedPlanningNotification: vi.fn(),
     acknowledgeDeliveredPlanningNotification: vi.fn(),
   };
   const adapter = new PlanningNotificationAdapter(client, h.routes, () => { if (!current) throw new Error('lease lost'); });

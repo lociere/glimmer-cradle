@@ -602,7 +602,14 @@ message PreparePlanningNotificationRequest {
   PlanningNotificationRequest request = 2;
 }
 
+// 只读原持久身份，用于已有实际 Delivery 确认的历史对账；不补造事实或获得新发送许可。
+message GetPreparedPlanningNotificationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningNotificationRequest request = 2;
+}
+
 // accepted 表示内部 Reply 已 flush 且 Conversation Turn 已持久确认；不是外部 delivered/源 ACK。
+// GetPreparedPlanningNotification 的 original 仅返回原历史身份/context，text 留空，不是发布正文。
 message PreparePlanningNotificationResponse {
   PlanningNotificationRequest request = 1;
   string turn_id = 2;
@@ -618,6 +625,11 @@ message PreparePlanningNotificationResponse {
   string disclosure_owner_id = 11;
   string text = 12;
   bool accepted = 13;
+}
+
+// 不存在完整历史时 original 缺席；部分/损坏历史为 RECOVERY_REQUIRED。
+message GetPreparedPlanningNotificationResponse {
+  PreparePlanningNotificationResponse original = 1;
 }
 
 // 可信 Host 从唯一 Delivery owner 读取的已持久确认；不是调用者自报的发送成功。
@@ -718,5 +730,6 @@ service CognitionService {
   rpc ReadPlanningNotifications(ReadPlanningNotificationsRequest) returns (ReadPlanningNotificationsResponse);
   rpc ResolvePlanningNotification(ResolvePlanningNotificationRequest) returns (ResolvePlanningNotificationResponse);
   rpc PreparePlanningNotification(PreparePlanningNotificationRequest) returns (PreparePlanningNotificationResponse);
+  rpc GetPreparedPlanningNotification(GetPreparedPlanningNotificationRequest) returns (GetPreparedPlanningNotificationResponse);
   rpc AcknowledgePlanningNotification(AcknowledgePlanningNotificationRequest) returns (AcknowledgePlanningNotificationResponse);
 }

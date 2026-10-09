@@ -198,10 +198,17 @@ notification_resolved = cognition_pb.ResolvePlanningNotificationResponse(request
         disclosure_scope="conversation_private"), receipt=planning_applied.result.receipt)
 notification_resolved.receipt.completed = True
 notification_prepare = cognition_pb.PreparePlanningNotificationRequest(request=notification)
+notification_history = cognition_pb.GetPreparedPlanningNotificationRequest(request=notification)
+assert type(notification_history).FromString(notification_history.SerializeToString()) == notification_history
+assert not cognition_pb.GetPreparedPlanningNotificationRequest.FromString(b"").HasField("request")
 notification_prepared = cognition_pb.PreparePlanningNotificationResponse(request=notification, accepted=True,
     turn_id="turn:通知", turn_revision=9007199254740991, reply_moment_id="reply:通知", log_position=9007199254740991,
     content_digest="f" * 64, context=notification_resolved.context, actor_id="actor:一", privacy_class="private",
     recall_owner_id="actor:一", disclosure_owner_id="conversation:一", text="根据真实证据形成的通知。")
+notification_history_response = cognition_pb.GetPreparedPlanningNotificationResponse(original=notification_prepared)
+notification_history_response.original.text = ""
+assert type(notification_history_response).FromString(notification_history_response.SerializeToString()) == notification_history_response
+assert not cognition_pb.GetPreparedPlanningNotificationResponse.FromString(b"").HasField("original")
 notification_ack = cognition_pb.AcknowledgePlanningNotificationRequest(request=notification,
     confirmation=cognition_pb.PlanningNotificationDeliveryConfirmation(turn_id=notification_prepared.turn_id,
         reply_moment_id=notification_prepared.reply_moment_id, log_position=9007199254740991, content_digest="f" * 64,

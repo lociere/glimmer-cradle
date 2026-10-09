@@ -56,6 +56,7 @@ from glimmer_cradle.cognition.planning import (
     PlanningConflictError,
     PlanningController,
     PlanningJobFeedback,
+    PlanningNotificationRequest,
     PlanningStore,
     PlanVersion,
 )
@@ -1486,6 +1487,7 @@ class CognitionGrpcHost:
             "ReadPlanningNotifications": self._method(self._read_planning_notifications, cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse),
             "ResolvePlanningNotification": self._method(self._resolve_planning_notification, cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse),
             "PreparePlanningNotification": self._method(self._prepare_planning_notification, cognition_pb.PreparePlanningNotificationRequest, cognition_pb.PreparePlanningNotificationResponse),
+            "GetPreparedPlanningNotification": self._method(self._get_prepared_planning_notification, cognition_pb.GetPreparedPlanningNotificationRequest, cognition_pb.GetPreparedPlanningNotificationResponse),
             "AcknowledgePlanningNotification": self._method(self._acknowledge_planning_notification, cognition_pb.AcknowledgePlanningNotificationRequest, cognition_pb.AcknowledgePlanningNotificationResponse),
         }
         server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(_COGNITION_SERVICE, handlers),))
@@ -1975,6 +1977,78 @@ class CognitionGrpcHost:
             return response
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
+    async def _prepared_planning_notification_identity(self, item: PlanningNotificationRequest) -> Any:
+        if self._conversation is None or not self._conversation.accepts_durable_facts or self._turns is None:
+            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 通知历史 owner 未 ready")
+        work = await self._planning_jobs_source().read_notification_work(item)
+        turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{item.notification_id}".encode()).hexdigest()
+        reply = self._conversation.recorded_fact(f"notification-reply:{item.notification_id}")
+        turn = await self._turns.load(turn_id)
+        if reply is None and turn is None:
+            return None
+        input_digest = hashlib.sha256(json.dumps(asdict(item), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
+        reference = reply.content.get("notification") if reply is not None and isinstance(reply.content, dict) else None
+        if (reply is None or turn is None or turn.status != "completed" or turn.revision != 2
+            or turn.payload_digest != input_digest or reply.kind != "reply" or reply.interaction_id != turn.turn_id
+            or reply.conversation_id != work.goal.scope_id or reply.causation_ids != (item.source_moment_id,)
+            or item.source_moment_id is None or item.source_digest is None
+            or not isinstance(reference, dict) or type(reference.get("created_at_ms")) is not int or reference != {
+                "notification_id": item.notification_id, "producer_id": "planning", "scope_id": item.scope_id,
+                "source_fact_id": item.source_moment_id, "source_digest": item.source_digest,
+                "input_digest": input_digest, "created_at_ms": item.created_at,
+            }
+            or reply.origin.source_event_id != item.notification_id or reply.origin.provider_kind != "cognition"
+            or reply.origin.provider_id != "planning" or reply.origin.schema_ref != "glimmer://conversation/notification-reply/v1"
+            or reply.origin.cognitive_effect != "reply" or reply.retention_ceiling != "experience" or reply.trace_id != turn_id
+            or any(getattr(turn, name) != getattr(reply, name) for name in
+                ("scene_id", "conversation_id", "continuity_id", "thread_id", "recall_scope", "disclosure_scope"))):
+            raise ValueError("Planning 通知没有对应的原持久 Reply/Turn 绑定")
+        provider, text = reply.content.get("source_provider_id"), reply.content.get("text")
+        owners = {"public": "public", "conversation_private": reply.conversation_id, "actor_private": reply.actor_id,
+            "space_local": reply.scene_id, "character_internal": reply.continuity_id}
+        values = (provider, reply.scene_id, reply.conversation_id, reply.continuity_id, reply.thread_id)
+        if (any(not isinstance(value, str) or not value.strip() or len(value.encode("utf-8")) > 4096 for value in values)
+            or reply.actor_id is not None and (not isinstance(reply.actor_id, str) or not reply.actor_id.strip()
+                or len(reply.actor_id.encode("utf-8")) > 4096)
+            or reply.origin.privacy_class not in {"public", "private", "sensitive"}
+            or any(scope not in owners or not isinstance(owners[scope], str) or not owners[scope].strip()
+                or len(owners[scope].encode("utf-8")) > 4096 for scope in (reply.recall_scope, reply.disclosure_scope))
+            or not isinstance(text, str) or not text.strip() or len(text.encode("utf-8")) > 16_384
+            or type(reply.seq) is not int or not 1 <= reply.seq <= 9007199254740991):
+            raise ValueError("Planning 通知原持久 context/位置/正文无效")
+        content = json.dumps(reply.content, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        if len(content) > 65_536:
+            raise ValueError("Planning 通知原持久正文超预算")
+        response = cognition_pb.PreparePlanningNotificationResponse(request=planning_notification_to_wire(item), accepted=True,
+            turn_id=turn_id, turn_revision=turn.revision, reply_moment_id=reply.moment_id, log_position=reply.seq,
+            content_digest=hashlib.sha256(content).hexdigest(), privacy_class=reply.origin.privacy_class,
+            recall_owner_id=owners[reply.recall_scope], disclosure_owner_id=owners[reply.disclosure_scope])
+        response.context.CopyFrom(cognition_pb.ConversationContext(source_provider_id=provider, scene_id=reply.scene_id,
+            conversation_id=reply.conversation_id, continuity_id=reply.continuity_id, thread_id=reply.thread_id,
+            interaction_id=turn_id, recall_scope=reply.recall_scope, disclosure_scope=reply.disclosure_scope))
+        if reply.actor_id is not None:
+            response.actor_id = reply.actor_id
+        if response.ByteSize() > 262_144:
+            raise ValueError("Planning 通知历史身份响应超预算")
+        return response
+
+    async def _get_prepared_planning_notification(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            if request.ByteSize() > 65_536 or not request.HasField("request"):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知历史请求缺失或超预算")
+            try:
+                item = planning_notification_from_wire(request.request)
+            except (ValueError, TypeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 通知历史引用无效") from error
+            try:
+                # 只读既有 Reply/Turn；源后来不可读不抹除历史身份，也不创造新的发送资格。
+                response = await self._prepared_planning_notification_identity(item)
+                return cognition_pb.GetPreparedPlanningNotificationResponse(original=response) if response is not None else cognition_pb.GetPreparedPlanningNotificationResponse()
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知原持久身份冲突") from error
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
     async def _acknowledge_planning_notification(self, request: Any, context: Any) -> Any:
         async def operation(_trace_id: str) -> Any:
             source = self._planning_jobs_source()
@@ -1989,27 +2063,10 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 通知确认 owner 未 ready")
             try:
                 # 只读原持久事实；ACK 不调用 Prepare，不补造 Reply/Turn，不重新获得发送权限。
-                work = await source.read_notification_work(item)
-                reply = self._conversation.recorded_fact(f"notification-reply:{item.notification_id}")
-                turn = await self._turns.load(delivery.turn_id)
-                input_digest = hashlib.sha256(json.dumps(asdict(item), ensure_ascii=False, sort_keys=True,
-                    separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
-                reference = reply.content.get("notification") if reply is not None and isinstance(reply.content, dict) else None
-                if (reply is None or turn is None or turn.status != "completed" or turn.revision != 2
-                    or turn.payload_digest != input_digest or reply.moment_id != delivery.reply_moment_id
-                    or reply.seq != delivery.log_position or reply.kind != "reply"
-                    or reply.interaction_id != turn.turn_id or reply.scene_id != delivery.destination_id
-                    or reply.conversation_id != work.goal.scope_id or reply.causation_ids != (item.source_moment_id,)
-                    or not isinstance(reference, dict) or type(reference.get("created_at_ms")) is not int or reference != {
-                        "notification_id": item.notification_id, "producer_id": "planning", "scope_id": item.scope_id,
-                        "source_fact_id": item.source_moment_id, "source_digest": item.source_digest,
-                        "input_digest": input_digest, "created_at_ms": item.created_at,
-                    }
-                    or reply.origin.source_event_id != item.notification_id
-                    or delivery.content_digest != hashlib.sha256(json.dumps(reply.content, ensure_ascii=False, sort_keys=True,
-                        separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
-                    or any(getattr(turn, name) != getattr(reply, name) for name in
-                        ("scene_id", "conversation_id", "continuity_id", "thread_id", "recall_scope", "disclosure_scope"))):
+                prepared = await self._prepared_planning_notification_identity(item)
+                if (prepared is None or prepared.turn_id != delivery.turn_id or prepared.reply_moment_id != delivery.reply_moment_id
+                    or prepared.log_position != delivery.log_position or prepared.content_digest != delivery.content_digest
+                    or prepared.context.scene_id != delivery.destination_id):
                     raise ValueError("Planning 通知没有对应的原持久 Reply/Turn/目的地绑定")
                 await source.acknowledge_notification(item, delivery)
             except (ValueError, TypeError, RuntimeError) as error:

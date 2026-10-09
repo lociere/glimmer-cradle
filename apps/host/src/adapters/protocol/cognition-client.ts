@@ -26,12 +26,14 @@ import {
   ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
   PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+  GetPreparedPlanningNotificationRequestSchema, GetPreparedPlanningNotificationResponseSchema,
   AcknowledgePlanningNotificationRequestSchema, AcknowledgePlanningNotificationResponseSchema,
   PlanningNotificationDeliveryConfirmationSchema,
   type AcknowledgePlanningNotificationResponse,
   type ReadPlanningNotificationsRequest, type ReadPlanningNotificationsResponse,
   type ResolvePlanningNotificationRequest, type ResolvePlanningNotificationResponse,
   type PreparePlanningNotificationRequest, type PreparePlanningNotificationResponse,
+  type GetPreparedPlanningNotificationRequest, type GetPreparedPlanningNotificationResponse,
   type PublishPlanningJobStateRequest, type PublishPlanningJobStateResponse,
   type GetPlanningJobAdmissionRequest, type GetPlanningJobAdmissionResponse,
   type AcceptPlanningCommitmentRequest, type AcceptPlanningCommitmentResponse,
@@ -81,6 +83,7 @@ export interface PlanningNotificationsCognitionPort {
   readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse>;
   resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse>;
   preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse>;
+  getPreparedPlanningNotification(request: GetPreparedPlanningNotificationRequest, signal?: AbortSignal): Promise<GetPreparedPlanningNotificationResponse>;
   acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,
     delivery: DeliveryController, signal?: AbortSignal): Promise<AcknowledgePlanningNotificationResponse>;
 }
@@ -204,6 +207,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse> {
     return this.call('PreparePlanningNotification', PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
       create(PreparePlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public getPreparedPlanningNotification(request: GetPreparedPlanningNotificationRequest, signal?: AbortSignal): Promise<GetPreparedPlanningNotificationResponse> {
+    return this.call('GetPreparedPlanningNotification', GetPreparedPlanningNotificationRequestSchema, GetPreparedPlanningNotificationResponseSchema,
+      create(GetPreparedPlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   /** 只从唯一 Delivery owner 读取历史确认；调用方不能传入 delivered 布尔值或自报回执。 */
   public async acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,

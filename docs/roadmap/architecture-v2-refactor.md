@@ -620,6 +620,51 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/7 已送达通知历史身份恢复（2026-10-09 当前候选）
+
+输入 `257234d5`，当前执行 owner 继续为唯一写入 owner。补 canonical
+`GetPreparedPlanningNotification` 只读 RPC：独立响应的 original 复用已有内部接纳响应的
+request/Turn/Reply/position/digest 与原持久 context，`text` 留空；无完整历史不返回 original。
+不返回可直接发送的正文，不补造 Reply/Turn。
+查询与既有 ACK 共用 Worker 原持久绑定校验，不读取后来已不可用的原 Perception，仍验证
+原 Planning work、完整原因果/通知引用/输入摘要与真实已完成 Turn。Host 只在唯一 Delivery
+已持久 confirmed receipt 存在时走这条历史查询→ACK；新发送仍走 Resolve/Prepare/当前权限，
+不能用查询复活旧 output 或忽略当前 source eligibility。测试须覆盖无历史、缺一半事实、损坏
+上下文/引用/修订、旧 generation/预算/取消，以及来源删除、接收方撤销后的真实自动恢复。
+唯一 Contract Spine 生成与三语言 roundtrip 同步，查询不创建表、修改库或调用模型。
+
+上述计划已落实。新增 request/独立 response 与只读 RPC；response 的 original 复用已有
+内部接纳身份，正文留空，原事实缺席不冒充 accepted。Worker 与源 ACK 共用原持久身份
+验证，检查原 work、原因果/通知引用/输入摘要、已完成 Turn、完整 context、scope owner、
+origin/retention/trace 与实际正文预算和摘要。只有一半历史或损坏事实 fail closed，历史
+查询不写库、不读取后来不可用的原 Perception、不补造 Reply/Turn，也不调用模型。
+
+Host 仅在唯一 Delivery 已有真实 confirmed receipt 时优先查询原身份并 ACK，不经
+Resolve/Prepare，不需要新接收实例/grant。扫描项以 canonical Schema 快照，来源解析/
+内部接纳/历史响应均比较完整通知引用，不只比较 ID；共享返回对象在 await 期间变化不能
+改变预期身份。每个查询返回后复验 Host lease/取消；缺历史/错绑定/带正文的历史响应拒绝。
+无真实确认的新发送仍须原来源/完整接纳/当前接收权限。没有新事实库、路径或数据迁移。
+
+最终证据（Windows，2026-10-09 本轮 dirty 候选）：Worker 全量 399 项 PASS（新增 29 项：
+26 项无历史/缺半边/损坏正文、provider、actor、origin、scope、context、引用/布尔时间、
+缺 owner/ready/generation/预算及来源删除的只读回归，3 项实际读事务 cancel/deadline/shutdown
+排空）；既有完整源 ACK 及提交/取消回归全部保持 PASS。Host 全量 252 项 PASS（新增 7 项
+原身份对账反例），生产 CLI fixture drain 调度后接纳实际送达、删除临时库原来源并撤销
+接收主体，再启动实际 Worker/Host；历史原身份恢复并自动清空待办，新 Prepare 仍拒绝来源
+不可读，历史查询正文不能交给发送路由。模型、attempt 与发送均一次，原 Reply/Turn 不重建。
+
+根 `pnpm typecheck`/`pnpm build`、docs 111 页、encoding、architecture、target-layout（仅规格）
+与 diff 检查 PASS，Worker RPC/测试的 Ruff I/F PASS。首次 Contracts lint 拒绝两个 RPC 直接
+复用同一 response，按现行唯一契约规则新增独立 response wrapper，没有放宽 lint 或刷新
+兼容基线；正式生成、22 项 gates、inventory、proto lint/additive compatibility、JSON/toolchain、
+TS/Python/C# roundtrip 和 generated-clean 均 PASS。包版本和锁文件未修改。
+首次历史 wrong-ID 反例暴露共享对象变化，修正为完整 Schema 快照/比较后定向与全量 PASS。
+Core Cognition/Conversation Python 输入未变，复用 `f6faee88` 对应证据；Conversation TS 使用
+本轮前一提交的 65 项证据。没有真实 UI、远端渠道、生产迁移或新模型语义验收。
+
+本切片补齐已送达通知的自动历史源确认，不宣称阶段 7 或整体完成。后继调度/撤销、
+完整产品 ingress/接收审批与状态投影、旧数据切换、authority/备份恢复及最终独立审查仍待完成。
+
 ### 阶段 5/7 Host 定向通知发送（2026-10-08 至 2026-10-09）
 
 当前执行 owner 在目标 `apps/host/src/gateway/conversation-routes.ts` 落地实际 Surface
@@ -658,8 +703,8 @@ docs 111 页、encoding、architecture、target-layout（仅规格）、diff 检
 generated/Python 输入变化，复用 `f6faee88` 的 Contracts/Cognition/Worker 对应证据。
 
 完整产品仍未切换旧 Kernel ingress，本地测试不证明远端认证、真实 UI/外部渠道或生产状态。
-当前自动链仍需 Resolve/Prepare 读取原来源；来源后来不可读时历史 prepared 身份自动查询
-尚未补齐，原回执与待办保留。下一步实现该只读查询再接历史 ACK，不能以重发或新 Reply 代替。
+该提交时自动链仍需 Resolve/Prepare 读取原来源；来源后来不可读时历史 prepared 身份自动
+查询尚未补齐，原回执与待办保留；此缺口已由上方本日历史查询切片收束，不以重发或新 Reply 代替。
 后继调度/撤销、产品迁移与最终独立审查门仍未完成，整个项目重构继续推进。
 
 ### 阶段 4/5/7 通知真实回执源确认（2026-10-08 当前候选）

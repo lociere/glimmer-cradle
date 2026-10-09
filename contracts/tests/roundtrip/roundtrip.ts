@@ -30,7 +30,8 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema, Memory
   AcceptPlanningCommitmentResponseSchema, ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
 import { PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
-import { PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+import { PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema, GetPreparedPlanningNotificationRequestSchema,
+  GetPreparedPlanningNotificationResponseSchema,
   AcknowledgePlanningNotificationRequestSchema, AcknowledgePlanningNotificationResponseSchema,
   PlanningNotificationRequestSchema, ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema } from '../../generated/ts/glimmer/cognition/v1/cognition_service_pb';
@@ -236,11 +237,17 @@ const notificationResolved = create(ResolvePlanningNotificationResponseSchema, {
   receipt: { ...planningApplied.result!.receipt!, completed: true } });
 const notificationRestored = fromBinary(ResolvePlanningNotificationResponseSchema, toBinary(ResolvePlanningNotificationResponseSchema, notificationResolved));
 const notificationPrepare = create(PreparePlanningNotificationRequestSchema, { request: notification });
+const notificationHistory = create(GetPreparedPlanningNotificationRequestSchema, { request: notification });
+if (fromBinary(GetPreparedPlanningNotificationRequestSchema, toBinary(GetPreparedPlanningNotificationRequestSchema, notificationHistory)).request?.goalVersion !== 9007199254740991n
+  || fromBinary(GetPreparedPlanningNotificationRequestSchema, new Uint8Array()).request !== undefined) throw new Error('Planning notification historical query precision/presence failed');
 const notificationPrepared = create(PreparePlanningNotificationResponseSchema, { request: notification, accepted: true,
   turnId: 'turn:通知', turnRevision: 9007199254740991n, replyMomentId: 'reply:通知', logPosition: 9007199254740991n,
   contentDigest: 'f'.repeat(64), context: notificationResolved.context, actorId: 'actor:一', privacyClass: 'private',
   recallOwnerId: 'actor:一', disclosureOwnerId: 'conversation:一', text: '根据真实证据形成的通知。' });
 const preparedRoundtrip = fromBinary(PreparePlanningNotificationResponseSchema, toBinary(PreparePlanningNotificationResponseSchema, notificationPrepared));
+const historicalIdentity = create(GetPreparedPlanningNotificationResponseSchema, { original: { ...notificationPrepared, text: '' } });
+if (fromBinary(GetPreparedPlanningNotificationResponseSchema, toBinary(GetPreparedPlanningNotificationResponseSchema, historicalIdentity)).original?.logPosition !== 9007199254740991n
+  || fromBinary(GetPreparedPlanningNotificationResponseSchema, new Uint8Array()).original !== undefined) throw new Error('Planning historical identity precision/presence failed');
 const notificationAck = create(AcknowledgePlanningNotificationRequestSchema, { request: notification, confirmation: {
   turnId: notificationPrepared.turnId, replyMomentId: notificationPrepared.replyMomentId,
   logPosition: 9007199254740991n, contentDigest: notificationPrepared.contentDigest,

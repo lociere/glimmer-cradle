@@ -1792,6 +1792,89 @@ async def test_planning_admission_rpc_reads_real_binding_without_attempt_or_mode
     with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
 
 
+@pytest.mark.parametrize("fault", ["none", "source-gone", "no-model", "no-history", "reply-gone", "turn-gone", "turn-state",
+    "text", "provider", "actor", "origin", "scope", "context", "reference", "time-bool", "missing", "pair", "goal",
+    "generation", "budget", "planning", "conversation", "turns", "disabled", "unready", "stopping"])
+async def test_planning_notification_history_query_reads_original_identity_without_body_or_writes(bound_planning_service, fault):
+    import sqlite3
+    from dataclasses import asdict
+
+    from glimmer_cradle.cognition_worker.adapters.job_client import (
+        planning_notification_to_wire,
+    )
+
+    host, recorder, store, _, _, model, _, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    notification = (await store.pending_notification_requests())[0]
+    request = cognition_pb.GetPreparedPlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+    turns_path = store._path.parent / "turns.db"
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        original = None
+        if fault != "no-history":
+            original = await _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest,
+                cognition_pb.PreparePlanningNotificationResponse)(cognition_pb.PreparePlanningNotificationRequest(
+                    call=execution.call, request=request.request), timeout=2)
+        if fault == "source-gone" or fault == "reply-gone":
+            for pack in recorder.log._pack_paths():
+                with sqlite3.connect(pack) as connection:
+                    connection.execute("DELETE FROM moments WHERE moment_id=?", (notification.source_moment_id if fault == "source-gone" else original.reply_moment_id,))
+        elif fault in {"turn-gone", "turn-state"}:
+            with sqlite3.connect(turns_path) as connection:
+                connection.execute("DELETE FROM conversation_turns" if fault == "turn-gone" else "UPDATE conversation_turns SET status='interrupted'")
+        elif fault in {"text", "provider", "reference", "time-bool", "actor", "origin", "scope", "context"}:
+            moment = recorder.log.get_moment(original.reply_moment_id)
+            content = dict(moment.content)
+            column, value = "content_json", None
+            if fault == "text": content["text"] = False
+            elif fault == "provider": content["source_provider_id"] = ""
+            elif fault == "reference": content["notification"] = []
+            elif fault == "time-bool": content["notification"] = {**content["notification"], "created_at_ms": True}
+            elif fault == "actor": column, value = "actor_id", "x" * 4097
+            elif fault == "origin": column, value = "origin_json", json.dumps({**asdict(moment.origin), "provider_id": "foreign"})
+            elif fault == "scope": column, value = "recall_scope", "foreign"
+            elif fault == "context": column, value = "scene_id", "foreign"
+            if value is None: value = json.dumps(content, ensure_ascii=False)
+            for pack in recorder.log._pack_paths():
+                with sqlite3.connect(pack) as connection:
+                    connection.execute(f"UPDATE moments SET {column}=? WHERE moment_id=?", (value, original.reply_moment_id))
+        elif fault == "no-model": host._planning_model = None
+        elif fault == "missing": request.ClearField("request")
+        elif fault == "pair": request.request.ClearField("source_digest")
+        elif fault == "goal": request.request.goal_id = "foreign"
+        elif fault == "generation": request.call.generation = "old"
+        elif fault == "budget": request.request.goal_id = "x" * 65537
+        elif fault in {"planning", "conversation", "turns"}: setattr(host, "_" + fault, None)
+        elif fault == "disabled": recorder._enabled = False
+        elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+        elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+        with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+        with sqlite3.connect(turns_path) as connection: before_turns = list(connection.iterdump())
+        before_log = recorder.log.query()
+        query = _call(channel, "GetPreparedPlanningNotification", cognition_pb.GetPreparedPlanningNotificationRequest,
+            cognition_pb.GetPreparedPlanningNotificationResponse)
+        if fault in {"none", "source-gone", "no-model", "no-history"}:
+            response = await query(request, timeout=2)
+            if original is None:
+                assert response == cognition_pb.GetPreparedPlanningNotificationResponse()
+            else:
+                original.text = ""
+                assert response.original == original and response.original.accepted and response.original.text == ""
+            assert await query(request, timeout=2) == response
+        else:
+            with pytest.raises(grpc.aio.AioRpcError) as denied: await query(request, timeout=2)
+            detail = common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"])
+            expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else (
+                common_pb.SERVICE_ERROR_CODE_NOT_READY if fault in {"planning", "conversation", "turns", "disabled", "unready", "stopping"}
+                else common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"missing", "pair", "budget"}
+                else common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED)
+            assert detail.code == expected
+        with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+        with sqlite3.connect(turns_path) as connection: assert list(connection.iterdump()) == before_turns
+        assert recorder.log.query() == before_log and len(model.requests) == 1
+        assert await store.pending_notification_requests() == [notification]
+
+
 @pytest.mark.parametrize("fault", ["none", "playback", "source-gone", "no-model", "missing", "confirmation", "receipt",
     "reason", "zero", "overflow", "started", "unknown", "sent", "failed", "progress", "duration", "destination", "turn",
     "content", "position", "reply", "goal", "digest", "abandoned", "turn-state", "reply-gone", "reply-body", "reply-reference", "reply-time-bool", "planning", "conversation",
@@ -2232,7 +2315,7 @@ async def test_planning_notification_rpc_readonly_scan_never_creates_windows(bou
     assert not model.requests
 
 
-@pytest.mark.parametrize("method", ["read", "resolve"])
+@pytest.mark.parametrize("method", ["read", "resolve", "history"])
 @pytest.mark.parametrize("termination", ["cancel", "deadline", "shutdown"])
 async def test_planning_notification_rpc_cancellation_tracks_and_drains_read_transaction(bound_planning_service, monkeypatch, method, termination):
     import sqlite3
@@ -2263,9 +2346,12 @@ async def test_planning_notification_rpc_cancellation_tracks_and_drains_read_tra
         if method == "read":
             operation = _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse)
             request = cognition_pb.ReadPlanningNotificationsRequest(call=execution.call, limit=1)
-        else:
+        elif method == "resolve":
             operation = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
             request = cognition_pb.ResolvePlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
+        else:
+            operation = _call(channel, "GetPreparedPlanningNotification", cognition_pb.GetPreparedPlanningNotificationRequest, cognition_pb.GetPreparedPlanningNotificationResponse)
+            request = cognition_pb.GetPreparedPlanningNotificationRequest(call=execution.call, request=planning_notification_to_wire(notification))
         running = operation(request, timeout=0.5 if termination == "deadline" else 5)
         try:
             await asyncio.wait_for(entered.wait(), 2)
