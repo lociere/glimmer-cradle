@@ -32,7 +32,9 @@ export interface JobStorePort {
   /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */
   listUnknown(epoch: number, kind: string, limit: number, afterJobId?: string): Job[];
   /** 接纳扫描按 job_id 稳定分页；读快照不消耗 attempt，claim 时须重验 revision。 */
-  listDue(epoch: number, kind: string, now: number, limit: number, afterJobId?: string): Job[];
+  listDue(epoch: number, kind: string, now: number, limit: number, afterJobId?: string, throughJobId?: string): Job[];
+  /** 固定本轮键区间上界，持续新增更高 ID 不得无限延长等待项回绕。 */
+  readDueBoundary(epoch: number, kind: string, now: number): string | null;
   listAttempts(jobId: string): JobAttempt[];
   reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
     policy: RetryPolicy): JobReconciliationReceipt;

@@ -212,16 +212,30 @@ export class SqliteJobStore implements JobStorePort {
     }).deferred();
   }
 
-  public listDue(epoch: number, kind: string, now: number, limit: number, afterJobId = ''): Job[] {
+  public readDueBoundary(epoch: number, kind: string, now: number): string | null {
     assertTimestamp(now);
-    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || typeof afterJobId !== 'string') {
+    if (!kind.trim()) throw new JobConflictError('Job due 接纳 kind 无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const row = this.database.prepare(`SELECT job_id FROM jobs WHERE status IN ('queued','retry_wait')
+        AND kind=? AND due_at<=? AND attempt<max_attempts ORDER BY job_id DESC LIMIT 1`)
+        .get(kind, now) as { job_id: string } | undefined;
+      return row?.job_id ?? null;
+    }).deferred();
+  }
+
+  public listDue(epoch: number, kind: string, now: number, limit: number, afterJobId = '', throughJobId?: string): Job[] {
+    assertTimestamp(now);
+    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || typeof afterJobId !== 'string'
+      || (throughJobId !== undefined && (typeof throughJobId !== 'string' || !throughJobId))) {
       throw new JobConflictError('Job due 接纳扫描范围无效');
     }
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
+      const upper = throughJobId === undefined ? '' : 'AND job_id<=?';
       const rows = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait')
-        AND kind=? AND due_at<=? AND attempt<max_attempts AND job_id>? ORDER BY job_id LIMIT ?`)
-        .all(kind, now, afterJobId, limit) as JobRow[];
+        AND kind=? AND due_at<=? AND attempt<max_attempts AND job_id>? ${upper} ORDER BY job_id LIMIT ?`)
+        .all(kind, now, afterJobId, ...(throughJobId === undefined ? [] : [throughJobId]), limit) as JobRow[];
       return rows.map(row => this.decode(row));
     }).deferred();
   }

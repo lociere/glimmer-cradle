@@ -118,12 +118,68 @@ describe('Jobs public API', () => {
       expect(await scheduler.runDue(2)).toBe(0); expect(scheduler.waitingCount).toBe(2);
       expect(store.readOutbox(1, 100)).toHaveLength(5);
       expect(await scheduler.runDue(2)).toBe(2); expect(executed).toEqual(['c', 'd']);
-      expect(await scheduler.runDue(2)).toBe(0); // 最后一页为空后回绕。
       allow = true;
       expect(await scheduler.runDue(2)).toBe(2); expect(checked).toEqual(['a', 'b', 'c', 'd', 'a', 'b']);
       expect(store.load('a')).toMatchObject({ attempt: 1, max_attempts: 3, due_at: 1000 });
       expect(store.load('foreign')).toMatchObject({ status: 'queued', attempt: 0 });
     } finally { await controller.stop(); store.close(); }
+  });
+
+  it.each(['full', 'cancelled-boundary', 'new-inside'] as const)
+  ('固定 due 键区间在持续新增高 ID/%s 下回绕原等待源，同钟入队不耗提前 attempt', async mode => {
+    const databasePath = path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-admission-arrivals-')), 'jobs.sqlite');
+    const store = new jobs.SqliteJobStore(databasePath), producer = new jobs.SqliteJobStore(databasePath);
+    const clock = { now: () => 1000 }, controller = new jobs.JobController(store, clock, { base_delay_ms: 1, max_delay_ms: 10 });
+    const request = JSON.parse(readFileSync(path.resolve(__dirname, 'fixtures/job.json'), 'utf8')) as JobRequest;
+    const checked: string[] = [], executed: string[] = [];
+    let allow = false;
+    try {
+      store.activateAuthority(1, 1000);
+      for (const id of ['a', 'm']) producer.enqueue({ ...request, job_id: id, idempotency_key: id }, 1, 1000);
+      controller.register({ kind: request.kind, retry_mode: request.retry_mode, async execute(context) {
+        executed.push(context.job.job_id); return { status: 'succeeded', result: {} };
+      } });
+      const scheduler = new jobs.JobScheduler(store, controller, clock, 1, 'host', 100, request.kind,
+        { kind: request.kind, async isEligible(job) { checked.push(job.job_id); return allow && job.job_id === 'a'; } });
+      expect(await scheduler.runDue(1)).toBe(0);
+      expect(store.load('a')).toMatchObject({ status: 'queued', attempt: 0, due_at: 1000 });
+      if (mode === 'cancelled-boundary') producer.cancel('m', 1, producer.load('m')!.revision, 1000);
+      if (mode === 'new-inside') producer.enqueue({ ...request, job_id: 'b', idempotency_key: 'b' }, 1, 1000);
+      for (let index = 0; index < (mode === 'new-inside' ? 2 : 1); index += 1) {
+        producer.enqueue({ ...request, job_id: `z${index}`, idempotency_key: `z${index}` }, 1, 1000);
+        expect(await scheduler.runDue(1)).toBe(0);
+      }
+      allow = true;
+      producer.enqueue({ ...request, job_id: 'z9', idempotency_key: 'z9' }, 1, 1000);
+      expect(await scheduler.runDue(1)).toBe(1);
+      expect(executed).toEqual(['a']);
+      expect(checked).toEqual(mode === 'cancelled-boundary' ? ['a', 'a'] : mode === 'new-inside' ? ['a', 'b', 'm', 'a'] : ['a', 'm', 'a']);
+      expect(store.load('z0')).toMatchObject({ status: 'queued', attempt: 0 });
+      expect(store.listAttempts('a')).toHaveLength(1);
+      expect(() => store.readDueBoundary(0, request.kind, 1000)).toThrow();
+      expect(() => store.readDueBoundary(1, '', 1000)).toThrow();
+      expect(() => store.listDue(1, request.kind, 1000, 1, '', '')).toThrow();
+    } finally { await controller.stop(); store.close(); producer.close(); }
+  });
+
+  it('读取轮次上界后、分页前真实另一连接切代，旧调度拒读且不接纳或消耗attempt', async () => {
+    const databasePath = path.join(mkdtempSync(path.join(os.tmpdir(), 'glimmer-admission-boundary-epoch-')), 'jobs.sqlite');
+    const store = new jobs.SqliteJobStore(databasePath), other = new jobs.SqliteJobStore(databasePath);
+    const clock = { now: () => 1000 }, controller = new jobs.JobController(store, clock, { base_delay_ms: 1, max_delay_ms: 10 });
+    const request = JSON.parse(readFileSync(path.resolve(__dirname, 'fixtures/job.json'), 'utf8')) as JobRequest;
+    let admitted = false;
+    try {
+      store.activateAuthority(1, 1000); store.enqueue(request, 1, 1000);
+      controller.register({ kind: request.kind, retry_mode: request.retry_mode, async execute() { throw new Error('must not execute'); } });
+      const boundary = store.readDueBoundary.bind(store);
+      store.readDueBoundary = (...args) => { const value = boundary(...args); other.activateAuthority(2, 1000); return value; };
+      const scheduler = new jobs.JobScheduler(store, controller, clock, 1, 'old', 100, request.kind,
+        { kind: request.kind, async isEligible() { admitted = true; return true; } });
+      await expect(scheduler.runDue(1)).rejects.toBeInstanceOf(jobs.JobAuthorityError);
+      expect(admitted).toBe(false);
+      expect(other.load(request.job_id)).toMatchObject({ status: 'queued', attempt: 0, authority_epoch: 2 });
+      expect(other.listAttempts(request.job_id)).toEqual([]);
+    } finally { await controller.stop(); store.close(); other.close(); }
   });
 
   it.each(['cancel', 'competing-claim', 'epoch', 'stop', 'abort', 'clock', 'unregister'] as const)

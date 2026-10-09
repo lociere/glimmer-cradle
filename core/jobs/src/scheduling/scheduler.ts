@@ -6,6 +6,7 @@ import type { JobStorePort } from '../ports/job-store-port.js';
 /** Host 显式驱动一次 tick；进程计时器与生命周期由 App 拥有，不在 Core 偷开常驻任务。 */
 export class JobScheduler {
   private cursor = '';
+  private boundary: string | null = null;
   private waiting = 0;
   public constructor(private readonly store: JobStorePort, private readonly controller: JobController,
     private readonly clock: JobClockPort, private readonly epoch: number,
@@ -24,12 +25,16 @@ export class JobScheduler {
     if (this.kind && !this.controller.hasHandler(this.kind)) {
       if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
       this.cursor = '';
+      this.boundary = null;
       return 0;
     }
     if (this.controller.isAccepting) this.store.materializeDue(this.epoch, this.clock.now(), limit);
     let count = 0;
     if (this.admission && this.controller.isAccepting) {
-      const page = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit, this.cursor);
+      // 上界只限定扫描，不授予执行权；新低 ID 可在下一轮接纳，旧等待项不会被新高 ID 推迟回绕。
+      this.boundary ??= this.store.readDueBoundary(this.epoch, this.kind!, this.clock.now());
+      if (this.boundary === null) { this.cursor = ''; return 0; }
+      const page = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit, this.cursor, this.boundary);
       for (const job of page) {
         this.cursor = job.job_id;
         signal?.throwIfAborted();
@@ -39,6 +44,7 @@ export class JobScheduler {
         if (!this.controller.hasHandler(this.kind!)) {
           if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit).length;
           this.cursor = '';
+          this.boundary = null;
           break;
         }
         if (eligible !== true) { this.waiting += 1; continue; }
@@ -47,7 +53,7 @@ export class JobScheduler {
           { job_id: job.job_id, revision: job.revision });
         if (claim) { await this.controller.execute(claim); count += 1; }
       }
-      if (page.length < limit) this.cursor = '';
+      if (page.length < limit || this.cursor === this.boundary) { this.cursor = ''; this.boundary = null; }
       return count;
     }
     while (count < limit && this.controller.isAccepting && (!this.kind || this.controller.hasHandler(this.kind))) {
@@ -60,6 +66,7 @@ export class JobScheduler {
     if (this.kind && this.controller.isAccepting && !this.controller.hasHandler(this.kind)) {
       this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
       this.cursor = '';
+      this.boundary = null;
     }
     return count;
   }

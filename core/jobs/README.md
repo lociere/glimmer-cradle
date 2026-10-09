@@ -19,7 +19,10 @@ App 注册 handler 并显式驱动 `JobScheduler.runDue`；handler 接收 AbortS
 接纳 await 后复验注册，缺失不消耗 attempt，待办仍留在原持久源。
 可按 kind 注入中立 `JobAdmissionPort`：`listDue` 在当前 authority 下按稳定 Job ID 有界分页，
 接纳 await 不持有 SQL 事务；严格 eligible 后以候选 ID/revision CAS claim，取消/竞争更新/切代
-不能将旧判断用于另一 Job。等待项仍推进 cursor 并最终回绕，不修改 due/attempt/重试预算。
+不能将旧判断用于另一 Job。等待项仍推进 cursor；每轮固定当前 due 集合最大 ID 为上界，
+达到上界或读到短页即回绕，持续新增更高 ID 不延长这一轮。上界内新到期项可进入当前轮，
+游标之前的新增项在后续轮读取；这不是固定成员快照，不修改 due/attempt/重试预算，
+也不按跨进程可能回拨的时钟划定入队批次。
 每轮最多扫描 limit 项；该检查不是执行授权，业务 handler 必须再次核验自己的真实政策。
 取消先持久撤销租约，再通知在途 handler，晚到结果无法覆写终态。停止 controller 时拒绝新执行并等待
 在途 handler 收尾，之后才能关闭 store。handler 必须合作响应取消；Host 的超时回收不属于本包。
