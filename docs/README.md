@@ -24,7 +24,7 @@
 - `AGENTS.md` 与项目 Skill 拥有开发智能体共同约束和操作路由，引用 docs 中的项目事实。
 
 Codex 接手重构时读取项目 Skill、[项目入口](roadmap/initiatives/architecture-v2/README.md)和
-[切片执行指南](guides/development/architecture-refactoring.md)，按任务状态表选择步骤。
+[主执行任务书](roadmap/initiatives/architecture-v2/execution-order.md)，从任务状态恢复对应步骤。
 规则冲突、缺少验收证据或未知数据迁移不能靠“继续”推定为通过。
 
 完整物理目录、分类规则和来源依据见[文档架构](governance/documentation-architecture.md)；

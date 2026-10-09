@@ -6,7 +6,7 @@
 
 当前产品主线是[架构 v2 重构](initiatives/architecture-v2/README.md)。
 接手时读取[状态与下一任务](initiatives/architecture-v2/status.md)，再按
-[切片执行指南](../guides/development/architecture-refactoring.md)执行。
+[主执行任务书](initiatives/architecture-v2/execution-order.md)的固定步骤执行。
 阶段状态不在本页重复维护；旧执行日志中的“下一步”只有经过当前任务表重新接纳才有效。
 
 此次文档整合完成后，产品实现从状态表指定的 **A00 接手与差距核对** 开始：

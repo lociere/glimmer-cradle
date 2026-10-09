@@ -64,6 +64,6 @@ Extension 只使用正式 SDK；同仓/异仓与第一方/第三方身份都不�
    保持 targetRoots/coreModules/migrationPolicy 不变，除非已授权对应语义变更。
 5. 审查源 diff 与锁 diff，运行 repo-checks 反例测试和 architecture 门。更新摘要本身不证明授权。
 
-规范源包含蓝图、物理契约、治理宪章、采用 ADR、切片方法、项目计划与验收要求。
+规范源包含蓝图、物理契约、治理宪章、采用 ADR、切片方法、项目计划、主执行任务书与验收要求。
 execution.json、status.md、切片卡和 evidence 保存可变进度，不纳入冻结摘要；它们的文件路径仍精确登记。
 新增进度文件会改变文件清单摘要，这是物理契约维护；更新已有任务状态无需修改冻结产品语义。

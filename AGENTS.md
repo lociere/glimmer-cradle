@@ -10,7 +10,7 @@
 - 用户指定的 [Architecture Baseline v2.1](docs/architecture/target/baseline.md)
   为唯一目标基线；[ADR-0023](docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md)
   替代下文冲突的目标路径与 owner 约束。实际 `contracts/`、`packages/extension-sdk/` 等仍是当前事实，迁移前不得建立第二契约源。
-- 本次按 [执行记录](docs/roadmap/initiatives/architecture-v2/README.md) 分阶段推进；旧目录删除以 consumer-zero、数据迁移与验证为条件。
+- 本次按 [主执行任务书](docs/roadmap/initiatives/architecture-v2/execution-order.md) 的固定步骤推进，从 execution.json 恢复当前任务；旧目录删除以 consumer-zero、数据迁移与验证为条件。
 
 ## 工作方式
 

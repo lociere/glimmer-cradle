@@ -8,9 +8,9 @@
 
 1. 读取项目 Skill 和本页，核对实际 Git/写入 owner。
 2. 读取[状态](status.md)；机器状态唯一源为 [execution.json](execution.json)，禁止手改生成视图。
-3. 读取指定[接手任务 A00](slices/A00-reconcile.md)以及该任务引用的当前源码和历史证据。
-4. 使用[通用切片流程](../../../guides/development/architecture-refactoring.md)达到入口门后，才进入实施。
-5. 依照[阶段计划](plan.md)和[验收矩阵](acceptance.md)推进；未通过的必要门不得记为完成。
+3. 读取[主执行任务书](execution-order.md)公共规则及 nextTask 对应章节，按固定的 22 项任务顺序推进。
+4. 直接执行该节编号动作，展开精确文件映射并通过入口门；[通用切片流程](../../../guides/development/architecture-refactoring.md)只补充通用方法。
+5. 依照任务书的完成门和[验收矩阵](acceptance.md)保存证据并前进，不重新设计架构或为每步另起一轮计划。
 
 ## 职责与入口
 
@@ -19,7 +19,8 @@
 | [目标基线](../../../architecture/target/README.md) | 产品目标和精确目录 |
 | [架构变更宪章](../../../governance/architecture-change-policy.md) | 冻结、变更与迁移纪律 |
 | [requirements.md](requirements.md) | 本项目交付要求，原已接受执行要求的归位 |
-| [plan.md](plan.md) | 阶段依赖、分步成果、切片策略和退出门 |
+| [execution-order.md](execution-order.md) | 唯一主执行任务书：固定顺序、每项具体动作、命令、完成门与例外处理 |
+| [plan.md](plan.md) | 阶段成果归属和退出门，不拥有具体任务顺序 |
 | [execution.json](execution.json) / [status.md](status.md) | 阶段与任务状态 / 自动生成可读视图 |
 | [migration-map.md](migration-map.md) | Current → Target 动作、owner 和删除条件 |
 | [acceptance.md](acceptance.md) | 场景、检查命令与证据要求 |

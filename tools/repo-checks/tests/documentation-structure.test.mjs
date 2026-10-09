@@ -43,6 +43,19 @@ test('blocked workflow has no runnable next task and never renders itself comple
   assert.doesNotMatch(renderExecutionStatus(candidate), /全部任务已接受/);
 });
 
+test('workflow rejects instruction routing and task order drift', () => {
+  for (const mutate of [
+    p => { delete p.instructionFile; },
+    p => { p.tasks[0].card = 'execution-order.md#step-absent'; },
+    p => { [p.tasks[1], p.tasks[2]] = [p.tasks[2], p.tasks[1]]; },
+    p => { p.tasks.pop(); },
+  ]) {
+    const candidate = structuredClone(plan);
+    mutate(candidate);
+    assert.ok(validateExecutionPlan(candidate, root).some(error => /instruction/.test(error)));
+  }
+});
+
 test('implementation readiness requires explicit file actions, commands and deletion conditions', () => {
   const candidate = structuredClone(plan);
   const task = candidate.tasks[0];
@@ -65,18 +78,22 @@ test('documentation governance detects missing/unlisted files and repairs only g
     fs.writeFileSync(path.join(fixture, file), value);
   };
   const candidate = structuredClone(plan);
-  for (const task of candidate.tasks) { task.card = 'card.md'; task.inputPaths = ['docs/README.md']; }
-  const files = [manifestPath, executionPath, statusPath, structurePath, 'docs/README.md', 'docs/roadmap/initiatives/architecture-v2/card.md'];
+  for (const task of candidate.tasks) { task.inputPaths = ['docs/README.md']; }
+  const instructions = 'docs/roadmap/initiatives/architecture-v2/execution-order.md';
+  const files = [manifestPath, executionPath, statusPath, structurePath, 'docs/README.md', instructions];
   write(manifestPath, JSON.stringify({ repositoryFiles: files.map(file => ({ path: file, owner: 'docs' })) }));
   write(executionPath, JSON.stringify(candidate));
   write(statusPath, 'stale');
   write(structurePath, 'before\n<!-- docs-layout:start -->\nwrong\n<!-- docs-layout:end -->\nafter\n');
   write('docs/README.md', '# Entry');
-  write('docs/roadmap/initiatives/architecture-v2/card.md', '# Card');
+  write(instructions, candidate.tasks.map(task => `## step-${task.id.toLowerCase()}`).join('\n\n'));
   assert.equal(checkDocumentationStructure(fixture).length, 2);
   assert.deepEqual(checkDocumentationStructure(fixture, { write: true }), []);
   assert.deepEqual(checkDocumentationStructure(fixture), []);
   assert.ok(fs.readFileSync(path.join(fixture, structurePath), 'utf8').endsWith('after\n'));
+  write(instructions, '# Missing steps');
+  assert.ok(checkDocumentationStructure(fixture).some(error => error.includes('instruction document')));
+  write(instructions, candidate.tasks.map(task => `## step-${task.id.toLowerCase()}`).join('\n\n'));
   write('docs/unlisted.md', '# Unlisted');
   fs.unlinkSync(path.join(fixture, 'docs/README.md'));
   const errors = checkDocumentationStructure(fixture);

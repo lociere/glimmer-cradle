@@ -5,6 +5,7 @@ import { manifestPath } from '../architecture/target-layout.mjs';
 export const initiativePath = 'docs/roadmap/initiatives/architecture-v2';
 export const executionPath = `${initiativePath}/execution.json`;
 export const statusPath = `${initiativePath}/status.md`;
+export const instructionFile = 'execution-order.md';
 
 const statuses = new Set(['planned', 'ready', 'in-progress', 'verified', 'accepted', 'blocked']);
 const safeFile = value => typeof value === 'string' && value.length > 0
@@ -18,6 +19,18 @@ export function validateExecutionPlan(plan, repositoryRoot) {
   if (!/^[a-f0-9]{7,40}$/.test(plan?.baselineCommit ?? '')) errors.push('execution: missing baseline commit');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(plan?.reviewedAt ?? '')) errors.push('execution: missing review date');
   if (!Array.isArray(plan?.stages) || !Array.isArray(plan?.tasks) || !plan.tasks.length) return [...errors, 'execution: stages/tasks required'];
+  if (plan.instructionFile !== instructionFile) errors.push('execution: missing canonical instruction file');
+  if (repositoryRoot) {
+    const instructionPath = path.join(repositoryRoot, initiativePath, instructionFile);
+    if (!fs.existsSync(instructionPath)) errors.push('execution: missing instruction document');
+    else {
+      const instructions = fs.readFileSync(instructionPath, 'utf8');
+      const orderedIds = [...instructions.matchAll(/^## step-([a-z0-9]+)\s*$/gm)].map(match => match[1].toUpperCase());
+      if (JSON.stringify(orderedIds) !== JSON.stringify(plan.tasks.map(task => task.id))) {
+        errors.push('execution: task order/IDs differ from the instruction document');
+      }
+    }
+  }
   const stages = new Map();
   const tasks = new Map();
   const targetFiles = repositoryRoot && fs.existsSync(path.join(repositoryRoot, manifestPath))
@@ -39,6 +52,7 @@ export function validateExecutionPlan(plan, repositoryRoot) {
     if (!statuses.has(task.status) || !['discovery', 'implementation', 'review'].includes(task.mode)
       || !present(task.title) || !present(task.scope) || !present(task.nextAction)) errors.push(`execution: incomplete task ${task.id}`);
     if (!localFile(task.card)) errors.push(`execution: invalid/missing card for ${task.id}`);
+    if (task.card !== `${instructionFile}#step-${task.id.toLowerCase()}`) errors.push(`execution: ${task.id} must link to its canonical instruction section`);
     if (['ready', 'in-progress'].includes(task.status) && task.card?.split('#')[0].endsWith('/TEMPLATE.md')) errors.push(`execution: ${task.id} cannot execute an unfilled template`);
     if (!Array.isArray(task.stageIds) || !task.stageIds.length || task.stageIds.some(id => !stages.has(id))) errors.push(`execution: invalid stages for ${task.id}`);
     if (!Array.isArray(task.dependsOn) || new Set(task.dependsOn).size !== task.dependsOn.length) errors.push(`execution: invalid dependencies for ${task.id}`);
@@ -102,7 +116,7 @@ export function renderExecutionStatus(plan) {
     ...plan.stages.map(stage => `| [${stage.id} ${cell(stage.title)}](plan.md#${stage.id.toLowerCase()}) | ${stage.status} | ${cell(stage.summary)} |`), '',
     '## 任务依赖与入口', '', '| 任务 | 状态/类型 | 依赖 | Owner |', '|---|---|---|---|',
     ...plan.tasks.map(task => `| [${task.id} ${cell(task.title)}](${task.card}) | ${task.status} / ${task.mode} | ${task.dependsOn.join(', ') || '无'} | ${cell(task.owner ?? '开始时指定')} |`), '',
-    'planned 任务先细化为精确切片；依赖 accepted 且准备门通过后置 ready。实现需精确映射/命令，',
+    `按[主执行任务书](${instructionFile})的固定顺序展开本步文件映射；依赖 accepted 且准备门通过后置 ready。实现需精确映射/命令，`,
     'verified/accepted 需可定位证据，高风险另需独立接受。状态检查不证明 evidence 内的业务结论。', '',
     '验证与未验范围查[证据索引](evidence/README.md)，风险查[风险台账](risks.md)。', ''].join('\n');
 }

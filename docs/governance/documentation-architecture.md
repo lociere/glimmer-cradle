@@ -254,7 +254,9 @@ docs/
     │   │   ├── acceptance.md
     │   │   ├── evidence/
     │   │   │   ├── 2026-10-09-docs-integration.md
+    │   │   │   ├── 2026-10-09-execution-order.md
     │   │   │   └── README.md
+    │   │   ├── execution-order.md
     │   │   ├── execution.json
     │   │   ├── migration-map.md
     │   │   ├── plan.md

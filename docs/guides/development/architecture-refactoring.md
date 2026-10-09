@@ -18,6 +18,9 @@
 
 ## 接手与选择任务
 
+架构 v2 的具体操作顺序以[主执行任务书](../../roadmap/initiatives/architecture-v2/execution-order.md)为准。
+其每个章节已是任务卡；本指南补充字段、准备门和状态方法，不要求重写计划或重复做全局 discovery。
+
 1. 在仓库根执行 `git status --short`、`git log -1 --oneline`，核对工作树改动和实际 owner。
    有别人的改动时保留；无法确认同一范围写入权时只调查。
 2. 读取 [now](../../roadmap/now.md)，再读取对应 initiative 的 README、status 及 nextTask 卡。

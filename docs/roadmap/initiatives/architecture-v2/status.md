@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[A00 接手与差距核对](slices/A00-reconcile.md)**（ready / discovery）。核对实际 HEAD 后执行 A00 卡的步骤 1–7
+下一任务：**[A00 接手与差距核对](execution-order.md#step-a00)**（ready / discovery）。A00.1：比较 dc59181e 与当前 HEAD；区分产品改动和文档整合，不能因为 HEAD 更新就重做已完成原身份恢复。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
@@ -33,30 +33,30 @@
 
 | 任务 | 状态/类型 | 依赖 | Owner |
 |---|---|---|---|
-| [A00 接手与差距核对](slices/A00-reconcile.md) | ready / discovery | 无 | 开始时指定 |
-| [P07A Planning 后继调度与撤销](plan.md#p07) | planned / discovery | A00 | 开始时指定 |
-| [P07B Jobs 产品接纳、catalog 与状态投影](plan.md#p07) | planned / discovery | P07A | 开始时指定 |
-| [P02A 剩余平台机制和关闭语义](plan.md#p02) | planned / discovery | A00 | 开始时指定 |
-| [P03A Content 最终路径与媒体恢复差距](plan.md#p03) | planned / discovery | A00 | 开始时指定 |
-| [P04A 交互、中断与实际播放回执](plan.md#p04) | planned / discovery | P03A, P02A | 开始时指定 |
-| [P05A Cognition IO、helper 和 checkpoint 解耦](plan.md#p05) | planned / discovery | P07A, P04A | 开始时指定 |
-| [P06A Capability 权限、预算和未知结果对账](plan.md#p06) | planned / discovery | P05A | 开始时指定 |
-| [P09A 公开 SDK 与 broker 生命周期](plan.md#p09) | planned / discovery | P06A | 开始时指定 |
-| [P08A 具身语义与 C# 行为迁移](plan.md#p08) | planned / discovery | P09A, P04A | 开始时指定 |
-| [P09B 多语言 SDK 与独立模板验收](plan.md#p09) | planned / discovery | P09A, P08A | 开始时指定 |
-| [P10A 模型、语音、MCP 与渠道扩展](plan.md#p10) | planned / discovery | P09B | 开始时指定 |
-| [P10B Renderer 扩展与 native/Unity 真实链](plan.md#p10) | planned / discovery | P08A, P09B | 开始时指定 |
-| [P11A Contract Spine 原子路径切换](plan.md#p11) | planned / discovery | P10A, P10B | 开始时指定 |
-| [P12A 可信产品 ingress 与唯一 Host 接线](plan.md#p12) | planned / discovery | P07B, P11A | 开始时指定 |
-| [P12B Desktop/控制面与打包监督迁移](plan.md#p12) | planned / discovery | P12A | 开始时指定 |
-| [P13A 全域 authority、离线与冲突恢复](plan.md#p13) | planned / discovery | P12B, P02A | 开始时指定 |
-| [P14A 旧队列及全域数据迁移恢复](plan.md#p14) | planned / discovery | P13A | 开始时指定 |
-| [P14B 版本事实源与固定制品矩阵](plan.md#p14) | planned / discovery | P14A | 开始时指定 |
-| [P01A 清空迁移例外并启用最终护栏](plan.md#p01) | planned / discovery | P14B | 开始时指定 |
-| [P15A 最终完整行为链与物理验收](plan.md#p15) | planned / discovery | P01A | 开始时指定 |
-| [P15B 固定候选独立审查与归档](plan.md#p15) | planned / discovery | P15A | 开始时指定 |
+| [A00 接手与差距核对](execution-order.md#step-a00) | ready / discovery | 无 | 开始时指定 |
+| [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | planned / implementation | A00 | 开始时指定 |
+| [P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b) | planned / implementation | P07A | 开始时指定 |
+| [P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a) | planned / implementation | A00 | 开始时指定 |
+| [P03A Content 最终路径与媒体恢复差距](execution-order.md#step-p03a) | planned / implementation | A00 | 开始时指定 |
+| [P04A 交互、中断与实际播放回执](execution-order.md#step-p04a) | planned / implementation | P03A, P02A | 开始时指定 |
+| [P05A Cognition IO、helper 和 checkpoint 解耦](execution-order.md#step-p05a) | planned / implementation | P07A, P04A | 开始时指定 |
+| [P06A Capability 权限、预算和未知结果对账](execution-order.md#step-p06a) | planned / implementation | P05A | 开始时指定 |
+| [P09A 公开 SDK 与 broker 生命周期](execution-order.md#step-p09a) | planned / implementation | P06A | 开始时指定 |
+| [P08A 具身语义与 C# 行为迁移](execution-order.md#step-p08a) | planned / implementation | P09A, P04A | 开始时指定 |
+| [P09B 多语言 SDK 与独立模板验收](execution-order.md#step-p09b) | planned / implementation | P09A, P08A | 开始时指定 |
+| [P10A 模型、语音、MCP 与渠道扩展](execution-order.md#step-p10a) | planned / implementation | P09B | 开始时指定 |
+| [P10B Renderer 扩展与 native/Unity 真实链](execution-order.md#step-p10b) | planned / implementation | P08A, P09B | 开始时指定 |
+| [P11A Contract Spine 原子路径切换](execution-order.md#step-p11a) | planned / implementation | P10A, P10B | 开始时指定 |
+| [P12A 可信产品 ingress 与唯一 Host 接线](execution-order.md#step-p12a) | planned / implementation | P07B, P11A | 开始时指定 |
+| [P12B Desktop/控制面与打包监督迁移](execution-order.md#step-p12b) | planned / implementation | P12A | 开始时指定 |
+| [P13A 全域 authority、离线与冲突恢复](execution-order.md#step-p13a) | planned / implementation | P12B, P02A | 开始时指定 |
+| [P14A 旧队列及全域数据迁移恢复](execution-order.md#step-p14a) | planned / implementation | P13A | 开始时指定 |
+| [P14B 版本事实源与固定制品矩阵](execution-order.md#step-p14b) | planned / implementation | P14A | 开始时指定 |
+| [P01A 清空迁移例外并启用最终护栏](execution-order.md#step-p01a) | planned / implementation | P14B | 开始时指定 |
+| [P15A 最终完整行为链与物理验收](execution-order.md#step-p15a) | planned / implementation | P01A | 开始时指定 |
+| [P15B 固定候选独立审查与归档](execution-order.md#step-p15b) | planned / review | P15A | 开始时指定 |
 
-planned 任务先细化为精确切片；依赖 accepted 且准备门通过后置 ready。实现需精确映射/命令，
+按[主执行任务书](execution-order.md)的固定顺序展开本步文件映射；依赖 accepted 且准备门通过后置 ready。实现需精确映射/命令，
 verified/accepted 需可定位证据，高风险另需独立接受。状态检查不证明 evidence 内的业务结论。
 
 验证与未验范围查[证据索引](evidence/README.md)，风险查[风险台账](risks.md)。

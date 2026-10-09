@@ -3240,8 +3240,16 @@
       "owner": "documentation"
     },
     {
+      "path": "docs/roadmap/initiatives/architecture-v2/evidence/2026-10-09-execution-order.md",
+      "owner": "docs"
+    },
+    {
       "path": "docs/roadmap/initiatives/architecture-v2/evidence/README.md",
       "owner": "documentation"
+    },
+    {
+      "path": "docs/roadmap/initiatives/architecture-v2/execution-order.md",
+      "owner": "docs"
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/execution.json",

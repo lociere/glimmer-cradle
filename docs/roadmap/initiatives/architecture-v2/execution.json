@@ -144,16 +144,16 @@
       "dependsOn": [],
       "status": "ready",
       "mode": "discovery",
-      "card": "slices/A00-reconcile.md",
+      "card": "execution-order.md#step-a00",
       "owner": null,
-      "scope": "docs/roadmap/initiatives/architecture-v2；只读现行 Planning/Host/Worker",
+      "scope": "docs/roadmap/initiatives/architecture-v2；只读核对现行 Planning/Host/Worker，填写 P07A 映射，不改产品。",
       "acceptance": [
         "G0",
         "G5"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "核对实际 HEAD 后执行 A00 卡的步骤 1–7",
+      "nextAction": "A00.1：比较 dc59181e 与当前 HEAD；区分产品改动和文档整合，不能因为 HEAD 更新就重做已完成原身份恢复。",
       "inputPaths": [
         "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
         "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
@@ -173,17 +173,22 @@
         "A00"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p07",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p07a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前与目标集中在 core/cognition/ 的 planning 与 persistence、core/jobs/、apps/host/ 和 apps/cognition-worker/ 的既有接线。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P07A.1：固定现有 commitment/revision、job/attempt、evaluation、notification receipt 关联；保留已送达历史通知的只读原身份恢复。"
     },
     {
       "id": "P07B",
@@ -196,17 +201,22 @@
         "P07A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p07",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p07b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前入口为 Host composition/cognition-job-adapter、gateway/conversation-routes 与 Jobs；目标为 core/jobs/、apps/host/src/composition/、apps/host/src/gateway/ 和对应测试。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P07B.1：把 Planning、Memory 等现有任务源逐一接入明确的 JobHandler/源业务接纳链；源负责业务含义，Jobs 只负责调度执行机制。"
     },
     {
       "id": "P02A",
@@ -218,17 +228,22 @@
         "A00"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p02",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p02a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "从 core/kernel/ 的 runtime/adapters 和当前 core/platform/ 核对；目标为 core/platform/ 与 Apps 的 platform adapter/supervision。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P02A.1：逐项划分剩余时钟、identity、租约、日志/trace、配置读取、健康与生命周期机制；业务策略留在对应领域/App，不整包搬 Kernel。"
     },
     {
       "id": "P03A",
@@ -240,17 +255,22 @@
         "A00"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p03",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p03a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "输入为 core/content/、Kernel content adapter/ingress 和旧媒体引用；目标为完整 core/content/、Host content mapper/routes。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P03A.1：按清单迁资产提交、引用解析、存储 Port/Adapter、配额与 GC；一个 canonical writer，App ingress 先提交资产再提交交互事实。"
     },
     {
       "id": "P04A",
@@ -263,17 +283,22 @@
         "P02A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p04",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p04a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为完整 core/conversation/、Host conversation mapper/routes、Worker conversation mapper。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P04A.1：核对 Log/Turn 的 Python 持久 owner 与 Host interaction/delivery owner；History 从事实重建，不另建权威 writer。"
     },
     {
       "id": "P05A",
@@ -286,17 +311,22 @@
         "P04A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p05",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p05a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为完整 core/cognition/ 与 apps/cognition-worker/，当前残留 IO/provider/helper 由 Worker adapter 承接。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P05A.1：遍历领域 import 和公开出口；时钟、Content、Model、Resource、Capabilities、Jobs 经消费方 Port 进入，网络/进程/平台 IO 留在 App adapter。"
     },
     {
       "id": "P06A",
@@ -308,17 +338,22 @@
         "P05A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p06",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p06a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为完整 core/capabilities/、Host capability mapper/broker 与 Worker capability client。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P06A.1：保持 ToolRegistry、SkillCatalog、ResourceRegistry 各自语义；迁剩余旧 Skill Plane 注册和实际默认调用者。"
     },
     {
       "id": "P09A",
@@ -330,17 +365,22 @@
         "P06A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p09",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p09a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前 packages/extension-sdk/、hosts/extension-host/；目标 extension-sdk/、apps/extension-host/、apps/host/src/broker/ 与 apps/host/src/extensions/。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P09A.1：迁 TS SDK 公开入口、manifest、contribution、兼容、打包校验及完整 package/build/test 配置；逐 consumer 切路径，保持公开 DTO 与 Core/wire 类型经 mapper 隔离。"
     },
     {
       "id": "P08A",
@@ -353,17 +393,22 @@
         "P04A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p08",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p08a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前 core/avatar/ 及 C#/Unity 行为；目标完整 core/embodiment/、Host embodiment mapper 与 SDK renderer contribution。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P08A.1：从旧 C# 行为提取真实输入/输出 fixture，保存动作优先级、中断、期限、视线、口型及姿态等可观察行为。"
     },
     {
       "id": "P09B",
@@ -376,17 +421,22 @@
         "P08A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p09",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p09b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为 extension-sdk/python/、dotnet/、unity/、templates/ 全部清单文件及 SDK 发布验证入口。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P09B.1：对齐 TS/Python/.NET/Unity 的公开 Content、Model、Speech、Renderer、生命周期与 HostClient 契约；只承诺各语言实际支持的能力。"
     },
     {
       "id": "P10A",
@@ -398,17 +448,22 @@
         "P09B"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p10",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p10a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "输入为当前模型/语音 provider、engines/audio/、MCP 和渠道接入；主仓目标为 SDK 模板、Host 接线及配置 catalog，厂商实现位于独立扩展项目。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P10A.1：按 model、speech、resource/tool/prompt、channel 列出实际适配及制品来源；沿用已登记外部项目，不凭空创建或修改无授权仓库。"
     },
     {
       "id": "P10B",
@@ -422,17 +477,22 @@
         "P09B"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p10",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p10b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前 core/avatar/、hosts/unity-avatar-host/ 和 native 合成链；目标为 Renderer 外部制品、extension-sdk/templates/renderer/、apps/desktop/native/。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P10B.1：将具体模型驱动、Unity 场景和资产参数移入 Renderer Extension；SDK/模板保留通用可运行示例及完整构建资源。"
     },
     {
       "id": "P11A",
@@ -445,17 +505,22 @@
         "P10B"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p11",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p11a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前唯一 contracts/；目标完整 protocol/ 与 files.json 指定 owner-local schemas。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P11A.1：枚举 IDL、Document Schema、生成器、TS/Python/.NET 生成消费、App mapper、SDK wire mapper、CI 与制品路径；保存迁移前 wire/旧样本。"
     },
     {
       "id": "P12A",
@@ -468,17 +533,22 @@
         "P11A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p12",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p12a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "输入为 Kernel 和 personal-server 业务装配；目标完整 apps/host/ 与 apps/cognition-worker/ 的 gateway/composition/adapters。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P12A.1：迁认证、身份/作用域绑定、输入校验、Content 接收、Conversation 路由与审批；外部请求不能指定任意内部身份/authority。"
     },
     {
       "id": "P12B",
@@ -490,17 +560,22 @@
         "P12A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p12",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p12b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "当前 products/desktop/、products/personal-server/；目标完整 apps/desktop/、Host ui/deployment/scripts 与 supervision。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P12B.1：迁 Desktop main/preload/renderer、受控 IPC、窗口/托盘与 native 接线；Renderer 只读受控投影，不持有 Core 对象或凭据。"
     },
     {
       "id": "P13A",
@@ -513,17 +588,22 @@
         "P02A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p13",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p13a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为 Platform 租约机制、各状态 owner 及 Host authority-store/topology adapter；不另建万能同步 owner。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P13A.1：为 Conversation、Memory、Persona、Jobs、Config 等全部持久 aggregate 登记 authority、identity、revision、epoch/fencing 与持久位置。"
     },
     {
       "id": "P14A",
@@ -536,17 +616,22 @@
         "P13A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p14",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p14a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为 Host backup/migration coordinator、各 owner migrations 与对应旧样本/恢复测试。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P14A.1：用隔离旧数据副本固定 Conversation/Execution/Jobs、Persona/Memory/Knowledge、资产、配置和 schema 版本的备份清单与校验和；秘密单独保护。"
     },
     {
       "id": "P14B",
@@ -558,17 +643,22 @@
         "P14A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p14",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p14b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为文件清单中的根 workspace/锁/版本事实源、各包元数据、Host/Desktop/SDK 打包与安装工具。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P14B.1：按风险 R05 核对全部自有产品/包/Host/Extension 的开发版本及消费约束；恢复统一 0.1.0 并同步锁，不改已发布 tag 或历史证据。"
     },
     {
       "id": "P01A",
@@ -580,17 +670,22 @@
         "P14B"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p01",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p01a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "目标为 tools/repo-checks/、CI、workspace 配置和已经迁完的 owner 公开面。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P01A.1：对全部 legacy debt/白名单逐项找到原 consumer 与删除证据，删除已经失效的例外；未消除的真实依赖回到其 owner 修复。"
     },
     {
       "id": "P15A",
@@ -602,17 +697,23 @@
         "P01A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p15",
+      "mode": "implementation",
+      "card": "execution-order.md#step-p15a",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "本步以固定候选的全部实物为输入，验收定义只引用 acceptance，不另立缩小版标准。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6",
+        "G7"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P15A.1：将每个阶段的所有任务、目标文件和未关闭风险对账；文件存在但无实际行为/消费者的目标仍判未完成。"
     },
     {
       "id": "P15B",
@@ -624,17 +725,24 @@
         "P15A"
       ],
       "status": "planned",
-      "mode": "discovery",
-      "card": "plan.md#p15",
+      "mode": "review",
+      "card": "execution-order.md#step-p15b",
       "owner": null,
-      "scope": "按阶段准备门确定精确路径，不预建目标文件",
+      "scope": "输入为 P15A 固定候选及全部证据；审查者不修改被审查对象。",
       "acceptance": [
         "G0",
-        "G5"
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6",
+        "G7"
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "依赖接受后，按阶段条目建立精确实施卡并满足准备完成门。"
+      "nextAction": "P15B.1：按已有授权安排独立审查，核对领域/协议/生命周期/安全/数据/物理目录及证据充分性；没有授权或审查者时保留 verified，不能自称独立审查通过。"
     }
-  ]
+  ],
+  "instructionFile": "execution-order.md"
 }

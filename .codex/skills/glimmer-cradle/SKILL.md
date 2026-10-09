@@ -15,7 +15,8 @@ description: Develop, debug, review, document, or coordinate Glimmer Cradle（�
 和 [ADR-0023](../../../docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md) 为准。
 卡片中的旧路径是迁移前事实；冲突的目标规则由该 ADR 替代。继续工作前查阅
 [重构项目](../../../docs/roadmap/initiatives/architecture-v2/README.md)与其生成状态，按
-[切片执行指南](../../../docs/guides/development/architecture-refactoring.md)选择 nextTask。
+[主执行任务书](../../../docs/roadmap/initiatives/architecture-v2/execution-order.md)的固定顺序执行 nextTask。
+直接使用当前章节的动作与完成门，定向核对文件/API；不为每一步重新评估蓝图或另造全局计划。
 状态只更新 execution.json；历史日志的“下一步”不能直接作为当前任务。不得直接将旧 Kernel 搬为 Platform 或新增第二契约源。
 
 本 Skill 提供项目操作方法与资料路由。目标、授权以用户请求为准，共同约束见根 `AGENTS.md`，当前实现与运行状态依据项目事实源核验。项目采用单一 canonical Skill。
