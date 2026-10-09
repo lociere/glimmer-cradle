@@ -16,7 +16,7 @@
 | Desktop/Surface 投影 | `adapters/surface/`、`ports/application-capabilities.port.ts` |
 | Skill Plane | `application/skill-plane/`、`adapters/skill-plane/`、`ports/skill-plane.port.ts` |
 | Extension Host supervision | `adapters/extension-host/`、`ports/extension-host.port.ts`、`ports/application-capabilities.port.ts`；执行容器在 `hosts/extension-host/` |
-| 时间与调度 | `ports/clock.port.ts`、`adapters/time/system-clock-adapter.ts`；Domain/Application 禁止直接持有 Node timer |
+| 时间与调度 | Platform `Clock` 与 root `SystemClock`；具体实现 `core/platform/src/time/system-clock.ts`，Domain/Application 禁止直接持有 Node timer |
 | 日志/trace/DLQ | `adapters/observability/`、`adapters/events/dead-letter-queue.ts` |
 
 ## 标准步骤

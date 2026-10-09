@@ -2,8 +2,237 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApplicationRuntime } from './application-runtime';
 import { App } from '../../composition/kernel-application';
+import { AppLifecycleState } from '../../domain/lifecycle/lifecycle-state.enum';
+import { SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 
 describe('ApplicationRuntime resource lifecycle', () => {
+  function controlledApp(options: {
+    startGate?: Promise<void>; stopGate?: Promise<void>; stopError?: () => boolean; eventError?: boolean;
+    application?: ApplicationRuntime; transportError?: boolean;
+    onPublish?: (type: string) => void; onCloseIngress?: () => void;
+  } = {}) {
+    const order: string[] = [];
+    const module = (name: string) => ({ name,
+      async start() { order.push(`start:${name}`); if (name === 'transport') {
+        await options.startGate; if (options.transportError) throw new Error('transport failed');
+      } },
+      async stop() { order.push(`stop:${name}`); if (name === 'application') {
+        await options.stopGate; if (options.stopError?.()) throw new Error('application stop failed');
+      } },
+    });
+    const openIngress = vi.fn(() => { order.push('open'); });
+    const app = new App({ debug: vi.fn(), info: vi.fn() } as never,
+      { createTraceContext: () => ({ trace_id: 'test' }), histogram: vi.fn(),
+        close: () => { order.push('observability-close'); } } as never,
+      { publish: (event: { type: string }) => {
+        order.push(event.type);
+        options.onPublish?.(event.type);
+        if (options.eventError && event.type === 'AppStoppingEvent') throw new Error('stopping observer failed');
+      }, shutdown: () => { order.push('eventbus-close'); } } as never,
+      { replaceModuleSnapshots: vi.fn(), clear: vi.fn() } as never, { monotonicNowMs: () => 1 } as never,
+      { ...module('bootstrap'), config: {} } as never,
+      () => ({ transport: { ...module('transport'), openIngress, closeIngress: () => {
+        order.push('close-ingress'); options.onCloseIngress?.();
+      } },
+        application: options.application ?? module('application'), presentation: [module('presentation')], coreReadiness: [],
+        organism: module('organism'), recovery: module('recovery') }) as never);
+    return { app, order, openIngress };
+  }
+
+  it('App stops every resource and closes diagnostics despite product stopping observer failure', async () => {
+    const { app, order } = controlledApp({ eventError: true });
+    await app.start();
+    await expect(app.stop()).rejects.toThrow('应用停止时存在资源释放失败');
+    expect(order.filter(value => value.startsWith('stop:'))).toEqual([
+      'stop:recovery', 'stop:organism', 'stop:presentation', 'stop:application', 'stop:transport', 'stop:bootstrap',
+    ]);
+    expect(order.slice(-2)).toEqual(['eventbus-close', 'observability-close']);
+    expect(app.state).toBe(AppLifecycleState.ERROR);
+  });
+
+  it('App concurrent stop waits for actual drain and preserves failed ownership for retry', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let failStop = true;
+    const { app, order } = controlledApp({ stopGate: gate, stopError: () => failStop });
+    await app.start();
+    const stop = app.stop();
+    expect(app.stop()).toBe(stop);
+    expect(app.state).toBe(AppLifecycleState.STOPPING);
+    const outcome = expect(stop).rejects.toThrow('应用停止时存在资源释放失败');
+    release(); await outcome;
+    expect(app.state).toBe(AppLifecycleState.ERROR);
+    expect(order).not.toContain('eventbus-close');
+    expect(order).not.toContain('observability-close');
+    expect(order.filter(value => value.startsWith('stop:'))).toHaveLength(6);
+    failStop = false;
+    await app.stop();
+    expect(app.state).toBe(AppLifecycleState.STOPPED);
+    expect(order.filter(value => value === 'stop:application')).toHaveLength(2);
+    expect(order.filter(value => value === 'stop:transport')).toHaveLength(1);
+    expect(order.slice(-3)).toEqual(['AppStoppedEvent', 'eventbus-close', 'observability-close']);
+  });
+
+  it('App stop during startup drains accepted module and cannot reopen ingress or enter running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { app, order, openIngress } = controlledApp({ startGate: gate });
+    const starting = app.start();
+    const outcome = expect(starting).rejects.toThrow('应用启动失败');
+    for (let tick = 0; tick < 50 && !order.includes('start:transport'); tick += 1) await Promise.resolve();
+    expect(order).toContain('start:transport');
+    const stopping = app.stop();
+    release();
+    await outcome; await stopping;
+    expect(openIngress).not.toHaveBeenCalled();
+    expect(app.state).toBe(AppLifecycleState.STOPPED);
+    expect(order.filter(value => value.startsWith('start:'))).toEqual(['start:bootstrap', 'start:transport']);
+    // The application owns construction-time resources even when its start was never admitted.
+    expect(order.filter(value => value.startsWith('stop:')).sort()).toEqual(['stop:application', 'stop:bootstrap', 'stop:transport']);
+  });
+
+  it('real App provider stop retry preserves live SQLite journal then closes it exactly once', async () => {
+    const journal = new SqliteExecutionJournal(':memory:');
+    const close = vi.spyOn(journal, 'close');
+    let failProvider = true;
+    const stopProvider = vi.fn(() => {
+      expect(journal.readOutbox(1)).toEqual([]);
+      if (failProvider) throw new Error('provider still owns work');
+    });
+    const runtime = new ApplicationRuntime({
+      setCognitionActionHandler: vi.fn(), logger: { debug: vi.fn() } as never,
+      skillProviders: [{ start: vi.fn(), stop: stopProvider, listSkills: () => [] }] as never,
+      providerReadiness: () => [], extensionHostService: {} as never, skillCatalog: {} as never,
+      skillPlanning: {} as never, skillAction: {} as never, perception: {} as never, ownedResources: [journal],
+    });
+    const { app } = controlledApp({ application: runtime });
+    try {
+      await app.start();
+      await expect(app.stop()).rejects.toThrow('应用停止时存在资源释放失败');
+      expect(app.state).toBe(AppLifecycleState.ERROR);
+      expect(close).not.toHaveBeenCalled();
+      expect(journal.readOutbox(1)).toEqual([]);
+      failProvider = false;
+      await app.stop();
+      await app.stop();
+      expect(app.state).toBe(AppLifecycleState.STOPPED);
+      expect(stopProvider).toHaveBeenCalledTimes(2);
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      if (close.mock.calls.length === 0) journal.close();
+    }
+  });
+
+  it('transport failure retains unstarted construction owner across failed cleanup until retry succeeds', async () => {
+    const journal = new SqliteExecutionJournal(':memory:');
+    const close = vi.spyOn(journal, 'close');
+    let failProvider = true;
+    const providerStart = vi.fn();
+    const providerStop = vi.fn(() => {
+      expect(journal.readOutbox(1)).toEqual([]);
+      if (failProvider) throw new Error('partial cleanup failed');
+    });
+    const runtime = new ApplicationRuntime({
+      setCognitionActionHandler: vi.fn(), logger: { debug: vi.fn() } as never,
+      skillProviders: [{ start: providerStart, stop: providerStop, listSkills: () => [] }] as never,
+      providerReadiness: () => [], extensionHostService: {} as never, skillCatalog: {} as never,
+      skillPlanning: {} as never, skillAction: {} as never, perception: {} as never, ownedResources: [journal],
+    });
+    const { app, order } = controlledApp({ application: runtime, transportError: true });
+    try {
+      await expect(app.start()).rejects.toThrow('应用启动失败');
+      expect(app.state).toBe(AppLifecycleState.ERROR);
+      expect(providerStart).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      expect(order).not.toContain('AppStoppedEvent');
+      expect(order).not.toContain('eventbus-close');
+      expect(order).not.toContain('observability-close');
+      failProvider = false;
+      await app.stop();
+      expect(app.state).toBe(AppLifecycleState.STOPPED);
+      expect(close).toHaveBeenCalledOnce();
+      expect(providerStop).toHaveBeenCalledTimes(2);
+      expect(order.slice(-3)).toEqual(['AppStoppedEvent', 'eventbus-close', 'observability-close']);
+      await expect(app.start()).rejects.toThrow('应用已关闭');
+    } finally { if (close.mock.calls.length === 0) journal.close(); }
+  });
+
+  it('closed App rejects reuse of its shutdown event bus and cannot reopen ingress', async () => {
+    const { app, openIngress, order } = controlledApp();
+    await app.start();
+    await app.stop();
+    const starts = order.filter(value => value.startsWith('start:')).length;
+    await expect(app.start()).rejects.toThrow('应用已关闭');
+    expect(app.state).toBe(AppLifecycleState.STOPPED);
+    expect(openIngress).toHaveBeenCalledOnce();
+    expect(order.filter(value => value.startsWith('start:'))).toHaveLength(starts);
+  });
+
+  it.each([false, true])('concurrent start shares actual startup outcome (transport failure=%s)', async (transportError) => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { app, order } = controlledApp({ startGate: gate, transportError });
+    const starting = app.start();
+    let completed = false;
+    void starting.then(() => { completed = true; }, () => { completed = true; });
+    const outcome = transportError ? expect(starting).rejects.toThrow('应用启动失败') : starting;
+    expect(app.start()).toBe(starting);
+    for (let tick = 0; tick < 50 && !order.includes('start:transport'); tick += 1) await Promise.resolve();
+    expect(order).toContain('start:transport');
+    expect(completed).toBe(false);
+    expect(app.state).toBe(AppLifecycleState.INITIALIZING);
+    release(); await outcome;
+    expect(completed).toBe(true);
+    expect(app.state).toBe(transportError ? AppLifecycleState.STOPPED : AppLifecycleState.RUNNING);
+    await app.stop();
+  });
+
+  it('synchronous product callbacks reenter the same installed startup/stop outcome', async () => {
+    let reentrantStart: Promise<void> | undefined;
+    let reentrantStop: Promise<void> | undefined;
+    const { app, order } = controlledApp({
+      onPublish: type => { if (type === 'AppStartingEvent') reentrantStart = app.start(); },
+      onCloseIngress: () => { reentrantStop = app.stop(); },
+    });
+    const starting = app.start();
+    expect(reentrantStart).toBe(starting);
+    await starting;
+    const stopping = app.stop();
+    expect(reentrantStop).toBe(stopping);
+    await stopping;
+    expect(order.filter(value => value === 'close-ingress')).toHaveLength(1);
+    expect(order.filter(value => value === 'AppStoppedEvent')).toHaveLength(1);
+  });
+
+  it('stop immediately after start closes admission before any module can start', async () => {
+    const { app, order, openIngress } = controlledApp();
+    const starting = app.start();
+    const outcome = expect(starting).rejects.toThrow('应用启动失败');
+    const stopping = app.stop();
+    await outcome; await stopping;
+    expect(order.filter(value => value.startsWith('start:'))).toEqual([]);
+    expect(openIngress).not.toHaveBeenCalled();
+    expect(app.state).toBe(AppLifecycleState.STOPPED);
+  });
+
+  it('resource close retry skips successfully released resources and already drained execution', async () => {
+    let failResource = true;
+    const released = vi.fn();
+    const retry = vi.fn(() => { if (failResource) throw new Error('resource failed'); });
+    const drainExecution = vi.fn();
+    const runtime = new ApplicationRuntime({
+      setCognitionActionHandler: vi.fn(), logger: { debug: vi.fn() } as never, skillProviders: [],
+      providerReadiness: () => [], extensionHostService: {} as never, skillCatalog: {} as never,
+      skillPlanning: {} as never, skillAction: {} as never, perception: {} as never,
+      ownedResources: [{ close: retry }, { close: released }], drainExecution,
+    });
+    await expect(runtime.stop({} as never)).rejects.toThrow('资源释放失败');
+    failResource = false;
+    await runtime.stop({} as never);
+    expect(drainExecution).toHaveBeenCalledOnce();
+    expect(released).toHaveBeenCalledOnce();
+    expect(retry).toHaveBeenCalledTimes(2);
+  });
   it.each(['transport', 'application'])('%s 启动失败也关闭装配时已打开、尚未进 started 栈的资源', async (phase) => {
     const close = vi.fn();
     const runtime = new ApplicationRuntime({
@@ -52,17 +281,20 @@ describe('ApplicationRuntime resource lifecycle', () => {
     await expect(runtime.stop({} as never)).rejects.toThrow('drain failed');
     expect(stop).not.toHaveBeenCalled(); expect(close).not.toHaveBeenCalled();
   });
-  it('releases owned resources and detaches the action handler when a provider stop fails', async () => {
+  it('provider stop failure preserves dependencies and retry closes each acquired resource once', async () => {
     const close = vi.fn();
     const setCognitionActionHandler = vi.fn();
+    let failProvider = true;
+    const stopProvider = vi.fn(() => { if (failProvider) throw new Error('provider stop failed'); });
+    const stoppedProvider = vi.fn();
     const runtime = new ApplicationRuntime({
       setCognitionActionHandler,
       logger: { debug: vi.fn() } as never,
       skillProviders: [{
         start: vi.fn(),
-        stop: vi.fn(() => { throw new Error('provider stop failed'); }),
+        stop: stopProvider,
         listSkills: () => [],
-      }] as never,
+      }, { stop: stoppedProvider, listSkills: () => [] }] as never,
       providerReadiness: () => [],
       extensionHostService: {} as never,
       skillCatalog: {} as never,
@@ -75,7 +307,13 @@ describe('ApplicationRuntime resource lifecycle', () => {
     await expect(runtime.stop({} as never)).rejects.toThrow(
       'Application Runtime 停止时存在资源释放失败',
     );
-    expect(close).toHaveBeenCalledOnce();
+    expect(close).not.toHaveBeenCalled();
     expect(setCognitionActionHandler).toHaveBeenLastCalledWith(null);
+    failProvider = false;
+    await runtime.stop({} as never);
+    await runtime.stop({} as never);
+    expect(close).toHaveBeenCalledOnce();
+    expect(stopProvider).toHaveBeenCalledTimes(2);
+    expect(stoppedProvider).toHaveBeenCalledOnce();
   });
 });

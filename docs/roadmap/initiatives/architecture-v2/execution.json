@@ -904,9 +904,11 @@
         "G5",
         "G6"
       ],
-      "evidence": [],
+      "evidence": [
+        "evidence/2026-10-09-P02A.md"
+      ],
       "blockedReason": null,
-      "nextAction": "P02A.1已恢复：核对Platform现有ports与Kernel实际consumer；先收束生命周期关闭/部分启动失败/observer异常资源释放及真实consumer，逐项完成时钟、identity、配置、日志与健康机制归属及最终物理迁移。P07B固定42588674独立审查接受；大型最终门仍待验，不推送。",
+      "nextAction": "P02A.1/2/3第一段：生命周期owned/关闭排空、真实App部分启动/逐资源释放重试、共享start/stop及同步重入、Clock/Identity迁移已实现。Platform15/Kernel32有效+10skip/Host49+40skip/三包typecheck/隔离产物/架构文档编码工具15通过；增量审查finding已修，固定候选复核待收束。下一动作：取消/超时与observer自等待，再迁日志/trace/配置读取/健康/进程监督机制和实际consumer；完整P02A/D04及大型最终门未接受。唯一writer本会话，无后台，不推送。",
       "mapping": [
         {
           "action": "split",
@@ -977,6 +979,46 @@
           "target": "core/platform/README.md",
           "owner": "Platform",
           "exitCondition": "同步实际机制、失败/关闭契约与未迁产品装配的具体退出门。"
+        },
+        {
+          "action": "retain",
+          "source": "core/platform/tsconfig.json",
+          "target": "core/platform/tsconfig.json",
+          "owner": "Platform",
+          "exitCondition": "Node adapter迁入后显式Node类型，source和公开测试编译通过。"
+        },
+        {
+          "action": "create",
+          "target": "core/platform/tests/public-api.test.ts",
+          "owner": "Platform",
+          "exitCondition": "公开入口真实timer与identity兼容性和关闭fencing反例通过。"
+        },
+        {
+          "action": "create",
+          "target": "docs/roadmap/initiatives/architecture-v2/evidence/2026-10-09-P02A.md",
+          "owner": "engineering",
+          "exitCondition": "只记录实际增量与未验门，不以局部提交关闭最终验收。"
+        },
+        {
+          "action": "split",
+          "source": "core/kernel/src/runtime/modules/lifecycle-orchestrator.ts",
+          "target": "apps/host/src/supervision/readiness.ts",
+          "owner": "Host",
+          "exitCondition": "暂存真实产品装配、事件与投影政策，不迁Platform；P12B迁全产品readiness消费者并删除原路径。"
+        },
+        {
+          "action": "split",
+          "source": "core/kernel/src/composition/kernel-application.ts",
+          "target": "apps/host/src/supervision/shutdown.ts",
+          "owner": "Host",
+          "exitCondition": "当前实际Kernel产品装配持续消费Platform并定向验证资源释放；P12B完成Host产品装配/入口切换后consumer-zero删除原路径。"
+        },
+        {
+          "action": "split",
+          "source": "core/kernel/src/runtime/modules/application-runtime.ts",
+          "target": "apps/host/src/composition/host.ts",
+          "owner": "Host",
+          "exitCondition": "真实产品Application provider/resource逐项owned、依赖保留与恢复由当前单一装配消费；P12B迁完整Host装配并通过真实行为验证后consumer-zero删除该原路径。"
         }
       ],
       "commands": [
@@ -984,6 +1026,10 @@
         "pnpm --filter @glimmer-cradle/platform typecheck",
         "pnpm test:host",
         "pnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/application-runtime.test.ts",
+        "pnpm --filter @glimmer-cradle/kernel typecheck",
+        "pnpm --filter @glimmer-cradle/host typecheck",
+        "pnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/application-runtime.test.ts src/runtime/modules/cognition-runtime.integration.test.ts tests/application/attention-lease-store.test.ts src/application/attention/attention-session-manager.test.ts src/application/use-cases/extension-host-app.service.test.ts",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '关闭|停机|重启|排空|启动失败|启动前|安装根|authority|公开Jobs通知'",
         "pnpm check:docs --write",
         "pnpm check:architecture",
         "pnpm check:encoding",

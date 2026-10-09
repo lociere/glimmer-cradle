@@ -18,14 +18,14 @@
       "default": "./dist/index.js"
     },
     "./time": {
-      "types": "./dist/time/index.d.ts",
-      "require": "./dist/time/index.js",
-      "default": "./dist/time/index.js"
+      "types": "./dist/time/clock.d.ts",
+      "require": "./dist/time/clock.js",
+      "default": "./dist/time/clock.js"
     },
     "./identity": {
-      "types": "./dist/identity/index.d.ts",
-      "require": "./dist/identity/index.js",
-      "default": "./dist/identity/index.js"
+      "types": "./dist/identity/identity.d.ts",
+      "require": "./dist/identity/identity.js",
+      "default": "./dist/identity/identity.js"
     },
     "./events": {
       "types": "./dist/events/index.d.ts",
@@ -38,15 +38,15 @@
       "default": "./dist/observability/index.js"
     },
     "./lifecycle": {
-      "types": "./dist/lifecycle/index.d.ts",
-      "require": "./dist/lifecycle/index.js",
-      "default": "./dist/lifecycle/index.js"
+      "types": "./dist/lifecycle/supervisor.d.ts",
+      "require": "./dist/lifecycle/supervisor.js",
+      "default": "./dist/lifecycle/supervisor.js"
     }
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts tests/lifecycle-drain.test.ts tests/public-api.test.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm run build && node --test tests/*.test.mjs tests/authority-fencing.test.ts"
+    "test": "pnpm run build && node --test tests/*.test.mjs tests/*.test.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

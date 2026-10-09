@@ -19,6 +19,9 @@ export class ApplicationRuntime implements RuntimeModule {
   private readonly _skillProviders: SkillProvider[];
   private readonly ownedResources: ReadonlyArray<{ close(): void | Promise<void> }>;
   private readonly drainExecution?: () => Promise<void>;
+  private readonly pendingProviders: Set<SkillProvider>;
+  private readonly pendingResources: Set<{ close(): void | Promise<void> }>;
+  private executionDrained = false;
 
   public constructor(options: {
     readonly setCognitionActionHandler: (handler: CognitionActionHandler | null) => void;
@@ -44,6 +47,8 @@ export class ApplicationRuntime implements RuntimeModule {
     this.perception = options.perception;
     this.ownedResources = options.ownedResources ?? [];
     this.drainExecution = options.drainExecution;
+    this.pendingProviders = new Set(this._skillProviders);
+    this.pendingResources = new Set(this.ownedResources);
   }
   private readonly logger: KernelLoggerPort;
   private readonly providerReadiness: () => RuntimeReadinessSnapshot[];
@@ -116,29 +121,35 @@ export class ApplicationRuntime implements RuntimeModule {
     const failures: unknown[] = [];
     this._setCognitionActionHandler(null);
     // Provider 和 journal 的寿命必须长于真实接收方调用；排空失败时保留资源，不假装停机完成。
-    await this.drainExecution?.();
-    for (const provider of [...this._skillProviders].reverse()) {
+    if (!this.executionDrained) {
+      await this.drainExecution?.();
+      this.executionDrained = true;
+    }
+    for (const provider of [...this.pendingProviders].reverse()) {
       try {
         await Promise.resolve(provider.stop(skillCatalogAppService));
+        this.pendingProviders.delete(provider);
       } catch (error) {
         failures.push(error);
       }
     }
-    for (const resource of [...this.ownedResources].reverse()) {
+    // An unreleased provider may still own work referencing the journal/catalog.
+    // Keep dependencies until every provider has stopped, rather than making retry use closed state.
+    if (failures.length > 0) throw new AggregateError(failures, 'Application Runtime 停止时存在资源释放失败');
+    for (const resource of [...this.pendingResources].reverse()) {
       try {
         await Promise.resolve(resource.close());
+        this.pendingResources.delete(resource);
       } catch (error) {
         failures.push(error);
       }
     }
 
+    if (failures.length > 0) throw new AggregateError(failures, 'Application Runtime 停止时存在资源释放失败');
     this._extensionHostAppService = null;
     this._perceptionAppService = null;
     this._skillPlanningAppService = null;
     this._skillCatalogAppService = null;
     this.logger.debug('Application Runtime 已停止');
-    if (failures.length > 0) {
-      throw new AggregateError(failures, 'Application Runtime 停止时存在资源释放失败');
-    }
   }
 }

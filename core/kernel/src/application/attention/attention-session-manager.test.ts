@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PerceptionEvent } from '../../ports/application-models';
 import type { Observability as KernelObservabilityPort } from '@glimmer-cradle/platform/observability';
-import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { SystemClock } from '@glimmer-cradle/platform';
 import { AttentionLeaseStore } from './attention-lease-store';
 import { AttentionSessionManager } from './attention-session-manager';
 
@@ -18,7 +18,7 @@ const observability: KernelObservabilityPort = {
   stop: () => undefined,
   close: async () => undefined,
 };
-const clock = new SystemClockAdapter();
+const clock = new SystemClock();
 const manager = new AttentionSessionManager({
   ingress_debounce_ms: 1,
   ingress_focused_debounce_ms: 1,

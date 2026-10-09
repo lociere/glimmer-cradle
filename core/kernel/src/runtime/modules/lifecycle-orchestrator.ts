@@ -53,6 +53,8 @@ export class LifecycleOrchestrator {
     return [...this.coordinator.started];
   }
 
+  public get owned(): readonly RuntimeModule[] { return this.coordinator.owned; }
+
   public get startupReport(): RuntimeStartupRecord[] {
     return this.coordinator.startupReport.map((record) => ({
       phase: record.phase,

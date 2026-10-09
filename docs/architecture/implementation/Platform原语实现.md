@@ -11,8 +11,8 @@
 
 | 子路径 | 职责 | 消费方/实现 |
 |---|---|---|
-| `/time` | Clock、ScheduledTask；墙钟、单调时间、timer 边界 | Attention、Ingress、LifeClock、lifecycle；SystemClockAdapter |
-| `/identity` | StableIdentity 的 newId/digest；领域决定 ID 含义 | IdentityRouter、ConversationDirectory；NodeStableIdentityAdapter |
+| `/time` | Clock、ScheduledTask；墙钟、单调时间、timer 边界 | Attention、Ingress、LifeClock、lifecycle；root `SystemClock` |
+| `/identity` | StableIdentity 的 newId/digest；领域决定 ID 含义 | IdentityRouter、ConversationDirectory；root `NodeStableIdentity` |
 | `/observability` | TraceContext、Logger、Span、Observability | Kernel application/runtime；KernelObservabilityAdapter |
 | `/lifecycle` | RuntimeModule、LifecyclePhase、Observer、LifecycleCoordinator | Kernel runtime modules 与 LifecycleOrchestrator |
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
@@ -25,16 +25,28 @@
 
 ## 组合与生命周期
 
-[Kernel composition](../../../core/kernel/src/composition/kernel-application.ts) 创建并复用 SystemClockAdapter。
+[Kernel composition](../../../core/kernel/src/composition/kernel-application.ts) 从 Platform root 创建并复用
+`SystemClock` 与 `NodeStableIdentity`；其通用实现位于 `time/system-clock.ts` 与
+`identity/stable-identity.ts`，原 Kernel 具体机制 consumer-zero 后删除。
 链路为 `App → LifecycleOrchestrator → LifecycleCoordinator → RuntimeModule.start/stop`。
 阶段由 composition 显式排序，Platform 不解析依赖图。
 
 - 串行依次启动；并行等待全部启动结果收敛，再报告单个错误或 AggregateError。
-- start 成功返回后才加入 started；耗时使用单调时钟。
+- start 调用前登记资源 owner，成功返回后加入 started；耗时使用单调时钟。
+  start 失败可能留下部分资源，因此 RuntimeModule.stop 必须能释放部分启动资源。
 - Kernel observer 生成领域事件、日志和 readiness projection；Platform 不判断业务 ready。
 - 组合根负责失败后的停机，startPhase 内不会自动回滚。
-- stopStarted 按成功记录逆序停止，finally 清空记录。当前 stop/observer 抛错会中断后续停止，
-  不能宣称已保证任意停止失败后的完整资源回收；后续行为修订须补失败测试。
+- stopStarted 立即关闭接纳，等待已接纳启动与 observer 收敛，再按 owner 接纳逆序停止。
+  stop/observer 异常不跳过其余模块，汇总失败上抛；成功释放的 owner 移除，失败资源保留供重试。
+  并发 stop 返回同一实际排空 Promise；coordinator 关闭后不能重新启动。
+- App 合并并发 start/stop，在调用可同步重入的回调前安装共享 Promise，调用者等待真实结果。
+  装配时已打开、尚未接纳的 Application 由 App field 持有，失败清理不丢失 owner；
+  已接纳资源转交 coordinator，避免两次关闭。关闭后的 App 拒绝复用已 shutdown 的总线。
+- 停机事件异常仍继续排空；未释放 owner 保留，状态 ERROR，可再次 stop 重试。
+  Application 在 provider 未停止时保留其依赖，每个成功释放 provider/resource 从重试集合移除；
+  全部资源释放后才发送 AppStopped 并关闭总线/diagnostics，失败中间态保持 observer 可用。
+- observer 不能同步等待当前 coordinator 的 stop（会自等待）；通用取消/超时与自等待检测
+  尚待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
 
 ## 事件、配置与数据边界
 

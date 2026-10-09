@@ -1,5 +1,7 @@
-export type { Clock, ScheduledTask } from './time/index.js';
-export type { StableIdentity } from './identity/index.js';
+export type { Clock, ScheduledTask } from './time/clock.js';
+export { SystemClock } from './time/system-clock.js';
+export type { StableIdentity } from './identity/identity.js';
+export { NodeStableIdentity } from './identity/stable-identity.js';
 export type {
   LiveEventBus,
   LiveEventHandler,
@@ -19,8 +21,8 @@ export type {
   LifecycleStartupRecord,
   RuntimeModule,
   RuntimeModuleStartDetails,
-} from './lifecycle/index.js';
-export { LifecycleCoordinator } from './lifecycle/index.js';
+} from './lifecycle/runtime-module.js';
+export { LifecycleCoordinator } from './lifecycle/supervisor.js';
 export { ConfigurationValidator } from './configuration/index.js';
 export type { ConfigurationValidation } from './configuration/index.js';
 export { AuthorityConflictError, isAuthorityCurrent, validateAuthorityLease, validateAuthorityWindow } from './topology/authority-lease.js';

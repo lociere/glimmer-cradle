@@ -20,7 +20,7 @@ import { KernelTransportRuntime } from './kernel-transport-runtime';
 import { createTraceContext } from '../../adapters/observability/trace-context';
 import { RuntimeReadinessProjectionMapper } from '../../application/projection/runtime-readiness-projection';
 import type { KernelConfiguration } from '../../ports/configuration.port';
-import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { SystemClock } from '@glimmer-cradle/platform';
 import { resolveRepoRoot } from '../../adapters/filesystem/path-utils';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal } from '@glimmer-cradle/capabilities';
 import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
@@ -38,7 +38,7 @@ const runIntegration = process.env.GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION === 
 it('Cognition 启动关闭入口但保持 starting；真正失败才发布 failed', () => {
   const projection = new RuntimeReadinessProjectionMapper();
   const logger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined, critical: () => undefined };
-  const transport = new KernelTransportRuntime({} as KernelConfiguration, new KernelCognitionTransport(), new IngressGateManager(logger, new SystemClockAdapter()), projection);
+  const transport = new KernelTransportRuntime({} as KernelConfiguration, new KernelCognitionTransport(), new IngressGateManager(logger, new SystemClock()), projection);
   const runtime = new CognitionRuntime(transport, { isReady: false, start: async () => {}, stop: async () => {} }, projection);
   runtime.acceptLifecycleFact('starting', '等待注册');
   expect(projection.getCatalog().runtimes.find(item => item.runtime_id === 'kernel.ingress')?.state).toBe('starting');
@@ -123,7 +123,7 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     transportRuntime = new KernelTransportRuntime(
       ConfigManager.instance.getConfig() as unknown as KernelConfiguration,
       transport,
-      new IngressGateManager(logger, new SystemClockAdapter()),
+      new IngressGateManager(logger, new SystemClock()),
       projection,
     );
     let cognitionRuntime!: CognitionRuntime;

@@ -34,7 +34,7 @@ import { AudioService } from '../adapters/audio/audio-service';
 import { AvatarController } from '../adapters/avatar/avatar-controller';
 import { AvatarRuntimeAdapter } from '../adapters/avatar/avatar-runtime-adapter';
 import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gateway';
-import { NodeStableIdentityAdapter } from '../adapters/identity/node-stable-identity-adapter';
+import { NodeStableIdentity } from '@glimmer-cradle/platform';
 import {
   ConversationDirectory,
   DeliveryController,
@@ -78,7 +78,7 @@ import { KernelPresentationAdapter } from '../adapters/surface/kernel-presentati
 import { KernelOrganismAdapter } from '../adapters/organism/kernel-organism-adapter';
 import { DlqReplayIngress } from '../adapters/events/dlq-replay-ingress';
 import { resolveLogDir } from '../adapters/filesystem/path-utils';
-import { SystemClockAdapter } from '../adapters/time/system-clock-adapter';
+import { SystemClock } from '@glimmer-cradle/platform';
 import { loadProductComposition, type ProductComposition } from './product-composition';
 
 interface OperationalRuntimePlan {
@@ -102,6 +102,10 @@ export class App {
   private stateValue = AppLifecycleState.UNINITIALIZED;
   private orchestrator: LifecycleOrchestrator | null = null;
   private transportRuntime: KernelTransportRuntime | null = null;
+  private stopping: Promise<void> | undefined;
+  private closing = false;
+  private constructionApplication: ApplicationRuntime | null = null;
+  private starting: Promise<void> | undefined;
 
   public constructor(
     private readonly logger: KernelLoggerPort,
@@ -115,61 +119,107 @@ export class App {
 
   public get state(): AppLifecycleState { return this.stateValue; }
 
-  public async start(): Promise<void> {
-    if (this.stateValue !== AppLifecycleState.UNINITIALIZED && this.stateValue !== AppLifecycleState.STOPPED) return;
+  public start(): Promise<void> {
+    if (this.closing) return Promise.reject(new Error('应用已关闭，重新启动需要全新承载实例'));
+    if (this.starting) return this.starting;
+    if (this.stateValue !== AppLifecycleState.UNINITIALIZED) return Promise.resolve();
+    let resolveStart!: () => void;
+    let rejectStart!: (error: unknown) => void;
+    const starting = new Promise<void>((resolve, reject) => { resolveStart = resolve; rejectStart = reject; });
+    this.starting = starting;
+    // Publish callbacks can synchronously reenter start; install their shared outcome first.
+    void this.startModules().then(resolveStart, rejectStart);
+    void starting.then(() => { this.starting = undefined; }, () => { this.starting = undefined; });
+    return starting;
+  }
+
+  private async startModules(): Promise<void> {
     const startedAt = this.clock.monotonicNowMs();
     const context = this.observability.createTraceContext();
     const orchestrator = new LifecycleOrchestrator(this.logger, this.eventBus, this.projection, this.clock);
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
-    let unstartedApplication: ApplicationRuntime | null = null;
     try {
       await this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context));
       await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context);
       const config = this.bootstrap.config;
       const plan = this.createOperationalPlan(config, (code = 0) => this.stop(code));
-      unstartedApplication = plan.application;
+      this.constructionApplication = plan.application;
       this.transportRuntime = plan.transport;
       await orchestrator.startPhase({ name: 'transport', modules: [plan.transport] }, context);
       await orchestrator.startPhase({ name: 'application', modules: [plan.application] }, context);
-      unstartedApplication = null;
+      this.constructionApplication = null;
       await orchestrator.startPhase({ name: 'presentation', modules: [...plan.presentation] }, context);
       await orchestrator.startPhase({ name: 'core-readiness', mode: 'parallel', modules: [...plan.coreReadiness] }, context);
       if (plan.executionResults) await orchestrator.startPhase({ name: 'execution-results', modules: [plan.executionResults] }, context);
+      if (this.stateValue !== AppLifecycleState.INITIALIZING) throw new Error('应用关闭期间拒绝开放 ingress');
       plan.transport.openIngress();
       if (plan.extension) await orchestrator.startPhase({ name: 'extensions', modules: [plan.extension] }, context);
       await orchestrator.startPhase({ name: 'organism', modules: [plan.organism] }, context);
       await orchestrator.startPhase({ name: 'recovery-ingress', modules: [plan.recovery] }, context);
+      if (this.stateValue !== AppLifecycleState.INITIALIZING) throw new Error('应用关闭期间拒绝进入 running');
       const startupTimeMs = Math.max(0, this.clock.monotonicNowMs() - startedAt);
       this.stateValue = AppLifecycleState.RUNNING;
       this.observability.histogram('app.startup_ms', startupTimeMs);
       await this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context));
       this.logger.info('应用启动完成，当前角色已就绪', { total_startup_time_ms: startupTimeMs });
     } catch (error) {
-      this.stateValue = AppLifecycleState.ERROR;
-      const failures: unknown[] = [error];
-      // journal 在装配时已打开；transport/provider 启动失败的 application 不在 started 栈中。
-      if (unstartedApplication && !orchestrator.started.includes(unstartedApplication)) {
-        try { await unstartedApplication.stop(context); } catch (cleanupError) { failures.push(cleanupError); }
+      if (this.state !== AppLifecycleState.STOPPING && this.state !== AppLifecycleState.STOPPED) {
+        this.stateValue = AppLifecycleState.ERROR;
       }
+      const failures: unknown[] = [error];
       try { await this.stop(1); } catch (stopError) { failures.push(stopError); }
       throw new CoreException(`应用启动失败: ${failures.map(normalizeError).join('；')}`, 'LIFECYCLE_ERROR', context.trace_id);
     }
   }
 
-  public async stop(exitCode = 0): Promise<void> {
-    if (this.stateValue === AppLifecycleState.STOPPING || this.stateValue === AppLifecycleState.STOPPED) return;
-    const context = this.observability.createTraceContext();
+  public stop(exitCode = 0): Promise<void> {
+    this.closing = true;
+    if (this.stopping) return this.stopping;
+    if (this.stateValue === AppLifecycleState.STOPPED) return Promise.resolve();
     this.stateValue = AppLifecycleState.STOPPING;
-    this.transportRuntime?.closeIngress();
-    await this.eventBus.publish(new AppStoppingEvent({ reason: exitCode === 0 ? '正常停机' : '异常停机' }, context));
-    if (this.orchestrator) await this.orchestrator.stopStarted(context);
-    this.orchestrator = null;
-    this.transportRuntime = null;
-    this.stateValue = AppLifecycleState.STOPPED;
-    await this.eventBus.publish(new AppStoppedEvent({ exitCode }, context));
-    await this.eventBus.shutdown();
-    await this.observability.close();
+    let resolveStop!: () => void;
+    let rejectStop!: (error: unknown) => void;
+    const stopping = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
+    this.stopping = stopping;
+    void this.releaseResources(exitCode).then(resolveStop, rejectStop);
+    void stopping.then(() => { this.stopping = undefined; }, () => { this.stopping = undefined; });
+    return stopping;
+  }
+
+  private async releaseResources(exitCode: number): Promise<void> {
+    const context = this.observability.createTraceContext();
+    const failures: unknown[] = [];
+    const release = async (action: () => unknown): Promise<void> => {
+      try { await action(); } catch (error) { failures.push(error); }
+    };
+    // Transfer construction ownership before closing the coordinator; after drain its
+    // successful owner may already be removed, so checking ownership later would double-close.
+    if (this.constructionApplication && this.orchestrator?.owned.includes(this.constructionApplication)) {
+      this.constructionApplication = null;
+    }
+    // Fence startup immediately, before any awaited product event can admit another phase.
+    const draining = this.orchestrator?.stopStarted(context);
+    const drained = draining?.catch(error => { failures.push(error); });
+    await release(() => this.transportRuntime?.closeIngress());
+    await release(() => this.eventBus.publish(new AppStoppingEvent({ reason: exitCode === 0 ? '正常停机' : '异常停机' }, context)));
+    if (this.constructionApplication) {
+      await release(async () => {
+        await this.constructionApplication!.stop(context);
+        this.constructionApplication = null;
+      });
+    }
+    await drained;
+    const resourcesRemain = (this.orchestrator?.owned.length ?? 0) > 0 || this.constructionApplication !== null;
+    if (!resourcesRemain) {
+      this.orchestrator = null;
+      this.transportRuntime = null;
+      await release(() => this.eventBus.publish(new AppStoppedEvent({ exitCode }, context)));
+      await release(() => this.eventBus.shutdown());
+      await release(() => this.observability.close());
+    }
+    this.stateValue = failures.length > 0 || resourcesRemain ? AppLifecycleState.ERROR : AppLifecycleState.STOPPED;
+    if (failures.length > 0) throw new AggregateError(failures, '应用停止时存在资源释放失败');
   }
 }
 
@@ -178,7 +228,7 @@ export function createKernelApplication(product: ProductComposition = loadProduc
   const observability = new KernelObservabilityAdapter();
   const eventBus = EventBus.instance;
   const projection = new RuntimeReadinessProjectionMapper();
-  const clock = new SystemClockAdapter();
+  const clock = new SystemClock();
   const bootstrap = new KernelBootstrapRuntime(new NodeKernelBootstrapAdapter());
   const configuration = new KernelConfigurationAdapter();
   return new App(
@@ -213,7 +263,7 @@ function createOperationalRuntimePlan(options: {
   const cognition = new AIProxy(cognitionAdapter);
   const audio = new AudioService();
   const avatar = new AvatarController(projection);
-  const stableIdentity = new NodeStableIdentityAdapter();
+  const stableIdentity = new NodeStableIdentity();
   const constructionResources: Array<{ close(): void }> = [];
   try {
     const bindingStore = new SqliteBindingStore(resolveStatePath('conversation/bindings.db'));

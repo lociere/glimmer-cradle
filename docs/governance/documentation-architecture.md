@@ -253,6 +253,7 @@ docs/
     │   │   ├── README.md
     │   │   ├── acceptance.md
     │   │   ├── evidence/
+    │   │   │   ├── 2026-10-09-P02A.md
     │   │   │   ├── 2026-10-09-P07A.md
     │   │   │   ├── 2026-10-09-P07B.md
     │   │   │   ├── 2026-10-09-docs-integration.md

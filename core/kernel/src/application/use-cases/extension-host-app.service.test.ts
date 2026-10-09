@@ -6,7 +6,7 @@ import { SkillCatalogAppService } from './skill-catalog-app.service';
 import { CapabilityCatalogAdapter } from '../../adapters/skill-plane/capability-catalog-adapter';
 import type { SkillAvailabilityContext } from '../../ports/skill-plane.port';
 import { SkillPlanePolicy } from '../skill-plane/availability';
-import { SystemClockAdapter } from '../../adapters/time/system-clock-adapter';
+import { SystemClock } from '@glimmer-cradle/platform';
 import { AttentionLeaseStore } from '../attention/attention-lease-store';
 import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
@@ -31,7 +31,7 @@ function createHostService(perception: unknown, catalog = new SkillCatalogAppSer
       catalog,
       availability,
       skillPlanePolicy,
-      new AttentionLeaseStore(new SystemClockAdapter()),
+      new AttentionLeaseStore(new SystemClock()),
       {} as never,
       new ExtensionRuntimeRegistry(availability, skillPlanePolicy),
       '0.2.2',
