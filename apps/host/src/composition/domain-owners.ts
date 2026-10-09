@@ -7,6 +7,7 @@ import { SqliteJobStore, type JobClockPort, type JobStateReceiverPort, type JobS
 import { SqliteAuthorityStore } from '../adapters/platform/authority-store.js';
 import { HostDataPaths } from '../adapters/platform/data-paths.js';
 import { loadHostCognitionJobsConfiguration, type HostCognitionJobsConfiguration } from '../adapters/platform/host-configuration.js';
+import type { HostConversationRoutes } from '../gateway/conversation-routes.js';
 import { CognitionJobAdapter } from './cognition-job-adapter.js';
 import { HostKnowledgeController, HostResourceContributions, type HostKnowledgeApproval, type HostKnowledgeSnapshot } from './extension-contributions.js';
 
@@ -28,6 +29,7 @@ export interface ConfiguredHostCognitionJobsOptions {
     | 'startup_timeout_ms' | 'shutdown_timeout_ms' | 'request_timeout_ms'>;
   readonly state_receiver?: JobStateReceiverPort;
   readonly resources?: HostResourceContributions;
+  readonly conversation_routes?: HostConversationRoutes;
 }
 export interface ConfiguredHostCognitionJobsSnapshot {
   readonly phase: 'idle' | 'starting' | 'active' | 'failed' | 'stopping' | 'stopped';
@@ -94,7 +96,8 @@ export class ConfiguredHostCognitionJobsOwner {
         ...(this.options.resources ? { knowledge: { resources: this.options.resources, approvals: this.configuration.knowledge_approvals } } : {}),
         jobs: { ...this.configuration.jobs, ...this.configuration.authority,
         store: this.store, authority: this.authority, clock: this.options.clock, owner_id: this.options.owner_id,
-        state_receiver: this.options.state_receiver, memory_state_feedback: true, planning_sources: true } });
+        state_receiver: this.options.state_receiver, memory_state_feedback: true, planning_sources: true,
+        conversation_routes: this.options.conversation_routes } });
       await this.session.start();
       if (this.stopRequested) throw new Error('配置 Host 启动已撤销');
       this.phase = 'active'; return this.snapshot;

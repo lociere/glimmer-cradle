@@ -11,7 +11,7 @@ import { PublishStateResponseSchema } from '@glimmer-cradle/contracts/glimmer/ke
 it('Host 暴露实际 App 装配/adapter，而不暴露 Kernel 内部或底层 DB connection', () => {
   expect(Object.keys(api).sort()).toEqual(['CognitionClient', 'CognitionJobAdapter', 'HostCognitionError', 'HostJobsController',
     'HostJobsOwner', 'HostCognitionJobsOwner', 'ConfiguredHostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
-    'HostDataPaths', 'HostConfigurationError', 'loadHostCognitionJobsConfiguration',
+    'HostDataPaths', 'HostConfigurationError', 'HostConversationRoutes', 'loadHostCognitionJobsConfiguration',
     'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest',
     'PermissionBroker', 'HostResourceContributions', 'HostKnowledgeController', 'HostCapabilityRequestError'].sort());
 });

@@ -178,6 +178,12 @@ export class DeliveryController {
     return this.store.isCurrentEpoch(this.authorityEpoch) && output?.authority_epoch === this.authorityEpoch ? output : null;
   }
 
+  /** 只读既有输出，包括旧 epoch；不提供重新发送或接纳迟到回执的能力。 */
+  public recordedOutput(outputId: string): OutputGeneration | null {
+    if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
+    return this.store.load(outputId);
+  }
+
   private move(outputId: string, status: DeliveryStatus): OutputGeneration {
     if (!this.store.isCurrentEpoch(this.authorityEpoch)) throw new Error('Delivery authority epoch 已失效');
     const current = this.store.load(outputId);

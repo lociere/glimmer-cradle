@@ -1,4 +1,11 @@
 import { create } from '@bufbuild/protobuf';
+import { createHash } from 'node:crypto';
+import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema,
+  PreparePlanningNotificationRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
+import type { PlanningNotificationsCognitionPort } from '../adapters/protocol/cognition-client.js';
+import { HostCognitionError } from '../adapters/protocol/cognition-client.js';
+import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
+import { HostConversationRoutes } from '../gateway/conversation-routes.js';
 import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
   ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
@@ -120,6 +127,49 @@ export class PlanningJobSourceAdapter implements JobReconciliationPort {
 }
 
 /** 实际 Planning 接纳/执行/对账；claim 前采样不替代 Execute 的 live 政策复验。 */
+/** 前向有界页不因首个无接收方而停止；事实源 ACK 只由实际 Delivery receipt 驱动。 */
+export class PlanningNotificationAdapter {
+  private cursor = '';
+  public constructor(private readonly cognition: PlanningNotificationsCognitionPort, private readonly routes: HostConversationRoutes,
+    private readonly assertCurrent: () => void) {}
+  public async deliver(limit: number, signal?: AbortSignal): Promise<void> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Planning 通知分页预算无效');
+    signal?.throwIfAborted();
+    const page = await this.cognition.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema,
+      { limit, ...(this.cursor ? { afterNotificationId: this.cursor } : {}) }), signal);
+    signal?.throwIfAborted();
+    if (page.requests.length > limit) throw new Error('Planning 通知分页响应越界');
+    if (!page.requests.length) { this.cursor = ''; return; }
+    for (const request of page.requests) {
+      this.assertCurrent();
+      if (!/^[a-f0-9]{64}$/.test(request.notificationId) || request.notificationId <= this.cursor) throw new Error('Planning 通知分页身份无效');
+      this.cursor = request.notificationId;
+      const resolved = await this.cognition.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request }), signal);
+      signal?.throwIfAborted(); this.assertCurrent();
+      if (resolved.request?.notificationId !== request.notificationId) throw new Error('Planning 通知来源响应错绑定');
+      if (!resolved.available) continue;
+      // 内部域合法但永不外送；缺接收方不产生新的 Reply/Turn。
+      if ([resolved.context?.recallScope, resolved.context?.disclosureScope].includes('character_internal')) continue;
+      const turnId = createHash('sha256').update(`conversation-notification-turn.v1:${request.notificationId}`).digest('hex');
+      const confirmed = this.routes.delivery.confirmedReceipt(`reply:${turnId}`);
+      if (!confirmed && !this.routes.available(resolved)) continue;
+      let prepared;
+      try { prepared = await this.cognition.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema, { request }), signal); }
+      catch (error) {
+        signal?.throwIfAborted(); this.assertCurrent();
+        // 来源可能在 Resolve→Prepare 的 await 间失去资格；保留本项，不停止其他 Jobs。
+        if (error instanceof HostCognitionError && error.code === ServiceErrorCode.PERMISSION_DENIED) continue;
+        throw error;
+      }
+      signal?.throwIfAborted(); this.assertCurrent();
+      if (prepared.request?.notificationId !== request.notificationId) throw new Error('Planning 通知接纳响应错绑定');
+      const result = this.routes.send(prepared, signal);
+      if (result === 'confirmed') await this.cognition.acknowledgeDeliveredPlanningNotification(prepared,
+        `reply:${prepared.turnId}`, this.routes.delivery, signal);
+    }
+  }
+}
+
 export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort, JobAdmissionPort {
   public readonly kind = PLANNING_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;

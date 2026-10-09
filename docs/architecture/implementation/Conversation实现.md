@@ -82,12 +82,18 @@ epoch 不按字符串排序推断新旧，窗口也不替代 Platform 的 author
 只允许原语义精确重投，到达时间可更晚，但保留首次时间；异内容不能冒充 duplicate。已知时长
 不能通过省略 duration 绕过，直接调用 Store 也不能倒退进度或篡改回执原因。
 
-`receipt` 与 `confirmedReceipt` 从唯一持久 owner 只读返回可核验事实；后者只认可真实
+`recordedOutput` 从当前 owner 只读查询包含旧 epoch 的输出，用于阻止重启自动重发；
+旧 controller 无权查询，该方法不改变状态。`receipt` 与 `confirmedReceipt` 从唯一持久 owner
+只读返回可核验事实；后者只认可真实
 delivered/playback_completed，sent、unknown、started/progress、失败或仅旧状态不是确认。
 新主可对账旧主曾接纳的历史确认，supersession 不抹除历史事实，但不接纳新的迟到旧世代回执；
 历史事实不授予当前外部发送权限，也不自动 ACK Planning。普通打开不建立增量窗口，旧最小
 receipt 不回填完整事实；需要独立真实新回执或受控对账。未知版本、部分窗口、损坏或原绑定
 冲突拒绝确认，不自动修复用户库。恢复与备份规则见[数据目录](../../reference/data-layout.md#用户状态与记忆)。
+
+Host 定向通知路由已复用该 Delivery owner，按完整接收域与显式当前权限绑定真实 Surface
+stream/回执实例；不复用旧 Kernel 的 Reply 广播。发送、背压、撤权与历史确认的精确边界见
+[协议](../../reference/protocol.md#planning-通知真实回执源确认)，完整产品 ingress 切换仍未完成。
 
 ## Canonical Log 与 Experience
 

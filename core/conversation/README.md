@@ -19,7 +19,8 @@ History 投影和输出 Delivery。认知内容由 Cognition 决定；平台地�
 - `bindings.db` 保存不含外部原始键的 opaque Binding。
 - `delivery.db` 保存当前/已退出 authority epoch、generation、投递状态、播放范围和完整回执事实。
   实际回执与状态同事务提交，绑定原 Turn、内容摘要和目的地；历史最小 receipt ID 不自动补造确认。
-  `receipt`/`confirmedReceipt` 只读查询历史接纳事实，不证明当前发送权限。
+  `recordedOutput`/`receipt`/`confirmedReceipt` 只读查询历史输出或接纳事实，不证明当前发送权限；
+  退出 controller 不能查询，Host 借旧输出阻止重启重复发送，不建立第二状态 owner。
 - `conversations.db` 是可重建 History 投影，同时保存绑定输入摘要的 Python Turn 状态；旧 Turn 缺少摘要时拒绝冒充可确认重复，canonical 交互事实仍在 Conversation Log。
 - 迁移 SQL 位于 `migrations/`；现有数据路径迁移须按阶段 14 的备份恢复门执行。
 

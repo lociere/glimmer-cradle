@@ -221,8 +221,8 @@ Plan/Synthesis 不随其删除。`PlanningDecisionSnapshot` 只读旧 `planning_
 Jobs 接纳不把承诺标为 completed。默认 Host 注册真实 Planning handler 和独立 kind scheduler，
 先调用逐任务只读接纳 RPC，再 CAS 原候选 revision；等待项不消耗 attempt、不改变 due/预算。
 Host 分别以 `jobs_admission_pending`/`jobs_state_feedback_pending` 呈现本轮等待与待反馈 backlog，Memory
-和 Planning 分 kind 投递到实际 owner。默认执行及状态接收已接真实 receipt/inbox；通知/
-下一次调度，以及撤销链路仍待接线，不认作完整长期承诺执行链路。
+和 Planning 分 kind 投递到实际 owner。默认执行及状态接收已接真实 receipt/inbox；通知可注入
+真实 Host 定向路由，下一次调度及撤销链路仍待接线，不认作完整长期承诺执行链路。
 
 Core `PlanningController.evaluate_job` 已提供评估的业务接纳边界：先从真实源 outbox 核验持久
 Job ACK、原 request/plan/goal/scope，登记原 attempt/epoch/token/owner/lease，再进入有界评估。
@@ -286,7 +286,8 @@ goal/scope/request、投递 epoch 和实际评估 receipt，再保存独立版�
 拒旧投递。queued 接收不建评估窗口、不调用模型；普通启动只核验既有状态窗口，不新增表。
 配置 Host 独立投递 Planning kind，实际 inbox commit 后才 ACK，之后可按既有 retention 清理 Jobs
 body；源/inbox/投影/评估 receipt 仍保留。ACK 前后丢失可双库重启恢复，状态失败不假 ready。
-协议字段见上述参考，备份边界见数据目录。通知真实投递/回执、pending 下一次源请求、撤销与产品消费仍待接线。
+协议字段见上述参考，备份边界见数据目录。通知投递/回执已接可注入的真实 Host 路由，
+pending 下一次源请求、撤销与完整产品消费仍待接线。
 
 完成通知的 Core 持久请求已落在既有 `planning/commitment.py`：`PlanningNotificationRequest`
 引用原源 request/Job、实际 evaluation receipt、承诺 revision、不可变 goal ID/version/scope 与原
@@ -315,10 +316,13 @@ Reply/Turn，内部接纳仍不消费通知。原业务/来源在跨 await 后�
 `acknowledge_notification` 同事务保存确认与首次时间，保留原请求，待办扫描越过已确认项。
 重投保留首次信封，绑定漂移拒绝；部分/未知版本窗口不修复。历史 ACK 不重新获得发送权限，
 也不因原来源后来不可读而伪造另一次发送。具体 wire 与边界见[协议参考](../../reference/protocol.md#planning-通知真实回执源确认)。
-精确分页、预算、reason/error 与生命周期见上述协议参考。本候选仍无默认投递 receiver；
-App 后续须复验真实目的地和当前权限，并复用 Conversation output generation/真实 delivery receipt；
-PublishAction 接纳、模型完成和本地读成功均不表示外部已送达。缺接收方、撤权、取消或 unknown
-保留请求，不能用空回调补齐链路。通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
+Host `PlanningNotificationAdapter` 现按有界前向页接实际定向 Surface 路由，完整接收域与显式
+receive/notify grant 复验后才写出；背压不建立第二队列，sent 不确认，旧/未知输出不重发。
+真实回执确认后默认 Jobs 链调用源确认 helper，历史确认无需新 grant；当前自动链在原来源
+后来不可读时仍保留请求，历史 prepared 身份查询待补。精确分页、预算、reason/error 与
+生命周期见上述协议参考。未装配接收路由或缺接收方、撤权、取消、unknown 时保留请求；
+完整产品 ingress 仍未切换，不能以 PublishAction/模型完成或空回调制造送达。
+通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
 
 ## 上下文与推理
 
@@ -540,7 +544,8 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 取消不回滚 Memory、unknown 不冒充未执行；重复/迟到事实不重复业务或回退 revision。精确语义见
 [协议参考](../../reference/protocol.md#memory-jobs-状态投递)，持久与迁移责任见数据目录。
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
-Planning 通知/再调度与旧队列/旧数据切换仍待完成；目标评估、接纳后默认调度与状态接收见本页长期承诺章节。
+Planning 通知的完整产品接收入口、历史自动恢复、再调度与旧队列/旧数据切换仍待完成；
+目标评估、接纳后默认调度、状态接收与可注入定向通知链见本页长期承诺章节。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存
 稳定 request ID、Episode/version/scope/input digest、首次记录时间、接纳 Job ID 与源已解决标记，

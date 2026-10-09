@@ -273,9 +273,28 @@ RECOVERY_REQUIRED，非法组合/预算为 INVALID_REQUEST，缺 owner/停机为
 为 GENERATION_MISMATCH。取消、deadline、shutdown 排空实际 rollback；提交后响应丢失
 保留原确认供同一请求重投，不再次评估或生成 Reply。
 
-当前只有实际 Delivery→源确认入口，默认 Host 尚无通知 sender/receiver 装配。生产 CLI
-fixture 用真实 Delivery SQLite owner 接纳测试回执，并验证源确认/重启；它不证明真实
-Renderer 或外部渠道已收到通知。没有真实接收回执的默认待办仍如实 pending。
+Host 的 `HostConversationRoutes` 现消费实际 Surface server stream 和同一 canonical
+`DeliveryReceiptCommand`，按 provider/scene/conversation/continuity/thread/actor、隐私与
+recall/disclosure owner 的完整域定向发送，不广播。可信 Host 身份适配器登记已认证接收方，
+显式授予域绑定的 `conversation.receive` / `conversation.notify`；登记、每次写出和回执入口
+核验当前 grant。主体/接收授权失效、撤权、断线或停机撤销实例，迟到回执不再接纳；
+`character_internal` 不外送。域身份不含一次性 interaction，通知 frame trace 绑定原持久 Turn。
+
+单 scene 只接一个实例，接收实例与在途输出各限 128，完整 wire frame 限 64 KiB。
+write(false) 仍只算 sent，并等待 drain 后接纳下一项；无额外排队或自动重放。
+queued/unknown、终态或旧 epoch 无真实确认时保持恢复待办，不再次发送。
+回执只接纳该实例实际发送过的 output，复用 Delivery 的 epoch/generation 与完整事实验证。
+当前 owner 可只读 `recordedOutput` 检查旧输出，不能借此继续前代写入。
+
+配置 Host 可注入同一真实路由；Jobs 单 owner 有界前向扫描执行 Resolve → Prepare → 发送，
+已有 confirmed receipt 再调用上述源确认 helper。各 RPC 返回后重验取消与当前 Host lease；
+无接收方不创建新 Reply/Turn，短非空页继续前进直到空页回绕，首个无权限项不挡后续项。
+历史确认无需新 grant/接收实例；当前自动链仍需 Resolve/Prepare 读取原来源，来源后来不可读
+时保留待办，手持原 prepared 身份的历史 ACK 入口不受此限制，自动历史身份查询仍待补齐。
+
+真实本地 gRPC stream/command fixture 覆盖实际收发，生产 CLI fixture 覆盖配置 Host 自动
+发送/回执源确认与重启去重；均不替代完整产品 UI/渠道认证验收。默认产品仍经旧 Kernel
+入口，未注入接收路由或没有真实回执的通知继续如实 pending；远端认证与产品迁移门仍未完成。
 
 ### Planning 原 attempt 持久对账
 

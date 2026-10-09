@@ -28,6 +28,18 @@ function fixture() {
 }
 
 describe('Delivery durable receipt facts and retired authority fencing', () => {
+  it('当前 owner 只读旧输出不改变状态，退出 owner 连历史查询也被围栏', () => {
+    const test = fixture();
+    try {
+      expect(test.controller.recordedOutput(test.output.output_id)).toEqual(test.controller.current(test.output.output_id));
+      const next = new DeliveryController(test.store, 'epoch:next', test.clock);
+      const before = snapshot(test.path);
+      expect(next.recordedOutput(test.output.output_id)).toMatchObject({ authority_epoch: 'epoch:1', status: 'interrupted' });
+      expect(next.recordedOutput('missing')).toBeNull();
+      expect(() => test.controller.recordedOutput(test.output.output_id)).toThrow('epoch');
+      expect(snapshot(test.path)).toEqual(before);
+    } finally { test.store.close(); rmSync(test.root, { recursive: true, force: true }); }
+  });
   it.each(['range', 'duration', 'reason', 'regression', 'overrun', 'without-receipt'] as const)
   ('Store 直接调用也拒绝 %s 播放事实漂移', fault => {
     const test = fixture();

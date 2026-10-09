@@ -76,7 +76,14 @@ Prepare client 已接内部 Conversation Reply/Turn 持久接纳，返回原事�
 `acknowledgeDeliveredPlanningNotification` 只读实际 Conversation Delivery owner 的已持久
 confirmed receipt，再核验原 Reply/Turn/digest/目的地并提交源确认，不接收自报 delivered。
 生产 CLI fixture 用真实 Delivery SQLite 接纳测试回执，验证确认后待办清空与再重启幂等；
-它不是默认通知 sender/真实渠道接收证明。默认 receiver 和再调度仍未完成，精确边界见上述协议参考。
+配置 Host 现可注入 `conversation_routes`，自动按前向有界页解析/接纳并发送通知；
+`HostConversationRoutes` 接实际 Surface stream/canonical receipt，复用注入的唯一 Delivery，
+不广播、不自行授予权限。可信身份适配器须先登记主体并显式批准完整接收域的
+`conversation.receive` / `conversation.notify`；授权不是 manifest 或客户端自报。
+sent/背压/未知状态不确认或重发，撤权/断线撤实例；实际确认才清除通知源。
+路由与 Delivery 生命周期由外层装配 owner 拥有，须在关闭 Delivery Store 前停止路由；
+Worker/Jobs 重启不自行建立第二 Delivery writer。生产 CLI 自动链与本地 gRPC 实收发已覆盖，
+完整产品 ingress/远端认证、来源已删除后的自动历史身份查询和再调度仍未完成，精确边界见上述协议参考。
 Tool/Skill gateway、完整配置 catalog、产品状态投影消费及产品启动迁移尚未完成；
 本包当前不提供伪装成可启动 Host 的空 CLI。
 

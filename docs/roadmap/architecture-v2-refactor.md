@@ -620,6 +620,48 @@ Contracts 完整 22 gate、inventory、lint/breaking、Document/工具链、三�
 进程，未操作用户运行进程或删除数据。下一依赖是 Capabilities 真实曝光/执行/持久 journal 与
 Planning 的受监督执行/完成评估，不能用字典 transport、空 handler 或模型自报完成替代。
 
+### 阶段 5/7 Host 定向通知发送（2026-10-08 至 2026-10-09）
+
+当前执行 owner 在目标 `apps/host/src/gateway/conversation-routes.ts` 落地实际 Surface
+stream 的定向接收登记，复用唯一 Delivery 与 PermissionBroker，不新增事实库或契约源。
+接收域绑定 provider/scene/conversation/continuity/thread/actor、隐私与两种 scope owner；
+显式 `conversation.receive` 与 `conversation.notify` 授权在写出及回执入口重新检查。
+单个 scene 只允许一个接收实例，背压时不排入无界队列，写出只算 sent；断线、撤权、旧 epoch
+与未知状态不重发。Host Jobs 在装配该真实路由后按有界前向页执行 Resolve → Prepare →
+发送 → 实际回执源确认，无接收方保持原待办。登记入口仅供可信 Host 身份适配器调用，
+不将浏览器自报身份或旧 Connect 握手升级为认证事实；完整产品 ingress 切换仍属阶段 12。
+
+验收包括真实本地 gRPC stream/command 回执、跨域/只读/到期/撤权反例、背压/取消/断线、
+稳定 output 不重复发送及分页不饿死后续通知；再运行 Host、根 typecheck/build 与文档门禁。
+
+上述计划已落实，输入 `f6faee88`，本会话为唯一写入 owner。配置 Host 可注入同一个实际
+`HostConversationRoutes`；登记主体、完整接收域和明确的 receive/notify grant，不从旧
+Connect 或客户端自报身份推导权限。一个 stream/scene 只能登记一次，接收实例与在途输出
+各限 128，过期实例有界回收，撤权/断线/停机销毁 stream 并移除监听器。授权审计同步重入
+不能恢复已撤销能力；写出前再验取消和当前授权。背压不建立第二队列，write(false) 只算 sent；
+transport 失败保留恢复状态，存储错误不吞掉。旧/未知/queued 输出不自动重发，历史确认
+无需新的 grant。Delivery 新增只读 `recordedOutput`，退出 controller 不可查询，不迁移用户库。
+
+Jobs 每轮前向有界页解析实际来源、接纳原 Reply/Turn 并定向发送，原实际回执确认后才源 ACK。
+短非空页继续前进，首个无接收方不饿死后续项；跨 RPC await 复验 Host lease/取消和最终接收域，
+原来源在 Resolve→Prepare 之间失去资格时保留该项、不停止其他 Jobs。未注入路由时保留原默认
+pending。接收路由与唯一 Delivery Store 的关闭顺序由外层装配 owner 拥有，Worker/Jobs 切代
+不新增第二 Delivery writer。唯一新增目标实物为已经列入物理清单的 gateway 文件，无清单/锁变更。
+
+最终证据（2026-10-09 Windows，本轮 dirty 候选）：Host 全量 245 项 PASS（新增 47 项），
+真实本地 gRPC stream 收到定向 Reply，canonical command 接纳实际回执；生产 CLI/SQLite/
+配置 Host 自动发送、sent 不确认、实际回执清空通知、再重启不重复模型/attempt/发送全部通过。
+Conversation TS 全量 65 项 PASS（新增 1 项历史输出只读/退出 owner fencing）。首次 Host 全量
+因新公开路由未登记到 API 预期清单失败，修正清单后定向及最终全量均 PASS，没有降低边界断言。
+中断时旧构建句柄失效，未据此认作通过；恢复后根 `pnpm typecheck`、`pnpm build` 重新 PASS。
+docs 111 页、encoding、architecture、target-layout（仅规格）、diff 检查 PASS；本轮无 IDL/
+generated/Python 输入变化，复用 `f6faee88` 的 Contracts/Cognition/Worker 对应证据。
+
+完整产品仍未切换旧 Kernel ingress，本地测试不证明远端认证、真实 UI/外部渠道或生产状态。
+当前自动链仍需 Resolve/Prepare 读取原来源；来源后来不可读时历史 prepared 身份自动查询
+尚未补齐，原回执与待办保留。下一步实现该只读查询再接历史 ACK，不能以重发或新 Reply 代替。
+后继调度/撤销、产品迁移与最终独立审查门仍未完成，整个项目重构继续推进。
+
 ### 阶段 4/5/7 通知真实回执源确认（2026-10-08 当前候选）
 
 输入 `e30177b2`，本会话继续作为唯一写入 owner。内部 accepted 不能清除通知；本切片先接

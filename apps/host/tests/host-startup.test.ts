@@ -7,6 +7,10 @@ import { createConnection } from 'node:net';
 import { createServer } from 'node:http';
 import * as grpc from '@grpc/grpc-js';
 import { createInterface } from 'node:readline';
+import { Writable } from 'node:stream';
+import { HostConversationRoutes } from '../src/gateway/conversation-routes.js';
+import { DeliveryReceiptCommandSchema, type SurfaceGatewayServiceStreamRequest,
+  type SurfaceGatewayServiceStreamResponse } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import path from 'node:path';
 import os from 'node:os';
 import Database from 'better-sqlite3';
@@ -202,19 +206,32 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         status: completed ? 'degraded' : 'ready', error_code: completed ? 'planning_notifications_pending' : null }),
       { timeout: 5000, interval: 25 });
       if (preparedNotification) {
-        // 真实 Delivery SQLite owner 接纳回执；fixture 不宣称已有默认通知 sender/Renderer。
+        // 生产 Worker + 默认 Host Jobs 接真实路由，实际 UI/认证入口另属产品切换门。
         const deliveryStore = new SqliteDeliveryStore(path.join(root, 'delivery-fixture.db'));
         const delivery = new DeliveryController(deliveryStore, 'epoch:receipt-fixture');
         const outputId = 'reply:' + preparedNotification.turnId;
+        const permissions = new PermissionBroker(Date.now, () => undefined);
+        const principal = permissions.registerPrincipal({ principal_id: 'authenticated:planning-user', host_id: 'host', generation: 'receiver:one', kind: 'user' });
+        const routes = new HostConversationRoutes(permissions, delivery, Date.now);
+        permissions.grant(routes.permissionRequest(principal, preparedNotification, 'conversation.receive'), Date.now() + 60000);
+        permissions.grant(routes.permissionRequest(principal, preparedNotification, 'conversation.notify'), Date.now() + 60000);
+        const frames: SurfaceGatewayServiceStreamResponse[] = [];
+        const stream = new Writable({ objectMode: true, write(frame: SurfaceGatewayServiceStreamResponse, _encoding, callback) { frames.push(frame); callback(); } });
+        const receiverId = routes.attach(principal, preparedNotification,
+          stream as grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>);
         try {
-          delivery.begin({ output_id: outputId, turn_id: preparedNotification.turnId,
-            destination_id: preparedNotification.context!.sceneId, content_digest: preparedNotification.contentDigest });
-          delivery.queue(outputId); delivery.sent(outputId);
+          client.close(); client = undefined; await owner.stop();
+          owner = new ConfiguredHostCognitionJobsOwner({ ...options, conversation_routes: routes }); await owner.start();
+          client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
+          await vi.waitFor(() => expect(frames).toHaveLength(1), { timeout: 5000, interval: 25 });
+          expect(frames[0].event?.event).toMatchObject({ case: 'reply', value: { text: preparedNotification.text, outputId } });
           await expect(client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).rejects.toThrow('已持久送达');
           expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
-          expect(delivery.applyReceipt({ output_id: outputId, destination_id: preparedNotification.context!.sceneId,
-            authority_epoch: 'epoch:receipt-fixture', generation: 1, received_at: new Date().toISOString(),
-            receipt: { receipt_id: 'receipt:planning-fixture', kind: 'delivered' } })).toEqual({ accepted: true });
+          expect(routes.receiveReceipt(receiverId, create(DeliveryReceiptCommandSchema, { outputId, destinationId: preparedNotification.context!.sceneId,
+            authorityEpoch: 'epoch:receipt-fixture', generation: 1n, receivedAt: new Date().toISOString(),
+            receiptId: 'receipt:planning-fixture', kind: 'delivered' }))).toEqual({ accepted: true });
+          await vi.waitFor(async () => expect((await client!.readPlanningNotifications(notificationRequest)).requests).toEqual([]),
+            { timeout: 5000, interval: 25 });
           const ack = await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery);
           expect(ack).toMatchObject({ accepted: true, notificationId: notifications.requests[0].notificationId });
           expect(await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).toEqual(ack);
@@ -226,7 +243,8 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
           client = new CognitionClient(owner.snapshot.session!.worker.endpoint!, owner.snapshot.session!.worker.generation!, 5000);
           expect(await client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).toEqual(ack);
           expect((await client.readPlanningNotifications(notificationRequest)).requests).toEqual([]);
-        } finally { deliveryStore.close(); }
+          expect(frames).toHaveLength(1);
+        } finally { await owner.stop(); routes.stop(); stream.destroy(); deliveryStore.close(); }
       }
       const planning = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
       try {

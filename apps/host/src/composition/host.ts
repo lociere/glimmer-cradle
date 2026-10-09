@@ -6,7 +6,8 @@ import { JobController, JobRecoveryController, JobRetentionController, JobSchedu
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, HostCognitionError } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
-import { CognitionJobAdapter, PlanningJobSourceAdapter, PlanningJobAdapter } from './cognition-job-adapter.js';
+import { CognitionJobAdapter, PlanningJobSourceAdapter, PlanningJobAdapter, PlanningNotificationAdapter } from './cognition-job-adapter.js';
+import type { HostConversationRoutes } from '../gateway/conversation-routes.js';
 
 export interface HostJobsOptions {
   readonly store: JobStorePort;
@@ -25,6 +26,8 @@ export interface HostJobsOptions {
   readonly state_receiver?: JobStateReceiverPort;
   /** 仅在真实 Planning 源已装配时开放；不意味 handler/readiness 已完成。 */
   readonly planning_sources?: boolean;
+  /** 同一可信接收/权限/Delivery 路由；生命周期由外层装配 owner 拥有。 */
+  readonly conversation_routes?: HostConversationRoutes;
 }
 export interface HostJobsSnapshot {
   readonly status: 'idle' | 'starting' | 'ready' | 'degraded' | 'failed' | 'stopping' | 'stopped';
@@ -39,6 +42,7 @@ export class HostJobsController {
   private readonly planningSource?: PlanningJobSourceAdapter;
   private readonly planningAdapter?: PlanningJobAdapter;
   private readonly planningScheduler?: JobScheduler;
+  private readonly notifications?: PlanningNotificationAdapter;
   private readonly controller: JobController;
   private readonly recovery: JobRecoveryController;
   private readonly scheduler: JobScheduler;
@@ -63,6 +67,9 @@ export class HostJobsController {
     this.options = { ...options, submission_policy: { ...options.submission_policy }, retry_policy: { ...options.retry_policy } };
     this.adapter = new CognitionJobAdapter(options.cognition);
     this.planningSource = options.planning_sources ? new PlanningJobSourceAdapter(options.cognition) : undefined;
+    if (options.conversation_routes && !options.planning_sources) throw new Error('通知路由须装配实际 Planning 源');
+    this.notifications = options.conversation_routes ? new PlanningNotificationAdapter(options.cognition, options.conversation_routes,
+      () => { options.clock.now(); }) : undefined;
     this.controller = new JobController(options.store, options.clock, this.options.retry_policy);
     this.controller.register(this.adapter);
     if (this.planningSource) {
@@ -161,7 +168,8 @@ export class HostJobsController {
         || !!this.planningSource && store.listUnknown(epoch, PLANNING_JOB_KIND, 1).length > 0;
       const admissionPending = (this.planningScheduler?.waitingCount ?? 0) > 0;
       const feedbackPending = !!this.planningSource && store.readOutbox(epoch, 1, PLANNING_JOB_KIND).length > 0;
-      // 尚无真实通知 receiver；只观察实际 durable 待办，不能以 Jobs ACK 或空回调清除。
+      await this.notifications?.deliver(batch_size, signal);
+      // 未装配路由/无接收方/未收到真实回执仍如实保留待办，不以 sent 或 Jobs ACK 清除。
       const notifications = this.planningSource ? await this.options.cognition.readPlanningNotifications(
         create(ReadPlanningNotificationsRequestSchema, { limit: 1 }), signal) : undefined;
       signal.throwIfAborted();

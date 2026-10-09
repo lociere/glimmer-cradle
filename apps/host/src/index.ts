@@ -5,6 +5,8 @@ export { HostJobsOwner, HostCognitionJobsOwner, ConfiguredHostCognitionJobsOwner
 export type { HostJobsOwnerOptions, HostJobsOwnerSnapshot, HostCognitionJobsOptions, HostCognitionJobsSnapshot } from './composition/domain-owners.js';
 export { WorkerSupervisor } from './supervision/worker-supervisor.js';
 export { PermissionBroker } from './broker/permission-broker.js';
+export { HostConversationRoutes } from './gateway/conversation-routes.js';
+export type { ConversationRecipientContext } from './gateway/conversation-routes.js';
 export type { PermissionAudit } from './broker/permission-broker.js';
 export { HostResourceContributions, HostCapabilityRequestError, HostKnowledgeController } from './composition/extension-contributions.js';
 export type { HostResourceOptions, HostCapabilityServicePort, HostKnowledgeResourceAccess, ResourceReader } from './composition/extension-contributions.js';
