@@ -908,7 +908,7 @@
         "evidence/2026-10-09-P02A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P02A.3/4：第一段固定63dd90b5、callback自等待段固定75a62c04独立复核通过；Platform19/KernelApp19+其他16输入未变有效/两包typecheck/架构文档编码已验。下一动作：迁core/kernel/src/adapters/process/process-supervisor.ts到Platform Node adapter，注入App logger/Clock，真实退出timeout/kill错误须失败上抛；同项修Cognition.finally、Audio.bootstrap/reset、Extension.error仍活进程owner丢失，撤销入口/保留句柄/阻止并行重启并补真实隔离Node与可控clock、consumer失败恢复反例。随后通用取消/超时和日志/trace/配置读取/健康剩余机制。完整P02A/D04与大型最终门仍未接受；唯一writer本会话，当前只规范/证据更新，无后台，不推送。",
+      "nextAction": "P02A.3/4：进程监督与4类consumer迁移源码dirty，尚未提交/验收。Platform27、Kernel cognition9/extension5/audio4（实际gRPC与64次health）及两包typecheck通过；失败句柄/注册项保留、入口撤销、共享stop/同owner重试、POSIX独立组退出回执已实现定向反例。独立中途审查P1仍开：Windows taskkill/root退出不等于tree空，须复用已有Job Object/ActiveProcesses真实边界并核对FD3/IPC/UV/Avatar launcher启动链；根退出未确认树时不得丢owner或复用死PID。下一动作：取得只读Native接线调查，补native/消费者真实后代反例并关闭此P1，再固定候选复核/提交。随后通用取消/超时与trace/log/config/health。P02A/D04/root大型/目录/安装/设备未接受；writer本会话，无后台测试进程，不推送。",
       "mapping": [
         {
           "action": "split",

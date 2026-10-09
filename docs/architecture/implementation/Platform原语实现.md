@@ -83,6 +83,15 @@ authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒�
 精确配置与持久边界分别见[配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)、
 [数据目录](../../reference/data-layout.md#用户状态与记忆)。跨机 wire/认证、离线 proposal 和恢复安装仍待完成。
 
+## Node 进程监督迁移在制品
+
+Platform root 当前导出 ManagedProcessSupervisor，App 注入 logger、保有子进程 handle、决定协议
+shutdown 与启动政策；实际 Kernel Cognition/Audio/Avatar/Extension 已切公开入口，旧 helper 删除。
+根退出等待使用 Clock，回收超时/命令失败明确上抛，失败 owner 保留并拒绝并行重启；POSIX
+独立组单独查询清空 receipt。此段源码仍在迁移，Windows 尚缺独立树空证明，不能把 taskkill
+完成或根退出当作完整树回收验收；当前问题和恢复点见
+[P02A 进程回收在制品](../../roadmap/initiatives/architecture-v2/evidence/2026-10-09-P02A.md#进程回收第三段在制品与恢复点)。
+
 ## 调试与验证
 
 1. 子路径找不到时核对 package exports 与 Platform build，不通过深路径绕过边界。
