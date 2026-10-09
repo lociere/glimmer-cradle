@@ -10,6 +10,19 @@ import { manifestPath } from '../src/architecture/target-layout.mjs';
 const root = path.resolve(import.meta.dirname, '../../..');
 const plan = JSON.parse(fs.readFileSync(path.join(root, executionPath), 'utf8'));
 
+function initialPlan() {
+  // 反例输入必须固定；实时进度只由首项测试核验，否则正常接受任务也会使非法变体变合法。
+  const candidate = structuredClone(plan);
+  for (const task of candidate.tasks) {
+    task.status = 'planned'; task.evidence = []; task.owner = null; task.blockedReason = null;
+    delete task.mapping; delete task.commands;
+  }
+  candidate.tasks[0].status = 'ready';
+  for (const stage of candidate.stages) { stage.status = 'planned'; stage.evidence = []; }
+  candidate.nextTask = candidate.tasks[0].id;
+  return candidate;
+}
+
 test('current plan has resolvable cards, input files and a runnable next task', () => {
   assert.deepEqual(validateExecutionPlan(plan, root), []);
   assert.deepEqual(checkDocumentationStructure(root), []);
@@ -27,14 +40,14 @@ test('workflow rejects cycles, missing dependencies, duplicate IDs and premature
     p => { p.tasks[0].inputPaths = ['../escape']; },
     p => { p.tasks[0].card = 'missing.md'; },
   ]) {
-    const candidate = structuredClone(plan);
+    const candidate = initialPlan();
     mutate(candidate);
     assert.notDeepEqual(validateExecutionPlan(candidate, root), []);
   }
 });
 
 test('blocked workflow has no runnable next task and never renders itself complete', () => {
-  const candidate = structuredClone(plan);
+  const candidate = initialPlan();
   candidate.tasks[0].status = 'blocked';
   candidate.tasks[0].blockedReason = '需要目标环境；环境恢复并验证后解除';
   candidate.nextTask = null;
@@ -50,14 +63,14 @@ test('workflow rejects instruction routing and task order drift', () => {
     p => { [p.tasks[1], p.tasks[2]] = [p.tasks[2], p.tasks[1]]; },
     p => { p.tasks.pop(); },
   ]) {
-    const candidate = structuredClone(plan);
+    const candidate = initialPlan();
     mutate(candidate);
     assert.ok(validateExecutionPlan(candidate, root).some(error => /instruction/.test(error)));
   }
 });
 
 test('implementation readiness requires explicit file actions, commands and deletion conditions', () => {
-  const candidate = structuredClone(plan);
+  const candidate = initialPlan();
   const task = candidate.tasks[0];
   task.mode = 'implementation';
   const source = 'core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py';
@@ -77,7 +90,7 @@ test('documentation governance detects missing/unlisted files and repairs only g
     fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true });
     fs.writeFileSync(path.join(fixture, file), value);
   };
-  const candidate = structuredClone(plan);
+  const candidate = initialPlan();
   for (const task of candidate.tasks) { task.inputPaths = ['docs/README.md']; }
   const instructions = 'docs/roadmap/initiatives/architecture-v2/execution-order.md';
   const files = [manifestPath, executionPath, statusPath, structurePath, 'docs/README.md', instructions];

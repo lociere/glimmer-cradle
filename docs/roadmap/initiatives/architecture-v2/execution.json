@@ -3,7 +3,7 @@
   "initiative": "architecture-v2",
   "baselineCommit": "dc59181e",
   "reviewedAt": "2026-10-09",
-  "nextTask": "A00",
+  "nextTask": "P07A",
   "stages": [
     {
       "id": "P00",
@@ -142,7 +142,7 @@
         "P00"
       ],
       "dependsOn": [],
-      "status": "in-progress",
+      "status": "accepted",
       "mode": "discovery",
       "card": "execution-order.md#step-a00",
       "owner": "本会话执行 owner（唯一写入负责人）",
@@ -151,9 +151,11 @@
         "G0",
         "G5"
       ],
-      "evidence": [],
+      "evidence": [
+        "slices/A00-reconcile.md"
+      ],
       "blockedReason": null,
-      "nextAction": "A00.2：已确认 dc59181e 后为文档/治理整合，rpc_service.py 仅文档路径变动；读取 Planning SQL、Host/Worker 真实接线并固定 P07A 映射。策略同步正在验证，HEAD 48a80b2f，dirty 仅本轮规范/锁/状态。",
+      "nextAction": "A00.6 完成：当前 owner、缺口和原身份恢复已核对；转 P07A.2 后继意图与撤销持久链。候选 1cd2585e + A00 文档/映射 dirty，无后台进程。",
       "inputPaths": [
         "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
         "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
@@ -172,7 +174,7 @@
       "dependsOn": [
         "A00"
       ],
-      "status": "planned",
+      "status": "ready",
       "mode": "implementation",
       "card": "execution-order.md#step-p07a",
       "owner": null,
@@ -188,7 +190,140 @@
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "P07A.1：固定现有 commitment/revision、job/attempt、evaluation、notification receipt 关联；保留已送达历史通知的只读原身份恢复。"
+      "nextAction": "P07A.2：在 Planning 评估事务中提交后继意图、追加兼容身份字段；实现撤销/revision CAS 与持久取消传播；复用原 attempt/lease/通知 ACK 链。准备映射已核对。",
+      "mapping": [
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/planning/planning_controller.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/planning/planning_store.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/planning/planning_store.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/planning/commitment.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/planning/commitment.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/adapters/persistence/sqlite_planning_store.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/tests/test_planning_jobs.py",
+          "target": "core/cognition/tests/test_planning_jobs.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
+          "target": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/job_client.py",
+          "target": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/job_client.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/tests/test_rpc_roundtrip.py",
+          "target": "apps/cognition-worker/tests/test_rpc_roundtrip.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/adapters/protocol/cognition-client.ts",
+          "target": "apps/host/src/adapters/protocol/cognition-client.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/adapters/protocol/job-mapper.ts",
+          "target": "apps/host/src/adapters/protocol/job-mapper.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/cognition-job-adapter.ts",
+          "target": "apps/host/src/composition/cognition-job-adapter.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/host.ts",
+          "target": "apps/host/src/composition/host.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/host-startup.test.ts",
+          "target": "apps/host/tests/host-startup.test.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/planning-reconciliation.test.ts",
+          "target": "apps/host/tests/planning-reconciliation.test.ts",
+          "owner": "Host",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/reference/data-layout.md",
+          "target": "docs/reference/data-layout.md",
+          "owner": "Documentation",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/reference/protocol.md",
+          "target": "docs/reference/protocol.md",
+          "owner": "Documentation",
+          "exitCondition": "保留既有 owner；后继/撤销真实链及失败恢复通过，原通知身份与已送达历史不变。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/proto/glimmer/cognition/v1/cognition_service.proto",
+          "target": "protocol/proto/glimmer/cognition/v1/cognition.proto",
+          "owner": "Contract Spine",
+          "exitCondition": "P07A 仅修改现行 contracts 唯一源并生成；路径原子切换与 contracts 删除留 P11A，禁止创建第二源。"
+        }
+      ],
+      "commands": [
+        "uv run --project core/cognition --extra dev pytest -q core/cognition/tests/test_planning_jobs.py",
+        "uv run --project apps/cognition-worker --extra dev pytest -q apps/cognition-worker/tests/test_rpc_roundtrip.py -k planning",
+        "pnpm --filter @glimmer-cradle/host test -- tests/host-startup.test.ts tests/planning-reconciliation.test.ts",
+        "pnpm test:jobs",
+        "pnpm contracts:generate",
+        "pnpm contracts:verify",
+        "pnpm check:architecture",
+        "pnpm check:docs",
+        "pnpm check:encoding",
+        "git diff --check"
+      ]
     },
     {
       "id": "P07B",

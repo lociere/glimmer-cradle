@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[A00 接手与差距核对](execution-order.md#step-a00)**（in-progress / discovery）。A00.2：已确认 dc59181e 后为文档/治理整合，rpc_service.py 仅文档路径变动；读取 Planning SQL、Host/Worker 真实接线并固定 P07A 映射。策略同步正在验证，HEAD 48a80b2f，dirty 仅本轮规范/锁/状态。
+下一任务：**[P07A Planning 后继调度与撤销](execution-order.md#step-p07a)**（ready / implementation）。P07A.2：在 Planning 评估事务中提交后继意图、追加兼容身份字段；实现撤销/revision CAS 与持久取消传播；复用原 attempt/lease/通知 ACK 链。准备映射已核对。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
@@ -33,8 +33,8 @@
 
 | 任务 | 状态/类型 | 依赖 | Owner |
 |---|---|---|---|
-| [A00 接手与差距核对](execution-order.md#step-a00) | in-progress / discovery | 无 | 本会话执行 owner（唯一写入负责人） |
-| [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | planned / implementation | A00 | 开始时指定 |
+| [A00 接手与差距核对](execution-order.md#step-a00) | accepted / discovery | 无 | 本会话执行 owner（唯一写入负责人） |
+| [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | ready / implementation | A00 | 开始时指定 |
 | [P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b) | planned / implementation | P07A | 开始时指定 |
 | [P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a) | planned / implementation | A00 | 开始时指定 |
 | [P03A Content 最终路径与媒体恢复差距](execution-order.md#step-p03a) | planned / implementation | A00 | 开始时指定 |
