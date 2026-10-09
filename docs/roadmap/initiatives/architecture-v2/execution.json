@@ -3,7 +3,7 @@
   "initiative": "architecture-v2",
   "baselineCommit": "dc59181e",
   "reviewedAt": "2026-10-09",
-  "nextTask": "P07B",
+  "nextTask": "P02A",
   "stages": [
     {
       "id": "P00",
@@ -443,7 +443,7 @@
       "dependsOn": [
         "P07A"
       ],
-      "status": "in-progress",
+      "status": "accepted",
       "mode": "implementation",
       "card": "execution-order.md#step-p07b",
       "owner": "本会话执行 owner（唯一写入负责人）",
@@ -461,7 +461,7 @@
         "evidence/2026-10-09-P07B.md"
       ],
       "blockedReason": null,
-      "nextAction": "P07B.5：在本轮单调接纳顺序/离线复制迁移逻辑提交的固定候选上，收束P07B全步骤定向证据和独立只读复核，然后按固定顺序转P02A；整体final门不随任务accepted提前关闭。输入f20aac84+本任务dirty，唯一writer本会话；Jobs77有效(76完整模块+仅新增compiled迁移/21，其余56复用)，Host真实链29PASS，Jobs/Hosttypecheck/Jobsbuild、docswrite/targetwrite/架构/编码/diff/工具15PASS。v5同事务单调seq固定有限round已关闭任意ID区间插入饿死；duplicate不分配/prune不降/maxsafe耗尽失败，seq不进Job/事件/投影。v4只读SQLite一致复制新候选，不覆盖/不自动App切换；全v4/v5DDL和原九窗口保留，含WAL/latecommit拒绝/故障rollback/源SHA恢复。冻结原v4.sql随migrations制品，API仅2路径；新文件只增Jobs精确清单/映射及派生锁，不改变架构根/边界/目标。独立审查必要问题已修复，待固定候选最后复核；当前无后台/未推送。原v1/v2/v3与全域/产品原子切换归P14A，B04/D04整体与根大型/产品UI/旧队列切换仍未验。",
+      "nextAction": "P07B.1–5定向实现/验证与固定clean42588674独立审查完成，无阻塞；转P02A.1。Jobs77有效/Host真实链29+最新关键3/两包typecheck/契约22及三语/文档架构编码工具15证据分子链保留；目录映射正确，v4复制/WAL/失败恢复与seq公平已验。旧产品ingress/UI接线P12A/B，旧queue/全域备份恢复及生产原子切换P14A；整体B04/D04/root大型/制品/适用平台设备仍未关闭。不推送，唯一writer仍本会话，无后台。",
       "mapping": [
         {
           "action": "retain",
@@ -890,10 +890,10 @@
       "dependsOn": [
         "A00"
       ],
-      "status": "planned",
+      "status": "in-progress",
       "mode": "implementation",
       "card": "execution-order.md#step-p02a",
-      "owner": null,
+      "owner": "本会话唯一写入负责人",
       "scope": "从 core/kernel/ 的 runtime/adapters 和当前 core/platform/ 核对；目标为 core/platform/ 与 Apps 的 platform adapter/supervision。",
       "acceptance": [
         "G0",
@@ -906,7 +906,89 @@
       ],
       "evidence": [],
       "blockedReason": null,
-      "nextAction": "P02A.1：逐项划分剩余时钟、identity、租约、日志/trace、配置读取、健康与生命周期机制；业务策略留在对应领域/App，不整包搬 Kernel。"
+      "nextAction": "P02A.1已恢复：核对Platform现有ports与Kernel实际consumer；先收束生命周期关闭/部分启动失败/observer异常资源释放及真实consumer，逐项完成时钟、identity、配置、日志与健康机制归属及最终物理迁移。P07B固定42588674独立审查接受；大型最终门仍待验，不推送。",
+      "mapping": [
+        {
+          "action": "split",
+          "source": "core/platform/src/lifecycle/index.ts",
+          "target": "core/platform/src/lifecycle/runtime-module.ts",
+          "owner": "Platform",
+          "exitCondition": "监督契约独立落位，保持实际App消费者与公开API，原聚合文件consumer-zero后删除。"
+        },
+        {
+          "action": "split",
+          "source": "core/platform/src/lifecycle/index.ts",
+          "target": "core/platform/src/lifecycle/supervisor.ts",
+          "owner": "Platform",
+          "exitCondition": "启动与关闭排空、observer异常、重复stop和资源失败传播定向反例通过；不包含业务readiness判断。"
+        },
+        {
+          "action": "move",
+          "source": "core/platform/tests/lifecycle-coordinator.test.mjs",
+          "target": "core/platform/tests/lifecycle-drain.test.ts",
+          "owner": "Platform",
+          "exitCondition": "迁移既有断言并补实际关闭竞态/失败清理证据，更新测试入口后删除原文件。"
+        },
+        {
+          "action": "split",
+          "source": "core/platform/src/time/index.ts",
+          "target": "core/platform/src/time/clock.ts",
+          "owner": "Platform",
+          "exitCondition": "复用Clock/ScheduledTask契约，实际消费者迁公开API，旧聚合文件consumer-zero删除。"
+        },
+        {
+          "action": "move",
+          "source": "core/kernel/src/adapters/time/system-clock-adapter.ts",
+          "target": "core/platform/src/time/system-clock.ts",
+          "owner": "Platform",
+          "exitCondition": "通用系统时钟机制迁owner；Kernel产品装配通过公开API消费，旧机制consumer-zero删除。"
+        },
+        {
+          "action": "split",
+          "source": "core/platform/src/identity/index.ts",
+          "target": "core/platform/src/identity/identity.ts",
+          "owner": "Platform",
+          "exitCondition": "identity契约不包含角色业务，实际consumer迁公开API后删除聚合文件。"
+        },
+        {
+          "action": "move",
+          "source": "core/kernel/src/adapters/identity/node-stable-identity-adapter.ts",
+          "target": "core/platform/src/identity/stable-identity.ts",
+          "owner": "Platform",
+          "exitCondition": "Node身份/digest机制迁owner并保持既有digest兼容，原机制consumer-zero删除。"
+        },
+        {
+          "action": "retain",
+          "source": "core/platform/src/index.ts",
+          "target": "core/platform/src/index.ts",
+          "owner": "Platform",
+          "exitCondition": "所有新机制均由公开API消费，不反向import Kernel/App。"
+        },
+        {
+          "action": "retain",
+          "source": "core/platform/package.json",
+          "target": "core/platform/package.json",
+          "owner": "Platform",
+          "exitCondition": "公开export及真实测试/构建入口同步最终路径，版本保持0.1.0。"
+        },
+        {
+          "action": "retain",
+          "source": "core/platform/README.md",
+          "target": "core/platform/README.md",
+          "owner": "Platform",
+          "exitCondition": "同步实际机制、失败/关闭契约与未迁产品装配的具体退出门。"
+        }
+      ],
+      "commands": [
+        "pnpm test:platform",
+        "pnpm --filter @glimmer-cradle/platform typecheck",
+        "pnpm test:host",
+        "pnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/application-runtime.test.ts",
+        "pnpm check:docs --write",
+        "pnpm check:architecture",
+        "pnpm check:encoding",
+        "git diff --check"
+      ]
     },
     {
       "id": "P03A",
