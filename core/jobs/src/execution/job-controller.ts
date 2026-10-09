@@ -16,9 +16,21 @@ export class JobController {
 
   public get isAccepting(): boolean { return this.accepting; }
 
+  public get catalog(): ReadonlyArray<{ readonly kind: string; readonly retry_mode: Job['retry_mode'] }> {
+    return [...this.handlers.entries()].sort(([left], [right]) => left.localeCompare(right))
+      .map(([kind, handler]) => Object.freeze({ kind, retry_mode: handler.retry_mode }));
+  }
+
+  public hasHandler(kind: string): boolean { return this.accepting && this.handlers.has(kind); }
+
+  /** App 撤销注册不撤销已开始的副作用；在途仍由原 lease/取消机制收尾。 */
+  public unregister(kind: string): boolean { return this.handlers.delete(kind); }
+
   public register(handler: JobHandlerPort): void {
-    if (!handler.kind.trim() || this.handlers.has(handler.kind)) throw new Error('Job handler kind 冲突');
-    this.handlers.set(handler.kind, handler);
+    if (!this.accepting || !handler.kind.trim() || this.handlers.has(handler.kind)
+      || !['idempotent', 'reconcile'].includes(handler.retry_mode)) throw new Error('Job handler kind/政策冲突或已停止');
+    this.handlers.set(handler.kind, Object.freeze({ kind: handler.kind, retry_mode: handler.retry_mode,
+      execute: handler.execute.bind(handler) }));
   }
 
   public execute(claim: JobClaim): Promise<Job | null> {
@@ -26,7 +38,9 @@ export class JobController {
     const key = jobAttemptKey(claim.lease);
     const existing = this.active.get(key);
     if (existing) return existing;
-    const pending = Promise.resolve().then(() => this.run(claim));
+    // execute 接纳后撤销注册只影响后续工作；不能在微任务启动前把原 claim 变成缺 handler。
+    const job = this.store.load(claim.lease.job_id), handler = job ? this.handlers.get(job.kind) : undefined;
+    const pending = Promise.resolve().then(() => this.run(claim, handler));
     this.active.set(key, pending);
     void pending.then(() => this.active.delete(key), () => this.active.delete(key));
     return pending;
@@ -46,7 +60,7 @@ export class JobController {
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'Jobs 在途收尾失败');
   }
 
-  private async run(claim: JobClaim): Promise<Job | null> {
+  private async run(claim: JobClaim, handler: JobHandlerPort | undefined): Promise<Job | null> {
     const { lease } = claim;
     // 执行只信持久事实，调用方的旧/伪造 claim snapshot 不能替换 kind、payload 或重试政策。
     const job = this.store.load(lease.job_id);
@@ -60,9 +74,8 @@ export class JobController {
       }
     };
     try {
-      const handler = this.handlers.get(job.kind);
       let outcome: JobFinish;
-      if (!handler || handler.retry_mode !== job.retry_mode) {
+      if (!handler || handler.kind !== job.kind || handler.retry_mode !== job.retry_mode) {
         outcome = { status: 'dead_letter', error_code: 'handler_policy_unavailable' };
       } else {
         try {

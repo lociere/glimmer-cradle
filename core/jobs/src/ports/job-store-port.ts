@@ -1,4 +1,4 @@
-import type { Job, JobAttempt, JobReconciliationEvidence, JobReconciliationReceipt, JobRequest, JobStateEvent } from '../execution/job.js';
+import type { Job, JobAttempt, JobProjection, JobReconciliationEvidence, JobReconciliationReceipt, JobRequest, JobStateEvent } from '../execution/job.js';
 import type { JobLease } from '../scheduling/job-lease.js';
 import type { RetryPolicy } from '../recovery/retry-policy.js';
 import type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from '../triggers/trigger.js';
@@ -27,6 +27,8 @@ export interface JobStorePort {
   /** 源 inbox 与 enqueue 同事务；重放沿用首次政策，不沿用可变 retry due。 */
   enqueueSource(source: JobSource, request: JobRequest, epoch: number, now: number): JobSubmission;
   load(jobId: string): Job | null;
+  /** 只读 scope 元数据；App 须在读取前后核验实际调用方权限。 */
+  listProjection(epoch: number, scopeId: string, limit: number, afterJobId?: string): JobProjection[];
   /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */
   listUnknown(epoch: number, kind: string, limit: number, afterJobId?: string): Job[];
   /** 接纳扫描按 job_id 稳定分页；读快照不消耗 attempt，claim 时须重验 revision。 */

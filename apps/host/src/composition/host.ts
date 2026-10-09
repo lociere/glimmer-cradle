@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { create } from '@bufbuild/protobuf';
 import { ReadPlanningNotificationsRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobController, JobRecoveryController, JobRetentionController, JobScheduler, type JobClockPort,
-  type JobStorePort, type JobStateReceiverPort, type RetryPolicy } from '@glimmer-cradle/jobs';
+  type JobStorePort, type JobStateReceiverPort, type RetryPolicy, type JobProjection } from '@glimmer-cradle/jobs';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, HostCognitionError } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
@@ -33,6 +33,12 @@ export interface HostJobsSnapshot {
   readonly status: 'idle' | 'starting' | 'ready' | 'degraded' | 'failed' | 'stopping' | 'stopped';
   readonly completed_cycles: number;
   readonly error_code: 'cognition_unavailable' | 'jobs_recovery_pending' | 'jobs_admission_pending' | 'jobs_state_feedback_pending' | 'planning_notifications_pending' | 'jobs_cycle_failed' | null;
+}
+
+export interface HostJobsProjectionPort {
+  readonly authorityEpoch: number;
+  readonly handlerCatalog: ReadonlyArray<{ readonly kind: string; readonly retry_mode: 'idempotent' | 'reconcile'; readonly available: boolean }>;
+  readJobStates(scopeId: string, limit: number, afterJobId?: string): JobProjection[];
 }
 
 /** 监督实际已装配链路；逐任务接纳和缺状态 receiver 如实降级，不代表整个产品 ready。 */
@@ -87,6 +93,26 @@ export class HostJobsController {
   }
 
   public get snapshot(): HostJobsSnapshot { return { ...this.state }; }
+
+  public get authorityEpoch(): number {
+    this.options.clock.now();
+    if (this.options.store.loadAuthorityEpoch() !== this.options.epoch) throw new Error('Host Jobs projection authority 已失效');
+    return this.options.epoch;
+  }
+
+  /** 私有 App projection；外部调用必须经过带身份与权限复验的 Host gateway。 */
+  public readJobStates(scopeId: string, limit: number, afterJobId = ''): JobProjection[] {
+    if (!['ready', 'degraded'].includes(this.state.status) || this.cancellation.signal.aborted) throw new Error('Host Jobs 状态读取尚未就绪');
+    this.options.clock.now(); // authority owner 注入的 live lease 围栏，不能只信快照 phase。
+    return this.options.store.listProjection(this.options.epoch, scopeId, limit, afterJobId);
+  }
+
+  public get handlerCatalog() {
+    if (['ready', 'degraded'].includes(this.state.status)) this.authorityEpoch;
+    return this.controller.catalog.map(handler => ({ ...handler,
+      available: this.controller.hasHandler(handler.kind) && ['ready', 'degraded'].includes(this.state.status)
+        && this.state.error_code !== 'cognition_unavailable' && !this.cancellation.signal.aborted }));
+  }
 
   public start(): Promise<HostJobsSnapshot> {
     if (this.stopping || this.cancellation.signal.aborted) return Promise.reject(new Error('Host Jobs 实例已撤销'));

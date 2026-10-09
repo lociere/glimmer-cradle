@@ -5,13 +5,15 @@
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
+import type { CallMetadata } from "../../common/v1/service_contract_pb";
+import { file_glimmer_common_v1_service_contract } from "../../common/v1/service_contract_pb";
 import type { JsonObject, Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file glimmer/jobs/v1/jobs.proto.
  */
 export const file_glimmer_jobs_v1_jobs: GenFile = /*@__PURE__*/
-  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIskCCg1Kb2JTdGF0ZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg4KBmpvYl9pZBgCIAEoCRIQCghzY29wZV9pZBgDIAEoCRIPCgdnb2FsX2lkGAQgASgJEgwKBGtpbmQYBSABKAkSEAoIcmV2aXNpb24YBiABKAQSKgoGc3RhdHVzGAcgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIPCgdhdHRlbXB0GAggASgEEhcKD2F1dGhvcml0eV9lcG9jaBgJIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAogASgEEicKBnJlc3VsdBgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKZXJyb3JfY29kZRgMIAEoCUgAiAEBEhUKDXVwZGF0ZWRfYXRfbXMYDSABKARCDQoLX2Vycm9yX2NvZGUiowEKFEpvYkV4ZWN1dGlvbklkZW50aXR5Eg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdhdHRlbXB0GAMgASgEEhcKD2F1dGhvcml0eV9lcG9jaBgEIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAUgASgEEhAKCG93bmVyX2lkGAYgASgJEhYKDmxlYXNlX3VudGlsX21zGAcgASgEKtkBCglKb2JTdGF0dXMSGgoWSk9CX1NUQVRVU19VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFUVVNfUVVFVUVEEAESFgoSSk9CX1NUQVRVU19SVU5OSU5HEAISGQoVSk9CX1NUQVRVU19SRVRSWV9XQUlUEAMSGAoUSk9CX1NUQVRVU19TVUNDRUVERUQQBBIYChRKT0JfU1RBVFVTX0NBTkNFTExFRBAFEhoKFkpPQl9TVEFUVVNfREVBRF9MRVRURVIQBhIWChJKT0JfU1RBVFVTX1VOS05PV04QB0IqqgInR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Kb2JzLlYxYgZwcm90bzM", [file_google_protobuf_struct]);
+  fileDesc("ChpnbGltbWVyL2pvYnMvdjEvam9icy5wcm90bxIPZ2xpbW1lci5qb2JzLnYxIskCCg1Kb2JTdGF0ZUV2ZW50EhAKCGV2ZW50X2lkGAEgASgJEg4KBmpvYl9pZBgCIAEoCRIQCghzY29wZV9pZBgDIAEoCRIPCgdnb2FsX2lkGAQgASgJEgwKBGtpbmQYBSABKAkSEAoIcmV2aXNpb24YBiABKAQSKgoGc3RhdHVzGAcgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIPCgdhdHRlbXB0GAggASgEEhcKD2F1dGhvcml0eV9lcG9jaBgJIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAogASgEEicKBnJlc3VsdBgLIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3QSFwoKZXJyb3JfY29kZRgMIAEoCUgAiAEBEhUKDXVwZGF0ZWRfYXRfbXMYDSABKARCDQoLX2Vycm9yX2NvZGUiowEKFEpvYkV4ZWN1dGlvbklkZW50aXR5Eg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdhdHRlbXB0GAMgASgEEhcKD2F1dGhvcml0eV9lcG9jaBgEIAEoBBIVCg1mZW5jaW5nX3Rva2VuGAUgASgEEhAKCG93bmVyX2lkGAYgASgJEhYKDmxlYXNlX3VudGlsX21zGAcgASgEIpECCg1Kb2JQcm9qZWN0aW9uEg4KBmpvYl9pZBgBIAEoCRIQCghzY29wZV9pZBgCIAEoCRIPCgdnb2FsX2lkGAMgASgJEgwKBGtpbmQYBCABKAkSKgoGc3RhdHVzGAUgASgOMhouZ2xpbW1lci5qb2JzLnYxLkpvYlN0YXR1cxIQCghyZXZpc2lvbhgGIAEoBBIPCgdhdHRlbXB0GAcgASgEEhEKCWR1ZV9hdF9tcxgIIAEoBBIXCgplcnJvcl9jb2RlGAkgASgJSACIAQESFQoNdXBkYXRlZF9hdF9tcxgKIAEoBBIeChZzdGF0ZV9mZWVkYmFja19wZW5kaW5nGAsgASgIQg0KC19lcnJvcl9jb2RlIksKFEpvYkhhbmRsZXJQcm9qZWN0aW9uEgwKBGtpbmQYASABKAkSEgoKcmV0cnlfbW9kZRgCIAEoCRIRCglhdmFpbGFibGUYAyABKAgilwEKGVJlYWRKb2JzUHJvamVjdGlvblJlcXVlc3QSLQoEY2FsbBgBIAEoCzIfLmdsaW1tZXIuY29tbW9uLnYxLkNhbGxNZXRhZGF0YRIQCghzY29wZV9pZBgCIAEoCRINCgVsaW1pdBgDIAEoDRIZCgxhZnRlcl9qb2JfaWQYBCABKAlIAIgBAUIPCg1fYWZ0ZXJfam9iX2lkItIBChpSZWFkSm9ic1Byb2plY3Rpb25SZXNwb25zZRIXCg9hdXRob3JpdHlfZXBvY2gYASABKAQSLAoEam9icxgCIAMoCzIeLmdsaW1tZXIuam9icy52MS5Kb2JQcm9qZWN0aW9uEjcKCGhhbmRsZXJzGAMgAygLMiUuZ2xpbW1lci5qb2JzLnYxLkpvYkhhbmRsZXJQcm9qZWN0aW9uEh4KEW5leHRfYWZ0ZXJfam9iX2lkGAQgASgJSACIAQFCFAoSX25leHRfYWZ0ZXJfam9iX2lkKtkBCglKb2JTdGF0dXMSGgoWSk9CX1NUQVRVU19VTlNQRUNJRklFRBAAEhUKEUpPQl9TVEFUVVNfUVVFVUVEEAESFgoSSk9CX1NUQVRVU19SVU5OSU5HEAISGQoVSk9CX1NUQVRVU19SRVRSWV9XQUlUEAMSGAoUSk9CX1NUQVRVU19TVUNDRUVERUQQBBIYChRKT0JfU1RBVFVTX0NBTkNFTExFRBAFEhoKFkpPQl9TVEFUVVNfREVBRF9MRVRURVIQBhIWChJKT0JfU1RBVFVTX1VOS05PV04QB0IqqgInR2xpbW1lckNyYWRsZS5Db250cmFjdHMuR2xpbW1lci5Kb2JzLlYxYgZwcm90bzM", [file_google_protobuf_struct, file_glimmer_common_v1_service_contract]);
 
 /**
  * Jobs outbox 的不可变事实。取消只表示调度意图撤销，不证明领域副作用回滚。
@@ -143,6 +145,170 @@ export type JobExecutionIdentity = Message<"glimmer.jobs.v1.JobExecutionIdentity
  */
 export const JobExecutionIdentitySchema: GenMessage<JobExecutionIdentity> = /*@__PURE__*/
   messageDesc(file_glimmer_jobs_v1_jobs, 1);
+
+/**
+ * Host 控制面仅公开状态元数据；正文、结果、租约/证据身份留在各领域 owner。
+ *
+ * @generated from message glimmer.jobs.v1.JobProjection
+ */
+export type JobProjection = Message<"glimmer.jobs.v1.JobProjection"> & {
+  /**
+   * @generated from field: string job_id = 1;
+   */
+  jobId: string;
+
+  /**
+   * @generated from field: string scope_id = 2;
+   */
+  scopeId: string;
+
+  /**
+   * @generated from field: string goal_id = 3;
+   */
+  goalId: string;
+
+  /**
+   * @generated from field: string kind = 4;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: glimmer.jobs.v1.JobStatus status = 5;
+   */
+  status: JobStatus;
+
+  /**
+   * @generated from field: uint64 revision = 6;
+   */
+  revision: bigint;
+
+  /**
+   * @generated from field: uint64 attempt = 7;
+   */
+  attempt: bigint;
+
+  /**
+   * @generated from field: uint64 due_at_ms = 8;
+   */
+  dueAtMs: bigint;
+
+  /**
+   * @generated from field: optional string error_code = 9;
+   */
+  errorCode?: string | undefined;
+
+  /**
+   * @generated from field: uint64 updated_at_ms = 10;
+   */
+  updatedAtMs: bigint;
+
+  /**
+   * @generated from field: bool state_feedback_pending = 11;
+   */
+  stateFeedbackPending: boolean;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.JobProjection.
+ * Use `create(JobProjectionSchema)` to create a new message.
+ */
+export const JobProjectionSchema: GenMessage<JobProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 2);
+
+/**
+ * available 表示此 handler 的实际装配可用；每个源 Job 仍须独立业务接纳。
+ *
+ * @generated from message glimmer.jobs.v1.JobHandlerProjection
+ */
+export type JobHandlerProjection = Message<"glimmer.jobs.v1.JobHandlerProjection"> & {
+  /**
+   * @generated from field: string kind = 1;
+   */
+  kind: string;
+
+  /**
+   * @generated from field: string retry_mode = 2;
+   */
+  retryMode: string;
+
+  /**
+   * @generated from field: bool available = 3;
+   */
+  available: boolean;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.JobHandlerProjection.
+ * Use `create(JobHandlerProjectionSchema)` to create a new message.
+ */
+export const JobHandlerProjectionSchema: GenMessage<JobHandlerProjection> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 3);
+
+/**
+ * @generated from message glimmer.jobs.v1.ReadJobsProjectionRequest
+ */
+export type ReadJobsProjectionRequest = Message<"glimmer.jobs.v1.ReadJobsProjectionRequest"> & {
+  /**
+   * @generated from field: glimmer.common.v1.CallMetadata call = 1;
+   */
+  call?: CallMetadata | undefined;
+
+  /**
+   * @generated from field: string scope_id = 2;
+   */
+  scopeId: string;
+
+  /**
+   * @generated from field: uint32 limit = 3;
+   */
+  limit: number;
+
+  /**
+   * @generated from field: optional string after_job_id = 4;
+   */
+  afterJobId?: string | undefined;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.ReadJobsProjectionRequest.
+ * Use `create(ReadJobsProjectionRequestSchema)` to create a new message.
+ */
+export const ReadJobsProjectionRequestSchema: GenMessage<ReadJobsProjectionRequest> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 4);
+
+/**
+ * @generated from message glimmer.jobs.v1.ReadJobsProjectionResponse
+ */
+export type ReadJobsProjectionResponse = Message<"glimmer.jobs.v1.ReadJobsProjectionResponse"> & {
+  /**
+   * @generated from field: uint64 authority_epoch = 1;
+   */
+  authorityEpoch: bigint;
+
+  /**
+   * @generated from field: repeated glimmer.jobs.v1.JobProjection jobs = 2;
+   */
+  jobs: JobProjection[];
+
+  /**
+   * @generated from field: repeated glimmer.jobs.v1.JobHandlerProjection handlers = 3;
+   */
+  handlers: JobHandlerProjection[];
+
+  /**
+   * 稳定原 Job ID；空页不返回 cursor，短非空页仍可继续读取。
+   *
+   * @generated from field: optional string next_after_job_id = 4;
+   */
+  nextAfterJobId?: string | undefined;
+};
+
+/**
+ * Describes the message glimmer.jobs.v1.ReadJobsProjectionResponse.
+ * Use `create(ReadJobsProjectionResponseSchema)` to create a new message.
+ */
+export const ReadJobsProjectionResponseSchema: GenMessage<ReadJobsProjectionResponse> = /*@__PURE__*/
+  messageDesc(file_glimmer_jobs_v1_jobs, 5);
 
 /**
  * @generated from enum glimmer.jobs.v1.JobStatus

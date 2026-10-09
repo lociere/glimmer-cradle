@@ -20,6 +20,12 @@ export class JobScheduler {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Job tick limit 无效');
     this.waiting = 0;
     signal?.throwIfAborted();
+    // 注册缺失不消耗源 attempt；动态接纳返回后也须重新核对注册。
+    if (this.kind && !this.controller.hasHandler(this.kind)) {
+      if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
+      this.cursor = '';
+      return 0;
+    }
     if (this.controller.isAccepting) this.store.materializeDue(this.epoch, this.clock.now(), limit);
     let count = 0;
     if (this.admission && this.controller.isAccepting) {
@@ -30,7 +36,11 @@ export class JobScheduler {
         if (!this.controller.isAccepting) break;
         const eligible = await this.admission.isEligible(job, signal);
         signal?.throwIfAborted();
-        if (!this.controller.isAccepting) break;
+        if (!this.controller.hasHandler(this.kind!)) {
+          if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit).length;
+          this.cursor = '';
+          break;
+        }
         if (eligible !== true) { this.waiting += 1; continue; }
         // 不跨接纳 await 持有事务；只 CAS 原候选，不能跳到另一个未经接纳的 Job。
         const claim = this.store.claim(this.epoch, this.ownerId, this.clock.now(), this.leaseMs, this.kind,
@@ -40,12 +50,16 @@ export class JobScheduler {
       if (page.length < limit) this.cursor = '';
       return count;
     }
-    while (count < limit && this.controller.isAccepting) {
+    while (count < limit && this.controller.isAccepting && (!this.kind || this.controller.hasHandler(this.kind))) {
       signal?.throwIfAborted();
       const claim = this.store.claim(this.epoch, this.ownerId, this.clock.now(), this.leaseMs, this.kind);
       if (!claim) break;
       await this.controller.execute(claim);
       count += 1;
+    }
+    if (this.kind && this.controller.isAccepting && !this.controller.hasHandler(this.kind)) {
+      this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
+      this.cursor = '';
     }
     return count;
   }

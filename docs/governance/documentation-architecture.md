@@ -254,6 +254,7 @@ docs/
     │   │   ├── acceptance.md
     │   │   ├── evidence/
     │   │   │   ├── 2026-10-09-P07A.md
+    │   │   │   ├── 2026-10-09-P07B.md
     │   │   │   ├── 2026-10-09-docs-integration.md
     │   │   │   ├── 2026-10-09-execution-order.md
     │   │   │   └── README.md

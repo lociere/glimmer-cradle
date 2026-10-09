@@ -14,6 +14,9 @@ due/max-attempts 与 Job/outbox 同事务接纳。ACK 丢失后重投沿用首�
 retry mode；不会用当前 retry due 或新配置重算。普通 `enqueue` 的完整请求冲突规则不变。
 
 App 注册 handler 并显式驱动 `JobScheduler.runDue`；handler 接收 AbortSignal 和 lease。
+`JobController.catalog` 从实际注册形成 kind/retry-policy 快照，不枚举计划中的 handler；停机后
+拒绝新注册。App 可撤销注册，在途仍按原 lease 排空；限定 kind 的 Scheduler 在 claim 前及
+接纳 await 后复验注册，缺失不消耗 attempt，待办仍留在原持久源。
 可按 kind 注入中立 `JobAdmissionPort`：`listDue` 在当前 authority 下按稳定 Job ID 有界分页，
 接纳 await 不持有 SQL 事务；严格 eligible 后以候选 ID/revision CAS claim，取消/竞争更新/切代
 不能将旧判断用于另一 Job。等待项仍推进 cursor 并最终回绕，不修改 due/attempt/重试预算。
@@ -50,6 +53,12 @@ retention 仅清理已无待 ACK outbox 的 succeeded/cancelled/dead-letter 大�
 源快照存在但 Job/tombstone 缺失则拒绝重新生成工作。schema version 4 不兼容时拒绝打开，旧候选
 v1/v2/v3 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
 本切片不会创建生产数据库或迁移 Memory 库。
+
+`listProjection` 在当前 authority 下按精确 scope 与稳定 Job ID 有界读取保留中的 Job 元数据，
+不读取/公开 payload、result、lease owner 或证据正文；待 ACK 状态来自真实 outbox。
+该读取不建立第二状态 writer，重启后直接由 SQL 重建。retention 后 tombstone 继续保护幂等，
+不伪造已经清理的大记录。Host 控制路由以实际 Principal 与本 epoch 的 scope grant 前后复验，
+通过 Contract Spine 生成的公开投影返回；catalog 可用不替代每个源的业务接纳。
 
 `listUnknown` 按已注册 kind、稳定 Job ID 与有界 cursor 扫描持久恢复集合，旧 authority 拒读。
 Scheduler 可限定已装配的 kind，避免提前判死其他 owner 的工作；App 的 signal 取消后不再 claim。

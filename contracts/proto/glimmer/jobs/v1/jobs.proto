@@ -5,6 +5,7 @@ package glimmer.jobs.v1;
 option csharp_namespace = "GlimmerCradle.Contracts.Glimmer.Jobs.V1";
 
 import "google/protobuf/struct.proto";
+import "glimmer/common/v1/service_contract.proto";
 
 enum JobStatus {
   JOB_STATUS_UNSPECIFIED = 0;
@@ -45,4 +46,41 @@ message JobExecutionIdentity {
   uint64 fencing_token = 5;
   string owner_id = 6;
   uint64 lease_until_ms = 7;
+}
+
+// Host 控制面仅公开状态元数据；正文、结果、租约/证据身份留在各领域 owner。
+message JobProjection {
+  string job_id = 1;
+  string scope_id = 2;
+  string goal_id = 3;
+  string kind = 4;
+  JobStatus status = 5;
+  uint64 revision = 6;
+  uint64 attempt = 7;
+  uint64 due_at_ms = 8;
+  optional string error_code = 9;
+  uint64 updated_at_ms = 10;
+  bool state_feedback_pending = 11;
+}
+
+// available 表示此 handler 的实际装配可用；每个源 Job 仍须独立业务接纳。
+message JobHandlerProjection {
+  string kind = 1;
+  string retry_mode = 2;
+  bool available = 3;
+}
+
+message ReadJobsProjectionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string scope_id = 2;
+  uint32 limit = 3;
+  optional string after_job_id = 4;
+}
+
+message ReadJobsProjectionResponse {
+  uint64 authority_epoch = 1;
+  repeated JobProjection jobs = 2;
+  repeated JobHandlerProjection handlers = 3;
+  // 稳定原 Job ID；空页不返回 cursor，短非空页仍可继续读取。
+  optional string next_after_job_id = 4;
 }

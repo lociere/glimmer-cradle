@@ -1,9 +1,20 @@
 import { createHash } from 'node:crypto';
 import { create, toBinary, type JsonObject } from '@bufbuild/protobuf';
-import { JobExecutionIdentitySchema, JobStateEventSchema, JobStatus, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
+import { JobExecutionIdentitySchema, JobStateEventSchema, JobProjectionSchema, JobStatus, type JobExecutionIdentity } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { MemoryJobResolution, PlanningJobResolution, PlanningJobResultSchema, PlanningJobSourceRequestSchema,
   type MemoryJobSourceRequest, type MemoryJobResult, type PlanningJobSourceRequest, type PlanningJobResult } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence, type JobStateEvent } from '@glimmer-cradle/jobs';
+import { JobConflictError, type JobSource, type JobRequest, type Job, type JobAttempt, type JobReconciliationEvidence, type JobStateEvent, type JobProjection } from '@glimmer-cradle/jobs';
+
+export function jobProjectionToWire(value: JobProjection) {
+  const statuses = { queued: JobStatus.QUEUED, running: JobStatus.RUNNING, retry_wait: JobStatus.RETRY_WAIT,
+    succeeded: JobStatus.SUCCEEDED, cancelled: JobStatus.CANCELLED, dead_letter: JobStatus.DEAD_LETTER, unknown: JobStatus.UNKNOWN };
+  if (!Number.isSafeInteger(value.attempt) || value.attempt < 0 || !Number.isSafeInteger(value.due_at) || value.due_at < 0
+    || !Number.isSafeInteger(value.updated_at) || value.updated_at < 0 || !statuses[value.status]) throw new JobConflictError('Job projection 元数据无效');
+  return create(JobProjectionSchema, { jobId: text(value.job_id), scopeId: text(value.scope_id), goalId: text(value.goal_id),
+    kind: text(value.kind), status: statuses[value.status], revision: BigInt(positive(value.revision)), attempt: BigInt(value.attempt),
+    dueAtMs: BigInt(value.due_at), errorCode: value.error_code ?? undefined, updatedAtMs: BigInt(value.updated_at),
+    stateFeedbackPending: value.state_feedback_pending });
+}
 
 export function memoryJobState(event: JobStateEvent) {
   return jobState(event, MEMORY_JOB_KIND);

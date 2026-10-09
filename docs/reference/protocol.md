@@ -118,6 +118,21 @@ attempt/token 可为零；Memory 执行状态需要非零 attempt/token。未知
 [数据目录](data-layout.md#用户状态与记忆)，实现见
 [Cognition 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
 
+## Jobs 受控状态投影
+
+`contracts/proto/glimmer/jobs/v1/jobs.proto` 唯一拥有 `ReadJobsProjectionRequest` /
+`ReadJobsProjectionResponse`、`JobProjection` 和 `JobHandlerProjection`。Host 控制路由只接受
+ingress 注入的已认证 Principal，metadata generation 必须匹配该实例；scope、trace 或自报
+身份不能授予权限。精确 `jobs.read` grant 绑定 scope、Host、principal generation 和当前 Jobs
+epoch，读取前后复验实际 grant 与 live authority；取消、换主、撤权、失效或存储故障不返回数据。
+请求限 16 KiB，响应限 256 KiB；limit 为 1–1000，按原 Job ID 分页，非空页给下一 cursor，空页停止。
+
+投影只返回 Job/goal/scope/kind、状态/revision/attempt/due、错误码/更新时间与真实待反馈标志；
+不公开 payload/result、lease owner、执行证据或通知正文。信息从唯一 Jobs SQL 重建，不用运行期
+数组冒充持久状态；retention 已清理的大记录不伪造为仍存在。handler catalog 来自实际注册，
+available 表示当前装配可用，各源仍须独立业务接纳和执行授权。当前 route 与配置 Host owner
+已接通，完整产品 HTTP/UI ingress 和安装组合仍归后续步骤。
+
 ## Planning Jobs 源接纳
 
 `PlanningJobSourceRequest` 携带 request/commitment/plan/goal/scope 身份、目标/计划版本与原

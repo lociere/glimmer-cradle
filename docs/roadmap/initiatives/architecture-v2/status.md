@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-暂无可直接执行的任务；先处理阻断或完成计划任务的准备门。
+下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B 首个catalog/受控投影子链已验证/复核：Jobs public-api22与其他30有效证据、Host公开反例10+真实配置投影1+实际Memory执行/状态retention1、Host类型、最新Jobs DTO contracts verify与docs/target-layout/architecture/encoding/tool15/diff均PASS。注册微任务P2与三处等待/cursor已关闭，无后台进程。逻辑中文提交保存后继续P07B.1 Memory逐任务业务接纳（disabled/provider/原ACK源与Episode域复验）、P07B.3 Planning通知状态公开映射及P07B.4分页公平/retention引用核对，尚未接受整个任务。HEAD58b94fc9加本步dirty，生成物已暂存，唯一writer本会话，无其他用户改动；根大型门/产品UI ingress/旧队列切换待后续，未推送。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
@@ -35,7 +35,7 @@
 |---|---|---|---|
 | [A00 接手与差距核对](execution-order.md#step-a00) | accepted / discovery | 无 | 本会话执行 owner（唯一写入负责人） |
 | [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | accepted / implementation | A00 | 本会话执行 owner（唯一写入负责人） |
-| [P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b) | planned / implementation | P07A | 开始时指定 |
+| [P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b) | in-progress / implementation | P07A | 本会话执行 owner（唯一写入负责人） |
 | [P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a) | planned / implementation | A00 | 开始时指定 |
 | [P03A Content 最终路径与媒体恢复差距](execution-order.md#step-p03a) | planned / implementation | A00 | 开始时指定 |
 | [P04A 交互、中断与实际播放回执](execution-order.md#step-p04a) | planned / implementation | P03A, P02A | 开始时指定 |

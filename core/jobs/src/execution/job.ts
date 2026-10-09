@@ -41,6 +41,10 @@ export interface JobAttempt {
   readonly error_code: string | null;
 }
 
+/** 受控状态元数据；没有 payload/result、lease owner 或执行证据正文。 */
+export type JobProjection = Pick<Job, 'job_id' | 'scope_id' | 'goal_id' | 'kind' | 'status' | 'revision'
+  | 'attempt' | 'due_at' | 'error_code' | 'updated_at'> & { readonly state_feedback_pending: boolean };
+
 /** 私有 App 投递边界；不包含请求 payload，不作为跨进程 wire DTO。 */
 export type JobStateEvent = Pick<Job, 'job_id' | 'scope_id' | 'goal_id' | 'kind' | 'revision' | 'status'
   | 'attempt' | 'authority_epoch' | 'fencing_token' | 'result' | 'error_code' | 'updated_at'> & {

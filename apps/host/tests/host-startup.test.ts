@@ -9,6 +9,8 @@ import * as grpc from '@grpc/grpc-js';
 import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
 import { HostConversationRoutes } from '../src/gateway/conversation-routes.js';
+import { HostJobControlRoutes } from '../src/gateway/control-routes.js';
+import { ReadJobsProjectionRequestSchema, ReadJobsProjectionResponseSchema, JobStatus } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { DeliveryReceiptCommandSchema, type SurfaceGatewayServiceStreamRequest,
   type SurfaceGatewayServiceStreamResponse } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
 import path from 'node:path';
@@ -559,6 +561,9 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       expect(projections).toBeGreaterThan(0); expect(readdirSync(paths.app_root)).toEqual(['core']);
       expect(installation()).toEqual(originalInstallation);
       expect(existsSync(paths.jobs_database)).toBe(true); expect(existsSync(paths.authority_database)).toBe(true);
+      const broker = new PermissionBroker(clock.now, () => {});
+      const principal = broker.registerPrincipal({ principal_id: 'projection-reader', host_id: 'host:configured', generation: 'ui:one', kind: 'user' });
+      const controls = new HostJobControlRoutes(owner.jobProjection, broker);
       const jobs = new Database(paths.jobs_database, { readonly: true });
       let before: unknown;
       try {
@@ -566,6 +571,17 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         expect(before).toMatchObject({ max_attempts: 5 });
         expect(jobs.prepare('SELECT attempt,status FROM jobs').get()).toEqual({ attempt: 0, status: 'queued' });
         expect(jobs.prepare('SELECT COUNT(*) AS count FROM job_outbox WHERE acknowledged_at IS NULL').get()).toEqual({ count: 0 });
+        const original = jobs.prepare('SELECT job_id,scope_id FROM jobs').get() as { job_id: string; scope_id: string };
+        const query = create(ReadJobsProjectionRequestSchema, { call: { traceId: 'actual-configured-read', generation: principal.generation },
+          scopeId: original.scope_id, limit: 10 });
+        expect(() => controls.read(principal, query)).toThrow('权限');
+        broker.grant(controls.permissionRequest(principal, original.scope_id), clock.now() + 1000);
+        const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, controls.read(principal, query)));
+        expect(result.jobs).toHaveLength(1);
+        expect(result.jobs[0]).toMatchObject({ jobId: original.job_id, scopeId: original.scope_id, status: JobStatus.QUEUED,
+          attempt: 0n, stateFeedbackPending: false });
+        expect(result.handlers).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'memory.consolidate', available: true })]));
+        expect(Object.keys(result.jobs[0])).not.toContain('payload');
       } finally { jobs.close(); }
       const feedback = new Database(path.join(paths.data_root, 'state/cognition/projections/episodes.db'), { readonly: true });
       try { expect(feedback.prepare('SELECT status,business_outcome FROM memory_job_projection').get()).toEqual({ status: 'queued', business_outcome: 'unknown' }); }

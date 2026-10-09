@@ -18,7 +18,8 @@ import { SurfaceGatewayServiceStreamRequestSchema, SurfaceGatewayServiceStreamRe
   SurfaceGatewayServiceCommandRequestSchema, SurfaceGatewayServiceCommandResponseSchema, DeliveryReceiptCommandSchema,
   type SurfaceGatewayServiceStreamRequest, type SurfaceGatewayServiceStreamResponse,
   type SurfaceGatewayServiceCommandRequest, type SurfaceGatewayServiceCommandResponse } from '@glimmer-cradle/contracts/glimmer/surface/v1/surface_gateway_pb';
-import { PermissionBroker, HostConversationRoutes } from '../src/index.js';
+import { PermissionBroker, HostConversationRoutes, HostJobControlRoutes } from '../src/index.js';
+import { ReadJobsProjectionRequestSchema, ReadJobsProjectionResponseSchema } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { CognitionClient, HostCognitionError } from '../src/adapters/protocol/cognition-client.js';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { planningJobEvidence, planningJobRequest, planningJobRequestId } from '../src/adapters/protocol/job-mapper.js';
@@ -90,6 +91,51 @@ function notificationRoutes() {
   return { root, store, delivery, broker, audit, principal, routes, prepared, stream, frames, receive, notify, grant, attach, receipt,
     time: (value: number) => { now = value; }, close: () => { routes.stop(); stream.destroy(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
+
+it.each(['read', 'foreign-scope', 'generation', 'expired', 'revoked-during-read', 'epoch-during-read', 'oversize', 'invalid-limit', 'abort', 'storage'] as const)
+('Host Jobs 公开投影 %s 经实际权限/SQL复验，不公开正文或失效读取', mode => {
+  const h = notificationRoutes(), store = new SqliteJobStore(path.join(h.root, 'jobs.sqlite'));
+  const scope = 'scope:protected';
+  const port = { get authorityEpoch() {
+    if (store.loadAuthorityEpoch() !== 1) throw new Error('authority changed'); return 1;
+  }, handlerCatalog: [{ kind: 'registered.kind', retry_mode: 'reconcile' as const, available: true }],
+  readJobStates: (scopeId: string, limit: number, cursor?: string) => store.listProjection(1, scopeId, limit, cursor) };
+  const route = new HostJobControlRoutes(port, h.broker), cancellation = new AbortController();
+  try {
+    store.activateAuthority(1, 100);
+    for (const id of ['a', 'b', 'foreign']) store.enqueue({ job_id: id, idempotency_key: id, scope_id: id === 'foreign' ? 'other' : scope,
+      goal_id: 'goal', kind: 'registered.kind', due_at: 1000, retry_mode: 'reconcile', max_attempts: 3,
+      payload: { private_text: 'must not leave owner' } }, 1, 100);
+    const grant = h.broker.grant(route.permissionRequest(h.principal, scope), 1000);
+    const query = create(ReadJobsProjectionRequestSchema, { call: { traceId: 'trace', generation: h.principal.generation }, scopeId: scope, limit: 1 });
+    if (mode === 'foreign-scope') query.scopeId = 'other';
+    if (mode === 'generation') query.call!.generation = 'old';
+    if (mode === 'expired') h.time(1000);
+    if (mode === 'oversize') query.call!.traceId = 'x'.repeat(20000);
+    if (mode === 'invalid-limit') query.limit = 1001;
+    if (mode === 'abort') cancellation.abort();
+    const read = store.listProjection.bind(store);
+    const failure = new Error('injected storage failure');
+    if (mode === 'storage') vi.spyOn(store, 'listProjection').mockImplementationOnce(() => { throw failure; });
+    if (mode === 'revoked-during-read' || mode === 'epoch-during-read') vi.spyOn(store, 'listProjection').mockImplementationOnce((...args: Parameters<SqliteJobStore['listProjection']>) => {
+      const result = read(...args);
+      if (mode === 'revoked-during-read') h.broker.revokeGrant(grant.grant_id);
+      else store.activateAuthority(2, 100);
+      return result;
+    });
+    if (mode === 'read') {
+      const result = fromBinary(ReadJobsProjectionResponseSchema, toBinary(ReadJobsProjectionResponseSchema, route.read(h.principal, query)));
+      expect(result.jobs.map(value => value.jobId)).toEqual(['a']); expect(result.nextAfterJobId).toBe('a');
+      expect(JSON.stringify(result.jobs, (_key, value) => typeof value === 'bigint' ? String(value) : value)).not.toContain('private_text');
+      query.afterJobId = result.nextAfterJobId;
+      expect(route.read(h.principal, query).jobs.map(value => value.jobId)).toEqual(['b']);
+      query.afterJobId = 'b'; expect(route.read(h.principal, query).jobs).toEqual([]);
+      expect(route.read(h.principal, query).nextAfterJobId).toBeUndefined();
+    } else if (mode === 'storage') expect(() => route.read(h.principal, query)).toThrow(failure);
+    else expect(() => route.read(h.principal, query, cancellation.signal)).toThrow();
+    expect(store.load('a')).toMatchObject({ status: 'queued', attempt: 0 });
+  } finally { store.close(); h.close(); }
+});
 
 it('transport 围栏进入前存储故障保留 queued、零帧且原错误可见', () => {
   const h = notificationRoutes();

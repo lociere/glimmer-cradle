@@ -1,6 +1,6 @@
 import { AuthorityConflictError, HandoverController, isAuthorityCurrent, type AuthorityLease,
   type AuthorityStorePort } from '@glimmer-cradle/platform';
-import { HostJobsController, type HostJobsOptions, type HostJobsSnapshot } from './host.js';
+import { HostJobsController, type HostJobsOptions, type HostJobsSnapshot, type HostJobsProjectionPort } from './host.js';
 import { WorkerSupervisor, type WorkerSupervisorSnapshot } from '../supervision/worker-supervisor.js';
 import type { WorkerSupervisorOptions } from '../supervision/worker-supervisor.js';
 import { SqliteJobStore, type JobClockPort, type JobStateReceiverPort, type JobStorePort } from '@glimmer-cradle/jobs';
@@ -60,6 +60,10 @@ export class ConfiguredHostCognitionJobsOwner {
   public get knowledge(): HostKnowledgeController {
     if (this.snapshot.phase !== 'active' || !this.session) throw new Error('配置 Host 尚未激活');
     return this.session.knowledge;
+  }
+  public get jobProjection(): HostJobsProjectionPort {
+    if (this.snapshot.phase !== 'active' || !this.session) throw new Error('配置 Host 尚未激活');
+    return this.session.jobProjection;
   }
   public start(): Promise<ConfiguredHostCognitionJobsSnapshot> {
     if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('配置 Host 实例已撤销'));
@@ -159,6 +163,10 @@ export class HostCognitionJobsOwner {
     if (this.snapshot.phase !== 'active' || !this.knowledgeController) throw new Error('Knowledge 未装配或尚未激活');
     return this.knowledgeController;
   }
+  public get jobProjection(): HostJobsProjectionPort {
+    if (this.snapshot.phase !== 'active' || !this.jobs) throw new Error('Host Jobs 未装配或尚未激活');
+    return this.jobs.jobProjection;
+  }
   public start(): Promise<HostCognitionJobsSnapshot> {
     if (this.stopRequested || this.snapshot.phase === 'failed') return Promise.reject(new Error('Host Worker/Jobs owner 已撤销'));
     if (this.starting) return this.starting;
@@ -252,6 +260,11 @@ export class HostJobsOwner {
   }
   public get snapshot(): HostJobsOwnerSnapshot {
     return { phase: this.phase, lease: this.lease ? { ...this.lease } : null, jobs: this.jobs?.snapshot ?? null };
+  }
+  public get jobProjection(): HostJobsProjectionPort {
+    if (this.phase !== 'active' || !this.jobs) throw new Error('Host Jobs owner 尚未激活');
+    this.guardedNow();
+    return this.jobs;
   }
   public start(): Promise<HostJobsOwnerSnapshot> {
     if (this.phase !== 'idle' && this.phase !== 'starting' && this.phase !== 'active') {

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobAttempt,
-  type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent } from '../../execution/job.js';
+  type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent, type JobProjection } from '../../execution/job.js';
 import type { JobClaim, JobClaimCandidate, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
@@ -192,6 +192,23 @@ export class SqliteJobStore implements JobStorePort {
       const rows = this.database.prepare(`SELECT * FROM jobs WHERE status='unknown' AND kind=? AND job_id>?
         ORDER BY job_id LIMIT ?`).all(kind, afterJobId, limit) as JobRow[];
       return rows.map(row => this.decode(row));
+    }).deferred();
+  }
+
+  public listProjection(epoch: number, scopeId: string, limit: number, afterJobId = ''): JobProjection[] {
+    if (typeof scopeId !== 'string' || !scopeId.trim() || Buffer.byteLength(scopeId) > 4096
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000
+      || typeof afterJobId !== 'string' || Buffer.byteLength(afterJobId) > 4096) {
+      throw new JobConflictError('Job projection 作用域/分页预算无效');
+    }
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const rows = this.database.prepare(`SELECT j.job_id,j.scope_id,j.goal_id,j.kind,j.status,j.revision,
+        j.attempt,j.due_at,j.error_code,j.updated_at,EXISTS(
+          SELECT 1 FROM job_outbox o WHERE o.job_id=j.job_id AND o.acknowledged_at IS NULL
+        ) AS state_feedback_pending FROM jobs j WHERE j.scope_id=? AND j.job_id>? ORDER BY j.job_id LIMIT ?`)
+        .all(scopeId, afterJobId, limit) as Array<Omit<JobProjection, 'state_feedback_pending'> & { state_feedback_pending: number }>;
+      return rows.map(row => ({ ...row, state_feedback_pending: row.state_feedback_pending === 1 }));
     }).deferred();
   }
 

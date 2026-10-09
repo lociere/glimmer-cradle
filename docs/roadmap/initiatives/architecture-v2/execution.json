@@ -3,7 +3,7 @@
   "initiative": "architecture-v2",
   "baselineCommit": "dc59181e",
   "reviewedAt": "2026-10-09",
-  "nextTask": null,
+  "nextTask": "P07B",
   "stages": [
     {
       "id": "P00",
@@ -443,10 +443,10 @@
       "dependsOn": [
         "P07A"
       ],
-      "status": "planned",
+      "status": "in-progress",
       "mode": "implementation",
       "card": "execution-order.md#step-p07b",
-      "owner": null,
+      "owner": "本会话执行 owner（唯一写入负责人）",
       "scope": "当前入口为 Host composition/cognition-job-adapter、gateway/conversation-routes 与 Jobs；目标为 core/jobs/、apps/host/src/composition/、apps/host/src/gateway/ 和对应测试。",
       "acceptance": [
         "G0",
@@ -457,9 +457,300 @@
         "G5",
         "G6"
       ],
-      "evidence": [],
+      "evidence": [
+        "evidence/2026-10-09-P07B.md"
+      ],
       "blockedReason": null,
-      "nextAction": "P07B.1：把 Planning、Memory 等现有任务源逐一接入明确的 JobHandler/源业务接纳链；源负责业务含义，Jobs 只负责调度执行机制。"
+      "nextAction": "P07B 首个catalog/受控投影子链已验证/复核：Jobs public-api22与其他30有效证据、Host公开反例10+真实配置投影1+实际Memory执行/状态retention1、Host类型、最新Jobs DTO contracts verify与docs/target-layout/architecture/encoding/tool15/diff均PASS。注册微任务P2与三处等待/cursor已关闭，无后台进程。逻辑中文提交保存后继续P07B.1 Memory逐任务业务接纳（disabled/provider/原ACK源与Episode域复验）、P07B.3 Planning通知状态公开映射及P07B.4分页公平/retention引用核对，尚未接受整个任务。HEAD58b94fc9加本步dirty，生成物已暂存，唯一writer本会话，无其他用户改动；根大型门/产品UI ingress/旧队列切换待后续，未推送。",
+      "mapping": [
+        {
+          "action": "retain",
+          "source": "core/jobs/src/execution/job-controller.ts",
+          "target": "core/jobs/src/execution/job-controller.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/execution/job-handler-port.ts",
+          "target": "core/jobs/src/execution/job-handler-port.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/execution/job.ts",
+          "target": "core/jobs/src/execution/job.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/ports/job-store-port.ts",
+          "target": "core/jobs/src/ports/job-store-port.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/adapters/storage/sqlite-job-store.ts",
+          "target": "core/jobs/src/adapters/storage/sqlite-job-store.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/scheduling/scheduler.ts",
+          "target": "core/jobs/src/scheduling/scheduler.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/recovery/recovery-controller.ts",
+          "target": "core/jobs/src/recovery/recovery-controller.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/recovery/retention.ts",
+          "target": "core/jobs/src/recovery/retention.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/src/index.ts",
+          "target": "core/jobs/src/index.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/tests/cancellation-retention.test.ts",
+          "target": "core/jobs/tests/cancellation-retention.test.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/tests/duplicate-trigger.test.ts",
+          "target": "core/jobs/tests/duplicate-trigger.test.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/tests/restart-recovery.test.ts",
+          "target": "core/jobs/tests/restart-recovery.test.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/tests/public-api.test.ts",
+          "target": "core/jobs/tests/public-api.test.ts",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/README.md",
+          "target": "core/jobs/README.md",
+          "owner": "Jobs",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/cognition-job-adapter.ts",
+          "target": "apps/host/src/composition/cognition-job-adapter.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/host.ts",
+          "target": "apps/host/src/composition/host.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/domain-owners.ts",
+          "target": "apps/host/src/composition/domain-owners.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/adapters/protocol/cognition-client.ts",
+          "target": "apps/host/src/adapters/protocol/cognition-client.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/adapters/protocol/job-mapper.ts",
+          "target": "apps/host/src/adapters/protocol/job-mapper.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/index.ts",
+          "target": "apps/host/src/index.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/host-startup.test.ts",
+          "target": "apps/host/tests/host-startup.test.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/planning-reconciliation.test.ts",
+          "target": "apps/host/tests/planning-reconciliation.test.ts",
+          "owner": "Host",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
+          "target": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/rpc_service.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/tests/test_rpc_roundtrip.py",
+          "target": "apps/cognition-worker/tests/test_rpc_roundtrip.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/reference/protocol.md",
+          "target": "docs/reference/protocol.md",
+          "owner": "Documentation",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/implementation/Cognition认知核实现.md",
+          "target": "docs/architecture/implementation/Cognition认知核实现.md",
+          "owner": "Documentation",
+          "exitCondition": "复用已验持久源/handler/恢复事实，catalog实际注册、拒绝与受控状态投影验证；旧产品队列保留项绑定P14A。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/proto/glimmer/jobs/v1/jobs.proto",
+          "target": "protocol/proto/glimmer/jobs/v1/jobs.proto",
+          "owner": "Contract Spine",
+          "exitCondition": "P11A前保留contracts唯一源，公开受控投影契约只由IDL生成，不提前双源。"
+        },
+        {
+          "action": "create",
+          "source": null,
+          "target": "apps/host/src/gateway/control-routes.ts",
+          "owner": "Host",
+          "exitCondition": "公开Jobs受控状态契约由现行IDL生成，已认证Principal和当前scope grant读取前后复验；产品HTTP/UI装配留P12B。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/ts/glimmer/jobs/v1/jobs_pb.ts",
+          "target": "protocol/generated/typescript/src/glimmer/jobs/v1/jobs_pb.ts",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成与inventory登记；P11A原子切换，不手写DTO或建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/python/glimmer/jobs/v1/jobs_pb2.py",
+          "target": "protocol/generated/python/src/glimmer/jobs/v1/jobs_pb2.py",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成与inventory登记；P11A原子切换，不手写DTO或建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/csharp/Jobs.cs",
+          "target": "protocol/generated/dotnet/src/Jobs.cs",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成与inventory登记；P11A原子切换，不手写DTO或建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/inventory.md",
+          "target": "protocol/README.md",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成与inventory登记；P11A原子切换，不手写DTO或建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/roadmap/initiatives/architecture-v2/evidence/README.md",
+          "target": "docs/roadmap/initiatives/architecture-v2/evidence/README.md",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/roadmap/initiatives/architecture-v2/evidence/2026-10-09-P07B.md",
+          "target": "docs/roadmap/initiatives/architecture-v2/evidence/2026-10-09-P07B.md",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/target/files.json",
+          "target": "docs/architecture/target/files.json",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/target/physical-layout.md",
+          "target": "docs/architecture/target/physical-layout.md",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/target/baseline.lock.json",
+          "target": "docs/architecture/target/baseline.lock.json",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/governance/documentation-architecture.md",
+          "target": "docs/governance/documentation-architecture.md",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "tools/repo-checks/src/architecture/baseline-lock.mjs",
+          "target": "tools/repo-checks/src/architecture/baseline-lock.mjs",
+          "owner": "Documentation governance",
+          "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        }
+      ],
+      "commands": [
+        "pnpm test:jobs",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts tests/planning-reconciliation.test.ts",
+        "uv run --project apps/cognition-worker --extra dev pytest -q apps/cognition-worker/tests/test_rpc_roundtrip.py -k memory",
+        "pnpm --filter @glimmer-cradle/jobs build",
+        "pnpm --filter @glimmer-cradle/host typecheck",
+        "pnpm contracts:generate",
+        "pnpm contracts:verify",
+        "pnpm check:architecture",
+        "pnpm check:docs",
+        "pnpm check:encoding",
+        "git diff --check",
+        "node --test tools/repo-checks/tests/baseline-lock.test.mjs tools/repo-checks/tests/target-layout.test.mjs tools/repo-checks/tests/documentation-structure.test.mjs"
+      ]
     },
     {
       "id": "P02A",

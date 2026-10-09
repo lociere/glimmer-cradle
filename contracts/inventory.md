@@ -1,5 +1,10 @@
 # M12 Contract Spine Inventory
 
+Jobs 控制面受控投影归 `proto/glimmer/jobs/v1/jobs.proto` 唯一拥有：`JobProjection`、
+`JobHandlerProjection`、`ReadJobsProjectionRequest`、`ReadJobsProjectionResponse`。
+Host 以已认证主体和当前精确 scope grant 读取；不公开 payload/result、lease owner、原 attempt
+证据正文。catalog 来自实际 handler 注册，available 不替代各源的逐任务业务接纳。
+
 Planning 通知历史身份查询由同一 `proto/glimmer/cognition/v1/cognition_service.proto` 拥有：
 `GetPreparedPlanningNotificationRequest` / `GetPreparedPlanningNotificationResponse` /
 `GetPreparedPlanningNotification`。独立响应的 original 复用原内部接纳身份/context，正文
