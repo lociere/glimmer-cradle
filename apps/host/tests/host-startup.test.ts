@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { createServer } from 'node:http';
 import * as grpc from '@grpc/grpc-js';
@@ -31,14 +31,14 @@ import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequ
   type PreparePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, AddressMode, ResponsePolicy,
   RetentionCeiling, PerceptionOperationState } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { PlanningJobSourceAdapter, PlanningJobAdapter } from '../src/composition/cognition-job-adapter.js';
+import { PlanningJobSourceAdapter, PlanningJobAdapter, PlanningJobCancellationAdapter, PlanningNotificationAdapter } from '../src/composition/cognition-job-adapter.js';
 import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry } from '@glimmer-cradle/capabilities';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
 import { PublishMemoryJobStateRequestSchema, PublishPlanningJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
-import { planningJobState } from '../src/adapters/protocol/job-mapper.js';
+import { planningJobState, planningJobSource } from '../src/adapters/protocol/job-mapper.js';
 import { JobStatus as WireJobStatus } from '@glimmer-cradle/contracts/glimmer/jobs/v1/jobs_pb';
 import { CallMetadataSchema, ServiceErrorCode, ServiceErrorDetailSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsController, HostJobsOwner, SqliteAuthorityStore,
@@ -50,6 +50,204 @@ const repository = path.resolve(__dirname, '../../..');
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
 const submissionPolicy = { debounce_ms: 0, max_attempts: 3 };
 const clock = { now: () => Date.now() };
+
+it.each(['before-schedule', 'queued'] as const)('真实 Planning 撤销 %s 在 Jobs 封口后 ACK；两库重启与旧源重投不复活', async phase => {
+  const { CancelPlanningCommitmentRequestSchema } = await import('@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-cancel-wire-'));
+  let service = await worker(root, 'planning-cancel-first'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  let lost: { mockRestore(): void } | undefined;
+  try {
+    store.activateAuthority(1, clock.now());
+    const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 1 }))).requests[0];
+    if (phase === 'queued') await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+    expect(await service.client.cancelPlanningCommitment(create(CancelPlanningCommitmentRequestSchema,
+      { commitmentId: source.commitmentId, expectedRevision: 1n, scopeId: source.scopeId }))).toMatchObject({ status: 'abandoned', revision: 2n });
+    const controller = new JobController(store, clock, policy);
+    const adapter = new PlanningJobCancellationAdapter(service.client);
+    lost = vi.spyOn(service.client, 'acknowledgePlanningCancellation').mockRejectedValueOnce(new HostCognitionError(ServiceErrorCode.UNAVAILABLE));
+    await expect(adapter.deliver(store, clock, 1, 3, 8, (id, revision) => controller.cancel(id, 1, revision)))
+      .rejects.toMatchObject({ code: ServiceErrorCode.UNAVAILABLE });
+    expect(store.load('planning:' + source.requestId)).toMatchObject({ status: 'cancelled', revision: 2, attempt: 0 });
+    lost.mockRestore(); lost = undefined;
+    await controller.stop(); store.close(); await service.stop();
+    service = await worker(root, 'planning-cancel-restarted'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    store.activateAuthority(2, clock.now());
+    const restarted = new JobController(store, clock, policy);
+    await new PlanningJobCancellationAdapter(service.client).deliver(store, clock, 2, 9, 8,
+      (id, revision) => restarted.cancel(id, 2, revision));
+    expect(await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 2, 9, 8)).toBe(0);
+    expect(store.enqueueSource(planningJobSource(source), planningJobRequest(source, 9), 2, clock.now()).job)
+      .toMatchObject({ status: 'cancelled', attempt: 0, max_attempts: 3 });
+    const receiver = new PlanningJobAdapter(service.client).stateReceiver(2);
+    await new JobRecoveryController(store, clock, 2, policy).deliverOutbox(receiver, 100, undefined, PLANNING_JOB_KIND);
+    expect(store.readOutbox(2, 100, PLANNING_JOB_KIND)).toEqual([]);
+    const db = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+    try {
+      expect(db.prepare('SELECT status,revision FROM planning_commitment').get()).toEqual({ status: 'abandoned', revision: 2 });
+      expect(db.prepare('SELECT status FROM planning_job_projection').get()).toEqual({ status: 'cancelled' });
+      expect(db.prepare('SELECT acknowledged_job_revision FROM planning_cancellation_outbox').get())
+        .toEqual({ acknowledged_job_revision: 2 });
+    } finally { db.close(); }
+    await restarted.stop();
+  } finally { lost?.mockRestore(); store.close(); await service.stop(); rmSync(root, { recursive: true, force: true }); }
+}, 30_000);
+it('真实执行中撤销取消模型，unknown 不先ACK；两库重启后原attempt对账再封口', async () => {
+  const { CancelPlanningCommitmentRequestSchema, ReadPlanningJobCancellationsRequestSchema } = await import('@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-cancel-running-'));
+  let service = await worker(root, 'planning-execute-cancel-waiting');
+  let store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  let controller = new JobController(store, clock, policy);
+  try {
+    store.activateAuthority(1, clock.now());
+    const source = (await service.client.readPlanningRequests(create(ReadPlanningJobRequestsRequestSchema, { limit: 1 }))).requests[0];
+    await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+    controller.register(new PlanningJobAdapter(service.client));
+    const running = controller.execute(store.claim(1, 'cancel-running', clock.now(), 60000, PLANNING_JOB_KIND)!);
+    const marker = path.join(root, 'planning-model-calls.txt');
+    await vi.waitFor(() => expect(existsSync(marker) && readFileSync(marker, 'utf8')).toBe('entered\n'), { timeout: 5000 });
+    expect(await service.client.cancelPlanningCommitment(create(CancelPlanningCommitmentRequestSchema,
+      { commitmentId: source.commitmentId, expectedRevision: 1n, scopeId: source.scopeId }))).toMatchObject({ status: 'abandoned', revision: 2n });
+    expect(await running).toMatchObject({ status: 'unknown', attempt: 1 });
+    expect(readFileSync(marker, 'utf8')).toBe('entered\ncancelled\n');
+    await new PlanningJobCancellationAdapter(service.client).deliver(store, clock, 1, 3, 8,
+      (id, revision) => controller.cancel(id, 1, revision));
+    expect((await service.client.readPlanningCancellations(create(ReadPlanningJobCancellationsRequestSchema, { limit: 8 }))).requests).toHaveLength(1);
+    await controller.stop(); store.close(); await service.stop();
+    service = await worker(root, 'planning-execute-cancel-restarted'); store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+    store.activateAuthority(2, clock.now()); controller = new JobController(store, clock, policy);
+    const adapter = new PlanningJobAdapter(service.client), jobId = 'planning:' + source.requestId;
+    await new JobRecoveryController(store, clock, 2, policy).reconcile(jobId, adapter);
+    expect(store.load(jobId)).toMatchObject({ status: 'retry_wait', attempt: 1 });
+    expect(await adapter.isEligible(store.load(jobId)!)).toBe(false);
+    await new PlanningJobCancellationAdapter(service.client).deliver(store, clock, 2, 3, 8,
+      (id, revision) => controller.cancel(id, 2, revision));
+    expect(store.load(jobId)).toMatchObject({ status: 'cancelled', attempt: 1 });
+    expect(store.listAttempts(jobId)).toHaveLength(1);
+    expect(readFileSync(marker, 'utf8')).toBe('entered\ncancelled\n');
+    const db = new Database(path.join(root, 'planning.sqlite'), { readonly: true });
+    try {
+      expect(db.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 0 });
+      expect(db.prepare('SELECT state FROM planning_evaluation_attempt').get()).toEqual({ state: 'sealed' });
+    } finally { db.close(); }
+  } finally { await controller.stop(); store.close(); await service.stop(); rmSync(root, { recursive: true, force: true }); }
+}, 30_000);
+
+it.each(['absent', 'generated', 'queued', 'sent', 'unknown'] as const)('真实发布许可后崩溃 %s，换主沿原输出恢复未发送，未知不重发', async status => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-publication-recovery-'));
+  let service = await worker(root, 'planning-execute-publication-first');
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite')), controller = new JobController(store, clock, policy);
+  const deliveryStore = new SqliteDeliveryStore(path.join(root, 'delivery.sqlite'));
+  let delivery = new DeliveryController(deliveryStore, 'epoch:first');
+  const permissions = new PermissionBroker(Date.now, () => undefined);
+  let routes = new HostConversationRoutes(permissions, delivery, Date.now);
+  const frames: SurfaceGatewayServiceStreamResponse[] = [];
+  const stream = new Writable({ objectMode: true, write(frame: SurfaceGatewayServiceStreamResponse, _encoding, callback) { frames.push(frame); callback(); } });
+  try {
+    store.activateAuthority(1, clock.now());
+    await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+    controller.register(new PlanningJobAdapter(service.client));
+    await controller.execute(store.claim(1, 'publication-recovery', clock.now(), 60000, PLANNING_JOB_KIND)!);
+    const item = (await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema, { limit: 1 }))).requests[0];
+    const prepared = await service.client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema, { request: item }));
+    expect(await service.client.beginPlanningNotificationPublication(prepared)).toBe(true);
+    const outputId = 'reply:' + prepared.turnId;
+    if (status !== 'absent') delivery.begin({ output_id: outputId, turn_id: prepared.turnId,
+      destination_id: prepared.context!.sceneId, content_digest: prepared.contentDigest });
+    if (['queued', 'sent', 'unknown'].includes(status)) delivery.queue(outputId);
+    if (['sent', 'unknown'].includes(status)) delivery.sent(outputId);
+    if (status === 'unknown') delivery.unknown(outputId, 'test_unknown');
+    // 原唯一 owner drain；仅在隔离数据上模拟原许可 commit 后、实际发送前的断点。
+    routes.stop(); await service.stop(); service = await worker(root, 'planning-execute-publication-restarted');
+    const previous = delivery;
+    delivery = new DeliveryController(deliveryStore, 'epoch:restarted'); routes = new HostConversationRoutes(permissions, delivery, Date.now);
+    expect(() => previous.recordedOutput(outputId)).toThrow('epoch');
+    const principal = permissions.registerPrincipal({ principal_id: 'recovery-user', host_id: 'host', generation: 'receiver:next', kind: 'user' });
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.receive'), Date.now() + 60000);
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.notify'), Date.now() + 60000);
+    const receiver = routes.attach(principal, prepared,
+      stream as grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>);
+    const adapter = new PlanningNotificationAdapter(service.client, routes, () => undefined);
+    await adapter.deliver(8);
+    const recoverable = status === 'absent' || status === 'generated';
+    expect(frames).toHaveLength(recoverable ? 1 : 0);
+    if (recoverable) {
+      const output = delivery.current(outputId)!;
+      expect(routes.receiveReceipt(receiver, create(DeliveryReceiptCommandSchema, { outputId, destinationId: prepared.context!.sceneId,
+        authorityEpoch: output.authority_epoch, generation: BigInt(output.generation), receivedAt: new Date().toISOString(),
+        receiptId: 'recovered-actual', kind: 'delivered' }))).toEqual({ accepted: true });
+      await adapter.deliver(8); await adapter.deliver(8);
+      expect((await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema, { limit: 8 }))).requests).toEqual([]);
+      expect(frames).toHaveLength(1);
+    } else {
+      expect(await service.client.beginPlanningNotificationPublication(prepared, delivery)).toBe(false);
+      expect(delivery.confirmedReceipt(outputId)).toBeNull();
+    }
+    expect(store.listAttempts('planning:' + item.requestId)).toHaveLength(1);
+  } finally { await controller.stop(); store.close(); await service.stop(); routes.stop(); stream.destroy(); deliveryStore.close(); rmSync(root, { recursive: true, force: true }); }
+}, 30_000);
+
+it.each(['before-publication', 'after-publication'] as const)('真实通知与撤销 %s 共享持久先后点，重启不重新授予未知发送', async phase => {
+  const { CancelPlanningCommitmentRequestSchema } = await import('@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb');
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-planning-publication-'));
+  let service = await worker(root, 'planning-execute-publication-first');
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const controller = new JobController(store, clock, policy);
+  const deliveryStore = new SqliteDeliveryStore(path.join(root, 'delivery.sqlite'));
+  const delivery = new DeliveryController(deliveryStore, 'epoch:publication');
+  const permissions = new PermissionBroker(Date.now, () => undefined);
+  const routes = new HostConversationRoutes(permissions, delivery, Date.now);
+  let crossing: { mockRestore(): void } | undefined;
+  const frames: SurfaceGatewayServiceStreamResponse[] = [];
+  const stream = new Writable({ objectMode: true, write(frame: SurfaceGatewayServiceStreamResponse, _encoding, callback) { frames.push(frame); callback(); } });
+  try {
+    store.activateAuthority(1, clock.now());
+    await new PlanningJobSourceAdapter(service.client).deliverRequests(store, clock, 1, 3, 8);
+    controller.register(new PlanningJobAdapter(service.client));
+    await controller.execute(store.claim(1, 'publication-owner', clock.now(), 60000, PLANNING_JOB_KIND)!);
+    const item = (await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema, { limit: 1 }))).requests[0];
+    const prepared = await service.client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema, { request: item }));
+    const principal = permissions.registerPrincipal({ principal_id: 'publication-user', host_id: 'host', generation: 'receiver:one', kind: 'user' });
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.receive'), Date.now() + 60000);
+    permissions.grant(routes.permissionRequest(principal, prepared, 'conversation.notify'), Date.now() + 60000);
+    const recipient = routes.attach(principal, prepared,
+      stream as grpc.ServerWritableStream<SurfaceGatewayServiceStreamRequest, SurfaceGatewayServiceStreamResponse>);
+    const cancel = async () => {
+      expect(frames).toEqual([]);
+      expect(await service.client.cancelPlanningCommitment(create(CancelPlanningCommitmentRequestSchema,
+        { commitmentId: item.commitmentId, expectedRevision: 2n, scopeId: item.scopeId }))).toMatchObject({ status: 'abandoned', revision: 3n });
+    };
+    if (phase === 'before-publication') {
+      const original = service.client.preparePlanningNotification.bind(service.client);
+      crossing = vi.spyOn(service.client, 'preparePlanningNotification').mockImplementation(async (...args: Parameters<CognitionClient['preparePlanningNotification']>) => {
+        const result = await original(...args); await cancel(); return result;
+      });
+    } else {
+      const original = service.client.beginPlanningNotificationPublication.bind(service.client);
+      crossing = vi.spyOn(service.client, 'beginPlanningNotificationPublication').mockImplementation(async (...args: Parameters<CognitionClient['beginPlanningNotificationPublication']>) => {
+        const result = await original(...args); expect(result).toBe(true); await cancel(); return result;
+      });
+    }
+    await new PlanningNotificationAdapter(service.client, routes, () => undefined).deliver(8);
+    const outputId = 'reply:' + prepared.turnId;
+    expect(frames).toHaveLength(phase === 'after-publication' ? 1 : 0);
+    expect(delivery.confirmedReceipt(outputId)).toBeNull();
+    if (phase === 'before-publication') expect(delivery.recordedOutput(outputId)).toBeNull();
+    crossing.mockRestore(); crossing = undefined;
+    await service.stop(); service = await worker(root, 'planning-execute-publication-restarted');
+    expect(await service.client.beginPlanningNotificationPublication(prepared)).toBe(false);
+    if (phase === 'after-publication') {
+      expect(routes.receiveReceipt(recipient, create(DeliveryReceiptCommandSchema, { outputId, destinationId: prepared.context!.sceneId,
+        authorityEpoch: 'epoch:publication', generation: 1n, receivedAt: new Date().toISOString(), receiptId: 'publication-actual', kind: 'delivered' })))
+        .toEqual({ accepted: true });
+      await new PlanningNotificationAdapter(service.client, routes, () => undefined).deliver(8);
+      expect((await service.client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema,
+        { limit: 8, includeRevoked: true }))).revokedRequests).toEqual([]);
+      expect(frames).toHaveLength(1);
+    }
+    expect(store.listAttempts('planning:' + item.requestId)).toHaveLength(1);
+  } finally { crossing?.mockRestore(); await controller.stop(); store.close(); await service.stop(); routes.stop(); stream.destroy(); deliveryStore.close(); rmSync(root, { recursive: true, force: true }); }
+}, 30_000);
+
 async function productionWorker(root: string, overrides: Partial<WorkerSupervisorOptions> = {}, seedPlanning = false) {
   const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
     'apps/cognition-worker/tests/test_rpc_roundtrip.py', seedPlanning ? '--host-production-planning-seed' : '--host-production-seed', root], { cwd: repository, windowsHide: true });
@@ -75,7 +273,8 @@ function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts =
 }
 
 describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
-  it.each([true, false])('生产 CLI 自动评估实际目标 completed=%s，重启不重复调用同一模型或消耗 attempt', async completed => {
+  it.each([{ completed: true, revoked: false }, { completed: false, revoked: false }, { completed: true, revoked: true }])
+  ('生产 CLI 自动评估实际目标 %j，重启不重复调用同一模型或消耗 attempt', async ({ completed, revoked }) => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-model-'));
     const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root);
@@ -229,6 +428,15 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
           await expect(client.acknowledgeDeliveredPlanningNotification(preparedNotification, outputId, delivery)).rejects.toThrow('已持久送达');
           expect(await client.readPlanningNotifications(notificationRequest)).toEqual(notifications);
           // 先 drain 调度，再接纳真实回执；确认提交前断点不能被运行中的下一轮抢先完成。
+          if (revoked) {
+            const { CancelPlanningCommitmentRequestSchema } = await import('@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb');
+            expect(await client.cancelPlanningCommitment(create(CancelPlanningCommitmentRequestSchema,
+              { commitmentId: 'commitment:actual-planning', expectedRevision: 2n, scopeId: 'conversation:actual-planning' })))
+              .toMatchObject({ status: 'abandoned', revision: 3n });
+            expect((await client.readPlanningNotifications(notificationRequest)).requests).toEqual([]);
+            expect((await client.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema,
+              { limit: 1, includeRevoked: true }))).revokedRequests).toEqual(notifications.requests);
+          }
           client.close(); client = undefined; await owner.stop();
           expect(routes.receiveReceipt(receiverId, create(DeliveryReceiptCommandSchema, { outputId, destinationId: preparedNotification.context!.sceneId,
             authorityEpoch: 'epoch:receipt-fixture', generation: 1n, receivedAt: new Date().toISOString(),
@@ -245,7 +453,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
           await vi.waitFor(async () => expect((await client!.readPlanningNotifications(notificationRequest)).requests).toEqual([]),
             { timeout: 5000, interval: 25 });
           expect(await client.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request: notifications.requests[0] })))
-            .toMatchObject({ available: false, reasonCode: 'planning_notification_source_unavailable' });
+            .toMatchObject({ available: false, reasonCode: revoked ? 'planning_notification_revoked' : 'planning_notification_source_unavailable' });
           await expect(client.preparePlanningNotification(create(PreparePlanningNotificationRequestSchema,
             { request: notifications.requests[0] }))).rejects.toMatchObject({ code: ServiceErrorCode.PERMISSION_DENIED });
           const original = (await client.getPreparedPlanningNotification(create(GetPreparedPlanningNotificationRequestSchema,
@@ -269,7 +477,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       const planning = new Database(path.join(paths.data_root, 'state/cognition/planning.sqlite'), { readonly: true });
       try {
         expect(planning.prepare('SELECT status,revision FROM planning_commitment').get())
-          .toEqual({ status: completed ? 'completed' : 'accepted', revision: 2 });
+          .toEqual({ status: revoked ? 'abandoned' : completed ? 'completed' : 'accepted', revision: revoked ? 3 : 2 });
         expect(planning.prepare('SELECT COUNT(*) AS count FROM planning_evaluation_receipt').get()).toEqual({ count: 1 });
         expect(planning.prepare('SELECT status,business_outcome FROM planning_job_projection').get()).toEqual({ status: 'succeeded', business_outcome: 'committed' });
       } finally { planning.close(); }

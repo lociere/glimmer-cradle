@@ -3,7 +3,7 @@
   "initiative": "architecture-v2",
   "baselineCommit": "dc59181e",
   "reviewedAt": "2026-10-09",
-  "nextTask": "P07A",
+  "nextTask": null,
   "stages": [
     {
       "id": "P00",
@@ -174,7 +174,7 @@
       "dependsOn": [
         "A00"
       ],
-      "status": "in-progress",
+      "status": "accepted",
       "mode": "implementation",
       "card": "execution-order.md#step-p07a",
       "owner": "本会话执行 owner（唯一写入负责人）",
@@ -192,7 +192,7 @@
         "evidence/2026-10-09-P07A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P07A.4：后继事务/兼容wire/恢复已实施并定向通过，独立P2复核关闭；接续承诺撤销CAS和持久Jobs取消传播，覆盖执行中/待通知/晚到结果。上一完成动作：后继子链定向测试与独立审查通过，准备局部提交；无后台验证进程，根大型门待最终集中验收。",
+      "nextAction": "本步后继/取消/发布与原身份恢复子链接受；Planning207、Worker Planning274、Host197、Conversation TS70、契约/包级类型构建/工具7与文档架构编码通过，独立只读必要问题已关闭。局部提交保存进度，不关闭整体B04/G3/G5/G7；旧队列P14A、产品接线P12A和根大型最终门保留。无后台进程，未推送；准备P07B准确文件映射与命令后直接继续。",
       "mapping": [
         {
           "action": "retain",
@@ -319,19 +319,118 @@
           "target": "docs/architecture/implementation/Cognition认知核实现.md",
           "owner": "Documentation",
           "exitCondition": "后继/撤销实际接线与未完成范围保持准确。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/planning/__init__.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/planning/__init__.py",
+          "owner": "Cognition Planning",
+          "exitCondition": "原身份恢复、未发送否定证明与旧authority围栏真实链验证通过，无重复副作用。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/inventory.md",
+          "target": "protocol/README.md",
+          "owner": "Contract Spine",
+          "exitCondition": "P07A保留现行唯一源/生成器登记；原子路径与旧contracts删除留P11A，不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/ts/glimmer/cognition/v1/cognition_service_pb.ts",
+          "target": "protocol/generated/typescript/src/glimmer/cognition/v1/cognition_pb.ts",
+          "owner": "Contract Spine",
+          "exitCondition": "P07A保留现行唯一源/生成器登记；原子路径与旧contracts删除留P11A，不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/python/glimmer/cognition/v1/cognition_service_pb2.py",
+          "target": "protocol/generated/python/src/glimmer/cognition/v1/cognition_pb2.py",
+          "owner": "Contract Spine",
+          "exitCondition": "P07A保留现行唯一源/生成器登记；原子路径与旧contracts删除留P11A，不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/csharp/CognitionService.cs",
+          "target": "protocol/generated/dotnet/src/Cognition.cs",
+          "owner": "Contract Spine",
+          "exitCondition": "P07A保留现行唯一源/生成器登记；原子路径与旧contracts删除留P11A，不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "core/conversation/src/delivery/delivery-controller.ts",
+          "target": "core/conversation/src/delivery/delivery-controller.ts",
+          "owner": "Conversation Delivery",
+          "exitCondition": "原身份恢复、未发送否定证明与旧authority围栏真实链验证通过，无重复副作用。"
+        },
+        {
+          "action": "retain",
+          "source": "core/conversation/src/delivery/delivery-store-port.ts",
+          "target": "core/conversation/src/delivery/delivery-store-port.ts",
+          "owner": "Conversation Delivery",
+          "exitCondition": "原身份恢复、未发送否定证明与旧authority围栏真实链验证通过，无重复副作用。"
+        },
+        {
+          "action": "retain",
+          "source": "core/conversation/src/adapters/storage/sqlite-delivery-store.ts",
+          "target": "core/conversation/src/adapters/storage/sqlite-delivery-store.ts",
+          "owner": "Conversation Delivery",
+          "exitCondition": "原身份恢复、未发送否定证明与旧authority围栏真实链验证通过，无重复副作用。"
+        },
+        {
+          "action": "retain",
+          "source": "core/conversation/tests/delivery-unknown.test.ts",
+          "target": "core/conversation/tests/delivery-unknown.test.ts",
+          "owner": "Conversation Delivery",
+          "exitCondition": "原身份恢复、未发送否定证明与旧authority围栏真实链验证通过，无重复副作用。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/gateway/conversation-routes.ts",
+          "target": "apps/host/src/gateway/conversation-routes.ts",
+          "owner": "Host",
+          "exitCondition": "真实发送围栏、旧 owner 拒绝与存储故障原样传播通过。"
+        },
+        {
+          "action": "retain",
+          "source": "tools/repo-checks/src/docs/execution-plan.mjs",
+          "target": "tools/repo-checks/src/docs/execution-plan.mjs",
+          "owner": "Engineering",
+          "exitCondition": "真实发送围栏/既定generatedAreas契约映射验证通过，不增加目标或放宽既定源文件门。"
+        },
+        {
+          "action": "retain",
+          "source": "tools/repo-checks/tests/documentation-structure.test.mjs",
+          "target": "tools/repo-checks/tests/documentation-structure.test.mjs",
+          "owner": "Engineering",
+          "exitCondition": "真实发送围栏/既定generatedAreas契约映射验证通过，不增加目标或放宽既定源文件门。"
+        },
+        {
+          "action": "retain",
+          "source": "docs/architecture/implementation/Conversation实现.md",
+          "target": "docs/architecture/implementation/Conversation实现.md",
+          "owner": "Documentation",
+          "exitCondition": "原通知恢复、真实回执与持久发送围栏事实准确，未完成产品门如实保留。"
+        },
+        {
+          "action": "retain",
+          "source": "core/jobs/README.md",
+          "target": "core/jobs/README.md",
+          "owner": "Documentation",
+          "exitCondition": "后继/撤销/通知已实现子链及catalog/产品/安装未验项事实准确。"
         }
       ],
       "commands": [
         "uv run --project core/cognition --extra dev pytest -q core/cognition/tests/test_planning_jobs.py",
         "uv run --project apps/cognition-worker --extra dev pytest -q apps/cognition-worker/tests/test_rpc_roundtrip.py -k planning",
-        "pnpm --filter @glimmer-cradle/host test -- tests/host-startup.test.ts tests/planning-reconciliation.test.ts",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts tests/planning-reconciliation.test.ts",
         "pnpm test:jobs",
         "pnpm contracts:generate",
         "pnpm contracts:verify",
         "pnpm check:architecture",
         "pnpm check:docs",
         "pnpm check:encoding",
-        "git diff --check"
+        "git diff --check",
+        "pnpm --filter @glimmer-cradle/conversation exec vitest run --threads false"
       ]
     },
     {

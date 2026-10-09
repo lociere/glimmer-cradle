@@ -83,6 +83,24 @@ test('implementation readiness requires explicit file actions, commands and dele
   assert.ok(validateExecutionPlan(candidate, root).some(error => error.includes('file mapping')));
 });
 
+test('execution mappings honor declared generated roots and patterns without accepting nearby source or traversal paths', () => {
+  const candidate = initialPlan(), task = candidate.tasks[0];
+  task.mode = 'implementation';
+  task.commands = ['pnpm contracts:generate'];
+  task.mapping = [{ action: 'retain', source: 'contracts/proto/glimmer/cognition/v1/cognition_service.proto',
+    target: 'protocol/generated/typescript/src/glimmer/cognition/v1/cognition_pb.ts', owner: 'Contract Spine', exitCondition: '生成器迁移通过' }];
+  for (const target of ['protocol/generated/typescript/src/glimmer/cognition/v1/cognition_pb.ts',
+    'protocol/generated/python/src/glimmer/cognition/v1/cognition_pb2.py', 'protocol/generated/dotnet/src/Cognition.cs']) {
+    task.mapping[0].target = target;
+    assert.deepEqual(validateExecutionPlan(candidate, root), []);
+  }
+  for (const target of ['protocol/generated/typescript/src/cognition.py', 'protocol/generated/typescript/src-adjacent/cognition.ts',
+    'protocol/generated/typescript/cognition.ts', 'protocol/generated/typescript/src/../outside.ts']) {
+    task.mapping[0].target = target;
+    assert.notDeepEqual(validateExecutionPlan(candidate, root), []);
+  }
+});
+
 test('documentation governance detects missing/unlisted files and repairs only generated views', t => {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-doc-structure-'));
   t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));

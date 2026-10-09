@@ -52,6 +52,7 @@ from glimmer_cradle.cognition.perception import (
     PerceptionOperationRegistry,
 )
 from glimmer_cradle.cognition.planning import (
+    PlanningJobCancellation,
     ModelPlanningCompletionEvaluator,
     PlanningConflictError,
     PlanningController,
@@ -1481,10 +1482,15 @@ class CognitionGrpcHost:
             "AcknowledgePlanningJobRequest": self._method(self._acknowledge_planning_job_request, cognition_pb.AcknowledgePlanningJobRequestRequest, cognition_pb.AcknowledgePlanningJobRequestResponse),
             "ReconcilePlanningJob": self._method(self._reconcile_planning_job, cognition_pb.ReconcilePlanningJobRequest, cognition_pb.ReconcilePlanningJobResponse),
             "AcceptPlanningCommitment": self._method(self._accept_planning_commitment, cognition_pb.AcceptPlanningCommitmentRequest, cognition_pb.AcceptPlanningCommitmentResponse),
+            "CancelPlanningCommitment": self._method(self._cancel_planning_commitment, cognition_pb.CancelPlanningCommitmentRequest, cognition_pb.CancelPlanningCommitmentResponse),
+            "ReadPlanningJobCancellations": self._method(self._read_planning_job_cancellations, cognition_pb.ReadPlanningJobCancellationsRequest, cognition_pb.ReadPlanningJobCancellationsResponse),
+            "AcknowledgePlanningJobCancellation": self._method(self._acknowledge_planning_job_cancellation, cognition_pb.AcknowledgePlanningJobCancellationRequest, cognition_pb.AcknowledgePlanningJobCancellationResponse),
             "ExecutePlanningJob": self._method(self._execute_planning_job, cognition_pb.ExecutePlanningJobRequest, cognition_pb.ExecutePlanningJobResponse),
             "GetPlanningJobAdmission": self._method(self._get_planning_job_admission, cognition_pb.GetPlanningJobAdmissionRequest, cognition_pb.GetPlanningJobAdmissionResponse),
             "PublishPlanningJobState": self._method(self._publish_planning_job_state, cognition_pb.PublishPlanningJobStateRequest, cognition_pb.PublishPlanningJobStateResponse),
             "ReadPlanningNotifications": self._method(self._read_planning_notifications, cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse),
+            "BeginPlanningNotificationPublication": self._method(self._begin_planning_notification_publication,
+                cognition_pb.BeginPlanningNotificationPublicationRequest, cognition_pb.BeginPlanningNotificationPublicationResponse),
             "ResolvePlanningNotification": self._method(self._resolve_planning_notification, cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse),
             "PreparePlanningNotification": self._method(self._prepare_planning_notification, cognition_pb.PreparePlanningNotificationRequest, cognition_pb.PreparePlanningNotificationResponse),
             "GetPreparedPlanningNotification": self._method(self._get_prepared_planning_notification, cognition_pb.GetPreparedPlanningNotificationRequest, cognition_pb.GetPreparedPlanningNotificationResponse),
@@ -1885,11 +1891,21 @@ class CognitionGrpcHost:
             try:
                 requests = await source.pending_notification_requests(limit=min(request.limit, 64),
                     after_notification_id=request.after_notification_id if request.HasField("after_notification_id") else None)
+                revoked = await source.pending_notification_requests(limit=min(request.limit, 64), revoked=True,
+                    after_notification_id=request.after_notification_id if request.HasField("after_notification_id") else None) if request.include_revoked else []
                 response = cognition_pb.ReadPlanningNotificationsResponse()
-                for item in requests:
-                    response.requests.append(planning_notification_to_wire(item))
+                unique = {item.notification_id: (item, False) for item in requests}
+                for item in revoked:
+                    if item.notification_id in unique and unique[item.notification_id][0] != item:
+                        raise ValueError("Planning 两次扫描的原通知身份冲突")
+                    # 撤销单向且原请求不变；后读到的撤销优先，不能返回重复游标。
+                    unique[item.notification_id] = (item, True)
+                items = sorted(unique.values(), key=lambda pair: pair[0].notification_id)
+                for item, historical in items[:min(request.limit, 64)]:
+                    target = response.revoked_requests if historical else response.requests
+                    target.append(planning_notification_to_wire(item))
                     if response.ByteSize() > 1_048_576:
-                        del response.requests[-1]
+                        del target[-1]
                         break
                 return response
             except ValueError as error:
@@ -1908,6 +1924,15 @@ class CognitionGrpcHost:
             try:
                 work = await source.read_notification_work(item)
             except PlanningConflictError as error:
+                commitment = await source.load_commitment(item.commitment_id)
+                if commitment is not None and commitment.status.value == "abandoned":
+                    # 先验证原历史引用；撤销不是伪造/损坏消息的宽泛白名单。
+                    try:
+                        await source.read_notification_work(item, historical=True)
+                    except PlanningConflictError:
+                        raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 撤销通知原引用冲突") from error
+                    return cognition_pb.ResolvePlanningNotificationResponse(request=planning_notification_to_wire(item),
+                        available=False, reason_code="planning_notification_revoked")
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知原来源/业务事实冲突") from error
             response = cognition_pb.ResolvePlanningNotificationResponse(request=planning_notification_to_wire(item))
             if work.goal.source_moment_id is None:
@@ -1958,6 +1983,14 @@ class CognitionGrpcHost:
             except PermissionError as error:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Planning 通知原来源不可读") from error
             except (ValueError, TypeError, RuntimeError) as error:
+                if isinstance(error, PlanningConflictError):
+                    commitment = await source.load_commitment(item.commitment_id)
+                    if commitment is not None and commitment.status.value == "abandoned":
+                        try:
+                            await source.read_notification_work(item, historical=True)
+                        except PlanningConflictError:
+                            raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 撤销通知原事实损坏") from error
+                        raise ServiceFault(common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED, "Planning 通知已撤销") from error
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知/Turn/Reply 持久绑定冲突") from error
             if not 1 <= reply.seq <= 9007199254740991 or not 1 <= turn.revision <= 9007199254740991:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 通知 Log/Turn 修订不可表示")
@@ -1977,10 +2010,34 @@ class CognitionGrpcHost:
             return response
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
+    async def _begin_planning_notification_publication(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if (request.ByteSize() > 65_536 or not request.HasField("request")
+                or not re.fullmatch(r"[a-f0-9]{64}", request.turn_id)
+                or not re.fullmatch(r"[a-f0-9]{64}", request.content_digest)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 发布请求身份/预算无效")
+            try:
+                item = planning_notification_from_wire(request.request)
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 发布通知引用无效") from error
+            try:
+                original = await self._prepared_planning_notification_identity(item)
+                if original is None or original.turn_id != request.turn_id or original.content_digest != request.content_digest:
+                    raise ValueError("Planning 发布缺少原 Reply/Turn/内容绑定")
+                decision = await source.claim_notification_publication(item, owner_id=self.generation, not_sent=request.not_sent)
+            except (ValueError, TypeError, RuntimeError) as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 原发布/历史事实冲突") from error
+            return cognition_pb.BeginPlanningNotificationPublicationResponse(request=request.request,
+                output_id="reply:" + request.turn_id, generation=self.generation, accepted=decision == "accepted",
+                reason_code={"accepted": "planning_publication_ready", "revoked": "planning_notification_revoked",
+                    "recovery_pending": "planning_publication_recovery_pending"}[decision])
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
     async def _prepared_planning_notification_identity(self, item: PlanningNotificationRequest) -> Any:
         if self._conversation is None or not self._conversation.accepts_durable_facts or self._turns is None:
             raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 通知历史 owner 未 ready")
-        work = await self._planning_jobs_source().read_notification_work(item)
+        work = await self._planning_jobs_source().read_notification_work(item, historical=True)
         turn_id = hashlib.sha256(f"conversation-notification-turn.v1:{item.notification_id}".encode()).hexdigest()
         reply = self._conversation.recorded_fact(f"notification-reply:{item.notification_id}")
         turn = await self._turns.load(turn_id)
@@ -2140,7 +2197,9 @@ class CognitionGrpcHost:
                 work = await source.read_evaluation_work(job_id=request.job_id, scope_id=request.scope_id, request_id=request.request_id)
             except PlanningConflictError as error:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 已 ACK 来源/目标绑定冲突") from error
-            if work.plan.goal.source_moment_id is None:
+            if work.commitment.status.value != "accepted":
+                reason = "planning_commitment_inactive"
+            elif work.plan.goal.source_moment_id is None:
                 reason = "planning_source_unbound"
             elif self._planning_model is None:
                 reason = "planning_model_unavailable"
@@ -2200,6 +2259,59 @@ class CognitionGrpcHost:
             return cognition_pb.AcceptPlanningCommitmentResponse(commitment_id=commitment.commitment_id,
                 plan_id=commitment.plan_id, plan_version=commitment.plan_version, revision=commitment.revision,
                 status=commitment.status.value, scope_id=goal.scope_id)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _cancel_planning_commitment(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if (request.ByteSize() > 16_384 or not 1 <= request.expected_revision < 9007199254740991
+                or any(not value.strip() or len(value.encode()) > 4096 for value in (request.commitment_id, request.scope_id))):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 撤销 identity/revision 无效")
+            try:
+                if self._planning_controller is None:
+                    raise ServiceFault(common_pb.SERVICE_ERROR_CODE_NOT_READY, "Planning 撤销 Controller 未装配")
+                commitment = await self._planning_controller.cancel_commitment(request.commitment_id,
+                    expected_revision=request.expected_revision, scope_id=request.scope_id)
+            except PlanningConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_CONFLICT, "Planning 撤销原来源/scope/revision 冲突") from error
+            return cognition_pb.CancelPlanningCommitmentResponse(commitment_id=commitment.commitment_id,
+                revision=commitment.revision, status=commitment.status.value)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _read_planning_job_cancellations(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if (request.ByteSize() > 16_384 or not 1 <= request.limit <= 1000 or request.HasField("after_request_id")
+                and not re.fullmatch(r"[a-f0-9]{64}", request.after_request_id)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 撤销扫描范围/游标无效")
+            try:
+                items = await source.pending_job_cancellations(limit=min(request.limit, 64),
+                    after_request_id=request.after_request_id if request.HasField("after_request_id") else None)
+                response = cognition_pb.ReadPlanningJobCancellationsResponse()
+                for item in items:
+                    response.requests.append(cognition_pb.PlanningJobCancellationRequest(
+                        request=planning_source_to_wire(item.request), commitment_revision=item.commitment_revision))
+                    if response.ByteSize() > 1_048_576:
+                        del response.requests[-1]
+                        break
+                return response
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 持久撤销源损坏") from error
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
+
+    async def _acknowledge_planning_job_cancellation(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            source = self._planning_jobs_source()
+            if (request.ByteSize() > 65_536 or not request.HasField("cancellation")
+                or not request.cancellation.HasField("request") or not 1 <= request.job_revision <= 9007199254740991):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Planning 撤销 ACK 信封/revision 无效")
+            try:
+                cancellation = PlanningJobCancellation(planning_source_from_wire(request.cancellation.request), request.cancellation.commitment_revision)
+                changed = await source.acknowledge_job_cancellation(cancellation, JobReceipt(request.job_id, "accepted", request.job_revision))
+            except ValueError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Planning 撤销 ACK 原来源/封口回执冲突") from error
+            return cognition_pb.AcknowledgePlanningJobCancellationResponse(request_id=cancellation.request.request_id,
+                accepted=True, duplicate=not changed)
         return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     async def _execute_planning_job(self, request: Any, context: Any) -> Any:

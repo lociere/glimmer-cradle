@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from glimmer_cradle.cognition.planning.goal import PlanningAssessment
-from glimmer_cradle.cognition.ports.job_port import PlanningEvidenceReference
+from glimmer_cradle.cognition.ports.job_port import JobRequest, PlanningEvidenceReference
 
 
 class CommitmentStatus(StrEnum):
@@ -27,6 +27,19 @@ class Commitment:
     status: CommitmentStatus
     revision: int
     plan_version: int
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningJobCancellation:
+    """持久源封口请求；仍引用原调度信封，不能用新的 request 身份撤销旧工作。"""
+
+    request: JobRequest
+    commitment_revision: int
+
+    def __post_init__(self) -> None:
+        if (not isinstance(self.request, JobRequest) or self.request.kind != "planning.evaluate"
+            or type(self.commitment_revision) is not int or not 2 <= self.commitment_revision <= 2**53 - 1):
+            raise ValueError("Planning 撤销信封/revision 无效")
 
 
 @dataclass(frozen=True, slots=True)

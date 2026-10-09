@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { create, toBinary } from '@bufbuild/protobuf';
 import type { ServerWritableStream } from '@grpc/grpc-js';
 import { snapshotPrincipal, type Principal, type PermissionGrant, type PermissionRequest } from '@glimmer-cradle/platform';
-import { type DeliveryController, type DeliveryReceiptEnvelope, type ReceiptDecision } from '@glimmer-cradle/conversation';
+import { DeliveryPublicationRejectedError, type DeliveryController, type DeliveryReceiptEnvelope, type ReceiptDecision } from '@glimmer-cradle/conversation';
 import type { PreparePlanningNotificationResponse, ResolvePlanningNotificationResponse } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { SurfaceGatewayServiceStreamResponseSchema, type SurfaceGatewayServiceStreamRequest,
   DeliveryReceiptCommandSchema, type DeliveryReceiptCommand,
@@ -122,17 +122,24 @@ export class HostConversationRoutes {
     }
     signal?.throwIfAborted();
     this.delivery.queue(outputId); recipient.outputs.add(outputId);
+    let transportEntered = false, transportAccepted = false;
     try {
       // write(false) 仍已接纳进 transport buffer；同步落 sent 后才让远端回执进入事件循环。
-      recipient.blocked = !recipient.stream.write(frame);
-    } catch {
+      this.delivery.withCurrentOutput(outputId, output.generation, () => {
+        transportEntered = true;
+        recipient.blocked = !recipient.stream.write(frame);
+        transportAccepted = true;
+        // 同一持久围栏保存已接纳进 transport 的结果，epoch 切换不能插入 write→sent。
+        this.delivery.sent(outputId);
+      });
+    } catch (error) {
+      if (!transportEntered && !(error instanceof DeliveryPublicationRejectedError)) throw error;
+      // 换主先赢时 current 返回 null；原 queued 意图仍留给当前 owner 对账，存储失败不能吞掉。
       if (this.delivery.current(outputId)?.status === 'queued') this.delivery.unknown(outputId, 'surface_write_unknown');
       this.detach(recipient.id, 'surface_write_unknown');
+      if (transportAccepted) throw error;
       return 'recovery_required';
     }
-    // 存储失败不是 transport 暂时断线，不能吞掉它或假造 sent。
-    try { this.delivery.sent(outputId); }
-    catch (error) { this.detach(recipient.id, 'delivery_commit_failed'); throw error; }
     return 'sent';
   }
 

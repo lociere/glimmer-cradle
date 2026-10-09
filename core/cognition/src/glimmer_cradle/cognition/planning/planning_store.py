@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from glimmer_cradle.cognition.planning.commitment import (
     Commitment,
     PlanningEvaluationReceipt,
     PlanningJobFeedback,
     PlanningJobIdentity,
+    PlanningJobCancellation,
     PlanningJobResult,
     PlanningNotificationDelivery,
     PlanningNotificationRequest,
@@ -80,6 +81,12 @@ class PlanningStore(Protocol):
 
     async def load_commitment(self, commitment_id: str) -> Commitment | None: ...
 
+    async def cancel_commitment(self, commitment_id: str, *, expected_revision: int, scope_id: str) -> Commitment: ...
+
+    async def pending_job_cancellations(self, *, limit: int = 64, after_request_id: str | None = None) -> list[PlanningJobCancellation]: ...
+
+    async def acknowledge_job_cancellation(self, cancellation: PlanningJobCancellation, receipt: JobReceipt) -> bool: ...
+
     async def load_plan(self, plan_id: str, version: int) -> PlanVersion | None: ...
 
     async def pending_job_requests(self, *, limit: int = 64) -> list[JobRequest]: ...
@@ -93,10 +100,12 @@ class PlanningStore(Protocol):
     async def accept_job_feedback(self, feedback: PlanningJobFeedback, result: dict | None) -> bool: ...
 
     async def pending_notification_requests(
-        self, *, limit: int = 64, after_notification_id: str | None = None,
+        self, *, limit: int = 64, after_notification_id: str | None = None, revoked: bool = False,
     ) -> list[PlanningNotificationRequest]: ...
 
-    async def read_notification_work(self, request: PlanningNotificationRequest) -> PlanningNotificationWork: ...
+    async def read_notification_work(self, request: PlanningNotificationRequest, *, historical: bool = False) -> PlanningNotificationWork: ...
+
+    async def claim_notification_publication(self, request: PlanningNotificationRequest, *, owner_id: str, not_sent: bool = False) -> Literal["accepted", "revoked", "recovery_pending"]: ...
 
     async def acknowledge_notification(
         self, request: PlanningNotificationRequest, delivery: PlanningNotificationDelivery,

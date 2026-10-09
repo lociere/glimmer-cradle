@@ -33,6 +33,15 @@ Planning claim 前只读接纳同属 `proto/glimmer/cognition/v1/cognition_servi
 `GetPlanningJobAdmission`。真实 source ACK/目标/来源/当前政策决定 eligible；不创建 attempt、
 评估窗口、封口或推理，不是授权证明，执行仍独立复验。
 
+Planning 撤销/通知发布仍由 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
+`CancelPlanningCommitmentRequest`、`CancelPlanningCommitmentResponse`、`PlanningJobCancellationRequest`、
+`ReadPlanningJobCancellationsRequest`、`ReadPlanningJobCancellationsResponse`、
+`AcknowledgePlanningJobCancellationRequest`、`AcknowledgePlanningJobCancellationResponse`、
+`BeginPlanningNotificationPublicationRequest`、`BeginPlanningNotificationPublicationResponse`；RPC 为
+`CancelPlanningCommitment`、`ReadPlanningJobCancellations`、`AcknowledgePlanningJobCancellation`、
+`BeginPlanningNotificationPublication`。Worker/Core 与 Host 沿原 identity、CAS、持久 outbox 与
+一次原输出发布许可接线；未知状态不能先确认、换代不自动重新授予发送。路径原子切换留 P11A。
+
 Planning 显式接纳/评估同属 `proto/glimmer/cognition/v1/cognition_service.proto`：
 `AcceptPlanningCommitmentRequest`、`AcceptPlanningCommitmentResponse`、`ExecutePlanningJobRequest`、
 `ExecutePlanningJobResponse`，同一 `CognitionService` 增加 `AcceptPlanningCommitment` / `ExecutePlanningJob`。

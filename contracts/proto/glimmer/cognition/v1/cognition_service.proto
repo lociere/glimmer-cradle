@@ -505,6 +505,49 @@ message AcceptPlanningCommitmentResponse {
   string scope_id = 6;
 }
 
+// 可信 App 的显式撤销，scope 必须匹配原源；expected_revision CAS，原版本重放幂等。
+message CancelPlanningCommitmentRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string commitment_id = 2;
+  uint64 expected_revision = 3;
+  string scope_id = 4;
+}
+
+message CancelPlanningCommitmentResponse {
+  string commitment_id = 1;
+  uint64 revision = 2;
+  string status = 3;
+}
+
+message PlanningJobCancellationRequest {
+  PlanningJobSourceRequest request = 1;
+  uint64 commitment_revision = 2;
+}
+
+message ReadPlanningJobCancellationsRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  uint32 limit = 2;
+  optional string after_request_id = 3;
+}
+
+message ReadPlanningJobCancellationsResponse {
+  repeated PlanningJobCancellationRequest requests = 1;
+}
+
+// Jobs 已封口/安全终态或留存的去重墓碑才 ACK；unknown 仍待原 identity 对账。
+message AcknowledgePlanningJobCancellationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningJobCancellationRequest cancellation = 2;
+  string job_id = 3;
+  uint64 job_revision = 4;
+}
+
+message AcknowledgePlanningJobCancellationResponse {
+  string request_id = 1;
+  bool accepted = 2;
+  bool duplicate = 3;
+}
+
 message ExecutePlanningJobRequest {
   glimmer.common.v1.CallMetadata call = 1;
   glimmer.jobs.v1.JobExecutionIdentity identity = 2;
@@ -528,7 +571,7 @@ message GetPlanningJobAdmissionResponse {
   string job_id = 2;
   string scope_id = 3;
   bool eligible = 4;
-  // planning_ready 或 planning_ 前缀的 source_unbound/source_unavailable/model_policy/model_unavailable。
+  // planning_ready 或 planning_ 前缀的 commitment_inactive/source_unbound/source_unavailable/model_policy/model_unavailable。
   string reason_code = 5;
 }
 
@@ -565,11 +608,15 @@ message ReadPlanningNotificationsRequest {
   glimmer.common.v1.CallMetadata call = 1;
   uint32 limit = 2;
   optional string after_notification_id = 3;
+  // 仅历史 Delivery 对账扫描启用；默认只返回当前待通知，避免历史挤占就绪探测。
+  bool include_revoked = 4;
 }
 
 // 稳定 ID 前向分页；只读，不 ACK。响应最多 1 MiB，可少于 limit；非空页须继续读取。
 message ReadPlanningNotificationsResponse {
   repeated PlanningNotificationRequest requests = 1;
+  // 原请求身份不变；仅供已经持久送达的历史确认，禁止 Resolve/Prepare/新发送。
+  repeated PlanningNotificationRequest revoked_requests = 2;
 }
 
 message ResolvePlanningNotificationRequest {
@@ -582,7 +629,7 @@ message ResolvePlanningNotificationRequest {
 message ResolvePlanningNotificationResponse {
   PlanningNotificationRequest request = 1;
   bool available = 2;
-  // planning_notification_source_ready/source_unbound/source_unavailable。
+  // planning_notification_source_ready/source_unbound/source_unavailable/revoked。
   string reason_code = 3;
   ConversationContext context = 4;
   optional string actor_id = 5;
@@ -632,6 +679,28 @@ message PreparePlanningNotificationResponse {
 // 不存在完整历史时 original 缺席；部分/损坏历史为 RECOVERY_REQUIRED。
 message GetPreparedPlanningNotificationResponse {
   PreparePlanningNotificationResponse original = 1;
+}
+
+// 仅在实际接收方与权限就绪后调用；与撤销 CAS 共享 Planning 串行事务。
+// 首次 accepted 是一次原输出的发布线性化点，仍须 App live lease/权限与实际 Delivery 回执。
+// 同 generation 重试沿用首次许可；新 generation 不自动重新授予，未知发送保持待对账。
+message BeginPlanningNotificationPublicationRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  PlanningNotificationRequest request = 2;
+  string turn_id = 3;
+  string content_digest = 4;
+  // 仅可信 Host 从当前唯一 Delivery owner 得到未开始发送的否定证明时启用。
+  // absence 或可恢复的 generated；queued/sent/unknown/旧已发送中断不证明未发送。
+  bool not_sent = 5;
+}
+
+message BeginPlanningNotificationPublicationResponse {
+  PlanningNotificationRequest request = 1;
+  string output_id = 2;
+  string generation = 3;
+  bool accepted = 4;
+  // planning_publication_ready / planning_notification_revoked / planning_publication_recovery_pending。
+  string reason_code = 5;
 }
 
 // 可信 Host 从唯一 Delivery owner 读取的已持久确认；不是调用者自报的发送成功。
@@ -726,12 +795,16 @@ service CognitionService {
   // 独立封口与提交共享 Planning 事务锁；可在 stopping 时完成，不调用模型或收集证据。
   rpc ReconcilePlanningJob(ReconcilePlanningJobRequest) returns (ReconcilePlanningJobResponse);
   rpc AcceptPlanningCommitment(AcceptPlanningCommitmentRequest) returns (AcceptPlanningCommitmentResponse);
+  rpc CancelPlanningCommitment(CancelPlanningCommitmentRequest) returns (CancelPlanningCommitmentResponse);
+  rpc ReadPlanningJobCancellations(ReadPlanningJobCancellationsRequest) returns (ReadPlanningJobCancellationsResponse);
+  rpc AcknowledgePlanningJobCancellation(AcknowledgePlanningJobCancellationRequest) returns (AcknowledgePlanningJobCancellationResponse);
   rpc ExecutePlanningJob(ExecutePlanningJobRequest) returns (ExecutePlanningJobResponse);
   rpc GetPlanningJobAdmission(GetPlanningJobAdmissionRequest) returns (GetPlanningJobAdmissionResponse);
   rpc PublishPlanningJobState(PublishPlanningJobStateRequest) returns (PublishPlanningJobStateResponse);
   rpc ReadPlanningNotifications(ReadPlanningNotificationsRequest) returns (ReadPlanningNotificationsResponse);
   rpc ResolvePlanningNotification(ResolvePlanningNotificationRequest) returns (ResolvePlanningNotificationResponse);
   rpc PreparePlanningNotification(PreparePlanningNotificationRequest) returns (PreparePlanningNotificationResponse);
+  rpc BeginPlanningNotificationPublication(BeginPlanningNotificationPublicationRequest) returns (BeginPlanningNotificationPublicationResponse);
   rpc GetPreparedPlanningNotification(GetPreparedPlanningNotificationRequest) returns (GetPreparedPlanningNotificationResponse);
   rpc AcknowledgePlanningNotification(AcknowledgePlanningNotificationRequest) returns (AcknowledgePlanningNotificationResponse);
 }

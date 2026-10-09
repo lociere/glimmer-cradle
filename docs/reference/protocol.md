@@ -139,7 +139,7 @@ INVALID_REQUEST，原内容/scope/due 冲突为 RECOVERY_REQUIRED；取消或响
 当前配置 Host 已接源投递、真实执行器与逐任务接纳后调度；不适用目标等待且不消耗 attempt。
 Host 按本轮等待/未 ACK 状态分别报告 `jobs_admission_pending`/`jobs_state_feedback_pending`，
 状态 outbox 独立投递 Planning receiver，不交给 Memory；真实 inbox commit 后才 ACK。完成通知与
-未完成评估的持久后继调度已接此链；承诺撤销传播及完整产品切换仍待 P07A/P12。
+未完成评估的持久后继调度和承诺撤销传播已接此链；完整产品切换仍待 P12。
 Job accepted 不改变承诺 accepted/revision。
 
 ### Planning 显式接纳与执行
@@ -173,12 +173,25 @@ RECOVERY_REQUIRED；缺 owner、业务未 ready 或 drain 为 NOT_READY，旧代
 只读实际持久输入，不登记 attempt、建评估表、封口、改变承诺/时钟 high-water 或调用模型。
 
 `planning_ready` 唯一对应 eligible=true；`planning_source_unbound`、`planning_source_unavailable`、
-`planning_model_policy`、`planning_model_unavailable` 对应等待。旧无绑定版本可以安全返回等待，
+`planning_model_policy`、`planning_model_unavailable`、`planning_commitment_inactive` 对应等待。旧无绑定版本可以安全返回等待，
 无需补造证据 owner；已绑定且模型已装配的目标缺 Conversation/Knowledge/Activity 则 NOT_READY。
 Host 校验响应身份及布尔/reason 组合，只 CAS 原候选 revision，等待仍前进分页并回绕。
 这不是执行资格持久授予或分布式原子授权；Execute 必须用新 Adapter 再复验当前来源/政策。
 
 ### Planning Jobs 状态投递
+
+`CancelPlanningCommitment` 接收原 commitment ID/scope、正 JS safe expected revision（小于最大值），
+请求最多 16 KiB。Planning CAS 将 accepted/completed 更新为 abandoned/revision+1，同事务封口
+active attempt 并记录所有原/后继 Job 取消意图；同 expected revision 重试返回原撤销结果。
+scope/状态/revision 竞争为 CONFLICT，不改写计划或已提交 receipt；本代/业务 ready 规则仍适用。
+Controller 取消并排空在途模型任务，晚到结果不得提交到撤销版本。
+
+`ReadPlanningJobCancellations` 用稳定原 request ID 前向分页，limit 1–1000、实际最多 64 项、
+响应最多 1 MiB；请求最多 16 KiB。取消项保留完整原 `PlanningJobSourceRequest` 和新的撤销
+commitment revision。Host 先保留原 Jobs source inbox/Job 去重墓碑，再同步取消 queued/running/
+retry_wait；unknown 必须先对账原 attempt，不能先 ACK。`AcknowledgePlanningJobCancellation`
+请求最多 64 KiB，提交原取消信封、`planning:<request_id>` 与实际正 JS safe封口 Job revision；
+Planning 提交后才 accepted，重投 duplicate，不创建新源或重算 due。错原信封/Job 为 RECOVERY_REQUIRED。
 
 `PublishPlanningJobState` 复用 Jobs 的 `JobStateEvent`，携本代 call 和正 JS safe
 `delivery_authority_epoch`；总请求不超过 64 KiB，字符串身份不超过 4096 UTF-8 bytes。
@@ -206,6 +219,10 @@ ID/digest 和 created time，稳定 ID 与 Core 规则一致；字符串 optiona
 Read 的 limit 为 1 至 1000，optional after ID 必须是 64 位小写 SHA-256；按稳定 ID 前向分页。
 单次实际至多 64 项、wire 响应至多 1 MiB，预算可使非空页少于 limit，消费者须沿最后 ID
 继续直到空页，不以短页判定扫描完毕。读取不创建通知/评估窗口、改写高水位或清除请求。
+`include_revoked` 默认 false，仅返回当前待通知；历史 Delivery 对账 adapter 显式设为 true，
+另返回 `revoked_requests`。两类合并后同原 ID 只出现一次，撤销分类优先，总量共享原 limit/预算。
+撤销请求保留原完成 revision，不携发送权限；Resolve 返回 available=false/
+`planning_notification_revoked`，Prepare 拒绝，但完整原 Reply/Turn 与实际回执的历史查询/ACK 仍可用。
 
 Resolve 先核验真实源 ACK、不可变目标/计划、已完成 receipt 与当前承诺 revision，再从实际
 Conversation Log 复验原完整来源摘要、保留资格、provider/scene/conversation/continuity/thread/
@@ -250,6 +267,20 @@ PERMISSION_DENIED，未 ready/owner 缺失/drain 为 NOT_READY，旧代为 GENER
 该操作是内部接纳，不是通知发布、外部权限、Delivery receipt 或源 ACK。Host client 已接真实
 RPC，生产 CLI 双重启恢复同一 Reply/Turn/digest；默认监督仍显示通知 pending。App 后续必须
 复验真实目的地与当前权限，再用唯一 Conversation Delivery 和实际接收回执完成源确认。
+
+实际 Host 在接收域/权限就绪并 Prepare 接纳后调用 `BeginPlanningNotificationPublication`，请求
+携原通知、原 Turn ID 与 Reply 内容摘要，限 64 KiB。Worker 验证持久历史绑定；Planning 与撤销
+CAS 在同一串行事务接纳一次原输出的 publication owner（当前受监督 generation）。撤销先提交
+返回 accepted=false/`planning_notification_revoked`，无发送；许可先提交则一次原发布已线性化，
+后来的撤销不伪报撤回。accepted=true 的 reason 为 `planning_publication_ready`，响应绑定原
+request、`reply:<turn_id>` 与当前 generation。Host 仍须在实际 send 前复验 live lease/权限。
+同 owner 重试沿原许可/唯一 Delivery；新 generation 先返回 `planning_publication_recovery_pending`。
+可信 Host 从当前唯一 Delivery owner 得到 absence 或可恢复 generated 的否定证明后，才可将
+`not_sent=true` 沿原请求重投；Planning 同事务重验 completed/revision 并转交原许可，撤销状态
+不补发。换主只为先前 generated 保存 `authority_epoch_changed_before_queue`，恢复时保留
+原输出/Turn/digest并围栏旧 authority；queued/sent/unknown 及普通旧中断不是否定证明，不能
+自动重新授权。实际已送达历史确认不调用此入口，不补造或重发。
+非法字段/预算为 INVALID_REQUEST，持久绑定冲突为 RECOVERY_REQUIRED；世代/ready/drain规则不变。
 
 ### Planning 通知真实回执源确认
 

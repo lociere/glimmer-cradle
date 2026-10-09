@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P07A Planning 后继调度与撤销](execution-order.md#step-p07a)**（in-progress / implementation）。P07A.4：后继事务/兼容wire/恢复已实施并定向通过，独立P2复核关闭；接续承诺撤销CAS和持久Jobs取消传播，覆盖执行中/待通知/晚到结果。上一完成动作：后继子链定向测试与独立审查通过，准备局部提交；无后台验证进程，根大型门待最终集中验收。
+暂无可直接执行的任务；先处理阻断或完成计划任务的准备门。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
@@ -34,7 +34,7 @@
 | 任务 | 状态/类型 | 依赖 | Owner |
 |---|---|---|---|
 | [A00 接手与差距核对](execution-order.md#step-a00) | accepted / discovery | 无 | 本会话执行 owner（唯一写入负责人） |
-| [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | in-progress / implementation | A00 | 本会话执行 owner（唯一写入负责人） |
+| [P07A Planning 后继调度与撤销](execution-order.md#step-p07a) | accepted / implementation | A00 | 本会话执行 owner（唯一写入负责人） |
 | [P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b) | planned / implementation | P07A | 开始时指定 |
 | [P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a) | planned / implementation | A00 | 开始时指定 |
 | [P03A Content 最终路径与媒体恢复差距](execution-order.md#step-p03a) | planned / implementation | A00 | 开始时指定 |

@@ -84,6 +84,7 @@ class PlanningController:
         self._reassessment_delay_ms = reassessment_delay_ms
         self._evaluation_lock = asyncio.Lock()
         self._pending_evaluations = 0
+        self._active_evaluations: dict[str, set[asyncio.Task]] = {}
 
     async def accept_commitment(
         self, commitment_id: str, plan: PlanVersion, *, due_at: int
@@ -99,6 +100,15 @@ class PlanningController:
             await self._store.acknowledge_job_request(request, receipt)
             delivered += 1
         return delivered
+
+    async def cancel_commitment(self, commitment_id: str, *, expected_revision: int, scope_id: str) -> Commitment:
+        result = await self._store.cancel_commitment(commitment_id, expected_revision=expected_revision, scope_id=scope_id)
+        tasks = tuple(self._active_evaluations.get(commitment_id, ()))
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        return result
 
     async def notification_reply(self, request: PlanningNotificationRequest) -> NotificationReplyFact:
         """只表达持久完成评估；不调用模型、不选择目的地、不接纳发送权限或 ACK。"""
@@ -120,10 +130,15 @@ class PlanningController:
         if self._pending_evaluations >= 128:
             raise PlanningConflictError("Planning 评估并发预算耗尽")
         self._pending_evaluations += 1
+        commitment_id = None
+        task = asyncio.current_task()
         try:
             result = await self._store.prepare_evaluation(identity, request_id)
             if isinstance(result, PlanningEvaluationReceipt):
                 return result
+            commitment_id = result.commitment.commitment_id
+            if task is not None:
+                self._active_evaluations.setdefault(commitment_id, set()).add(task)
             async with self._evaluation_lock:
                 work = await self._store.prepare_evaluation(identity, request_id)
                 if isinstance(work, PlanningEvaluationReceipt):
@@ -172,6 +187,12 @@ class PlanningController:
             raise
         finally:
             self._pending_evaluations -= 1
+            if commitment_id is not None and task is not None:
+                active = self._active_evaluations.get(commitment_id)
+                if active is not None:
+                    active.discard(task)
+                    if not active:
+                        self._active_evaluations.pop(commitment_id, None)
 
     async def reconcile_job(self, identity: PlanningJobIdentity, request_id: str) -> PlanningJobResult:
         return await self._store.reconcile_evaluation(identity, request_id)

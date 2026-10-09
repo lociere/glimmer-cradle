@@ -95,6 +95,16 @@ Host 定向通知路由已复用该 Delivery owner，按完整接收域与显式
 stream/回执实例；不复用旧 Kernel 的 Reply 广播。发送、背压、撤权与历史确认的精确边界见
 [协议](../../reference/protocol.md#planning-通知真实回执源确认)，完整产品 ingress 切换仍未完成。
 
+Planning 发布许可只表示原通知已取得一次发布资格，仍不代表实际投递。跨进程换代只在
+Delivery 没有原输出、或原输出确定处于 generated/换主前未 queue 时提供未发送否定证明；
+`resumeUnsent` 保留原 output/turn/destination/content 绑定并分配当前 epoch/generation，旧 owner
+不能写入。queued、sent、unknown 不提供否定证明，必须先对账，不能自动重发。
+Host 在独立提交 queued 后，以 Delivery 的 IMMEDIATE 持久围栏复验当前 epoch、输出和目的地
+generation，同一同步临界区完成 transport write 与 sent 落盘，换主不能插入两者之间。
+明确旧 owner/输出拒绝使用独立错误类型；进入 transport 前的 SQLite 故障向上抛且保留 queued，
+实际 write 异常保留 unknown，write 已接纳后的存储失败同样向上抛。实际确认仍只来自原接收
+实例的真实回执；回执已持久而源 ACK 丢失时，新主只恢复原历史绑定并 ACK，不重新生成或发送。
+
 ## Canonical Log 与 Experience
 
 `adapters/persistence/log_store.py` 是唯一 SQLite writer adapter：月度 pack 只追加 Moment，`catalog.db` 维护全局 position 和 pack 范围，

@@ -28,6 +28,54 @@ function fixture() {
 }
 
 describe('Delivery durable receipt facts and retired authority fencing', () => {
+  it('transport 同步临界区围栏同连接重入换主和第二写入连接；回滚仍保留先前queued意图', () => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-delivery-publish-fence-')), path = join(root, 'delivery.db');
+    const store = new SqliteDeliveryStore(path), other = new SqliteDeliveryStore(path);
+    const controller = new DeliveryController(store, 'epoch:first');
+    const output = controller.begin({ output_id: 'original', turn_id: 'turn', destination_id: 'surface', content_digest: 'digest' });
+    controller.queue('original');
+    try {
+      let writes = 0;
+      // 另一连接不能在持久围栏内部激活；缩短该故障用例的锁等待，不改变产品策略。
+      (other as unknown as { database: Database.Database }).database.pragma('busy_timeout = 1');
+      controller.withCurrentOutput('original', output.generation, () => {
+        expect(() => new DeliveryController(store, 'epoch:reentrant')).toThrow('发布期间');
+        expect(() => new DeliveryController(other, 'epoch:next')).toThrow(/locked|busy/);
+        writes++;
+      });
+      expect(writes).toBe(1);
+      expect(() => controller.withCurrentOutput('original', output.generation, () => { throw new Error('transport unknown'); })).toThrow('unknown');
+      expect(store.load('original')?.status).toBe('queued');
+      new DeliveryController(other, 'epoch:next');
+      expect(() => controller.withCurrentOutput('original', output.generation, () => { writes++; })).toThrow('epoch');
+      expect(writes).toBe(1);
+    } finally { other.close(); store.close(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each(['generated', 'queued', 'sent', 'unknown'] as const)('换主只恢复实际未排队原输出 %s；原身份保留且旧主不能写出', status => {
+    const root = mkdtempSync(join(tmpdir(), 'glimmer-delivery-unsent-'));
+    const store = new SqliteDeliveryStore(join(root, 'delivery.db'));
+    const first = new DeliveryController(store, 'epoch:first');
+    const request = { output_id: 'original', turn_id: 'turn', destination_id: 'surface', content_digest: 'digest' };
+    first.begin(request);
+    if (status !== 'generated') first.queue('original');
+    if (status === 'sent' || status === 'unknown') first.sent('original');
+    if (status === 'unknown') first.unknown('original', 'actual_unknown');
+    try {
+      const next = new DeliveryController(store, 'epoch:next');
+      expect(() => first.resumeUnsent(request)).toThrow('epoch');
+      if (status === 'generated') {
+        expect(next.resumeUnsent(request)).toMatchObject({ ...request, status: 'generated', authority_epoch: 'epoch:next' });
+        next.queue('original'); next.sent('original');
+        expect(next.resumeUnsent(request)).toBeNull();
+      } else {
+        expect(next.resumeUnsent(request)).toBeNull();
+        expect(next.recordedOutput('original')?.status).toBe('interrupted');
+      }
+      expect(() => next.resumeUnsent({ ...request, content_digest: 'foreign' })).toThrow('绑定');
+    } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('当前 owner 只读旧输出不改变状态，退出 owner 连历史查询也被围栏', () => {
     const test = fixture();
     try {

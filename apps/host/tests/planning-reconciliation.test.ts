@@ -91,6 +91,19 @@ function notificationRoutes() {
     time: (value: number) => { now = value; }, close: () => { routes.stop(); stream.destroy(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
+it('transport 围栏进入前存储故障保留 queued、零帧且原错误可见', () => {
+  const h = notificationRoutes();
+  const error = Object.assign(new Error('injected SQLITE_BUSY before publication'), { code: 'SQLITE_BUSY' });
+  try {
+    h.attach();
+    vi.spyOn(h.store, 'withCurrentOutput').mockImplementationOnce(() => { throw error; });
+    expect(() => h.routes.send(h.prepared)).toThrow(error);
+    expect(h.frames).toHaveLength(0);
+    expect(h.delivery.current('reply:' + h.prepared.turnId)).toMatchObject({ status: 'queued', terminal_reason: null });
+    expect(h.stream.destroyed).toBe(false);
+  } finally { h.close(); }
+});
+
 it.each(['provider', 'scene', 'conversation', 'continuity', 'thread', 'actor', 'privacy', 'recall', 'disclosure'] as const)
 ('Host 通知严格绑定实际接收域 %s，拒绝串送且不创建输出', mode => {
   const h = notificationRoutes();
@@ -147,6 +160,41 @@ it('Host 实际回执绑定唯一接收实例；sent/unknown/旧 epoch 不重发
     try { expect(nextRoutes.send(h.prepared)).toBe('confirmed'); expect(() => h.routes.send(h.prepared)).toThrow('epoch'); }
     finally { nextRoutes.stop(); }
   } finally { h.close(); }
+});
+it('真实 queued 提交后换主先赢，旧路由恢复执行不写 transport frame', () => {
+  const h = notificationRoutes();
+  const original = h.delivery.queue.bind(h.delivery);
+  const handover = vi.spyOn(h.delivery, 'queue').mockImplementation(id => {
+    const result = original(id);
+    new DeliveryController(h.store, 'epoch:next');
+    return result;
+  });
+  try {
+    h.attach();
+    expect(h.routes.send(h.prepared)).toBe('recovery_required');
+    expect(h.frames).toEqual([]);
+    expect(h.store.load('reply:' + h.prepared.turnId)).toMatchObject({ status: 'interrupted', terminal_reason: 'authority_epoch_changed' });
+  } finally { handover.mockRestore(); h.close(); }
+});
+it('transport 接纳和sent持久转换共享双连接围栏，换主后已接纳历史回执仍可查询', () => {
+  const h = notificationRoutes();
+  const other = new SqliteDeliveryStore(path.join(h.root, 'delivery.db'));
+  (other as unknown as { database: { pragma(value: string): unknown } }).database.pragma('busy_timeout = 1');
+  const original = h.delivery.sent.bind(h.delivery);
+  const crossed = vi.spyOn(h.delivery, 'sent').mockImplementation(id => {
+    expect(h.frames).toHaveLength(1);
+    expect(() => new DeliveryController(other, 'epoch:next')).toThrow(/locked|busy/);
+    return original(id);
+  });
+  try {
+    const recipient = h.attach();
+    expect(h.routes.send(h.prepared)).toBe('sent');
+    expect(h.delivery.current('reply:' + h.prepared.turnId)?.status).toBe('sent');
+    expect(h.routes.receiveReceipt(recipient, h.receipt())).toEqual({ accepted: true });
+    const next = new DeliveryController(other, 'epoch:next');
+    expect(next.confirmedReceipt('reply:' + h.prepared.turnId)?.turn_id).toBe(h.prepared.turnId);
+    expect(h.frames).toHaveLength(1);
+  } finally { crossed.mockRestore(); other.close(); h.close(); }
 });
 it.each(['queued', 'unknown', 'next-owner', 'write-failure', 'aborted'] as const)('Host %s 不补造送达或自动重发', mode => {
   const h = notificationRoutes();
@@ -333,6 +381,7 @@ it('通知 Adapter 跨未授权首项前进，sent 不 ACK、真实回执才确�
         privacyClass: value.privacyClass, recallOwnerId: value.recallOwnerId, disclosureOwnerId: value.disclosureOwnerId, available: true });
     }),
     preparePlanningNotification: vi.fn(async (request: { request?: { notificationId: string } }) => { prepared.push(request.request!.notificationId); return second; }),
+    beginPlanningNotificationPublication: vi.fn(async () => true),
     getPreparedPlanningNotification: vi.fn(async () => create(GetPreparedPlanningNotificationResponseSchema,
       { original: create(PreparePlanningNotificationResponseSchema, { ...second, text: '' }) })),
     acknowledgeDeliveredPlanningNotification: vi.fn(async (value: PreparePlanningNotificationResponse, outputId: string, delivery: DeliveryController) => {
@@ -353,12 +402,14 @@ it('通知 Adapter 跨未授权首项前进，sent 不 ACK、真实回执才确�
     expect(prepared).toEqual(['b'.repeat(64)]);
   } finally { h.close(); }
 });
-it.each(['none', 'missing', 'wrong-id', 'wrong-goal', 'body', 'cancelled', 'lease'] as const)
+it.each(['none', 'revoked', 'missing', 'wrong-id', 'wrong-goal', 'body', 'cancelled', 'lease'] as const)
 ('实际回执后的历史对账不解析/重接纳/重发，历史身份 %s 须经确认', async mode => {
   const h = notificationRoutes(), cancellation = new AbortController(); let current = true;
   const client = {
-    readPlanningNotifications: vi.fn(async () => create(ReadPlanningNotificationsResponseSchema, { requests: [h.prepared.request!] })),
+    readPlanningNotifications: vi.fn(async () => create(ReadPlanningNotificationsResponseSchema,
+      mode === 'revoked' ? { revokedRequests: [h.prepared.request!] } : { requests: [h.prepared.request!] })),
     resolvePlanningNotification: vi.fn(), preparePlanningNotification: vi.fn(),
+    beginPlanningNotificationPublication: vi.fn(async () => true),
     getPreparedPlanningNotification: vi.fn(async () => {
       if (mode === 'cancelled') cancellation.abort();
       if (mode === 'lease') current = false;
@@ -374,10 +425,10 @@ it.each(['none', 'missing', 'wrong-id', 'wrong-goal', 'body', 'cancelled', 'leas
   try {
     const id = h.attach(); h.routes.send(h.prepared); h.routes.receiveReceipt(id, h.receipt());
     h.broker.revokePrincipal(h.principal.principal_id);
-    if (mode === 'none') await adapter.deliver(1, cancellation.signal);
+    if (mode === 'none' || mode === 'revoked') await adapter.deliver(1, cancellation.signal);
     else await expect(adapter.deliver(1, cancellation.signal)).rejects.toThrow();
     expect(client.resolvePlanningNotification).not.toHaveBeenCalled(); expect(client.preparePlanningNotification).not.toHaveBeenCalled();
-    expect(client.acknowledgeDeliveredPlanningNotification).toHaveBeenCalledTimes(mode === 'none' ? 1 : 0);
+    expect(client.acknowledgeDeliveredPlanningNotification).toHaveBeenCalledTimes(mode === 'none' || mode === 'revoked' ? 1 : 0);
     expect(h.frames).toHaveLength(1);
   } finally { h.close(); }
 });
@@ -395,6 +446,7 @@ it.each(['lease', 'abort', 'scope-changed', 'source-permission'] as const)('通�
       if (mode === 'source-permission') throw new HostCognitionError(ServiceErrorCode.PERMISSION_DENIED);
       return h.prepared;
     }),
+    beginPlanningNotificationPublication: vi.fn(async () => true),
     getPreparedPlanningNotification: vi.fn(),
     acknowledgeDeliveredPlanningNotification: vi.fn(),
   };

@@ -27,6 +27,201 @@ from glimmer_cradle.cognition.planning import (
 from glimmer_cradle.cognition.ports import JobReceipt
 
 
+async def test_commitment_cancel_cas_stops_model_and_restart_cannot_revive(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    model = _PlanningModel()
+    entered = asyncio.Event()
+    async def blocked(request):
+        model.requests.append(request)
+        entered.set()
+        await asyncio.Future()
+    model.generate = blocked
+    running = asyncio.create_task(controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+        evaluator=ModelPlanningCompletionEvaluator(model)))
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        cancelled = await controller.cancel_commitment("commitment-1", expected_revision=1, scope_id="scene-1")
+        assert cancelled.status == CommitmentStatus.ABANDONED and cancelled.revision == 2
+        with pytest.raises(asyncio.CancelledError):
+            await running
+        assert len(model.requests) == 1
+        assert (await controller.reconcile_job(identity, source.request_id)).receipt is None
+        assert await store.pending_job_requests() == []
+        requests = await store.pending_job_cancellations()
+        assert len(requests) == 1 and requests[0].request == source and requests[0].commitment_revision == 2
+        assert await controller.cancel_commitment("commitment-1", expected_revision=1, scope_id="scene-1") == cancelled
+        with pytest.raises(PlanningConflictError):
+            await controller.cancel_commitment("commitment-1", expected_revision=2, scope_id="scene-1")
+        with pytest.raises(PlanningConflictError):
+            await controller.cancel_commitment("commitment-1", expected_revision=1, scope_id="foreign")
+        assert await controller.accept_commitment("commitment-1", _long_plan(), due_at=1) == cancelled
+        await store.close(); await store.connect()
+        assert await store.pending_job_cancellations() == requests
+        with pytest.raises(PlanningConflictError):
+            await controller.evaluate_job(replace(identity, attempt=2, fencing_token=2), source.request_id,
+                evidence=_PlanningEvidenceSource(), evaluator=ModelPlanningCompletionEvaluator(model))
+        assert len(model.requests) == 1
+        assert await store.acknowledge_job_cancellation(requests[0], JobReceipt(identity.job_id, "accepted", 2))
+        assert not await store.acknowledge_job_cancellation(requests[0], JobReceipt(identity.job_id, "duplicate", 2))
+        assert await store.pending_job_cancellations() == []
+    finally:
+        running.cancel()
+        await asyncio.gather(running, return_exceptions=True)
+        await store.close()
+
+
+async def test_cancel_before_schedule_ack_and_cancelled_successor_keep_original_sources(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel(completed=False)))
+        successor = (await store.pending_job_requests())[0]
+        cancelled = await controller.cancel_commitment("commitment-1", expected_revision=2, scope_id="scene-1")
+        assert cancelled.revision == 3 and await store.pending_job_requests() == []
+        cancellations = await store.pending_job_cancellations()
+        assert {item.request.request_id for item in cancellations} == {source.request_id, successor.request_id}
+        pending = next(item for item in cancellations if item.request == successor)
+        job_id = "planning:" + successor.request_id
+        with pytest.raises(PlanningConflictError):
+            await store.acknowledge_job_cancellation(pending, JobReceipt("foreign", "accepted", 2))
+        assert await store.acknowledge_job_cancellation(pending, JobReceipt(job_id, "accepted", 2))
+        # 后继普通调度 ACK 晚到仍只绑定原事实，承诺不会重新排队；状态投影可引用实际封口 Job。
+        await store.acknowledge_job_request(successor, JobReceipt(job_id, "duplicate", 2))
+        await store.accept_job_feedback(_feedback(successor, status="cancelled", revision=2), None)
+        assert (await store.load_commitment("commitment-1")) == cancelled
+        assert await store.pending_job_requests() == []
+        with sqlite3.connect(store._path) as db:
+            assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+    finally:
+        await store.close()
+
+
+async def test_cancel_pending_notification_keeps_original_delivered_history(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        receipt = await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        notification = (await store.pending_notification_requests())[0]
+        cancelled = await controller.cancel_commitment("commitment-1", expected_revision=receipt.commitment_revision, scope_id="scene-1")
+        assert cancelled.revision == 3
+        assert await store.pending_notification_requests() == []
+        assert await store.pending_notification_requests(revoked=True) == [notification]
+        with pytest.raises(PlanningConflictError):
+            await controller.notification_reply(notification)
+        assert (await store.read_notification_work(notification, historical=True)).receipt == receipt
+        delivery = _notification_delivery(notification)
+        # 实际已送达但 ACK 丢失仍可确认原身份；不能借历史读取生成新的通知。
+        assert await store.acknowledge_notification(notification, delivery)
+        await store.close(); await store.connect()
+        assert not await store.acknowledge_notification(notification, delivery)
+        assert await store.pending_notification_requests(revoked=True) == []
+        assert (await store.load_commitment("commitment-1")) == cancelled
+        assert (await controller.reconcile_job(identity, source.request_id)).receipt == receipt
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("first", ["publication", "cancel"])
+async def test_notification_publication_cancel_linearizes_and_restart_cannot_regrant(tmp_path, first):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        item = (await store.pending_notification_requests())[0]
+        if first == "publication":
+            assert await store.claim_notification_publication(item, owner_id="host:first") == "accepted"
+        await controller.cancel_commitment("commitment-1", expected_revision=2, scope_id="scene-1")
+        expected = "accepted" if first == "publication" else "revoked"
+        assert await store.claim_notification_publication(item, owner_id="host:first") == expected
+        await store.close(); await store.connect()
+        assert await store.claim_notification_publication(item, owner_id="host:first") == expected
+        assert await store.claim_notification_publication(item, owner_id="host:restarted") \
+            == ("recovery_pending" if first == "publication" else "revoked")
+        with sqlite3.connect(store._path) as db:
+            assert db.execute("SELECT COUNT(*) FROM planning_evaluation_receipt").fetchone()[0] == 1
+            assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert await store.pending_notification_requests() == []
+    finally:
+        await store.close()
+
+
+async def test_notification_publication_transfer_requires_negative_proof_and_never_revives_cancelled(tmp_path):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        item = (await store.pending_notification_requests())[0]
+        assert await store.claim_notification_publication(item, owner_id="first") == "accepted"
+        assert await store.claim_notification_publication(item, owner_id="second") == "recovery_pending"
+        assert await store.claim_notification_publication(item, owner_id="second", not_sent=True) == "accepted"
+        await store.close(); await store.connect()
+        assert await store.claim_notification_publication(item, owner_id="first") == "recovery_pending"
+        assert await store.claim_notification_publication(item, owner_id="second") == "accepted"
+        await controller.cancel_commitment("commitment-1", expected_revision=2, scope_id="scene-1")
+        assert await store.claim_notification_publication(item, owner_id="third", not_sent=True) == "revoked"
+        assert (await store.load_commitment("commitment-1")).status == CommitmentStatus.ABANDONED
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["CREATE TABLE planning_notification_publication_meta", "INSERT INTO planning_notification_publication VALUES",
+    "UPDATE planning_notification_publication SET"])
+async def test_notification_publication_failure_rolls_back_and_does_not_lose_original_request(tmp_path, monkeypatch, fault):
+    store, controller, source, identity = await _evaluation_fixture(tmp_path, bound=True)
+    try:
+        await controller.evaluate_job(identity, source.request_id, evidence=_PlanningEvidenceSource(),
+            evaluator=ModelPlanningCompletionEvaluator(_PlanningModel()))
+        item = (await store.pending_notification_requests())[0]
+        transfer = fault.startswith("UPDATE")
+        if transfer: assert await store.claim_notification_publication(item, owner_id="old") == "accepted"
+        with sqlite3.connect(store._path) as db: before = list(db.iterdump())
+        connection = store._require_connection()
+        original = connection.execute
+        async def failed(sql, *args, **kwargs):
+            result = await original(sql, *args, **kwargs)
+            if sql.startswith(fault): raise sqlite3.OperationalError("publication crash window")
+            return result
+        monkeypatch.setattr(connection, "execute", failed)
+        with pytest.raises(sqlite3.OperationalError, match="publication crash window"):
+            await store.claim_notification_publication(item, owner_id="host:first", not_sent=transfer)
+        with sqlite3.connect(store._path) as db: assert list(db.iterdump()) == before
+        monkeypatch.setattr(connection, "execute", original)
+        await store.close(); await store.connect()
+        assert await store.pending_notification_requests() == [item]
+        assert await store.claim_notification_publication(item, owner_id="host:first", not_sent=transfer) == "accepted"
+    finally:
+        await store.close()
+
+
+@pytest.mark.parametrize("fault", ["status", "schema", "outbox", "seal"])
+async def test_cancel_transaction_failure_preserves_original_facts(tmp_path, monkeypatch, fault):
+    store, _, source, identity = await _evaluation_fixture(tmp_path)
+    await store.prepare_evaluation(identity, source.request_id)
+    connection = store._require_connection()
+    execute = connection.execute
+    targets = {"status": "UPDATE planning_commitment SET status='abandoned'", "schema": "CREATE TABLE planning_cancellation_meta",
+        "outbox": "INSERT INTO planning_cancellation_outbox(request_id", "seal": "UPDATE planning_evaluation_attempt SET state='sealed'"}
+    with sqlite3.connect(store._path) as db:
+        before = list(db.iterdump())
+    async def failed(sql, *args, **kwargs):
+        result = await execute(sql, *args, **kwargs)
+        if sql.startswith(targets[fault]):
+            raise sqlite3.OperationalError("cancel crash window")
+        return result
+    monkeypatch.setattr(connection, "execute", failed)
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="cancel crash window"):
+            await store.cancel_commitment("commitment-1", expected_revision=1, scope_id="scene-1")
+        with sqlite3.connect(store._path) as db:
+            assert list(db.iterdump()) == before
+        monkeypatch.setattr(connection, "execute", execute)
+        await store.close(); await store.connect()
+        assert (await store.load_commitment("commitment-1")).revision == 1
+        assert await store.pending_job_cancellations() == []
+    finally:
+        await store.close()
+
+
 async def test_successor_atomic_identity_reopen_lost_ack_and_completion(tmp_path):
     clock = [100]
     store, _, source, identity = await _evaluation_fixture(tmp_path, now=lambda: clock[0])

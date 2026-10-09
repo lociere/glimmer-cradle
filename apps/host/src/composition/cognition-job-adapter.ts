@@ -1,6 +1,7 @@
 import { create, clone, equals } from '@bufbuild/protobuf';
 import { createHash } from 'node:crypto';
 import { ReadPlanningNotificationsRequestSchema, ResolvePlanningNotificationRequestSchema, GetPreparedPlanningNotificationRequestSchema,
+  ReadPlanningJobCancellationsRequestSchema, AcknowledgePlanningJobCancellationRequestSchema,
   PlanningNotificationRequestSchema,
   PreparePlanningNotificationRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import type { PlanningNotificationsCognitionPort } from '../adapters/protocol/cognition-client.js';
@@ -14,7 +15,7 @@ import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMem
   PublishPlanningJobStateRequestSchema } from '@glimmer-cradle/contracts/glimmer/cognition/v1/cognition_service_pb';
 import { JobConflictError, type Job, type JobAttempt, type JobClockPort, type JobStorePort, type JobExecutionContext,
   type JobHandlerPort, type JobHandlerResult, type JobAdmissionPort, type JobReconciliationPort, type JobReconciliationEvidence, type JobStateReceiverPort } from '@glimmer-cradle/jobs';
-import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort, PlanningJobsCognitionPort } from '../adapters/protocol/cognition-client.js';
+import type { MemoryJobsCognitionPort, PlanningJobsSourcePort, PlanningJobsReconciliationPort, PlanningJobsCognitionPort, PlanningJobsCancellationPort } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, memoryJobIdentity, memoryJobEvidence,
   memoryJobState, planningJobState, planningJobRequest, planningJobSource, planningJobIdentity, planningJobRequestId, planningJobEvidence,
   type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
@@ -127,6 +128,42 @@ export class PlanningJobSourceAdapter implements JobReconciliationPort {
   }
 }
 
+/** 先在 Jobs 封口再 ACK 源。旧调度仍可重放到同一去重墓碑；unknown 不冒充安全终态。 */
+export class PlanningJobCancellationAdapter {
+  private cursor = '';
+  public constructor(private readonly cognition: PlanningJobsCancellationPort) {}
+  public async deliver(store: JobStorePort, clock: JobClockPort, epoch: number, maxAttempts: number, limit: number,
+    cancel: (jobId: string, revision: number) => Job | null, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new JobConflictError('Planning 撤销批次无效');
+    const page = await this.cognition.readPlanningCancellations(create(ReadPlanningJobCancellationsRequestSchema,
+      { limit, ...(this.cursor ? { afterRequestId: this.cursor } : {}) }), signal);
+    signal?.throwIfAborted();
+    if (page.requests.length > limit) throw new JobConflictError('Planning 撤销分页响应越界');
+    if (!page.requests.length) { this.cursor = ''; return; }
+    for (const item of page.requests) {
+      signal?.throwIfAborted();
+      const source = item.request, revision = Number(item.commitmentRevision);
+      if (!source || !Number.isSafeInteger(revision) || revision < 2 || source.requestId <= this.cursor) {
+        throw new JobConflictError('Planning 撤销 identity/revision/分页无效');
+      }
+      this.cursor = source.requestId;
+      const request = planningJobRequest(source, maxAttempts);
+      // 撤销早于原调度到达时，先保留原源 inbox 与 Job，再同步封口，不给 scheduler 中间机会。
+      const submission = store.enqueueSource(planningJobSource(source), request, epoch, clock.now());
+      let job = store.load(submission.job_id);
+      if (job && ['queued', 'running', 'retry_wait'].includes(job.status)) job = cancel(job.job_id, job.revision);
+      if (job?.status === 'unknown') continue;
+      if (job && !['cancelled', 'succeeded', 'dead_letter'].includes(job.status)) throw new JobConflictError('Planning Job 未完成撤销封口');
+      if (!job && submission.job !== null) throw new JobConflictError('Planning 撤销 Job 发生 revision 竞争');
+      const ack = await this.cognition.acknowledgePlanningCancellation(create(AcknowledgePlanningJobCancellationRequestSchema,
+        { cancellation: item, jobId: submission.job_id, jobRevision: BigInt(job?.revision ?? submission.revision) }), signal);
+      signal?.throwIfAborted();
+      if (!ack.accepted || ack.requestId !== source.requestId) throw new JobConflictError('Planning 撤销 ACK 原身份冲突');
+    }
+  }
+}
+
 /** 前向有界页不因首个无接收方而停止；事实源 ACK 只由实际 Delivery receipt 驱动。 */
 export class PlanningNotificationAdapter {
   private cursor = '';
@@ -136,11 +173,13 @@ export class PlanningNotificationAdapter {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new Error('Planning 通知分页预算无效');
     signal?.throwIfAborted();
     const page = await this.cognition.readPlanningNotifications(create(ReadPlanningNotificationsRequestSchema,
-      { limit, ...(this.cursor ? { afterNotificationId: this.cursor } : {}) }), signal);
+      { limit, includeRevoked: true, ...(this.cursor ? { afterNotificationId: this.cursor } : {}) }), signal);
     signal?.throwIfAborted();
-    if (page.requests.length > limit) throw new Error('Planning 通知分页响应越界');
-    if (!page.requests.length) { this.cursor = ''; return; }
-    for (const value of page.requests) {
+    if (page.requests.length + page.revokedRequests.length > limit) throw new Error('Planning 通知分页响应越界');
+    const revoked = new Set(page.revokedRequests.map(item => item.notificationId));
+    const items = [...page.requests, ...page.revokedRequests].sort((a, b) => a.notificationId.localeCompare(b.notificationId));
+    if (!items.length) { this.cursor = ''; return; }
+    for (const value of items) {
       const request = clone(PlanningNotificationRequestSchema, value);
       this.assertCurrent();
       if (!/^[a-f0-9]{64}$/.test(request.notificationId) || request.notificationId <= this.cursor) throw new Error('Planning 通知分页身份无效');
@@ -156,6 +195,7 @@ export class PlanningNotificationAdapter {
         await this.cognition.acknowledgeDeliveredPlanningNotification(original, outputId, this.routes.delivery, signal);
         continue;
       }
+      if (revoked.has(request.notificationId)) continue;
       const resolved = await this.cognition.resolvePlanningNotification(create(ResolvePlanningNotificationRequestSchema, { request }), signal);
       signal?.throwIfAborted(); this.assertCurrent();
       if (!resolved.request || !equals(PlanningNotificationRequestSchema, resolved.request, request)) throw new Error('Planning 通知来源响应错绑定');
@@ -173,6 +213,8 @@ export class PlanningNotificationAdapter {
       }
       signal?.throwIfAborted(); this.assertCurrent();
       if (!prepared.request || !equals(PlanningNotificationRequestSchema, prepared.request, request)) throw new Error('Planning 通知接纳响应错绑定');
+      if (!await this.cognition.beginPlanningNotificationPublication(prepared, this.routes.delivery, signal)) continue;
+      signal?.throwIfAborted(); this.assertCurrent();
       const result = this.routes.send(prepared, signal);
       if (result === 'confirmed') await this.cognition.acknowledgeDeliveredPlanningNotification(prepared,
         `reply:${prepared.turnId}`, this.routes.delivery, signal);
@@ -202,7 +244,7 @@ export class PlanningJobAdapter implements JobHandlerPort, JobReconciliationPort
     const response = await this.cognition.getPlanningAdmission(create(GetPlanningJobAdmissionRequestSchema,
       { requestId, jobId: job.job_id, scopeId: job.scope_id }), signal);
     signal?.throwIfAborted();
-    const waiting = ['planning_source_unbound', 'planning_source_unavailable', 'planning_model_policy', 'planning_model_unavailable'];
+    const waiting = ['planning_source_unbound', 'planning_source_unavailable', 'planning_model_policy', 'planning_model_unavailable', 'planning_commitment_inactive'];
     if (response.requestId !== requestId || response.jobId !== job.job_id || response.scopeId !== job.scope_id
       || response.eligible !== (response.reasonCode === 'planning_ready')
       || !response.eligible && !waiting.includes(response.reasonCode)) throw new JobConflictError('Planning 接纳响应身份/状态无效');

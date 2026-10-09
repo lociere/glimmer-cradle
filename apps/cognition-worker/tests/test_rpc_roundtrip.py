@@ -2609,6 +2609,137 @@ async def test_bound_planning_successor_wire_restart_identity_and_completion(bou
         await channel.close()
 
 
+@pytest.mark.parametrize("phase", ["pending", "evaluating", "successor", "completed"])
+async def test_bound_planning_cancel_rpc_fences_original_work_and_persists_intents(bound_planning_service, phase):
+    host, _, store, _, _, model, accepted, accept, prepare, execute, _ = bound_planning_service
+    channel = grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://"))
+    cancel = _call(channel, "CancelPlanningCommitment", cognition_pb.CancelPlanningCommitmentRequest, cognition_pb.CancelPlanningCommitmentResponse)
+    read = _call(channel, "ReadPlanningJobCancellations", cognition_pb.ReadPlanningJobCancellationsRequest, cognition_pb.ReadPlanningJobCancellationsResponse)
+    ack = _call(channel, "AcknowledgePlanningJobCancellation", cognition_pb.AcknowledgePlanningJobCancellationRequest, cognition_pb.AcknowledgePlanningJobCancellationResponse)
+    running = None
+    try:
+        revision = 1
+        if phase == "pending":
+            await accept(accepted, timeout=2)
+        else:
+            request = await prepare()
+            if phase == "evaluating":
+                model.wait = True
+                running = asyncio.ensure_future(execute(request, timeout=5))
+                await asyncio.wait_for(model.entered.wait(), 2)
+            else:
+                model.completed = phase == "completed"
+                assert (await execute(request, timeout=2)).result.receipt.commitment_revision == 2
+                revision = 2
+        request_cancel = cognition_pb.CancelPlanningCommitmentRequest(call=accepted.call, commitment_id=accepted.commitment_id,
+            expected_revision=revision, scope_id="conversation:planning")
+        result = await cancel(request_cancel, timeout=2)
+        assert result.status == "abandoned" and result.revision == revision + 1
+        assert await cancel(request_cancel, timeout=2) == result
+        if running is not None:
+            with pytest.raises(grpc.aio.AioRpcError) as cancelled:
+                await running
+            assert cancelled.value.code() == grpc.StatusCode.CANCELLED
+        cancellations = (await read(cognition_pb.ReadPlanningJobCancellationsRequest(call=accepted.call, limit=8), timeout=2)).requests
+        assert len(cancellations) == (2 if phase == "successor" else 1)
+        assert all(item.commitment_revision == revision + 1 for item in cancellations)
+        await store.close(); await store.connect()
+        assert (await read(cognition_pb.ReadPlanningJobCancellationsRequest(call=accepted.call, limit=8), timeout=2)).requests == cancellations
+        for item in cancellations:
+            acknowledgement = cognition_pb.AcknowledgePlanningJobCancellationRequest(call=accepted.call, cancellation=item,
+                job_id="planning:" + item.request.request_id, job_revision=2)
+            assert (await ack(acknowledgement, timeout=2)).accepted
+            assert (await ack(acknowledgement, timeout=2)).duplicate
+        assert not (await read(cognition_pb.ReadPlanningJobCancellationsRequest(call=accepted.call, limit=8), timeout=2)).requests
+        assert await store.pending_job_requests() == []
+        assert (await accept(accepted, timeout=2)).status == "abandoned"
+        assert len(model.requests) == (0 if phase == "pending" else 1)
+        if phase == "completed":
+            scan = _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest, cognition_pb.ReadPlanningNotificationsResponse)
+            page = cognition_pb.ReadPlanningNotificationsRequest(call=accepted.call, limit=1)
+            assert not (await scan(page, timeout=2)).requests
+            page.include_revoked = True
+            history = await scan(page, timeout=2)
+            assert not history.requests and len(history.revoked_requests) == 1
+            assert history.revoked_requests[0].commitment_revision == 2
+            resolve = _call(channel, "ResolvePlanningNotification", cognition_pb.ResolvePlanningNotificationRequest, cognition_pb.ResolvePlanningNotificationResponse)
+            assert (await resolve(cognition_pb.ResolvePlanningNotificationRequest(call=accepted.call,
+                request=history.revoked_requests[0]), timeout=2)).reason_code == "planning_notification_revoked"
+            with pytest.raises(grpc.aio.AioRpcError) as denied:
+                await _call(channel, "PreparePlanningNotification", cognition_pb.PreparePlanningNotificationRequest,
+                    cognition_pb.PreparePlanningNotificationResponse)(cognition_pb.PreparePlanningNotificationRequest(
+                        call=accepted.call, request=history.revoked_requests[0]), timeout=2)
+            assert common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"]).code \
+                == common_pb.SERVICE_ERROR_CODE_PERMISSION_DENIED
+            original = await _call(channel, "GetPreparedPlanningNotification", cognition_pb.GetPreparedPlanningNotificationRequest,
+                cognition_pb.GetPreparedPlanningNotificationResponse)(cognition_pb.GetPreparedPlanningNotificationRequest(
+                    call=accepted.call, request=history.revoked_requests[0]), timeout=2)
+            assert not original.HasField("original")
+    finally:
+        if running is not None and not running.done():
+            running.cancel()
+            await asyncio.gather(running, return_exceptions=True)
+        await channel.close()
+
+
+async def test_planning_notification_scan_cancel_between_snapshots_returns_one_revoked_identity(bound_planning_service, monkeypatch):
+    from glimmer_cradle.cognition_worker.adapters.job_client import planning_notification_to_wire
+
+    host, _, store, _, _, _, accepted, _, prepare, execute, _ = bound_planning_service
+    execution = await prepare()
+    await execute(execution, timeout=2)
+    original = store.pending_notification_requests
+    async def crossed(**kwargs):
+        page = await original(**kwargs)
+        if not kwargs.get("revoked"):
+            await store.cancel_commitment(accepted.commitment_id, expected_revision=2, scope_id="conversation:planning")
+        return page
+    monkeypatch.setattr(store, "pending_notification_requests", crossed)
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        page = await _call(channel, "ReadPlanningNotifications", cognition_pb.ReadPlanningNotificationsRequest,
+            cognition_pb.ReadPlanningNotificationsResponse)(cognition_pb.ReadPlanningNotificationsRequest(
+                call=accepted.call, limit=8, include_revoked=True), timeout=2)
+        assert not page.requests and len(page.revoked_requests) == 1
+        assert list(page.revoked_requests) == [planning_notification_to_wire((await original(revoked=True))[0])]
+
+
+@pytest.mark.parametrize("method", ["cancel", "read", "ack", "publication"])
+@pytest.mark.parametrize("fault", ["generation", "unready", "stopping", "planning"])
+async def test_planning_cancellation_rpc_requires_current_ready_owner_without_writes(bound_planning_service, method, fault):
+    import sqlite3
+
+    host, _, store, _, _, model, accepted, accept, _, _, _ = bound_planning_service
+    await accept(accepted, timeout=2)
+    call = _metadata("old-generation" if fault == "generation" else accepted.call.generation, "cancel-boundary")
+    types = {
+        "cancel": ("CancelPlanningCommitment", cognition_pb.CancelPlanningCommitmentRequest,
+            cognition_pb.CancelPlanningCommitmentResponse),
+        "read": ("ReadPlanningJobCancellations", cognition_pb.ReadPlanningJobCancellationsRequest,
+            cognition_pb.ReadPlanningJobCancellationsResponse),
+        "ack": ("AcknowledgePlanningJobCancellation", cognition_pb.AcknowledgePlanningJobCancellationRequest,
+            cognition_pb.AcknowledgePlanningJobCancellationResponse),
+        "publication": ("BeginPlanningNotificationPublication", cognition_pb.BeginPlanningNotificationPublicationRequest,
+            cognition_pb.BeginPlanningNotificationPublicationResponse),
+    }
+    name, request_type, response_type = types[method]
+    request = request_type(call=call)
+    if method == "cancel":
+        request.commitment_id, request.expected_revision, request.scope_id = accepted.commitment_id, 1, "conversation:planning"
+    elif method == "read":
+        request.limit = 8
+    if fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    elif fault == "planning": host._planning = None
+    with sqlite3.connect(store._path) as connection: before = list(connection.iterdump())
+    async with grpc.aio.insecure_channel(host.endpoint.removeprefix("grpc://")) as channel:
+        with pytest.raises(grpc.aio.AioRpcError) as denied:
+            await _call(channel, name, request_type, response_type)(request, timeout=2)
+        expected = common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else common_pb.SERVICE_ERROR_CODE_NOT_READY
+        assert common_pb.ServiceErrorDetail.FromString(dict(denied.value.trailing_metadata())["glimmer-error-bin"]).code == expected
+    with sqlite3.connect(store._path) as connection: assert list(connection.iterdump()) == before
+    assert not model.requests
+
+
 @pytest.mark.parametrize("method", ["accept", "execute"])
 @pytest.mark.parametrize("fault", ["generation", "unready", "stopping", "planning", "conversation", "knowledge", "activity"])
 async def test_bound_planning_rpc_requires_actual_owners_generation_and_ready(bound_planning_service, method, fault):
@@ -2788,6 +2919,13 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     class Llm:
         async def generate(self, _request):
             if _request.metadata.get("purpose") == "planning-completion.v1":
+                if generation == "planning-execute-cancel-waiting":
+                    marker = root / "planning-model-calls.txt"
+                    marker.write_text("entered\n", encoding="utf-8", newline="\n")
+                    try:
+                        await asyncio.Future()
+                    finally:
+                        marker.write_text("entered\ncancelled\n", encoding="utf-8", newline="\n")
                 document = json.loads(_request.messages[1].content)
                 return json.dumps({"completed": not generation.endswith("incomplete"),
                     "evidence_ids": [item["reference"]["evidence_id"] for item in document["evidence"]], "reason": "核对真实来源"})
@@ -2805,10 +2943,12 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     knowledge_store = None
     knowledge = None
     activity = None
+    turns = None
     if generation.startswith("planning-execute"):
         from glimmer_cradle.cognition.adapters.persistence import SqliteKnowledgeStore
         from glimmer_cradle.cognition.knowledge import KnowledgeIndex
         from glimmer_cradle.cognition.state import CognitiveActivityController
+        from glimmer_cradle.conversation import SqliteTurnStore, TurnController
         from glimmer_cradle.cognition_worker.adapters.job_client import (
             PlanningEvidenceAdapter,
         )
@@ -2822,6 +2962,8 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
             clock=FixedClock(), observability=NullObservability())
         await activity.start()
         activity.engage()
+        turns = TurnController(SqliteTurnStore(root / "turns.db"), clock=FixedClock())
+        await turns.connect()
         existing = await planning.load_plan("plan:跨语言", 1)
         if existing is None:
             source = recorder.record(MomentKind.PERCEPTION, {"text": "跨语言评估实际事实", "source_provider_id": "surface:test"},
@@ -2839,7 +2981,7 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
     # 非 Memory RPC 不在该 fixture 的验收范围；不构造第二套业务实现。
     host = CognitionGrpcHost(generation=generation, inbound=None, queue=None, activity=activity, cycle=None,
         shutdown=shutdown, operations=None, workspace=None, consolidation=coordinator, planning=planning,
-        planning_model=Llm(), conversation=recorder, knowledge=knowledge)
+        planning_model=Llm(), conversation=recorder, knowledge=knowledge, turns=turns)
     await host.start()
     host.mark_ready()
     print(json.dumps({"endpoint": host.endpoint, "generation": generation}), flush=True)
@@ -2850,6 +2992,8 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
         await coordinator.stop()
         if activity is not None:
             await activity.stop()
+        if turns is not None:
+            await turns.close()
         await recorder.stop()
         if knowledge_store is not None:
             await knowledge_store.close()

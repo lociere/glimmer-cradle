@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as grpc from '@grpc/grpc-js';
-import { create, fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
+import { create, equals, fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf';
 import { fromJson, type JsonValue } from '@bufbuild/protobuf';
 import { ValueSchema } from '@bufbuild/protobuf/wkt';
 import type { ExecutionResultEvent, ExecutionResultReceipt } from '@glimmer-cradle/capabilities';
@@ -20,12 +20,20 @@ import {
   ReconcilePlanningJobRequestSchema, ReconcilePlanningJobResponseSchema,
   type ReconcilePlanningJobRequest, type ReconcilePlanningJobResponse,
   AcceptPlanningCommitmentRequestSchema, AcceptPlanningCommitmentResponseSchema,
+  CancelPlanningCommitmentRequestSchema, CancelPlanningCommitmentResponseSchema,
+  ReadPlanningJobCancellationsRequestSchema, ReadPlanningJobCancellationsResponseSchema,
+  AcknowledgePlanningJobCancellationRequestSchema, AcknowledgePlanningJobCancellationResponseSchema,
+  type CancelPlanningCommitmentRequest,
+  type ReadPlanningJobCancellationsRequest, type ReadPlanningJobCancellationsResponse,
+  type AcknowledgePlanningJobCancellationRequest, type AcknowledgePlanningJobCancellationResponse,
   ExecutePlanningJobRequestSchema, ExecutePlanningJobResponseSchema,
   GetPlanningJobAdmissionRequestSchema, GetPlanningJobAdmissionResponseSchema,
   PublishPlanningJobStateRequestSchema, PublishPlanningJobStateResponseSchema,
   ReadPlanningNotificationsRequestSchema, ReadPlanningNotificationsResponseSchema,
   ResolvePlanningNotificationRequestSchema, ResolvePlanningNotificationResponseSchema,
   PreparePlanningNotificationRequestSchema, PreparePlanningNotificationResponseSchema,
+  BeginPlanningNotificationPublicationRequestSchema, BeginPlanningNotificationPublicationResponseSchema,
+  PlanningNotificationRequestSchema,
   GetPreparedPlanningNotificationRequestSchema, GetPreparedPlanningNotificationResponseSchema,
   AcknowledgePlanningNotificationRequestSchema, AcknowledgePlanningNotificationResponseSchema,
   PlanningNotificationDeliveryConfirmationSchema,
@@ -69,6 +77,11 @@ export interface PlanningJobsSourcePort {
   acknowledgePlanning(request: AcknowledgePlanningJobRequestRequest, signal?: AbortSignal): Promise<AcknowledgePlanningJobRequestResponse>;
 }
 
+export interface PlanningJobsCancellationPort {
+  readPlanningCancellations(request: ReadPlanningJobCancellationsRequest, signal?: AbortSignal): Promise<ReadPlanningJobCancellationsResponse>;
+  acknowledgePlanningCancellation(request: AcknowledgePlanningJobCancellationRequest, signal?: AbortSignal): Promise<AcknowledgePlanningJobCancellationResponse>;
+}
+
 export interface PlanningJobsReconciliationPort {
   reconcilePlanning(request: ReconcilePlanningJobRequest, signal?: AbortSignal): Promise<ReconcilePlanningJobResponse>;
 }
@@ -83,6 +96,7 @@ export interface PlanningNotificationsCognitionPort {
   readPlanningNotifications(request: ReadPlanningNotificationsRequest, signal?: AbortSignal): Promise<ReadPlanningNotificationsResponse>;
   resolvePlanningNotification(request: ResolvePlanningNotificationRequest, signal?: AbortSignal): Promise<ResolvePlanningNotificationResponse>;
   preparePlanningNotification(request: PreparePlanningNotificationRequest, signal?: AbortSignal): Promise<PreparePlanningNotificationResponse>;
+  beginPlanningNotificationPublication(prepared: PreparePlanningNotificationResponse, delivery?: DeliveryController, signal?: AbortSignal): Promise<boolean>;
   getPreparedPlanningNotification(request: GetPreparedPlanningNotificationRequest, signal?: AbortSignal): Promise<GetPreparedPlanningNotificationResponse>;
   acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,
     delivery: DeliveryController, signal?: AbortSignal): Promise<AcknowledgePlanningNotificationResponse>;
@@ -212,6 +226,31 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
     return this.call('GetPreparedPlanningNotification', GetPreparedPlanningNotificationRequestSchema, GetPreparedPlanningNotificationResponseSchema,
       create(GetPreparedPlanningNotificationRequestSchema, { ...request, call: this.metadata() }), signal);
   }
+  public async beginPlanningNotificationPublication(prepared: PreparePlanningNotificationResponse, delivery?: DeliveryController, signal?: AbortSignal): Promise<boolean> {
+    if (!prepared.accepted || !prepared.request) throw new Error('Planning 发布没有原内部接纳');
+    const invoke = async (notSent: boolean) => {
+      const response = await this.call('BeginPlanningNotificationPublication', BeginPlanningNotificationPublicationRequestSchema,
+        BeginPlanningNotificationPublicationResponseSchema, create(BeginPlanningNotificationPublicationRequestSchema,
+          { call: this.metadata(), request: prepared.request, turnId: prepared.turnId, contentDigest: prepared.contentDigest, notSent }), signal);
+      if (!response.request || !equals(PlanningNotificationRequestSchema, response.request, prepared.request!)
+        || response.outputId !== `reply:${prepared.turnId}` || response.generation !== this.generation
+        || response.accepted !== (response.reasonCode === 'planning_publication_ready')
+        || !response.accepted && !['planning_notification_revoked', 'planning_publication_recovery_pending'].includes(response.reasonCode)) {
+        throw new Error('Planning 原发布许可响应冲突');
+      }
+      return response;
+    };
+    const response = await invoke(false);
+    if (!response.accepted && response.reasonCode === 'planning_publication_recovery_pending' && delivery) {
+      signal?.throwIfAborted();
+      const outputId = `reply:${prepared.turnId}`, original = delivery.recordedOutput(outputId);
+      // 当前唯一 Delivery owner 的围栏查询；生成态只经明确未排队恢复，其他状态不作否定证明。
+      const notSent = !original || !!delivery.resumeUnsent({ output_id: outputId, turn_id: prepared.turnId,
+        destination_id: prepared.context!.sceneId, content_digest: prepared.contentDigest });
+      if (notSent) return (await invoke(true)).accepted;
+    }
+    return response.accepted;
+  }
   /** 只从唯一 Delivery owner 读取历史确认；调用方不能传入 delivered 布尔值或自报回执。 */
   public async acknowledgeDeliveredPlanningNotification(prepared: PreparePlanningNotificationResponse, outputId: string,
     delivery: DeliveryController, signal?: AbortSignal): Promise<AcknowledgePlanningNotificationResponse> {
@@ -255,6 +294,18 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
     this.closed = true;
     for (const call of this.inflight) call.cancel();
     this.client.close();
+  }
+  public cancelPlanningCommitment(request: CancelPlanningCommitmentRequest, signal?: AbortSignal) {
+    return this.call('CancelPlanningCommitment', CancelPlanningCommitmentRequestSchema, CancelPlanningCommitmentResponseSchema,
+      create(CancelPlanningCommitmentRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public readPlanningCancellations(request: ReadPlanningJobCancellationsRequest, signal?: AbortSignal): Promise<ReadPlanningJobCancellationsResponse> {
+    return this.call('ReadPlanningJobCancellations', ReadPlanningJobCancellationsRequestSchema, ReadPlanningJobCancellationsResponseSchema,
+      create(ReadPlanningJobCancellationsRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public acknowledgePlanningCancellation(request: AcknowledgePlanningJobCancellationRequest, signal?: AbortSignal): Promise<AcknowledgePlanningJobCancellationResponse> {
+    return this.call('AcknowledgePlanningJobCancellation', AcknowledgePlanningJobCancellationRequestSchema, AcknowledgePlanningJobCancellationResponseSchema,
+      create(AcknowledgePlanningJobCancellationRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public publishJobState(request: PublishMemoryJobStateRequest, signal?: AbortSignal): Promise<PublishMemoryJobStateResponse> {
     return this.call('PublishMemoryJobState', PublishMemoryJobStateRequestSchema, PublishMemoryJobStateResponseSchema,

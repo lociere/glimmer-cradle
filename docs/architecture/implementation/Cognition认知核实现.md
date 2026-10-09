@@ -287,13 +287,14 @@ goal/scope/request、投递 epoch 和实际评估 receipt，再保存独立版�
 配置 Host 独立投递 Planning kind，实际 inbox commit 后才 ACK，之后可按既有 retention 清理 Jobs
 body；源/inbox/投影/评估 receipt 仍保留。ACK 前后丢失可双库重启恢复，状态失败不假 ready。
 协议字段见上述参考，备份边界见数据目录。通知投递/回执已接可注入的真实 Host 路由，
-pending 下一次源请求、撤销与完整产品消费仍待接线。
+未完成评估已持久产生下一次源请求；撤销 CAS 与原源取消 outbox 已接配置 Host。
+完整产品消费与旧队列切换仍待后续任务。
 
 完成通知的 Core 持久请求已落在既有 `planning/commitment.py`：`PlanningNotificationRequest`
 引用原源 request/Job、实际 evaluation receipt、承诺 revision、不可变 goal ID/version/scope 与原
 Moment ID/digest；不复制目标正文、证据或评估理由，不存目的地、人格、model-tier 或发送权限。
 notification ID 为 `planning-completion.v1:<receipt_id>` 的 UTF-8 SHA-256；同 Job 的 receipt 恢复
-不会再次评估或新增通知。completed=false 不生成完成通知，也不自动创建后继评估。
+不会再次评估或新增通知。completed=false 不生成完成通知，同事务产生后继评估源意图。
 
 首次新的完成提交在同一 IMMEDIATE 事务创建独立版本 1 通知窗口并写入请求；最终 lease/deadline
 失败、通知写失败或取消回滚连同 receipt/承诺/attempt 一起撤销。普通启动、分页读和既有 receipt
@@ -325,6 +326,18 @@ receive/notify grant 复验后才写出；背压不建立第二队列，sent 不
 生命周期见上述协议参考。未装配接收路由或缺接收方、撤权、取消、unknown 时保留请求；
 完整产品 ingress 仍未切换，不能以 PublishAction/模型完成或空回调制造送达。
 通知和评估/源状态一并保护，具体表与备份纪律归数据目录。
+
+承诺撤销以原 scope/revision CAS 更新 abandoned，封口正在评估的 attempt 并取消同一 Controller
+中的模型任务；不可变计划、已有 receipt 和已送达历史保留。原源取消 outbox 在 Jobs 原 inbox
+接纳/同步取消后才 ACK；尚未调度的源同样保留去重墓碑，unknown 先对账原 attempt，再封口，
+晚到评估不能修改撤销 revision。历史通知从当前待办分离，原实际 Delivery 确认仍可只读对账。
+
+通知 Prepare 只接纳内部历史，不授予发送许可。Host 实际接收/权限就绪后调用
+`BeginPlanningNotificationPublication`，Planning 与撤销同一串行事务保存一次原输出的发布 owner。
+撤销先提交则不允许发布；发布先提交则一次原发送已线性化，后来的撤销不伪报回滚。
+同 owner 只沿原输出重试，Host Delivery 仍阻止重复/未知输出；换代只在当前实际 Delivery
+证明未发送且原承诺未撤销时转交原许可，unknown 保留待对账。许可不代替 Host live lease/权限，
+也不证明送达；字段与恢复限制见协议参考。
 
 ## 上下文与推理
 
@@ -548,7 +561,7 @@ Coordinator 验证已接纳源和实际业务 receipt，Episode owner 同事务�
 本装配仅覆盖 Worker+Jobs，仍未替换产品默认 Kernel 入口；完整配置 catalog、产品状态投影消费、
 Planning 未完成评估已同事务保存后继源意图，Controller 复评间隔默认 60,000 ms；后继追加承诺
 revision，首次 identity/历史 receipt 保持不变。具体持久升级和 wire 规则见[数据布局](../../reference/data-layout.md)与[协议参考](../../reference/protocol.md#planning-jobs-源接纳)。
-Planning 承诺撤销传播、通知的完整产品接收入口与旧队列/旧数据切换仍待完成；
+Planning 承诺撤销传播已接持久原源与实际通知发布先后点；通知的完整产品接收入口与旧队列/旧数据切换仍待完成；
 目标评估、接纳后默认调度、状态接收与可注入定向通知链见本页长期承诺章节。
 
 `episodes.db` 的 `memory_request_outbox` 与 Episode 封口及 projection checkpoint 同事务提交，保存

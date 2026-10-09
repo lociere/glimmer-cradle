@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { DeliveryPublicationRejectedError } from '../../delivery/delivery-store-port.js';
 
 import type {
   CreateOutputRequest,
@@ -31,6 +32,7 @@ const RECEIPT_TABLES = ['delivery_receipt_meta', 'delivery_receipt_facts'];
 
 export class SqliteDeliveryStore implements DeliveryStorePort {
   private readonly database: Database.Database;
+  private publishing = false;
 
   public constructor(databasePath: string) {
     mkdirSync(dirname(databasePath), { recursive: true });
@@ -57,6 +59,7 @@ export class SqliteDeliveryStore implements DeliveryStorePort {
   }
 
   public activateEpoch(authorityEpoch: string, activatedAt: string): number {
+    if (this.publishing) throw new Error('Delivery 同步发布期间不能换主');
     this.identity(authorityEpoch);
     if (!Number.isFinite(Date.parse(activatedAt))) throw new TypeError('Delivery activated_at 无效');
     return this.database.transaction(() => {
@@ -80,7 +83,8 @@ export class SqliteDeliveryStore implements DeliveryStorePort {
       }
       const interrupted = this.database.prepare(
         `UPDATE delivery_outputs
-            SET status='interrupted',terminal_reason='authority_epoch_changed',updated_at=?
+            SET status='interrupted',terminal_reason=CASE WHEN status='generated'
+                THEN 'authority_epoch_changed_before_queue' ELSE 'authority_epoch_changed' END,updated_at=?
           WHERE authority_epoch<>?
             AND status IN (${ACTIVE_STATUSES.map(() => '?').join(',')})`,
       ).run(activatedAt, authorityEpoch, ...ACTIVE_STATUSES).changes;
@@ -159,6 +163,52 @@ export class SqliteDeliveryStore implements DeliveryStorePort {
          FROM delivery_outputs WHERE output_id=?`,
     ).get(outputId) as OutputRow | undefined;
     return row ?? null;
+  }
+
+  public resumeUnsent(request: CreateOutputRequest): OutputGeneration | null {
+    for (const value of [request.output_id, request.turn_id, request.destination_id, request.authority_epoch, request.content_digest]) this.identity(value);
+    if (!Number.isFinite(Date.parse(request.created_at))) throw new TypeError('Delivery 恢复时钟无效');
+    return this.database.transaction(() => {
+      this.assertEpoch(request.authority_epoch);
+      const original = this.load(request.output_id);
+      if (!original) return null;
+      if (original.turn_id !== request.turn_id || original.destination_id !== request.destination_id
+        || original.content_digest !== request.content_digest) throw new Error('Delivery 恢复原输出绑定冲突');
+      if (!(original.status === 'generated' || original.status === 'interrupted'
+        && original.terminal_reason === 'authority_epoch_changed_before_queue')) return null;
+      if (this.confirmedReceipt(request.output_id)) throw new Error('Delivery 未发送证明与实际回执冲突');
+      if (original.authority_epoch === request.authority_epoch) return original.status === 'generated' ? original : null;
+      const destination = this.database.prepare('SELECT authority_epoch,generation FROM delivery_destinations WHERE destination_id=?')
+        .get(request.destination_id) as DestinationRow | undefined;
+      const generation = destination?.authority_epoch === request.authority_epoch ? destination.generation + 1 : 1;
+      if (!Number.isSafeInteger(generation) || generation < 1) throw new Error('Delivery generation 超出预算');
+      this.interruptRows(request.destination_id, request.created_at, 'superseded');
+      this.database.prepare('INSERT INTO delivery_destinations VALUES(?,?,?,?) ON CONFLICT(destination_id) DO UPDATE SET '
+        + 'authority_epoch=excluded.authority_epoch,generation=excluded.generation,updated_at=excluded.updated_at')
+        .run(request.destination_id, request.authority_epoch, generation, request.created_at);
+      this.database.prepare("UPDATE delivery_outputs SET authority_epoch=?,generation=?,status='generated',terminal_reason=NULL,updated_at=? WHERE output_id=?")
+        .run(request.authority_epoch, generation, request.created_at, request.output_id);
+      return this.required(request.output_id);
+    }).immediate();
+  }
+
+  public withCurrentOutput(outputId: string, authorityEpoch: string, generation: number, action: () => undefined): void {
+    if (this.publishing) throw new Error('Delivery 同步发布不可重入');
+    return this.database.transaction(() => {
+      if (!this.isCurrentEpoch(authorityEpoch)) throw new DeliveryPublicationRejectedError('Delivery transport 发布 authority epoch 已失效');
+      const output = this.load(outputId);
+      const destination = output && this.database.prepare('SELECT authority_epoch,generation FROM delivery_destinations WHERE destination_id=?')
+        .get(output.destination_id) as DestinationRow | undefined;
+      if (!output || output.authority_epoch !== authorityEpoch || output.generation !== generation || output.status !== 'queued'
+        || destination?.authority_epoch !== authorityEpoch || destination.generation !== generation) {
+        throw new DeliveryPublicationRejectedError('Delivery transport 发布原输出已失效');
+      }
+      // SQLite IMMEDIATE 围栏覆盖同步 transport enqueue；queued 已在外层提交，回滚不伪造未发送。
+      this.publishing = true;
+      try {
+        if (action() !== undefined) throw new TypeError('Delivery transport 临界区只接受同步无返回值动作');
+      } finally { this.publishing = false; }
+    }).immediate();
   }
 
   public transition(

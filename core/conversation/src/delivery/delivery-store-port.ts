@@ -1,6 +1,9 @@
 import type { DeliveryStatus, OutputGeneration } from './output-generation.js';
 import type { DeliveryReceiptEnvelope, DeliveryReceiptFact } from './receipt.js';
 
+/** 持久围栏明确拒绝旧 owner/输出；存储故障必须保留原错误。 */
+export class DeliveryPublicationRejectedError extends Error {}
+
 export interface CreateOutputRequest {
   readonly output_id: string;
   readonly turn_id: string;
@@ -23,6 +26,8 @@ export interface DeliveryStorePort {
   activateEpoch(authorityEpoch: string, activatedAt: string): number;
   isCurrentEpoch(authorityEpoch: string): boolean;
   allocate(request: CreateOutputRequest): OutputGeneration;
+  resumeUnsent(request: CreateOutputRequest): OutputGeneration | null;
+  withCurrentOutput(outputId: string, authorityEpoch: string, generation: number, action: () => undefined): void;
   load(outputId: string): OutputGeneration | null;
   transition(
     outputId: string,

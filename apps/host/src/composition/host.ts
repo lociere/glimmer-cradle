@@ -6,7 +6,7 @@ import { JobController, JobRecoveryController, JobRetentionController, JobSchedu
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { CognitionClient, HostCognitionError } from '../adapters/protocol/cognition-client.js';
 import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
-import { CognitionJobAdapter, PlanningJobSourceAdapter, PlanningJobAdapter, PlanningNotificationAdapter } from './cognition-job-adapter.js';
+import { CognitionJobAdapter, PlanningJobSourceAdapter, PlanningJobAdapter, PlanningNotificationAdapter, PlanningJobCancellationAdapter } from './cognition-job-adapter.js';
 import type { HostConversationRoutes } from '../gateway/conversation-routes.js';
 
 export interface HostJobsOptions {
@@ -40,6 +40,7 @@ export class HostJobsController {
   private readonly options: HostJobsOptions;
   private readonly adapter: CognitionJobAdapter;
   private readonly planningSource?: PlanningJobSourceAdapter;
+  private readonly planningCancellations?: PlanningJobCancellationAdapter;
   private readonly planningAdapter?: PlanningJobAdapter;
   private readonly planningScheduler?: JobScheduler;
   private readonly notifications?: PlanningNotificationAdapter;
@@ -67,6 +68,7 @@ export class HostJobsController {
     this.options = { ...options, submission_policy: { ...options.submission_policy }, retry_policy: { ...options.retry_policy } };
     this.adapter = new CognitionJobAdapter(options.cognition);
     this.planningSource = options.planning_sources ? new PlanningJobSourceAdapter(options.cognition) : undefined;
+    this.planningCancellations = options.planning_sources ? new PlanningJobCancellationAdapter(options.cognition) : undefined;
     if (options.conversation_routes && !options.planning_sources) throw new Error('通知路由须装配实际 Planning 源');
     this.notifications = options.conversation_routes ? new PlanningNotificationAdapter(options.cognition, options.conversation_routes,
       () => { options.clock.now(); }) : undefined;
@@ -137,6 +139,8 @@ export class HostJobsController {
     try {
       this.recovery.recoverExpired();
       await this.adapter.deliverRequests(store, clock, epoch, submission_policy, batch_size, signal);
+      await this.planningCancellations?.deliver(store, clock, epoch, submission_policy.max_attempts, batch_size,
+        (jobId, revision) => this.controller.cancel(jobId, epoch, revision), signal);
       await this.planningSource?.deliverRequests(store, clock, epoch, submission_policy.max_attempts, batch_size, signal);
       const unknown = store.listUnknown(epoch, MEMORY_JOB_KIND, batch_size, this.cursor);
       let degraded = false;

@@ -54,6 +54,16 @@ export class DeliveryController {
     return this.move(outputId, 'queued');
   }
 
+  /** 只恢复尚未排入 transport 的原输出；旧 authority 不能在否定证明后继续写出。 */
+  public resumeUnsent(request: Omit<CreateOutputRequest, 'authority_epoch' | 'created_at'>): OutputGeneration | null {
+    return this.store.resumeUnsent({ ...request, authority_epoch: this.authorityEpoch, created_at: this.clock.nowIso() });
+  }
+
+  /** 已提交 queued 意图保留；transport 同步写入期间不能换主，失败仍能对账原输出。 */
+  public withCurrentOutput(outputId: string, generation: number, action: () => undefined): void {
+    this.store.withCurrentOutput(outputId, this.authorityEpoch, generation, action);
+  }
+
   public sent(outputId: string): OutputGeneration {
     return this.move(outputId, 'sent');
   }

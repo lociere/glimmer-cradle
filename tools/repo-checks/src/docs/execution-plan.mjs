@@ -33,8 +33,11 @@ export function validateExecutionPlan(plan, repositoryRoot) {
   }
   const stages = new Map();
   const tasks = new Map();
-  const targetFiles = repositoryRoot && fs.existsSync(path.join(repositoryRoot, manifestPath))
-    ? new Set(JSON.parse(fs.readFileSync(path.join(repositoryRoot, manifestPath), 'utf8')).repositoryFiles.map(entry => entry.path)) : null;
+  const manifest = repositoryRoot && fs.existsSync(path.join(repositoryRoot, manifestPath))
+    ? JSON.parse(fs.readFileSync(path.join(repositoryRoot, manifestPath), 'utf8')) : null;
+  const targetFiles = manifest ? new Set(manifest.repositoryFiles.map(entry => entry.path)) : null;
+  const targetGenerated = value => safeFile(value) && (manifest?.generatedAreas ?? []).some(area =>
+    value.startsWith(`${area.root}/`) && path.matchesGlob(value.slice(area.root.length + 1), area.pattern));
   const localFile = (ref, base = initiativePath) => {
     const file = ref?.split('#')[0];
     return safeFile(file) && (!repositoryRoot || fs.existsSync(path.join(repositoryRoot, base, file))
@@ -69,7 +72,7 @@ export function validateExecutionPlan(plan, repositoryRoot) {
           if (!['retain', 'create', 'move', 'split', 'delete'].includes(entry.action) || !present(entry.owner)
             || (entry.action !== 'create' && !safeFile(entry.source))
             || (entry.action !== 'delete' && !safeFile(entry.target)) || !present(entry.exitCondition)) errors.push(`execution: invalid file mapping for ${task.id}`);
-          if (entry.action !== 'delete' && targetFiles && !targetFiles.has(entry.target)) errors.push(`execution: ${task.id} target is not in the physical contract: ${entry.target}`);
+          if (entry.action !== 'delete' && targetFiles && !targetFiles.has(entry.target) && !targetGenerated(entry.target)) errors.push(`execution: ${task.id} target is not in the physical contract: ${entry.target}`);
           if (task.status === 'ready' && entry.action !== 'create' && !localFile(entry.source, '')) errors.push(`execution: ${task.id} missing current source: ${entry.source}`);
         }
       }

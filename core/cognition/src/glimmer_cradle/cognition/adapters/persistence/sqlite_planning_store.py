@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
+from typing import Literal
 
 import aiosqlite
 from glimmer_cradle.cognition.planning.commitment import (
@@ -19,6 +20,7 @@ from glimmer_cradle.cognition.planning.commitment import (
     PlanningEvaluationReceipt,
     PlanningJobFeedback,
     PlanningJobIdentity,
+    PlanningJobCancellation,
     PlanningJobResult,
     PlanningNotificationDelivery,
     PlanningNotificationRequest,
@@ -117,6 +119,22 @@ _NOTIFICATION_DELIVERY_SCHEMA = (
      "FOREIGN KEY(notification_id) REFERENCES planning_notification_outbox(notification_id))"),
 )
 
+_CANCELLATION_TABLES = ("planning_cancellation_meta", "planning_cancellation_outbox")
+_CANCELLATION_SCHEMA = (
+    "CREATE TABLE planning_cancellation_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+    ("CREATE TABLE planning_cancellation_outbox (request_id TEXT PRIMARY KEY,commitment_revision INTEGER NOT NULL,"
+     "acknowledged_job_revision INTEGER,FOREIGN KEY(request_id) REFERENCES planning_job_outbox(request_id),"
+     "CHECK(commitment_revision>1),CHECK(acknowledged_job_revision IS NULL OR acknowledged_job_revision>0))"),
+)
+
+# 与撤销 CAS 同库串行。一个原通知只有一个发布 owner；丢响应/换代不能自动授予第二次发送。
+_PUBLICATION_TABLES = ("planning_notification_publication_meta", "planning_notification_publication")
+_PUBLICATION_SCHEMA = (
+    "CREATE TABLE planning_notification_publication_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+    ("CREATE TABLE planning_notification_publication (notification_id TEXT PRIMARY KEY,owner_id TEXT NOT NULL,"
+     "FOREIGN KEY(notification_id) REFERENCES planning_notification_outbox(notification_id))"),
+)
+
 
 def _matches_feedback_result(actual: object, expected: object) -> bool:
     # protobuf Struct 的安全整数经 JSON mapper 成 float；bool 不可冒充数字或完成值。
@@ -195,6 +213,8 @@ class SqlitePlanningStore:
                 await self._feedback_schema(connection)
                 await self._notification_schema(connection)
                 await self._notification_delivery_schema(connection)
+                await self._cancellation_schema(connection)
+                await self._publication_schema(connection)
                 cursor = await connection.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 )
@@ -367,10 +387,106 @@ class SqlitePlanningStore:
             if not await self._commitment_schema(connection):
                 return []
             cursor = await connection.execute(
-                "SELECT payload_json FROM planning_job_outbox WHERE accepted_job_id IS NULL ORDER BY request_id LIMIT ?",
+                "SELECT o.payload_json FROM planning_job_outbox o JOIN planning_commitment c USING(commitment_id) "
+                "WHERE o.accepted_job_id IS NULL AND c.status='accepted' ORDER BY request_id LIMIT ?",
                 (limit,),
             )
             return [JobRequest(**json.loads(row[0])) for row in await cursor.fetchall()]
+
+    async def cancel_commitment(self, commitment_id: str, *, expected_revision: int, scope_id: str) -> Commitment:
+        if (not isinstance(commitment_id, str) or not commitment_id.strip() or not isinstance(scope_id, str) or not scope_id.strip()
+            or type(expected_revision) is not int or not 1 <= expected_revision < 2**53 - 1):
+            raise PlanningConflictError("Planning 撤销 identity/revision 无效")
+        async with self._transaction() as connection:
+            if not await self._commitment_schema(connection):
+                raise PlanningConflictError("Planning 撤销源不存在")
+            row = await (await connection.execute("SELECT * FROM planning_commitment WHERE commitment_id=?", (commitment_id,))).fetchone()
+            if row is None:
+                raise PlanningConflictError("Planning 撤销承诺不存在")
+            plan = await (await connection.execute("SELECT payload_json FROM planning_plan_version WHERE plan_id=? AND version=?",
+                (row["plan_id"], row["plan_version"]))).fetchone()
+            if plan is None or json.loads(plan[0])["goal"]["scope_id"] != scope_id:
+                raise PlanningConflictError("Planning 撤销 scope 与原来源冲突")
+            if row["status"] == "abandoned" and row["revision"] == expected_revision + 1:
+                return self._commitment(row)
+            if row["revision"] != expected_revision or row["status"] not in {"accepted", "completed"}:
+                raise PlanningConflictError("Planning 撤销 revision/状态冲突")
+            revision = expected_revision + 1
+            await connection.execute("UPDATE planning_commitment SET status='abandoned',revision=? WHERE commitment_id=?",
+                                     (revision, commitment_id))
+            await self._cancellation_schema(connection, create=True)
+            await connection.execute("INSERT INTO planning_cancellation_outbox(request_id,commitment_revision) "
+                                     "SELECT request_id,? FROM planning_job_outbox WHERE commitment_id=?", (revision, commitment_id))
+            if await self._evaluation_schema(connection):
+                now = await self._evaluation_time(connection)
+                await connection.execute("UPDATE planning_evaluation_attempt SET state='sealed',observed_at=? WHERE state='active' "
+                    "AND request_id IN (SELECT request_id FROM planning_job_outbox WHERE commitment_id=?)", (now, commitment_id))
+            return Commitment(commitment_id, row["plan_id"], CommitmentStatus.ABANDONED, revision, row["plan_version"])
+
+    async def pending_job_cancellations(self, *, limit: int = 64, after_request_id: str | None = None) -> list[PlanningJobCancellation]:
+        if (type(limit) is not int or not 1 <= limit <= 1000 or after_request_id is not None
+            and (not isinstance(after_request_id, str) or not re.fullmatch(r"[a-f0-9]{64}", after_request_id))):
+            raise PlanningConflictError("Planning 撤销扫描范围无效")
+        async with self._transaction() as connection:
+            if not await self._cancellation_schema(connection):
+                return []
+            rows = await (await connection.execute(
+                "SELECT x.request_id,x.commitment_revision,o.payload_json,c.status,c.revision "
+                "FROM planning_cancellation_outbox x JOIN planning_job_outbox o USING(request_id) "
+                "JOIN planning_commitment c USING(commitment_id) WHERE x.acknowledged_job_revision IS NULL AND x.request_id>? "
+                "ORDER BY x.request_id LIMIT ?", (after_request_id or "", limit))).fetchall()
+            result = []
+            for row in rows:
+                request = JobRequest(**json.loads(row["payload_json"]))
+                if row["status"] != "abandoned" or row["revision"] != row["commitment_revision"] or row["request_id"] != request.request_id:
+                    raise PlanningConflictError("Planning 撤销原来源/状态已损坏")
+                result.append(PlanningJobCancellation(request, row["commitment_revision"]))
+            return result
+
+    async def acknowledge_job_cancellation(self, cancellation: PlanningJobCancellation, receipt: JobReceipt) -> bool:
+        if (not isinstance(cancellation, PlanningJobCancellation) or not isinstance(receipt, JobReceipt)
+            or receipt.status not in {"accepted", "duplicate"} or type(receipt.revision) is not int
+            or not 1 <= receipt.revision <= 2**53 - 1 or receipt.job_id != "planning:" + cancellation.request.request_id):
+            raise PlanningConflictError("Planning 撤销没有有效 Jobs 封口回执")
+        async with self._transaction() as connection:
+            if not await self._cancellation_schema(connection):
+                raise PlanningConflictError("Planning 撤销源不存在")
+            row = await (await connection.execute(
+                "SELECT x.commitment_revision,x.acknowledged_job_revision,o.payload_json,o.accepted_job_id,c.status,c.revision "
+                "FROM planning_cancellation_outbox x JOIN planning_job_outbox o USING(request_id) "
+                "JOIN planning_commitment c USING(commitment_id) WHERE x.request_id=?", (cancellation.request.request_id,))).fetchone()
+            if (row is None or row["payload_json"] != _canonical(asdict(cancellation.request))
+                or row["commitment_revision"] != cancellation.commitment_revision or row["status"] != "abandoned"
+                or row["revision"] != cancellation.commitment_revision
+                or row["accepted_job_id"] not in {None, receipt.job_id}):
+                raise PlanningConflictError("Planning 撤销信封/原 Job 绑定冲突")
+            if row["acknowledged_job_revision"] is not None:
+                return False
+            # 即使调度 ACK 未到也绑定真实已封口 Job，使取消状态 inbox 仍引用原源；不重新排队。
+            await connection.execute("UPDATE planning_job_outbox SET accepted_job_id=?,accepted_revision=COALESCE(accepted_revision,?) "
+                "WHERE request_id=?", (receipt.job_id, receipt.revision, cancellation.request.request_id))
+            await connection.execute("UPDATE planning_cancellation_outbox SET acknowledged_job_revision=? WHERE request_id=?",
+                (receipt.revision, cancellation.request.request_id))
+            return True
+
+    @staticmethod
+    async def _cancellation_schema(connection: aiosqlite.Connection, *, create: bool = False) -> bool:
+        tables = {row[0] for row in await (await connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)", _CANCELLATION_TABLES)).fetchall()}
+        if not tables:
+            if not create:
+                return False
+            for statement in _CANCELLATION_SCHEMA:
+                await connection.execute(statement)
+            await connection.execute("INSERT INTO planning_cancellation_meta VALUES('schema_version','1')")
+            return True
+        if tables != set(_CANCELLATION_TABLES):
+            raise PlanningConflictError("Planning 撤销窗口不完整；须受控恢复")
+        version = await (await connection.execute("SELECT value FROM planning_cancellation_meta WHERE key='schema_version'")).fetchone()
+        if version is None or version[0] != "1":
+            raise PlanningConflictError("Planning 撤销窗口版本不受支持")
+        await connection.execute("SELECT request_id,commitment_revision,acknowledged_job_revision FROM planning_cancellation_outbox LIMIT 0")
+        return True
 
     async def acknowledge_job_request(
         self, request: JobRequest, receipt: JobReceipt
@@ -757,7 +873,7 @@ class SqlitePlanningStore:
             raise PlanningConflictError("Planning 通知结构/引用无效；须受控恢复") from error
 
     async def pending_notification_requests(
-        self, *, limit: int = 64, after_notification_id: str | None = None,
+        self, *, limit: int = 64, after_notification_id: str | None = None, revoked: bool = False,
     ) -> list[PlanningNotificationRequest]:
         if (type(limit) is not int or not 1 <= limit <= 1000 or after_notification_id is not None
             and (not isinstance(after_notification_id, str) or not re.fullmatch(r"[a-f0-9]{64}", after_notification_id))):
@@ -776,7 +892,12 @@ class SqlitePlanningStore:
                 for row in rows:
                     request = self._read_notification(row)
                     confirmation = await self._notification_delivery(connection, request) if delivered else None
-                    if confirmation is None:
+                    status = await (await connection.execute("SELECT status FROM planning_commitment WHERE commitment_id=?",
+                                                            (request.commitment_id,))).fetchone()
+                    if status is None:
+                        raise PlanningConflictError("Planning 通知原承诺丢失")
+                    cancelled = await self._notification_revoked(connection, request)
+                    if confirmation is None and cancelled == revoked:
                         result.append(request)
                         if len(result) == limit:
                             return result
@@ -786,13 +907,63 @@ class SqlitePlanningStore:
                 )).fetchall()
             return result
 
-    async def read_notification_work(self, request: PlanningNotificationRequest) -> PlanningNotificationWork:
+    async def read_notification_work(self, request: PlanningNotificationRequest, *, historical: bool = False) -> PlanningNotificationWork:
         if not isinstance(request, PlanningNotificationRequest):
             raise PlanningConflictError("Planning 通知请求无效")
         async with self._transaction() as connection:
-            return await self._notification_work(connection, request)
+            return await self._notification_work(connection, request, historical=historical)
 
-    async def _notification_work(self, connection: aiosqlite.Connection, request: PlanningNotificationRequest) -> PlanningNotificationWork:
+    async def claim_notification_publication(self, request: PlanningNotificationRequest, *, owner_id: str, not_sent: bool = False) -> Literal["accepted", "revoked", "recovery_pending"]:
+        if type(not_sent) is not bool or not isinstance(owner_id, str) or not owner_id.strip() or len(owner_id.encode("utf-8")) > 4096:
+            raise PlanningConflictError("Planning 通知发布 owner 无效")
+        async with self._transaction() as connection:
+            exists = await self._publication_schema(connection)
+            row = await (await connection.execute("SELECT owner_id FROM planning_notification_publication WHERE notification_id=?",
+                (request.notification_id,))).fetchone() if exists else None
+            if row is not None:
+                await self._notification_work(connection, request, historical=True)
+                if row[0] == owner_id:
+                    return "accepted"
+                if not not_sent:
+                    return "recovery_pending"
+                state = await (await connection.execute("SELECT status FROM planning_commitment WHERE commitment_id=?",
+                    (request.commitment_id,))).fetchone()
+                if state[0] == "abandoned":
+                    return "revoked"
+                # 旧发送方已被 App authority 围栏，实际 Delivery 否定证明允许沿原输出恢复。
+                await connection.execute("UPDATE planning_notification_publication SET owner_id=? WHERE notification_id=?",
+                    (owner_id, request.notification_id))
+                return "accepted"
+            # 此事务提交是新发送与撤销的先后点；已线性化发送不冒充实际 delivered。
+            await self._notification_work(connection, request, historical=True)
+            state = await (await connection.execute("SELECT status FROM planning_commitment WHERE commitment_id=?",
+                (request.commitment_id,))).fetchone()
+            if state[0] == "abandoned":
+                return "revoked"
+            await self._publication_schema(connection, create=True)
+            await connection.execute("INSERT INTO planning_notification_publication VALUES(?,?)", (request.notification_id, owner_id))
+            return "accepted"
+
+    @staticmethod
+    async def _publication_schema(connection: aiosqlite.Connection, *, create: bool = False) -> bool:
+        tables = {row[0] for row in await (await connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN (?,?)", _PUBLICATION_TABLES)).fetchall()}
+        if not tables:
+            if not create:
+                return False
+            for statement in _PUBLICATION_SCHEMA:
+                await connection.execute(statement)
+            await connection.execute("INSERT INTO planning_notification_publication_meta VALUES('schema_version','1')")
+            return True
+        if tables != set(_PUBLICATION_TABLES):
+            raise PlanningConflictError("Planning 通知发布窗口不完整；须受控恢复")
+        row = await (await connection.execute("SELECT value FROM planning_notification_publication_meta WHERE key='schema_version'")).fetchone()
+        if row is None or row[0] != "1":
+            raise PlanningConflictError("Planning 通知发布版本不受支持")
+        await connection.execute("SELECT notification_id,owner_id FROM planning_notification_publication LIMIT 0")
+        return True
+
+    async def _notification_work(self, connection: aiosqlite.Connection, request: PlanningNotificationRequest, *, historical: bool = False) -> PlanningNotificationWork:
         if not await self._notification_schema(connection):
             raise PlanningConflictError("Planning 通知不存在")
         row = await (await connection.execute(
@@ -809,12 +980,26 @@ class SqlitePlanningStore:
         if (receipt is None or not receipt.assessment.completed
             or receipt.request_id != work.request_id or receipt.commitment_id != work.commitment.commitment_id
             or receipt.identity.scope_id != work.plan.goal.scope_id
-            or work.commitment.status != CommitmentStatus.COMPLETED
-            or work.commitment.revision != receipt.commitment_revision
+            or not (work.commitment.status == CommitmentStatus.COMPLETED and work.commitment.revision == receipt.commitment_revision
+                    or historical and work.commitment.status == CommitmentStatus.ABANDONED
+                    and work.commitment.revision == receipt.commitment_revision + 1
+                    and await self._notification_revoked(connection, request))
             or goal_row is None or goal_row[0] != _canonical(_goal_document(work.plan.goal))
             or self._notification_request(work, receipt) != request):
             raise PlanningConflictError("Planning 通知/完成事实已改变；不得投递")
         return PlanningNotificationWork(request, work.plan.goal, receipt)
+
+    async def _notification_revoked(self, connection: aiosqlite.Connection, request: PlanningNotificationRequest) -> bool:
+        if not await self._cancellation_schema(connection):
+            return False
+        row = await (await connection.execute("SELECT x.commitment_revision,c.status,c.revision FROM planning_cancellation_outbox x "
+            "JOIN planning_job_outbox o USING(request_id) JOIN planning_commitment c USING(commitment_id) WHERE x.request_id=?",
+            (request.request_id,))).fetchone()
+        if row is None:
+            return False
+        if row["status"] != "abandoned" or row["revision"] != row["commitment_revision"]:
+            raise PlanningConflictError("Planning 通知撤销原事实冲突")
+        return True
 
     async def acknowledge_notification(self, request: PlanningNotificationRequest, delivery: PlanningNotificationDelivery) -> bool:
         if not isinstance(request, PlanningNotificationRequest) or not isinstance(delivery, PlanningNotificationDelivery):
@@ -825,7 +1010,7 @@ class SqlitePlanningStore:
             raise PlanningConflictError("Planning 通知确认引用冲突")
         payload = _canonical(asdict(delivery))
         async with self._transaction() as connection:
-            await self._notification_work(connection, request)
+            await self._notification_work(connection, request, historical=True)
             exists = await self._notification_delivery_schema(connection)
             original = await self._notification_delivery(connection, request) if exists else None
             if original is not None:

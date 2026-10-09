@@ -153,6 +153,21 @@ acknowledged_at_ms）。原 outbox 不删除，业务评估/承诺不改写；�
 该表是 Planning 接纳的确认记录，不替代唯一 Conversation Delivery writer/回执事实源，
 不证明当前发送权限；跨库不是原子事务，实际回执先提交、源 ACK 后提交，响应丢失沿同一
 完整确认重投。备份必须覆盖上述两窗口、原 Reply/Turn、完整 Delivery 和 authority 切点。
+
+首次显式撤销在同一 Planning 事务建立独立版本 1 的 `planning_cancellation_meta` 与
+`planning_cancellation_outbox`（原 request ID、撤销 commitment revision、实际封口 Job revision）。
+CAS 更新 abandoned、保存所有原/后继取消意图、封口 active attempt 一并提交或回滚。普通
+源扫描排除撤销承诺，但原 payload/due/ACK、计划、receipt 和通知不可删除；Jobs 封口后才 ACK，
+unknown 不能先确认。尚未收到普通 schedule ACK 的源也绑定原实际封口 Job，不创建新 identity。
+
+首次实际通知发布许可再建立独立版本 1 的 `planning_notification_publication_meta` 与
+`planning_notification_publication`（原 notification ID、唯一 publication owner）。与撤销 CAS 共用
+串行事务；撤销先提交不创建许可，许可先提交的一次原发布不被撤销伪报回滚。普通启动不建表，
+部分/未知窗口失败关闭，初始化/插入/owner转交故障全部回滚。同 owner 沿原输出恢复，换代
+仅在当前实际 Delivery 的未发送否定证明与 completed 原 revision 同时成立时转交原许可。
+Delivery 换主区分尚未排队的 generated 与其他在途状态；仅前者保留明确的原阶段标记供恢复，
+旧主已围栏。无法证明未发送的情形保留待对账，绝不生成新输出。许可与原 Reply/Turn、Delivery、撤销 outbox、
+完整 Planning/Jobs/authority 同属一致备份闭包；当前只验证隔离库，生产数据切换留 P14A。
 新接纳 GoalVersion 增量保存 `source_moment_id`、`source_digest` 和 `model_tier`，三字段必须完整；
 digest 为真实完整 Moment 的排序键紧凑 UTF-8 JSON SHA-256。旧不可变版本缺三字段时保持原 JSON
 与 active work 摘要字节语义，不改写 schema 1，也不补造权限；新绑定必须是显式新版本。
