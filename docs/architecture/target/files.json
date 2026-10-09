@@ -2240,7 +2240,15 @@
       "owner": "jobs"
     },
     {
+      "path": "core/jobs/migrations/000-jobs-v4.sql",
+      "owner": "jobs"
+    },
+    {
       "path": "core/jobs/migrations/001-jobs.sql",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/migrations/002-admission-order.sql",
       "owner": "jobs"
     },
     {
@@ -2249,6 +2257,10 @@
     },
     {
       "path": "core/jobs/schemas/jobs-config.schema.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/src/adapters/storage/sqlite-job-migration.ts",
       "owner": "jobs"
     },
     {
@@ -2316,6 +2328,10 @@
       "owner": "jobs"
     },
     {
+      "path": "core/jobs/tests/admission-order.test.ts",
+      "owner": "jobs"
+    },
+    {
       "path": "core/jobs/tests/cancellation-retention.test.ts",
       "owner": "jobs"
     },
@@ -2325,6 +2341,10 @@
     },
     {
       "path": "core/jobs/tests/fixtures/job.json",
+      "owner": "jobs"
+    },
+    {
+      "path": "core/jobs/tests/fixtures/jobs-v4-records.json",
       "owner": "jobs"
     },
     {

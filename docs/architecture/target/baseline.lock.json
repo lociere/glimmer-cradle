@@ -17,11 +17,11 @@
     },
     {
       "path": "docs/architecture/target/physical-layout.md",
-      "sha256": "5aaa0533c98c89e8c39fef149f80b9d919f78b2ca2dd5c8e2c11bf25ef92b1a3"
+      "sha256": "d2272efb8da0c1bcd1ab4f6cca61493c8ee60d9c1d871887f128a2972243e0d6"
     },
     {
       "path": "docs/architecture/target/files.json",
-      "sha256": "65c5f9cfcdf9df05541198d0e21041eb75b2e371e8e2cbd82117b58b607a3882"
+      "sha256": "d2fb14ee85a8c7f5610ad382916967b695fec75eae97b183b75f109d76b8bce2"
     },
     {
       "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",

@@ -5,8 +5,8 @@ import type { JobStorePort } from '../ports/job-store-port.js';
 
 /** Host 显式驱动一次 tick；进程计时器与生命周期由 App 拥有，不在 Core 偷开常驻任务。 */
 export class JobScheduler {
-  private cursor = '';
-  private boundary: string | null = null;
+  private cursor = 0;
+  private boundary: number | null = null;
   private waiting = 0;
   public constructor(private readonly store: JobStorePort, private readonly controller: JobController,
     private readonly clock: JobClockPort, private readonly epoch: number,
@@ -24,26 +24,26 @@ export class JobScheduler {
     // 注册缺失不消耗源 attempt；动态接纳返回后也须重新核对注册。
     if (this.kind && !this.controller.hasHandler(this.kind)) {
       if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
-      this.cursor = '';
+      this.cursor = 0;
       this.boundary = null;
       return 0;
     }
     if (this.controller.isAccepting) this.store.materializeDue(this.epoch, this.clock.now(), limit);
     let count = 0;
     if (this.admission && this.controller.isAccepting) {
-      // 上界只限定扫描，不授予执行权；新低 ID 可在下一轮接纳，旧等待项不会被新高 ID 推迟回绕。
+      // 新 Job 的接纳序号必定超过固定上界；不依赖 ID 分布/墙钟，也不在内存快照全库。
       this.boundary ??= this.store.readDueBoundary(this.epoch, this.kind!, this.clock.now());
-      if (this.boundary === null) { this.cursor = ''; return 0; }
-      const page = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit, this.cursor, this.boundary);
-      for (const job of page) {
-        this.cursor = job.job_id;
+      if (this.boundary === null) { this.cursor = 0; return 0; }
+      const page = this.store.listDueScan(this.epoch, this.kind!, this.clock.now(), limit, this.cursor, this.boundary);
+      for (const { job, sequence } of page) {
+        this.cursor = sequence;
         signal?.throwIfAborted();
         if (!this.controller.isAccepting) break;
         const eligible = await this.admission.isEligible(job, signal);
         signal?.throwIfAborted();
         if (!this.controller.hasHandler(this.kind!)) {
           if (this.controller.isAccepting) this.waiting = this.store.listDue(this.epoch, this.kind!, this.clock.now(), limit).length;
-          this.cursor = '';
+          this.cursor = 0;
           this.boundary = null;
           break;
         }
@@ -53,7 +53,7 @@ export class JobScheduler {
           { job_id: job.job_id, revision: job.revision });
         if (claim) { await this.controller.execute(claim); count += 1; }
       }
-      if (page.length < limit || this.cursor === this.boundary) { this.cursor = ''; this.boundary = null; }
+      if (page.length < limit || this.cursor === this.boundary) { this.cursor = 0; this.boundary = null; }
       return count;
     }
     while (count < limit && this.controller.isAccepting && (!this.kind || this.controller.hasHandler(this.kind))) {
@@ -65,7 +65,7 @@ export class JobScheduler {
     }
     if (this.kind && this.controller.isAccepting && !this.controller.hasHandler(this.kind)) {
       this.waiting = this.store.listDue(this.epoch, this.kind, this.clock.now(), limit).length;
-      this.cursor = '';
+      this.cursor = 0;
       this.boundary = null;
     }
     return count;

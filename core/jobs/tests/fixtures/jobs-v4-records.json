@@ -1,0 +1,350 @@
+{
+  "sourceCommit": "f20aac84",
+  "schemaVersion": 4,
+  "rows": {
+    "job_authority": [
+      {
+        "singleton": 1,
+        "epoch": 2
+      }
+    ],
+    "jobs": [
+      {
+        "job_id": "z-queued",
+        "scope_id": "scope-1",
+        "goal_id": "goal-1",
+        "kind": "test.reconcile",
+        "idempotency_key": "z-queued",
+        "payload_json": "{\"evidence_id\":\"evidence-1\"}",
+        "request_digest": "82495f0c982382e8087671406f8616220e5104836084bb8d126a8f93293b0cd6",
+        "due_at": 1000,
+        "retry_mode": "reconcile",
+        "max_attempts": 3,
+        "status": "queued",
+        "revision": 2,
+        "attempt": 0,
+        "authority_epoch": 2,
+        "fencing_token": 0,
+        "lease_owner": null,
+        "lease_until": null,
+        "error_code": null,
+        "result_json": null,
+        "created_at": 1000,
+        "updated_at": 2001
+      },
+      {
+        "job_id": "receipt",
+        "scope_id": "scope-1",
+        "goal_id": "goal-1",
+        "kind": "legacy.receipt",
+        "idempotency_key": "receipt",
+        "payload_json": "{\"evidence_id\":\"evidence-1\"}",
+        "request_digest": "ae36ad253eeeafef7f07ed98700f0e42d64c5a88ccbecc4505daa0d9001fd57d",
+        "due_at": 1000,
+        "retry_mode": "reconcile",
+        "max_attempts": 3,
+        "status": "succeeded",
+        "revision": 4,
+        "attempt": 1,
+        "authority_epoch": 1,
+        "fencing_token": 2,
+        "lease_owner": null,
+        "lease_until": null,
+        "error_code": null,
+        "result_json": "{\"original\":true}",
+        "created_at": 1000,
+        "updated_at": 1200
+      },
+      {
+        "job_id": "job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c",
+        "scope_id": "scope-1",
+        "goal_id": "goal-1",
+        "kind": "legacy.trigger",
+        "idempotency_key": "trigger:f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c",
+        "payload_json": "{\"input\":{\"original\":true},\"occurrence\":{\"occurred_at\":2000,\"occurrence_id\":\"event:original-event\",\"payload\":{\"original\":true}}}",
+        "request_digest": "3f06a6ac3f10f891456323c219bf56e030278914f841ba88abb02c8eba9b7dd2",
+        "due_at": 2000,
+        "retry_mode": "reconcile",
+        "max_attempts": 3,
+        "status": "queued",
+        "revision": 2,
+        "attempt": 0,
+        "authority_epoch": 2,
+        "fencing_token": 0,
+        "lease_owner": null,
+        "lease_until": null,
+        "error_code": null,
+        "result_json": null,
+        "created_at": 2000,
+        "updated_at": 2001
+      },
+      {
+        "job_id": "unknown",
+        "scope_id": "scope-1",
+        "goal_id": "goal-1",
+        "kind": "legacy.unknown",
+        "idempotency_key": "unknown",
+        "payload_json": "{\"evidence_id\":\"evidence-1\"}",
+        "request_digest": "c36511e24e7b9cc4c22677143100f34cc4015fc69979f0cb1fa7bd13900cf7ee",
+        "due_at": 1000,
+        "retry_mode": "reconcile",
+        "max_attempts": 3,
+        "status": "unknown",
+        "revision": 3,
+        "attempt": 1,
+        "authority_epoch": 2,
+        "fencing_token": 2,
+        "lease_owner": null,
+        "lease_until": null,
+        "error_code": "authority_changed",
+        "result_json": null,
+        "created_at": 2000,
+        "updated_at": 2001
+      },
+      {
+        "job_id": "running",
+        "scope_id": "scope-1",
+        "goal_id": "goal-1",
+        "kind": "legacy.running",
+        "idempotency_key": "running",
+        "payload_json": "{\"evidence_id\":\"evidence-1\"}",
+        "request_digest": "abbaaaf628a1e1220bd23bcc59c35d92f8b53553ed9612c04dcb8877e6c7e114",
+        "due_at": 1000,
+        "retry_mode": "reconcile",
+        "max_attempts": 3,
+        "status": "running",
+        "revision": 2,
+        "attempt": 1,
+        "authority_epoch": 2,
+        "fencing_token": 1,
+        "lease_owner": "current-owner",
+        "lease_until": 3001,
+        "error_code": null,
+        "result_json": null,
+        "created_at": 2001,
+        "updated_at": 2001
+      }
+    ],
+    "job_source_receipts": [
+      {
+        "source_id": "fixture.source",
+        "source_request_id": "request-original",
+        "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "job_id": "z-queued",
+        "request_identity_digest": "e0d22bf570a5b1806dec404365e37642ad6538c535ce22121d5875e04b8c967b",
+        "initial_due_at": 1000,
+        "max_attempts": 3,
+        "accepted_at": 1000
+      },
+      {
+        "source_id": "fixture.source",
+        "source_request_id": "request-retired",
+        "input_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "job_id": "retired",
+        "request_identity_digest": "79c9e47aee6f75b87e3bdc353109fb48ad4ce1b61277fbc06aef23e58d8cc42e",
+        "initial_due_at": 1000,
+        "max_attempts": 3,
+        "accepted_at": 1000
+      }
+    ],
+    "job_tombstones": [
+      {
+        "job_id": "retired",
+        "scope_id": "scope-1",
+        "idempotency_key": "retired",
+        "request_digest": "8c4393b37fa6b9207a8dc8bd7047b0f1a0b8370f47a34124baaa974eb8ed3c0f",
+        "terminal_status": "succeeded",
+        "revision": 3
+      }
+    ],
+    "job_triggers": [
+      {
+        "trigger_id": "original-trigger",
+        "definition_json": "{\"goal_id\":\"goal-1\",\"kind\":\"legacy.trigger\",\"max_attempts\":3,\"payload\":{\"original\":true},\"retry_mode\":\"reconcile\",\"schedule\":null,\"scope_id\":\"scope-1\",\"trigger_id\":\"original-trigger\"}",
+        "definition_digest": "5303fe6a0f5af64056aacd559aacddb61a71850063282d28916238be21b8313e",
+        "revision": 1,
+        "enabled": 1,
+        "next_due_at": null,
+        "last_due_at": null,
+        "created_at": 2000,
+        "updated_at": 2000
+      }
+    ],
+    "job_trigger_occurrences": [
+      {
+        "trigger_id": "original-trigger",
+        "occurrence_id": "event:original-event",
+        "occurrence_digest": "e0828c42dac3af9cbd0718f27c57201c3e7d6f7b70cfb09e8e1c8488aa8f61d7",
+        "job_id": "job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c",
+        "created_at": 2000
+      }
+    ],
+    "job_attempts": [
+      {
+        "job_id": "retired",
+        "attempt": 1,
+        "authority_epoch": 1,
+        "fencing_token": 1,
+        "owner_id": "old-owner",
+        "started_at": 1000,
+        "lease_until": 1100,
+        "finished_at": 1001,
+        "status": "succeeded",
+        "error_code": null
+      },
+      {
+        "job_id": "receipt",
+        "attempt": 1,
+        "authority_epoch": 1,
+        "fencing_token": 1,
+        "owner_id": "proof-owner",
+        "started_at": 1000,
+        "lease_until": 1100,
+        "finished_at": 1200,
+        "status": "succeeded",
+        "error_code": null
+      },
+      {
+        "job_id": "unknown",
+        "attempt": 1,
+        "authority_epoch": 1,
+        "fencing_token": 1,
+        "owner_id": "unknown-owner",
+        "started_at": 2000,
+        "lease_until": 3000,
+        "finished_at": 2001,
+        "status": "unknown",
+        "error_code": "authority_changed"
+      },
+      {
+        "job_id": "running",
+        "attempt": 1,
+        "authority_epoch": 2,
+        "fencing_token": 1,
+        "owner_id": "current-owner",
+        "started_at": 2001,
+        "lease_until": 3001,
+        "finished_at": null,
+        "status": "running",
+        "error_code": null
+      }
+    ],
+    "job_reconciliations": [
+      {
+        "source_id": "fixture.receiver",
+        "evidence_id": "original-proof",
+        "evidence_digest": "5caa4cd75fd9bcd09a9da5dd84d5a7a374a4c375bc2cc5f9b90775d2bfda7d11",
+        "job_id": "receipt",
+        "attempt": 1,
+        "accepted_revision": 4,
+        "accepted_at": 1200
+      }
+    ],
+    "job_outbox": [
+      {
+        "event_id": "2db4d554ab21f4c1ce56aeec7238d1145b976dcb04cc61a37e78e1ef5b570820",
+        "job_id": "z-queued",
+        "revision": 1,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"2db4d554ab21f4c1ce56aeec7238d1145b976dcb04cc61a37e78e1ef5b570820\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"z-queued\",\"kind\":\"test.reconcile\",\"result\":null,\"revision\":1,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":1000}",
+        "created_at": 1000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "775d1f70d113ca7ddb790601e13aa9c85dddd0fee2e01f998a21880d8fc6b01d",
+        "job_id": "receipt",
+        "revision": 1,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"775d1f70d113ca7ddb790601e13aa9c85dddd0fee2e01f998a21880d8fc6b01d\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"receipt\",\"kind\":\"legacy.receipt\",\"result\":null,\"revision\":1,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":1000}",
+        "created_at": 1000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "67a2a8614c88e8099dbcfa2712001fcec22515569e023cdda5d37d78509069fd",
+        "job_id": "receipt",
+        "revision": 2,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"67a2a8614c88e8099dbcfa2712001fcec22515569e023cdda5d37d78509069fd\",\"fencing_token\":1,\"goal_id\":\"goal-1\",\"job_id\":\"receipt\",\"kind\":\"legacy.receipt\",\"result\":null,\"revision\":2,\"scope_id\":\"scope-1\",\"status\":\"running\",\"updated_at\":1000}",
+        "created_at": 1000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "5ce3f5b04d8f2b290f91351debeeef99719c5702dcd14f62753d6572f0895938",
+        "job_id": "receipt",
+        "revision": 3,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":1,\"error_code\":\"lease_expired\",\"event_id\":\"5ce3f5b04d8f2b290f91351debeeef99719c5702dcd14f62753d6572f0895938\",\"fencing_token\":2,\"goal_id\":\"goal-1\",\"job_id\":\"receipt\",\"kind\":\"legacy.receipt\",\"result\":null,\"revision\":3,\"scope_id\":\"scope-1\",\"status\":\"unknown\",\"updated_at\":1200}",
+        "created_at": 1200,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "7f3eba76e8ed74acf6491e9f378067c4011f032e3bf48c6f4981ae72b5aa2b83",
+        "job_id": "receipt",
+        "revision": 4,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"7f3eba76e8ed74acf6491e9f378067c4011f032e3bf48c6f4981ae72b5aa2b83\",\"fencing_token\":2,\"goal_id\":\"goal-1\",\"job_id\":\"receipt\",\"kind\":\"legacy.receipt\",\"result\":{\"original\":true},\"revision\":4,\"scope_id\":\"scope-1\",\"status\":\"succeeded\",\"updated_at\":1200}",
+        "created_at": 1200,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "05270e7e4393754dd166425aed19e68d99f0bc9f5dc2af6af6605744ed429cf8",
+        "job_id": "job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c",
+        "revision": 1,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"05270e7e4393754dd166425aed19e68d99f0bc9f5dc2af6af6605744ed429cf8\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c\",\"kind\":\"legacy.trigger\",\"result\":null,\"revision\":1,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":2000}",
+        "created_at": 2000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "15d4309f892c42f0db4261e43ed6863981f020f01873cddb3c7675bc85547a55",
+        "job_id": "unknown",
+        "revision": 1,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"15d4309f892c42f0db4261e43ed6863981f020f01873cddb3c7675bc85547a55\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"unknown\",\"kind\":\"legacy.unknown\",\"result\":null,\"revision\":1,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":2000}",
+        "created_at": 2000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "c69337a9c55f3c08a0a68328d377116a49748637ffa62206af18a5ee59087c89",
+        "job_id": "unknown",
+        "revision": 2,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":1,\"error_code\":null,\"event_id\":\"c69337a9c55f3c08a0a68328d377116a49748637ffa62206af18a5ee59087c89\",\"fencing_token\":1,\"goal_id\":\"goal-1\",\"job_id\":\"unknown\",\"kind\":\"legacy.unknown\",\"result\":null,\"revision\":2,\"scope_id\":\"scope-1\",\"status\":\"running\",\"updated_at\":2000}",
+        "created_at": 2000,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "826f048d81a153aa7564ce79a2bf8e7b32066fe2b17eb60d510ad84114e3e940",
+        "job_id": "z-queued",
+        "revision": 2,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":2,\"error_code\":null,\"event_id\":\"826f048d81a153aa7564ce79a2bf8e7b32066fe2b17eb60d510ad84114e3e940\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"z-queued\",\"kind\":\"test.reconcile\",\"result\":null,\"revision\":2,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":2001}",
+        "created_at": 2001,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "04b9494af4fbfafe596e9ff52726ce33c2caa13cdc3b5be3076473bd433b55b1",
+        "job_id": "job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c",
+        "revision": 2,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":2,\"error_code\":null,\"event_id\":\"04b9494af4fbfafe596e9ff52726ce33c2caa13cdc3b5be3076473bd433b55b1\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"job-f81f4796a08e2ae46616d5ac90f95eab22b9a9c71d8a217927e765d4ae5bd14c\",\"kind\":\"legacy.trigger\",\"result\":null,\"revision\":2,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":2001}",
+        "created_at": 2001,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "5aaad66384fa58358980827b0ad9b5fc589eaed40f3549cd62c7738156d679c5",
+        "job_id": "unknown",
+        "revision": 3,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":2,\"error_code\":\"authority_changed\",\"event_id\":\"5aaad66384fa58358980827b0ad9b5fc589eaed40f3549cd62c7738156d679c5\",\"fencing_token\":2,\"goal_id\":\"goal-1\",\"job_id\":\"unknown\",\"kind\":\"legacy.unknown\",\"result\":null,\"revision\":3,\"scope_id\":\"scope-1\",\"status\":\"unknown\",\"updated_at\":2001}",
+        "created_at": 2001,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "279f4a9fbdc4b3c75d791a7d94eaa5ca729873e9ce012d8bec81a5f2f525bc4e",
+        "job_id": "running",
+        "revision": 1,
+        "event_json": "{\"attempt\":0,\"authority_epoch\":2,\"error_code\":null,\"event_id\":\"279f4a9fbdc4b3c75d791a7d94eaa5ca729873e9ce012d8bec81a5f2f525bc4e\",\"fencing_token\":0,\"goal_id\":\"goal-1\",\"job_id\":\"running\",\"kind\":\"legacy.running\",\"result\":null,\"revision\":1,\"scope_id\":\"scope-1\",\"status\":\"queued\",\"updated_at\":2001}",
+        "created_at": 2001,
+        "acknowledged_at": null
+      },
+      {
+        "event_id": "82713bccf72534a1aef79c4ae1e20a85f2593f0067379702d437cf9ba9e41c95",
+        "job_id": "running",
+        "revision": 2,
+        "event_json": "{\"attempt\":1,\"authority_epoch\":2,\"error_code\":null,\"event_id\":\"82713bccf72534a1aef79c4ae1e20a85f2593f0067379702d437cf9ba9e41c95\",\"fencing_token\":1,\"goal_id\":\"goal-1\",\"job_id\":\"running\",\"kind\":\"legacy.running\",\"result\":null,\"revision\":2,\"scope_id\":\"scope-1\",\"status\":\"running\",\"updated_at\":2001}",
+        "created_at": 2001,
+        "acknowledged_at": null
+      }
+    ]
+  }
+}

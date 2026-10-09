@@ -17,12 +17,13 @@ App 注册 handler 并显式驱动 `JobScheduler.runDue`；handler 接收 AbortS
 `JobController.catalog` 从实际注册形成 kind/retry-policy 快照，不枚举计划中的 handler；停机后
 拒绝新注册。App 可撤销注册，在途仍按原 lease 排空；限定 kind 的 Scheduler 在 claim 前及
 接纳 await 后复验注册，缺失不消耗 attempt，待办仍留在原持久源。
-可按 kind 注入中立 `JobAdmissionPort`：`listDue` 在当前 authority 下按稳定 Job ID 有界分页，
+可按 kind 注入中立 `JobAdmissionPort`：`listDueScan` 在当前 authority 下按持久接纳序号有界分页，
 接纳 await 不持有 SQL 事务；严格 eligible 后以候选 ID/revision CAS claim，取消/竞争更新/切代
-不能将旧判断用于另一 Job。等待项仍推进 cursor；每轮固定当前 due 集合最大 ID 为上界，
-达到上界或读到短页即回绕，持续新增更高 ID 不延长这一轮。上界内新到期项可进入当前轮，
-游标之前的新增项在后续轮读取；这不是固定成员快照，不修改 due/attempt/重试预算，
-也不按跨进程可能回拨的时钟划定入队批次。
+不能将旧判断用于另一 Job。admission 扫描按同一 enqueue 事务分配的持久单调序号前进，
+每轮固定当前 due 集合最大接纳序号为上界，达到上界或短/空页即回绕。新接纳项必定在
+当前界限之外，不论 ID 长度、分布或墙钟回拨均不能无限延长这一轮；先前已存在而刚到期
+的项可进入该有限区间。序号计数器不随 retention 下降，重复接纳不再分配；不复制全库
+到内存、不修改 due/attempt/重试预算。序号只用于 Jobs 私有扫描，不进入 Job、outbox 或公开投影。
 每轮最多扫描 limit 项；该检查不是执行授权，业务 handler 必须再次核验自己的真实政策。
 取消先持久撤销租约，再通知在途 handler，晚到结果无法覆写终态。停止 controller 时拒绝新执行并等待
 在途 handler 收尾，之后才能关闭 store。handler 必须合作响应取消；Host 的超时回收不属于本包。
@@ -53,9 +54,20 @@ UTC once/interval 调度显式选择 all/latest backlog 政策；每次最多 ma
 retention 仅清理已无待 ACK outbox 的 succeeded/cancelled/dead-letter 大记录和已 ACK 事件，
 保留去重 tombstone、源接纳最小快照、occurrence、最小 attempt 与证据摘要；unknown 不自动删除。
 源快照不复制领域 payload，不要求源 ACK 确认来解除 body 清理；清理后重投仍返回原 tombstone。
-源快照存在但 Job/tombstone 缺失则拒绝重新生成工作。schema version 4 不兼容时拒绝打开，旧候选
-v1/v2/v3 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
+源快照存在但 Job/tombstone 缺失则拒绝重新生成工作。schema version 5 不兼容时拒绝打开，旧候选
+v1/v2/v3/v4 库需显式迁移，不把用户旧数据库当成空库。产品数据路径由后续 Host composition 接线决定，
 本切片不会创建生产数据库或迁移 Memory 库。
+
+`copyJobStoreForAdmissionOrderMigration(sourcePath, candidatePath)` 是 v4→v5 的显式离线复制
+入口：调用者先停止全部源写入，保持停写直到受控切换；SQLite backup 包含已提交 WAL，
+但不负责纳入快照之后的写入。复制期间同一源连接的 data_version 变化会拒绝候选；该检查
+不替代停写纪律，完成复制后任何源写入也会令候选过期，切换前必须重新离线复制/复核。
+源库只读保留为恢复来源，目标必须新路径且不自动切换 App。
+候选在单事务重建相同约束的 jobs 表，原 identity/revision/epoch/attempt/lease/source receipt/
+tombstone/trigger/outbox/对账事实不变；仅按 `(created_at, job_id)` 为旧快照分配有限确定顺序，
+不宣称恢复历史 FIFO。失败保留候选供诊断，不覆盖它重跑；使用另一新路径重试。
+未知 owner/schema/额外对象拒绝迁移。操作与恢复见[数据迁移与恢复](../../docs/guides/operations/数据迁移与恢复.md)，
+全部产品旧数据切换仍须 P14A 验收，原 v1/v2/v3 不由这个入口猜测升级。
 
 `listProjection` 在当前 authority 下按精确 scope 与稳定 Job ID 有界读取保留中的 Job 元数据，
 不读取/公开 payload、result、lease owner 或证据正文；待 ACK 状态来自真实 outbox。

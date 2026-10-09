@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B.4：继续解决通用任意长ID在(cursor,boundary]持续插入的公平性限制；task正文要求分页公平，不缩成高ID单一场景。已完成本轮高于固定上界的新增不阻止回绕与Jobs终态prune后原Planning通知/Delivery确认恢复子链，准备逻辑中文提交，输入a7463fb7+本任务dirty，唯一writer本会话。Jobs52有效(4files51+仅新增query间epoch/publicAPI26，其余26复用)，Host反馈3+坏wire8输入有效复用、新pruned-restart1PASS；后者真实源inbox/ACK后prune、两库重开，Store直接重投tombstone/null/原attempt、不新claim、原Prepare恢复、真实Delivery确认、撤销再重开幂等一帧，不冒充Worker因ACK丢失重投。两包typecheck/Jobsbuild/docswrite/架构/编码/diffPASS；独立只读复核无本轮代码阻塞，fairness通用限制未关闭。当前无后台，未推送。候选提交后可研究Jobs owner单调接纳顺序及受控迁移/备份恢复，避免ROWID复用或墙钟假设、无界全量内存快照，不随意新增兼容壳；实际source为固定hex64。P07B整体in-progress，B04/D04整体与根大型/产品UI/旧队列切换待后续。
+下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B.5：在本轮单调接纳顺序/离线复制迁移逻辑提交的固定候选上，收束P07B全步骤定向证据和独立只读复核，然后按固定顺序转P02A；整体final门不随任务accepted提前关闭。输入f20aac84+本任务dirty，唯一writer本会话；Jobs77有效(76完整模块+仅新增compiled迁移/21，其余56复用)，Host真实链29PASS，Jobs/Hosttypecheck/Jobsbuild、docswrite/targetwrite/架构/编码/diff/工具15PASS。v5同事务单调seq固定有限round已关闭任意ID区间插入饿死；duplicate不分配/prune不降/maxsafe耗尽失败，seq不进Job/事件/投影。v4只读SQLite一致复制新候选，不覆盖/不自动App切换；全v4/v5DDL和原九窗口保留，含WAL/latecommit拒绝/故障rollback/源SHA恢复。冻结原v4.sql随migrations制品，API仅2路径；新文件只增Jobs精确清单/映射及派生锁，不改变架构根/边界/目标。独立审查必要问题已修复，待固定候选最后复核；当前无后台/未推送。原v1/v2/v3与全域/产品原子切换归P14A，B04/D04整体与根大型/产品UI/旧队列切换仍未验。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

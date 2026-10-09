@@ -9,11 +9,17 @@ CREATE TABLE jobs(
   authority_epoch INTEGER NOT NULL, fencing_token INTEGER NOT NULL CHECK(fencing_token>=0),
   lease_owner TEXT, lease_until INTEGER, error_code TEXT, result_json TEXT,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+  enqueue_sequence INTEGER NOT NULL CHECK(enqueue_sequence>0 AND enqueue_sequence<=9007199254740991),
   UNIQUE(scope_id,idempotency_key),
   CHECK((status='running' AND lease_owner IS NOT NULL AND lease_until IS NOT NULL)
     OR (status<>'running' AND lease_owner IS NULL AND lease_until IS NULL))
 );
 CREATE INDEX jobs_due ON jobs(status,due_at,created_at);
+CREATE UNIQUE INDEX jobs_enqueue_sequence ON jobs(enqueue_sequence);
+-- 独立于墙钟和可复用 ROWID；终态清理不能倒退接纳序号。
+CREATE TABLE job_enqueue_sequence(singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+  last_sequence INTEGER NOT NULL CHECK(last_sequence>=0 AND last_sequence<=9007199254740991));
+INSERT INTO job_enqueue_sequence VALUES(1,0);
 -- 源接纳与 Job 同事务；仅保留摘要/原政策，ACK 丢失及 retention 后不重新分配工作。
 CREATE TABLE job_source_receipts(
   source_id TEXT NOT NULL, source_request_id TEXT NOT NULL, input_digest TEXT NOT NULL,
@@ -57,5 +63,5 @@ CREATE TABLE job_outbox(
   UNIQUE(job_id,revision)
 );
 CREATE INDEX job_outbox_pending ON job_outbox(acknowledged_at,created_at,job_id,revision);
-PRAGMA user_version=4;
+PRAGMA user_version=5;
 PRAGMA application_id=0x47434a42;

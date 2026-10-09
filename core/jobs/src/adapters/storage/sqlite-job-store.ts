@@ -4,13 +4,13 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { JobAuthorityError, JobConflictError, validateJobRequest, type Job, type JobAttempt,
   type JobReconciliationEvidence, type JobReconciliationReceipt, type JobRequest, type JobStateEvent, type JobProjection } from '../../execution/job.js';
-import type { JobClaim, JobClaimCandidate, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
+import type { JobClaim, JobClaimCandidate, JobDueScanEntry, JobFinish, JobSource, JobStorePort, JobSubmission } from '../../ports/job-store-port.js';
 import { retryDelay, type RetryPolicy } from '../../recovery/retry-policy.js';
 import { validateLeaseWindow, type JobLease } from '../../scheduling/job-lease.js';
 import { initialScheduleDue, scheduledOccurrence } from '../../scheduling/schedule.js';
 import { validateTriggerDefinition, type JobTrigger, type JobTriggerDefinition, type JobTriggerEvent } from '../../triggers/trigger.js';
 
-type JobRow = Omit<Job, 'payload' | 'result'> & { payload_json: string; result_json: string | null; request_digest: string };
+type JobRow = Omit<Job, 'payload' | 'result'> & { payload_json: string; result_json: string | null; request_digest: string; enqueue_sequence: number };
 type Tombstone = { job_id: string; scope_id: string; idempotency_key: string; request_digest: string; revision: number };
 type TriggerRow = Omit<JobTrigger, 'definition' | 'enabled'> & {
   trigger_id: string; definition_json: string; definition_digest: string; enabled: number;
@@ -50,17 +50,33 @@ export class SqliteJobStore implements JobStorePort {
           throw new Error('未知 Jobs 数据库；须先执行受控迁移');
         }
         this.database.transaction(() => this.database.exec(readFileSync(migrationPath, 'utf8'))).immediate();
-      } else if (version !== 4) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
+      } else if (version !== 5) throw new Error('Jobs schema version 不兼容；须先执行受控迁移');
       if (this.database.pragma('application_id', { simple: true }) !== 0x47434a42) {
         throw new Error('Jobs 数据库 owner 标记无效');
       }
       this.database.prepare('SELECT epoch FROM job_authority').all();
-      this.database.prepare('SELECT job_id,request_digest,status,fencing_token FROM jobs LIMIT 0').all();
+      this.database.prepare('SELECT job_id,request_digest,status,fencing_token,enqueue_sequence FROM jobs LIMIT 0').all();
+      const jobColumns = (this.database.pragma('table_info(jobs)') as { name: string }[]).map(column => column.name);
+      if (jobColumns.join(',') !== 'job_id,scope_id,goal_id,kind,idempotency_key,payload_json,request_digest,due_at,retry_mode,max_attempts,status,revision,attempt,authority_epoch,fencing_token,lease_owner,lease_until,error_code,result_json,created_at,updated_at,enqueue_sequence') {
+        throw new JobConflictError('Jobs Job 行结构无效；拒绝公开未知存储字段');
+      }
       this.database.prepare('SELECT definition_json,next_due_at FROM job_triggers LIMIT 0').all();
       this.database.prepare('SELECT job_id,attempt,authority_epoch,fencing_token FROM job_attempts LIMIT 0').all();
       this.database.prepare('SELECT source_id,evidence_id,evidence_digest FROM job_reconciliations LIMIT 0').all();
       this.database.prepare('SELECT event_id,event_json,acknowledged_at FROM job_outbox LIMIT 0').all();
       this.database.prepare('SELECT source_id,source_request_id,input_digest,job_id,request_identity_digest,initial_due_at,max_attempts,accepted_at FROM job_source_receipts LIMIT 0').all();
+      const sequence = this.database.prepare('SELECT singleton,last_sequence FROM job_enqueue_sequence').all() as { singleton: number; last_sequence: number }[];
+      const order = this.database.prepare('SELECT COUNT(*) AS count,COUNT(DISTINCT enqueue_sequence) AS unique_count,MIN(enqueue_sequence) AS first,MAX(enqueue_sequence) AS last FROM jobs')
+        .get() as { count: number; unique_count: number; first: number | null; last: number | null };
+      if (sequence.length !== 1 || sequence[0].singleton !== 1 || !Number.isSafeInteger(sequence[0].last_sequence)
+        || sequence[0].last_sequence < 0 || order.count !== order.unique_count
+        || order.first !== null && (!Number.isSafeInteger(order.first) || order.first < 1)
+        || order.last !== null && (!Number.isSafeInteger(order.last) || order.last > sequence[0].last_sequence)) {
+        throw new JobConflictError('Jobs 接纳顺序持久依据无效');
+      }
+      if (this.database.prepare("SELECT job_id FROM jobs WHERE typeof(enqueue_sequence)<>'integer' OR enqueue_sequence<1 OR enqueue_sequence>9007199254740991 LIMIT 1").get()) {
+        throw new JobConflictError('Jobs 接纳顺序持久依据无效');
+      }
       this.database.pragma('foreign_keys = ON');
       this.database.pragma('journal_mode = WAL');
     } catch (error) { this.database.close(); throw error; }
@@ -115,10 +131,14 @@ export class SqliteJobStore implements JobStorePort {
         this.assertSameRequest(retired[0], request, digest);
         return { job: null, job_id: retired[0].job_id, revision: retired[0].revision, duplicate: true };
       }
+      const counter = this.database.prepare(`UPDATE job_enqueue_sequence SET last_sequence=last_sequence+1
+        WHERE singleton=1 AND last_sequence>=0 AND last_sequence<9007199254740991 RETURNING last_sequence`)
+        .get() as { last_sequence: number } | undefined;
+      if (!counter || !Number.isSafeInteger(counter.last_sequence)) throw new JobConflictError('Jobs 接纳顺序耗尽或损坏');
       this.database.prepare(`INSERT INTO jobs(job_id,scope_id,goal_id,kind,idempotency_key,payload_json,request_digest,
-        due_at,retry_mode,max_attempts,status,revision,attempt,authority_epoch,fencing_token,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,'queued',1,0,?,0,?,?)`).run(request.job_id, request.scope_id, request.goal_id, request.kind,
-          request.idempotency_key, payload, digest, request.due_at, request.retry_mode, request.max_attempts, epoch, now, now);
+        due_at,retry_mode,max_attempts,status,revision,attempt,authority_epoch,fencing_token,created_at,updated_at,enqueue_sequence)
+        VALUES(?,?,?,?,?,?,?,?,?,?,'queued',1,0,?,0,?,?,?)`).run(request.job_id, request.scope_id, request.goal_id, request.kind,
+          request.idempotency_key, payload, digest, request.due_at, request.retry_mode, request.max_attempts, epoch, now, now, counter.last_sequence);
       this.appendState(request.job_id);
       return { job: this.load(request.job_id)!, job_id: request.job_id, revision: 1, duplicate: false };
     }).immediate();
@@ -212,30 +232,42 @@ export class SqliteJobStore implements JobStorePort {
     }).deferred();
   }
 
-  public readDueBoundary(epoch: number, kind: string, now: number): string | null {
+  public readDueBoundary(epoch: number, kind: string, now: number): number | null {
     assertTimestamp(now);
     if (!kind.trim()) throw new JobConflictError('Job due 接纳 kind 无效');
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
-      const row = this.database.prepare(`SELECT job_id FROM jobs WHERE status IN ('queued','retry_wait')
-        AND kind=? AND due_at<=? AND attempt<max_attempts ORDER BY job_id DESC LIMIT 1`)
-        .get(kind, now) as { job_id: string } | undefined;
-      return row?.job_id ?? null;
+      const row = this.database.prepare(`SELECT enqueue_sequence FROM jobs WHERE status IN ('queued','retry_wait')
+        AND kind=? AND due_at<=? AND attempt<max_attempts ORDER BY enqueue_sequence DESC LIMIT 1`)
+        .get(kind, now) as { enqueue_sequence: number } | undefined;
+      return row?.enqueue_sequence ?? null;
     }).deferred();
   }
 
-  public listDue(epoch: number, kind: string, now: number, limit: number, afterJobId = '', throughJobId?: string): Job[] {
+  public listDueScan(epoch: number, kind: string, now: number, limit: number, afterSequence: number, throughSequence: number): JobDueScanEntry[] {
     assertTimestamp(now);
-    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || typeof afterJobId !== 'string'
-      || (throughJobId !== undefined && (typeof throughJobId !== 'string' || !throughJobId))) {
+    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000
+      || !Number.isSafeInteger(afterSequence) || afterSequence < 0 || !Number.isSafeInteger(throughSequence)
+      || throughSequence < 1 || afterSequence > throughSequence) throw new JobConflictError('Jobs 接纳分页范围无效');
+    return this.database.transaction(() => {
+      this.assertAuthority(epoch);
+      const rows = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait')
+        AND kind=? AND due_at<=? AND attempt<max_attempts AND enqueue_sequence>? AND enqueue_sequence<=?
+        ORDER BY enqueue_sequence LIMIT ?`).all(kind, now, afterSequence, throughSequence, limit) as JobRow[];
+      return rows.map(row => ({ job: this.decode(row), sequence: row.enqueue_sequence }));
+    }).deferred();
+  }
+
+  public listDue(epoch: number, kind: string, now: number, limit: number, afterJobId = ''): Job[] {
+    assertTimestamp(now);
+    if (!kind.trim() || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000 || typeof afterJobId !== 'string') {
       throw new JobConflictError('Job due 接纳扫描范围无效');
     }
     return this.database.transaction(() => {
       this.assertAuthority(epoch);
-      const upper = throughJobId === undefined ? '' : 'AND job_id<=?';
       const rows = this.database.prepare(`SELECT * FROM jobs WHERE status IN ('queued','retry_wait')
-        AND kind=? AND due_at<=? AND attempt<max_attempts AND job_id>? ${upper} ORDER BY job_id LIMIT ?`)
-        .all(kind, now, afterJobId, ...(throughJobId === undefined ? [] : [throughJobId]), limit) as JobRow[];
+        AND kind=? AND due_at<=? AND attempt<max_attempts AND job_id>? ORDER BY job_id LIMIT ?`)
+        .all(kind, now, afterJobId, limit) as JobRow[];
       return rows.map(row => this.decode(row));
     }).deferred();
   }
@@ -574,7 +606,7 @@ export class SqliteJobStore implements JobStorePort {
   }
 
   private decode(row: JobRow): Job {
-    const { payload_json, result_json, request_digest: digest, ...job } = row;
+    const { payload_json, result_json, request_digest: digest, enqueue_sequence: sequence, ...job } = row;
     return { ...job, payload: JSON.parse(payload_json), result: result_json === null ? null : JSON.parse(result_json) };
   }
 }

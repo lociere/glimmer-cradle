@@ -5,6 +5,8 @@ import type { JobTrigger, JobTriggerDefinition, JobTriggerEvent } from '../trigg
 
 export interface JobClaim { readonly job: Job; readonly lease: JobLease; }
 export type JobClaimCandidate = Pick<Job, 'job_id' | 'revision'>;
+/** Jobs 私有接纳扫描位置；不是 Job 身份、状态 revision 或公开 projection。 */
+export interface JobDueScanEntry { readonly job: Job; readonly sequence: number; }
 /** producer 的不可变源信封摘要；Jobs 不解释其中的领域含义。 */
 export interface JobSource { readonly source_id: string; readonly source_request_id: string; readonly input_digest: string; }
 export interface JobSubmission {
@@ -31,10 +33,11 @@ export interface JobStorePort {
   listProjection(epoch: number, scopeId: string, limit: number, afterJobId?: string): JobProjection[];
   /** 有界、稳定分页；App 选择已注册的 kind，不从内存 task 列表猜测恢复集合。 */
   listUnknown(epoch: number, kind: string, limit: number, afterJobId?: string): Job[];
-  /** 接纳扫描按 job_id 稳定分页；读快照不消耗 attempt，claim 时须重验 revision。 */
-  listDue(epoch: number, kind: string, now: number, limit: number, afterJobId?: string, throughJobId?: string): Job[];
-  /** 固定本轮键区间上界，持续新增更高 ID 不得无限延长等待项回绕。 */
-  readDueBoundary(epoch: number, kind: string, now: number): string | null;
+  /** 按 job_id 只读限量待办/诊断；不消耗 attempt，也不授予业务接纳或执行资格。 */
+  listDue(epoch: number, kind: string, now: number, limit: number, afterJobId?: string): Job[];
+  /** 固定本轮接纳序号上界，新 Job 不得延长当前轮，序号不随 retention 或墙钟倒退。 */
+  readDueBoundary(epoch: number, kind: string, now: number): number | null;
+  listDueScan(epoch: number, kind: string, now: number, limit: number, afterSequence: number, throughSequence: number): JobDueScanEntry[];
   listAttempts(jobId: string): JobAttempt[];
   reconcile(evidence: JobReconciliationEvidence, epoch: number, expectedRevision: number, now: number,
     policy: RetryPolicy): JobReconciliationReceipt;

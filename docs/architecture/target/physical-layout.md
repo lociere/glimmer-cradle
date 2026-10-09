@@ -165,7 +165,7 @@ C# SDK 与 Unity UPM 包是两种交付载体，不要求 Unity 直接消费不�
 
 <!-- target-layout:start -->
 
-精确登记 1121 个版本控制文件、339 个父目录。以下是目标，不是当前实物。
+精确登记 1126 个版本控制文件、339 个父目录。以下是目标，不是当前实物。
 
 ```text
 glimmer-cradle/
@@ -893,13 +893,16 @@ glimmer-cradle/
 │   ├── jobs/
 │   │   ├── README.md
 │   │   ├── migrations/
-│   │   │   └── 001-jobs.sql
+│   │   │   ├── 000-jobs-v4.sql
+│   │   │   ├── 001-jobs.sql
+│   │   │   └── 002-admission-order.sql
 │   │   ├── package.json
 │   │   ├── schemas/
 │   │   │   └── jobs-config.schema.json
 │   │   ├── src/
 │   │   │   ├── adapters/
 │   │   │   │   └── storage/
+│   │   │   │       ├── sqlite-job-migration.ts
 │   │   │   │       └── sqlite-job-store.ts
 │   │   │   ├── execution/
 │   │   │   │   ├── cancellation.ts
@@ -922,10 +925,12 @@ glimmer-cradle/
 │   │   │       ├── trigger-controller.ts
 │   │   │       └── trigger.ts
 │   │   ├── tests/
+│   │   │   ├── admission-order.test.ts
 │   │   │   ├── cancellation-retention.test.ts
 │   │   │   ├── duplicate-trigger.test.ts
 │   │   │   ├── fixtures/
-│   │   │   │   └── job.json
+│   │   │   │   ├── job.json
+│   │   │   │   └── jobs-v4-records.json
 │   │   │   ├── lease-fencing.test.ts
 │   │   │   ├── public-api.test.ts
 │   │   │   └── restart-recovery.test.ts

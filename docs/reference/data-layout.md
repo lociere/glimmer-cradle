@@ -72,11 +72,14 @@ CLI 的局部配置装配测试使用临时 DataRoot，不代表产品默认入�
 完整跨 owner 恢复验证仍归阶段 14，不能仅凭新库初始化宣称恢复可用。
 
 配置启动入口拥有 `${DataRoot}/state/jobs/jobs.sqlite` 的 `SqliteJobStore`，但尚未由产品默认
-Host 创建生产用户库。其 schema version 4/owner 标记、Job/lease/原 attempt、
+Host 创建生产用户库。其 schema version 5/owner 标记、Job/lease/原 attempt、
 对账证据摘要、待 ACK 状态 outbox 与去重 tombstone 独立于 Memory；retention 不删除未投递事件或
 unknown，清理终态后仍保留最小身份/审计。`job_source_receipts` 同事务保存 producer/request ID、
 源与业务摘要、稳定 Job ID、首次 due/预算和接纳时间，不复制领域 payload；终态 body 清理不删除
-源快照，重投用首次政策验证原 tombstone。旧候选 v1/v2/v3 拒绝隐式升级，不能对旧 Memory 数据库
+源快照，重投用首次政策验证原 tombstone。内部接纳序号在 enqueue 同事务单调分配，counter
+不随 body retention 下降，不进入公开 Job/事件/投影；扫描按固定轮次上界保持公平，与 ID/墙钟无关。
+旧候选 v1/v2/v3/v4 拒绝隐式升级，v4 用 Jobs 的显式离线复制入口创建新候选并保留原库，操作
+与恢复见[数据迁移与恢复](../guides/operations/数据迁移与恢复.md)。不能对旧 Memory 数据库
 直接应用 Jobs migration。产品入口切换、备份切点和跨库恢复仍须后续验证，参见
 [迁移地图](../roadmap/initiatives/architecture-v2/migration-map.md)。
 

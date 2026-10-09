@@ -145,7 +145,7 @@ describe('Jobs public API', () => {
       expect(store.load('a')).toMatchObject({ status: 'queued', attempt: 0, due_at: 1000 });
       if (mode === 'cancelled-boundary') producer.cancel('m', 1, producer.load('m')!.revision, 1000);
       if (mode === 'new-inside') producer.enqueue({ ...request, job_id: 'b', idempotency_key: 'b' }, 1, 1000);
-      for (let index = 0; index < (mode === 'new-inside' ? 2 : 1); index += 1) {
+      for (let index = 0; index < 1; index += 1) {
         producer.enqueue({ ...request, job_id: `z${index}`, idempotency_key: `z${index}` }, 1, 1000);
         expect(await scheduler.runDue(1)).toBe(0);
       }
@@ -153,12 +153,13 @@ describe('Jobs public API', () => {
       producer.enqueue({ ...request, job_id: 'z9', idempotency_key: 'z9' }, 1, 1000);
       expect(await scheduler.runDue(1)).toBe(1);
       expect(executed).toEqual(['a']);
-      expect(checked).toEqual(mode === 'cancelled-boundary' ? ['a', 'a'] : mode === 'new-inside' ? ['a', 'b', 'm', 'a'] : ['a', 'm', 'a']);
+      expect(checked).toEqual(mode === 'cancelled-boundary' ? ['a', 'a'] : ['a', 'm', 'a']);
+      if (mode === 'new-inside') expect(store.load('b')).toMatchObject({ status: 'queued', attempt: 0 });
       expect(store.load('z0')).toMatchObject({ status: 'queued', attempt: 0 });
       expect(store.listAttempts('a')).toHaveLength(1);
       expect(() => store.readDueBoundary(0, request.kind, 1000)).toThrow();
       expect(() => store.readDueBoundary(1, '', 1000)).toThrow();
-      expect(() => store.listDue(1, request.kind, 1000, 1, '', '')).toThrow();
+      expect(() => store.listDueScan(1, request.kind, 1000, 1, 0, 0)).toThrow();
     } finally { await controller.stop(); store.close(); producer.close(); }
   });
 

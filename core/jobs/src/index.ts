@@ -1,11 +1,12 @@
 export { SqliteJobStore } from './adapters/storage/sqlite-job-store.js';
+export { copyJobStoreForAdmissionOrderMigration } from './adapters/storage/sqlite-job-migration.js';
 export { JobController } from './execution/job-controller.js';
 export { JobCancellationController } from './execution/cancellation.js';
 export { JobAuthorityError, JobConflictError, JobLeaseLostError } from './execution/job.js';
 export type { Job, JobAttempt, JobProjection, JobReconciliationEvidence, JobReconciliationReceipt, JobRequest, JobRetryMode, JobStateEvent, JobStatus } from './execution/job.js';
 export type { JobExecutionContext, JobHandlerPort, JobHandlerResult, JobAdmissionPort, JobReconciliationPort, JobStateReceiverPort } from './execution/job-handler-port.js';
 export type { JobClockPort } from './ports/clock-port.js';
-export type { JobClaim, JobClaimCandidate, JobFinish, JobStorePort, JobSubmission, JobSource } from './ports/job-store-port.js';
+export type { JobClaim, JobClaimCandidate, JobDueScanEntry, JobFinish, JobStorePort, JobSubmission, JobSource } from './ports/job-store-port.js';
 export { JobRecoveryController } from './recovery/recovery-controller.js';
 export { JobRetentionController } from './recovery/retention.js';
 export { retryDelay } from './recovery/retry-policy.js';
