@@ -618,6 +618,19 @@ async def test_llm_gateway_fails_closed_without_or_for_unknown_provider() -> Non
         )
 
 
+@pytest.mark.parametrize("config", [None,
+    LLMSettings(api_type="local", api_key="fixture", models={"chat": "fixture"}),
+    LLMSettings(api_type="openai", models={"chat": "fixture"}),
+    LLMSettings(api_type="openai", api_key="fixture", models={})])
+async def test_llm_admission_configuration_matches_real_generate_rejection_without_network(config, monkeypatch):
+    from glimmer_cradle.cognition_worker.adapters import model_client
+    def network_forbidden(*_args, **_kwargs): raise AssertionError("配置接纳/拒绝不能访问网络")
+    monkeypatch.setattr(model_client.httpx, "AsyncClient", network_forbidden)
+    engine = LLMEngine(_model_settings(), config)
+    assert not engine.is_configured()
+    with pytest.raises(InferenceException): await engine.generate(ModelRequest(messages=[ModelMessage(role="user", content="fixture")]))
+
+
 async def test_multimodal_router_accepts_null_items_and_never_sends_audio_to_vision() -> None:
     settings = InferenceSettings(
         model=_model_settings(),
@@ -1140,6 +1153,78 @@ async def memory_job_service(service, tmp_path):
         await host.stop()
         await recorder.stop()
         await database.close()
+
+
+@pytest.mark.parametrize("fault", ["ready", "disabled", "model", "config", "salience", "unacked", "scope", "request", "job", "budget", "generation", "owner", "legacy", "unready", "stopping"])
+async def test_memory_admission_rpc_uses_original_source_and_live_owner_without_effects(memory_job_service, service, monkeypatch, fault):
+    import sqlite3
+
+    database, memory, coordinator, llm, _, _, _ = memory_job_service
+    host, channel, _, _ = service
+    source = (await coordinator.source_job_requests(limit=8))[0]
+    job_id = f"memory:{source.request_id}"
+    if fault != "unacked": coordinator.acknowledge_job_request(source, job_id)
+    request = cognition_pb.GetMemoryJobAdmissionRequest(call=_metadata("generation-1", "memory-admission"),
+        job_id=job_id, request_id=source.request_id, scope_id=source.input.scope_id)
+    if fault == "disabled": monkeypatch.setattr(coordinator, "_enabled", False)
+    elif fault == "model": monkeypatch.setattr(coordinator, "_llm", None)
+    elif fault == "config":
+        engine = LLMEngine(_model_settings(), LLMSettings(api_type="openai", api_key=None, models={"default": "fixture"}))
+        monkeypatch.setattr(coordinator, "_llm", engine)
+        monkeypatch.setattr(coordinator, "_model_available", engine.is_configured)
+    elif fault == "salience": monkeypatch.setattr(coordinator, "_minimum_salience", 1.0)
+    elif fault == "scope": request.scope_id = "foreign"
+    elif fault == "request": request.request_id = "invalid"
+    elif fault == "job": request.job_id = "foreign"
+    elif fault == "budget": request.call.trace_id = "x" * 16_384
+    elif fault == "generation": request.call.generation = "old"
+    elif fault == "owner": host._consolidation = None
+    elif fault == "legacy": monkeypatch.setattr(coordinator, "_jobs", ConsolidationJobRepository(database))
+    elif fault == "unready": host._readiness_tracker.mark_degraded("domain", "fixture")
+    elif fault == "stopping": host._readiness_tracker.begin_shutdown()
+    def snapshot():
+        result = []
+        for path in (database._db_path, coordinator._episodes._path):
+            with sqlite3.connect(path) as connection: result.append(tuple(connection.iterdump()))
+        return result
+    before = snapshot()
+    admission = _call(channel, "GetMemoryJobAdmission", cognition_pb.GetMemoryJobAdmissionRequest, cognition_pb.GetMemoryJobAdmissionResponse)
+    if fault in {"ready", "disabled", "model", "config", "salience"}:
+        result = await admission(request, timeout=2)
+        assert result.job_id == job_id and result.request_id == source.request_id and result.scope_id == source.input.scope_id
+        assert result.eligible == (fault == "ready")
+        assert result.reason_code == {"ready": "memory_ready", "disabled": "memory_disabled",
+            "model": "memory_model_unavailable", "config": "memory_model_unavailable", "salience": "memory_salience_below_threshold"}[fault]
+    else:
+        with pytest.raises(grpc.aio.AioRpcError) as rejected:
+            await admission(request, timeout=2)
+        detail = common_pb.ServiceErrorDetail.FromString(dict(rejected.value.trailing_metadata())["glimmer-error-bin"])
+        expected = (common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED if fault in {"unacked", "scope"} else
+            common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST if fault in {"request", "job", "budget"} else
+            common_pb.SERVICE_ERROR_CODE_GENERATION_MISMATCH if fault == "generation" else common_pb.SERVICE_ERROR_CODE_NOT_READY)
+        assert detail.code == expected
+    assert snapshot() == before and memory.count() == 0 and llm.calls == 0 and host._inflight == {}
+
+
+async def test_memory_admission_rpc_shutdown_drains_actual_inflight_read(memory_job_service, service, monkeypatch):
+    _, memory, coordinator, llm, _, _, _ = memory_job_service
+    host, channel, _, _ = service
+    source = (await coordinator.source_job_requests(limit=8))[0]
+    job_id = f"memory:{source.request_id}"
+    coordinator.acknowledge_job_request(source, job_id)
+    entered = asyncio.Event()
+    async def delayed(**_kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+    monkeypatch.setattr(coordinator, "job_admission_reason", delayed)
+    admission = _call(channel, "GetMemoryJobAdmission", cognition_pb.GetMemoryJobAdmissionRequest, cognition_pb.GetMemoryJobAdmissionResponse)
+    call = admission(cognition_pb.GetMemoryJobAdmissionRequest(call=_metadata("generation-1", "memory-read-drain"),
+        job_id=job_id, request_id=source.request_id, scope_id=source.input.scope_id), timeout=5)
+    await asyncio.wait_for(entered.wait(), 2)
+    assert len(host._inflight) == 1
+    await host.stop()
+    with pytest.raises(grpc.aio.AioRpcError): await call
+    assert host._inflight == {} and llm.calls == 0 and memory.count() == 0
 
 
 async def test_memory_job_rpc_persists_original_identity_and_reconciles_after_reopen(memory_job_service):
@@ -2935,7 +3020,9 @@ async def _host_memory_job_fixture(root: Path, generation: str) -> None:
                 "summary": "事实", "evidence_moment_ids": [moment.moment_id]}]})
 
     coordinator = ConsolidationCoordinator(episodes=EpisodeProjection(root / "episodes.db", recorder),
-        memory=memory, jobs=None, llm=Llm(), clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
+        memory=memory, jobs=None, llm=None if generation == "memory-no-model" else Llm(),
+        clock=FixedClock(), ids=DeterministicIds(), observability=NullObservability())
+    if generation == "memory-disabled": coordinator._enabled = False
     await coordinator.start()
     await coordinator.consolidate(force_seal=True)
     planning = SqlitePlanningStore(root / "planning.sqlite")

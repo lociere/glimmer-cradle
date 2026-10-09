@@ -1474,6 +1474,7 @@ class CognitionGrpcHost:
             "GetReadiness": self._method(self._readiness, cognition_pb.GetReadinessRequest, cognition_pb.GetReadinessResponse),
             "Shutdown": self._method(self._shutdown_rpc, cognition_pb.ShutdownRequest, cognition_pb.ShutdownResponse),
             "ExecuteMemoryJob": self._method(self._execute_memory_job, cognition_pb.ExecuteMemoryJobRequest, cognition_pb.ExecuteMemoryJobResponse),
+            "GetMemoryJobAdmission": self._method(self._get_memory_job_admission, cognition_pb.GetMemoryJobAdmissionRequest, cognition_pb.GetMemoryJobAdmissionResponse),
             "ReconcileMemoryJob": self._method(self._reconcile_memory_job, cognition_pb.ReconcileMemoryJobRequest, cognition_pb.ReconcileMemoryJobResponse),
             "ReadMemoryJobRequests": self._method(self._read_memory_job_requests, cognition_pb.ReadMemoryJobRequestsRequest, cognition_pb.ReadMemoryJobRequestsResponse),
             "AcknowledgeMemoryJobRequest": self._method(self._acknowledge_memory_job_request, cognition_pb.AcknowledgeMemoryJobRequestRequest, cognition_pb.AcknowledgeMemoryJobRequestResponse),
@@ -1808,6 +1809,21 @@ class CognitionGrpcHost:
                 raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory Job 原 attempt 对账冲突") from error
             return cognition_pb.ReconcileMemoryJobResponse(result=self._memory_job_result(request.identity, result.receipt, result.receiver_fenced, result.observed_at))
         return await self._invoke(request, context, operation, track=True, allow_stopping=True)
+
+    async def _get_memory_job_admission(self, request: Any, context: Any) -> Any:
+        async def operation(_trace_id: str) -> Any:
+            coordinator = self._external_memory_jobs()
+            if request.ByteSize() > 16_384 or not re.fullmatch(r"[a-f0-9]{64}", request.request_id) \
+                    or request.job_id != f"memory:{request.request_id}" or any(
+                        not value.strip() or len(value.encode("utf-8")) > 4096 for value in (request.job_id, request.scope_id)):
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_INVALID_REQUEST, "Memory 接纳查询身份/预算无效")
+            try:
+                reason = await coordinator.job_admission_reason(job_id=request.job_id, request_id=request.request_id, scope_id=request.scope_id)
+            except MemoryConsolidationConflictError as error:
+                raise ServiceFault(common_pb.SERVICE_ERROR_CODE_RECOVERY_REQUIRED, "Memory 已ACK原源/作用域冲突") from error
+            return cognition_pb.GetMemoryJobAdmissionResponse(request_id=request.request_id, job_id=request.job_id,
+                scope_id=request.scope_id, eligible=reason == "memory_ready", reason_code=reason)
+        return await self._invoke(request, context, operation, track=True, require_ready=True)
 
     def _external_memory_jobs(self) -> ConsolidationCoordinator:
         if self._consolidation is None or not self._consolidation.uses_external_jobs:

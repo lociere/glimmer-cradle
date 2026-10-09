@@ -10,6 +10,8 @@ import { ExecutionResultState, ExecutionSideEffects } from '@glimmer-cradle/cont
 import { CallMetadataSchema, ServiceErrorDetailSchema, ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import {
   ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
+  GetMemoryJobAdmissionRequestSchema, GetMemoryJobAdmissionResponseSchema,
+  type GetMemoryJobAdmissionRequest, type GetMemoryJobAdmissionResponse,
   ReconcileMemoryJobRequestSchema, ReconcileMemoryJobResponseSchema,
   ReadMemoryJobRequestsRequestSchema, ReadMemoryJobRequestsResponseSchema,
   AcknowledgeMemoryJobRequestRequestSchema, AcknowledgeMemoryJobRequestResponseSchema,
@@ -65,6 +67,7 @@ import {
 import { AcceptExecutionResultRequestSchema, AcceptExecutionResultResponseSchema, ConversationService } from '@glimmer-cradle/contracts/glimmer/conversation/v1/conversation_pb';
 
 export interface MemoryJobsCognitionPort {
+  getMemoryAdmission(request: GetMemoryJobAdmissionRequest, signal?: AbortSignal): Promise<GetMemoryJobAdmissionResponse>;
   execute(request: ExecuteMemoryJobRequest, signal?: AbortSignal): Promise<ExecuteMemoryJobResponse>;
   reconcile(request: ReconcileMemoryJobRequest, signal?: AbortSignal): Promise<ReconcileMemoryJobResponse>;
   readRequests(request: ReadMemoryJobRequestsRequest, signal?: AbortSignal): Promise<ReadMemoryJobRequestsResponse>;
@@ -121,6 +124,10 @@ export class CognitionClient implements MemoryJobsCognitionPort, PlanningJobsSou
   public execute(request: ExecuteMemoryJobRequest, signal?: AbortSignal): Promise<ExecuteMemoryJobResponse> {
     return this.call('ExecuteMemoryJob', ExecuteMemoryJobRequestSchema, ExecuteMemoryJobResponseSchema,
       create(ExecuteMemoryJobRequestSchema, { ...request, call: this.metadata() }), signal);
+  }
+  public getMemoryAdmission(request: GetMemoryJobAdmissionRequest, signal?: AbortSignal): Promise<GetMemoryJobAdmissionResponse> {
+    return this.call('GetMemoryJobAdmission', GetMemoryJobAdmissionRequestSchema, GetMemoryJobAdmissionResponseSchema,
+      create(GetMemoryJobAdmissionRequestSchema, { ...request, call: this.metadata() }), signal);
   }
   public submitPerception(request: SubmitPerceptionRequest, signal?: AbortSignal) {
     const call = request.call ? create(CallMetadataSchema, { ...request.call, generation: this.generation }) : this.metadata();

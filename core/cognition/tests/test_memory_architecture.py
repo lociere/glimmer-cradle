@@ -920,6 +920,60 @@ async def test_old_claim_cannot_complete_new_attempt_or_partially_complete_batch
         assert await (await conn.execute("SELECT state FROM consolidation_jobs")).fetchall() == [("completed",), ("completed",)]
 
 
+@pytest.mark.parametrize("fault", ["ready", "disabled", "model", "availability", "salience", "missing", "stale", "scope", "unacked", "domain"])
+async def test_memory_job_admission_reads_actual_acked_source_without_mutating_or_inference(consolidation_stack, monkeypatch, fault):
+    database, _, _, episodes, _, llm, coordinator = consolidation_stack
+    await database.select_consolidation_dispatch("external")
+    monkeypatch.setattr(coordinator, "_jobs", None)
+    await coordinator.consolidate(force_seal=True)
+    source = (await coordinator.source_job_requests(limit=64))[0]
+    job_id = f"memory:{source.request_id}"
+    if fault != "unacked": coordinator.acknowledge_job_request(source, job_id)
+    if fault == "disabled": monkeypatch.setattr(coordinator, "_enabled", False)
+    elif fault == "model": monkeypatch.setattr(coordinator, "_llm", None)
+    elif fault == "availability": monkeypatch.setattr(coordinator, "_model_available", lambda: False)
+    elif fault == "salience": monkeypatch.setattr(coordinator, "_minimum_salience", 1.0)
+    elif fault == "missing": monkeypatch.setattr(episodes, "get_episode", lambda _id: None)
+    elif fault in {"stale", "domain"}:
+        episode = episodes.get_episode(source.input.episode_id)
+        assert episode is not None
+        if fault == "stale": episode = replace(episode, moments=(replace(episode.moments[0], content={"text": "changed"}),))
+        else: episode = replace(episode, moments=())
+        monkeypatch.setattr(episodes, "get_episode", lambda _id: episode)
+    def snapshot(path):
+        with sqlite3.connect(path) as connection: return tuple(connection.iterdump())
+    before = snapshot(database._db_path), snapshot(episodes._path)
+    kwargs = {"job_id": job_id, "request_id": source.request_id, "scope_id": "foreign" if fault == "scope" else source.input.scope_id}
+    if fault in {"scope", "unacked"}:
+        with pytest.raises(MemoryConsolidationConflictError): await coordinator.job_admission_reason(**kwargs)
+    else:
+        expected = {"ready": "memory_ready", "disabled": "memory_disabled", "model": "memory_model_unavailable", "availability": "memory_model_unavailable",
+                    "salience": "memory_salience_below_threshold", "missing": "memory_source_stale",
+                    "stale": "memory_source_stale", "domain": "memory_domain_conflict"}[fault]
+        assert await coordinator.job_admission_reason(**kwargs) == expected
+    assert snapshot(database._db_path) == before[0] and snapshot(episodes._path) == before[1]
+    assert not llm.requests
+
+
+async def test_memory_job_admission_restores_real_receipt_without_model_when_disabled(consolidation_stack, monkeypatch):
+    database, _, _, _, _, llm, coordinator = consolidation_stack
+    await database.select_consolidation_dispatch("external")
+    monkeypatch.setattr(coordinator, "_jobs", None)
+    await coordinator.consolidate(force_seal=True)
+    source = (await coordinator.source_job_requests(limit=64))[0]
+    job_id = f"memory:{source.request_id}"
+    coordinator.acknowledge_job_request(source, job_id)
+    identity = replace(_job_identity(scope_id=source.input.scope_id), job_id=job_id)
+    receipt = await coordinator.execute_job(identity, source.input)
+    assert len(llm.requests) == 1
+    monkeypatch.setattr(coordinator, "_enabled", False)
+    monkeypatch.setattr(coordinator, "_llm", None)
+    assert await coordinator.job_admission_reason(job_id=job_id, request_id=source.request_id, scope_id=source.input.scope_id) == "memory_ready"
+    duplicate = await coordinator.execute_job(identity, source.input)
+    assert duplicate.receipt_id == receipt.receipt_id and duplicate.duplicate
+    assert len(llm.requests) == 1
+
+
 async def test_external_jobs_maintenance_only_publishes_and_applies_source_eligibility(consolidation_stack, monkeypatch):
     database, _, _, episodes, _, llm, coordinator = consolidation_stack
     monkeypatch.setattr(coordinator, "_jobs", None)

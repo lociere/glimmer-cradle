@@ -514,7 +514,7 @@ Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监�
 边界。源 request outbox 已在真实 Episode 封口中写入；Host 投递 wire、Jobs handler/query、持续调度与局部配置装配已落位，产品默认入口尚未切换，旧队列仍保留
 既定退出门。不自动升级用户 v3/v4/v5 库；受控迁移、备份与恢复归阶段 14。
 
-四个 Memory Jobs RPC 只在 `ConsolidationCoordinator(jobs=None)` 的外部 Jobs 模式开放。
+Memory Jobs RPC 只在 `ConsolidationCoordinator(jobs=None)` 的外部 Jobs 模式开放。
 实际 Worker CLI/Host/composition 已接 `memory_jobs_owner` 显式选择；默认产品入口仍为 legacy，
 旧模式 RPC 返回 NOT_READY，禁止两套 owner 双消费。选择在 Log 单写者建立、Memory 连接后、维护
 启动前通过 `select_consolidation_dispatch()` 原子持久绑定。未完成旧任务拒绝转交；external 绑定或
@@ -525,6 +525,11 @@ Worker 真实 composition 将同一个 `ConsolidationCoordinator` 注入受监�
 完整源信封摘要（含首次 createdAt），Jobs 保持源 request/hash 与 Job ID 稳定，并恢复首次政策。
 重投不以新配置或当前 retry due 替代首次 due/预算；事实/业务内容或 retry mode 漂移仍拒绝。
 源 ACK 已提交但响应丢失后，源扫描不再返回该请求，已接纳 Job 继续执行；不以本地响应判断源回滚。
+默认 Host 在 claim 前调用只读 `GetMemoryJobAdmission`，Memory owner 从已 ACK 的原源核验当前
+Episode/version/digest、enabled、salience、域与模型装配；生产 composition 显式注入实际默认
+模型配置检查，Core 不读取 provider 配置或网络。缺配置保持原 Job/预算/attempt0，不写失败
+结果；历史同输入 receipt 沿原结果恢复而不要求新模型。接纳等待由 `jobs_admission_pending`
+呈现，精确身份、理由与生命周期边界见[协议参考](../../reference/protocol.md#memory-jobs-调度接纳)。
 源最小快照与终态 tombstone 的保留规则见 [数据布局](../../reference/data-layout.md)。
 App 将生成 `JobExecutionIdentity` 映射到 `ExecuteMemoryJob`，由 `ReconcileMemoryJob` 获取原 attempt
 证据；只接受 `cognition.memory`、完全匹配的 identity、持久封口和有效证据摘要，业务结果排除易变 duplicate

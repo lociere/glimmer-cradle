@@ -275,6 +275,36 @@ function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts =
 }
 
 describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
+  it('实际生产 CLI 未配置默认 provider 时已ACK Memory 只等待，不消耗 attempt 或写模型结果', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-production-memory-admission-'));
+    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const seeded = await productionWorker(paths.data_root);
+    const memory = { ...seeded.input.runtime_document.memory,
+      consolidation: { ...seeded.input.runtime_document.memory.consolidation, debounce_seconds: 0 } };
+    seeded.input.runtime_document.llm = null;
+    writeConfiguration(paths, memory);
+    const owner = new ConfiguredHostCognitionJobsOwner({ paths, clock, owner_id: 'production-memory-no-provider',
+      worker: { python_executable: seeded.input.python_executable, runtime_document: seeded.input.runtime_document,
+        accept_state: async request => create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' }) } });
+    try {
+      await owner.start();
+      await eventually(() => (owner.snapshot.session?.jobs?.jobs?.completed_cycles ?? 0) >= 3);
+      expect(owner.snapshot.session?.jobs?.jobs).toMatchObject({ status: 'degraded', error_code: 'jobs_admission_pending' });
+      const jobs = new Database(paths.jobs_database, { readonly: true });
+      try {
+        expect(jobs.prepare('SELECT status,attempt FROM jobs').get()).toEqual({ status: 'queued', attempt: 0 });
+        expect(jobs.prepare('SELECT COUNT(*) AS count FROM job_attempts').get()).toEqual({ count: 0 });
+        expect(jobs.prepare('SELECT COUNT(*) AS count FROM job_outbox WHERE acknowledged_at IS NULL').get()).toEqual({ count: 0 });
+      } finally { jobs.close(); }
+      expect(memoryCounts(path.join(paths.data_root, 'state/cognition'))).toEqual([0, 0, 0]);
+      const episodes = new Database(path.join(paths.data_root, 'state/cognition/projections/episodes.db'), { readonly: true });
+      try {
+        expect(episodes.prepare('SELECT status,business_outcome FROM memory_job_projection').get()).toEqual({ status: 'queued', business_outcome: 'unknown' });
+        expect(episodes.prepare('SELECT COUNT(*) AS count FROM memory_request_outbox WHERE accepted_job_id IS NOT NULL').get()).toEqual({ count: 1 });
+      } finally { episodes.close(); }
+    } finally { await owner.stop(); }
+  }, 30_000);
+
   it.each([{ completed: true, revoked: false }, { completed: false, revoked: false }, { completed: true, revoked: true }])
   ('生产 CLI 自动评估实际目标 %j，重启不重复调用同一模型或消耗 attempt', async ({ completed, revoked }) => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-model-'));
@@ -1192,6 +1222,103 @@ it('Host 循环实际执行终态保留政策：缺接收方不删，真实 inbo
   } finally { await next?.stop(); await first.stop(); receiver.close(); store.close(); await service.stop(); }
 }, 30_000);
 
+it.each(['job', 'request', 'scope', 'reason', 'eligible'] as const)('Memory 接纳wire响应冲突 %s 不创建attempt，失败关闭并保留原源', async fault => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-memory-admission-wire-'));
+  const service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const actualAdmission = service.client.getMemoryAdmission.bind(service.client);
+  const admission = vi.spyOn(service.client, 'getMemoryAdmission').mockImplementation(async (...args: Parameters<CognitionClient['getMemoryAdmission']>) => {
+    const response = await actualAdmission(...args);
+    if (fault === 'job') response.jobId = 'foreign';
+    else if (fault === 'request') response.requestId = 'a'.repeat(64);
+    else if (fault === 'scope') response.scopeId = 'foreign';
+    else if (fault === 'reason') response.reasonCode = 'unknown';
+    else response.eligible = false;
+    return response;
+  });
+  const execute = vi.spyOn(service.client, 'execute');
+  const host = hostJobs(store, service.client);
+  try {
+    await expect(host.start()).rejects.toThrow('Memory 接纳响应身份/理由冲突');
+    const request = admission.mock.calls[0][0];
+    expect(store.load(request.jobId)).toMatchObject({ scope_id: request.scopeId, status: 'queued', attempt: 0 });
+    expect(store.listAttempts(request.jobId)).toEqual([]);
+    expect(host.snapshot).toMatchObject({ status: 'failed', error_code: 'jobs_cycle_failed' });
+    expect(execute).not.toHaveBeenCalled(); expect(memoryCounts(root)).toEqual([0, 0, 0]);
+  } finally { await host.stop(); admission.mockRestore(); execute.mockRestore(); store.close(); await service.stop(); }
+}, 30_000);
+
+it.each(['stale', 'domain'] as const)('Memory 已ACK证据损坏 %s 明确失败关闭；恢复原事实后原 Job 执行一次', async fault => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-memory-source-conflict-'));
+  const service = await worker(root, 'one'), store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  const episodes = new Database(path.join(root, 'episodes.db'));
+  const execute = vi.spyOn(service.client, 'execute');
+  const admission = vi.spyOn(service.client, 'getMemoryAdmission');
+  const host = hostJobs(store, service.client);
+  let restored: HostJobsController | undefined;
+  try {
+    store.activateAuthority(1, clock.now());
+    await new CognitionJobAdapter(service.client).deliverRequests(store, clock, 1, submissionPolicy, 8);
+    const source = episodes.prepare('SELECT request_id,accepted_job_id,input_digest,episode_id,episode_version FROM memory_request_outbox').get() as
+      { request_id: string; accepted_job_id: string; input_digest: string; episode_id: string; episode_version: number };
+    const original = store.load(source.accepted_job_id)!;
+    if (fault === 'stale') episodes.prepare('UPDATE memory_request_outbox SET input_digest=? WHERE request_id=?').run('a'.repeat(64), source.request_id);
+    else episodes.prepare('UPDATE episodes SET version=version+1 WHERE episode_id=?').run(source.episode_id);
+    await expect(host.start()).rejects.toThrow('Memory 原源证据失配');
+    expect(await admission.mock.results[0].value).toMatchObject({ eligible: false,
+      reasonCode: fault === 'stale' ? 'memory_source_stale' : 'memory_domain_conflict' });
+    expect(host.snapshot).toMatchObject({ status: 'failed', error_code: 'jobs_cycle_failed' });
+    expect(store.load(source.accepted_job_id)).toEqual(original);
+    expect(store.listAttempts(source.accepted_job_id)).toEqual([]);
+    expect(execute).not.toHaveBeenCalled(); expect(memoryCounts(root)).toEqual([0, 0, 0]);
+    await host.stop();
+    // 模拟从已保护副本恢复原事实；不能修改 Job 身份或以新源重投逃过冲突。
+    if (fault === 'stale') episodes.prepare('UPDATE memory_request_outbox SET input_digest=? WHERE request_id=?').run(source.input_digest, source.request_id);
+    else episodes.prepare('UPDATE episodes SET version=? WHERE episode_id=?').run(source.episode_version, source.episode_id);
+    restored = hostJobs(store, new CognitionClient(service.endpoint, 'one', 5000), 2);
+    await restored.start();
+    expect(store.load(source.accepted_job_id)).toMatchObject({ status: 'succeeded', attempt: 1,
+      idempotency_key: original.idempotency_key, max_attempts: original.max_attempts, due_at: original.due_at });
+    expect(memoryCounts(root)).toEqual([1, 1, 1]);
+    expect(episodes.prepare('SELECT accepted_job_id FROM memory_request_outbox').get()).toEqual({ accepted_job_id: source.accepted_job_id });
+  } finally { await restored?.stop(); await host.stop(); admission.mockRestore(); execute.mockRestore(); episodes.close(); store.close(); await service.stop(); }
+}, 30_000);
+
+it('Memory 实际模型缺失或配置停用只等待；跨进程恢复执行原 Job 一次且不耗提前 attempt', async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-memory-admission-'));
+  const store = new SqliteJobStore(path.join(root, 'jobs.sqlite'));
+  let originalId: string | undefined;
+  try {
+    for (const [index, generation] of ['memory-no-model', 'memory-disabled', 'memory-ready'].entries()) {
+      const service = await worker(root, generation);
+      const execute = vi.spyOn(service.client, 'execute');
+      const admission = vi.spyOn(service.client, 'getMemoryAdmission');
+      const host = hostJobs(store, service.client, index + 1);
+      try {
+        await host.start();
+        await eventually(() => host.snapshot.completed_cycles >= 3);
+        expect(admission.mock.calls.length).toBeGreaterThan(0);
+        const observed = admission.mock.calls[0][0];
+        const actual = store.load(observed.jobId)!;
+        expect(actual.scope_id).toBe(observed.scopeId);
+        originalId ??= actual.job_id;
+        expect(actual.job_id).toBe(originalId);
+        if (index < 2) {
+          expect(actual).toMatchObject({ status: 'queued', attempt: 0 });
+          expect(execute).not.toHaveBeenCalled();
+          expect(memoryCounts(root)).toEqual([0, 0, 0]);
+          expect(host.snapshot).toMatchObject({ status: 'degraded', error_code: 'jobs_admission_pending' });
+          expect(store.readOutbox(index + 1, 100).some(event => ['running', 'succeeded', 'failed', 'unknown'].includes(event.status))).toBe(false);
+        } else {
+          expect(actual).toMatchObject({ status: 'succeeded', attempt: 1 });
+          expect(execute).toHaveBeenCalledTimes(1);
+          expect(memoryCounts(root)).toEqual([1, 1, 1]);
+          expect(host.snapshot.status).toBe('ready');
+        }
+      } finally { await host.stop(); admission.mockRestore(); execute.mockRestore(); await service.stop(); }
+    }
+  } finally { store.close(); }
+}, 45_000);
+
 describe('Memory 状态事实真实 wire/inbox', () => {
   it('投影写入失败回滚 inbox，未知/取消未执行事实不冒充无副作用，未知 schema 保留数据并拒绝', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-state-rollback-'));
@@ -1640,6 +1767,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     let first = true;
     const port = { execute: service.client.execute.bind(service.client), reconcile: service.client.reconcile.bind(service.client),
       publishJobState: service.client.publishJobState.bind(service.client),
+      getMemoryAdmission: service.client.getMemoryAdmission.bind(service.client),
       readRequests: service.client.readRequests.bind(service.client), acknowledge: async (...args: Parameters<CognitionClient['acknowledge']>) => {
         if (first) { first = false; throw new Error('injected ACK loss'); }
         return service.client.acknowledge(...args);
@@ -1676,6 +1804,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     let controller = new JobController(store, clock, policy);
     const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
       publishJobState: service.client.publishJobState.bind(service.client),
+      getMemoryAdmission: service.client.getMemoryAdmission.bind(service.client),
       reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
       acknowledge: async (...args: Parameters<CognitionClient['acknowledge']>) => {
         await service.client.acknowledge(...args); throw new Error('injected committed ACK response loss');
@@ -1708,6 +1837,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
     const acknowledge = vi.fn(async () => { throw new Error('injected ACK loss'); });
     const adapter = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
       publishJobState: service.client.publishJobState.bind(service.client),
+      getMemoryAdmission: service.client.getMemoryAdmission.bind(service.client),
       reconcile: service.client.reconcile.bind(service.client), acknowledge,
       readRequests: async (...args: Parameters<CognitionClient['readRequests']>) => {
         const response = await actualRead(...args);
@@ -1735,7 +1865,8 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
       const adapter = new CognitionJobAdapter({ execute: async (...args) => {
         await service.client.execute(...args); throw new Error('injected completion response loss');
       }, reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
-      acknowledge: service.client.acknowledge.bind(service.client), publishJobState: service.client.publishJobState.bind(service.client) });
+      acknowledge: service.client.acknowledge.bind(service.client), publishJobState: service.client.publishJobState.bind(service.client),
+      getMemoryAdmission: service.client.getMemoryAdmission.bind(service.client) });
       await adapter.deliverRequests(store, clock, 1, submissionPolicy, 8);
       controller.register(adapter);
       const claim = store.claim(1, 'original-host', clock.now(), 60_000)!;
@@ -1767,6 +1898,7 @@ describe('Host Jobs 消费真实 Worker Memory owner', () => {
       const adapter = new CognitionJobAdapter(service.client);
       const lostAck = new CognitionJobAdapter({ execute: service.client.execute.bind(service.client),
         publishJobState: service.client.publishJobState.bind(service.client),
+      getMemoryAdmission: service.client.getMemoryAdmission.bind(service.client),
         reconcile: service.client.reconcile.bind(service.client), readRequests: service.client.readRequests.bind(service.client),
         acknowledge: async () => { throw new Error('injected ACK loss'); } });
       await expect(lostAck.deliverRequests(store, clock, 1, submissionPolicy, 8)).rejects.toThrow('ACK loss');

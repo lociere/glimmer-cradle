@@ -8,7 +8,7 @@ import type { PlanningNotificationsCognitionPort } from '../adapters/protocol/co
 import { HostCognitionError } from '../adapters/protocol/cognition-client.js';
 import { ServiceErrorCode } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { HostConversationRoutes } from '../gateway/conversation-routes.js';
-import { ExecuteMemoryJobRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
+import { ExecuteMemoryJobRequestSchema, GetMemoryJobAdmissionRequestSchema, ReconcileMemoryJobRequestSchema, ReadMemoryJobRequestsRequestSchema,
   AcknowledgeMemoryJobRequestRequestSchema, PublishMemoryJobStateRequestSchema,
   ReadPlanningJobRequestsRequestSchema, AcknowledgePlanningJobRequestRequestSchema,
   ReconcilePlanningJobRequestSchema, ExecutePlanningJobRequestSchema, GetPlanningJobAdmissionRequestSchema,
@@ -21,10 +21,28 @@ import { MEMORY_JOB_KIND, PLANNING_JOB_KIND, memoryJobSource, memoryJobRequest, 
   type MemoryJobSubmissionPolicy } from '../adapters/protocol/job-mapper.js';
 
 /** App 接线真正 Jobs 与 Memory owner；不持有推理或第二套重试状态。 */
-export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPort {
+export class CognitionJobAdapter implements JobHandlerPort, JobReconciliationPort, JobAdmissionPort {
   public readonly kind = MEMORY_JOB_KIND;
   public readonly retry_mode = 'reconcile' as const;
   public constructor(private readonly cognition: MemoryJobsCognitionPort) {}
+
+  public async isEligible(job: Job, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted();
+    const requestId = job.payload.source_request_id;
+    if (job.kind !== this.kind || typeof requestId !== 'string' || !/^[a-f0-9]{64}$/.test(requestId)
+      || job.job_id !== `memory:${requestId}` || job.idempotency_key !== requestId) throw new JobConflictError('Memory 接纳查询原源身份无效');
+    const response = await this.cognition.getMemoryAdmission(create(GetMemoryJobAdmissionRequestSchema,
+      { requestId, jobId: job.job_id, scopeId: job.scope_id }), signal);
+    signal?.throwIfAborted();
+    if (response.requestId !== requestId || response.jobId !== job.job_id || response.scopeId !== job.scope_id
+      || !['memory_ready', 'memory_disabled', 'memory_source_stale', 'memory_salience_below_threshold',
+        'memory_domain_conflict', 'memory_model_unavailable'].includes(response.reasonCode)
+      || response.eligible !== (response.reasonCode === 'memory_ready')) throw new JobConflictError('Memory 接纳响应身份/理由冲突');
+    if (['memory_source_stale', 'memory_domain_conflict'].includes(response.reasonCode)) {
+      throw new JobConflictError('Memory 原源证据失配；恢复原Episode/Log事实后才能重启调度');
+    }
+    return response.eligible;
+  }
 
   public stateReceiver(epoch: number): JobStateReceiverPort {
     if (!Number.isSafeInteger(epoch) || epoch < 1) throw new JobConflictError('Memory 状态投递主无效');

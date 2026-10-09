@@ -1,5 +1,10 @@
 # M12 Contract Spine Inventory
 
+Memory claim前只读接纳仍由 `proto/glimmer/cognition/v1/cognition_service.proto` 唯一拥有：
+`GetMemoryJobAdmissionRequest`、`GetMemoryJobAdmissionResponse` 与 `GetMemoryJobAdmission`。
+查询绑定真实已ACK源/Job/scope和当前Episode输入；disabled、salience、模型与权限域不满足
+时不claim，不创建receipt/封口。原已提交receipt恢复不重新推理。
+
 Jobs 控制面受控投影归 `proto/glimmer/jobs/v1/jobs.proto` 唯一拥有：`JobProjection`、
 `JobHandlerProjection`、`ReadJobsProjectionRequest`、`ReadJobsProjectionResponse`。
 Host 以已认证主体和当前精确 scope grant 读取；不公开 payload/result、lease owner、原 attempt

@@ -89,7 +89,7 @@ export class HostJobsController {
     this.recovery = new JobRecoveryController(options.store, options.clock, options.epoch, this.options.retry_policy);
     this.retention = new JobRetentionController(options.store, options.clock, options.epoch);
     this.scheduler = new JobScheduler(options.store, this.controller, options.clock, options.epoch, options.owner_id,
-      options.lease_ms, MEMORY_JOB_KIND);
+      options.lease_ms, MEMORY_JOB_KIND, this.adapter);
   }
 
   public get snapshot(): HostJobsSnapshot { return { ...this.state }; }
@@ -196,7 +196,7 @@ export class HostJobsController {
       if (this.options.terminal_retention_ms !== undefined) this.retention.prune(this.options.terminal_retention_ms);
       const pending = store.listUnknown(epoch, MEMORY_JOB_KIND, 1).length > 0
         || !!this.planningSource && store.listUnknown(epoch, PLANNING_JOB_KIND, 1).length > 0;
-      const admissionPending = (this.planningScheduler?.waitingCount ?? 0) > 0;
+      const admissionPending = this.scheduler.waitingCount > 0 || (this.planningScheduler?.waitingCount ?? 0) > 0;
       const feedbackPending = !!this.planningSource && store.readOutbox(epoch, 1, PLANNING_JOB_KIND).length > 0;
       await this.notifications?.deliver(batch_size, signal);
       // 未装配路由/无接收方/未收到真实回执仍如实保留待办，不以 sent 或 Jobs ACK 清除。

@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B 首个catalog/受控投影子链已验证/复核：Jobs public-api22与其他30有效证据、Host公开反例10+真实配置投影1+实际Memory执行/状态retention1、Host类型、最新Jobs DTO contracts verify与docs/target-layout/architecture/encoding/tool15/diff均PASS。注册微任务P2与三处等待/cursor已关闭，无后台进程。逻辑中文提交保存后继续P07B.1 Memory逐任务业务接纳（disabled/provider/原ACK源与Episode域复验）、P07B.3 Planning通知状态公开映射及P07B.4分页公平/retention引用核对，尚未接受整个任务。HEAD58b94fc9加本步dirty，生成物已暂存，唯一writer本会话，无其他用户改动；根大型门/产品UI ingress/旧队列切换待后续，未推送。
+下一任务：**[P07B Jobs 产品接纳、catalog 与状态投影](execution-order.md#step-p07b)**（in-progress / implementation）。P07B.3：实现Planning通知受控公开状态，当前Jobs投影尚不包含真实通知状态；从原Planning源/通知outbox与确认只读重建，按精确scope/Jobs权限/当前epoch读取，不复制正文或创建第二writer。上一Memory子链已完成并独立P2复核关闭：domain81、Worker32、HostMemory18+原配置/retention2+新缺模型/生产CLI2+证据恢复2+wire5、契约22门/三语/clean、Hosttypecheck/docs/架构/编码通过；相关dirty准备逻辑提交。无后台进程，未推送；P07B整体in-progress，P07B.4分页公平/retention引用随后，根大型/产品UI/旧队列切换待后续。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

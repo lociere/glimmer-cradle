@@ -75,11 +75,13 @@ class ConsolidationCoordinator:
         lease_seconds: int = 180, retry_base_seconds: int = 30,
         minimum_salience: float = 0.45,
         autobiographical_evidence_threshold: int = 3,
+        model_available: Callable[[], bool] | None = None,
     ) -> None:
         self._episodes = episodes
         self._memory = memory
         self._jobs = jobs
         self._llm = llm
+        self._model_available = model_available
         self._relationship_projection = relationship_projection
         self._clock = clock
         self._ids = ids
@@ -195,6 +197,36 @@ class ConsolidationCoordinator:
         if not self.uses_external_jobs:
             raise MemoryConsolidationConflictError("旧巩固队列尚未切换；禁止双消费")
         self._episodes.acknowledge_job_request(request, job_id)
+
+    async def job_admission_reason(self, *, job_id: str, request_id: str, scope_id: str) -> str:
+        """只读核验真实已接纳源；不分配 attempt、不封口或修改投影。"""
+        if not self.uses_external_jobs:
+            raise MemoryConsolidationConflictError("旧巩固队列尚未切换；禁止双消费")
+        source = self._episodes.accepted_job_request(job_id)
+        if source.request_id != request_id or source.input.scope_id != scope_id:
+            raise MemoryConsolidationConflictError("Memory 接纳查询原源/作用域冲突")
+        episode = self._episodes.get_episode(source.input.episode_id)
+        if episode is None:
+            return "memory_source_stale"
+        try:
+            current_input = self._receipt_input(episode)
+        except MemoryConsolidationConflictError:
+            return "memory_domain_conflict"
+        if current_input != source.input:
+            return "memory_source_stale"
+        # 已提交的原结果恢复不要求重新提供模型，也不因新政策声明副作用被撤销。
+        if await self._memory.find_consolidation(source.input) is not None:
+            return "memory_ready"
+        if not self._enabled:
+            return "memory_disabled"
+        if episode.salience < self._minimum_salience:
+            return "memory_salience_below_threshold"
+        eligible = [moment for moment in episode.moments if moment.retention_ceiling == "memory_candidate"][-self._max_batch_moments:]
+        if len({self._moment_domain_key(moment) for moment in eligible}) > 1:
+            return "memory_domain_conflict"
+        if eligible and (self._llm is None or (self._model_available is not None and not self._model_available())):
+            return "memory_model_unavailable"
+        return "memory_ready"
 
     async def accept_job_feedback(self, feedback: MemoryJobFeedback, result: dict | None) -> bool:
         if not self.uses_external_jobs:

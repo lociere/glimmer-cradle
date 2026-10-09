@@ -391,6 +391,22 @@ message ReconcileMemoryJobResponse {
   MemoryJobResult result = 1;
 }
 
+// claim 前只读业务接纳，不授予执行权限，也不产生 receipt/receiver fence。
+message GetMemoryJobAdmissionRequest {
+  glimmer.common.v1.CallMetadata call = 1;
+  string request_id = 2;
+  string job_id = 3;
+  string scope_id = 4;
+}
+
+message GetMemoryJobAdmissionResponse {
+  string request_id = 1;
+  string job_id = 2;
+  string scope_id = 3;
+  bool eligible = 4;
+  string reason_code = 5;
+}
+
 // Memory 源投递身份；不包含 Moment 正文，也不表示业务完成。
 message MemoryJobSourceRequest {
   string request_id = 1;
@@ -782,6 +798,7 @@ service CognitionService {
   rpc GetReadiness(GetReadinessRequest) returns (GetReadinessResponse);
   rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
   rpc ExecuteMemoryJob(ExecuteMemoryJobRequest) returns (ExecuteMemoryJobResponse);
+  rpc GetMemoryJobAdmission(GetMemoryJobAdmissionRequest) returns (GetMemoryJobAdmissionResponse);
   // 此调用会持久封口原 attempt；不是只读查询。空结果不得返回 not-applied。
   rpc ReconcileMemoryJob(ReconcileMemoryJobRequest) returns (ReconcileMemoryJobResponse);
   // 仅在外部 Jobs owner 模式开放；不能与旧巩固队列双消费。

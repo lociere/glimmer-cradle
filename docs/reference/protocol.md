@@ -101,6 +101,25 @@ Host-local Resource 更新订阅与刷新状态不是新 wire；重采集仍复�
 不以通知自动创建 grant、更新审批或恢复旧 Context。通知及有界监督机制归
 [Knowledge 采集边界](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
 
+## Memory Jobs 调度接纳
+
+`GetMemoryJobAdmission` 只携本代 call、原 request/job/scope；request 为 64 位小写 SHA-256，
+job 必须是 `memory:<request_id>`，请求限 16 KiB。Worker 从真实 Episode 源 outbox 读取已 ACK
+绑定，复验当前完整 Episode/version/input digest 和域，不以 Host 自报身份代替源事实。
+读取不写库、不创建 attempt 或封口、不调用模型；未 ACK 或原 scope 冲突为 RECOVERY_REQUIRED，
+非法身份/预算为 INVALID_REQUEST，旧 generation、非外部模式、未 ready 或 drain 按实际边界拒绝。
+
+响应回显完整原身份，`eligible` 仅与 `memory_ready` 等价；其余理由为 `memory_disabled`、
+`memory_source_stale`、`memory_salience_below_threshold`、`memory_domain_conflict`、
+`memory_model_unavailable`。同输入已有持久 receipt 可恢复原结果，不要求重新推理；其余候选
+核验 enabled、salience、域和模型装配。生产 Worker 通过 App 提供默认 generate 路由的真实
+配置检查（api type/key/model），不探测供应商网络健康。Host 在 claim 前接纳，等待项保持原
+Job/due/预算，attempt 不增加，并呈现 `jobs_admission_pending`；响应身份或理由冲突失败关闭。
+原证据失配的 stale/domain 理由在 Host 明确失败关闭并撤销循环，不当作可恢复配置等待；原 Job、
+源 ACK 与 receipt 保留，不自动丢弃或以新 ID 重发。恢复原 Episode/Log/outbox 事实并重启
+调度后才可继续原 Job；备份/修复事务完整产品路径仍归 P13A/P14A。
+这项读取不授予执行权限，Execute/Reconcile 仍复验原输入、identity、lease 与接收端 fencing。
+
 ## Memory Jobs 状态投递
 
 Jobs 的 `JobStateEvent` 是原 outbox 事实，携带稳定 event/job/scope/goal/kind、revision、状态枚举、

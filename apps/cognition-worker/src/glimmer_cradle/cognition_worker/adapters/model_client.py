@@ -571,6 +571,11 @@ class LLMEngine:
             llm_config=_summarize_llm_config(self.llm_config),
         )
 
+    def is_configured(self) -> bool:
+        """只核验 generate 的默认路由配置；不探测网络或声明供应商健康。"""
+        cfg = self.llm_config
+        return bool(cfg and cfg.api_type and cfg.api_type.lower() != "local" and cfg.api_key and _first_model(cfg.models))
+
     def _render_messages_as_prompt(self, llm_request: ModelRequest) -> str:
         sections: list[str] = []
         for message in llm_request.messages:

@@ -536,6 +536,7 @@ def compose_cognition(
         memory=memory_substrate,
         jobs=(ConsolidationJobRepository(cognition_database) if memory_jobs_owner == "legacy" else None),
         llm=llm_engine,
+        model_available=llm_engine.is_configured,
         clock=clock,
         ids=ids,
         observability=observability,

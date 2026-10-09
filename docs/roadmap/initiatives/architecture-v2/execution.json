@@ -461,7 +461,7 @@
         "evidence/2026-10-09-P07B.md"
       ],
       "blockedReason": null,
-      "nextAction": "P07B 首个catalog/受控投影子链已验证/复核：Jobs public-api22与其他30有效证据、Host公开反例10+真实配置投影1+实际Memory执行/状态retention1、Host类型、最新Jobs DTO contracts verify与docs/target-layout/architecture/encoding/tool15/diff均PASS。注册微任务P2与三处等待/cursor已关闭，无后台进程。逻辑中文提交保存后继续P07B.1 Memory逐任务业务接纳（disabled/provider/原ACK源与Episode域复验）、P07B.3 Planning通知状态公开映射及P07B.4分页公平/retention引用核对，尚未接受整个任务。HEAD58b94fc9加本步dirty，生成物已暂存，唯一writer本会话，无其他用户改动；根大型门/产品UI ingress/旧队列切换待后续，未推送。",
+      "nextAction": "P07B.3：实现Planning通知受控公开状态，当前Jobs投影尚不包含真实通知状态；从原Planning源/通知outbox与确认只读重建，按精确scope/Jobs权限/当前epoch读取，不复制正文或创建第二writer。上一Memory子链已完成并独立P2复核关闭：domain81、Worker32、HostMemory18+原配置/retention2+新缺模型/生产CLI2+证据恢复2+wire5、契约22门/三语/clean、Hosttypecheck/docs/架构/编码通过；相关dirty准备逻辑提交。无后台进程，未推送；P07B整体in-progress，P07B.4分页公平/retention引用随后，根大型/产品UI/旧队列切换待后续。",
       "mapping": [
         {
           "action": "retain",
@@ -735,6 +735,62 @@
           "target": "tools/repo-checks/src/architecture/baseline-lock.mjs",
           "owner": "Documentation governance",
           "exitCondition": "新增本步证据按宪章同步精确清单/生成树/摘要锁，产品目标与护栏断言不变。"
+        },
+        {
+          "action": "retain",
+          "source": "core/cognition/src/glimmer_cradle/cognition/memory/consolidation.py",
+          "target": "core/cognition/src/glimmer_cradle/cognition/memory/consolidation.py",
+          "owner": "Cognition Memory",
+          "exitCondition": "已ACK原源与当前Episode/domain、enabled/model就绪条件只读接纳，历史receipt恢复不重复模型，拒绝不消耗Jobs attempt。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
+          "target": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/composition.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "生产factory从实际默认模型配置注入中立只读可用性，不把对象存在当配置就绪，不探测网络。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
+          "target": "apps/cognition-worker/src/glimmer_cradle/cognition_worker/adapters/model_client.py",
+          "owner": "Cognition Worker",
+          "exitCondition": "当前generate默认路由真实配置检查与实际无网络拒绝一致；供应商实现迁移仍归P10A，不新增路由语义。"
+        },
+        {
+          "action": "split",
+          "source": "core/cognition/tests/test_memory_architecture.py",
+          "target": "core/cognition/tests/test_public_api.py",
+          "owner": "Cognition Memory",
+          "exitCondition": "P07B保留现行Memory真实持久链回归；P05A将领域公开API/取消/恢复测试及fixture整合到目标test_public_api.py，旧队列专项测试保留至P14A，等价验证与consumer-zero后删除旧测试文件。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/proto/glimmer/cognition/v1/cognition_service.proto",
+          "target": "protocol/proto/glimmer/cognition/v1/cognition.proto",
+          "owner": "Contract Spine",
+          "exitCondition": "新增Memory只读接纳由现行唯一IDL生成，P11A前不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/ts/glimmer/cognition/v1/cognition_service_pb.ts",
+          "target": "protocol/generated/typescript/src/glimmer/cognition/v1/cognition_pb.ts",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成Memory接纳DTO并成对接Host/Worker，P11A前不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/python/glimmer/cognition/v1/cognition_service_pb2.py",
+          "target": "protocol/generated/python/src/glimmer/cognition/v1/cognition_pb2.py",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成Memory接纳DTO并成对接Host/Worker，P11A前不建立第二源。"
+        },
+        {
+          "action": "retain",
+          "source": "contracts/generated/csharp/CognitionService.cs",
+          "target": "protocol/generated/dotnet/src/Cognition.cs",
+          "owner": "Contract Spine",
+          "exitCondition": "现行唯一IDL生成Memory接纳DTO并成对接Host/Worker，P11A前不建立第二源。"
         }
       ],
       "commands": [
@@ -749,7 +805,8 @@
         "pnpm check:docs",
         "pnpm check:encoding",
         "git diff --check",
-        "node --test tools/repo-checks/tests/baseline-lock.test.mjs tools/repo-checks/tests/target-layout.test.mjs tools/repo-checks/tests/documentation-structure.test.mjs"
+        "node --test tools/repo-checks/tests/baseline-lock.test.mjs tools/repo-checks/tests/target-layout.test.mjs tools/repo-checks/tests/documentation-structure.test.mjs",
+        "uv run --project core/cognition --extra dev pytest -q core/cognition/tests/test_memory_architecture.py"
       ]
     },
     {
