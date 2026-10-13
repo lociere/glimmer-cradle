@@ -14,10 +14,11 @@ import { ConfigManager } from '../config/config-manager';
 import { CoreException } from '../../domain/errors';
 import { createTraceContext } from '../observability/trace-context';
 import { getLogger } from '../observability/logger';
-import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot } from '../filesystem/path-utils';
-import { forceTerminateManagedProcessTree, stopManagedProcess, waitForManagedProcessExit } from '../process/process-supervisor';
+import { resolveLogDir, resolveObservabilityDir, resolveRepoRoot, resolveManagedProcessBridge } from '../filesystem/path-utils';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
 
 const logger = getLogger('cognition-manager');
+const processSupervisor = new ManagedProcessSupervisor(logger);
 const PROCESS_LOG = 'cognition.console.log';
 let processLogDir = path.join(resolveLogDir(), 'application');
 const execFileAsync = promisify(execFile);
@@ -34,6 +35,7 @@ export class CognitionManager {
   private recoveryGeneration = 0;
   private recoveryAttempts = 0;
   private readonly inFlightPerceptions = new Map<string, string>();
+  private stopOperation: Promise<void> | undefined;
 
   public constructor(
     private transport: CognitionProcessTransportPort,
@@ -45,14 +47,18 @@ export class CognitionManager {
   }
 
   public async start(): Promise<void> {
-    if (this.running) return;
+    if (this.stopping || this.stopOperation) throw new Error("Cognition 正在关闭");
+    if (this.running && this.ready) return;
+    if (this.child || this.starting) throw new Error('Cognition 上代进程尚未释放，拒绝并行启动');
     const config = ConfigManager.instance.getConfig();
+    const generation = this.recoveryGeneration;
     const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
     const repoRoot = resolveRepoRoot();
     const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
     const command = packagedPython || await ensureDevelopmentPython(repoRoot);
     const args = ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', this.memoryJobsOwner];
     this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
+    if (generation !== this.recoveryGeneration || this.stopOperation || this.child) throw new Error("Cognition 启动世代已关闭或已接纳");
     this.transport.configureActionDeadline(this.requestTimeoutMs);
     processLogDir = path.join(resolveLogDir(), 'application');
     this.stopping = false;
@@ -62,11 +68,14 @@ export class CognitionManager {
 
     try {
       ConfigManager.instance.freezeCoreConfig();
-      this.child = spawn(command, args, {
+      const pythonLaunch = await resolvePythonProcess(command, repoRoot);
+      if (generation !== this.recoveryGeneration || this.stopOperation) throw new Error('Cognition 启动世代已关闭');
+      this.child = processSupervisor.spawnManagedProcess(pythonLaunch.command, args, {
         cwd: repoRoot,
         detached: process.platform !== 'win32',
         env: {
           ...process.env,
+          ...pythonLaunch.environment,
           ...secrets,
           GLIMMER_CRADLE_CONFIG: JSON.stringify({
             manifest: config.character.manifest,
@@ -85,11 +94,14 @@ export class CognitionManager {
           PYTHONUNBUFFERED: '1',
         },
         stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-      });
+      }, resolveManagedProcessBridge(), spawn);
       this.attachProcessObservers(this.child);
       if (!this.child.pid) throw new Error('Cognition 子进程未返回 PID');
-      this.transport.expectProcess(this.child.pid);
-      const bootstrapPipe = this.child.stdio[3];
+      const child = this.child;
+      const processId = await processSupervisor.waitForManagedProcessReady(child, config.system.cognition_service.registration_timeout_ms);
+      if (this.child !== child || generation !== this.recoveryGeneration || this.stopOperation || !processSupervisor.isManagedProcessRootRunning(child)) throw new Error('Cognition 启动世代或实际根已失效');
+      this.transport.expectProcess(processId);
+      const bootstrapPipe = child.stdio[3];
       if (!bootstrapPipe || typeof (bootstrapPipe as NodeJS.WritableStream).write !== 'function') {
         throw new Error('Cognition 子进程缺少受监督 bootstrap pipe');
       }
@@ -181,7 +193,18 @@ export class CognitionManager {
     await this.start();
   }
 
-  public async stop(): Promise<void> {
+  public stop(): Promise<void> {
+    if (this.stopOperation) return this.stopOperation;
+    let resolveStop!: () => void;
+    let rejectStop!: (error: unknown) => void;
+    const stopping = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
+    this.stopOperation = stopping;
+    void this.stopChild().then(resolveStop, rejectStop);
+    void stopping.then(() => { this.stopOperation = undefined; }, () => { this.stopOperation = undefined; });
+    return stopping;
+  }
+
+  private async stopChild(): Promise<void> {
     this.recoveryGeneration += 1;
     const child = this.child;
     this.stopping = true;
@@ -207,6 +230,7 @@ export class CognitionManager {
       this.lifecycleObserver('stopped', 'Cognition 未完成启动的子进程已释放');
       return;
     }
+    let processStopped = false;
     try {
       let accepted = false;
       if (child && this.transport.isRegistered) {
@@ -218,25 +242,29 @@ export class CognitionManager {
         }
       }
       if (child && accepted) {
-        if (!await waitForManagedProcessExit(child, 2500)) {
-          await forceTerminateManagedProcessTree(child, 'Cognition 认知核', 1000, process.platform !== 'win32');
+        if (!await processSupervisor.waitForManagedProcessExit(child, 2500) || !processSupervisor.isProcessReleased(child)) {
+          await processSupervisor.forceTerminateManagedProcessTree(child, 'Cognition 认知核', 1000, process.platform !== 'win32');
         }
       } else {
-        await stopManagedProcess(child, {
+        await processSupervisor.stopManagedProcess(child, {
           label: 'Cognition 认知核', gracefulTimeoutMs: 2500, forceTimeoutMs: 1000,
           ownsProcessGroup: process.platform !== 'win32',
         });
       }
+      processStopped = true;
+    } catch (error) {
+      this.lifecycleObserver('failed', 'Cognition 进程回收未确认，保留 owner 等待恢复');
+      throw error;
     } finally {
       try {
         await this.transport.invalidateProcess(
-          child?.pid,
+          child ? processSupervisor.managedProcessPid(child) : undefined,
           new Error('Cognition 受监督进程生命周期已结束'),
         );
       } finally {
         this.running = false;
         this.inFlightPerceptions.clear();
-        this.child = null;
+        if (processStopped || child && processSupervisor.isProcessReleased(child)) this.child = null;
         this.stopping = false;
       }
     }
@@ -298,35 +326,56 @@ export class CognitionManager {
   private attachProcessObservers(child: ChildProcess): void {
     child.stdout?.on('data', (data: Buffer) => this.consumeOutput(data, false));
     child.stderr?.on('data', (data: Buffer) => this.consumeOutput(data, true));
-    child.on('exit', (code: any, signal: any) => {
+    let rootObserved = false;
+    let rootRecovery: Promise<void> | undefined;
+    const onRootExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+      if (rootObserved || this.child !== child) return;
+      rootObserved = true;
       this.flushOutput();
       const interrupted = code === 0xC000013A;
       const intentional = this.stopping || interrupted;
       const startupFailure = this.starting;
-      if (this.child === child) this.child = null;
+      const released = processSupervisor.isProcessReleased(child);
+      if (this.child === child && released) this.child = null;
       this.running = false;
       this.ready = false;
       const invalidation = this.transport.invalidateProcess(
-        child.pid,
+        processSupervisor.managedProcessPid(child),
         new Error('受监督 Cognition 进程退出'),
       );
+      void invalidation.catch((error) => {
+        logger.error('Cognition 退出后的 transport 失效失败', { error: normalizeError(error) });
+      });
       logger[code === 0 || interrupted ? 'info' : 'warn']('Cognition 认知核进程退出', { code, signal });
       if (!intentional) {
         this.inFlightPerceptions.clear();
         this.lifecycleObserver('failed', 'Cognition 受监督进程意外退出');
       }
-      if (!intentional && !startupFailure) {
+      if (!intentional && !startupFailure && released) {
         const recoveryGeneration = ++this.recoveryGeneration;
         void this.recoverAfterUnexpectedExit(invalidation, recoveryGeneration);
       }
+      if (!intentional && !startupFailure && !released) rootRecovery = invalidation;
+    };
+    processSupervisor.onManagedProcessRootExit(child, onRootExit);
+    processSupervisor.onManagedProcessExit(child, () => {
+      if (this.child !== child) return;
+      if (!rootObserved) onRootExit(child.exitCode, child.signalCode);
+      if (!processSupervisor.isProcessReleased(child)) return;
+      this.child = null;
+      if (rootRecovery && !this.stopping && !this.starting) {
+        const generation = ++this.recoveryGeneration;
+        void this.recoverAfterUnexpectedExit(rootRecovery, generation);
+      }
     });
     child.on('error', (error: any) => {
-      if (this.child === child) this.child = null;
+      // A pipe/signal error does not prove that a successfully spawned process exited.
+      if (this.child === child && (!child.pid || processSupervisor.isProcessReleased(child))) this.child = null;
       this.running = false;
       this.ready = false;
       this.lifecycleObserver('failed', 'Cognition 子进程启动失败');
       logger.error('Cognition 子进程启动失败', { error: error.message });
-      void this.transport.invalidateProcess(child.pid, error).catch((invalidationError) => {
+      void this.transport.invalidateProcess(processSupervisor.managedProcessPid(child), error).catch((invalidationError) => {
         logger.error('Cognition 子进程错误后的 transport 失效失败', {
           error: normalizeError(invalidationError),
         });
@@ -403,4 +452,19 @@ async function ensureDevelopmentPython(repoRoot: string): Promise<string> {
     throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
   }
   return python;
+}
+
+async function resolvePythonProcess(command: string, repoRoot: string): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
+  if (process.platform !== 'win32') return { command, environment: {} };
+  // Windows venv python.exe is a redirector. Bind registration to the real interpreter
+  // without weakening PID authentication; CPython's launcher variable preserves pyvenv.cfg.
+  const { stdout } = await execFileAsync(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], {
+    cwd: repoRoot, windowsHide: true, timeout: 10_000, maxBuffer: 8192,
+  });
+  const interpreter: unknown = JSON.parse(stdout);
+  if (!interpreter || typeof interpreter !== 'object' || !('base' in interpreter) || !('executable' in interpreter)
+    || typeof interpreter.base !== 'string' || typeof interpreter.executable !== 'string') throw new Error('Python 解释器身份查询无效');
+  if (interpreter.base === interpreter.executable) return { command, environment: {} };
+  if (!path.isAbsolute(interpreter.base) || !path.isAbsolute(interpreter.executable) || !await fs.pathExists(interpreter.base)) throw new Error('Python 实际解释器路径无效');
+  return { command: interpreter.base, environment: { __PYVENV_LAUNCHER__: interpreter.executable } };
 }

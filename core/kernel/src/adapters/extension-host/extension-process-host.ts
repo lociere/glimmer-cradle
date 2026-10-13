@@ -21,7 +21,11 @@ import type {
 import { ErrorCode } from '../../domain/error-code';
 import { ExtensionException } from '../../domain/errors';
 import type { Disposable, ExtensionAgentRegistration, IExtensionHostService } from '../../ports';
-import { forceTerminateManagedProcessTree, waitForManagedProcessExit } from '../../adapters/process/process-supervisor';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
+import { getLogger } from '../observability/logger';
+import { resolveManagedProcessBridge } from '../filesystem/path-utils';
+
+const processSupervisor = new ManagedProcessSupervisor(getLogger('extension-process-supervisor'));
 
 type Manifest = Pick<ExtensionManifest, 'id' | 'permissions'>;
 
@@ -40,6 +44,10 @@ export class ExtensionProcessHost {
   private rejectReady: ((error: Error) => void) | null = null;
   private readonly runtimeId: string;
   private stopping = false;
+  private active = false;
+  private closing = false;
+  private stopOperation: Promise<void> | undefined;
+  private readonly disposing = new Map<string, Promise<void>>();
 
   public constructor(
     private readonly service: IExtensionHostService,
@@ -54,10 +62,15 @@ export class ExtensionProcessHost {
   }
 
   public async start(): Promise<void> {
-    if (this.child) return;
+    if (this.child) {
+      if (this.active && !this.stopping) return;
+      throw new Error('Extension Host 上代进程尚未释放，拒绝并行启动');
+    }
+    if (this.registrations.size > 0 || this.stopOperation) throw new Error('Extension Host 旧资源尚未释放');
+    this.closing = false;
     const hostEntry = resolveExtensionHostEntry();
     const useTypeScript = hostEntry.endsWith('.ts');
-    const child = fork(hostEntry, [], {
+    const child = processSupervisor.forkManagedProcess(hostEntry, [], {
       cwd: path.dirname(this.entryPath),
       env: {
         ...process.env,
@@ -69,22 +82,28 @@ export class ExtensionProcessHost {
       detached: process.platform !== 'win32',
       serialization: 'advanced',
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    });
+    }, resolveManagedProcessBridge(), fork);
     this.child = child;
+    processSupervisor.observeManagedProcess(child, process.platform !== 'win32');
     this.readyPromise = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
     });
-    child.on('message', (message: ExtensionHostProcessMessage) => this.onMessage(message));
-    child.once('disconnect', () => this.onDisconnect());
-    child.once('error', (error) => this.onExit(error));
-    child.once('exit', (code, signal) => {
+    child.on('message', (message: ExtensionHostProcessMessage) => { if (this.child === child) this.onMessage(message); });
+    child.once('disconnect', () => { if (this.child === child) this.onDisconnect(); });
+    child.once('error', (error) => { if (this.child === child) this.onExit(error); });
+    processSupervisor.onManagedProcessExit(child, (code, signal) => {
+      if (this.child !== child) return;
       const cleanExit = this.stopping || code === 0;
       this.onExit(cleanExit ? null : new Error(`Extension Host 退出: code=${code}, signal=${signal}`));
     });
     this.forwardOutput(child.stdout, 'debug');
     this.forwardOutput(child.stderr, 'warn');
 
+    processSupervisor.onManagedProcessRootExit(child, (code, signal) => {
+      if (this.child === child) this.onExit(this.stopping || code === 0 ? null : new Error(`Extension Host 根退出: code=${code}, signal=${signal}`));
+    });
+    await processSupervisor.waitForManagedProcessReady(child, this.timeoutMs);
     await withTimeout(this.readyPromise, this.timeoutMs, `扩展 ${this.manifest.id} Host 启动超时`);
     await this.request('activate', {
       extension_id: this.manifest.id,
@@ -92,27 +111,51 @@ export class ExtensionProcessHost {
       entry_path: this.entryPath,
       config: hasExtensionPermission(ExtensionPermission.CONFIG_READ_SELF, this.manifest.permissions) ? this.config : {},
     });
+    if (this.child !== child || this.closing || this.stopOperation || !processSupervisor.isManagedProcessRootRunning(child)) throw new Error("Extension Host 启动世代已关闭");
+    this.active = true;
   }
 
   public invokeHandler(handlerId: string, args: unknown): Promise<unknown> {
+    if (!this.active || this.stopping) return Promise.reject(new Error('Extension Host 尚未就绪或正在关闭'));
     return this.request('handler.invoke', { handler_id: handlerId, args });
   }
 
-  public async stop(): Promise<void> {
+  public stop(): Promise<void> {
+    if (this.stopOperation) return this.stopOperation;
+    let resolveStop!: () => void;
+    let rejectStop!: (error: unknown) => void;
+    const stopping = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
+    this.stopOperation = stopping;
+    void this.stopChild().then(resolveStop, rejectStop);
+    void stopping.then(() => { this.stopOperation = undefined; }, () => { this.stopOperation = undefined; });
+    return stopping;
+  }
+
+  private async stopChild(): Promise<void> {
     const child = this.child;
-    if (!child) return;
+    this.active = false;
+    this.closing = true;
     this.stopping = true;
+    const failures: unknown[] = [];
     try {
-      await this.request('deactivate', undefined).catch(() => undefined);
+      if (child?.connected) await this.request('deactivate', undefined).catch(() => undefined);
     } finally {
-      await this.disposeRegistrations();
-      if (child.connected) child.disconnect();
-      if (!(await waitForManagedProcessExit(child, 1500))) {
-        await forceTerminateManagedProcessTree(child, `Extension Host ${this.manifest.id}`, 1500, process.platform !== 'win32');
-      }
-      this.child = null;
-      this.rejectPending(new Error(`Extension Host ${this.manifest.id} 已停止`));
+      try { await this.disposeRegistrations(); } catch (error) { failures.push(error); }
+      try {
+        if (child?.connected) child.disconnect();
+        if (child) {
+          if (!(await processSupervisor.waitForManagedProcessExit(child, 1500)) || !processSupervisor.isProcessReleased(child)) {
+            await processSupervisor.forceTerminateManagedProcessTree(child, `Extension Host ${this.manifest.id}`, 1500, process.platform !== 'win32');
+          }
+          if (this.child === child) this.child = null;
+        }
+      } catch (error) { failures.push(error); }
+      this.rejectPending(new Error(`Extension Host ${this.manifest.id} 已停止接纳`));
       this.stopping = false;
+      if (failures.length > 0) {
+        this.reportHostStage('failed', `Extension Host ${this.manifest.id} 停机未确认`);
+        throw new AggregateError(failures, 'Extension Host 资源释放失败');
+      }
       this.reportHostStage('stopped', `Extension Host ${this.manifest.id} stopped`);
     }
   }
@@ -148,6 +191,7 @@ export class ExtensionProcessHost {
   }
 
   private async dispatchHostRequest(message: ExtensionKernelRequest): Promise<unknown> {
+    if (this.closing) throw new Error('Extension Host 正在关闭，拒绝新请求');
     const payload = asRecord(message.payload);
     switch (message.method) {
       case 'log': {
@@ -321,18 +365,28 @@ export class ExtensionProcessHost {
   private async disposeRegistration(id: string): Promise<void> {
     const disposable = this.registrations.get(id);
     if (!disposable) return;
-    this.registrations.delete(id);
+    let pending = this.disposing.get(id);
+    if (!pending) {
+      pending = Promise.resolve().then(() => disposable.dispose());
+      this.disposing.set(id, pending);
+      void pending.then(() => {
+        if (this.registrations.get(id) === disposable) this.registrations.delete(id);
+        this.disposing.delete(id);
+      }, () => { this.disposing.delete(id); });
+    }
     await withTimeout(
-      Promise.resolve(disposable.dispose()),
+      pending,
       Math.min(this.timeoutMs, 1500),
       `扩展 ${this.manifest.id} 注册项释放超时: ${id}`,
     );
   }
 
   private async disposeRegistrations(): Promise<void> {
+    const failures: unknown[] = [];
     for (const id of [...this.registrations.keys()].reverse()) {
-      await this.disposeRegistration(id).catch(() => undefined);
+      try { await this.disposeRegistration(id); } catch (error) { failures.push(error); }
     }
+    if (failures.length > 0) throw new AggregateError(failures, 'Extension Host 注册资源释放失败');
   }
 
   private assertPermission(permission: ExtensionPermissionValue, action: string): void {
@@ -357,28 +411,34 @@ export class ExtensionProcessHost {
   }
 
   private onDisconnect(): void {
+    this.active = false;
+    this.closing = true;
     const error = new Error(`Extension Host ${this.manifest.id} IPC disconnected`);
     this.rejectReady?.(error);
     this.resolveReady = null;
     this.rejectReady = null;
     this.rejectPending(error);
     if (!this.stopping) {
-      void this.disposeRegistrations();
+      void this.disposeRegistrations().catch(() => this.reportHostStage('failed', 'Extension Host 注册资源释放失败'));
       this.reportHostStage('failed', `Extension Host ${this.manifest.id} IPC disconnected`, error.message);
     }
   }
 
   private onExit(error: Error | null): void {
+    this.active = false;
+    this.closing = true;
     if (error) this.rejectReady?.(error);
     this.resolveReady = null;
     this.rejectReady = null;
-    this.child = null;
+    const released = !this.child?.pid || processSupervisor.isProcessReleased(this.child);
+    if (released) this.child = null;
     this.rejectPending(error ?? new Error(`Extension Host ${this.manifest.id} exited`));
-    void this.disposeRegistrations();
+    const cleanup = this.disposeRegistrations();
+    void cleanup.then(() => {
+      if (!error && released && !this.stopping && !this.child) this.reportHostStage('stopped', `Extension Host ${this.manifest.id} process exited`);
+    }, () => this.reportHostStage('failed', 'Extension Host 注册资源释放失败'));
     if (error) {
       this.reportHostStage('failed', `Extension Host ${this.manifest.id} process exited`, error.message);
-    } else {
-      this.reportHostStage('stopped', `Extension Host ${this.manifest.id} process exited`);
     }
   }
 

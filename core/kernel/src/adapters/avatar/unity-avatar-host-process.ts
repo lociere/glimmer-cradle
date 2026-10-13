@@ -9,16 +9,15 @@ import {
   resolveLogDir,
   resolveRepoRoot,
   resolveStatePath,
+  resolveManagedProcessBridge,
 } from '../filesystem/path-utils';
-import {
-  forceTerminateManagedProcessTree,
-  waitForManagedProcessExit,
-} from '../process/process-supervisor';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
 
 type UnityAvatarHostConfig = AvatarConfig['host'];
 type UnityAvatarHostProcessState = 'manual' | 'disabled' | 'starting' | 'running' | 'exited' | 'failed' | 'stopped';
 
 const logger = getLogger('avatar-process');
+const processSupervisor = new ManagedProcessSupervisor(logger);
 const PROCESS_LOG_FILE = 'avatar-host.console.log';
 const GRACEFUL_STOP_TIMEOUT_MS = 3000;
 
@@ -66,6 +65,7 @@ export class UnityAvatarHostProcess {
   private _lastError: string | undefined;
   private _startedAtMs: number | undefined;
   private _stopRequested = false;
+  private _stopOperation: Promise<void> | undefined;
   private _restartTimer: ReturnType<typeof setTimeout> | null = null;
   private _resolvedCommand: string | undefined;
   private _resolvedCwd: string | undefined;
@@ -89,7 +89,7 @@ export class UnityAvatarHostProcess {
     if (config.launch_mode !== 'managed') {
       this._state = config.launch_mode === 'manual' ? 'manual' : 'disabled';
       this._emitSnapshot();
-      void this.stop();
+      void this.stop().catch((error) => logger.error("Avatar 停机失败", { error: String(error) }));
       return;
     }
 
@@ -107,7 +107,11 @@ export class UnityAvatarHostProcess {
   public start(): void {
     const config = this._config;
     if (!config || config.launch_mode !== 'managed') return;
-    if (this._process && !this._process.killed) return;
+    if (this._stopOperation) throw new Error("Avatar 正在关闭");
+    if (this._process) {
+      if (this._state === "running" && !this._stopRequested) return;
+      throw new Error("Avatar 上代进程尚未释放");
+    }
 
     this._stopRequested = false;
     this._lastError = undefined;
@@ -141,8 +145,9 @@ export class UnityAvatarHostProcess {
     // 安装树中的原生 launcher 与 Unity Player 分属不同组件目录。
     const packagedPlayer = process.env.GLIMMER_CRADLE_AVATAR_PLAYER_EXECUTABLE?.trim();
     const args = packagedPlayer ? [packagedPlayer, ...config.args.slice(1)] : config.args;
-    const child = spawn(command, args, {
+    const child = processSupervisor.spawnManagedProcess(command, args, {
       cwd,
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         GLIMMER_CRADLE_AVATAR_PLACEMENT_PATH: resolveStatePath('desktop/avatar-placement.json'),
@@ -156,18 +161,20 @@ export class UnityAvatarHostProcess {
       // 隐藏 Unity Player，否则它可能停在场景初始化前。
       windowsHide: false,
       stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    }, resolveManagedProcessBridge(), spawn);
     this._process = child;
-    this._state = 'running';
+    processSupervisor.observeManagedProcess(child, process.platform !== 'win32');
+    this._state = 'starting';
     this._emitSnapshot();
 
-    const stdout = readline.createInterface({ input: child.stdout });
+    const stdout = readline.createInterface({ input: child.stdout! });
     stdout.on('line', (line: any) => this.handleProcessLine('stdout', line));
 
-    const stderr = readline.createInterface({ input: child.stderr });
+    const stderr = readline.createInterface({ input: child.stderr! });
     stderr.on('line', (line: any) => this.handleProcessLine('stderr', line));
 
     child.on('error', (error: any) => {
+      if (this._process !== child) return;
       this._state = 'failed';
       this._lastError = error.message;
       appendUnityAvatarHostProcessLog({ level: 'error', stream: 'process', message: error.message });
@@ -175,11 +182,14 @@ export class UnityAvatarHostProcess {
       this._emitSnapshot();
     });
 
-    child.on('exit', (code: any, signal: any) => {
-      this._process = null;
+    processSupervisor.onManagedProcessExit(child, (code, signal) => {
+      if (this._process !== child) return;
+      const released = processSupervisor.isProcessReleased(child);
+      if (released) this._process = null;
       this._lastExitCode = code;
       this._lastExitSignal = signal;
-      this._state = this._stopRequested ? 'stopped' : 'exited';
+      this._state = released ? (this._stopRequested ? 'stopped' : 'exited') : 'failed';
+      if (!released) this._lastError = 'Avatar 子树回收未确认';
       logger.warn('Avatar 受管进程已退出', { code, signal });
       appendUnityAvatarHostProcessLog({
         level: this._stopRequested ? 'info' : 'warn',
@@ -188,9 +198,30 @@ export class UnityAvatarHostProcess {
       });
       this._emitSnapshot();
 
-      if (!this._stopRequested && config.restart_on_exit) {
+      if (released && !this._stopRequested && config.restart_on_exit) {
         this._restartTimer = setTimeout(() => this.start(), 2000);
       }
+    });
+
+    processSupervisor.onManagedProcessRootExit(child, (code, signal) => {
+      if (this._process !== child || processSupervisor.isProcessReleased(child)) return;
+      this._lastExitCode = code;
+      this._lastExitSignal = signal;
+      this._state = 'failed';
+      this._lastError = 'Avatar 根已退出，受管子树仍在等待释放';
+      this._emitSnapshot();
+    });
+    void processSupervisor.waitForManagedProcessReady(child, GRACEFUL_STOP_TIMEOUT_MS).then(() => {
+      if (this._process === child && !this._stopRequested && this._lastExitCode === undefined) {
+        this._state = 'running';
+        this._emitSnapshot();
+      }
+    }).catch((error) => {
+      if (this._process !== child) return;
+      this._state = 'failed';
+      this._lastError = String(error);
+      this._emitSnapshot();
+      void this.stop().catch((stopError) => logger.error('Avatar 启动失败后回收未确认', { error: String(stopError) }));
     });
 
     logger.info('Avatar 受管进程已启动', {
@@ -200,7 +231,18 @@ export class UnityAvatarHostProcess {
     });
   }
 
-  public async stop(): Promise<void> {
+  public stop(): Promise<void> {
+    if (this._stopOperation) return this._stopOperation;
+    let resolveStop!: () => void;
+    let rejectStop!: (error: unknown) => void;
+    const operation = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
+    this._stopOperation = operation;
+    void this.stopChild().then(resolveStop, rejectStop);
+    void operation.then(() => { this._stopOperation = undefined; }, () => { this._stopOperation = undefined; });
+    return operation;
+  }
+
+  private async stopChild(): Promise<void> {
     this._stopRequested = true;
     if (this._restartTimer) {
       clearTimeout(this._restartTimer);
@@ -216,11 +258,18 @@ export class UnityAvatarHostProcess {
       return;
     }
 
-    if (await waitForManagedProcessExit(child, GRACEFUL_STOP_TIMEOUT_MS)) {
-      return;
+    try {
+      if (!await processSupervisor.waitForManagedProcessExit(child, GRACEFUL_STOP_TIMEOUT_MS) || !processSupervisor.isProcessReleased(child)) {
+        await processSupervisor.forceTerminateManagedProcessTree(child, 'Avatar', 1500, process.platform !== 'win32');
+      }
+    } catch (error) {
+      if (processSupervisor.isProcessReleased(child) && this._process === child) this._process = null;
+      this._state = 'failed';
+      this._lastError = error instanceof Error ? error.message : String(error);
+      this._emitSnapshot();
+      throw error;
     }
-
-    await forceTerminateManagedProcessTree(child, 'Avatar');
+    if (this._process === child) this._process = null;
 
     if (this._state !== 'manual' && this._state !== 'disabled') {
       this._state = 'stopped';
@@ -233,7 +282,7 @@ export class UnityAvatarHostProcess {
       state: this._state,
       command: this._resolvedCommand,
       cwd: this._resolvedCwd,
-      pid: this._process?.pid,
+      pid: this._process ? processSupervisor.managedProcessPid(this._process) : undefined,
       started_at_ms: this._startedAtMs,
       last_exit_code: this._lastExitCode,
       last_exit_signal: this._lastExitSignal,

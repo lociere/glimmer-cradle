@@ -165,7 +165,7 @@ C# SDK 与 Unity UPM 包是两种交付载体，不要求 Unity 直接消费不�
 
 <!-- target-layout:start -->
 
-精确登记 1127 个版本控制文件、339 个父目录。以下是目标，不是当前实物。
+精确登记 1131 个版本控制文件、341 个父目录。以下是目标，不是当前实物。
 
 ```text
 glimmer-cradle/
@@ -939,15 +939,20 @@ glimmer-cradle/
 │   │   └── vitest.config.ts
 │   └── platform/
 │       ├── README.md
+│       ├── native/
+│       │   ├── CMakeLists.txt
+│       │   └── build.mjs
 │       ├── package.json
 │       ├── schemas/
 │       │   └── platform-config.schema.json
 │       ├── src/
 │       │   ├── adapters/
-│       │   │   └── node/
-│       │   │       ├── file-config-loader.ts
-│       │   │       ├── process-supervisor.ts
-│       │   │       └── structured-logger.ts
+│       │   │   ├── node/
+│       │   │   │   ├── file-config-loader.ts
+│       │   │   │   ├── process-supervisor.ts
+│       │   │   │   └── structured-logger.ts
+│       │   │   └── windows/
+│       │   │       └── process-tree-bridge.cpp
 │       │   ├── communication/
 │       │   │   ├── backpressure.ts
 │       │   │   ├── command.ts
@@ -1002,7 +1007,8 @@ glimmer-cradle/
 │       │   ├── lifecycle-drain.test.ts
 │       │   ├── log-redaction.test.ts
 │       │   ├── public-api.test.ts
-│       │   └── stream-backpressure.test.ts
+│       │   ├── stream-backpressure.test.ts
+│       │   └── windows-process-tree.test.ts
 │       ├── tsconfig.build.json
 │       ├── tsconfig.json
 │       └── vitest.config.ts

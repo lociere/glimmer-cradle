@@ -29,15 +29,12 @@ import {
 } from '@glimmer-cradle/contracts/glimmer/engine/audio/v1/audio_engine_pb';
 import { CallMetadataSchema } from '@glimmer-cradle/contracts/glimmer/common/v1/service_contract_pb';
 import { getLogger } from '../observability/logger';
-import {
-  forceTerminateManagedProcessTree,
-  stopManagedProcess,
-  waitForManagedProcessExit,
-} from '../process/process-supervisor';
-import { resolveLogDir, resolveRepoRoot, resolveWorkPath } from '../filesystem/path-utils';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
+import { resolveLogDir, resolveRepoRoot, resolveWorkPath, resolveManagedProcessBridge } from '../filesystem/path-utils';
 import { audioUnaryMethod } from './audio-grpc-contract';
 
 const logger = getLogger('official-audio-engine');
+const processSupervisor = new ManagedProcessSupervisor(logger);
 const AUTH_HEADER = 'x-glimmer-audio-token';
 const BOOTSTRAP_TIMEOUT_MS = 15_000;
 const LEASE_GRACE_MS = 30_000;
@@ -81,6 +78,8 @@ export class OfficialAudioEngineClient {
   private starting: Promise<RunningAudioHost> | null = null;
   private resetting: Promise<void> = Promise.resolve();
   private stoppingProcess: AudioChild | null = null;
+  private resettingFailed = false;
+  private stopOperation: Promise<void> | undefined;
   private environment: AudioEngineEnvironment | null = null;
   private readonly mediaRoot: string;
 
@@ -165,8 +164,10 @@ export class OfficialAudioEngineClient {
     method: grpc.MethodDefinition<I, O>,
     request: I,
     timeoutMs = this.timeoutMs,
+    allowClosing = false,
   ): Promise<O> {
-    const running = await this.ensureProcess();
+    const running = allowClosing ? this.running : await this.ensureProcess();
+    if (!running) throw new Error("audio engine 停机时连接已关闭");
     const metadata = new grpc.Metadata();
     metadata.set(AUTH_HEADER, running.token);
     return new Promise<O>((resolve, reject) => {
@@ -181,15 +182,17 @@ export class OfficialAudioEngineClient {
           if (!error && response) return resolve(response);
           const failure = error ?? new Error(`audio engine ${this.lane} returned no response`);
           reject(failure);
-          if (error?.code === grpc.status.DEADLINE_EXCEEDED) this.resetProcess(failure);
+          if (!allowClosing && error?.code === grpc.status.DEADLINE_EXCEEDED) this.resetProcess(failure);
         },
       );
     });
   }
 
   private async ensureProcess(): Promise<RunningAudioHost> {
+    if (this.stopOperation || this.stoppingProcess || this.resettingFailed) throw new Error("audio engine 正在关闭或上代回收失败");
     if (this.running && this.process?.exitCode === null && this.process.signalCode === null) return this.running;
     if (this.starting) return this.starting;
+    if (this.process || this.resettingFailed || this.stoppingProcess) throw new Error('audio engine 上代进程尚未释放');
     this.starting = this.startProcess();
     try {
       this.running = await this.starting;
@@ -210,8 +213,9 @@ export class OfficialAudioEngineClient {
     const args = packagedPython
       ? ['-m', 'glimmer_cradle.audio.main']
       : ['run', '--project', this.engineDir, '--extra', this.lane, 'glimmer-cradle-audio'];
-    const child = spawn(command, args, {
+    const child = processSupervisor.spawnManagedProcess(command, args, {
       cwd: packagedPython ? resolveRepoRoot() : this.engineDir,
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         ...this.environment.secrets,
@@ -223,22 +227,27 @@ export class OfficialAudioEngineClient {
       },
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-    }) as AudioChild;
+    }, resolveManagedProcessBridge(), spawn) as AudioChild;
     this.process = child;
+    processSupervisor.observeManagedProcess(child, process.platform !== 'win32');
     readline.createInterface({ input: child.stderr }).on('line', (line) => this.handleProcessLogLine('stderr', line));
     child.on('error', (error) => logger.warn('官方音频引擎进程错误', { lane: this.lane, error: error.message }));
-    child.on('exit', (code, signal) => this.handleExit(child, code, signal));
+    processSupervisor.onManagedProcessExit(child, (code, signal) => this.handleExit(child, code, signal));
+    processSupervisor.onManagedProcessRootExit(child, (code, signal) => this.handleExit(child, code, signal));
     let endpoint: string;
     try {
-      endpoint = await readBootstrapEndpoint(
+      const bootstrapEndpoint = readBootstrapEndpoint(
         child.stdout,
         child,
         BOOTSTRAP_TIMEOUT_MS,
         (line) => this.handleProcessLogLine('stdout', line),
       );
+      const results = await Promise.all([bootstrapEndpoint, processSupervisor.waitForManagedProcessReady(child, BOOTSTRAP_TIMEOUT_MS)]);
+      endpoint = results[0];
+      if (!processSupervisor.isManagedProcessRootRunning(child)) throw new Error('audio engine bootstrap 根已退出');
     } catch (error) {
+      await processSupervisor.stopManagedProcess(child, { label: `官方音频引擎 ${this.lane} bootstrap`, ownsProcessGroup: process.platform !== 'win32' });
       if (this.process === child) this.process = null;
-      await stopManagedProcess(child, { label: `官方音频引擎 ${this.lane} bootstrap` });
       await fs.remove(this.mediaRoot);
       throw error;
     }
@@ -255,13 +264,14 @@ export class OfficialAudioEngineClient {
   private handleExit(child: AudioChild, code: number | null, signal: NodeJS.Signals | null): void {
     const expected = this.stoppingProcess === child;
     const ownsCurrentProcess = this.process === child;
+    const released = processSupervisor.isProcessReleased(child);
     if (this.running?.child === child) {
       this.running.client.close();
       this.running = null;
     }
-    if (ownsCurrentProcess) this.process = null;
-    if (this.stoppingProcess === child) this.stoppingProcess = null;
-    if (ownsCurrentProcess) void fs.remove(this.mediaRoot);
+    if (ownsCurrentProcess && released) this.process = null;
+    if (this.stoppingProcess === child && released) this.stoppingProcess = null;
+    if (ownsCurrentProcess && released) void fs.remove(this.mediaRoot);
     const record = { lane: this.lane, code, signal, expected };
     if (expected && code === 0) logger.info('官方音频引擎已正常退出', record);
     else logger.warn('官方音频引擎已退出', record);
@@ -271,25 +281,50 @@ export class OfficialAudioEngineClient {
     const child = this.process;
     this.running?.client.close();
     this.running = null;
-    this.process = null;
+    this.stoppingProcess = child;
     this.resetting = (async () => {
-      await stopManagedProcess(child, { label: `官方音频引擎 ${this.lane}` });
+      await processSupervisor.stopManagedProcess(child, { label: `官方音频引擎 ${this.lane}`, ownsProcessGroup: process.platform !== 'win32' });
+      if (this.process === child) this.process = null;
+      if (this.stoppingProcess === child) this.stoppingProcess = null;
+      this.resettingFailed = false;
       await fs.remove(this.mediaRoot);
     })();
+    void this.resetting.catch(() => { this.resettingFailed = true; });
     logger.warn('官方音频引擎连接已重置', { lane: this.lane, error: error.message });
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    if (this.stopOperation) return this.stopOperation;
+    let resolveStop!: () => void;
+    let rejectStop!: (error: unknown) => void;
+    const operation = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
+    this.stopOperation = operation;
+    void this.stopChild().then(resolveStop, rejectStop);
+    void operation.then(() => { this.stopOperation = undefined; }, () => { this.stopOperation = undefined; });
+    return operation;
+  }
+
+  private async stopChild(): Promise<void> {
+    await this.starting?.catch(() => undefined);
+    await this.resetting.catch(() => undefined);
     const child = this.process;
     const running = this.running;
-    if (!child || child.exitCode !== null || child.signalCode !== null) {
+    if (!child || processSupervisor.isProcessReleased(child)) {
+      this.running?.client.close();
+      this.running = null;
+      this.process = null;
+      this.stoppingProcess = null;
+      this.resettingFailed = false;
+      this.resetting = Promise.resolve();
       await fs.remove(this.mediaRoot);
       return;
     }
     this.stoppingProcess = child;
+    let processStopped = false;
     try {
       if (!running) {
-        await stopManagedProcess(child, { label: `官方音频引擎 ${this.lane} bootstrap` });
+        await processSupervisor.stopManagedProcess(child, { label: `官方音频引擎 ${this.lane} bootstrap` });
+        processStopped = true;
         return;
       }
       try {
@@ -297,9 +332,14 @@ export class OfficialAudioEngineClient {
           audioUnaryMethod('Shutdown', ShutdownRequestSchema, ShutdownResponseSchema),
           create(ShutdownRequestSchema, { call: this.callMetadata('shutdown'), reason: 'kernel shutdown' }),
           1000,
+          true,
         );
         if (response.failure || !response.accepted) throw new Error(response.failure?.safeMessage ?? 'audio engine 拒绝停机请求');
-        if (await waitForManagedProcessExit(child, 2500)) return;
+        if (await processSupervisor.waitForManagedProcessExit(child, 2500)) {
+          if (!processSupervisor.isProcessReleased(child)) throw new Error('audio engine 子树回收未确认');
+          processStopped = true;
+          return;
+        }
         logger.warn('官方音频引擎未在协议停机期限内退出', { lane: this.lane });
       } catch (error) {
         logger.warn('官方音频引擎协议停机失败，转入受管进程回收', {
@@ -307,9 +347,18 @@ export class OfficialAudioEngineClient {
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      await forceTerminateManagedProcessTree(child, `官方音频引擎 ${this.lane}`, 1000, process.platform !== 'win32');
+      await processSupervisor.forceTerminateManagedProcessTree(child, `官方音频引擎 ${this.lane}`, 1000, process.platform !== 'win32');
+      processStopped = true;
     } finally {
-      await fs.remove(this.mediaRoot);
+      if (processStopped || processSupervisor.isProcessReleased(child)) {
+        this.running?.client.close();
+        this.running = null;
+        if (this.process === child) this.process = null;
+        if (this.stoppingProcess === child) this.stoppingProcess = null;
+        this.resettingFailed = false;
+        this.resetting = Promise.resolve();
+        await fs.remove(this.mediaRoot);
+      } else this.resettingFailed = true;
     }
   }
 
@@ -443,12 +492,21 @@ async function readBootstrapEndpoint(
       settled = true;
       clearTimeout(timer);
       child.off('exit', onExit);
+      child.off('error', onError);
+      pipe.off('error', onError);
+      lines.off('close', onClose);
+      if (error) { lines.removeAllListeners('line'); lines.close(); }
       if (error) reject(error);
       else resolve(endpoint!);
     };
     const timer = setTimeout(() => finish(new Error('audio engine endpoint bootstrap timed out')), timeoutMs);
     const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish(new Error(`audio engine exited before bootstrap: code=${code}, signal=${signal}`));
+    const onError = (error: Error) => finish(error);
+    const onClose = () => finish(new Error('audio engine stdout closed before bootstrap'));
     child.once('exit', onExit);
+    child.once('error', onError);
+    pipe.once('error', onError);
+    lines.once('close', onClose);
     lines.on('line', (line) => {
       const match = /^GLIMMER_AUDIO_ENDPOINT=(127\.0\.0\.1:\d+)$/.exec(line.trim());
       if (match && !settled) finish(undefined, match[1]);

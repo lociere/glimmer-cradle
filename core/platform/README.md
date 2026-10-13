@@ -23,6 +23,15 @@ observer 负责产品通知/投影。LifecycleCallbackGuard 按实例跟踪活�
 回调 settle 后的异步后续任务、另一个 coordinator 的生命周期均可正常执行。
 当前尚无通用启动取消/超时，P02A 仍未接受。
 
+`ManagedProcessSupervisor` 通过公开 root 提供 Node 受管启动、真实 PID、等待与停止机制，
+App 注入 logger、Clock 和 Native bridge 路径，协议 shutdown/业务 readiness 仍由 App 拥有。
+Windows 在目标恢复执行前分配 Job，私有 FD4 接收实际根退出及 Job 空回执，FD3 bootstrap/IPC
+继续交给目标；仅收到空回执并确认 helper 退出才释放 owner。根先退出、停止超时或控制回执丢失
+不清除 owner，不通过 taskkill 或 PID 重用伪造成功。目标从未创建有单独失败回执，可安全重试。
+POSIX 在启动时登记独立组，根退出与组清空分别确认；真实 Linux/mac 行为待适用平台验收。
+Native 源与构建属于 Platform；Desktop 的旧控制协议及文件名投影绑定 P12B 删除门，仍核验
+实际句柄退出与 Job 空，不以 managed launch 的测试代证旧入口。
+
 `pnpm test:platform` 运行实际 Node 测试；包 `typecheck` 包含 source、authority、生命周期与公开 API 测试。
 物理迁移、hybrid/offline、完整生命周期故障回收与产品装配仍按
 [执行记录](../../docs/roadmap/initiatives/architecture-v2/README.md) 推进，当前目录不代表所有目标模块已完成。

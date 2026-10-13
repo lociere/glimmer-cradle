@@ -2376,6 +2376,14 @@
       "owner": "platform"
     },
     {
+      "path": "core/platform/native/CMakeLists.txt",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/native/build.mjs",
+      "owner": "platform"
+    },
+    {
       "path": "core/platform/package.json",
       "owner": "platform"
     },
@@ -2393,6 +2401,10 @@
     },
     {
       "path": "core/platform/src/adapters/node/structured-logger.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/src/adapters/windows/process-tree-bridge.cpp",
       "owner": "platform"
     },
     {
@@ -2569,6 +2581,10 @@
     },
     {
       "path": "core/platform/tests/stream-backpressure.test.ts",
+      "owner": "platform"
+    },
+    {
+      "path": "core/platform/tests/windows-process-tree.test.ts",
       "owner": "platform"
     },
     {

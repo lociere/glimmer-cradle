@@ -23,11 +23,11 @@ const expectedLock = {
     },
     {
       "path": "docs/architecture/target/physical-layout.md",
-      "sha256": "0f6e240201415d66600f390dbd9938763b3604320532686306d40f8cd2aecea9"
+      "sha256": "6320f908606b6539253d78efd4024dd56a735e0f0529eaec4bd8219b07141878"
     },
     {
       "path": "docs/architecture/target/files.json",
-      "sha256": "313d36ed94e71c5cd54266849411ba27ebc6dd0c92cb92bb7ebad0c40ccd9291"
+      "sha256": "f523d4f518833ac99d8ba9a86ab5dc87ac1aa3c3599e7fb49782894ac049b939"
     },
     {
       "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",

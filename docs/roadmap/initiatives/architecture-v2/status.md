@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：进程监督与4类consumer迁移源码dirty，尚未提交/验收。Platform27、Kernel cognition9/extension5/audio4（实际gRPC与64次health）及两包typecheck通过；失败句柄/注册项保留、入口撤销、共享stop/同owner重试、POSIX独立组退出回执已实现定向反例。独立中途审查P1仍开：Windows taskkill/root退出不等于tree空，须复用已有Job Object/ActiveProcesses真实边界并核对FD3/IPC/UV/Avatar launcher启动链；根退出未确认树时不得丢owner或复用死PID。下一动作：取得只读Native接线调查，补native/消费者真实后代反例并关闭此P1，再固定候选复核/提交。随后通用取消/超时与trace/log/config/health。P02A/D04/root大型/目录/安装/设备未接受；writer本会话，无后台测试进程，不推送。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：受管进程逻辑单元已实现并通过固定源码只读复核（范围限此单元），准备保存中文提交后继续通用取消/超时与trace/log/config/health。Windows Native/Node/旧Desktop23、Platform包52及最后POSIX observer微差lifecycle21、Kernel Cognition10/Audio5/Extension6/实际Worker4及最后FD4边界2项重跑通过；两包typecheck与架构/文档/编码/工具10项反例通过。App安装/开发路径真实接线，旧机制consumer-zero删除，Desktop旧装配显式绑定P12B。下一动作：按现有Clock/Lifecycle API补有界取消/超时及失败owner保留，不重构已有架构。P02A/D04/整体任务/根大型/完整制品/适用设备未验收，不推送；writer本会话，无后台测试句柄。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

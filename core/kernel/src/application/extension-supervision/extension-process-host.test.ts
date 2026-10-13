@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ExtensionPermission,
   type ExtensionCommandContribution,
@@ -173,7 +173,7 @@ describe('ExtensionProcessHost', () => {
     await allowedHost.stop();
   });
 
-  it('stops the isolated host when a registration disposable hangs', async () => {
+  it('reclaims the isolated host but retains a timed-out registration until its actual release', async () => {
     process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
     const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-host-hung-registration-'));
     temporaryRoots.push(root);
@@ -187,7 +187,10 @@ describe('ExtensionProcessHost', () => {
       '',
     ].join('\n'), 'utf8');
     const service = new FakeExtensionHostService();
-    service.attentionLeaseDispose = () => new Promise<void>(() => undefined);
+    let release!: () => void;
+    let disposeCalls = 0;
+    const disposal = new Promise<void>(resolve => { release = resolve; });
+    service.attentionLeaseDispose = () => { disposeCalls += 1; return disposal; };
     const host = new ExtensionProcessHost(
       service,
       { id: 'demo.hung-registration', permissions: [] },
@@ -199,9 +202,47 @@ describe('ExtensionProcessHost', () => {
     );
 
     await host.start();
-    await expect(withTestTimeout(host.stop(), 5000)).resolves.toBeUndefined();
-
+    await expect(withTestTimeout(host.stop(), 5000)).rejects.toThrow('Extension Host 资源释放失败');
+    const internals = host as unknown as { child: unknown; registrations: Map<string, Disposable> };
+    expect(internals.child).toBeNull();
+    expect(internals.registrations.size).toBe(1);
+    expect(disposeCalls).toBe(1);
+    expect(service.lifecycleStages).not.toContain('Extension Host demo.hung-registration stopped');
+    await expect(host.start()).rejects.toThrow('旧资源尚未释放');
+    await expect(host.invokeHandler('late-handler', {})).rejects.toThrow('尚未就绪');
+    release();
+    await disposal;
+    await withTestTimeout(host.stop(), 5000);
+    expect(disposeCalls).toBe(1);
+    expect(internals.registrations.size).toBe(0);
     expect(service.lifecycleStages).toContain('Extension Host demo.hung-registration stopped');
+  });
+
+  it.skipIf(process.platform !== 'win32')('retains a live descendant after the real Extension root exits and drains the same Job on stop', async () => {
+    process.env.GLIMMER_CRADLE_EXTENSION_HOST_ENTRY = hostEntry;
+    const root = await mkdtemp(path.join(tmpdir(), 'glimmer-extension-descendant-'));
+    temporaryRoots.push(root);
+    const entry = path.join(root, 'extension.js');
+    await writeFile(entry, `module.exports={onActivate(ctx){ctx.ports.commands.registerCommand('demo.descendant.start',async()=>{const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',detached:true});await new Promise(resolve=>child.once('spawn',resolve));setTimeout(()=>process.exit(0),100);return {root:process.pid,descendant:child.pid};});}};`, 'utf8');
+    const service = new FakeExtensionHostService();
+    const host = new ExtensionProcessHost(service, { id: 'demo.descendant', permissions: [ExtensionPermission.COMMAND_REGISTER] }, entry, {}, {}, 'default', 5000);
+    try {
+      await host.start();
+      const { root: rootPid, descendant } = await service.executeCommand('demo.descendant.start') as { root: number; descendant: number };
+      const internals = host as unknown as { child: import('node:child_process').ChildProcess | null; closing: boolean };
+      const owner = internals.child;
+      expect(owner?.pid).not.toBe(rootPid);
+      await vi.waitFor(() => expect(() => process.kill(rootPid, 0)).toThrow(), { timeout: 5000 });
+      await vi.waitFor(() => expect(internals.closing).toBe(true), { timeout: 5000 });
+      expect(() => process.kill(descendant, 0)).not.toThrow();
+      expect(internals.child).toBe(owner);
+      expect(owner?.exitCode).toBeNull();
+      await expect(host.invokeHandler('late-handler', {})).rejects.toThrow('尚未就绪');
+      await host.stop();
+      expect(internals.child).toBeNull();
+      expect(() => process.kill(descendant, 0)).toThrow();
+      expect(service.commands.size).toBe(0);
+    } finally { await host.stop(); }
   });
 });
 

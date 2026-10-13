@@ -25,7 +25,7 @@ if (process.argv.includes('--dry-run')) {
       'build/components/avatar/unity-host/windows-x64',
       'build/extension-host/modules',
       'build/components/native/composition-host/windows-x64',
-      'products/desktop/native/process-tree-bridge/DesktopProcessTreeBridge.cpp',
+      'core/platform/src/adapters/windows/process-tree-bridge.cpp',
     ],
     output,
     command: 'pnpm',

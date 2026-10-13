@@ -18,6 +18,7 @@
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
 | root 的 topology exports | AuthorityLease/StorePort、fencing 判定、HandoverController | Host `SqliteAuthorityStore` 与 `HostJobsOwner`；无数据库依赖 |
 | root 的 security exports | 不可变 Principal、PermissionRequest/Grant/Decision 与身份验证 | Host PermissionBroker 登记/授权/审计/撤销；不解释 Resource 内容或 scope |
+| root 的 ManagedProcessSupervisor | Node/OS 受管进程启动、真实 PID、边界释放与失败保留 | 当前 Cognition/Audio/Avatar/Extension App adapter；通用 Node/Windows Native 实现由 Platform 拥有 |
 
 契约提取不表示具体 IO 实现已迁入 Platform。Scope、完整 Topology/hybrid、Configuration 装配和
 完整 Security 等仍按执行记录推进；短寿命授权接线见
@@ -51,6 +52,32 @@
   App 的事件与资源释放回调也消费同一公开机制，自等待错误不跳过其余资源释放。
   通用取消/超时尚待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
 
+## 受管进程的实际边界
+
+`adapters/node/process-supervisor.ts` 由公开 root 暴露；当前四类 Kernel App adapter
+实际消费启动/等待/回收，旧 Kernel process helper 已删除。App 注入 logger、Clock 和
+`resolveManagedProcessBridge()` 解析的当前开发/安装路径，Platform 不依赖产品目录。
+Windows Native 源在 `adapters/windows/process-tree-bridge.cpp`，独立构建入口为
+`core/platform/native/build.mjs`。Desktop 暂将同一产物投影为原有文件名；其 CMake/
+包装入口与旧 stdin 控制协议仍由 P12B 完成产品切换后删除，不能据此声称产品路径已迁完。
+
+Windows 目标以 suspended 创建，成功 AssignJob 后才 Resume；目标 FD0–3 保留，FD4 仅属于
+Native 监督。root PID 与 helper PID 分开，根退出立即撤销业务入口，但释放 owner 还须
+实际根句柄退出、成功查询 ActiveProcesses=0 的回执，以及 helper 实际退出和私有FD4排空。
+helper exit可早于最后回执，Node advanced fork IPC的父端disconnect也可能不发聚合close；
+完整退出通知基于helper实际exit与FD4排空，不以聚合close或私有Node计数替代事实。
+Assign/Resume/Query 失败保留实际句柄，继续清理/查询；超时保留同一 Job 供 stop 重试。
+控制连接/回执丢失保持未知 owner，禁止重用 PID 回收；根本未创建目标有明确失败回执。
+旧 Desktop 控制入口同样检查系统调用结果，失败启动清理确认后才回报，停止须实际根退出与
+Job 清空，EOF 清理也保留句柄到确认完成。两种私有机制都有独立真实/故障验证。
+
+Cognition 在 Windows venv redirector 场景解析实际 CPython，并保留原 venv 路径初始化，
+注册/失效绑定实际根 PID，未放宽认证。协议 readiness、shutdown、注册项和媒体 owner
+仍在 App：关闭接纳、共享 stop、失败保留与恢复重试；Native 接纳不表示业务 ready。
+POSIX 独立进程组须另行确认组空，当前可控反例不代替 Linux/mac 实机验收。
+Native/Node 与实际消费者的证据、固定候选复核及未验范围见
+[P02A 证据](../../roadmap/initiatives/architecture-v2/evidence/2026-10-09-P02A.md)。
+
 ## 事件、配置与数据边界
 
 Live-event contract 表达进程内通知，不承诺持久化、重试或 exactly-once。
@@ -82,15 +109,6 @@ authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒�
 `HostDataPaths` 接目标 authority/Jobs 路径并持有数据库，恢复预检先于 Worker 外部绑定；
 精确配置与持久边界分别见[配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)、
 [数据目录](../../reference/data-layout.md#用户状态与记忆)。跨机 wire/认证、离线 proposal 和恢复安装仍待完成。
-
-## Node 进程监督迁移在制品
-
-Platform root 当前导出 ManagedProcessSupervisor，App 注入 logger、保有子进程 handle、决定协议
-shutdown 与启动政策；实际 Kernel Cognition/Audio/Avatar/Extension 已切公开入口，旧 helper 删除。
-根退出等待使用 Clock，回收超时/命令失败明确上抛，失败 owner 保留并拒绝并行重启；POSIX
-独立组单独查询清空 receipt。此段源码仍在迁移，Windows 尚缺独立树空证明，不能把 taskkill
-完成或根退出当作完整树回收验收；当前问题和恢复点见
-[P02A 进程回收在制品](../../roadmap/initiatives/architecture-v2/evidence/2026-10-09-P02A.md#进程回收第三段在制品与恢复点)。
 
 ## 调试与验证
 

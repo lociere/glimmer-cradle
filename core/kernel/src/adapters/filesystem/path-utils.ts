@@ -45,6 +45,15 @@ export function resolveRepoRoot(): string {
   return lastPackageJson || process.cwd();
 }
 
+/** 当前产品装配注入 Platform 机制路径；安装目录映射随 P12B 迁入 Host。 */
+export function resolveManagedProcessBridge(): string | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const root = resolveRepoRoot();
+  return readConfiguredPathEnv('GLIMMER_CRADLE_APP_ROOT')
+    ? path.join(root, 'components/native/composition-host/DesktopProcessTreeBridge.exe')
+    : path.join(root, 'build/components/native/composition-host/windows-x64/PlatformProcessTreeBridge.exe');
+}
+
 /**
  * 统一计算 Local Data Domain 根目录。
  *

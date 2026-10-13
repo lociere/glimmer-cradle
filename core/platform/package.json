@@ -5,7 +5,11 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "native",
+    "src/adapters/windows/process-tree-bridge.cpp"
+  ],
   "exports": {
     "./configuration": {
       "types": "./dist/configuration/index.d.ts",
@@ -44,9 +48,10 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts tests/lifecycle-drain.test.ts tests/public-api.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts tests/lifecycle-drain.test.ts tests/public-api.test.ts tests/windows-process-tree.test.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm run build && node --test tests/*.test.mjs tests/*.test.ts"
+    "test": "pnpm run build && pnpm run build:native && node --test tests/*.test.mjs tests/*.test.ts",
+    "build:native": "node native/build.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",

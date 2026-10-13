@@ -213,3 +213,189 @@ test('a module may drain a different coordinator without being mistaken for self
   assert.deepEqual(parent.owned, []);
   assert.deepEqual(child.owned, []);
 });
+
+const { EventEmitter } = require('node:events');
+const { ManagedProcessSupervisor } = require('../dist/index.js') as typeof import('../src/index');
+const quietProcessLogger = { info() {}, warn() {}, error() {} };
+function processFixture() {
+  const child = Object.assign(new EventEmitter(), {
+    pid: 4422, exitCode: null as number | null, signalCode: null as NodeJS.Signals | null,
+    killed: false, kill() { this.killed = true; return true; },
+  }) as import('node:child_process').ChildProcess;
+  let now = 0;
+  const timers = new Set<{ at: number; task: () => void }>();
+  const controlled = {
+    monotonicNowMs: () => now,
+    schedule(delay: number, task: () => void) {
+      const timer = { at: now + delay, task }; timers.add(timer);
+      return { cancel: () => { timers.delete(timer); } };
+    },
+    advance(delta: number) { now += delta; for (const timer of [...timers]) if (timer.at <= now) { timers.delete(timer); timer.task(); } },
+  };
+  const exit = () => { Object.assign(child, { exitCode: 0 }); child.emit('exit', 0, null); };
+  return { child, controlled, timers, exit };
+}
+
+test('managed process timeout cancels its clock task and detaches the exit listener', async () => {
+  const fixture = processFixture();
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled);
+  const wait = supervisor.waitForManagedProcessExit(fixture.child, 25);
+  fixture.controlled.advance(25);
+  assert.equal(await wait, false);
+  assert.equal(fixture.child.listenerCount('exit'), 0);
+  assert.equal(fixture.timers.size, 0);
+  const actualExit = supervisor.waitForManagedProcessExit(fixture.child, 25);
+  fixture.exit();
+  assert.equal(await actualExit, true);
+  assert.equal(fixture.timers.size, 0);
+});
+
+test('accepted kill and child.killed cannot substitute for a root exit receipt', async () => {
+  const fixture = processFixture();
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() {},
+  });
+  const stop = supervisor.forceTerminateManagedProcessTree(fixture.child, 'hung-root', 25);
+  const rejection = assert.rejects(stop, /未在回收期限内退出/);
+  assert.equal(fixture.child.killed, true);
+  fixture.controlled.advance(25);
+  await rejection;
+  assert.equal(supervisor.isProcessReleased(fixture.child), false);
+  assert.equal(fixture.child.listenerCount('exit'), 0);
+});
+
+test('Windows refuses an unowned tree, retains it after root exit and forbids dead PID retry', async () => {
+  const fixture = processFixture();
+  let calls = 0;
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'win32', signalProcessGroup() { calls += 1; },
+  });
+  await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'unknown-tree', 25), /缺少所属 Native Job owner/);
+  fixture.exit();
+  assert.equal(supervisor.isProcessReleased(fixture.child), false);
+  await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'unknown-tree', 25), /禁止复用其 PID/);
+  assert.equal(calls, 0);
+});
+
+test('throwing stop logger does not skip native termination or discard the exit receipt', async () => {
+  const fixture = processFixture();
+  let calls = 0;
+  const supervisor = new ManagedProcessSupervisor({ ...quietProcessLogger, warn() { throw new Error('observer failure'); } }, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() { calls += 1; fixture.exit(); }, isProcessGroupAlive() { return false; },
+  });
+  await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'observer', 25, true), /停止 observer 失败/);
+  assert.equal(calls, 1);
+  assert.equal(supervisor.isProcessReleased(fixture.child), true);
+  assert.equal(fixture.timers.size, 0);
+});
+
+test('invalid native termination budget never signals the owned process', async () => {
+  const fixture = processFixture();
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled);
+  for (const budget of [0, -1, NaN, Infinity, 1.5, 2147483648]) {
+    await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'invalid-budget', budget), /timeout 无效/);
+  }
+  assert.equal(fixture.child.killed, false);
+});
+
+test('native isolated Node root exits within the termination budget', async () => {
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger);
+  const bridge = require('node:path').resolve(__dirname, '../../../build/components/native/composition-host/windows-x64/PlatformProcessTreeBridge.exe');
+  const child = supervisor.spawnManagedProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+    windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32',
+  }, bridge);
+  child.stdout!.resume(); child.stderr!.resume();
+  await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
+  await supervisor.waitForManagedProcessReady(child, 5000);
+  try {
+    await supervisor.forceTerminateManagedProcessTree(child, 'isolated-test-root', 5000, process.platform !== 'win32');
+    assert.equal(supervisor.isProcessReleased(child), true);
+    assert.equal(child.exitCode != null || child.signalCode != null, true);
+  } finally {
+    if (child.exitCode == null && child.signalCode == null) {
+      child.kill('SIGKILL');
+      assert.equal(await supervisor.waitForManagedProcessExit(child, 5000), true);
+    }
+  }
+});
+
+test('a tracked POSIX group keeps its owner when its leader exits before its descendant', async () => {
+  const fixture = processFixture();
+  let groupAlive = true;
+  let kills = 0;
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() { kills += 1; },
+    isProcessGroupAlive() { return groupAlive; },
+  });
+  supervisor.observeManagedProcess(fixture.child, true);
+  fixture.exit();
+  assert.equal(supervisor.isProcessReleased(fixture.child), false);
+  await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'leader-first', 25, true), /禁止复用其 PID/);
+  assert.equal(kills, 0);
+  groupAlive = false;
+  assert.equal(supervisor.isProcessReleased(fixture.child), true);
+});
+
+test('group signal acceptance and root exit wait for a separate empty-group receipt', async () => {
+  const fixture = processFixture();
+  let groupAlive = true;
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() { fixture.exit(); },
+    isProcessGroupAlive() { return groupAlive; },
+  });
+  const stopping = supervisor.forceTerminateManagedProcessTree(fixture.child, 'group-drain', 50, true);
+  await Promise.resolve();
+  assert.equal(supervisor.isProcessReleased(fixture.child), false);
+  groupAlive = false;
+  fixture.controlled.advance(25);
+  await stopping;
+  assert.equal(supervisor.isProcessReleased(fixture.child), true);
+  assert.equal(fixture.timers.size, 0);
+});
+
+test('a real POSIX adapter spawn error without PID proves no target was created and permits recovery', async () => {
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, undefined, { platform: 'linux', signalProcessGroup() {} });
+  const child = supervisor.spawnManagedProcess(require('node:path').resolve('glimmer-nonexistent-executable'), [], { stdio: 'ignore', detached: true }, undefined);
+  const exit = supervisor.waitForManagedProcessExit(child, 1000);
+  await assert.rejects(supervisor.waitForManagedProcessReady(child, 1000), /ENOENT|未创建/);
+  assert.equal(child.pid, undefined);
+  assert.equal(await exit, true);
+  assert.equal(supervisor.isProcessReleased(child), true);
+  assert.equal(supervisor.isManagedProcessRootRunning(child), false);
+  await supervisor.stopManagedProcess(child, { label: 'never-created', ownsProcessGroup: true });
+  const recovered = supervisor.spawnManagedProcess(process.execPath, ['-e', 'process.exit(0)'], { stdio: 'ignore' }, undefined);
+  await supervisor.waitForManagedProcessReady(recovered, 1000);
+  assert.equal(await supervisor.waitForManagedProcessExit(recovered, 1000), true);
+  assert.equal(supervisor.isProcessReleased(recovered), true);
+  assert.equal(recovered.listenerCount('error'), 1, 'only the supervisor admission observer remains');
+});
+
+test('a POSIX root observer failure cannot interrupt actual exit and empty-group confirmation', async () => {
+  const fixture = processFixture();
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() { fixture.exit(); }, isProcessGroupAlive() { return false; },
+  });
+  supervisor.onManagedProcessRootExit(fixture.child, () => { throw new Error('root notification failed'); });
+  await assert.rejects(supervisor.forceTerminateManagedProcessTree(fixture.child, 'observer', 25, true), /observer 失败/);
+  assert.equal(supervisor.isProcessReleased(fixture.child), true);
+  assert.equal(fixture.child.listenerCount('exit'), 0);
+  assert.equal(fixture.timers.size, 0);
+});
+
+test('a delayed empty POSIX group reports its captured root observer error after releasing ownership', async () => {
+  const fixture = processFixture();
+  let groupAlive = true;
+  const supervisor = new ManagedProcessSupervisor(quietProcessLogger, fixture.controlled, {
+    platform: 'linux', signalProcessGroup() {}, isProcessGroupAlive() { return groupAlive; },
+  });
+  supervisor.observeManagedProcess(fixture.child, true);
+  supervisor.onManagedProcessRootExit(fixture.child, () => { throw new Error('notification failed'); });
+  fixture.exit();
+  const stop = supervisor.stopManagedProcess(fixture.child, { label: 'late-group', gracefulTimeoutMs: 50, ownsProcessGroup: true });
+  const rejected = assert.rejects(stop, /observer 失败/);
+  groupAlive = false;
+  fixture.controlled.advance(25);
+  await rejected;
+  assert.equal(supervisor.isProcessReleased(fixture.child), true);
+  assert.equal(fixture.timers.size, 0);
+});

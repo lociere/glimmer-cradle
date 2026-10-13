@@ -158,6 +158,10 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     expect(await manager.sendLifeHeartbeat({})).toEqual({ status: 'alive' });
     const firstGeneration = transport.generation;
     const firstChild = (manager as unknown as { child: ChildProcess }).child;
+    const registeredPid = (transport as unknown as { registeredProcessId: number }).registeredProcessId;
+    expect(registeredPid).toBeGreaterThan(0);
+    expect(() => process.kill(registeredPid, 0)).not.toThrow();
+    if (process.platform === 'win32') expect(registeredPid).not.toBe(firstChild.pid);
 
     await manager.stop();
     expect(firstChild.exitCode).toBe(0);
@@ -473,9 +477,10 @@ asyncio.run(seed())
     await manager.start();
     transportRuntime.openIngress();
     const firstGeneration = transport.generation;
-    const child = (manager as unknown as { child: { kill(): boolean } | null }).child;
+    const child = (manager as unknown as { child: ChildProcess | null }).child;
     expect(child).not.toBeNull();
-    child!.kill();
+    // Crash the authenticated Worker, leaving its Native Job owner alive to attest release.
+    process.kill((transport as unknown as { registeredProcessId: number }).registeredProcessId);
 
     await waitUntil(() => !manager.isReady);
     const failedIngress = projection.getCatalog().runtimes
@@ -497,8 +502,7 @@ asyncio.run(seed())
     const attemptsBeforeCrash = (manager as unknown as { recoveryAttempts: number })
       .recoveryAttempts;
     process.env.GLIMMER_CRADLE_PYTHON_RUNTIME = 'Z:\\missing\\glimmer-cognition-python.exe';
-    const child = (manager as unknown as { child: { kill(): boolean } | null }).child;
-    child!.kill();
+    process.kill((transport as unknown as { registeredProcessId: number }).registeredProcessId);
     try {
       await waitUntil(() => !manager.isReady);
       await waitUntil(() => {

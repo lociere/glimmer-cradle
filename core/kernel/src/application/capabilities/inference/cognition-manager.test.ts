@@ -9,7 +9,14 @@ import type {
 } from '../../../ports/cognition-service-port';
 import { CognitionManager } from '../../../adapters/cognition/cognition-process-adapter';
 
-vi.mock('node:child_process', () => ({ spawn: vi.fn(), execFile: vi.fn() }));
+vi.mock('node:child_process', () => {
+  const execFile = vi.fn();
+  // The real Node execFile custom promisifier returns both stdout and stderr.
+  Object.defineProperty(execFile, Symbol.for('nodejs.util.promisify.custom'), {
+    value: async (command: string) => ({ stdout: JSON.stringify({ base: command, executable: command }), stderr: '' }),
+  });
+  return { spawn: vi.fn(), execFile };
+});
 vi.mock('../../../adapters/config/config-manager', () => ({
   ConfigManager: {
     instance: {
@@ -26,10 +33,24 @@ vi.mock('../../../adapters/config/config-manager', () => ({
     },
   },
 }));
-vi.mock('../../../adapters/process/process-supervisor', () => ({
-  forceTerminateManagedProcessTree: vi.fn(async () => undefined),
-  stopManagedProcess: vi.fn(async () => undefined),
-  waitForManagedProcessExit: vi.fn(async () => true),
+const processMethods = vi.hoisted(() => ({
+  forceTerminateManagedProcessTree: vi.fn(), stopManagedProcess: vi.fn(), waitForManagedProcessExit: vi.fn(),
+}));
+vi.mock('@glimmer-cradle/platform', async () => ({
+  ...await vi.importActual<object>('@glimmer-cradle/platform'),
+  ManagedProcessSupervisor: class {
+    spawnManagedProcess(command: string, args: string[], options: object, _bridge: unknown, port: typeof spawn) { return port(command, args, options); }
+    async waitForManagedProcessReady(child: FakeChild) { if (!child.pid) throw new Error('受管子进程未取得 PID'); return child.pid; }
+    managedProcessPid(child: FakeChild) { return child.pid; }
+    isManagedProcessRootRunning(child: FakeChild) { return child.exitCode === null && child.signalCode === null; }
+    onManagedProcessRootExit(child: FakeChild, observer: (...args: unknown[]) => void) { child.once(child.nativeReleased === undefined ? 'exit' : 'root-exit', observer); }
+    onManagedProcessExit(child: FakeChild, observer: (...args: unknown[]) => void) { child.once('exit', observer); }
+    observeManagedProcess() {}
+    forceTerminateManagedProcessTree = processMethods.forceTerminateManagedProcessTree;
+    stopManagedProcess = processMethods.stopManagedProcess;
+    waitForManagedProcessExit = processMethods.waitForManagedProcessExit;
+    isProcessReleased(child: FakeChild): boolean { return child.nativeReleased ?? (child.exitCode != null || child.signalCode != null); }
+  },
 }));
 
 class FakeTransport implements CognitionProcessTransportPort {
@@ -52,6 +73,7 @@ class FakeTransport implements CognitionProcessTransportPort {
   public waitForRegistration(): Promise<void> { return Promise.resolve(); }
   public configureActionDeadline(): void {}
   public async invalidateProcess(processId?: number, reason?: Error): Promise<void> {
+    this.isRegistered = false;
     this.invalidations.push({ processId, reason });
     this.activeSecret?.fill(0);
     this.activeSecret = null;
@@ -63,6 +85,9 @@ class FakeChild extends EventEmitter {
   public stdout = null;
   public stderr = null;
   public stdio = [null, null, null, null];
+  public exitCode: number | null = null;
+  public signalCode: NodeJS.Signals | null = null;
+  public nativeReleased?: boolean;
   public constructor(public pid?: number) { super(); }
 }
 
@@ -71,12 +96,62 @@ describe('CognitionManager process capability invalidation', () => {
 
   beforeEach(() => {
     vi.mocked(spawn).mockReset();
+    for (const method of Object.values(processMethods)) method.mockReset();
+    const exit = async (child?: FakeChild) => { if (child) child.exitCode = 0; };
+    processMethods.stopManagedProcess.mockImplementation(exit);
+    processMethods.forceTerminateManagedProcessTree.mockImplementation(exit);
+    processMethods.waitForManagedProcessExit.mockImplementation(async (child: FakeChild) => { child.exitCode = 0; return true; });
   });
 
   afterEach(async () => {
     vi.mocked(spawn).mockReset();
     if (previousRuntime === undefined) delete process.env.GLIMMER_CRADLE_PYTHON_RUNTIME;
     else process.env.GLIMMER_CRADLE_PYTHON_RUNTIME = previousRuntime;
+  });
+
+  it('retains a live process after failed stop, seals ingress and retries the same owner', async () => {
+    const transport = new FakeTransport();
+    const manager = configureManager(transport, vi.fn());
+    const child = new FakeChild(4141);
+    const internals = manager as unknown as { child: FakeChild | null; running: boolean; ready: boolean };
+    internals.child = child;
+    internals.running = internals.ready = true;
+    transport.prepareProcess();
+    processMethods.stopManagedProcess.mockRejectedValueOnce(new Error('kill denied'));
+    const first = manager.stop();
+    expect(manager.stop()).toBe(first);
+    await expect(first).rejects.toThrow('kill denied');
+    expect(internals.child).toBe(child);
+    expect(manager.isReady).toBe(false);
+    expect(transport.activeSecret).toBeNull();
+    await expect(manager.start()).rejects.toThrow('上代进程尚未释放');
+    expect(spawn).not.toHaveBeenCalled();
+    await manager.stop();
+    expect(internals.child).toBeNull();
+    expect(processMethods.stopManagedProcess).toHaveBeenCalledTimes(2);
+  });
+
+  it('revokes readiness and registration when the Native helper exits without a root receipt', async () => {
+    const transport = new FakeTransport();
+    transport.isRegistered = true;
+    const manager = configureManager(transport, vi.fn());
+    const child = new FakeChild(4343);
+    child.nativeReleased = false;
+    const internals = manager as unknown as { child: FakeChild | null; running: boolean; ready: boolean; attachProcessObservers(child: FakeChild): void };
+    internals.child = child;
+    internals.running = internals.ready = true;
+    transport.prepareProcess();
+    internals.attachProcessObservers(child);
+    child.exitCode = 1;
+    child.emit('exit', 1, null);
+    expect(manager.isReady).toBe(false);
+    expect(internals.child).toBe(child);
+    expect(transport.activeSecret).toBeNull();
+    expect(transport.invalidations.at(-1)?.processId).toBe(4343);
+    await expect(manager.start()).rejects.toThrow('上代进程尚未释放');
+    processMethods.stopManagedProcess.mockRejectedValueOnce(new Error('release receipt missing'));
+    await expect(manager.stop()).rejects.toThrow('release receipt missing');
+    expect(internals.child).toBe(child);
   });
 
   it('invalidates the FD3 secret when spawn returns no PID and emits ENOENT', async () => {
