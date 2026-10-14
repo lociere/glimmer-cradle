@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：受管进程逻辑单元已实现并通过固定源码只读复核（范围限此单元），准备保存中文提交后继续通用取消/超时与trace/log/config/health。Windows Native/Node/旧Desktop23、Platform包52及最后POSIX observer微差lifecycle21、Kernel Cognition10/Audio5/Extension6/实际Worker4及最后FD4边界2项重跑通过；两包typecheck与架构/文档/编码/工具10项反例通过。App安装/开发路径真实接线，旧机制consumer-zero删除，Desktop旧装配显式绑定P12B。下一动作：按现有Clock/Lifecycle API补有界取消/超时及失败owner保留，不重构已有架构。P02A/D04/整体任务/根大型/完整制品/适用设备未验收，不推送；writer本会话，无后台测试句柄。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：Host Native消费与实际Python probe owner单元已通过固定源码增量独立只读复审，两个必要问题关闭；Host修复后4+8项/最终真实probe1、broker31、Kernelunit11/真实Worker2、Native输出3及三包typecheck/文档架构编码diff通过，保存本地中文提交。下一动作：Host abortable/bounded迁Platform通用取消/deadline并实际消费，随后Kernel30s生命周期预算；实际callback未settle保留owner，核对显式stop取消后迟到failed通知。再trace/log/config/health。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

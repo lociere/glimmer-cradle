@@ -1,7 +1,10 @@
-import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
+import { resolveHostProcessTreeBridge } from '../adapters/platform/data-paths.js';
 import { setTimeout as schedule, clearTimeout as unschedule } from 'node:timers';
 import { setTimeout as delay } from 'node:timers/promises';
 import * as grpc from '@grpc/grpc-js';
@@ -27,6 +30,7 @@ export interface WorkerSupervisorOptions {
   readonly console_path: string;
   readonly runtime_document: Readonly<Record<string, unknown>>;
   readonly environment?: Readonly<Record<string, string>>;
+  readonly process_tree_bridge?: string;
   readonly startup_timeout_ms: number;
   readonly shutdown_timeout_ms: number;
   readonly request_timeout_ms: number;
@@ -62,7 +66,7 @@ export class WorkerSupervisor {
   private readonly listeners = new Set<() => void>();
   private server?: grpc.Server;
   private child?: ChildProcess;
-  private registeredProcessId?: number;
+  private pythonProbe?: ChildProcess;
   private lifecycle?: CognitionClient;
   private secret?: Buffer;
   private nonce?: string;
@@ -71,9 +75,8 @@ export class WorkerSupervisor {
   private starting?: Promise<WorkerSession>;
   private stopping?: Promise<void>;
   private reclaiming?: Promise<void>;
-  private terminal?: Promise<void>;
-  private closed = false;
   private stoppingRequested = false;
+  private readonly processSupervisor = new ManagedProcessSupervisor({ info() {}, warn() {}, error() {} });
 
   public constructor(options: WorkerSupervisorOptions) {
     if (![options.python_executable, options.app_root, options.data_root, options.console_path]
@@ -84,7 +87,8 @@ export class WorkerSupervisor {
       || !options.runtime_document || typeof options.runtime_document !== 'object' || Array.isArray(options.runtime_document)) {
       throw new Error('Worker supervisor 装配参数无效');
     }
-    this.options = { ...options, environment: { ...options.environment } };
+    this.options = { ...options, environment: { ...options.environment },
+      process_tree_bridge: resolveHostProcessTreeBridge(options.app_root, options.process_tree_bridge) };
     this.document = JSON.stringify(options.runtime_document);
     if (!this.document || this.document === 'null') throw new Error('Worker 配置 Document 无效');
     const sensitive: string[] = [];
@@ -117,8 +121,8 @@ export class WorkerSupervisor {
   public stop(): Promise<void> {
     if (this.stopping) return this.stopping;
     this.stoppingRequested = true; this.state = { ...this.state, state: 'stopping' };
-    this.cancel();
-    this.stopping = (async () => {
+    this.stopping = Promise.resolve().then(async () => {
+      this.cancel();
       await this.starting?.catch(() => undefined);
       try {
         await this.reclaim();
@@ -127,7 +131,9 @@ export class WorkerSupervisor {
         this.state = { ...this.state, state: 'failed', error_code: 'worker_control_failed', endpoint: null };
         throw error;
       }
-    })();
+    });
+    const stopping = this.stopping;
+    void stopping.catch(() => { if (this.stopping === stopping) this.stopping = undefined; });
     return this.stopping;
   }
   private async begin(): Promise<WorkerSession> {
@@ -188,23 +194,29 @@ export class WorkerSupervisor {
       this.cancellation.signal.throwIfAborted();
       this.state = { ...this.state, control_endpoint: `grpc://127.0.0.1:${port}` };
       mkdirSync(path.dirname(this.options.console_path), { recursive: true });
-      const child = spawn(this.options.python_executable, ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', 'external'], {
+      const python = await this.resolvePythonProcess();
+      this.cancellation.signal.throwIfAborted();
+      const child = this.processSupervisor.spawnManagedProcess(python.command, ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', 'external'], {
         cwd: this.options.app_root, detached: process.platform !== 'win32', windowsHide: true,
-        env: { ...process.env, ...this.options.environment, GLIMMER_CRADLE_APP_ROOT: this.options.app_root,
+        env: { ...process.env, ...this.options.environment, ...python.environment, GLIMMER_CRADLE_APP_ROOT: this.options.app_root,
           GLIMMER_CRADLE_DATA_ROOT: this.options.data_root, GLIMMER_CRADLE_CONFIG: this.document, PYTHONUNBUFFERED: '1' },
         stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
-      });
-      this.child = child; this.state = { ...this.state, process_id: child.pid ?? null };
+      }, this.options.process_tree_bridge, spawn);
+      this.child = child;
       this.capture(child.stdout!); this.capture(child.stderr!);
-      this.terminal = new Promise(resolve => child.once('close', code => {
-        this.closed = true; this.state = { ...this.state, exit_code: code }; resolve();
+      this.processSupervisor.onManagedProcessExit(child, code => {
+        this.state = { ...this.state, exit_code: code };
         if (!this.stoppingRequested && !this.reclaiming) this.fail('worker_exited');
-      }));
-      child.once('exit', () => {
+      });
+      this.processSupervisor.onManagedProcessRootExit(child, () => {
         if (!this.stoppingRequested && !this.reclaiming) this.fail('worker_exited');
       });
       child.once('error', () => this.fail('worker_start_failed'));
       if (!child.pid) throw new Error('Worker 未返回受监督 PID');
+      const processId = await abortable(this.processSupervisor.waitForManagedProcessReady(child, this.options.startup_timeout_ms), this.cancellation.signal);
+      this.cancellation.signal.throwIfAborted();
+      if (!this.processSupervisor.isManagedProcessRootRunning(child)) throw new Error('Worker 实际根在接纳前已退出');
+      this.state = { ...this.state, process_id: processId };
       const pipe = child.stdio[3] as NodeJS.WritableStream;
       pipe.on('error', () => this.fail('worker_start_failed'));
       pipe.end(JSON.stringify({ kernelEndpoint: `grpc://127.0.0.1:${port}`, generation: this.state.generation,
@@ -230,16 +242,17 @@ export class WorkerSupervisor {
     if (this.state.state !== 'starting' || !this.secret || !this.nonce || !request.call?.traceId
       || request.call.generation !== this.state.generation || request.registrationNonce !== this.nonce) throw new Error('注册能力已失效');
     const pid = Number(request.processId), parent = Number(request.supervisorProcessId);
-    // Windows venv redirector 可转交给一个直接子进程；两种形式均须持有 FD3 一次性能力。
+    // FD3 proof binds the actual interpreter; the Windows Native supervisor is only its parent.
+    const expected = this.child && this.processSupervisor.managedProcessPid(this.child);
+    const expectedParent = process.platform === 'win32' ? this.child?.pid : process.pid;
     if (![pid, parent].every(value => Number.isSafeInteger(value) && value > 0)
-      || !(pid === this.child?.pid && parent === process.pid || parent === this.child?.pid)
+      || pid !== expected || parent !== expectedParent
       || !/^grpc:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/.test(request.endpoint)
       || Number(request.endpoint.split(':').at(-1)) > 65535) throw new Error('受监督进程/端点不匹配');
-    const expected = createHmac('sha256', this.secret).update(`${this.state.generation}\n${this.nonce}\n${request.endpoint}\n${pid}\n${parent}`).digest();
+    const expectedProof = createHmac('sha256', this.secret).update(`${this.state.generation}\n${this.nonce}\n${request.endpoint}\n${pid}\n${parent}`).digest();
     const proof = Buffer.from(request.authProof);
-    if (proof.length !== expected.length || !timingSafeEqual(proof, expected)) throw new Error('注册认证失败');
+    if (proof.length !== expectedProof.length || !timingSafeEqual(proof, expectedProof)) throw new Error('注册认证失败');
     this.zeroSecret(); this.state = { ...this.state, endpoint: request.endpoint };
-    this.registeredProcessId = pid;
     this.options.capability_service?.activatePrincipal(this.principalId(), this.state.generation!);
     this.lifecycle = new CognitionClient(request.endpoint, this.state.generation!, this.options.request_timeout_ms);
     this.registration!.resolve();
@@ -271,7 +284,7 @@ export class WorkerSupervisor {
     this.tasks.add(task); void task.finally(() => this.tasks.delete(task)).catch(() => this.fail('worker_control_failed'));
   }
   private assertCurrent(generation?: string): void {
-    if (!this.state.endpoint || generation !== this.state.generation || this.cancellation.signal.aborted) throw new Error('Worker 调用世代已撤销');
+    if (!this.state.endpoint || generation !== this.state.generation || this.cancellation.signal.aborted || this.stoppingRequested) throw new Error('Worker 调用世代已撤销');
   }
   private principalId(): string { return `cognition:${this.state.generation}`; }
   private capabilities(): HostCapabilityServicePort {
@@ -308,7 +321,14 @@ export class WorkerSupervisor {
     // 先发布 Promise 再操作资源，避免 close/error 回调重入同一回收流程。
     this.reclaiming = Promise.resolve().then(async () => {
       this.cancel();
-      try { if (this.child && !this.closed) {
+      const failures: unknown[] = [];
+      try {
+        if (this.pythonProbe && !this.processSupervisor.isProcessReleased(this.pythonProbe)) {
+          await this.processSupervisor.forceTerminateManagedProcessTree(this.pythonProbe, 'Host Python identity probe', 5000, process.platform !== 'win32');
+        }
+        if (this.pythonProbe && this.processSupervisor.isProcessReleased(this.pythonProbe)) this.pythonProbe = undefined;
+      } catch (error) { failures.push(error); }
+      try { if (this.child && !this.processSupervisor.isProcessReleased(this.child)) {
         const deadline = Date.now() + this.options.shutdown_timeout_ms;
         if (this.lifecycle) {
           const cancellation = new AbortController();
@@ -319,30 +339,50 @@ export class WorkerSupervisor {
         }
         if (!await this.waitExit(Math.max(0, deadline - Date.now()))) {
           this.state = { ...this.state, forced: true };
-          const pid = this.child.pid;
-          if (pid) {
-            if (process.platform === 'win32') {
-              // redirector 已退出时仍回收通过本代能力认证的直接子进程，不枚举任意系统 PID。
-              const owned = new Set([...(this.child.exitCode === null && this.child.signalCode === null ? [pid] : []),
-                ...(this.registeredProcessId ? [this.registeredProcessId] : [])]);
-              for (const target of owned) await new Promise<void>(resolve => execFile('taskkill', ['/PID', String(target), '/T', '/F'],
-                { windowsHide: true, timeout: 5000 }, () => resolve()));
-            } else { try { process.kill(-pid, 'SIGKILL'); } catch { /* 退出竞态仍以 terminal 证据判断。 */ } }
-          }
-          if (!await this.waitExit(5000)) throw new Error('受监督 Worker 进程树未完成回收');
+          await this.processSupervisor.forceTerminateManagedProcessTree(this.child, 'Host Cognition Worker', 5000, process.platform !== 'win32');
         }
-      } } finally {
-        this.lifecycle?.close(); this.lifecycle = undefined;
-        this.server?.forceShutdown(); this.server = undefined;
+      } } catch (error) { failures.push(error); }
+      finally {
+        // Native owner remains available for retry even if another teardown action fails.
+        if (this.child && this.processSupervisor.isProcessReleased(this.child)) this.child = undefined;
+        try { this.lifecycle?.close(); this.lifecycle = undefined; } catch (error) { failures.push(error); }
+        try { this.server?.forceShutdown(); this.server = undefined; } catch (error) { failures.push(error); }
         this.state = { ...this.state, control_endpoint: null };
         const drained = await bounded(Promise.allSettled([...this.tasks]).then(() => true), this.options.shutdown_timeout_ms);
-        if (!drained) throw new Error('Worker control 接收方未响应取消；不能宣称 drain 完成');
+        if (!drained) failures.push(new Error('Worker control 接收方未响应取消；不能宣称 drain 完成'));
       }
+      if (failures.length === 1) throw failures[0];
+      if (failures.length > 1) throw new AggregateError(failures, 'Host Worker 回收存在错误');
     });
+    const reclaiming = this.reclaiming;
+    void reclaiming.then(() => { if (this.reclaiming === reclaiming) this.reclaiming = undefined; },
+      () => { if (this.reclaiming === reclaiming) this.reclaiming = undefined; });
     return this.reclaiming;
   }
   private async waitExit(timeout: number): Promise<boolean> {
-    return this.closed || !this.terminal ? true : !!await bounded(this.terminal.then(() => true), timeout);
+    const child = this.child;
+    if (!child || this.processSupervisor.isProcessReleased(child)) return true;
+    return await this.processSupervisor.waitForManagedProcessExit(child, timeout) && this.processSupervisor.isProcessReleased(child);
+  }
+
+  private async resolvePythonProcess(): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
+    const command = this.options.python_executable;
+    if (process.platform !== 'win32') return { command, environment: {} };
+    // App policy: resolve the venv redirector to the actual interpreter without weakening PID proof.
+    const probe = this.processSupervisor.spawnManagedProcess(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], {
+      cwd: this.options.app_root, windowsHide: true, env: { ...process.env, ...this.options.environment },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }, this.options.process_tree_bridge, spawn);
+    this.pythonProbe = probe;
+    const { stdout, code } = await this.processSupervisor.readManagedProcessOutput(probe, 10_000, this.cancellation.signal);
+    if (this.processSupervisor.isProcessReleased(probe)) this.pythonProbe = undefined;
+    if (code !== 0) throw new Error('Python 解释器身份查询失败');
+    const interpreter: unknown = JSON.parse(stdout);
+    if (!interpreter || typeof interpreter !== 'object' || !('base' in interpreter) || !('executable' in interpreter)
+      || typeof interpreter.base !== 'string' || typeof interpreter.executable !== 'string') throw new Error('Python 解释器身份查询无效');
+    if (interpreter.base === interpreter.executable) return { command, environment: {} };
+    if (!path.isAbsolute(interpreter.base) || !path.isAbsolute(interpreter.executable) || !existsSync(interpreter.base)) throw new Error('Python 实际解释器路径无效');
+    return { command: interpreter.base, environment: { __PYVENV_LAUNCHER__: interpreter.executable } };
   }
   private capture(stream: NodeJS.ReadableStream): void {
     let buffered = '', omitted = false;

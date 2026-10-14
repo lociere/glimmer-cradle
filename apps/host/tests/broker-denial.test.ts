@@ -335,7 +335,7 @@ it.each([
     return '真正授权的资料正文';
   }); service.registerResource(resource, reader);
   const actions: unknown[] = [];
-  supervisor = new WorkerSupervisor({ ...input, app_root: repository, data_root: root, console_path: path.join(root, 'worker-console.log'),
+  supervisor = new WorkerSupervisor({ ...input, process_tree_bridge: process.platform === 'win32' ? path.join(repository, 'build/components/native/composition-host/windows-x64/PlatformProcessTreeBridge.exe') : undefined, app_root: repository, data_root: root, console_path: path.join(root, 'worker-console.log'),
     startup_timeout_ms: 15000, shutdown_timeout_ms: 3000, request_timeout_ms: 5000, capability_service: service,
     accept_state: async request => create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' }),
     accept_action: async request => {
@@ -494,7 +494,7 @@ asyncio.run(read())
 it('配置 Host 用实际 RPC 登记来源；重启重验审批并发新 grant/采集，停用和失配拒绝读取', async () => {
   const repository = path.resolve(__dirname, '../../..');
   const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-knowledge-restart-'));
-  const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+  const paths = new HostDataPaths({ process_tree_bridge: process.platform === 'win32' ? path.join(repository, 'build/components/native/composition-host/windows-x64/PlatformProcessTreeBridge.exe') : undefined, app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
   const seeded = await promisify(execFile)('uv', ['run', '--project', 'apps/cognition-worker', '--extra', 'dev', 'python',
     'apps/cognition-worker/tests/test_rpc_roundtrip.py', '--host-production-seed', paths.data_root], { cwd: repository, windowsHide: true });
   const input = JSON.parse(seeded.stdout);

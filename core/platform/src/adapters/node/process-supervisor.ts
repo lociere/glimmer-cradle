@@ -138,6 +138,58 @@ export class ManagedProcessSupervisor {
     return job ? job.pid : child.pid;
   }
 
+  /** Read a bounded command result; cancellation ends the wait, never releases its resource owner. */
+  public readManagedProcessOutput(child: ChildProcess, timeoutMs: number, signal?: AbortSignal, maxBufferBytes = 8192): Promise<{ stdout: string; stderr: string; code: number | null }> {
+    validateTimeout(timeoutMs, false);
+    if (!Number.isSafeInteger(maxBufferBytes) || maxBufferBytes <= 0 || !child.stdout || !child.stderr) return Promise.reject(new Error('受管输出读取参数无效'));
+    const stdout = child.stdout, stderr = child.stderr;
+    return new Promise((resolve, reject) => {
+      let timer: ScheduledTask | undefined, done = false, bytes = 0, exited = false;
+      let outEnded = stdout.readableEnded, errEnded = stderr.readableEnded;
+      const out: Buffer[] = [], err: Buffer[] = [];
+      const finish = (error?: unknown): void => {
+        if (done) return;
+        done = true;
+        stdout.off('data', onOut); stderr.off('data', onErr);
+        stdout.off('end', onOutEnd); stderr.off('end', onErrEnd);
+        stdout.off('error', onError); stderr.off('error', onError); child.off('error', onError);
+        signal?.removeEventListener('abort', onAbort);
+        // Drain discarded output without retaining buffers while the App reclaims the same owner.
+        stdout.resume(); stderr.resume();
+        try { timer?.cancel(); } catch (cancelError) { reject(cancelError); return; }
+        if (error !== undefined) reject(error);
+        else resolve({ stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8'), code: child.exitCode });
+      };
+      const check = (): void => { if (exited && outEnded && errEnded) finish(); };
+      const read = (chunk: Buffer | string, target: Buffer[]): void => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        bytes += buffer.length;
+        if (bytes > maxBufferBytes) finish(new Error('受管命令输出超过限制'));
+        else target.push(buffer);
+      };
+      const onOut = (chunk: Buffer | string): void => read(chunk, out);
+      const onErr = (chunk: Buffer | string): void => read(chunk, err);
+      const onOutEnd = (): void => { outEnded = true; check(); };
+      const onErrEnd = (): void => { errEnded = true; check(); };
+      const onError = (error: Error): void => finish(error);
+      const onAbort = (): void => finish(signal!.reason);
+      stdout.on('data', onOut); stderr.on('data', onErr);
+      stdout.once('end', onOutEnd); stderr.once('end', onErrEnd);
+      stdout.once('error', onError); stderr.once('error', onError); child.once('error', onError);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      try {
+        timer = this.clock.schedule(timeoutMs, () => finish(new Error('受管命令未在期限内释放')));
+        if (done) timer.cancel();
+        if (signal?.aborted) onAbort();
+        if (!done) void this.waitForManagedProcessExit(child, timeoutMs).then(released => {
+          if (done) return;
+          if (!released || !this.isProcessReleased(child)) finish(new Error('受管命令未确认整树释放'));
+          else { exited = true; check(); }
+        }, finish);
+      } catch (error) { finish(error); }
+    });
+  }
+
   public isManagedProcessRootRunning(child: ChildProcess): boolean {
     const job = this.windowsJobs.get(child);
     return child.pid !== undefined && !hasExited(child) && !this.failedSpawns.has(child) && (!job || job.rootCode === undefined && !job.launchFailed);

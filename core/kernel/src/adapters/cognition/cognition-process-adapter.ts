@@ -25,6 +25,7 @@ const execFileAsync = promisify(execFile);
 
 export class CognitionManager {
   private child: ChildProcess | null = null;
+  private pythonProbe: ChildProcess | null = null;
   private running = false;
   private ready = false;
   private requestTimeoutMs = 30_000;
@@ -49,7 +50,7 @@ export class CognitionManager {
   public async start(): Promise<void> {
     if (this.stopping || this.stopOperation) throw new Error("Cognition 正在关闭");
     if (this.running && this.ready) return;
-    if (this.child || this.starting) throw new Error('Cognition 上代进程尚未释放，拒绝并行启动');
+    if (this.child || this.pythonProbe || this.starting) throw new Error('Cognition 上代进程尚未释放，拒绝并行启动');
     const config = ConfigManager.instance.getConfig();
     const generation = this.recoveryGeneration;
     const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
@@ -68,7 +69,7 @@ export class CognitionManager {
 
     try {
       ConfigManager.instance.freezeCoreConfig();
-      const pythonLaunch = await resolvePythonProcess(command, repoRoot);
+      const pythonLaunch = await this.resolvePythonProcess(command, repoRoot);
       if (generation !== this.recoveryGeneration || this.stopOperation) throw new Error('Cognition 启动世代已关闭');
       this.child = processSupervisor.spawnManagedProcess(pythonLaunch.command, args, {
         cwd: repoRoot,
@@ -209,6 +210,16 @@ export class CognitionManager {
     const child = this.child;
     this.stopping = true;
     this.ready = false;
+    try {
+      if (this.pythonProbe && !processSupervisor.isProcessReleased(this.pythonProbe)) {
+        await processSupervisor.forceTerminateManagedProcessTree(this.pythonProbe, 'Cognition Python identity probe', 1000, process.platform !== 'win32');
+      }
+      if (this.pythonProbe && processSupervisor.isProcessReleased(this.pythonProbe)) this.pythonProbe = null;
+    } catch (error) {
+      this.stopping = false;
+      this.lifecycleObserver('failed', 'Cognition 身份探测回收未确认，保留 owner 等待恢复');
+      throw error;
+    }
     if (!this.running && !child) {
       try {
         await this.transport.invalidateProcess(undefined, new Error('Cognition 生命周期已停止'));
@@ -285,7 +296,7 @@ export class CognitionManager {
     client: CognitionRequestPort,
     observer: CognitionLifecycleObserver,
   ): void {
-    if (this.running || this.starting || this.child) {
+    if (this.running || this.starting || this.child || this.pythonProbe) {
       if (this.transport !== transport || this.client !== client) {
         throw new Error('CognitionManager 运行期间不得替换 transport composition');
       }
@@ -413,6 +424,24 @@ export class CognitionManager {
     for (const line of lines) routeProcessLine(line, stderr);
   }
 
+  private async resolvePythonProcess(command: string, repoRoot: string): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
+    if (process.platform !== 'win32') return { command, environment: {} };
+    // The venv redirector and Python startup hooks may create descendants; the probe has its own Job.
+    const probe = processSupervisor.spawnManagedProcess(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], {
+      cwd: repoRoot, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    }, resolveManagedProcessBridge(), spawn);
+    this.pythonProbe = probe;
+    const { stdout, code } = await processSupervisor.readManagedProcessOutput(probe, 10_000);
+    if (processSupervisor.isProcessReleased(probe)) this.pythonProbe = null;
+    if (code !== 0) throw new Error('Python 解释器身份查询失败');
+    const interpreter: unknown = JSON.parse(stdout);
+    if (!interpreter || typeof interpreter !== 'object' || !('base' in interpreter) || !('executable' in interpreter)
+      || typeof interpreter.base !== 'string' || typeof interpreter.executable !== 'string') throw new Error('Python 解释器身份查询无效');
+    if (interpreter.base === interpreter.executable) return { command, environment: {} };
+    if (!path.isAbsolute(interpreter.base) || !path.isAbsolute(interpreter.executable) || !await fs.pathExists(interpreter.base)) throw new Error('Python 实际解释器路径无效');
+    return { command: interpreter.base, environment: { __PYVENV_LAUNCHER__: interpreter.executable } };
+  }
+
   private flushOutput(): void {
     if (this.stdoutBuffer.trim()) routeProcessLine(this.stdoutBuffer, false);
     if (this.stderrBuffer.trim()) routeProcessLine(this.stderrBuffer, true);
@@ -452,19 +481,4 @@ async function ensureDevelopmentPython(repoRoot: string): Promise<string> {
     throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
   }
   return python;
-}
-
-async function resolvePythonProcess(command: string, repoRoot: string): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
-  if (process.platform !== 'win32') return { command, environment: {} };
-  // Windows venv python.exe is a redirector. Bind registration to the real interpreter
-  // without weakening PID authentication; CPython's launcher variable preserves pyvenv.cfg.
-  const { stdout } = await execFileAsync(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], {
-    cwd: repoRoot, windowsHide: true, timeout: 10_000, maxBuffer: 8192,
-  });
-  const interpreter: unknown = JSON.parse(stdout);
-  if (!interpreter || typeof interpreter !== 'object' || !('base' in interpreter) || !('executable' in interpreter)
-    || typeof interpreter.base !== 'string' || typeof interpreter.executable !== 'string') throw new Error('Python 解释器身份查询无效');
-  if (interpreter.base === interpreter.executable) return { command, environment: {} };
-  if (!path.isAbsolute(interpreter.base) || !path.isAbsolute(interpreter.executable) || !await fs.pathExists(interpreter.base)) throw new Error('Python 实际解释器路径无效');
-  return { command: interpreter.base, environment: { __PYVENV_LAUNCHER__: interpreter.executable } };
 }

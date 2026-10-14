@@ -39,7 +39,11 @@ const processMethods = vi.hoisted(() => ({
 vi.mock('@glimmer-cradle/platform', async () => ({
   ...await vi.importActual<object>('@glimmer-cradle/platform'),
   ManagedProcessSupervisor: class {
-    spawnManagedProcess(command: string, args: string[], options: object, _bridge: unknown, port: typeof spawn) { return port(command, args, options); }
+    spawnManagedProcess(command: string, args: string[], options: object, _bridge: unknown, port: typeof spawn) {
+      if (args[0] === '-c') { const probe = new FakeChild(2121); probe.exitCode = 0; probe.probeCommand = command; return probe; }
+      return port(command, args, options);
+    }
+    async readManagedProcessOutput(child: FakeChild) { return { stdout: JSON.stringify({ base: child.probeCommand, executable: child.probeCommand }), stderr: '', code: 0 }; }
     async waitForManagedProcessReady(child: FakeChild) { if (!child.pid) throw new Error('受管子进程未取得 PID'); return child.pid; }
     managedProcessPid(child: FakeChild) { return child.pid; }
     isManagedProcessRootRunning(child: FakeChild) { return child.exitCode === null && child.signalCode === null; }
@@ -88,6 +92,7 @@ class FakeChild extends EventEmitter {
   public exitCode: number | null = null;
   public signalCode: NodeJS.Signals | null = null;
   public nativeReleased?: boolean;
+  public probeCommand?: string;
   public constructor(public pid?: number) { super(); }
 }
 
@@ -131,6 +136,21 @@ describe('CognitionManager process capability invalidation', () => {
     expect(processMethods.stopManagedProcess).toHaveBeenCalledTimes(2);
   });
 
+  it('retains a failed identity probe owner and retries the same Job before permitting another start', async () => {
+    const manager = configureManager(new FakeTransport(), vi.fn());
+    const probe = new FakeChild(4242); probe.nativeReleased = false;
+    const internals = manager as unknown as { pythonProbe: FakeChild | null };
+    internals.pythonProbe = probe;
+    processMethods.forceTerminateManagedProcessTree.mockRejectedValueOnce(new Error('probe recovery denied'));
+    await expect(manager.stop()).rejects.toThrow('probe recovery denied');
+    expect(internals.pythonProbe).toBe(probe);
+    await expect(manager.start()).rejects.toThrow('上代进程尚未释放');
+    processMethods.forceTerminateManagedProcessTree.mockImplementation(async (child: FakeChild) => { child.nativeReleased = true; child.exitCode = 0; });
+    await manager.stop();
+    expect(internals.pythonProbe).toBeNull();
+    expect(processMethods.forceTerminateManagedProcessTree).toHaveBeenCalledTimes(2);
+    expect(processMethods.forceTerminateManagedProcessTree.mock.calls.every(call => call[0] === probe)).toBe(true);
+  });
   it('revokes readiness and registration when the Native helper exits without a root receipt', async () => {
     const transport = new FakeTransport();
     transport.isRegistered = true;

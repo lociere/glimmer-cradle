@@ -41,6 +41,12 @@ startup，所有 timer 为正安全整数且不超过 Node timer 上限。该监
 发布；运行根与原有配置 Document 仍通过现行 Worker 环境注入。配置启动入口已接入下述唯一 Document；
 产品完整 catalog、默认入口切换仍待完成，不能把这些装配参数另存为第二份角色配置 Schema。
 
+Windows 受管启动还须提供 Platform Native 进程监督组件。`HostDataPaths` 默认解析
+`<AppRoot>/native/windows/<architecture>/PlatformProcessTreeBridge.exe`；开发装配通过
+`process_tree_bridge` 显式注入绝对构建路径，`WorkerSupervisor` 的直接装配同样可注入。
+此项是可信 App/安装参数，不进入角色配置或复制一份 Host Document。当前隔离安装根测试
+包含实际 Native 组件和只读 checksum；完整 Host 制品 producer/安装矩阵仍待 P12/P14。
+
 ### 目标 Host 与 Jobs 配置
 
 `ConfiguredHostCognitionJobsOwner` 通过显式 `HostDataPaths` 读取 ConfigRoot 下的

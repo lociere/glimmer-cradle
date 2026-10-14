@@ -18,7 +18,7 @@
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
 | root 的 topology exports | AuthorityLease/StorePort、fencing 判定、HandoverController | Host `SqliteAuthorityStore` 与 `HostJobsOwner`；无数据库依赖 |
 | root 的 security exports | 不可变 Principal、PermissionRequest/Grant/Decision 与身份验证 | Host PermissionBroker 登记/授权/审计/撤销；不解释 Resource 内容或 scope |
-| root 的 ManagedProcessSupervisor | Node/OS 受管进程启动、真实 PID、边界释放与失败保留 | 当前 Cognition/Audio/Avatar/Extension App adapter；通用 Node/Windows Native 实现由 Platform 拥有 |
+| root 的 ManagedProcessSupervisor | Node/OS 受管进程启动、真实 PID、边界释放与失败保留 | 当前四类 Kernel App adapter 与共享 Host WorkerSupervisor；通用 Node/Windows Native 实现由 Platform 拥有 |
 
 契约提取不表示具体 IO 实现已迁入 Platform。Scope、完整 Topology/hybrid、Configuration 装配和
 完整 Security 等仍按执行记录推进；短寿命授权接线见
@@ -77,6 +77,18 @@ Cognition 在 Windows venv redirector 场景解析实际 CPython，并保留原 
 POSIX 独立进程组须另行确认组空，当前可控反例不代替 Linux/mac 实机验收。
 Native/Node 与实际消费者的证据、固定候选复核及未验范围见
 [P02A 证据](../../roadmap/initiatives/architecture-v2/evidence/2026-10-09-P02A.md)。
+
+共享 Host `WorkerSupervisor` 也消费同一机制，移除私有 taskkill/PID 回收；Windows 解析
+实际 CPython 后严格绑定 Native root PID 与 parent PID，FD3 nonce/HMAC 和首次状态接纳
+继续作为独立门。`HostDataPaths` 拥有开发注入与安装 Native 路径，见
+[装配参数](../../reference/configuration.md#变更规则)。进程回收或接收方 drain 失败保留 owner，
+后续 stop 可重试原过程；配置/复合 owner 在失败时保留实际库，全部排空后才关闭。
+这些真实隔离证据不接受完整安装包、产品默认入口或跨平台设备门。
+
+Windows Python 身份探测同样拥有独立 Job，不能因为是短命令而由未受管 execFile 承载。
+Host 和现行 Kernel Cognition adapter 持有该探测 owner；公开 `readManagedProcessOutput`
+限制输出字节/等待时间，确认整树释放及 stdout/stderr 排空后才返回。取消、超时或输出超限
+只结束读取等待，App 继续通过原 Job 回收；失败保持句柄供重试，不把输出完成等同资源释放。
 
 ## 事件、配置与数据边界
 

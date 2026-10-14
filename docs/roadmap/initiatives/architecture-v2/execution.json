@@ -908,7 +908,7 @@
         "evidence/2026-10-09-P02A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P02A.3/4：受管进程逻辑单元已实现并通过固定源码只读复核（范围限此单元），准备保存中文提交后继续通用取消/超时与trace/log/config/health。Windows Native/Node/旧Desktop23、Platform包52及最后POSIX observer微差lifecycle21、Kernel Cognition10/Audio5/Extension6/实际Worker4及最后FD4边界2项重跑通过；两包typecheck与架构/文档/编码/工具10项反例通过。App安装/开发路径真实接线，旧机制consumer-zero删除，Desktop旧装配显式绑定P12B。下一动作：按现有Clock/Lifecycle API补有界取消/超时及失败owner保留，不重构已有架构。P02A/D04/整体任务/根大型/完整制品/适用设备未验收，不推送；writer本会话，无后台测试句柄。",
+      "nextAction": "P02A.3/4：Host Native消费与实际Python probe owner单元已通过固定源码增量独立只读复审，两个必要问题关闭；Host修复后4+8项/最终真实probe1、broker31、Kernelunit11/真实Worker2、Native输出3及三包typecheck/文档架构编码diff通过，保存本地中文提交。下一动作：Host abortable/bounded迁Platform通用取消/deadline并实际消费，随后Kernel30s生命周期预算；实际callback未settle保留owner，核对显式stop取消后迟到failed通知。再trace/log/config/health。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。",
       "mapping": [
         {
           "action": "split",
@@ -1065,6 +1065,41 @@
           "target": "apps/desktop/src/main/host-supervisor.ts",
           "owner": "Desktop",
           "exitCondition": "当前旧stdin控制协议仍实际消费Platform Native Job机制，安全失败与释放定向反例保留；P12B完成Desktop产品入口/监督迁移并通过真实安装/恢复后consumer-zero删除旧路径。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/supervision/worker-supervisor.ts",
+          "target": "apps/host/src/supervision/worker-supervisor.ts",
+          "owner": "Host",
+          "exitCondition": "保留协议、能力认证与状态接纳政策，实际受管启动/边界回收消费Platform公开API，失败owner与同代重试、真实后代释放验证通过，不将taskkill/根退出当作树空。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/adapters/platform/data-paths.ts",
+          "target": "apps/host/src/adapters/platform/data-paths.ts",
+          "owner": "Host",
+          "exitCondition": "拥有可信App注入/安装Native路径及实际consumer，安装root只读反例通过，完整制品留P12/P14。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/src/composition/domain-owners.ts",
+          "target": "apps/host/src/composition/domain-owners.ts",
+          "owner": "Host",
+          "exitCondition": "真实Worker Native回收失败后复合/配置owner保留资源并同owner重试；未drain不关闭实际数据库。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/host-startup.test.ts",
+          "target": "apps/host/tests/host-startup.test.ts",
+          "owner": "Host",
+          "exitCondition": "保留原行为/权限/持久断言，追加真实Node/CPython后代与失败恢复/实际库和Native安装投影证据，不冒充最终矩阵。"
+        },
+        {
+          "action": "retain",
+          "source": "apps/host/tests/broker-denial.test.ts",
+          "target": "apps/host/tests/broker-denial.test.ts",
+          "owner": "Host",
+          "exitCondition": "实际Worker与配置owner注入开发Native组件路径，真实权限/撤销/知识链定向回归通过，权限断言不放宽。"
         }
       ],
       "commands": [
@@ -1086,7 +1121,16 @@
         "node --test core/platform/tests/lifecycle-drain.test.ts",
         "pnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/adapters/audio/official-audio-engine.grpc.test.ts",
         "$env:GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION = '1'\npnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/cognition-runtime.integration.test.ts -t 'starts, reaches|cancels an in-flight|revokes required|keeps ingress'",
-        "node --experimental-transform-types --test products/desktop/tests/packaged-supervisor.test.ts"
+        "node --experimental-transform-types --test products/desktop/tests/packaged-supervisor.test.ts",
+        "pnpm --filter @glimmer-cradle/platform build",
+        "node --test --test-name-pattern='Platform command output' core/platform/tests/windows-process-tree.test.ts",
+        "pnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/application/capabilities/inference/cognition-manager.test.ts",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '首条投影屏障|安装根/配置根|生产启动失败|协议 shutdown 不可用|不响应取消的接收方|实际 Worker 根退出|配置 Host 在真实 Worker 回收失败|有效 FD3|崩溃撤销旧 client|启动 deadline|状态接收方返回拒绝'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '有效 FD3|首条投影屏障|实际 Worker 根退出|配置 Host 在真实 Worker 回收失败'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t 'Python 身份探测|安装根/配置根|生产启动失败|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t 'Python 身份探测'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/broker-denial.test.ts",
+        "$env:GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION = '1'\npnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/cognition-runtime.integration.test.ts -t 'starts, reaches|cancels an in-flight'"
       ]
     },
     {

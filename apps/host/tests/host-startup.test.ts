@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { mkdtempSync, readFileSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync, rmSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { createServer } from 'node:http';
@@ -36,6 +36,7 @@ import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, Add
 import { PlanningJobSourceAdapter, PlanningJobAdapter, PlanningJobCancellationAdapter, PlanningNotificationAdapter } from '../src/composition/cognition-job-adapter.js';
 import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
+import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry } from '@glimmer-cradle/capabilities';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
@@ -49,6 +50,7 @@ import { CognitionClient, CognitionJobAdapter, HostCognitionError, HostJobsContr
 import { HostResourceContributions, PermissionBroker } from '../src/index.js';
 
 const repository = path.resolve(__dirname, '../../..');
+const developmentProcessTreeBridge = process.platform === 'win32' ? path.join(repository, 'build/components/native/composition-host/windows-x64/PlatformProcessTreeBridge.exe') : undefined;
 const policy = { base_delay_ms: 1, max_delay_ms: 10 };
 const submissionPolicy = { debounce_ms: 0, max_attempts: 3 };
 const clock = { now: () => Date.now() };
@@ -255,7 +257,7 @@ async function productionWorker(root: string, overrides: Partial<WorkerSuperviso
     'apps/cognition-worker/tests/test_rpc_roundtrip.py', seedPlanning ? '--host-production-planning-seed' : '--host-production-seed', root], { cwd: repository, windowsHide: true });
   const input = JSON.parse(seeded.stdout);
   const projections: Message[] = [];
-  const supervisor = new WorkerSupervisor({ ...input, app_root: repository, data_root: root,
+  const supervisor = new WorkerSupervisor({ ...input, process_tree_bridge: developmentProcessTreeBridge, app_root: repository, data_root: root,
     console_path: path.join(root, 'logs', 'worker-console.log'), startup_timeout_ms: 15_000,
     shutdown_timeout_ms: 3000, request_timeout_ms: 2000,
     accept_state: async request => {
@@ -277,7 +279,7 @@ function writeConfiguration(paths: HostDataPaths, memory: unknown, maxAttempts =
 describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
   it('实际生产 CLI 未配置默认 provider 时已ACK Memory 只等待，不消耗 attempt 或写模型结果', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-production-memory-admission-'));
-    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const paths = new HostDataPaths({ process_tree_bridge: developmentProcessTreeBridge, app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root);
     const memory = { ...seeded.input.runtime_document.memory,
       consolidation: { ...seeded.input.runtime_document.memory.consolidation, debounce_seconds: 0 } };
@@ -308,7 +310,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
   it.each([{ completed: true, revoked: false }, { completed: false, revoked: false }, { completed: true, revoked: true }])
   ('生产 CLI 自动评估实际目标 %j，重启不重复调用同一模型或消耗 attempt', async ({ completed, revoked }) => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-model-'));
-    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const paths = new HostDataPaths({ process_tree_bridge: developmentProcessTreeBridge, app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root);
     const assessments: Array<{ goal: { source_moment_id: string; model_tier: string }; evidence: Array<{ reference: { evidence_id: string }; text: string }> }> = [];
     const provider = createServer((request, response) => {
@@ -521,7 +523,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
   }, 40_000);
   it('生产 CLI 接纳实际 Planning 源，未到期目标不执行且状态真实 ACK，不阻塞 Memory 投递', async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-planning-'));
-    const paths = new HostDataPaths({ app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const paths = new HostDataPaths({ process_tree_bridge: developmentProcessTreeBridge, app_root: repository, config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
     const seeded = await productionWorker(paths.data_root, {}, true);
     const memory = { ...seeded.input.runtime_document.memory, consolidation: { ...seeded.input.runtime_document.memory.consolidation, debounce_seconds: 60 } };
     writeConfiguration(paths, memory, 5);
@@ -570,7 +572,13 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
     mkdirSync(migrations, { recursive: true });
     const migrationFiles = readdirSync(path.join(repository, 'core/cognition/migrations'));
     for (const file of migrationFiles) copyFileSync(path.join(repository, 'core/cognition/migrations', file), path.join(migrations, file));
-    const installation = () => migrationFiles.map(file => [file, createHash('sha256').update(readFileSync(path.join(migrations, file))).digest('hex')]);
+    if (paths.worker_process_tree_bridge) {
+      mkdirSync(path.dirname(paths.worker_process_tree_bridge), { recursive: true });
+      copyFileSync(developmentProcessTreeBridge!, paths.worker_process_tree_bridge);
+    }
+    const installation = () => [...migrationFiles.map(file => path.join(migrations, file)),
+      ...(paths.worker_process_tree_bridge ? [paths.worker_process_tree_bridge] : [])]
+      .map(file => [path.relative(paths.app_root, file), createHash('sha256').update(readFileSync(file)).digest('hex')]);
     const originalInstallation = installation();
     const seeded = await productionWorker(paths.data_root);
     const memory = { ...seeded.input.runtime_document.memory,
@@ -588,7 +596,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
       const start = owner.start(); expect(owner.start()).toBe(start);
       expect(await start).toMatchObject({ phase: 'active', configuration: { jobs: { submission_policy: { debounce_ms: 60000, max_attempts: 5 } } },
         session: { worker: { state: 'ready' }, jobs: { lease: { epoch: 1 } } } });
-      expect(projections).toBeGreaterThan(0); expect(readdirSync(paths.app_root)).toEqual(['core']);
+      expect(projections).toBeGreaterThan(0); expect(readdirSync(paths.app_root)).toEqual(process.platform === 'win32' ? ['core', 'native'] : ['core']);
       expect(installation()).toEqual(originalInstallation);
       expect(existsSync(paths.jobs_database)).toBe(true); expect(existsSync(paths.authority_database)).toBe(true);
       const broker = new PermissionBroker(clock.now, () => {});
@@ -631,7 +639,7 @@ describe('配置启动拥有真实 Worker/Jobs/authority 资源', () => {
         expect(restored.prepare('SELECT max_attempts,authority_epoch FROM jobs').get()).toEqual({ max_attempts: 5, authority_epoch: 2 });
         expect(restored.prepare('SELECT COUNT(*) AS count FROM jobs').get()).toEqual({ count: 1 });
       } finally { restored.close(); }
-      expect(readdirSync(paths.app_root)).toEqual(['core']); expect(installation()).toEqual(originalInstallation);
+      expect(readdirSync(paths.app_root)).toEqual(process.platform === 'win32' ? ['core', 'native'] : ['core']); expect(installation()).toEqual(originalInstallation);
     } finally { await next?.stop(); await owner.stop(); }
   }, 40_000);
 
@@ -869,7 +877,148 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
       expect(supervisor.snapshot).toMatchObject({ state: 'failed', error_code: 'worker_control_failed', control_endpoint: null });
       expect(await portClosed(endpoint)).toBe(true);
       await expect(start).rejects.toThrow();
-    } finally { release(); await supervisor.stop().catch(() => undefined); }
+      release();
+      await supervisor.stop();
+      expect(supervisor.snapshot.state).toBe('stopped');
+    } finally { release(); await supervisor.stop(); }
+  }, 30_000);
+
+  it.skipIf(process.platform !== 'win32')('实际 Worker 根退出后保留存活后代及原 Job，首次回收失败后同 owner 重试确认释放', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-native-descendant-'));
+    const site = path.join(root, 'python-site'); mkdirSync(site);
+    const pidFile = path.join(root, 'descendant.pid');
+    // This trusted fixture runs only in the actual Worker -m launch, never in its identity probe.
+    writeFileSync(path.join(site, 'sitecustomize.py'), [
+      'import os,sys,subprocess',
+      'if "-m" in sys.orig_argv and "glimmer_cradle.cognition_worker" in sys.orig_argv:',
+      '    environment=os.environ.copy(); environment.pop("__PYVENV_LAUNCHER__",None)',
+      '    child=subprocess.Popen([sys._base_executable,"-c","import time; time.sleep(120)"],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.DETACHED_PROCESS,env=environment)',
+      `    with open(${JSON.stringify(pidFile)},"w") as output: output.write(str(child.pid))`,
+    ].join('\n'), 'utf8');
+    const { supervisor } = await productionWorker(root, { shutdown_timeout_ms: 100, environment: { PYTHONPATH: site } });
+    const force = vi.spyOn(ManagedProcessSupervisor.prototype, 'forceTerminateManagedProcessTree');
+    force.mockRejectedValueOnce(new Error('isolated native termination denied'));
+    try {
+      await supervisor.start();
+      const owner = (supervisor as unknown as { child: import('node:child_process').ChildProcess }).child;
+      const workerPid = supervisor.snapshot.process_id!;
+      const descendant = Number(readFileSync(pidFile, 'utf8'));
+      expect(workerPid).not.toBe(owner.pid);
+      expect(() => process.kill(descendant, 0)).not.toThrow();
+      process.kill(workerPid, 'SIGKILL');
+      await eventually(() => force.mock.calls.length === 1);
+      await eventually(() => (supervisor as unknown as { reclaiming?: unknown }).reclaiming === undefined);
+      expect(supervisor.snapshot.state).toBe('failed');
+      expect((supervisor as unknown as { child: unknown }).child).toBe(owner);
+      expect(owner.exitCode).toBeNull();
+      expect(() => process.kill(descendant, 0)).not.toThrow();
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
+      const stop = supervisor.stop(); expect(supervisor.stop()).toBe(stop);
+      await stop;
+      expect(force).toHaveBeenCalledTimes(2);
+      expect(force.mock.calls[0][0]).toBe(owner); expect(force.mock.calls[1][0]).toBe(owner);
+      expect(supervisor.snapshot).toMatchObject({ state: 'stopped', forced: true });
+      expect((supervisor as unknown as { child?: unknown }).child).toBeUndefined();
+      expect(() => process.kill(descendant, 0)).toThrow();
+    } finally { force.mockRestore(); await supervisor.stop(); }
+  }, 30_000);
+
+  it('配置 Host 在真实 Worker 回收失败时保留实际数据库，同 owner 重试后再关闭', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-configured-stop-retry-'));
+    const paths = new HostDataPaths({ process_tree_bridge: developmentProcessTreeBridge, app_root: repository,
+      config_root: path.join(root, 'config'), data_root: path.join(root, 'data') });
+    const seeded = await productionWorker(paths.data_root);
+    writeConfiguration(paths, seeded.input.runtime_document.memory);
+    const owner = new ConfiguredHostCognitionJobsOwner({ paths, clock, owner_id: 'configured-stop-retry', worker: {
+      python_executable: seeded.input.python_executable, runtime_document: seeded.input.runtime_document,
+      accept_state: async request => create(PublishStateResponseSchema, { operationId: request.call!.traceId, status: 'state_published' }),
+    } });
+    const force = vi.spyOn(ManagedProcessSupervisor.prototype, 'forceTerminateManagedProcessTree');
+    const shutdown = vi.spyOn(CognitionClient.prototype, 'shutdown');
+    try {
+      await owner.start();
+      const internals = owner as unknown as { store?: SqliteJobStore; authority?: SqliteAuthorityStore };
+      const store = internals.store!, authority = internals.authority!;
+      shutdown.mockRejectedValue(new Error('isolated shutdown unavailable'));
+      force.mockRejectedValueOnce(new Error('isolated native stop denied'));
+      const stop = owner.stop(); expect(owner.stop()).toBe(stop);
+      await expect(stop).rejects.toThrow('isolated native stop denied');
+      expect(owner.snapshot.phase).toBe('failed');
+      expect(internals.store).toBe(store); expect(internals.authority).toBe(authority);
+      expect(store.loadAuthorityEpoch()).toBe(1);
+      expect(authority.load('jobs')).toBeDefined();
+      await owner.stop();
+      expect(owner.snapshot.phase).toBe('stopped');
+      expect(internals.store).toBeUndefined(); expect(internals.authority).toBeUndefined();
+      expect(() => store.loadAuthorityEpoch()).toThrow();
+      expect(() => authority.load('jobs')).toThrow();
+    } finally { force.mockRestore(); shutdown.mockRestore(); await owner.stop(); }
+  }, 40_000);
+
+  it.skipIf(process.platform !== 'win32')('Python 身份探测根退出后仍持有实际后代，取消失败可重试原 Job', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-python-probe-'));
+    const site = path.join(root, 'python-site'); mkdirSync(site);
+    const pidFile = path.join(root, 'probe-descendant.pid');
+    writeFileSync(path.join(site, 'sitecustomize.py'), [
+      'import os,sys,subprocess',
+      'if "-c" in sys.orig_argv:',
+      '    env=dict(os.environ);env.pop("__PYVENV_LAUNCHER__",None);env.pop("PYTHONPATH",None)',
+      '    child=subprocess.Popen([sys._base_executable,"-I","-S","-c","import time;time.sleep(120)"],env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.DETACHED_PROCESS)',
+      `    open(${JSON.stringify(pidFile)},"w").write(str(child.pid))`,
+    ].join('\n'), 'utf8');
+    const { supervisor } = await productionWorker(root, { environment: { PYTHONPATH: site }, startup_timeout_ms: 2500, request_timeout_ms: 2500 });
+    const force = vi.spyOn(ManagedProcessSupervisor.prototype, 'forceTerminateManagedProcessTree').mockRejectedValueOnce(new Error('isolated probe recovery denied'));
+    try {
+      const startup = supervisor.start();
+      const outcome = expect(startup).rejects.toThrow('isolated probe recovery denied');
+      await eventually(() => existsSync(pidFile));
+      const descendant = Number(readFileSync(pidFile, 'utf8'));
+      const internals = supervisor as unknown as { pythonProbe?: import('node:child_process').ChildProcess; child?: import('node:child_process').ChildProcess; processSupervisor: ManagedProcessSupervisor };
+      const probe = internals.pythonProbe!;
+      await outcome;
+      expect(internals.child).toBeUndefined(); expect(internals.pythonProbe).toBe(probe);
+      expect(internals.processSupervisor.isManagedProcessRootRunning(probe)).toBe(false);
+      expect(supervisor.snapshot.state).toBe('failed');
+      expect(probe.exitCode).toBeNull(); expect(() => process.kill(descendant, 0)).not.toThrow();
+      await supervisor.stop();
+      expect(force).toHaveBeenCalledTimes(2);
+      expect(force.mock.calls.every(call => call[0] === probe)).toBe(true);
+      expect(internals.pythonProbe).toBeUndefined(); expect(supervisor.snapshot.state).toBe('stopped');
+      try { process.kill(descendant, 0); throw new Error('probe descendant still alive'); }
+      catch (error) { expect(error).toMatchObject({ code: 'ESRCH' }); }
+    } finally { force.mockRestore(); await supervisor.stop(); }
+  }, 30_000);
+  it.skipIf(process.platform !== 'win32')('有效 FD3 能力 proof 不能用 Native wrapper PID 替代实际 Worker 身份', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-native-pid-proof-'));
+    const site = path.join(root, 'python-site'); mkdirSync(site);
+    const releaseFile = path.join(root, 'release-worker');
+    writeFileSync(path.join(site, 'sitecustomize.py'), [
+      'import os,sys,time',
+      'if "-m" in sys.orig_argv and "glimmer_cradle.cognition_worker" in sys.orig_argv:',
+      '    deadline=time.monotonic()+15',
+      `    while not os.path.exists(${JSON.stringify(releaseFile)}) and time.monotonic()<deadline: time.sleep(0.01)`,
+    ].join('\n'), 'utf8');
+    const { supervisor } = await productionWorker(root, { environment: { PYTHONPATH: site } });
+    const startup = supervisor.start();
+    try {
+      await eventually(() => supervisor.snapshot.process_id !== null);
+      const internals = supervisor as unknown as { child: import('node:child_process').ChildProcess; secret: Buffer; nonce: string };
+      const generation = supervisor.snapshot.generation!, endpoint = 'grpc://127.0.0.1:12345';
+      const wrapperPid = internals.child.pid!;
+      expect(wrapperPid).not.toBe(supervisor.snapshot.process_id);
+      // 保留正确的 Native 父身份，只伪造实际 Worker PID，隔离该认证断言。
+      const proof = createHmac('sha256', internals.secret).update(`${generation}\n${internals.nonce}\n${endpoint}\n${wrapperPid}\n${wrapperPid}`).digest();
+      await expect(controlCall(supervisor.snapshot.control_endpoint!, 'RegisterCognition', create(RegisterCognitionRequestSchema, {
+        call: { generation, traceId: 'wrong-native-wrapper' }, endpoint, processId: BigInt(wrapperPid), supervisorProcessId: BigInt(wrapperPid),
+        registrationNonce: internals.nonce, authProof: proof,
+      }), RegisterCognitionRequestSchema, RegisterCognitionResponseSchema)).rejects.toThrow();
+      expect(supervisor.snapshot.state).toBe('starting');
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
+      writeFileSync(releaseFile, 'release', 'utf8');
+      await startup;
+      expect(supervisor.snapshot.state).toBe('ready');
+      expect(supervisor.snapshot.process_id).not.toBe(wrapperPid);
+    } finally { writeFileSync(releaseFile, 'release', 'utf8'); await startup.catch(() => undefined); await supervisor.stop(); }
   }, 30_000);
 });
 describe('Planning 源真实 wire/Jobs 接纳', () => {

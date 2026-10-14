@@ -266,6 +266,33 @@ nativeTest('Platform Windows API preserves an unknown owner after control loss d
   await nativeAssert.rejects(supervisor.stopManagedProcess(child, { label: 'missing-receipt' }), /释放回执缺失/);
 });
 
+nativeTest('Platform command output waits for final stdout/stderr and actual Native release', windowsOnly, async () => {
+  const supervisor = new WindowsSupervisor(windowsLogger);
+  const child = supervisor.spawnManagedProcess(process.execPath, ['-e', 'process.stdout.write("stdout-final");process.stderr.write("stderr-final");process.exitCode=7'], { stdio: ['ignore', 'pipe', 'pipe'] }, nativeBridge);
+  try {
+    nativeAssert.deepEqual(await supervisor.readManagedProcessOutput(child, 5000), { stdout: 'stdout-final', stderr: 'stderr-final', code: 7 });
+    nativeAssert.equal(supervisor.isProcessReleased(child), true);
+  } finally { if (!supervisor.isProcessReleased(child)) await supervisor.forceTerminateManagedProcessTree(child, 'output-fixture', 5000); }
+});
+for (const failure of ['cancel', 'overflow'] as const) {
+  nativeTest(`Platform command output ${failure} retains the same live Job for actual recovery`, windowsOnly, async () => {
+    const supervisor = new WindowsSupervisor(windowsLogger);
+    const child = supervisor.spawnManagedProcess(process.execPath, ['-e', 'process.stdout.write("too-many-output-bytes");setInterval(()=>{},1000)'], { stdio: ['ignore', 'pipe', 'pipe'] }, nativeBridge);
+    const cancellation = new AbortController();
+    try {
+      const reading = supervisor.readManagedProcessOutput(child, 5000, cancellation.signal, failure === 'overflow' ? 8 : 8192);
+      const outcome = nativeAssert.rejects(reading, failure === 'overflow' ? /输出超过限制/ : /isolated cancellation/);
+      const pid = await supervisor.waitForManagedProcessReady(child, 5000);
+      if (failure === 'cancel') cancellation.abort(new Error('isolated cancellation'));
+      await outcome;
+      nativeAssert.equal(supervisor.isProcessReleased(child), false);
+      nativeAssert.doesNotThrow(() => process.kill(pid, 0));
+      await supervisor.forceTerminateManagedProcessTree(child, 'output-recovery', 5000);
+      nativeAssert.equal(supervisor.isProcessReleased(child), true);
+      nativeAssert.throws(() => process.kill(pid, 0), (error: NodeJS.ErrnoException) => error.code === 'ESRCH');
+    } finally { if (!supervisor.isProcessReleased(child)) await supervisor.forceTerminateManagedProcessTree(child, 'output-fixture', 5000); }
+  });
+}
 nativeTest('Platform Windows API still reclaims the tree when the root observer throws', windowsOnly, async () => {
   const supervisor = new WindowsSupervisor(windowsLogger);
   const child = supervisor.spawnManagedProcess(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: ['ignore', 'pipe', 'pipe'] }, nativeBridge);

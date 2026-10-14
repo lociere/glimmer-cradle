@@ -73,13 +73,15 @@ export class ConfiguredHostCognitionJobsOwner {
   public stop(): Promise<void> {
     if (this.stopping) return this.stopping;
     this.stopRequested = true; this.phase = 'stopping';
-    this.stopping = (async () => {
+    this.stopping = Promise.resolve().then(async () => {
       try {
         await this.session?.stop();
         await this.starting?.catch(() => undefined);
         this.closeStores(); this.phase = 'stopped';
       } catch (error) { this.phase = 'failed'; throw error; }
-    })();
+    });
+    const stopping = this.stopping;
+    void stopping.catch(() => { if (this.stopping === stopping) this.stopping = undefined; });
     return this.stopping;
   }
   private async begin(): Promise<ConfiguredHostCognitionJobsSnapshot> {
@@ -94,6 +96,7 @@ export class ConfiguredHostCognitionJobsOwner {
       this.authority = new SqliteAuthorityStore(this.options.paths.authority_database);
       assertJobsRestoration(this.store, this.authority);
       const worker = new WorkerSupervisor({ ...this.options.worker, ...this.configuration.worker,
+        process_tree_bridge: this.options.worker.process_tree_bridge ?? this.options.paths.worker_process_tree_bridge,
         runtime_document: { ...this.options.worker.runtime_document, memory: this.configuration.memory_document },
         app_root: this.options.paths.app_root, data_root: this.options.paths.data_root, console_path: this.options.paths.worker_console });
       this.session = new HostCognitionJobsOwner({ worker,
@@ -183,7 +186,7 @@ export class HostCognitionJobsOwner {
     this.stopRequested = true; this.phase = 'stopping';
     // 尚未装配 Jobs 时立即中断启动屏障，不能等 startup deadline 才停止。
     if (!this.jobs) void this.options.worker.stop().catch(() => undefined);
-    this.stopping = (async () => {
+    this.stopping = Promise.resolve().then(async () => {
       let drained = false;
       try {
         await this.drainDomains();
@@ -195,7 +198,9 @@ export class HostCognitionJobsOwner {
         catch (error) { this.phase = 'failed'; throw error; }
         finally { this.unsubscribe?.(); this.unsubscribe = undefined; }
       }
-    })();
+    });
+    const stopping = this.stopping;
+    void stopping.catch(() => { if (this.stopping === stopping) this.stopping = undefined; });
     return this.stopping;
   }
   private async begin(): Promise<HostCognitionJobsSnapshot> {
