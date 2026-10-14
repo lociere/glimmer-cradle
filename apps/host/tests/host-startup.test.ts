@@ -36,7 +36,7 @@ import { SubmitPerceptionRequestSchema, GetPerceptionOperationRequestSchema, Add
 import { PlanningJobSourceAdapter, PlanningJobAdapter, PlanningJobCancellationAdapter, PlanningNotificationAdapter } from '../src/composition/cognition-job-adapter.js';
 import { planningJobRequest, planningJobIdentity, PLANNING_JOB_KIND } from '../src/adapters/protocol/job-mapper.js';
 import type { AuthorityLease } from '@glimmer-cradle/platform';
-import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
+import { ManagedProcessSupervisor, SystemClock } from '@glimmer-cradle/platform';
 import { ExecutionController, ExecutionResultOutbox, SqliteExecutionJournal, ResourceRegistry } from '@glimmer-cradle/capabilities';
 import { JobController, JobRecoveryController, JobRetentionController, SqliteJobStore, type Job, type JobStateEvent } from '@glimmer-cradle/jobs';
 import { memoryJobState } from '../src/adapters/protocol/job-mapper.js';
@@ -818,6 +818,42 @@ describe('目标 Host 监督真实生产 Worker 与 Jobs', () => {
       expect(JSON.stringify(supervisor.snapshot)).not.toContain('fixture-private-key');
       expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
     } finally { await supervisor.stop(); }
+  }, 30_000);
+
+  it('启动 Clock 创建 timer 失败撤销状态并保持可停止，不创建实际 Worker', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-clock-schedule-'));
+    const clock = new SystemClock();
+    vi.spyOn(clock, 'schedule').mockImplementationOnce(() => { throw new Error('isolated schedule failure'); });
+    const { supervisor } = await productionWorker(root, { clock });
+    await expect(supervisor.start()).rejects.toThrow('isolated schedule failure');
+    expect(supervisor.snapshot).toMatchObject({ state: 'failed', process_id: null, control_endpoint: null });
+    await supervisor.stop();
+    expect(supervisor.snapshot.state).toBe('stopped');
+  });
+
+  it('启动 Clock 取消 timer 失败不留下 ready Worker，保留原 timer 后可重试释放', async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-clock-cancel-'));
+    const clock = new SystemClock();
+    const schedule = clock.schedule.bind(clock);
+    let denied = true, calls = 0;
+    vi.spyOn(clock, 'schedule').mockImplementation((ms, task) => {
+      const timer = schedule(ms, task);
+      if (calls++ !== 0) return timer;
+      return { cancel() { if (denied) throw new Error('isolated timer release denied'); timer.cancel(); } };
+    });
+    const { supervisor, projections } = await productionWorker(root, { clock });
+    try {
+      await expect(supervisor.start()).rejects.toThrow('isolated timer release denied');
+      expect(projections.length).toBeGreaterThan(0);
+      expect(supervisor.snapshot).toMatchObject({ state: 'failed', endpoint: null, control_endpoint: null });
+      const internals = supervisor as unknown as { child?: import('node:child_process').ChildProcess; secret?: Buffer; nonce?: string; timers: Set<unknown> };
+      expect(internals.child).toBeUndefined(); expect(internals.secret).toBeUndefined(); expect(internals.nonce).toBeUndefined();
+      expect(internals.timers.size).toBe(1);
+      expect(() => supervisor.createCognitionClient()).toThrow('尚未业务 ready');
+      await expect(supervisor.stop()).rejects.toThrow('isolated timer release denied');
+      denied = false; await supervisor.stop();
+      expect(internals.timers.size).toBe(0); expect(supervisor.snapshot.state).toBe('stopped');
+    } finally { denied = false; await supervisor.stop(); }
   }, 30_000);
 
   it('启动 deadline 取消状态接收并回收实际进程，不把已注册端点当 ready', async () => {

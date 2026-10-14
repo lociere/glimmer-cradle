@@ -215,7 +215,7 @@ test('a module may drain a different coordinator without being mistaken for self
 });
 
 const { EventEmitter } = require('node:events');
-const { ManagedProcessSupervisor } = require('../dist/index.js') as typeof import('../src/index');
+const { Deadline, ManagedProcessSupervisor, waitWithCancellation } = require('../dist/index.js') as typeof import('../src/index');
 const quietProcessLogger = { info() {}, warn() {}, error() {} };
 function processFixture() {
   const child = Object.assign(new EventEmitter(), {
@@ -235,6 +235,68 @@ function processFixture() {
   const exit = () => { Object.assign(child, { exitCode: 0 }); child.emit('exit', 0, null); };
   return { child, controlled, timers, exit };
 }
+
+test('a shared monotonic deadline preserves one budget and distinguishes completed undefined from expiry', async () => {
+  const fixture = processFixture();
+  const deadline = new Deadline(fixture.controlled, 30);
+  const first = deadline.waitFor(Promise.resolve(undefined));
+  fixture.controlled.advance(15);
+  assert.deepEqual(await first, { status: 'completed', value: undefined });
+  assert.equal(fixture.timers.size, 0);
+  let release!: () => void;
+  const actual = new Promise<void>(resolve => { release = resolve; });
+  let actuallyDrained = false;
+  void actual.then(() => { actuallyDrained = true; });
+  const second = deadline.waitFor(actual);
+  fixture.controlled.advance(15);
+  assert.deepEqual(await second, { status: 'expired' });
+  assert.equal(actuallyDrained, false);
+  assert.equal(fixture.timers.size, 0);
+  release(); await actual;
+  assert.equal(actuallyDrained, true);
+  assert.deepEqual(await new Deadline(fixture.controlled, 30).waitFor(actual), { status: 'completed', value: undefined });
+});
+
+test('cancelling a wait removes its listener while the actual callback can still settle later', async () => {
+  const cancellation = new AbortController();
+  const getListeners = require('node:events').getEventListeners;
+  let release!: () => void, settled = false;
+  const actual = new Promise<void>(resolve => { release = resolve; }).then(() => { settled = true; });
+  const wait = waitWithCancellation(actual, cancellation.signal);
+  assert.equal(getListeners(cancellation.signal, 'abort').length, 1);
+  cancellation.abort(new Error('caller cancelled'));
+  await assert.rejects(wait, /caller cancelled/);
+  assert.equal(settled, false);
+  assert.equal(getListeners(cancellation.signal, 'abort').length, 0);
+  // A pre-cancelled wait still observes the input rejection, avoiding an unhandled late failure.
+  await assert.rejects(waitWithCancellation(Promise.reject(new Error('actual failed')), cancellation.signal), /caller cancelled/);
+  release(); await actual;
+  assert.equal(settled, true);
+});
+
+test('completed and failed waits release timers/listeners and deadline clock failures propagate', async () => {
+  const fixture = processFixture(), cancellation = new AbortController();
+  const getListeners = require('node:events').getEventListeners;
+  assert.equal(await waitWithCancellation(Promise.resolve(42), cancellation.signal), 42);
+  await assert.rejects(waitWithCancellation(Promise.reject(new Error('actual failed')), cancellation.signal), /actual failed/);
+  assert.equal(getListeners(cancellation.signal, 'abort').length, 0);
+  await assert.rejects(new Deadline(fixture.controlled, 30).waitFor(Promise.reject(new Error('actual failed'))), /actual failed/);
+  assert.equal(fixture.timers.size, 0);
+  let broken = false;
+  const deadline = new Deadline({ ...fixture.controlled, monotonicNowMs() { if (broken) throw new Error('clock failed'); return 0; } }, 30);
+  const waiting = deadline.waitFor(Promise.resolve(42));
+  broken = true;
+  await assert.rejects(waiting, /clock failed/);
+  assert.equal(fixture.timers.size, 0);
+});
+
+test('deadline expiry rejects new waits without losing observation of an actual rejected operation', async () => {
+  const fixture = processFixture();
+  const deadline = new Deadline(fixture.controlled, 0);
+  assert.deepEqual(await deadline.waitFor(Promise.reject(new Error('late failure'))), { status: 'expired' });
+  assert.equal(fixture.timers.size, 0);
+  assert.throws(() => new Deadline(fixture.controlled, -1), /预算无效/);
+});
 
 test('managed process timeout cancels its clock task and detaches the exit listener', async () => {
   const fixture = processFixture();

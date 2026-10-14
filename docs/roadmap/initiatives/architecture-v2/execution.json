@@ -908,7 +908,7 @@
         "evidence/2026-10-09-P02A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P02A.3/4：Host Native消费与实际Python probe owner单元已通过固定源码增量独立只读复审，两个必要问题关闭；Host修复后4+8项/最终真实probe1、broker31、Kernelunit11/真实Worker2、Native输出3及三包typecheck/文档架构编码diff通过，保存本地中文提交。下一动作：Host abortable/bounded迁Platform通用取消/deadline并实际消费，随后Kernel30s生命周期预算；实际callback未settle保留owner，核对显式stop取消后迟到failed通知。再trace/log/config/health。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。",
+      "nextAction": "P02A.3/4：Host Native/probe已保存7ba499ce；取消/Deadline与Host真实consumer单元及timer失败owner已通过固定增量独立只读复审，lifecycle25/Host实际9/两包typecheck/文档架构编码diff通过，按授权本地中文提交。下一动作：核对core/kernel/src/runtime/modules/lifecycle-orchestrator.ts与composition/kernel-application.ts，对声明的30s生命周期预算接通Platform单调等待；保留实际pending start/stop/observer及依赖owner，expired不能发AppStopped或关闭诊断，重试join同实际Promise；验证显式stop后迟到failed通知。再trace/log/config/health与剩余物理目录。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。",
       "mapping": [
         {
           "action": "split",
@@ -916,6 +916,20 @@
           "target": "core/platform/src/lifecycle/runtime-module.ts",
           "owner": "Platform",
           "exitCondition": "监督契约独立落位，保持实际App消费者与公开API，原聚合文件consumer-zero后删除。"
+        },
+        {
+          "action": "split",
+          "source": "apps/host/src/supervision/worker-supervisor.ts",
+          "target": "core/platform/src/lifecycle/cancellation.ts",
+          "owner": "Platform",
+          "exitCondition": "真实Host等待消费公开取消机制，取消只终止等待、观察迟到真实失败并移除listener；原私有abortable consumer-zero删除。"
+        },
+        {
+          "action": "split",
+          "source": "apps/host/src/supervision/worker-supervisor.ts",
+          "target": "core/platform/src/communication/deadline.ts",
+          "owner": "Platform",
+          "exitCondition": "真实Host消费单调共享等待预算，expired不等同drain，timer释放/迟到任务保留与同owner恢复验证通过；原私有bounded consumer-zero删除。"
         },
         {
           "action": "split",
@@ -1130,7 +1144,9 @@
         "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t 'Python 身份探测|安装根/配置根|生产启动失败|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝'",
         "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t 'Python 身份探测'",
         "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/broker-denial.test.ts",
-        "$env:GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION = '1'\npnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/cognition-runtime.integration.test.ts -t 'starts, reaches|cancels an in-flight'"
+        "$env:GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION = '1'\npnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/cognition-runtime.integration.test.ts -t 'starts, reaches|cancels an in-flight'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '首条投影屏障|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝|Python 身份探测|配置 Host 在真实 Worker 回收失败'",
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '启动 Clock|首条投影屏障|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝|Python 身份探测|配置 Host 在真实 Worker 回收失败'"
       ]
     },
     {

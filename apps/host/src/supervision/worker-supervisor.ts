@@ -3,9 +3,8 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { ManagedProcessSupervisor } from '@glimmer-cradle/platform';
+import { Deadline, ManagedProcessSupervisor, SystemClock, waitWithCancellation, type Clock, type ScheduledTask } from '@glimmer-cradle/platform';
 import { resolveHostProcessTreeBridge } from '../adapters/platform/data-paths.js';
-import { setTimeout as schedule, clearTimeout as unschedule } from 'node:timers';
 import { setTimeout as delay } from 'node:timers/promises';
 import * as grpc from '@grpc/grpc-js';
 import { create, fromBinary, toBinary, type Message } from '@bufbuild/protobuf';
@@ -31,6 +30,7 @@ export interface WorkerSupervisorOptions {
   readonly runtime_document: Readonly<Record<string, unknown>>;
   readonly environment?: Readonly<Record<string, string>>;
   readonly process_tree_bridge?: string;
+  readonly clock?: Clock;
   readonly startup_timeout_ms: number;
   readonly shutdown_timeout_ms: number;
   readonly request_timeout_ms: number;
@@ -57,11 +57,13 @@ export class WorkerSupervisor {
   private readonly options: WorkerSupervisorOptions;
   private readonly document: string;
   private readonly secrets: string[];
+  private readonly clock: Clock;
   private state: WorkerSupervisorSnapshot = { state: 'idle', generation: null, process_id: null,
     endpoint: null, control_endpoint: null, error_code: null, exit_code: null, forced: false };
   private readonly cancellation = new AbortController();
   private readonly requests = new Set<AbortController>();
   private readonly tasks = new Set<Promise<void>>();
+  private readonly timers = new Set<ScheduledTask>();
   private readonly clients = new Set<CognitionClient>();
   private readonly listeners = new Set<() => void>();
   private server?: grpc.Server;
@@ -76,7 +78,7 @@ export class WorkerSupervisor {
   private stopping?: Promise<void>;
   private reclaiming?: Promise<void>;
   private stoppingRequested = false;
-  private readonly processSupervisor = new ManagedProcessSupervisor({ info() {}, warn() {}, error() {} });
+  private readonly processSupervisor: ManagedProcessSupervisor;
 
   public constructor(options: WorkerSupervisorOptions) {
     if (![options.python_executable, options.app_root, options.data_root, options.console_path]
@@ -89,6 +91,8 @@ export class WorkerSupervisor {
     }
     this.options = { ...options, environment: { ...options.environment },
       process_tree_bridge: resolveHostProcessTreeBridge(options.app_root, options.process_tree_bridge) };
+    this.clock = options.clock ?? new SystemClock();
+    this.processSupervisor = new ManagedProcessSupervisor({ info() {}, warn() {}, error() {} }, this.clock);
     this.document = JSON.stringify(options.runtime_document);
     if (!this.document || this.document === 'null') throw new Error('Worker 配置 Document 无效');
     const sensitive: string[] = [];
@@ -137,8 +141,8 @@ export class WorkerSupervisor {
     return this.stopping;
   }
   private async begin(): Promise<WorkerSession> {
-    const timer = setTimeout(() => this.cancellation.abort(new Error('Worker startup deadline 已到期')), this.options.startup_timeout_ms);
     try {
+      const timer = this.scheduleTimer(this.options.startup_timeout_ms, () => this.cancellation.abort(new Error('Worker startup deadline 已到期')));
       this.secret = randomBytes(32); this.nonce = randomUUID();
       this.registration = deferred(); void this.registration.promise.catch(() => undefined);
       const server = new grpc.Server(); this.server = server;
@@ -213,7 +217,7 @@ export class WorkerSupervisor {
       });
       child.once('error', () => this.fail('worker_start_failed'));
       if (!child.pid) throw new Error('Worker 未返回受监督 PID');
-      const processId = await abortable(this.processSupervisor.waitForManagedProcessReady(child, this.options.startup_timeout_ms), this.cancellation.signal);
+      const processId = await waitWithCancellation(this.processSupervisor.waitForManagedProcessReady(child, this.options.startup_timeout_ms), this.cancellation.signal);
       this.cancellation.signal.throwIfAborted();
       if (!this.processSupervisor.isManagedProcessRootRunning(child)) throw new Error('Worker 实际根在接纳前已退出');
       this.state = { ...this.state, process_id: processId };
@@ -221,7 +225,7 @@ export class WorkerSupervisor {
       pipe.on('error', () => this.fail('worker_start_failed'));
       pipe.end(JSON.stringify({ kernelEndpoint: `grpc://127.0.0.1:${port}`, generation: this.state.generation,
         registrationNonce: this.nonce, registrationSecret: this.secret.toString('base64url') }) + '\n');
-      await abortable(this.registration.promise, this.cancellation.signal);
+      await waitWithCancellation(this.registration.promise, this.cancellation.signal);
       this.cancellation.signal.throwIfAborted();
       while (true) {
         const readiness = await this.lifecycle!.readiness(this.cancellation.signal);
@@ -231,12 +235,13 @@ export class WorkerSupervisor {
         if (readiness.state !== 'starting' && readiness.state !== 'ready') throw new Error('Worker 未达到业务 ready');
         await delay(25, undefined, { signal: this.cancellation.signal });
       }
+      this.cancelTimer(timer);
       this.state = { ...this.state, state: 'ready' };
       return { endpoint: this.state.endpoint!, generation: this.state.generation! };
     } catch (error) {
       if (!this.stoppingRequested) this.fail('worker_start_failed');
       await this.reclaim(); throw error;
-    } finally { clearTimeout(timer); this.zeroSecret(); }
+    } finally { this.zeroSecret(); }
   }
   private register(request: RegisterCognitionRequest) {
     if (this.state.state !== 'starting' || !this.secret || !this.nonce || !request.call?.traceId
@@ -262,8 +267,12 @@ export class WorkerSupervisor {
     callback: grpc.sendUnaryData<O>, handler: (signal: AbortSignal) => Promise<O>, header?: CallMetadata): void {
     const metadata = header ?? (call.request as { call?: CallMetadata }).call;
     const cancellation = new AbortController(); this.requests.add(cancellation);
-    const timer = setTimeout(() => cancellation.abort(), this.options.request_timeout_ms);
-    cancellation.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+    let timer: ScheduledTask;
+    try { timer = this.scheduleTimer(this.options.request_timeout_ms, () => cancellation.abort()); }
+    catch { this.requests.delete(cancellation); this.fail('worker_control_failed'); callback(this.fault(ServiceErrorCode.NOT_READY, metadata?.traceId), null); return; }
+    cancellation.signal.addEventListener('abort', () => {
+      try { this.cancelTimer(timer); } catch { this.fail('worker_control_failed'); }
+    }, { once: true });
     call.once('cancelled', () => cancellation.abort());
     const task = (async () => {
       try {
@@ -279,7 +288,7 @@ export class WorkerSupervisor {
           : cancellation.signal.aborted ? ServiceErrorCode.CANCELLED
           : error instanceof HostCapabilityRequestError ? ServiceErrorCode.INVALID_REQUEST : ServiceErrorCode.NOT_READY;
         callback(this.fault(code, metadata?.traceId, error instanceof ExecutionRecoveryRequiredError ? error.invocationId : ''), null);
-      } finally { clearTimeout(timer); this.requests.delete(cancellation); }
+      } finally { try { this.cancelTimer(timer); } finally { this.requests.delete(cancellation); } }
     })();
     this.tasks.add(task); void task.finally(() => this.tasks.delete(task)).catch(() => this.fail('worker_control_failed'));
   }
@@ -329,15 +338,15 @@ export class WorkerSupervisor {
         if (this.pythonProbe && this.processSupervisor.isProcessReleased(this.pythonProbe)) this.pythonProbe = undefined;
       } catch (error) { failures.push(error); }
       try { if (this.child && !this.processSupervisor.isProcessReleased(this.child)) {
-        const deadline = Date.now() + this.options.shutdown_timeout_ms;
+        const deadline = new Deadline(this.clock, this.options.shutdown_timeout_ms);
         if (this.lifecycle) {
           const cancellation = new AbortController();
-          const timer = setTimeout(() => cancellation.abort(), this.options.shutdown_timeout_ms);
+          const timer = this.scheduleTimer(deadline.remainingMs, () => cancellation.abort());
           try { await this.lifecycle.shutdown('Host supervised shutdown', cancellation.signal); }
           catch { /* 超时后仍核验实际退出；shutdown RPC 与退出等待共用一个预算。 */ }
-          finally { clearTimeout(timer); }
+          finally { this.cancelTimer(timer); }
         }
-        if (!await this.waitExit(Math.max(0, deadline - Date.now()))) {
+        if (!await this.waitExit(Math.floor(deadline.remainingMs))) {
           this.state = { ...this.state, forced: true };
           await this.processSupervisor.forceTerminateManagedProcessTree(this.child, 'Host Cognition Worker', 5000, process.platform !== 'win32');
         }
@@ -347,9 +356,12 @@ export class WorkerSupervisor {
         if (this.child && this.processSupervisor.isProcessReleased(this.child)) this.child = undefined;
         try { this.lifecycle?.close(); this.lifecycle = undefined; } catch (error) { failures.push(error); }
         try { this.server?.forceShutdown(); this.server = undefined; } catch (error) { failures.push(error); }
+        for (const timer of [...this.timers]) {
+          try { this.cancelTimer(timer); } catch (error) { failures.push(error); }
+        }
         this.state = { ...this.state, control_endpoint: null };
-        const drained = await bounded(Promise.allSettled([...this.tasks]).then(() => true), this.options.shutdown_timeout_ms);
-        if (!drained) failures.push(new Error('Worker control 接收方未响应取消；不能宣称 drain 完成'));
+        const drained = await new Deadline(this.clock, this.options.shutdown_timeout_ms).waitFor(Promise.allSettled([...this.tasks]));
+        if (drained.status === 'expired') failures.push(new Error('Worker control 接收方未响应取消；不能宣称 drain 完成'));
       }
       if (failures.length === 1) throw failures[0];
       if (failures.length > 1) throw new AggregateError(failures, 'Host Worker 回收存在错误');
@@ -363,6 +375,22 @@ export class WorkerSupervisor {
     const child = this.child;
     if (!child || this.processSupervisor.isProcessReleased(child)) return true;
     return await this.processSupervisor.waitForManagedProcessExit(child, timeout) && this.processSupervisor.isProcessReleased(child);
+  }
+
+  private scheduleTimer(delayMs: number, task: () => void): ScheduledTask {
+    let timer: ScheduledTask | undefined, fired = false;
+    timer = this.clock.schedule(delayMs, () => {
+      fired = true;
+      if (timer) this.timers.delete(timer);
+      task();
+    });
+    if (!fired) this.timers.add(timer);
+    return timer;
+  }
+
+  private cancelTimer(timer: ScheduledTask): void {
+    timer.cancel();
+    this.timers.delete(timer);
   }
 
   private async resolvePythonProcess(): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
@@ -407,15 +435,4 @@ function deferred() {
   let resolve!: () => void, reject!: (error: Error) => void;
   const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
-}
-async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
-  let abort!: () => void;
-  const interrupted = new Promise<never>((_, reject) => { abort = () => reject(signal.reason); signal.addEventListener('abort', abort, { once: true }); });
-  try { return await Promise.race([promise, interrupted]); } finally { signal.removeEventListener('abort', abort); }
-}
-async function bounded<T>(promise: Promise<T>, timeout: number): Promise<T | undefined> {
-  let timer!: ReturnType<typeof schedule>;
-  try { return await Promise.race([promise, new Promise<undefined>(resolve => { timer = schedule(() => resolve(undefined), timeout); })]); }
-  finally { unschedule(timer); }
 }

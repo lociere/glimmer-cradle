@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：Host Native消费与实际Python probe owner单元已通过固定源码增量独立只读复审，两个必要问题关闭；Host修复后4+8项/最终真实probe1、broker31、Kernelunit11/真实Worker2、Native输出3及三包typecheck/文档架构编码diff通过，保存本地中文提交。下一动作：Host abortable/bounded迁Platform通用取消/deadline并实际消费，随后Kernel30s生命周期预算；实际callback未settle保留owner，核对显式stop取消后迟到failed通知。再trace/log/config/health。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：Host Native/probe已保存7ba499ce；取消/Deadline与Host真实consumer单元及timer失败owner已通过固定增量独立只读复审，lifecycle25/Host实际9/两包typecheck/文档架构编码diff通过，按授权本地中文提交。下一动作：核对core/kernel/src/runtime/modules/lifecycle-orchestrator.ts与composition/kernel-application.ts，对声明的30s生命周期预算接通Platform单调等待；保留实际pending start/stop/observer及依赖owner，expired不能发AppStopped或关闭诊断，重试join同实际Promise；验证显式stop后迟到failed通知。再trace/log/config/health与剩余物理目录。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

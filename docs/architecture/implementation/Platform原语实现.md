@@ -50,7 +50,19 @@
   start/stop 会明确拒绝，避免等待当前操作自身；外部并发调用仍共享真实 Promise。
   同步回调返回立刻退出，异步回调 settle 后退出，后续异步任务与其他 coordinator 不受误拒。
   App 的事件与资源释放回调也消费同一公开机制，自等待错误不跳过其余资源释放。
-  通用取消/超时尚待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
+  Kernel 配置生命周期预算的实际消费仍待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
+
+`lifecycle/cancellation.ts` 的公开 `waitWithCancellation` 只取消等待；预先取消也观察输入的
+实际失败，结束时移除 signal listener，不把实际 callback 丢弃或声明已停止。
+`communication/deadline.ts` 的公开 `Deadline` 以注入 Clock 的单调时间计算一个共享预算；
+`DeadlineResult` 区分 completed（允许 undefined）和 expired，输出过期不表示 drain。
+共享 Host WorkerSupervisor 已删除私有 abortable/bounded，消费这两个机制；App 拥有
+启动/请求/shutdown 的预算与取消策略，Clock 注入统一用于相关 timer 和进程等待。
+协议 shutdown 与实际退出等待消费同一单调预算，超时后的接收任务仍留在实际 task 集合，
+后续 stop 只能在它们真正结束后报告排空。通用机制不包含角色、领域或协议判断。
+Host 持有启动/请求/协议关闭 timer；取消确认后才移除，取消失败保留原 timer 供 stop 重试。
+startup timer 创建失败进入失败回收，取消成功后才开放 ready；所有结果都清零 FD3 能力，
+timer 异常不绕过实际 Worker 回收。
 
 ## 受管进程的实际边界
 

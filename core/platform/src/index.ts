@@ -1,5 +1,8 @@
 export type { Clock, ScheduledTask } from './time/clock.js';
 export { SystemClock } from './time/system-clock.js';
+export { waitWithCancellation } from './lifecycle/cancellation.js';
+export { Deadline } from './communication/deadline.js';
+export type { DeadlineResult } from './communication/deadline.js';
 export { ManagedProcessSupervisor, ManagedProcessTerminationError } from './adapters/node/process-supervisor.js';
 export type { ManagedProcessStopOptions, ManagedProcessEnvironment } from './adapters/node/process-supervisor.js';
 export type { StableIdentity } from './identity/identity.js';
