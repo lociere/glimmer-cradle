@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：Host Native/probe已保存7ba499ce；取消/Deadline与Host真实consumer单元及timer失败owner已通过固定增量独立只读复审，lifecycle25/Host实际9/两包typecheck/文档架构编码diff通过，按授权本地中文提交。下一动作：核对core/kernel/src/runtime/modules/lifecycle-orchestrator.ts与composition/kernel-application.ts，对声明的30s生命周期预算接通Platform单调等待；保留实际pending start/stop/observer及依赖owner，expired不能发AppStopped或关闭诊断，重试join同实际Promise；验证显式stop后迟到failed通知。再trace/log/config/health与剩余物理目录。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：bounded coordinator/Kernel根预算单元固定源码与最后微差已独立只读接受，Platform28/App26（factory spy零调用+正例、实际SQLite/迟到回调/原operation retry）/Schema5/两包typecheck/文档架构编码diff通过，保存本地中文提交。唯一Schema上限与JSON-only基线同步，generate和verify22及三语往返通过；最后guard合法baseline unstaged差异已正式暂存并只重跑failed generated通过，未改断言/白名单。下一动作：Cognition显式stop取消后迟到failed通知反例与修复，然后Platform配置loader/schema/revision真实链，解决foundation/AppStarting配置可用前预算事实源与有界等待；再日志trace/health及全部剩余物理目录。早期配置预算缺口仍未关闭，整体P02A/D04/最终验收未完成；唯一writer本会话，无后台测试，不推送。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

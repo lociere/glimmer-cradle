@@ -236,6 +236,72 @@ function processFixture() {
   return { child, controlled, timers, exit };
 }
 
+test('startup and stop expiry retain actual startup callbacks and forbid concurrent resource release', async () => {
+  const fixture = processFixture(), events: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const module = runtime('pending', events, { startGate: gate });
+  const coordinator = new LifecycleCoordinator(fixture.controlled);
+  const starting = coordinator.startPhase({ name: 'bounded', modules: [module] }, context, new Deadline(fixture.controlled, 30));
+  const startOutcome = assert.rejects(starting, /启动等待预算已到期/);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  fixture.controlled.advance(30); await startOutcome;
+  assert.deepEqual(coordinator.owned, [module]); assert.equal(coordinator.hasPendingWork, true);
+  await assert.rejects(coordinator.startPhase({ name: 'late', modules: [] }, context), /已关闭/);
+  const stopping = coordinator.stopStarted(context, new Deadline(fixture.controlled, 20));
+  const stopOutcome = assert.rejects(stopping, /停止等待预算已到期/);
+  fixture.controlled.advance(20); await stopOutcome;
+  assert.deepEqual(events, ['start:pending']);
+  release();
+  await coordinator.stopStarted(context, new Deadline(fixture.controlled, 20));
+  assert.deepEqual(events, ['start:pending', 'stop:pending']);
+  assert.equal(coordinator.hasPendingWork, false); assert.equal(coordinator.hasRetainedStopOutcome, false);
+  assert.deepEqual(coordinator.owned, []); assert.equal(fixture.timers.size, 0);
+});
+
+test('a stop retry joins the same actual pending stop and preserves its earlier dependencies', async () => {
+  const fixture = processFixture(), events: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const dependency = runtime('dependency', events);
+  const pending = { ...runtime('pending', events), async stop() { events.push('stop:pending'); await gate; } };
+  const coordinator = new LifecycleCoordinator(fixture.controlled);
+  await coordinator.startPhase({ name: 'resources', modules: [dependency, pending] }, context);
+  const first = coordinator.stopStarted(context, new Deadline(fixture.controlled, 30));
+  const outcome = assert.rejects(first, /停止等待预算已到期/);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  fixture.controlled.advance(30); await outcome;
+  assert.deepEqual(coordinator.owned, [dependency, pending]);
+  assert.equal(events.includes('stop:dependency'), false);
+  const retry = coordinator.stopStarted(context, new Deadline(fixture.controlled, 30));
+  assert.equal(coordinator.stopStarted(context), retry);
+  assert.equal(events.filter(event => event === 'stop:pending').length, 1);
+  release(); await retry;
+  assert.deepEqual(events.slice(-2), ['stop:pending', 'stop:dependency']);
+  assert.deepEqual(coordinator.owned, []); assert.equal(fixture.timers.size, 0);
+});
+
+test('a late actual stop error remains observable after timeout before a new resource-release retry', async () => {
+  const fixture = processFixture(), events: string[] = [];
+  let release!: () => void, fail = true;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const failure = new Error('actual late release failed');
+  const pending = { ...runtime('pending', events), async stop() { events.push('stop:pending'); await gate; if (fail) throw failure; } };
+  const coordinator = new LifecycleCoordinator(fixture.controlled);
+  await coordinator.startPhase({ name: 'resources', modules: [pending] }, context);
+  const first = coordinator.stopStarted(context, new Deadline(fixture.controlled, 30));
+  const outcome = assert.rejects(first, /停止等待预算已到期/);
+  fixture.controlled.advance(30); await outcome;
+  release(); await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(coordinator.hasPendingWork, false); assert.equal(coordinator.hasRetainedStopOutcome, true);
+  await assert.rejects(coordinator.stopStarted(context, new Deadline(fixture.controlled, 30)), (error: unknown) => error === failure);
+  assert.equal(events.filter(event => event === 'stop:pending').length, 1);
+  fail = false;
+  await coordinator.stopStarted(context, new Deadline(fixture.controlled, 30));
+  assert.equal(events.filter(event => event === 'stop:pending').length, 2);
+  assert.deepEqual(coordinator.owned, []); assert.equal(fixture.timers.size, 0);
+});
+
 test('a shared monotonic deadline preserves one budget and distinguishes completed undefined from expiry', async () => {
   const fixture = processFixture();
   const deadline = new Deadline(fixture.controlled, 30);

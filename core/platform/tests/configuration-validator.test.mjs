@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ConfigurationValidator } from '@glimmer-cradle/platform/configuration';
+import { readFileSync } from 'node:fs';
 
 const schema = {
   $id: 'https://example.test/config',
@@ -11,6 +12,21 @@ const schema = {
     endpoint: { type: 'string', format: 'uri' },
   },
 };
+
+test('the authoritative lifecycle Schema rejects unsupported timer budgets before App resource construction', () => {
+  const lifecycle = JSON.parse(readFileSync(new URL('../../../contracts/json-schema/config/v1/lifecycle-config.schema.json', import.meta.url), 'utf8'));
+  const validator = new ConfigurationValidator({ lifecycle });
+  const defaults = {};
+  assert.equal(validator.validate('lifecycle', defaults).ok, true);
+  assert.equal(defaults.start_timeout_ms, 30000); assert.equal(defaults.stop_timeout_ms, 30000);
+  for (const key of ['start_timeout_ms', 'stop_timeout_ms']) {
+    assert.equal(validator.validate('lifecycle', { [key]: 2147483647 }).ok, true);
+    const rejected = validator.validate('lifecycle', { [key]: 2147483648 });
+    assert.equal(rejected.ok, false);
+    assert.deepEqual(rejected.errors, [`/${key}: must be <= 2147483647`]);
+    assert.equal(validator.validate('lifecycle', { [key]: 999 }).ok, false);
+  }
+});
 
 test('fills defaults in place, rejects rather than strips unknown fields, and does not coerce', () => {
   const validator = new ConfigurationValidator({ config: schema }, { formats: true });

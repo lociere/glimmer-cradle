@@ -10,6 +10,7 @@ import type { TraceContext } from '../../domain/kernel-contracts';
 import type { KernelEventBusPort } from '../../ports/event-bus.port';
 import type { Logger as KernelLoggerPort } from '@glimmer-cradle/platform/observability';
 import type { Clock as KernelClockPort } from '@glimmer-cradle/platform/time';
+import type { Deadline } from '@glimmer-cradle/platform';
 import type { RuntimeProjectionInputPort } from '../../ports/kernel-lifecycle.port';
 import {
   normalizeRuntimeReadiness,
@@ -54,7 +55,10 @@ export class LifecycleOrchestrator {
   }
 
   public get owned(): readonly RuntimeModule[] { return this.coordinator.owned; }
+  public get hasPendingWork(): boolean { return this.coordinator.hasPendingWork; }
+  public get hasRetainedStopOutcome(): boolean { return this.coordinator.hasRetainedStopOutcome; }
   public assertExternalCall(): void { this.coordinator.assertExternalCall(); }
+  public closeAdmission(): void { this.coordinator.closeAdmission(); }
 
   public get startupReport(): RuntimeStartupRecord[] {
     return this.coordinator.startupReport.map((record) => ({
@@ -65,8 +69,8 @@ export class LifecycleOrchestrator {
     }));
   }
 
-  public async startPhase(phase: RuntimePhase, context: TraceContext): Promise<void> {
-    await this.coordinator.startPhase(phase, context);
+  public async startPhase(phase: RuntimePhase, context: TraceContext, deadline?: Deadline): Promise<void> {
+    await this.coordinator.startPhase(phase, context, deadline);
   }
 
   private logPhaseStarting(phase: RuntimePhase): void {
@@ -90,6 +94,8 @@ export class LifecycleOrchestrator {
       moduleName: record.moduleName,
       startupTimeMs: record.startupTimeMs,
     }, context));
+
+    if (this.coordinator.isClosing) return;
 
     const snapshots = normalizeRuntimeReadiness(record.details?.runtime_readiness)
       .map((snapshot) => ({
@@ -125,9 +131,9 @@ export class LifecycleOrchestrator {
     this.logger.info('停止模块完成', { runtime_module: module.name });
   }
 
-  public async stopStarted(context: TraceContext): Promise<void> {
+  public async stopStarted(context: TraceContext, deadline?: Deadline): Promise<void> {
     try {
-      await this.coordinator.stopStarted(context);
+      await this.coordinator.stopStarted(context, deadline);
     } finally {
       this.projection.clear();
     }

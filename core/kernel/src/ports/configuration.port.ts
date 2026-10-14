@@ -79,6 +79,7 @@ export interface LifeClockConfiguration {
 
 export interface KernelConfiguration {
   readonly system: {
+    readonly lifecycle: { readonly start_timeout_ms: number; readonly stop_timeout_ms: number };
     readonly identity: { readonly app_name: string };
     readonly character: { readonly active_id: string; readonly profile_root: string };
     readonly cognition_service: { readonly request_timeout_ms: number; readonly registration_timeout_ms: number };

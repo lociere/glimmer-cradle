@@ -39,7 +39,9 @@
 - 组合根负责失败后的停机，startPhase 内不会自动回滚。
 - stopStarted 立即关闭接纳，等待已接纳启动与 observer 收敛，再按 owner 接纳逆序停止。
   stop/observer 异常不跳过其余模块，汇总失败上抛；成功释放的 owner 移除，失败资源保留供重试。
-  并发 stop 返回同一实际排空 Promise；coordinator 关闭后不能重新启动。
+  并发 stop 返回同一等待 Promise；coordinator 关闭后不能重新启动。
+  App 可注入 Deadline，等待到期封闭接纳但继续持有实际start/stop与observer；下一等待
+  加入同一次actual操作。迟到的真实stop失败在消费前保留，不以重新调用stop掩盖该错误。
 - App 合并并发 start/stop，在调用可同步重入的回调前安装共享 Promise，调用者等待真实结果。
   装配时已打开、尚未接纳的 Application 由 App field 持有，失败清理不丢失 owner；
   已接纳资源转交 coordinator，避免两次关闭。关闭后的 App 拒绝复用已 shutdown 的总线。
@@ -50,7 +52,15 @@
   start/stop 会明确拒绝，避免等待当前操作自身；外部并发调用仍共享真实 Promise。
   同步回调返回立刻退出，异步回调 settle 后退出，后续异步任务与其他 coordinator 不受误拒。
   App 的事件与资源释放回调也消费同一公开机制，自等待错误不跳过其余资源释放。
-  Kernel 配置生命周期预算的实际消费仍待 P02A 后续实现，当前定向证据不等于完整 D04 验收。
+  现行Kernel配置可用后的总预算已实际消费；配置可用前的foundation/AppStarting仍没有
+  可用预算，配置加载链继续待P02A处理，不能按此接受完整D04。
+
+Kernel App 从唯一 lifecycle 配置投影读取预算，扣除foundation已用单调时间后，后续
+启动阶段及AppStarted回调共享启动预算；耗尽后不再调用资源装配factory。根公开stop
+等待与actual AppStopRun分开：closeIngress、已接纳startup回调、AppStopping和module
+排空后才释放依赖及诊断；等待超时保留原过程，retry不重复事件、provider stop或库close。
+即使模块owner数组已空，未结束observer和未消费结果仍由owner保留，不能报排空成功。
+关闭中的迟到ModuleStarted事实不再更新业务ready projection。
 
 `lifecycle/cancellation.ts` 的公开 `waitWithCancellation` 只取消等待；预先取消也观察输入的
 实际失败，结束时移除 signal listener，不把实际 callback 丢弃或声明已停止。

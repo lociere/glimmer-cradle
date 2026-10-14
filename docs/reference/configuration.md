@@ -139,6 +139,12 @@ Base URL 只接受不含账号信息、查询参数和片段的 HTTP(S) 地址�
 | `configs/extensions/active.yaml` | Extension 激活集合；每项包含精确 `id`、`version` 与 Host 解析后的 `profile` |
 | `configs/extensions/*.yaml` | 单个扩展的运行配置 |
 
+现行 `kernel.yaml.lifecycle` 的 `start_timeout_ms`、`stop_timeout_ms` 由唯一
+[Lifecycle Schema](../../contracts/json-schema/config/v1/lifecycle-config.schema.json) 校验，
+范围为 1000–2147483647 ms，默认 30000 ms；越过 timer 支持范围会在配置边界拒绝。
+实际预算消费与配置可用前的未完成范围见
+[Platform 生命周期实现](../architecture/implementation/Platform原语实现.md#组合与生命周期)。
+
 ## Character Package 配置
 
 Character Package 是角色作者设定的事实源，不是 RAG 资料库：

@@ -9,12 +9,14 @@
     "start_timeout_ms": {
       "type": "integer",
       "minimum": 1000,
+      "maximum": 2147483647,
       "default": 30000,
       "description": "模块启动总超时（ms）"
     },
     "stop_timeout_ms": {
       "type": "integer",
       "minimum": 1000,
+      "maximum": 2147483647,
       "default": 30000,
       "description": "模块停止总超时（ms）"
     },
@@ -51,5 +53,5 @@
   },
   "x-glimmer-owner": "Kernel Config Application owner",
   "x-glimmer-contract-kind": "Document",
-  "x-glimmer-compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh."
+  "x-glimmer-compatibility": "P02A aligns lifecycle budgets with the managed timer range (1000..2147483647 ms); document shape and 30000 ms defaults remain unchanged."
 }

@@ -908,7 +908,7 @@
         "evidence/2026-10-09-P02A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P02A.3/4：Host Native/probe已保存7ba499ce；取消/Deadline与Host真实consumer单元及timer失败owner已通过固定增量独立只读复审，lifecycle25/Host实际9/两包typecheck/文档架构编码diff通过，按授权本地中文提交。下一动作：核对core/kernel/src/runtime/modules/lifecycle-orchestrator.ts与composition/kernel-application.ts，对声明的30s生命周期预算接通Platform单调等待；保留实际pending start/stop/observer及依赖owner，expired不能发AppStopped或关闭诊断，重试join同实际Promise；验证显式stop后迟到failed通知。再trace/log/config/health与剩余物理目录。P02A/D04/最终产品未验收，不推送，writer本会话，无后台测试。",
+      "nextAction": "P02A.3/4：bounded coordinator/Kernel根预算单元固定源码与最后微差已独立只读接受，Platform28/App26（factory spy零调用+正例、实际SQLite/迟到回调/原operation retry）/Schema5/两包typecheck/文档架构编码diff通过，保存本地中文提交。唯一Schema上限与JSON-only基线同步，generate和verify22及三语往返通过；最后guard合法baseline unstaged差异已正式暂存并只重跑failed generated通过，未改断言/白名单。下一动作：Cognition显式stop取消后迟到failed通知反例与修复，然后Platform配置loader/schema/revision真实链，解决foundation/AppStarting配置可用前预算事实源与有界等待；再日志trace/health及全部剩余物理目录。早期配置预算缺口仍未关闭，整体P02A/D04/最终验收未完成；唯一writer本会话，无后台测试，不推送。",
       "mapping": [
         {
           "action": "split",
@@ -923,6 +923,34 @@
           "target": "core/platform/src/lifecycle/cancellation.ts",
           "owner": "Platform",
           "exitCondition": "真实Host等待消费公开取消机制，取消只终止等待、观察迟到真实失败并移除listener；原私有abortable consumer-zero删除。"
+        },
+        {
+          "action": "split",
+          "source": "core/kernel/src/ports/configuration.port.ts",
+          "target": "apps/host/src/adapters/platform/host-configuration.ts",
+          "owner": "当前Kernel配置消费方，最终Host",
+          "exitCondition": "仅投影唯一Schema已有lifecycle预算供实际App消费，不增加第二契约源；P12B实际Host配置/装配迁完并consumer-zero后删除旧消费Port。"
+        },
+        {
+          "action": "split",
+          "source": "contracts/json-schema/config/v1/lifecycle-config.schema.json",
+          "target": "apps/host/schemas/host-config.schema.json",
+          "owner": "当前Contract Spine，最终Host Document",
+          "exitCondition": "P11A前仅修改当前唯一Schema，生命周期budget与实际timer范围一致；P11A原子迁owner-local Document且全部加载/模板/兼容消费者切完后consumer-zero删除旧Schema。"
+        },
+        {
+          "action": "split",
+          "source": "contracts/compatibility/json-schema-baseline.json",
+          "target": "protocol/document-catalog.json",
+          "owner": "Contract Spine",
+          "exitCondition": "当前只同步明确Schema约束变更的compat记录/hash，不改Proto历史image；P11A原子owner-local Document目录/兼容核验迁完后删除旧记录入口。"
+        },
+        {
+          "action": "move",
+          "source": "core/platform/tests/configuration-validator.test.mjs",
+          "target": "core/platform/tests/config-reload.test.ts",
+          "owner": "Platform",
+          "exitCondition": "当前保留实际配置Schema边界反例；P02A配置loader/schema实际实现后迁全既有断言及真实加载链，consumer-zero删除原test。"
         },
         {
           "action": "split",
@@ -1146,7 +1174,12 @@
         "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/broker-denial.test.ts",
         "$env:GLIMMER_CRADLE_RUN_COGNITION_INTEGRATION = '1'\npnpm --filter @glimmer-cradle/kernel exec vitest run --threads false src/runtime/modules/cognition-runtime.integration.test.ts -t 'starts, reaches|cancels an in-flight'",
         "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '首条投影屏障|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝|Python 身份探测|配置 Host 在真实 Worker 回收失败'",
-        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '启动 Clock|首条投影屏障|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝|Python 身份探测|配置 Host 在真实 Worker 回收失败'"
+        "pnpm --filter @glimmer-cradle/host exec vitest run --threads false tests/host-startup.test.ts -t '启动 Clock|首条投影屏障|协议 shutdown 不可用|不响应取消的接收方|启动 deadline|状态接收方返回拒绝|Python 身份探测|配置 Host 在真实 Worker 回收失败'",
+        "node --test core/platform/tests/configuration-validator.test.mjs",
+        "node contracts/scripts/refresh-baselines.mjs --json-schema-only",
+        "pnpm contracts:generate",
+        "pnpm contracts:verify",
+        "pnpm --filter @glimmer-cradle/contracts check:generated"
       ]
     },
     {

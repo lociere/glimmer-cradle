@@ -2,6 +2,10 @@ import type { TraceContext } from '../observability/index.js';
 import type { Clock } from '../time/clock.js';
 import type { LifecycleObserver, LifecyclePhase, LifecycleStartupRecord, RuntimeModule } from './runtime-module.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { Deadline } from '../communication/deadline.js';
+
+type StopOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
+type StopRun = { outcome: Promise<StopOutcome>; settled: boolean; consumed: boolean };
 
 export type { LifecycleObserver, LifecyclePhase, LifecycleStartupRecord, RuntimeModule, RuntimeModuleStartDetails } from './runtime-module.js';
 
@@ -36,7 +40,8 @@ export class LifecycleCoordinator {
   private readonly startupRecords: LifecycleStartupRecord[] = [];
   private readonly pendingStarts = new Set<Promise<void>>();
   private closing = false;
-  private stopping: Promise<void> | undefined;
+  private stopping: StopRun | undefined;
+  private stopWait: Promise<void> | undefined;
   private readonly callbacks = new LifecycleCallbackGuard();
 
   public constructor(
@@ -47,16 +52,29 @@ export class LifecycleCoordinator {
   public get started(): readonly RuntimeModule[] { return [...this.startedModules]; }
   public get owned(): readonly RuntimeModule[] { return [...this.ownedModules]; }
   public get startupReport(): readonly LifecycleStartupRecord[] { return [...this.startupRecords]; }
+  public get hasPendingWork(): boolean { return this.pendingStarts.size > 0 || !!this.stopping && !this.stopping.settled; }
+  public get hasRetainedStopOutcome(): boolean { return !!this.stopping && !this.stopping.consumed; }
+  public get isClosing(): boolean { return this.closing; }
   public assertExternalCall(): void { this.callbacks.assertExternalCall(); }
+  public closeAdmission(): void { this.assertExternalCall(); this.closing = true; }
 
-  public startPhase(phase: LifecyclePhase, context: TraceContext): Promise<void> {
+  public startPhase(phase: LifecyclePhase, context: TraceContext, deadline?: Deadline): Promise<void> {
     try { this.assertExternalCall(); } catch (error) { return Promise.reject(error); }
     if (this.closing) return Promise.reject(new Error('生命周期已关闭，拒绝启动阶段'));
+    try {
+      if (deadline && deadline.remainingMs <= 0) { this.closing = true; return Promise.reject(new Error('生命周期启动等待预算已到期')); }
+    } catch (error) { this.closing = true; return Promise.reject(error); }
     const pending = this.runPhase(phase, context);
     this.pendingStarts.add(pending);
     // Use both handlers so bookkeeping does not create an unobserved rejected promise.
     void pending.then(() => this.pendingStarts.delete(pending), () => this.pendingStarts.delete(pending));
-    return pending;
+    return deadline ? this.waitForStart(pending, deadline) : pending;
+  }
+
+  private async waitForStart(pending: Promise<void>, deadline: Deadline): Promise<void> {
+    try {
+      if ((await deadline.waitFor(pending)).status === 'expired') throw new Error('生命周期启动等待预算已到期；实际回调仍由原 owner 持有');
+    } catch (error) { this.closing = true; throw error; }
   }
 
   private async runPhase(phase: LifecyclePhase, context: TraceContext): Promise<void> {
@@ -89,14 +107,36 @@ export class LifecycleCoordinator {
     await this.callbacks.run(() => this.observer.moduleStarted?.(record, context));
   }
 
-  public stopStarted(context: TraceContext): Promise<void> {
+  public stopStarted(context: TraceContext, deadline?: Deadline): Promise<void> {
     try { this.assertExternalCall(); } catch (error) { return Promise.reject(error); }
     this.closing = true;
-    if (this.stopping) return this.stopping;
-    const pending = this.drainAndStop(context);
-    this.stopping = pending;
-    void pending.then(() => { this.stopping = undefined; }, () => { this.stopping = undefined; });
-    return pending;
+    if (this.stopWait) return this.stopWait;
+    if (!this.stopping || this.stopping.consumed) {
+      const run: StopRun = { outcome: undefined!, settled: false, consumed: false };
+      this.stopping = run;
+      // Publish the operation owner before invoking any module or observer.
+      run.outcome = Promise.resolve().then(() => this.drainAndStop(context)).then(
+        () => { run.settled = true; return { ok: true }; },
+        error => { run.settled = true; return { ok: false, error }; },
+      );
+    }
+    const run = this.stopping;
+    const waiting = this.waitForStop(run, deadline);
+    this.stopWait = waiting;
+    void waiting.then(() => { if (this.stopWait === waiting) this.stopWait = undefined; },
+      () => { if (this.stopWait === waiting) this.stopWait = undefined; });
+    return waiting;
+  }
+
+  private async waitForStop(run: StopRun, deadline?: Deadline): Promise<void> {
+    let outcome: StopOutcome;
+    if (deadline) {
+      const result = await deadline.waitFor(run.outcome);
+      if (result.status === 'expired') throw new Error('生命周期停止等待预算已到期；实际排空与结果仍由原 owner 持有');
+      outcome = result.value;
+    } else outcome = await run.outcome;
+    run.consumed = true;
+    if (!outcome.ok) throw outcome.error;
   }
 
   private async drainAndStop(context: TraceContext): Promise<void> {

@@ -161,8 +161,8 @@
       "dialect": "https://json-schema.org/draft/2020-12/schema",
       "owner": "Kernel Config Application owner",
       "kind": "Document",
-      "compatibility": "M12 Slice 9 preserved legacy document semantics; further changes require an intentional compatibility baseline refresh.",
-      "sha256": "05f01834611cb59df33225a0173549a080c1b2d72582511f4be51da6e270245e"
+      "compatibility": "P02A aligns lifecycle budgets with the managed timer range (1000..2147483647 ms); document shape and 30000 ms defaults remain unchanged.",
+      "sha256": "0b28fd9e3d8cb10beb9a69147581b9bc778b0f33c16485d93b95b358811fc943"
     },
     {
       "path": "json-schema/config/v1/llm-config.schema.json",

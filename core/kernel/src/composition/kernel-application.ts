@@ -34,7 +34,7 @@ import { AudioService } from '../adapters/audio/audio-service';
 import { AvatarController } from '../adapters/avatar/avatar-controller';
 import { AvatarRuntimeAdapter } from '../adapters/avatar/avatar-runtime-adapter';
 import { ControlSurfaceGateway } from '../adapters/surface/control-surface-gateway';
-import { NodeStableIdentity } from '@glimmer-cradle/platform';
+import { Deadline, NodeStableIdentity } from '@glimmer-cradle/platform';
 import {
   ConversationDirectory,
   DeliveryController,
@@ -97,15 +97,21 @@ type OperationalRuntimeFactory = (
   requestStop: (exitCode?: number) => Promise<void>,
 ) => OperationalRuntimePlan;
 
+type LifecycleOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
+type AppStopRun = { outcome: Promise<LifecycleOutcome>; consumed: boolean };
+
 /** Kernel 生命周期根；所有 concrete 都由下方唯一 composition factory 创建。 */
 export class App {
   private stateValue = AppLifecycleState.UNINITIALIZED;
   private orchestrator: LifecycleOrchestrator | null = null;
   private transportRuntime: KernelTransportRuntime | null = null;
-  private stopping: Promise<void> | undefined;
+  private stopping: AppStopRun | undefined;
+  private stopWait: Promise<void> | undefined;
+  private readonly pendingStartupCallbacks = new Set<Promise<LifecycleOutcome>>();
   private closing = false;
   private constructionApplication: ApplicationRuntime | null = null;
   private starting: Promise<void> | undefined;
+  private lifecycleStopTimeoutMs: number | undefined;
   private readonly callbacks = new LifecycleCallbackGuard();
 
   public constructor(
@@ -143,28 +149,34 @@ export class App {
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
     try {
-      await this.callbacks.run(() => this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context)));
+      await this.awaitStartupCallback(() => this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context)));
       await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context);
       const config = this.bootstrap.config;
+      const { start_timeout_ms, stop_timeout_ms } = config.system.lifecycle;
+      if (![start_timeout_ms, stop_timeout_ms].every(ms => Number.isSafeInteger(ms) && ms > 0 && ms <= 2_147_483_647)) throw new Error('模块生命周期预算无效');
+      this.lifecycleStopTimeoutMs = stop_timeout_ms;
+      // Configuration becomes authoritative after foundation; do not reset the elapsed startup budget.
+      const deadline = new Deadline(this.clock, Math.max(0, Math.floor(start_timeout_ms - (this.clock.monotonicNowMs() - startedAt))));
+      if (deadline.remainingMs <= 0) throw new Error('生命周期启动等待预算已到期，拒绝装配后续资源');
       const plan = this.createOperationalPlan(config, (code = 0) => this.stop(code));
       this.constructionApplication = plan.application;
       this.transportRuntime = plan.transport;
-      await orchestrator.startPhase({ name: 'transport', modules: [plan.transport] }, context);
-      await orchestrator.startPhase({ name: 'application', modules: [plan.application] }, context);
+      await orchestrator.startPhase({ name: 'transport', modules: [plan.transport] }, context, deadline);
+      await orchestrator.startPhase({ name: 'application', modules: [plan.application] }, context, deadline);
       this.constructionApplication = null;
-      await orchestrator.startPhase({ name: 'presentation', modules: [...plan.presentation] }, context);
-      await orchestrator.startPhase({ name: 'core-readiness', mode: 'parallel', modules: [...plan.coreReadiness] }, context);
-      if (plan.executionResults) await orchestrator.startPhase({ name: 'execution-results', modules: [plan.executionResults] }, context);
+      await orchestrator.startPhase({ name: 'presentation', modules: [...plan.presentation] }, context, deadline);
+      await orchestrator.startPhase({ name: 'core-readiness', mode: 'parallel', modules: [...plan.coreReadiness] }, context, deadline);
+      if (plan.executionResults) await orchestrator.startPhase({ name: 'execution-results', modules: [plan.executionResults] }, context, deadline);
       if (this.stateValue !== AppLifecycleState.INITIALIZING) throw new Error('应用关闭期间拒绝开放 ingress');
       plan.transport.openIngress();
-      if (plan.extension) await orchestrator.startPhase({ name: 'extensions', modules: [plan.extension] }, context);
-      await orchestrator.startPhase({ name: 'organism', modules: [plan.organism] }, context);
-      await orchestrator.startPhase({ name: 'recovery-ingress', modules: [plan.recovery] }, context);
+      if (plan.extension) await orchestrator.startPhase({ name: 'extensions', modules: [plan.extension] }, context, deadline);
+      await orchestrator.startPhase({ name: 'organism', modules: [plan.organism] }, context, deadline);
+      await orchestrator.startPhase({ name: 'recovery-ingress', modules: [plan.recovery] }, context, deadline);
       if (this.stateValue !== AppLifecycleState.INITIALIZING) throw new Error('应用关闭期间拒绝进入 running');
       const startupTimeMs = Math.max(0, this.clock.monotonicNowMs() - startedAt);
       this.stateValue = AppLifecycleState.RUNNING;
       this.observability.histogram('app.startup_ms', startupTimeMs);
-      await this.callbacks.run(() => this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context)));
+      await this.awaitStartupCallback(() => this.eventBus.publish(new AppStartedEvent({ startupTimeMs }, context)), deadline);
       this.logger.info('应用启动完成，当前角色已就绪', { total_startup_time_ms: startupTimeMs });
     } catch (error) {
       if (this.state !== AppLifecycleState.STOPPING && this.state !== AppLifecycleState.STOPPED) {
@@ -180,16 +192,50 @@ export class App {
     try { this.callbacks.assertExternalCall(); this.orchestrator?.assertExternalCall(); }
     catch (error) { return Promise.reject(error); }
     this.closing = true;
-    if (this.stopping) return this.stopping;
-    if (this.stateValue === AppLifecycleState.STOPPED) return Promise.resolve();
-    this.stateValue = AppLifecycleState.STOPPING;
-    let resolveStop!: () => void;
-    let rejectStop!: (error: unknown) => void;
-    const stopping = new Promise<void>((resolve, reject) => { resolveStop = resolve; rejectStop = reject; });
-    this.stopping = stopping;
-    void this.releaseResources(exitCode).then(resolveStop, rejectStop);
-    void stopping.then(() => { this.stopping = undefined; }, () => { this.stopping = undefined; });
-    return stopping;
+    this.orchestrator?.closeAdmission();
+    if (this.stopWait) return this.stopWait;
+    if (this.stateValue === AppLifecycleState.STOPPED && (!this.stopping || this.stopping.consumed)) return Promise.resolve();
+    if (!this.stopping || this.stopping.consumed) {
+      this.stateValue = AppLifecycleState.STOPPING;
+      const run: AppStopRun = { outcome: undefined!, consumed: false };
+      this.stopping = run;
+      run.outcome = Promise.resolve().then(() => this.releaseResources(exitCode)).then(
+        () => ({ ok: true }), error => ({ ok: false, error }),
+      );
+    }
+    const waiting = this.waitForStop(this.stopping);
+    this.stopWait = waiting;
+    void waiting.then(() => { if (this.stopWait === waiting) this.stopWait = undefined; },
+      () => { if (this.stopWait === waiting) this.stopWait = undefined; });
+    return waiting;
+  }
+
+  private async waitForStop(run: AppStopRun): Promise<void> {
+    try {
+      let outcome: LifecycleOutcome;
+      if (this.lifecycleStopTimeoutMs !== undefined) {
+        const result = await new Deadline(this.clock, this.lifecycleStopTimeoutMs).waitFor(run.outcome);
+        if (result.status === 'expired') throw new AggregateError([new Error('生命周期停止等待预算已到期；实际操作仍由原 owner 持有')], '应用停止时存在资源释放失败');
+        outcome = result.value;
+      } else outcome = await run.outcome;
+      run.consumed = true;
+      if (!outcome.ok) throw outcome.error;
+    } catch (error) { this.stateValue = AppLifecycleState.ERROR; throw error; }
+  }
+
+  private async awaitStartupCallback(action: () => unknown, deadline?: Deadline): Promise<void> {
+    const outcome = this.callbacks.run(action).then<LifecycleOutcome, LifecycleOutcome>(
+      () => ({ ok: true }), error => ({ ok: false, error }),
+    );
+    this.pendingStartupCallbacks.add(outcome);
+    let result: LifecycleOutcome;
+    if (deadline) {
+      const waiting = await deadline.waitFor(outcome);
+      if (waiting.status === 'expired') throw new Error('应用启动 observer 等待预算已到期；实际回调仍由原 owner 持有');
+      result = waiting.value;
+    } else result = await outcome;
+    this.pendingStartupCallbacks.delete(outcome);
+    if (!result.ok) throw result.error;
   }
 
   private async releaseResources(exitCode: number): Promise<void> {
@@ -203,10 +249,13 @@ export class App {
     if (this.constructionApplication && this.orchestrator?.owned.includes(this.constructionApplication)) {
       this.constructionApplication = null;
     }
-    // Fence startup immediately, before any awaited product event can admit another phase.
-    const draining = this.orchestrator?.stopStarted(context);
-    const drained = draining?.catch(error => { failures.push(error); });
     await release(() => this.transportRuntime?.closeIngress());
+    // Public stop may time out, but accepted root observers retain their dependencies until they settle.
+    for (const outcome of [...this.pendingStartupCallbacks]) {
+      const result = await outcome;
+      this.pendingStartupCallbacks.delete(outcome);
+      if (!result.ok) failures.push(result.error);
+    }
     await release(() => this.eventBus.publish(new AppStoppingEvent({ reason: exitCode === 0 ? '正常停机' : '异常停机' }, context)));
     if (this.constructionApplication) {
       await release(async () => {
@@ -214,8 +263,9 @@ export class App {
         this.constructionApplication = null;
       });
     }
-    await drained;
-    const resourcesRemain = (this.orchestrator?.owned.length ?? 0) > 0 || this.constructionApplication !== null;
+    await release(() => this.orchestrator?.stopStarted(context));
+    const resourcesRemain = (this.orchestrator?.owned.length ?? 0) > 0 || this.constructionApplication !== null
+      || this.orchestrator?.hasPendingWork || this.orchestrator?.hasRetainedStopOutcome;
     if (!resourcesRemain) {
       this.orchestrator = null;
       this.transportRuntime = null;
