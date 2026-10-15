@@ -259,6 +259,34 @@ test('startup and stop expiry retain actual startup callbacks and forbid concurr
   assert.deepEqual(coordinator.owned, []); assert.equal(fixture.timers.size, 0);
 });
 
+for (const timing of ['before-stop', 'during-drain'] as const) test(`late actual startup failure remains observable ${timing}, including after stop wait expires`, async () => {
+  const fixture = processFixture(), events: string[] = [];
+  let reject!: (error: Error) => void;
+  const gate = new Promise<void>((_resolve, rejected) => { reject = rejected; });
+  const failure = new Error('actual late startup failed');
+  const module = runtime('pending', events, { startGate: gate });
+  const coordinator = new LifecycleCoordinator(fixture.controlled);
+  const startOutcome = assert.rejects(coordinator.startPhase({ name: 'bounded', modules: [module] }, context,
+    new Deadline(fixture.controlled, 30)), /启动等待预算已到期/);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  fixture.controlled.advance(30); await startOutcome;
+  if (timing === 'before-stop') {
+    reject(failure); await new Promise<void>(resolve => setImmediate(resolve));
+  } else {
+    const stopOutcome = assert.rejects(coordinator.stopStarted(context, new Deadline(fixture.controlled, 20)), /停止等待预算已到期/);
+    fixture.controlled.advance(20); await stopOutcome;
+    assert.deepEqual(events, ['start:pending']);
+    reject(failure); await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  await assert.rejects(coordinator.stopStarted(context), (error: unknown) => error === failure);
+  assert.deepEqual(events, ['start:pending', 'stop:pending']);
+  assert.deepEqual(coordinator.owned, []);
+  await coordinator.stopStarted(context);
+  assert.deepEqual(events, ['start:pending', 'stop:pending']);
+  assert.equal(coordinator.hasPendingWork, false); assert.equal(coordinator.hasRetainedStopOutcome, false);
+  assert.equal(fixture.timers.size, 0);
+});
+
 test('a stop retry joins the same actual pending stop and preserves its earlier dependencies', async () => {
   const fixture = processFixture(), events: string[] = [];
   let release!: () => void;

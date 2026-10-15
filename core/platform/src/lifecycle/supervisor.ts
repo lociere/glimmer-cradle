@@ -6,6 +6,10 @@ import { Deadline } from '../communication/deadline.js';
 
 type StopOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown };
 type StopRun = { outcome: Promise<StopOutcome>; settled: boolean; consumed: boolean };
+type StartRun = { outcome: Promise<StopOutcome>; consumed: boolean };
+
+/** 只识别监督器自己生成的封口结果，不能按错误文字忽略实际 callback 的失败。 */
+class LifecycleAdmissionClosedError extends Error {}
 
 export type { LifecycleObserver, LifecyclePhase, LifecycleStartupRecord, RuntimeModule, RuntimeModuleStartDetails } from './runtime-module.js';
 
@@ -38,7 +42,7 @@ export class LifecycleCoordinator {
   private readonly ownedModules: RuntimeModule[] = [];
   private readonly startedModules: RuntimeModule[] = [];
   private readonly startupRecords: LifecycleStartupRecord[] = [];
-  private readonly pendingStarts = new Set<Promise<void>>();
+  private readonly pendingStarts = new Set<StartRun>();
   private closing = false;
   private stopping: StopRun | undefined;
   private stopWait: Promise<void> | undefined;
@@ -64,21 +68,35 @@ export class LifecycleCoordinator {
     try {
       if (deadline && deadline.remainingMs <= 0) { this.closing = true; return Promise.reject(new Error('生命周期启动等待预算已到期')); }
     } catch (error) { this.closing = true; return Promise.reject(error); }
-    const pending = this.runPhase(phase, context);
-    this.pendingStarts.add(pending);
-    // Use both handlers so bookkeeping does not create an unobserved rejected promise.
-    void pending.then(() => this.pendingStarts.delete(pending), () => this.pendingStarts.delete(pending));
-    return deadline ? this.waitForStart(pending, deadline) : pending;
+    const run: StartRun = { outcome: undefined!, consumed: false };
+    this.pendingStarts.add(run);
+    run.outcome = this.runPhase(phase, context).then<StopOutcome, StopOutcome>(
+      () => ({ ok: true }), error => ({ ok: false, error }),
+    );
+    void run.outcome.then(outcome => {
+      // 成功不需要迟到错误收据；失败必须保留到公开等待或实际排空消费。
+      if (outcome.ok || run.consumed) this.pendingStarts.delete(run);
+    });
+    return this.waitForStart(run, deadline);
   }
 
-  private async waitForStart(pending: Promise<void>, deadline: Deadline): Promise<void> {
+  private async waitForStart(run: StartRun, deadline?: Deadline): Promise<void> {
     try {
-      if ((await deadline.waitFor(pending)).status === 'expired') throw new Error('生命周期启动等待预算已到期；实际回调仍由原 owner 持有');
-    } catch (error) { this.closing = true; throw error; }
+      let outcome: StopOutcome;
+      if (deadline) {
+        const result = await deadline.waitFor(run.outcome);
+        if (result.status === 'expired') throw new Error('生命周期启动等待预算已到期；实际回调仍由原 owner 持有');
+        outcome = result.value;
+      } else outcome = await run.outcome;
+      run.consumed = true;
+      this.pendingStarts.delete(run);
+      if (!outcome.ok) throw outcome.error;
+    } catch (error) { if (deadline) this.closing = true; throw error; }
   }
 
   private async runPhase(phase: LifecyclePhase, context: TraceContext): Promise<void> {
     await this.callbacks.run(() => this.observer.phaseStarting?.(phase));
+    if (this.closing) throw new LifecycleAdmissionClosedError('生命周期已关闭，拒绝启动阶段模块');
     if (phase.mode === 'parallel') {
       const results = await Promise.allSettled(phase.modules.map(module => this.startModule(phase.name, module, context)));
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
@@ -86,12 +104,12 @@ export class LifecycleCoordinator {
     } else {
       for (const module of phase.modules) await this.startModule(phase.name, module, context);
     }
-    if (this.closing) throw new Error('生命周期关闭期间启动阶段被中断');
+    if (this.closing) throw new LifecycleAdmissionClosedError('生命周期关闭期间启动阶段被中断');
     await this.callbacks.run(() => this.observer.phaseStarted?.(phase));
   }
 
   private async startModule(phase: string, module: RuntimeModule, context: TraceContext): Promise<void> {
-    if (this.closing) throw new Error('生命周期已关闭，拒绝启动模块');
+    if (this.closing) throw new LifecycleAdmissionClosedError('生命周期已关闭，拒绝启动模块');
     if (this.ownedModules.includes(module)) throw new Error(`生命周期模块 ${module.name} 已有 owner`);
     // Ownership starts before start(): a rejection may still leave acquired resources.
     this.ownedModules.push(module);
@@ -141,8 +159,15 @@ export class LifecycleCoordinator {
 
   private async drainAndStop(context: TraceContext): Promise<void> {
     // No new starts can enter; settle accepted callbacks before releasing their resources.
-    await Promise.allSettled([...this.pendingStarts]);
+    const acceptedStarts = [...this.pendingStarts];
+    const startOutcomes = await Promise.all(acceptedStarts.map(run => run.outcome));
     const failures: unknown[] = [];
+    for (const [index, run] of acceptedStarts.entries()) {
+      const outcome = startOutcomes[index];
+      if (!run.consumed && !outcome.ok && !(outcome.error instanceof LifecycleAdmissionClosedError)) failures.push(outcome.error);
+      run.consumed = true;
+      this.pendingStarts.delete(run);
+    }
     for (const module of [...this.ownedModules].reverse()) {
       try { await this.callbacks.run(() => module.stop(context)); }
       catch (error) { failures.push(error); continue; }

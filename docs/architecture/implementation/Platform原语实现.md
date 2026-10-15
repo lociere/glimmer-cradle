@@ -54,8 +54,9 @@
   start/stop 会明确拒绝，避免等待当前操作自身；外部并发调用仍共享真实 Promise。
   同步回调返回立刻退出，异步回调 settle 后退出，后续异步任务与其他 coordinator 不受误拒。
   App 的事件与资源释放回调也消费同一公开机制，自等待错误不跳过其余资源释放。
-  现行Kernel配置可用后的总预算已实际消费；配置可用前的foundation/AppStarting仍没有
-  可用预算，配置加载链继续待P02A处理，不能按此接受完整D04。
+  现行Kernel在第一个异步启动callback前，从唯一Lifecycle Schema校验空文档取得早期
+  默认预算；AppStarting与foundation共用单调预算，配置前stop也有同源默认等待上限。
+  配置就绪后实际配置成为权威，仍扣除全部已用时间；超时后不重开资源接纳。
 
 Kernel App 从唯一 lifecycle 配置投影读取预算，扣除foundation已用单调时间后，后续
 启动阶段及AppStarted回调共享启动预算；耗尽后不再调用资源装配factory。根公开stop
@@ -63,6 +64,9 @@ Kernel App 从唯一 lifecycle 配置投影读取预算，扣除foundation已用
 排空后才释放依赖及诊断；等待超时保留原过程，retry不重复事件、provider stop或库close。
 即使模块owner数组已空，未结束observer和未消费结果仍由owner保留，不能报排空成功。
 关闭中的迟到ModuleStarted事实不再更新业务ready projection。
+Platform保留每个实际StartRun的结果，公开等待超时后，迟到的实际启动错误仍由原owner
+持有，后续drain消费并报告；已经由公开等待消费的错误不重复上报。监督器自己的封口
+中断用私有错误类型区分，不按消息文本忽略实际callback失败；错误报告不跳过其资源释放。
 
 `lifecycle/cancellation.ts` 的公开 `waitWithCancellation` 只取消等待；预先取消也观察输入的
 实际失败，结束时移除 signal listener，不把实际 callback 丢弃或声明已停止。

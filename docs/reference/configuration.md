@@ -143,7 +143,9 @@ Base URL 只接受不含账号信息、查询参数和片段的 HTTP(S) 地址�
 现行 `kernel.yaml.lifecycle` 的 `start_timeout_ms`、`stop_timeout_ms` 由唯一
 [Lifecycle Schema](../../contracts/json-schema/config/v1/lifecycle-config.schema.json) 校验，
 范围为 1000–2147483647 ms，默认 30000 ms；越过 timer 支持范围会在配置边界拒绝。
-实际预算消费与配置可用前的未完成范围见
+配置可用前，App 从同一 Schema 校验空文档取得30000 ms早期默认值，约束
+AppStarting、foundation及早期stop等待；配置就绪后应用实际预算并扣除全部已用时间。
+等待到期保留实际callback/start/stop owner，不表示资源已停止，完整语义见
 [Platform 生命周期实现](../architecture/implementation/Platform原语实现.md#组合与生命周期)。
 
 ## Character Package 配置

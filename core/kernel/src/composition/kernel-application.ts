@@ -73,6 +73,7 @@ import { ExtensionManager } from '../adapters/extension-host/extension-manager';
 import { KernelExtensionRuntimeAdapter } from '../adapters/extension-host/kernel-extension-runtime-adapter';
 import { ConfigApplicationService } from '../adapters/config/config-application-adapter';
 import { ConfigManager } from '../adapters/config/config-manager';
+import { configValidator } from '../adapters/config/document-schema-registry';
 import { ConversationHistoryService } from '../adapters/surface/conversation-history-service';
 import { KernelPresentationAdapter } from '../adapters/surface/kernel-presentation-adapter';
 import { KernelOrganismAdapter } from '../adapters/organism/kernel-organism-adapter';
@@ -111,7 +112,7 @@ export class App {
   private closing = false;
   private constructionApplication: ApplicationRuntime | null = null;
   private starting: Promise<void> | undefined;
-  private lifecycleStopTimeoutMs: number | undefined;
+  private lifecycleStopTimeoutMs: number;
   private readonly callbacks = new LifecycleCallbackGuard();
 
   public constructor(
@@ -122,7 +123,12 @@ export class App {
     private readonly clock: KernelClockPort,
     private readonly bootstrap: KernelBootstrapRuntime,
     private readonly createOperationalPlan: OperationalRuntimeFactory,
-  ) {}
+    private readonly bootstrapLifecycleBudget: KernelConfiguration['system']['lifecycle'] = defaultLifecycleBudget(),
+  ) {
+    validateLifecycleBudget(bootstrapLifecycleBudget);
+    this.bootstrapLifecycleBudget = Object.freeze({ ...bootstrapLifecycleBudget });
+    this.lifecycleStopTimeoutMs = bootstrapLifecycleBudget.stop_timeout_ms;
+  }
 
   public get state(): AppLifecycleState { return this.stateValue; }
 
@@ -149,11 +155,14 @@ export class App {
     this.stateValue = AppLifecycleState.INITIALIZING;
     this.orchestrator = orchestrator;
     try {
-      await this.awaitStartupCallback(() => this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context)));
-      await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context);
+      // 配置尚不可用时由同一 Schema 的默认值封闭早期等待，不丢弃实际 callback/start owner。
+      const bootstrapDeadline = new Deadline(this.clock, Math.max(0, Math.floor(this.bootstrapLifecycleBudget.start_timeout_ms - (this.clock.monotonicNowMs() - startedAt))));
+      if (bootstrapDeadline.remainingMs <= 0) throw new Error('早期生命周期启动等待预算已到期');
+      await this.awaitStartupCallback(() => this.eventBus.publish(new AppStartingEvent({ appVersion: '1.0.0' }, context)), bootstrapDeadline);
+      await orchestrator.startPhase({ name: 'foundation', modules: [this.bootstrap] }, context, bootstrapDeadline);
       const config = this.bootstrap.config;
       const { start_timeout_ms, stop_timeout_ms } = config.system.lifecycle;
-      if (![start_timeout_ms, stop_timeout_ms].every(ms => Number.isSafeInteger(ms) && ms > 0 && ms <= 2_147_483_647)) throw new Error('模块生命周期预算无效');
+      validateLifecycleBudget(config.system.lifecycle);
       this.lifecycleStopTimeoutMs = stop_timeout_ms;
       // Configuration becomes authoritative after foundation; do not reset the elapsed startup budget.
       const deadline = new Deadline(this.clock, Math.max(0, Math.floor(start_timeout_ms - (this.clock.monotonicNowMs() - startedAt))));
@@ -212,12 +221,9 @@ export class App {
 
   private async waitForStop(run: AppStopRun): Promise<void> {
     try {
-      let outcome: LifecycleOutcome;
-      if (this.lifecycleStopTimeoutMs !== undefined) {
-        const result = await new Deadline(this.clock, this.lifecycleStopTimeoutMs).waitFor(run.outcome);
-        if (result.status === 'expired') throw new AggregateError([new Error('生命周期停止等待预算已到期；实际操作仍由原 owner 持有')], '应用停止时存在资源释放失败');
-        outcome = result.value;
-      } else outcome = await run.outcome;
+      const result = await new Deadline(this.clock, this.lifecycleStopTimeoutMs).waitFor(run.outcome);
+      if (result.status === 'expired') throw new AggregateError([new Error('生命周期停止等待预算已到期；实际操作仍由原 owner 持有')], '应用停止时存在资源释放失败');
+      const outcome = result.value;
       run.consumed = true;
       if (!outcome.ok) throw outcome.error;
     } catch (error) { this.stateValue = AppLifecycleState.ERROR; throw error; }
@@ -500,3 +506,15 @@ function createSkillAvailability(product: ProductComposition): SkillAvailability
 }
 
 function normalizeError(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+
+function defaultLifecycleBudget(): KernelConfiguration['system']['lifecycle'] {
+  const result = configValidator.validate<KernelConfiguration['system']['lifecycle']>('LifecycleConfig', {});
+  if (!result.ok || !result.data) throw new Error('生命周期默认预算无效');
+  return result.data;
+}
+
+function validateLifecycleBudget(budget: KernelConfiguration['system']['lifecycle']): void {
+  if (![budget.start_timeout_ms, budget.stop_timeout_ms].every(ms => Number.isSafeInteger(ms) && ms > 0 && ms <= 2_147_483_647)) {
+    throw new Error('模块生命周期预算无效');
+  }
+}

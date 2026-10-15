@@ -23,6 +23,7 @@ describe('ApplicationRuntime resource lifecycle', () => {
     onPublish?: (type: string) => void | Promise<void>; onCloseIngress?: () => void | Promise<void>;
     clock?: Clock; startTimeoutMs?: number; stopTimeoutMs?: number;
     bootstrapGate?: Promise<void>;
+    bootstrapBudget?: { start_timeout_ms: number; stop_timeout_ms: number };
     onConstruct?: () => void;
   } = {}) {
     const order: string[] = [];
@@ -49,9 +50,98 @@ describe('ApplicationRuntime resource lifecycle', () => {
         order.push('close-ingress'); return options.onCloseIngress?.();
       } },
         application: options.application ?? module('application'), presentation: [module('presentation')], coreReadiness: [],
-        organism: module('organism'), recovery: module('recovery') } as never; });
+        organism: module('organism'), recovery: module('recovery') } as never; }, options.bootstrapBudget);
     return { app, order, openIngress };
   }
+
+  it.each(['AppStartingEvent', 'foundation'])('early %s expiry keeps its actual owner and bounds stop before configuration is available', async phase => {
+    const clock = manualClock();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const construct = vi.fn();
+    const { app, order, openIngress } = controlledApp({ clock, onConstruct: construct,
+      bootstrapBudget: { start_timeout_ms: 100, stop_timeout_ms: 30 },
+      startTimeoutMs: 1000, stopTimeoutMs: 1000,
+      bootstrapGate: phase === 'foundation' ? gate : undefined,
+      onPublish: type => { if (type === phase) return gate; },
+    });
+    const outcome = expect(app.start()).rejects.toThrow('应用启动失败');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(100); await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(30); await outcome;
+    expect(app.state).toBe(AppLifecycleState.ERROR);
+    expect(construct).not.toHaveBeenCalled(); expect(openIngress).not.toHaveBeenCalled();
+    expect(order).not.toContain('stop:bootstrap');
+    expect(order).not.toContain('eventbus-close'); expect(order).not.toContain('observability-close');
+    const retry = app.stop(); expect(app.stop()).toBe(retry);
+    release(); await retry;
+    expect(app.state).toBe(AppLifecycleState.STOPPED); expect(construct).not.toHaveBeenCalled();
+    expect(order.filter(type => type === 'AppStartingEvent')).toHaveLength(1);
+    expect(order.filter(type => type === 'AppStoppingEvent')).toHaveLength(1);
+    expect(order.filter(type => type === 'stop:bootstrap')).toHaveLength(phase === 'foundation' ? 1 : 0);
+    expect(clock.timers.size).toBe(0);
+  });
+
+  it('uses the canonical Schema default before AppStarting completes, including the pre-configuration stop budget', async () => {
+    const clock = manualClock();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const construct = vi.fn();
+    const { app, order } = controlledApp({ clock, onConstruct: construct, onPublish: type => {
+      if (type === 'AppStartingEvent') return gate;
+    } });
+    const outcome = expect(app.start()).rejects.toThrow('应用启动失败');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(29999); await Promise.resolve(); expect(app.state).toBe(AppLifecycleState.INITIALIZING);
+    clock.advance(1); await new Promise<void>(resolve => setImmediate(resolve));
+    expect(order).not.toContain('start:bootstrap');
+    clock.advance(30000); await outcome;
+    expect(app.state).toBe(AppLifecycleState.ERROR); expect(construct).not.toHaveBeenCalled();
+    release(); await app.stop();
+    expect(app.state).toBe(AppLifecycleState.STOPPED); expect(clock.timers.size).toBe(0);
+  });
+
+  it('authoritative configuration replaces the early default without refreshing elapsed startup time', async () => {
+    const clock = manualClock();
+    let configured!: () => void, release!: () => void;
+    const bootstrapGate = new Promise<void>(resolve => { configured = resolve; });
+    const startGate = new Promise<void>(resolve => { release = resolve; });
+    const construct = vi.fn();
+    const { app, order } = controlledApp({ clock, bootstrapGate, startGate, onConstruct: construct,
+      bootstrapBudget: { start_timeout_ms: 100, stop_timeout_ms: 30 }, startTimeoutMs: 250, stopTimeoutMs: 40 });
+    const outcome = expect(app.start()).rejects.toThrow('应用启动失败');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(80); configured(); await new Promise<void>(resolve => setImmediate(resolve));
+    expect(construct).toHaveBeenCalledOnce(); expect(order).toContain('start:transport');
+    clock.advance(100); await Promise.resolve(); expect(app.state).toBe(AppLifecycleState.INITIALIZING);
+    clock.advance(70); await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(40); await outcome;
+    expect(app.state).toBe(AppLifecycleState.ERROR); expect(order).not.toContain('stop:bootstrap');
+    release(); await app.stop();
+    expect(construct).toHaveBeenCalledOnce(); expect(app.state).toBe(AppLifecycleState.STOPPED);
+    expect(clock.timers.size).toBe(0);
+  });
+
+  it('a late foundation failure survives both early startup and stop timeouts while its actual owner is released once', async () => {
+    const clock = manualClock();
+    let reject!: (error: Error) => void;
+    const bootstrapGate = new Promise<void>((_resolve, rejected) => { reject = rejected; });
+    const failure = new Error('actual configuration load failed late');
+    const construct = vi.fn();
+    const { app, order } = controlledApp({ clock, bootstrapGate, onConstruct: construct,
+      bootstrapBudget: { start_timeout_ms: 100, stop_timeout_ms: 30 } });
+    const startOutcome = expect(app.start()).rejects.toThrow('应用启动失败');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(100); await new Promise<void>(resolve => setImmediate(resolve));
+    clock.advance(30); await startOutcome;
+    expect(order).not.toContain('stop:bootstrap'); expect(order).not.toContain('eventbus-close');
+    reject(failure); await new Promise<void>(resolve => setImmediate(resolve));
+    await expect(app.stop()).rejects.toMatchObject({ errors: [failure] });
+    expect(construct).not.toHaveBeenCalled();
+    expect(order.filter(type => type === 'start:bootstrap')).toHaveLength(1);
+    expect(order.filter(type => type === 'stop:bootstrap')).toHaveLength(1);
+    expect(clock.timers.size).toBe(0);
+  });
 
   it('elapsed foundation time cannot refresh the configured startup budget or admit further resource construction', async () => {
     const clock = manualClock();

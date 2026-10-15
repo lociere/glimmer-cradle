@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：配置机制单元完成并保存本地中文提交：Platform schema/config-loader/config-revision已落精确目标，Host真实读取与Kernel现有串行配置更新消费，旧index/test及App重复机制consumer-zero删除；Platform9、Host33、Kernel16定向测试及三包typecheck通过，独立只读接受，文档/架构/编码/diff通过。上一单元5e94cca9。下一动作：解决foundation/AppStarting配置可用前的等待预算，以唯一Lifecycle Schema默认值作为早期预算来源并保留actual callback/start owner及stop重试；配置成为权威后扣除已用时间，不重开资源接纳。随后日志/trace/redaction/health/完整目录。P02A仍in-progress；没有根全量或最终产品安装/设备/恢复证据，无push、无后台测试，单一writer /root。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：早期生命周期预算及迟到actual startup错误单元已完成：唯一Lifecycle Schema默认值覆盖AppStarting/foundation/early stop，实际配置ready后扣总elapsed；Platform StartRun结果保留至公开等待或drain消费，原owner只回收一次。Platform lifecycle30/public API3、Kernel App31及两包类型通过，2最小反例旧产物失败后修复，独立只读接受；docs/encoding/architecture/diff与target-layout specification-only通过。基于9ecaf581保存本地中文提交，前序配置b885debb；无push、后台测试或外部阻断，单一writer /root。下一动作：ConfigManager reload先清空快照导致并发读取失败，改为独立候选完成后原子替换、失败保留原快照与合并并发加载；核对秘密解析诊断再完成日志/trace/redaction/health与全物理目录。P02整体、根集中源码和最终安装/平台/设备/恢复门未接受。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
