@@ -165,37 +165,57 @@ C# SDK 与 Unity UPM 包是两种交付载体，不要求 Unity 直接消费不�
 
 <!-- target-layout:start -->
 
-精确登记 1131 个版本控制文件、341 个父目录。以下是目标，不是当前实物。
+精确登记 1140 个版本控制文件、353 个父目录。以下是目标，不是当前实物。
 
 ```text
 glimmer-cradle/
-├── .codex/
+├── .agents/
 │   └── skills/
-│       └── glimmer-cradle/
+│       ├── glimmer-cognition/
+│       │   ├── SKILL.md
+│       │   ├── agents/
+│       │   │   └── openai.yaml
+│       │   └── references/
+│       │       └── model-evaluation.md
+│       ├── glimmer-contracts/
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       │       └── openai.yaml
+│       ├── glimmer-delivery/
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       │       └── openai.yaml
+│       ├── glimmer-desktop/
+│       │   ├── SKILL.md
+│       │   ├── agents/
+│       │   │   └── openai.yaml
+│       │   └── references/
+│       │       ├── audio.md
+│       │       └── avatar.md
+│       ├── glimmer-documentation/
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       │       └── openai.yaml
+│       ├── glimmer-integrations/
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       │       └── openai.yaml
+│       ├── glimmer-investigation/
+│       │   ├── SKILL.md
+│       │   └── agents/
+│       │       └── openai.yaml
+│       ├── glimmer-services/
+│       │   ├── SKILL.md
+│       │   ├── agents/
+│       │   │   └── openai.yaml
+│       │   └── references/
+│       │       └── persistence.md
+│       └── glimmer-ui/
 │           ├── SKILL.md
 │           ├── agents/
 │           │   └── openai.yaml
 │           └── references/
-│               ├── architecture/
-│               │   ├── Runtime与生命周期.md
-│               │   ├── 协议与跨边界契约.md
-│               │   ├── 可观测性与诊断.md
-│               │   ├── 数据、配置与路径.md
-│               │   └── 架构边界与决策.md
-│               ├── common/
-│               │   └── 文档、注释与编码.md
-│               ├── subsystems/
-│               │   ├── AI前端开发.md
-│               │   ├── Cognition.md
-│               │   ├── Desktop与Avatar.md
-│               │   ├── Extensions与SkillPlane.md
-│               │   └── Frontend与UI.md
-│               └── workflow/
-│                   ├── 上下文与工具.md
-│                   ├── 会话与任务编排.md
-│                   ├── 审查与风险评估.md
-│                   ├── 开发工作流.md
-│                   └── 测试与交付.md
+│               └── external-capabilities.md
 ├── .dockerignore
 ├── .editorconfig
 ├── .gitattributes
@@ -1019,21 +1039,12 @@ glimmer-cradle/
 │   ├── architecture/
 │   │   ├── README.md
 │   │   ├── current/
-│   │   │   ├── 00-阅读说明.md
 │   │   │   ├── 01-目标、约束与质量属性.md
 │   │   │   ├── 02-系统上下文.md
 │   │   │   ├── 03-运行拓扑与进程边界.md
 │   │   │   ├── 04-构件、分层与依赖.md
 │   │   │   ├── 05-关键运行时链路.md
 │   │   │   ├── 06-跨切面机制.md
-│   │   │   ├── 07-子系统当前视图/
-│   │   │   │   ├── Cognition.md
-│   │   │   │   ├── Data与Observability.md
-│   │   │   │   ├── Desktop与Avatar.md
-│   │   │   │   ├── Engines与Native.md
-│   │   │   │   ├── Extension与SkillPlane.md
-│   │   │   │   ├── Kernel与Runtime.md
-│   │   │   │   └── README.md
 │   │   │   ├── 08-部署与交付形态.md
 │   │   │   ├── 09-术语表.md
 │   │   │   ├── 10-当前物理拓扑.md
@@ -1066,6 +1077,8 @@ glimmer-cradle/
 │   │   │   ├── ADR-0024-文档职责与重构执行体系整合.md
 │   │   │   └── README.md
 │   │   ├── implementation/
+│   │   │   ├── CognitionMemory与Knowledge实现.md
+│   │   │   ├── CognitionPlanning实现.md
 │   │   │   ├── Cognition认知核实现.md
 │   │   │   ├── Conversation实现.md
 │   │   │   ├── Desktop与Avatar实现.md
@@ -1085,38 +1098,16 @@ glimmer-cradle/
 │   │       └── physical-layout.md
 │   ├── governance/
 │   │   ├── README.md
+│   │   ├── agent-workflow/
+│   │   │   ├── coverage.md
+│   │   │   ├── design-decisions.md
+│   │   │   ├── evaluation.md
+│   │   │   ├── migration.md
+│   │   │   └── research.md
 │   │   ├── agent-workflow-design.md
 │   │   ├── architecture-change-policy.md
 │   │   ├── documentation-architecture.md
 │   │   └── documentation.md
-│   ├── guides/
-│   │   ├── README.md
-│   │   ├── development/
-│   │   │   ├── AI辅助前端开发.md
-│   │   │   ├── Schema与跨进程契约变更.md
-│   │   │   ├── architecture-refactoring.md
-│   │   │   ├── 前端开发与UI验收.md
-│   │   │   ├── 功能开发与缺陷修复.md
-│   │   │   ├── 命名规范.md
-│   │   │   ├── 文档维护.md
-│   │   │   ├── 架构性改动.md
-│   │   │   └── 测试与验收.md
-│   │   ├── onboarding/
-│   │   │   └── 本地开发环境.md
-│   │   ├── operations/
-│   │   │   ├── 性能诊断.md
-│   │   │   ├── 数据迁移与恢复.md
-│   │   │   └── 日志、Trace与DLQ排障.md
-│   │   ├── release/
-│   │   │   ├── Personal Server部署.md
-│   │   │   └── 客户端打包.md
-│   │   ├── subsystems/
-│   │   │   ├── Cognition开发.md
-│   │   │   ├── Kernel开发.md
-│   │   │   ├── 扩展开发.md
-│   │   │   ├── 桌面与Avatar开发.md
-│   │   │   └── 音频引擎开发.md
-│   │   └── 开发手册.md
 │   ├── history/
 │   │   ├── README.md
 │   │   ├── architecture-decisions/
@@ -1195,52 +1186,77 @@ glimmer-cradle/
 │   │           ├── M12-目标物理清单.md
 │   │           ├── M13-目标物理清单.md
 │   │           └── README.md
+│   ├── how-to/
+│   │   ├── Cognition开发.md
+│   │   ├── Kernel开发.md
+│   │   ├── Personal Server部署.md
+│   │   ├── README.md
+│   │   ├── Schema与跨进程契约变更.md
+│   │   ├── 前端开发与UI验收.md
+│   │   ├── 功能开发与缺陷修复.md
+│   │   ├── 审查权限与外部边界.md
+│   │   ├── 客户端打包.md
+│   │   ├── 性能诊断.md
+│   │   ├── 执行架构切片.md
+│   │   ├── 扩展开发.md
+│   │   ├── 数据迁移与恢复.md
+│   │   ├── 文档维护.md
+│   │   ├── 日志、Trace与DLQ排障.md
+│   │   ├── 本地开发环境.md
+│   │   ├── 架构性改动.md
+│   │   ├── 桌面与Avatar开发.md
+│   │   ├── 测试与验收.md
+│   │   ├── 长任务与恢复.md
+│   │   └── 音频引擎开发.md
 │   ├── reference/
 │   │   ├── README.md
 │   │   ├── configuration.md
 │   │   ├── data-layout.md
 │   │   ├── engineering-lifecycle.md
 │   │   ├── extension-sdk.md
+│   │   ├── naming.md
 │   │   ├── observability.md
 │   │   ├── packaging-layout.md
 │   │   ├── product-compositions.md
 │   │   ├── protocol.md
 │   │   └── ui-design-tokens.md
-│   └── roadmap/
-│       ├── README.md
-│       ├── backlog.md
-│       ├── initiatives/
-│       │   ├── architecture-v2/
-│       │   │   ├── README.md
-│       │   │   ├── acceptance.md
-│       │   │   ├── evidence/
-│       │   │   │   ├── 2026-10-09-P02A.md
-│       │   │   │   ├── 2026-10-09-P07A.md
-│       │   │   │   ├── 2026-10-09-P07B.md
-│       │   │   │   ├── 2026-10-09-docs-integration.md
-│       │   │   │   ├── 2026-10-09-execution-order.md
-│       │   │   │   └── README.md
-│       │   │   ├── execution-order.md
-│       │   │   ├── execution.json
-│       │   │   ├── migration-map.md
-│       │   │   ├── plan.md
-│       │   │   ├── requirements.md
-│       │   │   ├── risks.md
-│       │   │   ├── slices/
-│       │   │   │   ├── A00-reconcile.md
-│       │   │   │   └── TEMPLATE.md
-│       │   │   └── status.md
-│       │   └── m11-delivery/
-│       │       ├── M11-Personal Server UI设计简报.md
-│       │       ├── README.md
-│       │       ├── physical-layout.md
-│       │       └── reference-assets/
-│       │           └── m11-ui/
-│       │               ├── accent-a-qingyao.svg
-│       │               ├── accent-b-paraiba.svg
-│       │               ├── accent-c-peacock.svg
-│       │               └── m11-accepted-overview-dark-light-narrow.png
-│       └── now.md
+│   ├── roadmap/
+│   │   ├── README.md
+│   │   ├── backlog.md
+│   │   ├── initiatives/
+│   │   │   ├── architecture-v2/
+│   │   │   │   ├── README.md
+│   │   │   │   ├── acceptance.md
+│   │   │   │   ├── evidence/
+│   │   │   │   │   ├── 2026-10-09-P02A.md
+│   │   │   │   │   ├── 2026-10-09-P07A.md
+│   │   │   │   │   ├── 2026-10-09-P07B.md
+│   │   │   │   │   ├── 2026-10-09-docs-integration.md
+│   │   │   │   │   ├── 2026-10-09-execution-order.md
+│   │   │   │   │   └── README.md
+│   │   │   │   ├── execution-order.md
+│   │   │   │   ├── execution.json
+│   │   │   │   ├── migration-map.md
+│   │   │   │   ├── plan.md
+│   │   │   │   ├── requirements.md
+│   │   │   │   ├── risks.md
+│   │   │   │   ├── slices/
+│   │   │   │   │   ├── A00-reconcile.md
+│   │   │   │   │   └── TEMPLATE.md
+│   │   │   │   └── status.md
+│   │   │   └── m11-delivery/
+│   │   │       ├── M11-Personal Server UI设计简报.md
+│   │   │       ├── README.md
+│   │   │       ├── physical-layout.md
+│   │   │       └── reference-assets/
+│   │   │           └── m11-ui/
+│   │   │               ├── accent-a-qingyao.svg
+│   │   │               ├── accent-b-paraiba.svg
+│   │   │               ├── accent-c-peacock.svg
+│   │   │               └── m11-accepted-overview-dark-light-narrow.png
+│   │   └── now.md
+│   └── tutorials/
+│       └── 首次受控验证.md
 ├── extension-sdk/
 │   ├── README.md
 │   ├── dotnet/
@@ -1605,11 +1621,15 @@ glimmer-cradle/
 │   │   │   │   ├── check-docs.mjs
 │   │   │   │   ├── cli.mjs
 │   │   │   │   ├── documentation-structure.mjs
-│   │   │   │   └── execution-plan.mjs
+│   │   │   │   ├── execution-plan.mjs
+│   │   │   │   └── markdown.mjs
 │   │   │   ├── encoding/
 │   │   │   │   ├── check-encoding.mjs
 │   │   │   │   └── cli.mjs
-│   │   │   └── repository-root.mjs
+│   │   │   ├── repository-root.mjs
+│   │   │   └── skills/
+│   │   │       ├── check-skills.mjs
+│   │   │       └── cli.mjs
 │   │   └── tests/
 │   │       ├── architecture.test.mjs
 │   │       ├── baseline-lock.test.mjs
@@ -1617,6 +1637,7 @@ glimmer-cradle/
 │   │       ├── docs.test.mjs
 │   │       ├── documentation-structure.test.mjs
 │   │       ├── encoding.test.mjs
+│   │       ├── skills.test.mjs
 │   │       ├── target-layout.test.mjs
 │   │       └── v2-boundaries.test.mjs
 │   └── workspace-supervisor/

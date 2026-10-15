@@ -19,7 +19,7 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
 - Knowledge schema 2 保存独立 Resource 来源/采集修订及实际 parser/chunk 版本；显式采集与
   检索消费 live ResourcePort，不自动保存 Tool 结果。原生 Step/Reply 复验已使用的修订；
   可信来源管理支持修订 CAS 与 enabled 停用，停用失效正文/向量但保留来源和历史；
-  v1 的备份迁移只在 owner 停止后显式执行，见[认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+  v1 的备份迁移只在 owner 停止后显式执行，见[认知核实现](../../docs/architecture/implementation/CognitionMemory与Knowledge实现.md#knowledge-来源与持久化)。
 - Planning 已持有不可变 GoalVersion/PlanVersion、显式 accepted 承诺和同事务 Job request outbox；
   JobPort 接纳只结束源投递，不代表完成条件成立。普通回复或工具调用不自动成为长期承诺；短程 ActionPlan 已删除，旧决策只读恢复。
   生产长期 Jobs 源 wire 已接线；Core 评估现有严格模型输出、scope/live 证据复验、原 attempt 封口
@@ -29,7 +29,7 @@ Attention、Context、Inference、Planning 与原生模型/工具 Loop。平台 
   内部接纳不消费通知、不替代发送许可或真实回执。
   可信 App 的实际 Delivery 确认可经 Worker 核验原 Reply/Turn 后原子接纳源 ACK，保留完整首次
   确认与原请求；默认通知 sender/receiver 与下一次调度仍未装配，不把业务完成或测试 Port fixture 当作外部送达，详见
-  [认知核实现](../../docs/architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
+  [认知核实现](../../docs/architecture/implementation/CognitionPlanning实现.md#长期承诺与-jobs-源请求)。
 - Conversation Log 是交互事实 owner；Cognition 只消费事实并写入受控认知投影。
 - Memory schema 6 的 dispatch 绑定只用于旧巩固队列迁移屏障，不承担 Jobs authority 或新调度；
   非终态旧任务拒绝转交，外部绑定拒绝回退，旧 writer 同事务拒写。受控迁移与删除门见

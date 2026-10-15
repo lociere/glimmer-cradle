@@ -11,23 +11,23 @@ const expectedLock = {
   "immutableSources": [
     {
       "path": "docs/architecture/target/baseline.md",
-      "sha256": "4f5f92aad5d182319cf1e15bcc58449384368f965cb1810b6c1bf5e395233266"
+      "sha256": "b7b7cc863f4a2798441d63d13c1bc95d636ed9f0a27f4cf98b0c7f6cece5e323"
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/requirements.md",
-      "sha256": "995c6f73e8bdd4f393e49470b0c141b3d1b6fca803134f78de43c1ae3e985973"
+      "sha256": "9567a06ecad0b9a1e4c9d2f33589f39bdb47b4196691237676ca53333447c64e"
     },
     {
       "path": "docs/governance/architecture-change-policy.md",
-      "sha256": "472ded447bae843d84e6de9f7c30e3db74c1a8d36ac5ad524b31412f515bb125"
+      "sha256": "802e47b9cac6679f7d3e632246b30afe280a96abefd09fe7e371b279cc4868b2"
     },
     {
       "path": "docs/architecture/target/physical-layout.md",
-      "sha256": "6320f908606b6539253d78efd4024dd56a735e0f0529eaec4bd8219b07141878"
+      "sha256": "5b011f9c479c510831f9aac233373e11152e3c75537a4c3357823fdaa75f8806"
     },
     {
       "path": "docs/architecture/target/files.json",
-      "sha256": "f523d4f518833ac99d8ba9a86ab5dc87ac1aa3c3599e7fb49782894ac049b939"
+      "sha256": "fc4432e85c94ae450557680c8eba469c2fadf1d7614c25aa4fb4a960bd2f7a02"
     },
     {
       "path": "docs/architecture/decisions/ADR-0023-最终目标蓝图与物理目录契约.md",
@@ -39,19 +39,19 @@ const expectedLock = {
     },
     {
       "path": "docs/governance/documentation.md",
-      "sha256": "003e5937804653e3a4a8ac976fa63386f6783768f976b924ba53d79b4b05167c"
+      "sha256": "a58fa73a1a4639662a3760987d16cd0450997c70017b862afce2e24cc530de43"
     },
     {
       "path": "docs/governance/documentation-architecture.md",
-      "sha256": "b9b5bb2b19ab05e310a107e08b07599a39f2e68f7a1f44c3991acc91f9d7eaeb"
+      "sha256": "f69f1027ffb366c6d3daf2f5b74eecab89923c6b16f163edee135ebaeaafe329"
     },
     {
-      "path": "docs/guides/development/architecture-refactoring.md",
-      "sha256": "f8824731829cf93a3c3de54da4eedd8cdf7beef37e2c5e2d74a215dd0fd9a746"
+      "path": "docs/how-to/执行架构切片.md",
+      "sha256": "dfd7d47d7c0883c6ecd6ec62d3247017db61b5465c8378f703e0b37747a055ca"
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/plan.md",
-      "sha256": "1a064722d8b213013ba9e2353bb3e766101d979bf8a74c5a0db70e393e063443"
+      "sha256": "76e0c9736b6d332845da3901ec3dabadd8916362f1580de5b23a7e322d8e8690"
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/acceptance.md",
@@ -59,7 +59,7 @@ const expectedLock = {
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/execution-order.md",
-      "sha256": "4a872ce3b275a0ca8c33145527bc6aa48a0aba97423cf39ed30bc222fc8a429b"
+      "sha256": "daa716023106033ce817cca492fadef880100a9d6ca0be762875f3a906b6e032"
     }
   ],
   "targetRoots": [

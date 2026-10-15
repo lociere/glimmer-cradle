@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkDocumentationStructure } from './documentation-structure.mjs';
+import { markdownInfo } from './markdown.mjs';
 
 function markdownFiles(root) {
   if (!fs.existsSync(root)) return [];
@@ -10,23 +11,9 @@ function markdownFiles(root) {
   });
 }
 
-// Check local file targets, not remote availability or renderer-specific heading slugs.
+// Public file-link helper is also consumed by Skill validation.
 export function localMarkdownTargets(text) {
-  let fence;
-  const prose = text.split(/\r?\n/).map(line => {
-    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
-    if (marker) {
-      if (!fence) fence = marker;
-      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = undefined;
-      return '';
-    }
-    return fence ? '' : line;
-  }).join('\n').replace(/`+[^`\n]*`+/g, '');
-  const targets = [
-    ...prose.matchAll(/\]\((<[^>]+>|[^)]+)\)/g),
-    ...prose.matchAll(/^\s{0,3}\[[^\]]+\]:\s*(<[^>]+>|\S+)/gm),
-  ].map(match => match[1].replace(/^<|>$/g, '').replace(/\s+["'][\s\S]*$/, ''));
-  return targets.filter(target => target && !/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(target));
+  return markdownInfo(text).links.filter(target => !target.startsWith('#'));
 }
 
 export function checkDocs(repositoryRoot) {
@@ -35,18 +22,30 @@ export function checkDocs(repositoryRoot) {
   const active = markdownFiles(docs).filter(file => !path.relative(docs, file).split(path.sep).includes('history'));
   const errors = checkDocumentationStructure(root);
   const edges = new Map(active.map(file => [file, new Set()]));
+  const info = new Map();
+  const readInfo = file => {
+    if (!info.has(file)) info.set(file, markdownInfo(fs.readFileSync(file, 'utf8')));
+    return info.get(file);
+  };
   const label = file => path.relative(root, file).replaceAll('\\', '/');
   for (const file of active) {
-    for (const target of localMarkdownTargets(fs.readFileSync(file, 'utf8'))) {
-      let decoded;
-      try { decoded = decodeURIComponent(target.split('#')[0].split('?')[0]); }
+    for (const target of readInfo(file).links) {
+      let decoded, fragment;
+      try {
+        const [address, ...parts] = target.split('#');
+        decoded = decodeURIComponent(address.split('?')[0]);
+        fragment = decodeURIComponent(parts.join('#'));
+      }
       catch { errors.push(`${label(file)}: invalid link encoding: ${target}`); continue; }
-      const resolved = path.resolve(path.dirname(file), decoded);
+      const resolved = decoded ? path.resolve(path.dirname(file), decoded) : file;
       if (!fs.existsSync(resolved)) {
         errors.push(`${label(file)}: missing local target: ${target}`);
         continue;
       }
       const destination = fs.statSync(resolved).isDirectory() ? path.join(resolved, 'README.md') : resolved;
+      if (fragment && destination.endsWith('.md') && fs.existsSync(destination) && !readInfo(destination).headings.has(fragment)) {
+        errors.push(`${label(file)}: missing Markdown heading: ${target}`);
+      }
       if (edges.has(destination)) edges.get(file).add(destination);
     }
   }

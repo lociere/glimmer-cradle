@@ -14,8 +14,7 @@ const requiredOwnerPaths = [
   'core/kernel/src/adapters',
   'core/kernel/src/runtime',
   'core/kernel/src/composition',
-  'core/cognition/src/glimmer_cradle/cognition/domain',
-  'core/cognition/src/glimmer_cradle/cognition/application',
+  // Cognition's former domain/application layers are retired; only ignored caches may remain locally.
   'core/cognition/src/glimmer_cradle/cognition/ports',
   'core/cognition/src/glimmer_cradle/cognition/adapters',
   'apps/cognition-worker/src/glimmer_cradle/cognition_worker',

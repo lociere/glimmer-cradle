@@ -151,7 +151,7 @@ desktop.ini
 *.sublime-project
 *.sublime-workspace
 
-# Tool-local state. Project instructions and canonical skills remain tracked.
+# Tool-local state. Project instructions and repository skills remain tracked.
 /.claude/settings.local.json
 /.claude/skills/
 /.codex/config.toml
@@ -159,7 +159,9 @@ desktop.ini
 /.codex/sessions/
 /.codex/logs/
 /.codex/tmp/
-/.agents/
+/.agents/*
+!/.agents/skills/
+!/.agents/skills/**
 
 # Local troubleshooting notes are not project facts.
 /docs/troubleshooting/

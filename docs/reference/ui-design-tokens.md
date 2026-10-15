@@ -4,7 +4,7 @@
 > 事实依据：`products/desktop/src/renderer/styles/`、`products/desktop/src/renderer/components/control-center/`、`products/personal-server/src/web/shared/styles/`、对应 UI 测试与用户确认的视觉方向。
 > 维护触发：当前主题/token、页面结构、组件状态、响应式策略、可访问性基线、品牌资产消费边界或用户确认的视觉方向变化。
 
-本文必须同时回答三件事：当前代码已经是什么、跨产品长期必须达到什么质量、哪些视觉选择仍可重新设计。精确开发与验收步骤见 [前端开发与 UI 验收](../guides/development/前端开发与UI验收.md)。
+本文必须同时回答三件事：当前代码已经是什么、跨产品长期必须达到什么质量、哪些视觉选择仍可重新设计。精确开发与验收步骤见 [前端开发与 UI 验收](../how-to/前端开发与UI验收.md)。
 
 ## 目录
 

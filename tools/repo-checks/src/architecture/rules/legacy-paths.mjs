@@ -24,7 +24,6 @@ const removedPaths = [
   'data/legacy',
   'output',
   '.tmp',
-  '.agents',
   'deploy/personal-server/host-transaction.sh',
 ];
 

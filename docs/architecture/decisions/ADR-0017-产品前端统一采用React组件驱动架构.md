@@ -112,5 +112,5 @@ React、React Router、React Aria、Storybook 与 addon 的精确版本由各实
 
 - Architecture：[Product Compositions](../../reference/product-compositions.md)
 - Reference：[UI Design Tokens Reference](../../reference/ui-design-tokens.md)
-- Guide：[AI 辅助前端开发](../../guides/development/AI辅助前端开发.md)、[前端开发与 UI 验收](../../guides/development/前端开发与UI验收.md)
+- Guide：[AI 辅助前端开发](../../how-to/前端开发与UI验收.md)、[前端开发与 UI 验收](../../how-to/前端开发与UI验收.md)
 - Roadmap：[M11](../../roadmap/initiatives/m11-delivery/README.md)、[M11 目标物理清单](../../roadmap/initiatives/m11-delivery/physical-layout.md)

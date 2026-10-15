@@ -1,6 +1,6 @@
 # ADR-0008 Experience Ledger 与版本化 Memory
 
-> 部分替代：交互事实源已由 Conversation Log 接管，owner 为 Conversation；Episode、Memory、证据与恢复原则继续有效。详见 [ADR-0022](./ADR-0022-ConversationLog与Experience投影边界.md)。
+> 部分替代：交互事实源已由 Conversation Log 接管，owner 为 Conversation；Episode、Memory、证据与恢复原则继续有效。详见 [ADR-0022](ADR-0022-ConversationLog与Experience投影边界.md)。
 
 - 状态：accepted
 - 日期：2026-07-13

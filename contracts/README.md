@@ -40,7 +40,7 @@ pnpm --filter @glimmer-cradle/contracts baseline:refresh:json-schema
 
 - Node 与 pnpm 依赖由根 `pnpm-lock.yaml` 固定；本机已有 store 时可用 `pnpm install --offline --frozen-lockfile` 后运行全部 Node/Buff/TS 门。
 - Buf 使用本地 npm package `@bufbuild/buf@1.66.1`，TS 插件使用本地 `@bufbuild/protoc-gen-es@2.13.0`，不使用远程插件或 Buf Schema Registry。
-- Python round-trip 只接受 `uv 0.11.28`，并使用 `--locked --offline --no-python-downloads`；全新环境必须先按 [supply-chain.md](./supply-chain.md) 校验官方 archive、准备 Python/依赖 cache，离线缺件时失败闭合。
+- Python round-trip 只接受 `uv 0.11.28`，并使用 `--locked --offline --no-python-downloads`；全新环境必须先按 [supply-chain.md](supply-chain.md) 校验官方 archive、准备 Python/依赖 cache，离线缺件时失败闭合。
 - C# round-trip 只接受 `.NET SDK 8.0.423` 与 locked `Google.Protobuf 3.33.0`。全新环境按 supply-chain 清单校验 archive 后安装，或放到 ignored `contracts/.tools/dotnet/`；`DOTNET_EXE` 指向本地 SDK 时还会校验 launcher SHA-256。
 - `toolchain.json` 的支持平台、archive 摘要和 launcher 摘要是机器事实源；工具缺失、版本/摘要/许可证不符均失败，不降为 warn。
 

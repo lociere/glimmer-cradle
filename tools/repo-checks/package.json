@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "typescript": "^6.0.2"
+    "github-slugger": "2.0.0",
+    "mdast-util-from-markdown": "2.1.0",
+    "mdast-util-to-string": "4.0.0",
+    "typescript": "^6.0.2",
+    "yaml": "^2.8.1"
   },
   "scripts": {
     "check:docs": "node src/docs/cli.mjs",
+    "check:skills": "node src/skills/cli.mjs",
     "check:architecture": "node src/architecture/cli.mjs",
     "check:encoding": "node src/encoding/cli.mjs",
     "test": "node --test tests/*.test.mjs",

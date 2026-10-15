@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 契约工程"
+  short_description: "维护微光摇篮跨语言契约、Schema、SDK 与生成消费链路"
+  default_prompt: "使用 $glimmer-contracts 完成本次范围内的工作，按实际成果验证并说明未验项。"

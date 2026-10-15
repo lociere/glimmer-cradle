@@ -22,6 +22,7 @@ const allowedDevelopmentToolReferences = new Map([
 ]);
 const allowedRootFacadeReferences = new Map([
   ['check:docs', new Set(['@glimmer-cradle/repo-checks'])],
+  ['check:skills', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:architecture', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:encoding', new Set(['@glimmer-cradle/repo-checks'])],
   ['check:target-layout', new Set(['@glimmer-cradle/repo-checks'])],

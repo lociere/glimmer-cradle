@@ -17,11 +17,19 @@
 | Kernel `audio-service.ts` | 能力门、缓存、状态与 readiness 投影 |
 | Kernel `official-audio-engine.ts` | 双 lane 子进程监督、动态端点 gRPC client 与媒体租约 owner |
 
-Audio Engine 是摇篮本体能力，不通过 Extension 安装。Kernel 不维护 provider 数组，不循环尝试 provider，也不理解具体 TTS/ASR provider 的内部参数。
+当前 Audio Engine 由主仓发布和 Kernel Audio adapter 管理，不通过 Extension 安装。
+这是当前归属；目标 v2.1 的 Speech/Provider 边界见基线与原迁移任务，不能从第三方来源或旧 Engine 名称推导永久归属。Kernel 不维护 provider 数组，不循环尝试 provider，也不理解具体 TTS/ASR provider 的内部参数。
 
 TTS 与 ASR lane 绑定 `127.0.0.1:0`，用一次性 stdout 启动帧向直接父进程报告动态端点；主请求/响应只走二进制 `AudioEngineService`，stdout/stderr 此后只承载日志。Kernel 为每个进程注入随机 `x-glimmer-audio-token`，令牌不进入配置、catalog 或日志。两条 lane 均通过 `Shutdown` RPC 完成协议级停机：Engine 先 ACK、关闭 provider 资源并以 `0` 退出，Kernel 等待 2.5 秒后才升级为进程树强制回收。停机控制请求使用独立短超时，不继承业务长超时。
 
 大型音频不进入普通 RPC。Kernel 在 `data/work/audio/media-leases/<lane>/<lease-id>/` 为 ASR 输入创建 `READ_ONLY` 副本，为 TTS 输出创建 `WRITE_ONCE` 目标；`AudioMediaReference` 固定 file URI、MIME、长度、SHA-256、访问模式和过期时间。Engine 只能解析注入的 lane root，拒绝越界、过期、摘要不符或重复写入；Kernel 验证 TTS 回执后才把产物移入最终缓存/目标路径，并在成功、错误、超时、正常停机与崩溃后回收租约根。
+
+## 配置与输入输出语义
+
+`configs/system/audio.yaml` 当前 TTS/ASR 都 `enabled: false`；TTS primary 为 `dashscope-cosyvoice`、fallbacks 为空，
+ASR 为 `funasr`。角色 `configs/characters/<id>/voice.yaml` 拥有声线身份，系统配置拥有路由/超时/缓存/熔断，秘密来自环境或 secrets。
+默认 Selrena `voice_id` 为空，不能据配置/目录声称 TTS 可用；启用还需有效身份、依赖、模型/供应商与真实 warmup。
+ASR 成功后才进入文本感知，失败不伪造文本；TTS 失败不抹掉已成立的文本回复。关闭的 lane 不产生预热义务。
 
 ## TTS 链路
 
@@ -68,6 +76,9 @@ TTS 与 ASR 独立预热、独立收敛：任一 lane 完成 warmup、业务成�
 ## Native 实现边界
 
 Native 当前只服务 Avatar Composition：平台窗口/surface、per-pixel alpha、透明命中、DPI、多显示器和 ABI 检查。音频不保留 Native 假 ABI、不可达 provider 或固定结果 stub。
+Windows composition 有实际实现，其他平台的 stub/加载诊断不能当作透明合成等价支持。
+ABI/版本/平台与 DLL 位置由正式构建投影和 resolver 核对，不能从开发机绝对路径加载。
+`native.host` 的 package/动态库资源 readiness 与具体 Avatar 首帧是不同门，后者见 [Desktop/Avatar](Desktop与Avatar实现.md#avatar-readiness-实现点)。
 
 ## 验证
 

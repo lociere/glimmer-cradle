@@ -421,7 +421,7 @@ v4.0 **认知编译模型**——将离散的知识库条目编译为连贯的�
 > 阶段 7.5b-7：**ChatUseCase 已删除**。其全部对话编排职责（多模态路由 / 情绪更新 /
 > 记忆与知识 / 人设 prompt / LLM 生成 / 红线校验 / 会话沉淀 / 经历埋点）已迁进
 > CognitiveLoop 九阶段。感知唯一去向 = PerceptionEventQueue → CognitiveLoop。
-> 详见 [阶段7-自主输出通路设计.md](../../history/architecture-decisions/阶段7-自主输出通路设计.md) §九 与 7.5b-1~5。
+> 详见 [阶段7-自主输出通路设计.md](../architecture-decisions/阶段7-自主输出通路设计.md) §九 与 7.5b-1~5。
 
 #### ActiveThoughtUseCase — 主动思维用例
 
@@ -517,7 +517,7 @@ Moment 之间通过 `causation_ids` 编织因果网（蓝图 §4.1）。
 - 每个 Moment 携带 `kind / content / causation_ids / affect / importance`
 - `trace_id` 在 Moment 上为薄注解（与 telemetry 关联用，可空）
 - 启动恢复：载入最近快照 + fold 尾段确定续号
-- 物理位置 `data/state/experience/`；详见 [08 §八](./08-记忆与日志架构.md)
+- 物理位置 `data/state/experience/`；详见 [08 §八](08-记忆与日志架构.md)
 
 #### persistence/ — 持久化层（`cognition.db`）
 
@@ -529,7 +529,7 @@ L3 知识库、L4 向量 —— 三者同库可原子写，相似度计算仍在
 - `VectorRepository`——embedding 以 float32 BLOB 持久化（按 model 标识；
   换模型即视为 stale，加载时重算）。**省去每次启动全量重算 embedding。**
 - `migration.py`——内核旧库 `cognition_core.db` → `cognition.db` 一次性迁移
-- 详见 [阶段2-数据持久化设计](../../history/architecture-decisions/阶段2-数据持久化设计.md)
+- 详见 [阶段2-数据持久化设计](../architecture-decisions/阶段2-数据持久化设计.md)
 
 ---
 
@@ -597,7 +597,7 @@ Kernel 内核 ──ZMQ──→ KernelBridge.receive_loop()
 ```
 
 短期记忆是 working memory，纯内存、不落库。对话内容的持久记录由经历日志
-（L1，见 [08 §八](./08-记忆与日志架构.md)）承担。
+（L1，见 [08 §八](08-记忆与日志架构.md)）承担。
 
 ### 5.3 多模态处理链路
 

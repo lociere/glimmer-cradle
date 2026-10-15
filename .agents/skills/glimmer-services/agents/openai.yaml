@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 服务与数据"
+  short_description: "实现微光摇篮服务、持久数据、并发恢复、配置与资源生命周期"
+  default_prompt: "使用 $glimmer-services 完成本次范围内的工作，按实际成果验证并说明未验项。"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 文档与知识工程"
+  short_description: "依据仓库证据编写和核实项目文档，设计可用的上手路径、导航与维护归属"
+  default_prompt: "使用 $glimmer-documentation 完成当前文档任务，核验来源并取得与读者成果对应的证据。"

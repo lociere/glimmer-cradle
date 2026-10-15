@@ -10,5 +10,5 @@ Roadmap 保存已承诺但尚未完成的工作。当前主线只由 [now.md](no
 | [已结束里程碑](../history/milestones/README.md) | 历史完成范围及证据 |
 
 每个 initiative 有明确成果、范围、依赖、风险、验收与归档位置。
-通用执行方法见[切片执行指南](../guides/development/architecture-refactoring.md)。
+通用执行方法见[切片执行指南](../how-to/执行架构切片.md)。
 状态只能依据相应输入上的证据变更；代码存在、提交成功和生产发布是不同结论。

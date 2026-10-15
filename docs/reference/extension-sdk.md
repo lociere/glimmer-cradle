@@ -201,4 +201,4 @@ Skill 及其 tool/resource/prompt 可以声明 `scope`：`global` 对所有匹�
 - 用 Extension 承载官方本体能力，如 Audio Engine、Avatar、Cognition。
 - 未经显式 Avatar contribution/permission 直接控制 Live2D、Unity 参数、动作或模型加载。
 
-开发步骤见 [扩展开发](../guides/subsystems/扩展开发.md)，Skill Plane 实现见 [Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。
+开发步骤见 [扩展开发](../how-to/扩展开发.md)，Skill Plane 实现见 [Extension 与 Skill Plane 实现](../architecture/implementation/Extension与SkillPlane实现.md)。

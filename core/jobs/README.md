@@ -66,7 +66,7 @@ v1/v2/v3/v4 库需显式迁移，不把用户旧数据库当成空库。产品�
 候选在单事务重建相同约束的 jobs 表，原 identity/revision/epoch/attempt/lease/source receipt/
 tombstone/trigger/outbox/对账事实不变；仅按 `(created_at, job_id)` 为旧快照分配有限确定顺序，
 不宣称恢复历史 FIFO。失败保留候选供诊断，不覆盖它重跑；使用另一新路径重试。
-未知 owner/schema/额外对象拒绝迁移。操作与恢复见[数据迁移与恢复](../../docs/guides/operations/数据迁移与恢复.md)，
+未知 owner/schema/额外对象拒绝迁移。操作与恢复见[数据迁移与恢复](../../docs/how-to/数据迁移与恢复.md)，
 全部产品旧数据切换仍须 P14A 验收，原 v1/v2/v3 不由这个入口猜测升级。
 
 `listProjection` 在当前 authority 下按精确 scope 与稳定 Job ID 有界读取保留中的 Job 元数据，

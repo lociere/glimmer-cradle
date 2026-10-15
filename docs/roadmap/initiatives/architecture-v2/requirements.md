@@ -16,13 +16,13 @@
 ## 实施输入
 
 本页保存项目交付要求。当前任务由 [execution.json](execution.json) 的生成[状态](status.md)选择，
-有序切片由[阶段计划](plan.md)细化；接手、实施与失败恢复统一执行[指南](../../../guides/development/architecture-refactoring.md)。
+有序切片由[阶段计划](plan.md)细化；接手、实施与失败恢复统一执行[指南](../../../how-to/执行架构切片.md)。
 准确命令、行为场景与证据要求见[验收矩阵](acceptance.md)。下表定义成果，不保存阶段进度。
 
 先读取蓝图、[物理目录规范](../../../architecture/target/physical-layout.md)、当前迁移地图和执行记录。
 不根据目标树假设当前 API 已存在。确认 writer、消费者、契约、测试、数据样本和可删除对象后实现。
 在现有源代码事实源中演进，不先复制出第二套可消费契约或并行状态 owner。
-命名遵循 [命名规范](../../../guides/development/命名规范.md)；核心按稳定语义命名，特定环境转换局限于边缘。
+命名遵循 [命名规范](../../../reference/naming.md)；核心按稳定语义命名，特定环境转换局限于边缘。
 
 ## 交付阶段
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 认知与角色"
+  short_description: "实现和评估微光摇篮角色、推理、记忆、知识与认知循环行为"
+  default_prompt: "使用 $glimmer-cognition 完成本次范围内的工作，按实际成果验证并说明未验项。"

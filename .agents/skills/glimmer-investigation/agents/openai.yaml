@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 工程调查"
+  short_description: "定位微光摇篮疑难故障、跨进程竞态、性能与已知缺陷变体"
+  default_prompt: "使用 $glimmer-investigation 完成本次范围内的工作，按实际成果验证并说明未验项。"

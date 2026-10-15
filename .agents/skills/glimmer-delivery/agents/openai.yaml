@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 构建与交付"
+  short_description: "诊断持续集成并验证固定制品、来源证明、打包安装与失败恢复的实际边界"
+  default_prompt: "使用 $glimmer-delivery 完成当前构建交付任务，核实固定制品、信任来源与对应验证。"

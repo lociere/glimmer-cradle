@@ -4,75 +4,95 @@
   "status": "target-not-implemented",
   "repositoryFiles": [
     {
-      "path": ".codex/skills/glimmer-cradle/SKILL.md",
+      "path": ".agents/skills/glimmer-cognition/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/agents/openai.yaml",
+      "path": ".agents/skills/glimmer-cognition/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/architecture/Runtime与生命周期.md",
+      "path": ".agents/skills/glimmer-cognition/references/model-evaluation.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/architecture/协议与跨边界契约.md",
+      "path": ".agents/skills/glimmer-contracts/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/architecture/可观测性与诊断.md",
+      "path": ".agents/skills/glimmer-contracts/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/architecture/数据、配置与路径.md",
+      "path": ".agents/skills/glimmer-delivery/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/architecture/架构边界与决策.md",
+      "path": ".agents/skills/glimmer-delivery/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/common/文档、注释与编码.md",
+      "path": ".agents/skills/glimmer-desktop/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/subsystems/AI前端开发.md",
+      "path": ".agents/skills/glimmer-desktop/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/subsystems/Cognition.md",
+      "path": ".agents/skills/glimmer-desktop/references/audio.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/subsystems/Desktop与Avatar.md",
+      "path": ".agents/skills/glimmer-desktop/references/avatar.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/subsystems/Extensions与SkillPlane.md",
+      "path": ".agents/skills/glimmer-documentation/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/subsystems/Frontend与UI.md",
+      "path": ".agents/skills/glimmer-documentation/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/workflow/上下文与工具.md",
+      "path": ".agents/skills/glimmer-integrations/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/workflow/会话与任务编排.md",
+      "path": ".agents/skills/glimmer-integrations/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/workflow/审查与风险评估.md",
+      "path": ".agents/skills/glimmer-investigation/SKILL.md",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/workflow/开发工作流.md",
+      "path": ".agents/skills/glimmer-investigation/agents/openai.yaml",
       "owner": "engineering"
     },
     {
-      "path": ".codex/skills/glimmer-cradle/references/workflow/测试与交付.md",
+      "path": ".agents/skills/glimmer-services/SKILL.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".agents/skills/glimmer-services/agents/openai.yaml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".agents/skills/glimmer-services/references/persistence.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".agents/skills/glimmer-ui/SKILL.md",
+      "owner": "engineering"
+    },
+    {
+      "path": ".agents/skills/glimmer-ui/agents/openai.yaml",
+      "owner": "engineering"
+    },
+    {
+      "path": ".agents/skills/glimmer-ui/references/external-capabilities.md",
       "owner": "engineering"
     },
     {
@@ -2612,10 +2632,6 @@
       "owner": "documentation"
     },
     {
-      "path": "docs/architecture/current/00-阅读说明.md",
-      "owner": "documentation"
-    },
-    {
       "path": "docs/architecture/current/01-目标、约束与质量属性.md",
       "owner": "documentation"
     },
@@ -2637,34 +2653,6 @@
     },
     {
       "path": "docs/architecture/current/06-跨切面机制.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Cognition.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Data与Observability.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Desktop与Avatar.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Engines与Native.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Extension与SkillPlane.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/Kernel与Runtime.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/architecture/current/07-子系统当前视图/README.md",
       "owner": "documentation"
     },
     {
@@ -2788,6 +2776,14 @@
       "owner": "documentation"
     },
     {
+      "path": "docs/architecture/implementation/CognitionMemory与Knowledge实现.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/architecture/implementation/CognitionPlanning实现.md",
+      "owner": "documentation"
+    },
+    {
       "path": "docs/architecture/implementation/Cognition认知核实现.md",
       "owner": "documentation"
     },
@@ -2860,6 +2856,26 @@
       "owner": "documentation"
     },
     {
+      "path": "docs/governance/agent-workflow/coverage.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/governance/agent-workflow/design-decisions.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/governance/agent-workflow/evaluation.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/governance/agent-workflow/migration.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/governance/agent-workflow/research.md",
+      "owner": "documentation"
+    },
+    {
       "path": "docs/governance/architecture-change-policy.md",
       "owner": "documentation"
     },
@@ -2869,94 +2885,6 @@
     },
     {
       "path": "docs/governance/documentation.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/README.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/AI辅助前端开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/Schema与跨进程契约变更.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/architecture-refactoring.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/前端开发与UI验收.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/功能开发与缺陷修复.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/命名规范.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/文档维护.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/架构性改动.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/development/测试与验收.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/onboarding/本地开发环境.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/operations/性能诊断.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/operations/数据迁移与恢复.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/operations/日志、Trace与DLQ排障.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/release/Personal Server部署.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/release/客户端打包.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/subsystems/Cognition开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/subsystems/Kernel开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/subsystems/扩展开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/subsystems/桌面与Avatar开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/subsystems/音频引擎开发.md",
-      "owner": "documentation"
-    },
-    {
-      "path": "docs/guides/开发手册.md",
       "owner": "documentation"
     },
     {
@@ -3220,6 +3148,90 @@
       "owner": "documentation"
     },
     {
+      "path": "docs/how-to/Cognition开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/Kernel开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/Personal Server部署.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/README.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/Schema与跨进程契约变更.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/前端开发与UI验收.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/功能开发与缺陷修复.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/审查权限与外部边界.md",
+      "owner": "engineering"
+    },
+    {
+      "path": "docs/how-to/客户端打包.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/性能诊断.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/执行架构切片.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/扩展开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/数据迁移与恢复.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/文档维护.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/日志、Trace与DLQ排障.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/本地开发环境.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/架构性改动.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/桌面与Avatar开发.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/测试与验收.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/长任务与恢复.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/how-to/音频引擎开发.md",
+      "owner": "documentation"
+    },
+    {
       "path": "docs/reference/README.md",
       "owner": "documentation"
     },
@@ -3237,6 +3249,10 @@
     },
     {
       "path": "docs/reference/extension-sdk.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/reference/naming.md",
       "owner": "documentation"
     },
     {
@@ -3365,6 +3381,10 @@
     },
     {
       "path": "docs/roadmap/now.md",
+      "owner": "documentation"
+    },
+    {
+      "path": "docs/tutorials/首次受控验证.md",
       "owner": "documentation"
     },
     {
@@ -4408,6 +4428,10 @@
       "owner": "engineering"
     },
     {
+      "path": "tools/repo-checks/src/docs/markdown.mjs",
+      "owner": "engineering"
+    },
+    {
       "path": "tools/repo-checks/src/encoding/check-encoding.mjs",
       "owner": "engineering"
     },
@@ -4417,6 +4441,14 @@
     },
     {
       "path": "tools/repo-checks/src/repository-root.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/skills/check-skills.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/src/skills/cli.mjs",
       "owner": "engineering"
     },
     {
@@ -4441,6 +4473,10 @@
     },
     {
       "path": "tools/repo-checks/tests/encoding.test.mjs",
+      "owner": "engineering"
+    },
+    {
+      "path": "tools/repo-checks/tests/skills.test.mjs",
       "owner": "engineering"
     },
     {

@@ -1,7 +1,7 @@
 # M11：Personal Server 控制面、区域分发与跨产品 Extension 闭环
 
 - 状态：in-progress
-- 关联架构：[Product Compositions](../../../reference/product-compositions.md)、[Extension 与 Skill Plane 当前视图](../../../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)
+- 关联架构：[Product Compositions](../../../reference/product-compositions.md)、[Extension 与 Skill Plane 当前视图](../../../architecture/implementation/Extension与SkillPlane实现.md)
 - 关联决策：[ADR-0011 Extension 发布与开放生态边界](../../../architecture/decisions/ADR-0011-Extension发布与开放生态边界.md)、[ADR-0012 场景 Adapter 与平台受管资源分层](../../../architecture/decisions/ADR-0012-场景Adapter与平台受管资源分层.md)、[ADR-0017 产品前端统一采用 React 组件驱动架构](../../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)（`accepted`）
 - 前置里程碑：[M10：发布形态、安装投影与数据迁移闭环](../../../history/milestones/M10-发布形态、安装投影与数据迁移闭环.md)
 - 目标物理清单：[M11 目标物理清单](physical-layout.md)
@@ -127,7 +127,7 @@
 
 ### Personal Server UI 优化门（页面已实现）
 
-五个一级页面、七个设置子区及旧 DOM owner 删除已完成；当前实现、验证范围和证据见 [now.md](../../now.md) 与目标物理清单。本节保留原问题和接受标准，历史问题不再作为当前未完成项。视觉输入、代表页面、三个候选方向和用户确认门由 [M11 UI 设计简报](M11-Personal%20Server%20UI设计简报.md) 唯一拥有；实施另遵循 [前端开发与 UI 验收](../../../guides/development/前端开发与UI验收.md)、[AI 辅助前端开发](../../../guides/development/AI辅助前端开发.md)、[UI Design Tokens Reference](../../../reference/ui-design-tokens.md) 和 [M11 目标物理清单](physical-layout.md)。
+五个一级页面、七个设置子区及旧 DOM owner 删除已完成；当前实现、验证范围和证据见 [now.md](../../now.md) 与目标物理清单。本节保留原问题和接受标准，历史问题不再作为当前未完成项。视觉输入、代表页面、三个候选方向和用户确认门由 [M11 UI 设计简报](M11-Personal%20Server%20UI设计简报.md) 唯一拥有；实施另遵循 [前端开发与 UI 验收](../../../how-to/前端开发与UI验收.md)、[AI 辅助前端开发](../../../how-to/前端开发与UI验收.md)、[UI Design Tokens Reference](../../../reference/ui-design-tokens.md) 和 [M11 目标物理清单](physical-layout.md)。
 
 #### 2026-08-25 前端架构与 AI 工作流前置
 

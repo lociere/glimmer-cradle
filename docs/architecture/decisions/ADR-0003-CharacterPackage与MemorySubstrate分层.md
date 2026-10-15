@@ -1,6 +1,6 @@
 # ADR-0003：Character Package 与 Memory Substrate 分层
 
-> 部分替代：交互事实源现名为 Conversation Log，owner 为 Conversation；本 ADR 的分层原则继续有效。详见 [ADR-0022](./ADR-0022-ConversationLog与Experience投影边界.md)。
+> 部分替代：交互事实源现名为 Conversation Log，owner 为 Conversation；本 ADR 的分层原则继续有效。详见 [ADR-0022](ADR-0022-ConversationLog与Experience投影边界.md)。
 
 - 状态：accepted
 - 日期：2026-06-30

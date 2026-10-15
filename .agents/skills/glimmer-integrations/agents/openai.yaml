@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 扩展与集成"
+  short_description: "维护产品 Skill Plane、公开扩展接口、MCP及外部适配的授权与撤销"
+  default_prompt: "使用 $glimmer-integrations 完成当前产品 Skill Plane、扩展或外部集成任务，并验证公开消费与失败撤销。"

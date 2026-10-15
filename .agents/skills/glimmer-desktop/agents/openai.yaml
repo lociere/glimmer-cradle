@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 桌面与设备"
+  short_description: "验证微光摇篮桌面窗口、原生合成、Avatar 与音频设备链路"
+  default_prompt: "使用 $glimmer-desktop 完成本次范围内的工作，按实际成果验证并说明未验项。"

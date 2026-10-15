@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { checkArchitecture } from '../src/architecture/check-architecture.mjs';
 import { checkRepositoryTopology } from '../src/architecture/rules/repository-topology.mjs';
 import { checkWorkspaceBoundaries } from '../src/architecture/rules/workspace-boundaries.mjs';
+import { checkLegacyPaths } from '../src/architecture/rules/legacy-paths.mjs';
 import {
   checkWorkspaceArtifactBoundaries,
   findCanonicalRepositoryReferences,
@@ -30,6 +31,36 @@ const validWorkspace = `packages:
 
 injectWorkspacePackages: true
 `;
+
+test('Cognition topology accepts a clean checkout without retired layers and still requires active ports', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-cognition-topology-'));
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
+    fs.rmSync(fixture, { recursive: true, force: true });
+  });
+  const cognitionRoot = 'core/cognition/src/glimmer_cradle/cognition';
+  const cognitionViolations = () => checkRepositoryTopology(fixture).filter(item => item.startsWith(`${cognitionRoot}/`));
+  writeFixture(fixture, 'package.json', '{}');
+  writeFixture(fixture, `${cognitionRoot}/adapters/__init__.py`, '');
+  assert.deepEqual(cognitionViolations(), [`${cognitionRoot}/ports: canonical 物理边界缺失`]);
+  writeFixture(fixture, `${cognitionRoot}/ports/__init__.py`, '');
+  assert.deepEqual(cognitionViolations(), []);
+  for (const retiredLayer of ['domain', 'application']) {
+    assert.equal(fs.existsSync(path.join(fixture, cognitionRoot, retiredLayer)), false);
+  }
+});
+
+test('repository skills are current engineering sources while retired product paths still fail', t => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-skill-topology-'));
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
+    fs.rmSync(fixture, { recursive: true, force: true });
+  });
+  writeFixture(fixture, '.agents/skills/sample/SKILL.md', '# Sample');
+  assert.deepEqual(checkLegacyPaths(fixture), []);
+  writeFixture(fixture, 'protocol/duplicate.ts', '// Still not cut over');
+  assert.ok(checkLegacyPaths(fixture).some(item => item.startsWith('protocol:')));
+});
 
 test('新增 Host App 不能绕过 legacy package 与仓库工具依赖门', () => {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'glimmer-host-boundary-'));
@@ -82,6 +113,7 @@ test('工具拓扑允许未来叶子，并以负向 fixture 固定 workspace/art
     writeFixture(fixture, 'package.json', JSON.stringify({
       scripts: {
         'check:architecture': 'pnpm --filter @glimmer-cradle/repo-checks --fail-if-no-match run check:architecture',
+        'check:skills': 'pnpm --filter @glimmer-cradle/repo-checks --fail-if-no-match run check:skills',
       },
     }));
     writeFixture(fixture, 'docs/architecture/decisions/ADR-0009-本地监督树与动态端点治理.md',

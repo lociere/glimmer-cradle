@@ -2,7 +2,7 @@
 
 - 状态：accepted
 - 日期：2026-07-13
-- 部分替代：第 4–5 条中 Domain/Application 与六个 asmdef 全部位于 Unity 工程的物理和编译落点已由 [ADR-0014](./ADR-0014-仓库物理分层与器官模块边界.md) 部分替代；单向依赖、Domain 不依赖 Infrastructure/Host、分层语义与 SDK 投影安全规则继续有效。
+- 部分替代：第 4–5 条中 Domain/Application 与六个 asmdef 全部位于 Unity 工程的物理和编译落点已由 [ADR-0014](ADR-0014-仓库物理分层与器官模块边界.md) 部分替代；单向依赖、Domain 不依赖 Infrastructure/Host、分层语义与 SDK 投影安全规则继续有效。
 
 ## 背景
 
@@ -22,7 +22,7 @@ Domain ──────────> Infrastructure┘
 Live2D.Cubism ───> Infrastructure
 ```
 
-[ADR-0014](./ADR-0014-仓库物理分层与器官模块边界.md) 部分替代第 4 条“六者全部在 Unity 工程内编译”的落点：长期 Domain/Application/Ports 编译为 Unity 外可独立构建和测试的 Core Avatar assembly；Unity 工程只保留具体 Host、Infrastructure、Editor 与边界 Adapter，并单向引用该 Core assembly。上图表达的“Domain 不反向依赖 Infrastructure/Host”继续有效。
+[ADR-0014](ADR-0014-仓库物理分层与器官模块边界.md) 部分替代第 4 条“六者全部在 Unity 工程内编译”的落点：长期 Domain/Application/Ports 编译为 Unity 外可独立构建和测试的 Core Avatar assembly；Unity 工程只保留具体 Host、Infrastructure、Editor 与边界 Adapter，并单向引用该 Core assembly。上图表达的“Domain 不反向依赖 Infrastructure/Host”继续有效。
 5. Contracts 只保存 Host 帧模型、Domain 不读取文件、Application 不拥有 Unity Host 生命周期、Infrastructure 负责 Cubism/模型资产读取、Host 负责协议/Unity 生命周期/合成/组装的分层语义继续有效；长期 contract DTO 映射只位于 Host Adapter，Core Avatar 不依赖 generated DTO 或具体 transport。
 6. 不保留 Unity 原生 `-importPackage` 首次安装入口、手工 SDK 复制说明或默认程序集兼容路径。
 

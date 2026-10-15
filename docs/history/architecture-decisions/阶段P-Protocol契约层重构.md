@@ -374,7 +374,7 @@ P.4a 与 P.4b 之间靠 `sync:contracts:check` 强制一致性 —— schema 改
 
 ## 附：阶段 4 与本阶段的关系
 
-阶段 4（觉醒态机）已有 v1.1 设计文档（[阶段4-觉醒态设计.md](./阶段4-觉醒态设计.md)）。
+阶段 4（觉醒态机）已有 v1.1 设计文档（[阶段4-觉醒态设计.md](阶段4-觉醒态设计.md)）。
 其中 §3.7 + §5.1 已经明确 `ArousalState` / `ArousalProfile` / `ArousalSnapshot` 走 schema 路径
 （4.0 前置批次）。
 

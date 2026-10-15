@@ -95,7 +95,7 @@ Web 管理面、协议连接、业务能力和登录态不得混用同一个 rea
 
 ## Links
 
-- Architecture：[Extension 与 Skill Plane 当前视图](../current/07-子系统当前视图/Extension与SkillPlane.md)
+- Architecture：[Extension 与 Skill Plane 当前视图](../implementation/Extension与SkillPlane实现.md)
 - Implementation：[Extension 与 Skill Plane 实现](../implementation/Extension与SkillPlane实现.md)
 - Reference：[Extension SDK Reference](../../reference/extension-sdk.md)、[Data Layout Reference](../../reference/data-layout.md)、[Protocol Reference](../../reference/protocol.md)
-- Guide：[开发手册](../../guides/开发手册.md)、[扩展开发](../../guides/subsystems/扩展开发.md)
+- Guide：[开发手册](../../README.md)、[扩展开发](../../how-to/扩展开发.md)

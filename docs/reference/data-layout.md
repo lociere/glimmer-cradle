@@ -79,7 +79,7 @@ unknown，清理终态后仍保留最小身份/审计。`job_source_receipts` �
 源快照，重投用首次政策验证原 tombstone。内部接纳序号在 enqueue 同事务单调分配，counter
 不随 body retention 下降，不进入公开 Job/事件/投影；扫描按固定轮次上界保持公平，与 ID/墙钟无关。
 旧候选 v1/v2/v3/v4 拒绝隐式升级，v4 用 Jobs 的显式离线复制入口创建新候选并保留原库，操作
-与恢复见[数据迁移与恢复](../guides/operations/数据迁移与恢复.md)。不能对旧 Memory 数据库
+与恢复见[数据迁移与恢复](../how-to/数据迁移与恢复.md)。不能对旧 Memory 数据库
 直接应用 Jobs migration。产品入口切换、备份切点和跨库恢复仍须后续验证，参见
 [迁移地图](../roadmap/initiatives/architecture-v2/migration-map.md)。
 
@@ -92,7 +92,7 @@ SQL migration 并核对启动/重启前后资源摘要不变；尚未证明完�
 
 现行 Memory 新库 schema 为 6，数据路径不变；共享异步 SQLite 连接的事务、读取隔离、取消回滚和初始化
 由 `SqliteMemoryStore` 统一持有。业务结果 receipt 与修订/evidence 同事务持久化，详见
-[认知核持久化实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
+[认知核持久化实现](../architecture/implementation/CognitionMemory与Knowledge实现.md#记忆经历与持久化)。
 原 Jobs attempt 的接收资格、authority 和封口证据也在此库持久化，结果接纳与业务 receipt 原子提交。
 `memory_consolidation_dispatch` 保存受监督装配的 legacy/external 单向选择，未完成旧队列拒绝转交，
 外部绑定或已有外部 attempt 拒绝回退旧队列；旧 writer 在其写事务内检查该屏障。它不持有 epoch/lease，
@@ -308,6 +308,6 @@ Extension 受管资源的 console 输出归 `data/observability/logs/application
 4. 完成后更新 resolver、ignore、Reference、Guide，并搜索旧路径。
 5. 缓存可删除重建，但删除缓存不能代替状态迁移。
 
-操作见 [数据迁移与恢复](../guides/operations/数据迁移与恢复.md)，部署映射见 [Packaging Layout Reference](./packaging-layout.md)。
+操作见 [数据迁移与恢复](../how-to/数据迁移与恢复.md)，部署映射见 [Packaging Layout Reference](packaging-layout.md)。
 
 Personal Server 将部署备份域固定为宿主 `/var/lib/glimmer-cradle/host/backups/<kind>/<UTC timestamp>/`。每个部署备份包含 `config.tar.gz`、`data.tar.gz`、`SHA256SUMS` 与事务元数据；`glimmer-cradle backup` 和 `restore` 是唯一受支持的宿主备份恢复入口，恢复不接受备份域外路径。它与应用 owner 可使用的 `data/backups/` 不是同一目录或权限域。

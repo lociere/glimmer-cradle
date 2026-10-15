@@ -71,6 +71,15 @@ Personal Server 的浏览器本地 `.gcex` 不把服务器路径暴露成公共�
 
 Desktop main 只保留精确激活版本与扩展配置 YAML 的受控编辑入口，不承担扩展身份发现或运行事实拼装。依赖健康、能力可用性、动作 enablement 和诊断均来自 Host runtime projection 的 Capability Graph。`ManagedResourceSupervisor` 会在扩展加载和启动时检查第三方 package 是否存在，并执行 `readinessGates` 生成 graph node 状态；NapCat 通过 `runtime` Port 上报 process、OneBot、WebUI 和 capability graph 节点。Control Center 扩展页按 projection 通用渲染 Contribution Points、Capability Graph Nodes、Graph Edges、Action Intents 和 Diagnostics，不硬编码 NapCat 面板。`contributes.glimmer.setting` 会经 Capability Graph 派生为通用配置表单字段；renderer 只通过 `saveExtensionConfig()` 保存 YAML 草稿，不直接读写扩展配置文件。
 
+## 安装、信任与权限的不同门
+
+包/版本和 Registry 发布指针、安装预览/授权、校验/解包/提交、激活和业务 ready 是不同阶段。
+`adapters/extension-installation/{extension-package-manager,extension-package-verifier}.ts` 与 SDK `distribution/package.ts`
+实施包 SHA-256/内容完整性检查；release manifest 的 `signature` 字段存在不等于发布者签名验证已经实现或通过。
+来源、builder 和最终字节的独立信任检查见[工程生命周期](工程生命周期实现.md)，不能由待验包自证可信。
+`PERCEPTION_WRITE` 同时限制感知注入与资产 staging；`CONFIG_READ_SELF`/`SECRET_READ_SELF` 仅为对应扩展/授权 profile 的自身范围。
+安装期预览许可、运行时 catalog 曝光和派发时授权不能互相替代。共享边界核验见[权限审查](../../how-to/审查权限与外部边界.md)。
+
 ## Skill Plane 代码结构
 
 ```text
@@ -307,7 +316,7 @@ Python `adapters/resource_client.py` 的 ResourceClient 实际实现 Core Resour
 
 Worker composition 已向 KnowledgeIndex 注入 ResourceClient 与本代主体。显式来源登记、
 文本/JSON 持久采集、修订与派生索引失效、scope/live 过滤和原生 Step/Reply 复验门见唯一
-[Knowledge 实现](Cognition认知核实现.md#knowledge-来源与持久化)。真实 Host/生产 Worker/SQLite/SSE
+[Knowledge 实现](CognitionMemory与Knowledge实现.md#knowledge-来源与持久化)。真实 Host/生产 Worker/SQLite/SSE
 已验证知识正文进入模型，保存权限撤销后不再续接或产生 Reply。Host 不写 Knowledge 库。
 HostKnowledgeController 已通过 CognitionService 来源管理 RPC 接入真实持久 owner；唯一
 HostConfig 审批驱动新世代重验与重新采集，来源修订/摘要/enabled 不符或到期拒绝，详细字段与

@@ -96,7 +96,7 @@ Host 审批先由唯一 HostConfig 校验，再由同一 Resource/Broker graph �
 管理更新先撤 IO/proof 再 CAS；失败保持拒绝，不承诺跨 Host/SQLite 分布式原子事务。审批不是
 临时 grant，来源声明不是读取授权，采集材料不是 Memory。配置、重新装配和未交付 UI 边界见
 [配置参考](configuration.md#目标-host-与-jobs-配置) 与
-[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+[Knowledge 实现](../architecture/implementation/CognitionMemory与Knowledge实现.md#knowledge-来源与持久化)。
 Host-local Resource 更新订阅与刷新状态不是新 wire；重采集仍复用上述查询/采集 RPC 和原授权，
 不以通知自动创建 grant、更新审批或恢复旧 Context。通知及有界监督机制归
 [Knowledge 采集边界](../architecture/implementation/Extension与SkillPlane实现.md#knowledge-显式资源采集边界)。
@@ -135,7 +135,7 @@ attempt/token 可为零；Memory 执行状态需要非零 attempt/token。未知
 成功状态返回 RECOVERY_REQUIRED。inbox 与投影同事务提交后才 accepted；ACK 丢失可重投。
 取消/unknown 不表示 Memory 未执行或回滚；已提交 receipt 与不确定性必须保留。数据责任见
 [数据目录](data-layout.md#用户状态与记忆)，实现见
-[Cognition 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化)。
+[Cognition 实现](../architecture/implementation/CognitionMemory与Knowledge实现.md#记忆经历与持久化)。
 
 ## Jobs 受控状态投影
 
@@ -208,7 +208,7 @@ Perception，绑定完整 Conversation context、隐私/保留分类、完整 Mo
 接受时及模型调用前后当前 tier 都必须 cloud_allowed；sensitive、local_only/none 不送云，也不假装
 本地推理可用。来源/政策拒绝为 PERMISSION_DENIED，原源/attempt/提交冲突为 RECOVERY_REQUIRED。
 取消/异常先独立封口，再交还调用者；响应复用持久 `PlanningJobResult`，不另建完成事实。
-来源选择、预算及 live 复验归[认知核实现](../architecture/implementation/Cognition认知核实现.md#长期承诺与-jobs-源请求)。
+来源选择、预算及 live 复验归[认知核实现](../architecture/implementation/CognitionPlanning实现.md#长期承诺与-jobs-源请求)。
 
 Host `PlanningJobAdapter` 验持久 receipt 后返回 Jobs succeeded，不把评估值改成 true；取消后用
 独立非取消 signal 的有界 Reconcile 调用封口。配置 Host 默认经下面的接纳闸驱动独立 scheduler。
@@ -353,7 +353,7 @@ Worker 只读已有真实 Reply/已完成 revision=2 的 Turn，核验完整通�
 Planning 在同一事务持久保存完整确认与首次接纳时间，保留原 outbox/业务 receipt；扫描只
 返回未确认请求，越过已确认项后仍能找到后续分页。相同确认只忽略传输到达时间、保持首次
 信封；同通知的回执身份、output、epoch/generation、已听范围或其他绑定漂移拒绝覆盖。
-窗口版本/恢复纪律见[数据目录](./data-layout.md)。无原持久事实/业务绑定冲突为
+窗口版本/恢复纪律见[数据目录](data-layout.md)。无原持久事实/业务绑定冲突为
 RECOVERY_REQUIRED，非法组合/预算为 INVALID_REQUEST，缺 owner/停机为 NOT_READY，旧代
 为 GENERATION_MISMATCH。取消、deadline、shutdown 排空实际 rollback；提交后响应丢失
 保留原确认供同一请求重投，不再次评估或生成 Reply。
@@ -468,4 +468,4 @@ pnpm contracts:verify
 - 跨语言边界覆盖成功、缺字段、未知枚举、非法组合、typed error、deadline、cancellation、readiness 与 generation mismatch。
 - 媒体另覆盖权限拒绝、过期、摘要、越界、崩溃清理和大数据不进入普通 RPC。
 
-实现入口见 [Contract Spine 实现](../architecture/implementation/Protocol契约层实现.md)，配置字段见 [Configuration Reference](./configuration.md)，公开扩展见 [Extension SDK Reference](./extension-sdk.md)。
+实现入口见 [Contract Spine 实现](../architecture/implementation/Protocol契约层实现.md)，配置字段见 [Configuration Reference](configuration.md)，公开扩展见 [Extension SDK Reference](extension-sdk.md)。

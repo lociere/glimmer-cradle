@@ -8,13 +8,14 @@
 
 | 命令 | owner 与结果 |
 |---|---|
-| `pnpm check:docs` | repo-checks `src/docs/cli.mjs`；活跃链接/入口、精确 docs 清单、任务依赖/状态及生成视图；0 通过、1 违规、2 无法运行 |
+| `pnpm check:docs` | repo-checks `src/docs/cli.mjs`；活跃 Markdown 本地文件/章节链接与入口、精确 docs 清单、任务依赖/状态及生成视图；0 通过、1 违规、2 无法运行 |
+| `pnpm check:skills` | repo-checks `src/skills/cli.mjs`；项目 Skill YAML/元数据、名称/目录、Git 可见性、唯一发现位置、引用可达性与本地链接；0 通过、1 违规、2 无法运行；不验证自动触发或行为效果 |
 | `pnpm check:docs --write` | 重建 status.md 与 docs 物理树后检查；不改变 execution.json 中的任务状态 |
 | `pnpm check:architecture` | repo-checks；基线锁、依赖边界和精确 legacy exceptions |
 | `pnpm check:encoding` | repo-checks；tracked 与未忽略 untracked 文本的 UTF-8/BOM |
-| `pnpm check:pr` | 根薄编排；编码、文档、架构、测试、typecheck、build；PR workflow 调用同一入口 |
+| `pnpm check:pr` | 根薄编排；编码、文档、Skill、架构、测试、typecheck、build；PR workflow 调用同一入口 |
 
-文档检查不验证远端链接、章节锚点或产品事实；维护方式见 [文档维护](../guides/development/文档维护.md)。
+文档检查不验证远端/HTML 链接与显式 HTML anchor、代码片段或产品事实；本地标题按 GFM slug 约定核对，精确范围见 [文档维护](../how-to/文档维护.md)。
 
 ## 宿主事务
 

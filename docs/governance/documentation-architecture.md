@@ -1,54 +1,77 @@
-# 文档架构与物理布局
+# 知识与文档架构
 
-> 范围：全仓 docs 的信息架构、职责、路径生命周期与目录清单；不定义产品运行时边界。
-> 事实依据：ADR-0024、现有文档职责与下列官方资料。
-> 维护触发：新增文档类型、权威归属、目录、生成规则或项目工作流。
+本页拥有资料分类、单一维护位置、状态、读取时机与维护责任；写作质量见[文档规范](documentation.md)，
+实际编辑/迁移见[文档维护](../how-to/文档维护.md)。文档和 Skill 都供人及 Codex 使用。
 
-## 目录
+## 从需求到结构
 
-- [设计依据](#设计依据)
-- [信息职责](#信息职责)
-- [物理结构](#物理结构)
-- [架构文档的覆盖](#架构文档的覆盖)
-- [工作项生命周期](#工作项生命周期)
-- [本次迁移](#本次迁移)
-- [维护与验证](#维护与验证)
+首次接手者需要得到一个安全、可观察的成果；实现者需要真实入口/owner/consumer；设计者需要概念、质量要求和边界；
+调试者需要运行因果与失败/退出；作者需要精确 SDK/Schema；交付者需要制品身份/环境/恢复；接手者需要当前授权与原状态。
+同一使用者会切换任务，不能只按语言、团队目录或“给人/给 AI”分类。
+
+采用任务导航＋主题正文＋交叉引用：学习成果独立到 tutorials；可执行操作集中到 how-to，取消旧 guides 的阶段/子系统多级分类，
+避免读者先猜阶段再找命令；精确查询保留 reference。架构目标、采用决策、跨组件视图和组件解释有不同权威/更新频率，
+保留 architecture 的语义边界；将 Current 的六篇组件说明并入 Implementation，消除两份同主题详情。
+认知主链与 Memory/Knowledge、Planning 长细节分开，使其他认知任务无需加载持久化/Jobs 全部内容。
+
+治理、任务状态和历史因权限、维护周期及证据时效而独立，不能强塞进教程/参考四类型。
+这些是本项目适配，比较及来源链见[设计决定](agent-workflow/design-decisions.md)，实际旧→新见[迁移记录](agent-workflow/migration.md)。
 
 ## 设计依据
 
-资料核对日期为 2026-10-09。以下是本项目的适配决策，并非宣称存在一个强制统一的行业目录标准。
+Diátaxis 用于判断学习/应用和行动/理解；Docs as Code 用于同仓 diff、审查与自动检查；
+GitLab/Django/Kubernetes 的实际实现支持任务主题、链接和版本/源的区别，不能证明本目录树是通行标准。
+C4/arc42 仅辅助检查系统视图、组件职责与代表运行场景，不作为目录模板，不宣称符合整个方法或标准。
+各依据属于平台机制、推荐、开放规范、案例、项目适配或实验的哪一类，见设计决定与[研究](agent-workflow/research.md)。
 
-| 官方实践 | 采用方式 | 适用边界 |
+## 内容归属与读取
+
+| 内容或问题 | 权威维护位置 | 何时读取、由谁维护 |
 |---|---|---|
-| [Diátaxis](https://diataxis.fr/) 区分教程、操作、参考、解释 | 按读者意图区分 Guides、Reference 和 Architecture；onboarding 提供学习入口 | 不将全部工程治理强塞进四个目录；没有完整教学路径时不建立空 tutorials |
-| [GitLab topic types](https://docs.gitlab.com/development/documentation/topic_types/) | 一个主题回答一个明确问题，导航页与正文职责分开 | 允许正文链接相关主题，不复制另一页的准确字段 |
-| [GitLab 文档工作流](https://docs.gitlab.com/development/documentation/workflow/) | 文档随实现更新，变更在同一候选检查 | 本项目 Git/发布权限沿用用户授权 |
-| [arc42](https://docs.arc42.org/) | 以目标/约束、上下文、构件、运行、部署、质量、风险、决策和术语审查覆盖 | 用作内容检查表，不机械复制十二份空模板 |
-| [ADR](https://adr.github.io/) | 记录背景、决定、后果与替代关系 | ADR 不重复蓝图正文、不作为阶段状态表 |
-| [Kubernetes 页面类型](https://kubernetes.io/docs/contribute/style/page-content-types/) | Concept、Task、Reference 使用不同写法，操作页有前置条件和步骤 | docs 检查只能证明其覆盖的结构与链接，不能证明运行时行为 |
+| 产品目标、长期职责与不变量 | architecture/target、accepted ADR | 边界判断；产品/架构决定 owner |
+| 当前系统上下文、跨组件依赖/运行/部署 | architecture/current | 理解相应关系；实际实现 owner |
+| 组件目的、概念、入口、装配、生命周期、失败/恢复 | architecture/implementation | 修改/追踪该组件；组件 owner，按任务组织而非固定六节模板 |
+| 协议/Schema/配置/数据/SDK/token/命名/制品精确语义 | reference；实际定义仍由 Schema/源码/manifest 拥有 | 查询或变更；相应定义 owner |
+| 学习第一个受控成果 | tutorials 的具体教程 | 首次学习；拥有 fixture/构建与反馈的工程 owner |
+| 开发、构造、启动、调试、测试、交付、恢复的完整操作 | how-to 的具体指南 | 执行该任务；拥有命令、副作用与恢复的工程 owner |
+| 仓库共同约束、安全与授权 | 根 AGENTS.md | 宿主指令；协作 owner，不复制详细操作 |
+| 专项执行判断、反例、工具选择 | .agents/skills 的专项正文和条件性资源 | 匹配任务；能力维护者结合领域 owner |
+| 文档/协作职责、质量与方法选择 | governance | 维护体系时；资料/能力 owner |
+| 当前计划、授权、进度和恢复点 | 对应 roadmap initiative 或临时任务记录 | 继续对应任务；唯一整合 owner |
+| 决策原语境、被替代设计、研究与验证证据 | ADR/history、对应 research/evaluation | 追溯或复验；保留原候选/来源/许可/限制 |
+| 确定性工具、模板、生成物 | 实际 tools/product/contract owner | 执行相应操作；不在 Skill 复制脚本或模板 |
 
-## 信息职责
+归属落实到一条事实或一个流程。例如字段定义在 Contract Spine，协议参考解释语义，变更指南提供生成/兼容操作，
+contracts Skill 提醒真实跨语言消费与失效模式。允许有用途的短摘要与最小例子，不分别维护多份完整字段/默认值/副作用表。
+共享验收、证据复用和独立审查由[测试与验收](../how-to/测试与验收.md)拥有；持久接手由[长任务与恢复](../how-to/长任务与恢复.md)拥有。
 
-| 目录 | 唯一拥有 | 不应混入 |
-|---|---|---|
-| architecture/target | 已接受的目标语义、完整物理契约及摘要锁 | 当前执行状态、会话日志 |
-| architecture/current | 当前结构、部署、运行关系、质量约束与术语 | 尚未实施的迁移动作 |
-| architecture/implementation | 真实代码、入口、状态机与调试链路 | 目标中的不存在 API |
-| architecture/decisions | 长期取舍、上下文、替代关系 | 每次测试流水 |
-| reference | 协议、配置、数据、SDK、命令等精确查表 | 长篇操作步骤 |
-| guides | 前置条件、操作、失败恢复、验证和同步 | 再次定义规范或项目状态 |
-| governance | 文档与架构变更规则、工作流设计 | 产品业务规则、活跃切片状态 |
-| roadmap | 承诺、依赖、待办、风险、切片与证据索引 | 已被替代的长期过程正文 |
-| history | 完成的里程碑、被冻结的原始记录与旧设计 | 当前执行指令 |
+## 权威与状态
 
-文档的语义权威来自职责与明确替代关系；Markdown 链接位置不授予更高权限。
-Blueprint 在本文中作为“目标蓝图”的概念使用，物理路径统一为 `architecture/target/`。
-产品基线保持 v2.1，文档治理修订由 ADR-0024 记录，不虚构产品 v2.2。
+用户最新决定与授权优先，产品规范顺序见[变更宪章](architecture-change-policy.md)。
+规范目标说“应达到什么”；当前源码/Schema/consumer 说“实现了什么”；运行证据说明“哪个候选/环境验证过什么”。
+三者冲突时修正所属说法或明确偏差，不能以目标目录、历史 PASS、声明字段或文件存在替代接入/ready。
 
-## 物理结构
+可调整的目录/Skill 数量、加载与协作流程不属于产品不变量。架构 v2 的临时步骤和完成门只用于该 initiative；
+execution.json 唯一拥有其进度，status.md 是生成视图。本轮重组不接受或推进产品任务。
+历史保留过去语境和原证据，只切换失效的导航链接；日期不是当前事实正确性的证明。
 
-下方是从 `architecture/target/files.json` 的 docs 条目生成的精确文件树。
-历史材料也登记；源文件不得用通配符代替。新增页面同时更新权威清单和入口，空目录不登记。
+## 任务流程与能力组合
+
+[docs 入口](../README.md)按成果导航，已知 owner 可以跳过；专项 Skill 只加载会改变判断的必要资料。
+组件主题可含解释和方法，指南可含必要概念，Skill 可含必要项目事实，不机械按“事实/方法”切开。
+内容应直接回答问题或引向可操作下一站，避免 docs→Skill→同一 docs 的无效往返。
+完整覆盖和正反请求在[覆盖矩阵](agent-workflow/coverage.md)，不要求普通任务读全图、研究或历史。
+
+## 维护与追溯
+
+实现变化同步唯一正文及误导性的直接摘要；职责迁移切消费者后删旧入口，不保留无期限壳。
+资料重组同时处理精确文件清单、生成树与受影响摘要；[文档维护](../how-to/文档维护.md)给实际命令和失败分支。
+上游变化或重复失败触发有证据的最小修正，来源/适配/验证记录不默认进入任务上下文。
+ADR-0024 保存先前布局决定的历史；本轮选择和旧内容处理以[协作设计](agent-workflow-design.md)及迁移记录解释，不改写其原接受语义。
+
+## 文件清单视图
+
+以下从目标 files.json 的 docs 条目生成，用于核对物理文件，不证明能力或事实正确性；普通读者用任务导航。
 
 <!-- docs-layout:start -->
 
@@ -58,21 +81,12 @@ docs/
 ├── architecture/
 │   ├── README.md
 │   ├── current/
-│   │   ├── 00-阅读说明.md
 │   │   ├── 01-目标、约束与质量属性.md
 │   │   ├── 02-系统上下文.md
 │   │   ├── 03-运行拓扑与进程边界.md
 │   │   ├── 04-构件、分层与依赖.md
 │   │   ├── 05-关键运行时链路.md
 │   │   ├── 06-跨切面机制.md
-│   │   ├── 07-子系统当前视图/
-│   │   │   ├── Cognition.md
-│   │   │   ├── Data与Observability.md
-│   │   │   ├── Desktop与Avatar.md
-│   │   │   ├── Engines与Native.md
-│   │   │   ├── Extension与SkillPlane.md
-│   │   │   ├── Kernel与Runtime.md
-│   │   │   └── README.md
 │   │   ├── 08-部署与交付形态.md
 │   │   ├── 09-术语表.md
 │   │   ├── 10-当前物理拓扑.md
@@ -105,6 +119,8 @@ docs/
 │   │   ├── ADR-0024-文档职责与重构执行体系整合.md
 │   │   └── README.md
 │   ├── implementation/
+│   │   ├── CognitionMemory与Knowledge实现.md
+│   │   ├── CognitionPlanning实现.md
 │   │   ├── Cognition认知核实现.md
 │   │   ├── Conversation实现.md
 │   │   ├── Desktop与Avatar实现.md
@@ -125,37 +141,15 @@ docs/
 ├── governance/
 │   ├── README.md
 │   ├── agent-workflow-design.md
+│   ├── agent-workflow/
+│   │   ├── coverage.md
+│   │   ├── design-decisions.md
+│   │   ├── evaluation.md
+│   │   ├── migration.md
+│   │   └── research.md
 │   ├── architecture-change-policy.md
 │   ├── documentation-architecture.md
 │   └── documentation.md
-├── guides/
-│   ├── README.md
-│   ├── development/
-│   │   ├── AI辅助前端开发.md
-│   │   ├── Schema与跨进程契约变更.md
-│   │   ├── architecture-refactoring.md
-│   │   ├── 前端开发与UI验收.md
-│   │   ├── 功能开发与缺陷修复.md
-│   │   ├── 命名规范.md
-│   │   ├── 文档维护.md
-│   │   ├── 架构性改动.md
-│   │   └── 测试与验收.md
-│   ├── onboarding/
-│   │   └── 本地开发环境.md
-│   ├── operations/
-│   │   ├── 性能诊断.md
-│   │   ├── 数据迁移与恢复.md
-│   │   └── 日志、Trace与DLQ排障.md
-│   ├── release/
-│   │   ├── Personal Server部署.md
-│   │   └── 客户端打包.md
-│   ├── subsystems/
-│   │   ├── Cognition开发.md
-│   │   ├── Kernel开发.md
-│   │   ├── 扩展开发.md
-│   │   ├── 桌面与Avatar开发.md
-│   │   └── 音频引擎开发.md
-│   └── 开发手册.md
 ├── history/
 │   ├── README.md
 │   ├── architecture-decisions/
@@ -234,103 +228,77 @@ docs/
 │           ├── M12-目标物理清单.md
 │           ├── M13-目标物理清单.md
 │           └── README.md
+├── how-to/
+│   ├── Cognition开发.md
+│   ├── Kernel开发.md
+│   ├── Personal Server部署.md
+│   ├── README.md
+│   ├── Schema与跨进程契约变更.md
+│   ├── 前端开发与UI验收.md
+│   ├── 功能开发与缺陷修复.md
+│   ├── 审查权限与外部边界.md
+│   ├── 客户端打包.md
+│   ├── 性能诊断.md
+│   ├── 执行架构切片.md
+│   ├── 扩展开发.md
+│   ├── 数据迁移与恢复.md
+│   ├── 文档维护.md
+│   ├── 日志、Trace与DLQ排障.md
+│   ├── 本地开发环境.md
+│   ├── 架构性改动.md
+│   ├── 桌面与Avatar开发.md
+│   ├── 测试与验收.md
+│   ├── 长任务与恢复.md
+│   └── 音频引擎开发.md
 ├── reference/
 │   ├── README.md
 │   ├── configuration.md
 │   ├── data-layout.md
 │   ├── engineering-lifecycle.md
 │   ├── extension-sdk.md
+│   ├── naming.md
 │   ├── observability.md
 │   ├── packaging-layout.md
 │   ├── product-compositions.md
 │   ├── protocol.md
 │   └── ui-design-tokens.md
-└── roadmap/
-    ├── README.md
-    ├── backlog.md
-    ├── initiatives/
-    │   ├── architecture-v2/
-    │   │   ├── README.md
-    │   │   ├── acceptance.md
-    │   │   ├── evidence/
-    │   │   │   ├── 2026-10-09-P02A.md
-    │   │   │   ├── 2026-10-09-P07A.md
-    │   │   │   ├── 2026-10-09-P07B.md
-    │   │   │   ├── 2026-10-09-docs-integration.md
-    │   │   │   ├── 2026-10-09-execution-order.md
-    │   │   │   └── README.md
-    │   │   ├── execution-order.md
-    │   │   ├── execution.json
-    │   │   ├── migration-map.md
-    │   │   ├── plan.md
-    │   │   ├── requirements.md
-    │   │   ├── risks.md
-    │   │   ├── slices/
-    │   │   │   ├── A00-reconcile.md
-    │   │   │   └── TEMPLATE.md
-    │   │   └── status.md
-    │   └── m11-delivery/
-    │       ├── M11-Personal Server UI设计简报.md
-    │       ├── README.md
-    │       ├── physical-layout.md
-    │       └── reference-assets/
-    │           └── m11-ui/
-    │               ├── accent-a-qingyao.svg
-    │               ├── accent-b-paraiba.svg
-    │               ├── accent-c-peacock.svg
-    │               └── m11-accepted-overview-dark-light-narrow.png
-    └── now.md
+├── roadmap/
+│   ├── README.md
+│   ├── backlog.md
+│   ├── initiatives/
+│   │   ├── architecture-v2/
+│   │   │   ├── README.md
+│   │   │   ├── acceptance.md
+│   │   │   ├── evidence/
+│   │   │   │   ├── 2026-10-09-P02A.md
+│   │   │   │   ├── 2026-10-09-P07A.md
+│   │   │   │   ├── 2026-10-09-P07B.md
+│   │   │   │   ├── 2026-10-09-docs-integration.md
+│   │   │   │   ├── 2026-10-09-execution-order.md
+│   │   │   │   └── README.md
+│   │   │   ├── execution-order.md
+│   │   │   ├── execution.json
+│   │   │   ├── migration-map.md
+│   │   │   ├── plan.md
+│   │   │   ├── requirements.md
+│   │   │   ├── risks.md
+│   │   │   ├── slices/
+│   │   │   │   ├── A00-reconcile.md
+│   │   │   │   └── TEMPLATE.md
+│   │   │   └── status.md
+│   │   └── m11-delivery/
+│   │       ├── M11-Personal Server UI设计简报.md
+│   │       ├── README.md
+│   │       ├── physical-layout.md
+│   │       └── reference-assets/
+│   │           └── m11-ui/
+│   │               ├── accent-a-qingyao.svg
+│   │               ├── accent-b-paraiba.svg
+│   │               ├── accent-c-peacock.svg
+│   │               └── m11-accepted-overview-dark-light-narrow.png
+│   └── now.md
+└── tutorials/
+    └── 首次受控验证.md
 ```
 
 <!-- docs-layout:end -->
-
-目录结构表达维护职责；文件名表达主题。新的流程、治理和任务文件使用稳定 kebab-case。
-已存在的中文专业指南和 ADR 保持可识别的名称，不为纯风格重命名全部文件。
-大版本原文归 History，活跃入口保持稳定；历史记录的日期属于证据身份，不用于制造最新版分叉。
-
-## 架构文档的覆盖
-
-| arc42 关注面 | 本仓库落点 |
-|---|---|
-| 目标、约束、上下文 | Target baseline §1–3；Current 01–03 |
-| 构件与依赖 | Target §2–11；Current 04；Implementation 各 owner |
-| 运行场景 | Target §13；Current 05；Implementation 实际链路 |
-| 部署与跨切面 | Target §12/14；Current 06/08；Reference 数据/制品 |
-| 决策、质量、术语 | ADR；Current 01/09；重构验收矩阵 |
-| 风险与技术债 | 对应 initiative 的 risks.md；产品当前限制链接对应实现页 |
-
-完整覆盖不意味着文档声明自动为真。Source/Schema/构建与真实环境证据分别支撑对应层次。
-
-## 工作项生命周期
-
-一个长期工作只有一个 `roadmap/initiatives/<id>/` 目录：
-入口说明范围；计划定义依赖与验收；execution.json 保存机器可核验的阶段/任务状态；
-status.md 是生成视图；slices 保存可执行任务契约；evidence 保存固定输入的验证结果；
-migration-map 只记录现有到目标动作；risks 记录未关闭风险及关闭条件。
-
-`roadmap/now.md` 只选定当前主线并链接状态，不抄阶段状态。
-已完成切片的稳定事实同步 Current/Implementation/Reference；证据归档到 History 时更新索引，
-但任务 ID 与接受结论保持可追溯。未完成的外部环境验收仍保留为风险或任务，不能一起标记完成。
-状态生成与验证按[执行指南](../guides/development/architecture-refactoring.md)操作。
-
-## 本次迁移
-
-| 原位置 | 当前位置及处理 |
-|---|---|
-| architecture/blueprint 的版本化主文/树/JSON/lock | architecture/target 下 baseline、physical-layout、files、baseline.lock |
-| Blueprint 中的执行宪章 | governance/architecture-change-policy.md |
-| Blueprint 中的 Codex Prompt | architecture-v2 initiative 的 requirements.md；通用步骤进入 Guide |
-| Current 11 迁移地图 | architecture-v2 initiative 的 migration-map.md |
-| roadmap 单文件执行记录 | 原文逐字节保留在 history/architecture-v2；有效状态进入 execution.json |
-| roadmap 中已完成 M08/09/10/12/13 | history/milestones，未验范围仍由活跃风险跟踪 |
-| 未完成 M11、物理清单与设计资产 | roadmap/initiatives/m11-delivery，保持验收状态 |
-| 根文档维护规范、智能体工作流设计 | governance，Skill 引用新入口 |
-
-旧路径引用已随移动重算。历史整份执行快照保留原始链接文本与语境，由归档索引说明原位置和来源 Git；
-它不参与活跃链接门，也不能被当作当前指令。
-
-## 维护与验证
-
-运行 `pnpm check:docs --write` 重建文档树及执行状态视图，再运行 `pnpm check:docs`。
-该检查验证活跃链接/入口、文档清单与实物、任务依赖/状态及生成视图；不检查远端网页和历史正文，
-不把测试报告文字当成真实测试结果。新增路径后还要重建目标树和受控摘要，见架构变更宪章。

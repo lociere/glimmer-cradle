@@ -1,0 +1,4 @@
+interface:
+  display_name: "微光摇篮 · 界面工程"
+  short_description: "设计与验证微光摇篮产品界面、交互、React 状态与可访问性"
+  default_prompt: "使用 $glimmer-ui 完成本次范围内的工作，按实际成果验证并说明未验项。"

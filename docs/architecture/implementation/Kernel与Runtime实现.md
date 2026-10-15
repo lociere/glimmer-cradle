@@ -58,8 +58,13 @@
 
 ## Runtime module 实现规则
 
-通用 RuntimeModule 与生命周期协调已由 [Platform](./Platform原语实现.md) 拥有；
+通用 RuntimeModule 与生命周期协调已由 [Platform](Platform原语实现.md) 拥有；
 阶段由 composition 显式配置，Coordinator 不自动进行依赖排序。
+
+当前 composition 的 phase 顺序是 `foundation → transport → application → presentation → core-readiness`，
+然后可选 `execution-results`，开放 Ingress，再启动 `extensions → organism → recovery-ingress`。
+`coreReadiness` 由 Cognition 和配置启用时的 Audio 组成；开放输入不承诺所有 Extension、Avatar 或 provider 均已 ready。
+各非必需能力仍独立投影等待/降级。phase 名来自 `kernel-application.ts`，不是下面模块概念分组的别名。
 
 当前 runtime module 位于 `core/kernel/src/runtime/modules/`，包括 foundation、transport、application、surface、cognition、capability、extension、organism 等。每个 module 应实现同一组语义：
 
@@ -113,6 +118,11 @@ Cognition outbound action/reply/status
 ```
 
 `ActionStreamManager` 和 `visual-command-dispatcher.ts` 把认知行动投影到频道、桌面和身体。音频、Avatar、Desktop、Scene、Skill Plane 都是 capability adapter；它们不能反向改写 Cognition 的语义事实。`ApplicationRuntime` 会用 `SkillActionController` 覆盖 `ACTION_COMMAND` 处理器：`reply` 仍规范化为 `ChannelReplyEvent`，`skill_request` 则进入 Skill Plane 编排、工具调用和 Cognition synthesis 闭环。
+
+当前产品 Kernel 由 `adapters/cognition/cognition-process-adapter.ts` 的 `CognitionManager` 管进程，
+`kernel-cognition-transport.ts` 管 challenge/proof、generation/PID 校验与注册能力撤销。
+迁移中 `apps/host/src/supervision/worker-supervisor.ts` 另有 Worker 监督/认证实现；必须按实际 composition 区分消费者，
+不能把 Host 局部能力写成默认产品已经切换，也不能只列 client adapter 充当认证 owner。
 
 `CognitionManager` 先调用 Cognition Service `Shutdown`，确认后等待自然退出；协议停机超时才进入强制回收。Kernel 直接监督虚拟环境内的 Python 进程，不把 `uv` 启动外壳当成 Cognition PID。启动时 Kernel 经 FD 3 匿名 pipe 单次交付 generation、动态 control endpoint、nonce 和 capability secret；Cognition 的 HMAC proof 绑定上述 challenge、实际 Service PID 与受监督子进程 PID。注册成功或校验失败后两端都会清零/作废 secret；Python 入口解码后只短暂持有可覆写 `bytearray`，不把原始 secret 字符串保留在 Host 生命周期。Windows 的 venv launcher 与解释器 PID 可不同，因此监督树关系与已认证 proof 共同校验，绝不把自报 PID 单独当身份。Windows 通过根 PID 回收进程树，POSIX 通过独立进程组回收。
 
@@ -170,13 +180,13 @@ Catalog 只说明能力可被发现；Policy 决定是否允许；Gateway 才能
 
 `runtime/modules/extension-runtime.ts` 不再只返回一个笼统的 `extension_host=ready`。它在 `ExtensionManager.startAllExtensions()` 之后调用 `getReadinessSnapshots()`，把 Host 当前维护的 `ExtensionRuntimeProjection` 统一折叠为 `RuntimeReadinessSnapshot[]`：`extension.host` 是聚合 runtime，`extension.<extension-id>` 是逐扩展 runtime，`reconciler.resources` 来自 Capability Graph 节点，缺失 package / sidecar / bridge 会直接体现为 `missing`、`degraded` 或 `failed`。这样 Lifecycle Orchestrator、Ingress 和 Desktop 读取的是同一条 runtime readiness 主线，而不是额外拼一份 Extension 专用状态。
 
-`LifecycleOrchestrator` 和具体 Adapter 只持有 `RuntimeProjectionInputPort`，把 runtime facts 统一提交给 `application/projection/runtime-readiness-projection.ts`；Runtime/Adapter 不 import 该 concrete mapper。这个 mapper 是 Kernel runtime readiness catalog 的唯一 store mutation：Cognition、Audio、Avatar、Extension Host 等模块的 readiness 快照都在这里按 `runtime_id` 收口，Desktop 与 Personal Server 不再从启动日志、页面局部探测或本地文件侧推运行状态。`KernelTransportRuntime` 还将 Ingress Gate 投影为 blocking 的 `kernel.ingress`，只在 required runtime 完成后切换为 `ready`。Personal Server 通过长连接观察该 catalog；断连即撤销 `/readyz`，不缓存陈旧 ready。Audio 采用 `audio.host -> audio.tts/audio.asr -> providers`：Kernel 只把 Audio Engine 返回的路线和节点健康折叠为 readiness；云端连接、模型目录、fallback 和熔断由 Engine owner 判断。
+`LifecycleOrchestrator` 和具体 Adapter 只持有 `RuntimeProjectionInputPort`，把 runtime facts 统一提交给 `application/projection/runtime-readiness-projection.ts`；Runtime/Adapter 不 import 该 concrete mapper。这个 mapper 是 Kernel runtime readiness catalog 的唯一 store mutation：Cognition、Audio、Avatar、Extension Host 等模块的 readiness 快照都在这里按 `runtime_id` 收口，Desktop 与 Personal Server 不再从启动日志、页面局部探测或本地文件侧推运行状态。`KernelTransportRuntime` 还将 Ingress Gate 投影为 blocking 的 `kernel.ingress`，只在当前 core readiness 门满足并开放 Ingress 后切换为 `ready`；不是全部可选能力的 ready 聚合。Personal Server 通过长连接观察该 catalog；断连即撤销 `/readyz`，不缓存陈旧 ready。Audio 采用 `audio.host -> audio.tts/audio.asr -> providers`：Kernel 只把 Audio Engine 返回的路线和节点健康折叠为 readiness；云端连接、模型目录、fallback 和熔断由 Engine owner 判断。
 
 `avatar-runtime` 的 `avatar.host` 不再只在模块启动时写一次 catalog。`adapters/avatar/UnityAvatarHostProcess` 会把受管进程状态变化推给 `AvatarController`，后者在 `connected / host_hello / host_ready / heartbeat_timeout / disconnect / process exit` 各阶段都经 `RuntimeProjectionInputPort` 覆写 `avatar-runtime` 快照。这样 Desktop 诊断看到的 `avatar.host.reconciler.actual` 会随着 `waiting-manual-launch -> connected-waiting-ready-gates -> connected-first-frame-presented` 实时变化，而不是停留在启动瞬间的陈旧状态。
 
 `adapters/endpoints/endpoint-registry.ts` 是内部地址唯一目录。Kernel Control Service、Surface Gateway 和 Avatar Host Service 先绑定动态回环 gRPC 端点，取得真实地址后发布 `cognition-rpc`、`control-surface`、`avatar-host`。目录位于 `data/run/host/endpoints.json`，包含 Kernel PID 与 generation；安装态 Desktop 通过 `GLIMMER_CRADLE_LAUNCH_SESSION` 将该 generation 绑定到本次受管启动，其他启动保留随机 generation。Desktop main、Personal Server、开发启动器和 Unity 只接受存活 owner 的本代回环端点。Kernel 启动 UnityAvatarHost 时另注入随机进程级令牌，`AvatarHostService.Connect` 缺失或错误令牌即以 `PERMISSION_DENIED` 失败。Kernel Control Service 地址与 generation 由 Kernel 直接注入 Cognition 子进程；Cognition Service 亦绑定 `127.0.0.1:0` 并通过受监注册回传，不经磁盘发现。
 
-`capability-runtime` 不再等待 Audio model warmup 后才返回。它先配置 AudioService，再把资源准备作为有 owner 的后台任务运行，并持续覆写 readiness 与 Desktop audio status；停机由 AudioService 统一取消和回收 lane。composition root 在 Cognition 与必要传输完成后开放 Ingress，Extension activation 和 Organism 启动不再决定直接文本对话能否开始。
+Audio adapter 的资源准备使用独立后台任务，不把所有 lane warmup 串成一条全局等待。它先配置 AudioService，再把资源准备作为有 owner 的后台任务运行，并持续覆写 readiness 与 Desktop audio status；停机由 AudioService 统一取消和回收 lane。composition root 在 Cognition 与必要传输完成后开放 Ingress，Extension activation 和 Organism 启动不再决定直接文本对话能否开始。
 同一条 `avatar.host.reconciler` 现在也承载 Avatar Package 相关资源投影：Kernel 从 `hosts/unity-avatar-host/Assets/StreamingAssets/avatar-package-registry.json` 与 `hosts/unity-avatar-host/avatar-sdk-catalog.json` 读取 Host owner 的 Registry/SDK catalog，并将受管 Host 可执行产物、工作目录和按 Avatar Package 反推的 `avatar.sdk.*` Unity SDK 导入状态并入 `resources`。已删除的 `core/avatar/unity-host/` 不再是 resolver fallback。这样“缺 Avatar Package Registry / 缺 UnityAvatarHost.exe / Cubism SDK 只准备未导入”属于正式 runtime reconciler 事实，而不是 Desktop 专用的第二套判断。
 
 `application-runtime` 当前还负责把由 Composition 创建的 `adapters/skill-plane/mcp-server/McpServerSkillProvider` 接入同一 catalog：启动时返回 provider readiness 作为初始快照，后续连接状态变化经 `RuntimeProjectionInputPort` 继续覆写 `application` 模块的 runtime snapshots。这样 Control Center 诊断页看到的是正式 lifecycle 主线里的 `mcp.host` / `mcp.<server-id>`，而不是只看 Skill catalog 的 provider runtime 文案。

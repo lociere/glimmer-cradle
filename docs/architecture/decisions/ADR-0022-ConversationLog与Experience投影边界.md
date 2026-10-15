@@ -53,4 +53,4 @@ Moment 应落哪一份。直接把 `conversations.db` 升为事实源则会丢�
 - [Architecture Baseline v2.0](../../history/architecture-v2.0/Glimmer_Cradle_Architecture_Baseline_v2.0_Frozen.md)
 - [重构执行记录](../../roadmap/initiatives/architecture-v2/README.md)
 - [Conversation 实现](../implementation/Conversation实现.md)
-- [ADR-0008](./ADR-0008-ExperienceLedger与版本化Memory.md)
+- [ADR-0008](ADR-0008-ExperienceLedger与版本化Memory.md)

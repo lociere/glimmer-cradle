@@ -29,7 +29,7 @@ Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legac
 由 CLI 和 composition 显式校验，需要重启，不读取角色 Memory YAML 或环境变量覆盖。
 外部选择在 Memory schema 6 中持久绑定，未完成旧任务拒绝转交，外部绑定拒绝回退；
 这不是 Jobs 政策 Document，也不代表产品 Host 已切换。机制与临时窗口见
-[Worker 实现](../architecture/implementation/Cognition认知核实现.md#记忆经历与持久化) 和
+[Worker 实现](../architecture/implementation/CognitionMemory与Knowledge实现.md#记忆经历与持久化) 和
 [执行记录](../roadmap/initiatives/architecture-v2/README.md)。
 
 ## 变更规则
@@ -97,7 +97,7 @@ Renderer 直接写配置权限；Control Center 编辑、审批 UI、热更新�
 同 graph 的内容通知仅在原接纳和双 grant 仍有效、来源仍匹配时驱动重新采集，不补发或续期。
 定义替换/移除、撤权或刷新失败保持拒绝；重新授权须由明确 App collect 或配置重启进入既有
 审批校验。没有新增刷新配置、计时器或持久通知保证，机制与状态语义见
-[Knowledge 实现](../architecture/implementation/Cognition认知核实现.md#knowledge-来源与持久化)。
+[Knowledge 实现](../architecture/implementation/CognitionMemory与Knowledge实现.md#knowledge-来源与持久化)。
 
 - 新配置必须有 Schema 或显式 normalizer，并说明默认来源。
 - 一个配置键只有一个写入 owner；其他 runtime 只能消费投影。
@@ -287,7 +287,7 @@ Execution；provider 停止后原方法引用失效。原生 Step/Loop 接线状
 
 ## 环境变量边界
 
-环境变量用于部署覆盖、密钥注入或本地调试，不应替代普通配置事实源。音频密钥使用 `DASHSCOPE_API_KEY`；进程级超时可用 `GLIMMER_CRADLE_AUDIO_TTS_TIMEOUT_MS`、`GLIMMER_CRADLE_AUDIO_ASR_TIMEOUT_MS` 覆盖；FunASR 的本机缓存调试方式见 [音频引擎开发指南](../guides/subsystems/音频引擎开发.md)。
+环境变量用于部署覆盖、密钥注入或本地调试，不应替代普通配置事实源。音频密钥使用 `DASHSCOPE_API_KEY`；进程级超时可用 `GLIMMER_CRADLE_AUDIO_TTS_TIMEOUT_MS`、`GLIMMER_CRADLE_AUDIO_ASR_TIMEOUT_MS` 覆盖；FunASR 的本机缓存调试方式见 [音频引擎开发指南](../how-to/音频引擎开发.md)。
 
 ## 验证
 
@@ -297,4 +297,4 @@ Execution；provider 停止后原方法引用失效。原生 Step/Loop 接线状
 - Control Center 保存设置后能显示保存中、成功、失败、需要重启和校验错误。
 - `rg` 搜索旧键、旧路径和旧默认值无运行时残留。
 
-操作指南见 [功能开发与缺陷修复](../guides/development/功能开发与缺陷修复.md) 和 [数据迁移与恢复](../guides/operations/数据迁移与恢复.md)。
+操作指南见 [功能开发与缺陷修复](../how-to/功能开发与缺陷修复.md) 和 [数据迁移与恢复](../how-to/数据迁移与恢复.md)。

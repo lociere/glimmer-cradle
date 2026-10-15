@@ -16,7 +16,7 @@
 
 planned 任务直接使用主任务书对应章节作为任务卡，先执行既定文件核对动作，填 mapping/commands，
 明确真实消费者与数据恢复后进入 implementation。无需为每项任务另起 discovery 或重新设计；未知 API 仍须查实际入口。
-准备门/实施/失败恢复/状态推进只在[通用指南](../../../guides/development/architecture-refactoring.md)维护。
+准备门/实施/失败恢复/状态推进只在[通用指南](../../../how-to/执行架构切片.md)维护。
 
 ## 阶段目录
 

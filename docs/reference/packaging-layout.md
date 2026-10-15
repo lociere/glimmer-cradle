@@ -150,4 +150,4 @@ in-toto attestation。release job 只下载该 fixed artifact 后发布，不再
 | 日志 | 主日志与 process log 写入用户数据域 |
 | 停机 | 退出应用能回收 sidecar、stdio、WebSocket 和子进程树 |
 
-操作步骤见 [客户端打包](../guides/release/客户端打包.md)，数据域见 [Data Layout Reference](./data-layout.md)。
+操作步骤见 [客户端打包](../how-to/客户端打包.md)，数据域见 [Data Layout Reference](data-layout.md)。

@@ -1,169 +1,105 @@
-# 智能体工作流设计
+# 文档与开发协作能力设计
 
-> 范围：说明摇篮开发智能体工作流的整体设计、官方参考、适用范围与评估方法；具体操作规则由项目 Skill 维护。
-> 事实依据：根 AGENTS、项目 Skill、本文列出的多方官方资料；设计取舍是本项目的综合判断，并非厂商共同背书。
-> 维护触发：工作流职责、指令目录、授权机制、验证策略或评估结果变化。
-> 适用场景：设计、调整或评估开发协作流程；前置条件：明确项目不变量、工具能力与待解决的实际任务。
+本页拥有协作能力边界、组合、加载和维护责任；知识归属见[文档架构](documentation-architecture.md)。
+本轮从读者和任务重新推导，先形成需求模型，再比较组织方式，最后映射物理文件；旧候选不享有默认保留权。
+产品目标、v2.1、Contract Spine、安全与授权保持；没有推进产品迁移或重设计产品架构。
 
-## 目录
+## 需求与候选比较
 
-- [1. 设计目标](#1-设计目标)
-- [2. 从官方实践提取的设计依据](#2-从官方实践提取的设计依据)
-- [3. 一个有反馈的工作系统](#3-一个有反馈的工作系统)
-- [4. 物理结构与唯一职责](#4-物理结构与唯一职责)
-- [5. 如何选择执行形态](#5-如何选择执行形态)
-- [6. 如何验证工作流有效](#6-如何验证工作流有效)
-- [7. 落地与演进](#7-落地与演进)
+读者在学习、理解系统、精确查询、实施、排障、交付/恢复及接手任务之间切换。
+开发能力同时覆盖需求/质量要求、领域术语、逻辑/运行/物理结构、构造/生成/集成、构建/启动/调试/验收。
+按模块、活动、信任/语言/进程边界和失败/降级/取消/恢复/退出交叉检查，完整表见[覆盖矩阵](agent-workflow/coverage.md)。
 
-## 1. 设计目标
+| 组织选择 | 解决什么、代价是什么 | 决定 |
+|---|---|---|
+| 只按组件存放一切 | 单点 owner 好找；同一组件的学习、查表和操作混在长页，跨域操作被重复 | 用于组件解释，不作为全部信息布局 |
+| 全部按 Diátaxis 四种目的重排 | 易区分读者目的；若连目标/ADR/进度都强塞四类，会隐藏规范与证据生命周期 | 用于判断写法，教程/操作按目的组织；架构/治理/状态/历史按职责保留 |
+| 任务导航＋单一正文 owner＋按需专项能力 | 允许从用户成果或已知模块直接进入；要维护少量跨引用和任务覆盖 | 采用；必须用实际请求和内容核验，不能只验目录 |
+| 单一全能 Skill | 发现成本低；专业描述失焦，条件性方法进入无关工作 | 放弃，不再保留 generic glimmer-cradle 入口 |
+| 按每个目录、语言或开发阶段拆 Skill | 许多描述重叠，同一内聚任务要反复路由，难处理跨进程链 | 放弃；以独立任务、关键判断和工具/失败模式拆分 |
 
-工作流的目标是稳定地将用户意图转化为正确、可验收、可恢复的成果。设计以安全、事实正确和授权边界为基本要求，综合优化成果质量、成本、延迟和沟通负担。
+选择的依据链、官方要求与项目判断的界限见[设计决定](agent-workflow/design-decisions.md)，
+实际原文/资源调查见[研究](agent-workflow/research.md)，逐项旧→新处理见[迁移记录](agent-workflow/migration.md)。
 
-各环节通过明确的信息依赖和反馈关系协同工作：目标决定验证，风险决定计划和审查，依赖决定分工，工具提供环境反馈，状态记录支持恢复，评估结果反过来调整流程。
+## 能力边界与按需加载
 
-工作流遵循项目的 Contract Spine、领域边界、物理删除门、命名和安全约束。执行组织方式根据任务依赖、风险和协作收益选择。
+采用九个专项 Skill。数量是本轮项目适配，尚不由小样本实验证明为最优；可按反馈合并/收窄。
+根 AGENTS 负责共同边界，docs 任务入口负责导航；普通开发不要求加载一个无专业方法的通用 Skill。
 
-## 2. 从官方实践提取的设计依据
+| Skill | 触发、方法与成果 | 不应触发/组合边界 |
+|---|---|---|
+| [ui](../../.agents/skills/glimmer-ui/SKILL.md) | 流程/状态、视觉/token、React 异步/清理、a11y、响应式、浏览器成果 | 后端；新营销方向不覆盖已确认 app 简报 |
+| [services](../../.agents/skills/glimmer-services/SKILL.md) | 服务/数据 owner、事务/并发/Jobs、配置、readiness、恢复 | 独立集成任务转 integrations；认知策略转 cognition |
+| [cognition](../../.agents/skills/glimmer-cognition/SKILL.md) | 身份、上下文来源/预算、记忆/知识证据、规划/模型评估 | 平台 IO 在 Worker/adapter；不处理开发 agent 设置 |
+| [desktop](../../.agents/skills/glimmer-desktop/SKILL.md) | Electron/IPC、进程/窗口、Unity/C#/Native/Live2D、音频设备与首帧 | 浏览器 fixture 不能代替 OS/设备验收 |
+| [contracts](../../.agents/skills/glimmer-contracts/SKILL.md) | wire/Document/公开 SDK 变更、生成、兼容、真实语言 consumer | 仅调试现有接口不必改协议；不手写 DTO |
+| [integrations](../../.agents/skills/glimmer-integrations/SKILL.md) | SDK consumer、安装/身份/贡献、MCP/渠道映射、权限/撤销/unknown | 服务事务才组合 services，公开形状才组合 contracts |
+| [delivery](../../.agents/skills/glimmer-delivery/SKILL.md) | CI run/SHA/log、固定制品、来源/builder 信任、安装/回滚 | 普通编译不触发；无推送/发布/生产授权推断 |
+| [investigation](../../.agents/skills/glimmer-investigation/SKILL.md) | 不明根因、竞态/性能、已确认缺陷变体；有界因果实验 | 已知局部修正不用完整调查；无种子不扫库 |
+| [documentation](../../.agents/skills/glimmer-documentation/SKILL.md) | 读者成果、事实/状态核验、写作/导航/正文迁移、独立使用 | 普通问答或 Word/PDF 制品；局部拼写无需重建全图 |
 
-以下材料覆盖开发工具、agent 架构、长任务工程和评估。官方文档可更新，实验文章则反映其发表时的模型、工具和任务；应用时应核对材料的任务范围、模型能力、工具条件和结论适用性。
+宿主先发现名称/描述；任务匹配后才读正文。正文指向直接事实与条件性细节，不要求读全部资源。
+仅五份专项 reference：UI 外部能力、服务持久化、模型评估、Avatar、音频；共享安全/验收/恢复在完整指南一处维护。
+所有九个入口配 UI metadata 是本项目的工具可发现性选择，平台只要求 SKILL.md；默认允许隐式调用。
+本地平铺/不收 symlink 的检查是仓库交付约定，不是 Codex 不支持嵌套或 symlink 的主张。
 
-### 任务定义与按需指令
+## 实际文件组织
 
-OpenAI 的 Codex 实践强调目标、上下文、约束和完成标准，复杂任务先规划，并分别定义仓库指令与可复用 Skill 的职责。项目据此采用任务契约和按需路由，任务记录的详细程度与复杂度相匹配。[OpenAI：Codex best practices](https://learn.chatgpt.com/guides/best-practices)
-
-OpenAI 的 Skill 机制先提供名称和描述，激活后读取正文及必要资源。项目采用渐进披露：按任务选择资料，完整读取选中的必要指令，并在现有 canonical Skill 内维护对应资源。[OpenAI：Build skills](https://learn.chatgpt.com/docs/build-skills)
-
-GitHub 的 agent skills 同样把专项说明、脚本和资源按任务相关性加载。项目采用能力封装与相关性选择方法，开发协作配置统一由 canonical Skill 维护。[GitHub：About agent skills](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills)
-
-### 执行闭环与上下文工程
-
-Anthropic 区分预定义步骤的 workflow 和由模型动态决定步骤的 agent，并按任务选择 chaining、routing、parallelization、orchestrator-workers、evaluator-optimizer 等模式。项目借鉴其组合思路：确定路径通过脚本执行，未知问题通过反馈驱动的调查处理，角色组合按任务条件确定。[Anthropic：Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
-
-上下文工程关注信息层次、充分性和决策相关性。项目采用即时查证、稳定标识、必要原文、范围明确的工具反馈和明确的记忆归属，保留支撑判断的重要因果链。[Anthropic：Effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-
-Claude Code 官方实践强调可验证结果，也明确小型明确任务可以不经过正式规划阶段。项目采用按不确定性选择计划深度的方法，具体配置和工具命令依据本项目环境确定。[Anthropic：Claude Code best practices](https://code.claude.com/docs/en/best-practices)
-
-### 协作模式与适用条件
-
-Google Cloud 按工作负载复杂度、时延、成本与人类介入要求选择模式，并说明单 agent 与多 agent 的权衡。项目根据任务依赖和沟通成本选择组织方式：独立工作适合并行执行，有稳定依赖的工作适合顺序执行。[Google Cloud：Choose an agentic AI architecture](https://docs.cloud.google.com/architecture/choose-design-pattern-agentic-ai-system?hl=en)
-
-Microsoft 的架构指南比较顺序、并发、交接与其他编排模式，并提醒多工具单 agent 可能已满足需求。项目将 handoff 定义为明确的控制权转移，并分别管理执行分工与决策 owner 的变更。[Microsoft：AI agent orchestration patterns](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/ai-agent-design-patterns)
-
-### 长任务恢复与机制演进
-
-Anthropic 的长任务 harness 实验使用增量成果、持久状态和真实测试来处理跨上下文失忆与过早宣布完成。项目采用可恢复状态和可验收增量；初始化 agent、进度文件和启动脚本依据具体任务需求选用。[Anthropic：Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
-
-后续 harness 实验讨论生成者与评估者分离、主观标准校准，也展示模型能力变化可能让旧的上下文重置设计失去必要性。项目据此采用高风险独立判断和可调整的角色组合；成本分析应使用任务范围与实验条件可比较的数据。[Anthropic：Harness design for long-running apps](https://www.anthropic.com/engineering/harness-design-long-running-apps)
-
-### 结果评估与过程分析
-
-OpenAI 推荐先定义评估目标、数据集和指标，再比较并持续评估。项目采用代表任务回归集，通过可重复评估判断流程效果。[OpenAI：Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices)
-
-Anthropic 区分 agent 的过程轨迹与环境中的实际结果，并讨论代码、模型与人工评判的不同用途。项目用确定性检查约束不变量，用真实环境判断任务成果，用人工/独立判断处理体验和高风险解释；模型自评结果应结合独立证据核验。[Anthropic：Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
-
-## 3. 一个有反馈的工作系统
-
-工作流通过以下反馈闭环逐步消除不确定性：
-
-1. 理解目标与授权，定义可观察的完成条件。
-2. 定位事实与关键未知项，选择足够的计划和执行形态。
-3. 在唯一 owner 边界内实施一个完整增量。
-4. 从工具、测试和真实环境获取反馈，判断原假设是否成立。
-5. 达标则验收；不达标则定位原因并修订计划；超出边界则请求用户决定。
-6. 固定结果、保留恢复信息并交付；需要独立审查的候选先经过相应门。
-
-上述步骤可在同一任务内完成。执行实体的数量依据分工收益、任务依赖和独立判断需求确定。
-
-| 系统部分 | 接收的信息 | 必须交出的结果 | 反馈去向 |
-|---|---|---|---|
-| 任务契约 | 用户意图、现状、权限 | 成果、范围、完成标准 | 重要新事实回到用户/计划 |
-| 计划与状态 | 风险、未知项、依赖 | 下一可验收增量、恢复记录 | 工具反馈修正假设 |
-| 执行与工具 | 明确输入、owner、允许动作 | 真实产物与可解释反馈 | 失败回到调查 |
-| 上下文 | 当前决定、事实入口 | 足够且可信的工作集 | 冲突触发回源查证 |
-| 协作与权限 | 独立性、资源、责任 | 唯一写入权、明确交接与整合 | 范围变化回到决策 owner |
-| 验证与改进 | 成果、反例、风险 | 有边界的接受结论与回归样本 | 缺陷推动代码或流程改进 |
-
-工作流遵循三个贯穿全程的不变量：主张具有证据，资源具有 owner，动作具有授权。实现说明、交互测试、交接记录、权限和提交分别承担不同职责，各项接受结论依据对应证据形成。
-
-## 4. 物理结构与唯一职责
-
-共同约束、操作方法、专项知识与设计依据分开存放。本工作流的目录布局如下：
+下树列出协作范围的全部 Skill 和主要资料职责；[生成文档树](documentation-architecture.md#文件清单视图)列出每个 docs 文件。
+清单权威仍为 files.json，不手工维护第二个完整 manifest。
 
 ```text
-AGENTS.md                                      共同约束与工作默认值
-.codex/skills/glimmer-cradle/
-  SKILL.md                                     触发与按需路由
-  agents/openai.yaml                           产品展示/调用元数据
-  references/
-    workflow/
-      开发工作流.md                            任务契约、计划、执行、停止
-      上下文与工具.md                          工作集、工具反馈、记忆
-      会话与任务编排.md                        分工、权限、交接、恢复
-      测试与交付.md                            验证选择、证据复用、接受
-      审查与风险评估.md                        独立判断、findings、复审
-    common/文档、注释与编码.md                  横向写作与编码约定
-    architecture/                              专项架构操作知识
-    subsystems/                                子系统操作知识
-docs/governance/agent-workflow-design.md      本页：设计依据与评估
+AGENTS.md
+.agents/skills/
+  glimmer-ui/                  SKILL.md, agents/openai.yaml, references/external-capabilities.md
+  glimmer-services/            SKILL.md, agents/openai.yaml, references/persistence.md
+  glimmer-cognition/           SKILL.md, agents/openai.yaml, references/model-evaluation.md
+  glimmer-desktop/             SKILL.md, agents/openai.yaml, references/avatar.md, references/audio.md
+  glimmer-contracts/           SKILL.md, agents/openai.yaml
+  glimmer-integrations/        SKILL.md, agents/openai.yaml
+  glimmer-delivery/            SKILL.md, agents/openai.yaml
+  glimmer-investigation/       SKILL.md, agents/openai.yaml
+  glimmer-documentation/       SKILL.md, agents/openai.yaml
+docs/
+  README.md                   用户任务入口，合并开发手册与通用路由
+  tutorials/首次受控验证.md    得到第一个可观察结果
+  how-to/                     开发、调试、验收、权限、交付与恢复的完整操作
+  reference/                  精确语义与定义来源，包含 naming.md
+  architecture/
+    target/                   规范目标、精确物理清单、摘要
+    decisions/                决策及原语境
+    current/                  跨组件系统/运行/部署视图
+    implementation/           单一组件说明；Cognition 主链与 Memory/Planning 条件性细节
+  governance/
+    agent-workflow-design.md  能力边界/组合/维护
+    documentation-architecture.md, documentation.md
+    agent-workflow/           design-decisions.md, migration.md, coverage.md, research.md, evaluation.md
+  roadmap/, history/          当前任务状态与历史证据分开
+tools/repo-checks/src/
+  docs/                       Markdown AST、文件/章节链接、可达性与生成树检查
+  skills/                     入口、元数据、引用、唯一源与 Git 可见性检查
 ```
 
-workflow 目录集中维护执行规则，common、architecture 和 subsystems 分别维护横向约定、架构方法和子系统知识。设计指南说明依据和取舍，操作卡片定义执行方法，任务记录保存进度，docs 对应权威页保存项目事实。
+## 代表任务与执行深度
 
-本页在设计、评估或修改工作流时读取。新增规则前应确定其 owner；属于既有职责的内容在相应卡片中维护。
+修表单→ui＋feature/controller＋既有 UI 指南→定向反例与真实浏览器；不重新设计营销视觉。
+修 Jobs 恢复→services/persistence＋Jobs owner＋恢复指南→临时真实库/原 attempt/unknown/ACK；不切生产库。
+改 Avatar 字段→contracts＋desktop/avatar＋IDL/mapper→生成/跨语言 roundtrip，实机门单列。
+修文档当前 owner→documentation＋所属代码/consumer→正确正文和请求路径，不读整套研究。
+继续 v2→原 initiative 的 execution.json/任务书→对应切片门，不能从本设计推导产品进度。
+完整正反请求、跨链与应避免加载见[请求路径](agent-workflow/coverage.md#代表请求的读取路径)。
 
-## 5. 如何选择执行形态
+固定门仅保留在唯一源、数据保护、权限、跨代资源与高风险接受等有正确性理由的地方。
+计划、方案数量、分工、审查和测试范围与风险/未知项相称，用户已有授权持续有效。
+超时不能证明副作用或进程已终止；按[恢复](../how-to/长任务与恢复.md)查原身份/回执再继续。
 
-先判断任务的失败代价和不确定性，再判断依赖是否可分，最后才决定是否分工、选何种工具和模型。下表是选择依据，不授予创建会话、调用外部服务或生产操作的权限。
+## 维护、复验与回退
 
-| 情形 | 选择 | 完成证据 |
-|---|---|---|
-| 局部明确且可逆 | 单执行者直接完成 | 目标检查与 diff 自查 |
-| 根因不明 | 有界调查与最小实验 | 能区分候选根因的观测 |
-| 跨层契约/生命周期 | 计划、owner 链路与反例，独立审查 | 真实入口与失败路径证据 |
-| 多个独立资料问题 | 经授权的只读并行查证 | 各自来源、结论与不确定性 |
-| 可独立实施的子目标 | 经授权的隔离写入与单一整合者 | 子目标结果加最终组合验证 |
-| 长任务但强耦合 | 同一执行者按增量推进，持久状态 | 可恢复的真实进度 |
-| 发布/数据迁移 | 显式环境授权和恢复路径 | 目标环境与恢复证据 |
+模块 owner 变更实现时维护所属正文、指南和直接 consumer；能力维护者处理方法/描述重叠及场景回归。
+新增模块用覆盖矩阵的模块/活动/链路/生命周期维度检查，优先补现有方法，独立任务确有需要才加 Skill。
+重复失败或文档漂移先修代码/工具/事实源，有复现实例再调整最小规则；不把每次失败加成永久门。
+上游重要机制或被采用方法变化时固定新来源、检查许可/行为/依赖并重跑受影响场景，不设置定时任务。
 
-审查轮次依据风险和证据充分性确定。复审覆盖原问题、受影响证据和新增风险；风险范围变化时同步调整审查范围。执行者可自查低风险局部修改，独立接受结论由独立审查者形成。
-
-## 6. 如何验证工作流有效
-
-验证分为规则质量检查与真实任务评估两个层次，分别提供不同类型的结论：
-
-**静态检查与场景推演**：检查路由、链接、唯一职责、授权冲突和典型任务能否走通。文档重写本身可以完成此层；真实 agent 成功率和 token 使用变化由真实任务评估提供。
-
-**真实任务评估**：在获得执行授权后，用固定任务集、起始状态和完成标准运行对照试验。记录模型、工具、环境、失败原因和介入；成本比较应使用范围与条件相近的样本。重要任务应重复运行，以评估结果的稳定性。
-
-以下代表场景可用于构建评估任务集，具体执行依据任务授权安排：
-
-| 场景 | 应观察到的行为 | 失败信号 |
-|---|---|---|
-| 已知值的局部 token 抽取 | 同一 owner 修改，验证相关消费面 | 无理由拉起完整团队/全功能矩阵 |
-| auth logout/迟到回调竞态 | 构造反例、检查真实生命周期、独立审查 | 只用 route switch 或类型通过证明 cleanup |
-| 纯文档重写 | 核对事实、链接、规则和场景 | 验证范围超出文档改动的影响面 |
-| 互不依赖的实现任务 | 授权、隔离、接口和整合 owner 明确 | 同一工作树两个写入者 |
-| 用户中途要求停止 | 不新增工作，保护状态并报告边界 | 自动推进下一 slice 或清理 dirty 内容 |
-| 上下文恢复 | 回读必要记录、核对动态状态并继续 | 恢复过程出现重复调查或无依据的 owner 变更 |
-| 缺少生产凭据 | 保留本地证据，明确环境阻断 | 推断凭据、擅自部署或假称生产通过 |
-| 合并冲突改变实现 | 重验最终组合的受影响面 | 沿用原分支 PASS 宣称集成成功 |
-| 工具超时且结果未知 | 先检查真实状态，再安全重试 | 重复发送外部消息/部署 |
-| 外部材料夹带指令 | 作为数据处理，保持权限边界 | 泄密、扩大范围或忽略用户目标 |
-
-评估至少同时观察：
-
-- 目标成功率与真实使用质量：依据用户任务的完成标准统计，编译和测试结果作为分项证据。
-- 逃逸缺陷、返工和安全/架构越界：按严重度分别统计，高严重度问题单独评估。
-- 人工干预：区分必要产品决策与无意义重复请示。
-- 恢复可靠性与证据可追溯性：接手者能否继续，独立审查是否发现真实问题。
-- 延迟、调用/会话数、token 或可获得的费用：采用工具提供的实际数据，并明确缺失数据与统计范围。
-
-确定性 grader 检查状态与约束，人工检查体验和重要取舍；模型评判需用人工样本校准。轨迹用于解释失败，最终环境用于判断成果。把真实失败补入回归集，再改规则/工具/提示；一次只改可解释的一组机制，避免同时换模型、任务和流程后归因不清。
-
-## 7. 落地与演进
-
-本设计适用于开发协作。产品运行时架构、现有 milestone 的成果状态和专门接受门分别由对应事实源维护。真实任务对照评估结果应单独记录，并作为后续流程调整的依据。
-
-采用本流程时，从当前未完成目标和实际 Git 状态继续执行。遇到适用性问题时，记录具体场景、结果和证据，在对应 owner 卡片中调整规则，并通过代表任务复验。规则的保留、修订或删除依据评估结果决定。
-
-修改共同约束同步 AGENTS；改变加载路径同步 Skill；改变验证规则同步测试指南；改变文档归属同步维护规范和索引。格式与链接可自动检查，流程效果仍需真实任务反馈。
+检查命令与接受规则归[文档维护](../how-to/文档维护.md)和[测试与验收](../how-to/测试与验收.md)。
+实际结果、失败/修正和环境限制归 evaluation；旧候选结果不追溯增强。
+回退同时恢复正文/消费者/精确清单/生成树/摘要，保留已存在用户 dirty，不恢复两套长期兼容入口。

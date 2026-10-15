@@ -78,7 +78,7 @@ Global Workspace 广播是易失的当前意识焦点。自动广播、循环 ti
 
 ## 链接
 
-- Architecture：[Kernel 与 Runtime 当前视图](../current/07-子系统当前视图/Kernel与Runtime.md)
-- Architecture：[Cognition 当前视图](../current/07-子系统当前视图/Cognition.md)
+- Architecture：[Kernel 与 Runtime 当前视图](../implementation/Kernel与Runtime实现.md)
+- Architecture：[Cognition 当前视图](../implementation/Cognition认知核实现.md)
 - Implementation：[Cognition 认知核实现](../implementation/Cognition认知核实现.md)
 - Reference：[Protocol Reference](../../reference/protocol.md)

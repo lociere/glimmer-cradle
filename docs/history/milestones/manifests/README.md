@@ -1,6 +1,6 @@
 # Roadmap 目标物理清单
 
-> 范围：索引受 [文档维护规范](../../../governance/documentation.md#完成态物理目录门) 约束的 milestone/slice target manifest 与 Change Authorization Inventory；不保存稳定 Blueprint/Current 目录树。
+> 范围：索引历史 milestone/slice target manifest 与 Change Authorization Inventory，保留形成时的路径、动作及删除门；当前文件迁移遵循 [架构变更宪章](../../../governance/architecture-change-policy.md#文件清单规则)。本目录不保存稳定 Blueprint/Current 目录树。
 > 事实依据：对应 milestone、[目标物理拓扑](../../architecture-v1/目标物理拓扑.md)、
 > [当前物理拓扑](../../../architecture/current/10-当前物理拓扑.md)。
 > 维护触发：新可执行 milestone/slice、target path、owner、动作、授权范围或删除门变化。

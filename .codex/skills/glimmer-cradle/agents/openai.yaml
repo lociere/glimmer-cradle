@@ -1,7 +1,0 @@
-interface:
-  display_name: "Glimmer Cradle 开发"
-  short_description: "围绕用户成果，按微光摇篮事实源与风险闭环开发、验证和交付"
-  default_prompt: "使用 $glimmer-cradle，确定目标与完成证据，按需读取事实源，完成本次任务并报告验证和剩余限制。"
-
-policy:
-  allow_implicit_invocation: true

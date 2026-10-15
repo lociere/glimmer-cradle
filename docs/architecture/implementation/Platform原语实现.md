@@ -156,7 +156,7 @@ Host `adapters/platform/authority-store.ts` 在 SQLite IMMEDIATE 事务中更新
 authority 缺失/落后于既有 Jobs，或新租约未领先 Jobs 序列时拒绝启动，不靠重复获取 epoch
 绕过恢复门。phase active 仅表示租约已持有，不表示 Jobs/整个产品 ready。
 目标 Host 已通过 `HostCognitionJobsOwner` 接通真实 Worker 监督与本地持久 Jobs 生命周期，见
-[Cognition 实现](./Cognition认知核实现.md#记忆经历与持久化)；当前验证使用临时库，没有替换产品默认
+[Cognition 实现](CognitionMemory与Knowledge实现.md#记忆经历与持久化)；当前验证使用临时库，没有替换产品默认
 启动入口。`ConfiguredHostCognitionJobsOwner` 使用 Platform validator 校验唯一配置，通过
 `HostDataPaths` 接目标 authority/Jobs 路径并持有数据库，恢复预检先于 Worker 外部绑定；
 精确配置与持久边界分别见[配置参考](../../reference/configuration.md#目标-host-与-jobs-配置)、

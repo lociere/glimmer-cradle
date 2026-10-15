@@ -114,7 +114,7 @@ glimmer-cradle/data/
 app.getPath("userData")/data/
 ```
 
-安装目录只放只读资源与组件投影，完整结构见 [客户端安装形态](./客户端安装形态.md)。用户配置、模型、本地托管包和月见连续性数据进入用户数据目录，升级时不覆盖。
+安装目录只放只读资源与组件投影，完整结构见 [客户端安装形态](客户端安装形态.md)。用户配置、模型、本地托管包和月见连续性数据进入用户数据目录，升级时不覆盖。
 
 月见自身的 Kernel、Cognition、Engine、Composition Host 与 Unity Worker 构建结果不属于 `data/`。当前 `data/packages/avatar-shell/windows/` 是迁移期间的事实路径；目标构建流为 `out/` 中转、`dist/` 交付、安装时进入 `resources/components/avatar-shell/`。
 

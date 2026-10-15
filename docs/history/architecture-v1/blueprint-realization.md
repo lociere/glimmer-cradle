@@ -124,8 +124,8 @@ Roadmap 不是事实仓库；它只描述路线和承诺。
 | Phase 6：反思、记忆图谱与叙事日记 | `done` | 建立 Reflection、Memory Graph 与 Narrative Journal 主线。 | `architecture/current/`、`reference/data-layout.md` | [阶段6 ADR](../architecture-decisions/阶段6-反思与记忆图谱设计.md)。 |
 | Phase 7：自主输出通路 | `done` | ActionCommand、自主输出、旧 ChatUseCase 退出主路径。 | `architecture/current/`、`implementation/` | [阶段7 ADR](../architecture-decisions/阶段7-自主输出通路设计.md)。 |
 | Phase 8：桌面身体、Skill Plane 与 Extension 收口 | `recent-done` | Renderer / Shell / Extension / Skill Plane 形成开发期闭环。 | `architecture/current/`、`implementation/`、`reference/extension-sdk.md` | [M08](../../roadmap/milestones/M08-SkillPlane、Extension与桌面体验收口.md)、[阶段8 ADR](../architecture-decisions/阶段8-渲染层架构分析与重构.md)。 |
-| Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../../architecture/current/07-子系统当前视图/Cognition.md)、[Extension 与 Skill Plane 当前视图](../../architecture/current/07-子系统当前视图/Extension与SkillPlane.md)、[extension-sdk](../../reference/extension-sdk.md) | [M09](../../roadmap/milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
-| Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../../reference/packaging-layout.md)、[Personal Server 部署](../../guides/release/Personal%20Server部署.md) | [M10](../../roadmap/milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
+| Phase 9：主体可用性、跨场景记忆与体验收口 | `done` | 让开发期闭环成为具备跨场景连续性、真实 Skill 和可解释体验的可用主体。 | [Cognition 当前视图](../../architecture/implementation/Cognition认知核实现.md)、[Extension 与 Skill Plane 当前视图](../../architecture/implementation/Extension与SkillPlane实现.md)、[extension-sdk](../../reference/extension-sdk.md) | [M09](../../roadmap/milestones/M09-主体可用性、跨场景记忆与体验收口.md)。 |
+| Phase 10：发布形态、安装投影与数据迁移闭环 | `done` | Personal Server 已形成可安装、可更新、可回滚、可恢复的正式发行主链。 | [packaging-layout](../../reference/packaging-layout.md)、[Personal Server 部署](../../how-to/Personal%20Server部署.md) | [M10](../../roadmap/milestones/M10-发布形态、安装投影与数据迁移闭环.md)。 |
 | Phase 11：Personal Server 控制面与跨产品 Extension 闭环 | `in-progress` | 让服务器配置、运维、Extension 管理和 QQ 场景 Adapter 形成远程产品闭环；前端架构与视觉前置已完成，准备进入实现，整体里程碑仍未完成。 | [Product Compositions](../../reference/product-compositions.md)、[UI Design Tokens](../../reference/ui-design-tokens.md)、未来配置与 Extension Reference | [M11](../../roadmap/milestones/M11-Personal%20Server控制面、区域分发与跨产品Extension闭环.md)、[M11 manifest](../../roadmap/manifests/M11-目标物理清单.md)、[ADR-0017](../../architecture/decisions/ADR-0017-产品前端统一采用React组件驱动架构.md)。 |
 | Phase 12：契约脊柱与跨进程服务架构重建 | `done` | Slice 1～9 已完成 Contract Spine、typed Surface、owner-local projection 与 legacy `protocol/` 物理删除。 | Blueprint、Current/Implementation/Reference | [M12](../../roadmap/milestones/M12-契约脊柱与跨进程服务架构重建.md)、[M12 manifest](../../roadmap/manifests/M12-目标物理清单.md)、[ADR-0013](../../architecture/decisions/ADR-0013-契约脊柱与跨进程服务架构.md)、[ADR-0014](../../architecture/decisions/ADR-0014-仓库物理分层与器官模块边界.md)。 |
 | Phase 13：工程自动化脊柱与交付生命周期闭环 | `done` | A～F 与 ADR-0016 最终仓库工具收口已完成；真实 Docker/Ubuntu/Windows installer/签名/发布仍为环境风险。 | Current/Implementation/Reference/Guide | [M13](../../roadmap/milestones/M13-工程自动化脊柱与交付生命周期闭环.md)、[M13 manifest](../../roadmap/manifests/M13-目标物理清单.md)、[ADR-0015](../../architecture/decisions/ADR-0015-工程自动化平面与交付生命周期分层.md)、[ADR-0016](../../architecture/decisions/ADR-0016-仓库工具工作区与产品监督边界.md)。 |
@@ -190,7 +190,7 @@ Phase 2 是蓝图中“当前角色是一个连续主体”的基础。如果记
 | 主问题 | 多进程、多语言系统必须能解释失败、延迟、丢信和状态漂移。 |
 | 核心成果 | 建立日志、指标、追踪、事件 ID、DLQ 与排障入口。 |
 | 非范围 | 不追求完整 APM 平台，不把 observability 做成业务语义存储。 |
-| 当前事实归属 | [observability](../../reference/observability.md)、[日志、Trace与DLQ排障](../../guides/operations/日志、Trace与DLQ排障.md)。 |
+| 当前事实归属 | [observability](../../reference/observability.md)、[日志、Trace与DLQ排障](../../how-to/日志、Trace与DLQ排障.md)。 |
 | 历史证据 | [阶段3-遥测设计](../architecture-decisions/阶段3-遥测设计.md)。 |
 | 完成门 | 关键链路可关联；失败可以定位到进程、协议、provider 或数据层；DLQ 有处理路径。 |
 
@@ -232,7 +232,7 @@ Phase 5 是当前角色从“应用”走向“主体”的关键阶段。后续
 | 主问题 | 跨语言、跨进程结构必须有唯一权威定义，禁止手写镜像和漂移。 |
 | 核心成果 | 当时由 `protocol/src/schemas/` 统一 Schema 与 TypeScript/Python 投影；M12 已迁至 Contract Spine。 |
 | 非范围 | 不改变业务语义本身，不把生成物当作人工维护文件。 |
-| 当前事实归属 | [protocol reference](../../reference/protocol.md)、[开发手册](../../guides/开发手册.md)。 |
+| 当前事实归属 | [protocol reference](../../reference/protocol.md)、[开发手册](../../README.md)。 |
 | 历史证据 | [阶段P-Protocol契约层重构](../architecture-decisions/阶段P-Protocol契约层重构.md)。 |
 | 完成门 | 历史完成门为同步旧生成物；当前契约变更统一运行 `pnpm contracts:generate` 与 `pnpm contracts:verify`。 |
 
@@ -246,7 +246,7 @@ Protocol 阶段是后续所有能力平面、Extension、Provider 和 Renderer �
 | 主问题 | TypeScript workspace、Python 包、生成链和路径引用必须自洽，否则协议正确也无法稳定开发。 |
 | 核心成果 | 包管理、生成命令、开发命令、路径约定和同步流程收敛。 |
 | 非范围 | 不解决所有运行时功能，不替代发布打包策略。 |
-| 当前事实归属 | [开发手册](../../guides/开发手册.md)、[Implementation Map](../../architecture/implementation/README.md)。 |
+| 当前事实归属 | [开发手册](../../README.md)、[Implementation Map](../../architecture/implementation/README.md)。 |
 | 历史证据 | [阶段P9-契约层与包管理自洽化重构](../architecture-decisions/阶段P9-契约层与包管理自洽化重构.md)。 |
 | 完成门 | 新开发者可以按文档安装、生成、检查和构建；协议同步不依赖个人机器隐式状态。 |
 
@@ -290,7 +290,7 @@ Phase 7 把“意图”接入系统动作，但仍必须维持安全边界。任
 | 主问题 | 当前角色需要一个可感知、可互动、可扩展的桌面身体，而不是只有内部认知循环。 |
 | 核心成果 | Renderer / Shell / Extension Host / Skill Plane / Extension SDK 形成开发期闭环；Extension 的定位从“插件杂项”收敛为受控能力与内容生态。 |
 | 非范围 | 不把 Extension 变成第二套 Kernel；不承诺发布安装矩阵已经完成；不把所有平台适配都放进本阶段。 |
-| 当前事实归属 | [Current Architecture](../../architecture/current/README.md)、[Implementation Map](../../architecture/implementation/README.md)、[extension-sdk](../../reference/extension-sdk.md)、[开发手册](../../guides/开发手册.md)。 |
+| 当前事实归属 | [Current Architecture](../../architecture/current/README.md)、[Implementation Map](../../architecture/implementation/README.md)、[extension-sdk](../../reference/extension-sdk.md)、[开发手册](../../README.md)。 |
 | 历史证据 | [M08](../../roadmap/milestones/M08-SkillPlane、Extension与桌面体验收口.md)、[阶段8-渲染层架构分析与重构](../architecture-decisions/阶段8-渲染层架构分析与重构.md)。 |
 | 完成门 | Extension 通过声明式清单、能力边界、Skill Plane 网关和 Renderer 投影接入；桌面体验可以展示当前角色的身体、状态和受控交互；相关文档完成迁移。 |
 

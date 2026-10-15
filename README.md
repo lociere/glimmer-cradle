@@ -42,7 +42,7 @@ curl -fsSL https://github.com/lociere/glimmer-cradle/releases/latest/download/gl
 ssh -N -L 8080:127.0.0.1:8080 <user>@<server>
 ```
 
-随后打开 `http://127.0.0.1:8080/`。配置位于 `/etc/glimmer-cradle/`，用户配置、记忆、经历、扩展包和可观测数据位于 `/var/lib/glimmer-cradle/`。域名、HTTPS、阿里云 OSS/ACR 镜像和更新恢复说明见 [Personal Server 部署指南](docs/guides/release/Personal%20Server部署.md)。
+随后打开 `http://127.0.0.1:8080/`。配置位于 `/etc/glimmer-cradle/`，用户配置、记忆、经历、扩展包和可观测数据位于 `/var/lib/glimmer-cradle/`。域名、HTTPS、阿里云 OSS/ACR 镜像和更新恢复说明见 [Personal Server 部署指南](docs/how-to/Personal%20Server部署.md)。
 
 ### Desktop
 
@@ -121,11 +121,11 @@ pnpm typecheck
 pnpm build
 ```
 
-涉及 UI、Avatar、Audio、Extension、生命周期、协议或数据迁移时，还必须运行对应专项验证。完整要求见 [开发手册](docs/guides/开发手册.md)。
+涉及 UI、Avatar、Audio、Extension、生命周期、协议或数据迁移时，还必须运行对应专项验证。完整要求见 [开发手册](docs/README.md)。
 
 ## Extension 生态
 
-Extension 使用 [Extension SDK](packages/extension-sdk/) 和 [基础模板](templates/extension-basic/) 开发。标准 `.gcex` 包携带 Extension Manifest、全量 SHA-256 摘要与 SPDX 2.3 SBOM，可从审核 Registry、发布者仓库 Release、Release Manifest 或本地包进入同一套 prepare、preview、commit 安装事务。
+Extension 使用 [Extension SDK](packages/extension-sdk) 和 [基础模板](templates/extension-basic) 开发。标准 `.gcex` 包携带 Extension Manifest、全量 SHA-256 摘要与 SPDX 2.3 SBOM，可从审核 Registry、发布者仓库 Release、Release Manifest 或本地包进入同一套 prepare、preview、commit 安装事务。
 
 安装后的不可变版本进入 `data/packages/extensions/<extension-id>/<version>/`，由 `configs/extensions/active.yaml` 精确选择。多个版本可以并存，版本切换必须显式完成，主程序不从扩展源码仓库直接加载。
 
@@ -169,7 +169,7 @@ templates/    Extension 等开发模板
 - [当前架构](docs/architecture/current/README.md)：现有系统结构和边界。
 - [实现地图](docs/architecture/implementation/README.md)：代码入口、组装和运行链路。
 - [Reference](docs/reference/README.md)：协议、配置、数据、SDK 与打包的精确事实。
-- [开发与运维指南](docs/guides/README.md)：开发、测试、发布和排障步骤。
+- [开发与运维指南](docs/how-to/README.md)：开发、测试、发布和排障步骤。
 - [路线图](docs/roadmap/README.md)：当前承诺、候选事项和验收门。
 
 ## 许可证

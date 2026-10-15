@@ -15,6 +15,12 @@
 - [调试入口](#调试入口)
 - [验证](#验证)
 
+## 身体、窗口与展示边界
+
+Character Profile 拥有身份、persona、声音与 Avatar 资产选择；Avatar 表达身体状态，Surface 是展示/交互窗口，
+Native Composition 提供平台合成原语。控制面预览图不等于正式身体渲染，Presence 等待/降级也不能替代 Unity first-frame ready。
+Desktop 进程树 authority 与 Native Avatar 窗口隔离是不同 owner，下面分别追踪；组件/Schema 存在不证明当前设备已构建可用。
+
 ## Electron Desktop 入口
 
 | 入口 | 职责 |
@@ -188,4 +194,4 @@ pnpm avatar:build
 ```
 
 窗口、托盘、透明、DPI、多显示器、Unity 首帧、音频播放和打包版路径不能只靠 typecheck 验证。
-2026-07-05 实机启动记录显示：`connected -> host_hello -> 首帧 ready -> host_ready` 顺序已成立，且未再出现 `first_frame_presented=false` 的 `host_ready` 误报。
+以下仅为有日期的历史证据，未在本轮重跑 Unity/设备，不能覆盖当前候选或任意机器：2026-07-05 实机启动记录显示：`connected -> host_hello -> 首帧 ready -> host_ready` 顺序已成立，且未再出现 `first_frame_presented=false` 的 `host_ready` 误报。
