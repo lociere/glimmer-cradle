@@ -23,6 +23,11 @@
 
 `configs/system/identity.yaml` 必须显式提供 `character.active_id` 和 `character.profile_root`。Kernel 启动不会创建缺失的系统配置、Character Package 文件或目录，也不会回退到某个内置角色；当前选择的角色包缺少 manifest、persona、dialogue、safety、inference、provider 或知识索引时，启动应明确失败。开发仓库的受版本控制模板以及未来安装器负责初始配置投影。
 
+当前 Kernel ConfigManager 的 init/reload 共享单一在途加载。新候选完成全部配置装配、
+校验与深冻结后才一次替换已接纳快照；加载中和失败时原快照持续可读，嵌套对象也不可修改。
+此为运行时快照原子接纳，不表示多文件保存或运行中能力重启已经构成同一事务；
+effect 与重启仍由 ConfigApplicationService 拥有。
+
 发行版本不是配置。当前产品版本只由不可变的 `products/<id>/product.json` 提供，Kernel 用它校验 Extension 的 `engines.glimmerCradle`；`identity.yaml` 不保存 `app_version`，升级也不需要改写用户配置。
 
 Cognition Worker 的受监督装配参数 `--memory-jobs-owner` 仅接受 `legacy`（现行默认）或 `external`，

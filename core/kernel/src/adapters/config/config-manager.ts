@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'yaml';
+import { freezeConfiguration } from '@glimmer-cradle/platform';
 import { EXTENSION_ID_PATTERN, EXTENSION_VERSION_PATTERN } from '@glimmer-cradle/extension-sdk';
 import { ErrorCode } from '../../domain/error-code';
 import type { KnowledgeBaseConfig, KnowledgeIndexConfig } from './documents';
@@ -52,10 +53,10 @@ interface AudioSecretsLike {
 export class ConfigManager {
   private static _instance: ConfigManager | null = null;
 
-  private _config: GlobalConfig | null = null;
+  private _config: Readonly<GlobalConfig> | null = null;
   private _configDir = resolveConfigDir();
-  private _isInitialized = false;
-  private _isFrozen = false;
+  private loading: Promise<void> | undefined;
+  private freezeLogged = false;
 
   public static get instance(): ConfigManager {
     if (!ConfigManager._instance) {
@@ -66,19 +67,40 @@ export class ConfigManager {
 
   private constructor() {}
 
-  public async init(): Promise<void> {
-    if (this._isInitialized) {
-      logger.warn('配置管理器已初始化，跳过重复初始化');
-      return;
+  public init(): Promise<void> {
+    if (this.loading) return this.loading;
+    if (this._config) {
+      try { logger.warn('配置管理器已初始化，跳过重复初始化'); return Promise.resolve(); }
+      catch (error) { return Promise.reject(error); }
     }
+    return this.loadAndPublish();
+  }
 
-    logger.info('开始初始化配置管理器', { config_dir: this._configDir });
+  public reloadConfig(): Promise<void> { return this.loadAndPublish(); }
 
-    if (!(await fs.pathExists(this._configDir))) {
-      throw new CoreException(`配置目录不存在: ${this._configDir}`, ErrorCode.CONFIG_ERROR);
-    }
+  private loadAndPublish(): Promise<void> {
+    if (this.loading) return this.loading;
+    // 先安装单一加载 owner；重入与并发调用加入同一候选，读取者继续消费已接纳快照。
+    const loading = Promise.resolve().then(async () => {
+      const candidate = freezeConfiguration(await this.loadCandidate());
+      logger.info('配置管理器加载完成', {
+        app_name: candidate.system.identity.app_name,
+        active_character: candidate.system.character.active_id,
+      });
+      this._config = candidate;
+    });
+    this.loading = loading;
+    void loading.then(() => { if (this.loading === loading) this.loading = undefined; },
+      () => { if (this.loading === loading) this.loading = undefined; });
+    return loading;
+  }
 
+  private async loadCandidate(): Promise<GlobalConfig> {
+    logger.info('开始加载配置候选', { config_dir: this._configDir });
     try {
+      if (!(await fs.pathExists(this._configDir))) {
+        throw new CoreException(`配置目录不存在: ${this._configDir}`, ErrorCode.CONFIG_ERROR);
+      }
       // 阶段 P.4b：ajv 校验 + 填默认值（原地修改 data）
       // 1. YAML null 归一（observability.module_levels 等）
       const systemData = await this.loadSystemConfigData();
@@ -141,75 +163,36 @@ export class ConfigManager {
         this.validateSection('LLMConfig', characterData.llm);
       }
 
-      this._config = {
+      return {
         system: systemData as unknown as GlobalConfig['system'],
         character: characterData as unknown as GlobalConfig['character'],
       };
-      this._isInitialized = true;
-
-      logger.info('配置管理器初始化完成', {
-        app_name: this._config.system.identity.app_name,
-        active_character: activeCharacter.id,
-      });
     } catch (error) {
-      logger.error('配置管理器初始化失败', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      try {
+        logger.error('配置候选加载失败，保留已接纳配置', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } catch (diagnosticError) { throw new AggregateError([error, diagnosticError], '配置候选及诊断失败'); }
       throw error;
     }
   }
 
   public getConfig(): Readonly<GlobalConfig> {
-    if (!this._isInitialized || !this._config) {
+    if (!this._config) {
       throw new CoreException('配置管理器未初始化', ErrorCode.CONFIG_ERROR);
     }
-    return Object.freeze(this._config);
+    return this._config;
   }
 
   public freezeCoreConfig(): void {
-    if (this._isFrozen) {
-      return;
-    }
     if (!this._config) {
       throw new CoreException('配置尚未加载，无法冻结', ErrorCode.CONFIG_ERROR);
     }
 
-    Object.freeze(this._config.character);
-    Object.freeze(this._config.character.manifest);
-    Object.freeze(this._config.character.profile);
-    Object.freeze(this._config.character.dialogue);
-    Object.freeze(this._config.character.safety);
-    Object.freeze(this._config.character.inference);
-    Object.freeze(this._config.character.voice);
-    this._isFrozen = true;
-
+    // 现有启动 consumer 仍调用此入口；所有实际冻结已在原子发布前完成。
+    if (this.freezeLogged) return;
     logger.info('核心配置已冻结，运行时不再允许修改');
-  }
-
-  public async reloadConfig(): Promise<void> {
-    logger.info('开始重载配置文件');
-    const backup = this._config;
-    const wasFrozen = this._isFrozen;
-
-    this._config = null;
-    this._isInitialized = false;
-    this._isFrozen = false;
-
-    try {
-      await this.init();
-      if (wasFrozen) {
-        this.freezeCoreConfig();
-      }
-      logger.info('配置重载完成');
-    } catch (error) {
-      this._config = backup;
-      this._isInitialized = backup !== null;
-      this._isFrozen = wasFrozen;
-      logger.error('配置重载失败，已回滚到旧配置', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
+    this.freezeLogged = true;
   }
 
   public async loadKnowledgeBaseConfig(): Promise<KnowledgeBaseConfig> {

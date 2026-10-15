@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：早期生命周期预算及迟到actual startup错误单元已完成：唯一Lifecycle Schema默认值覆盖AppStarting/foundation/early stop，实际配置ready后扣总elapsed；Platform StartRun结果保留至公开等待或drain消费，原owner只回收一次。Platform lifecycle30/public API3、Kernel App31及两包类型通过，2最小反例旧产物失败后修复，独立只读接受；docs/encoding/architecture/diff与target-layout specification-only通过。基于9ecaf581保存本地中文提交，前序配置b885debb；无push、后台测试或外部阻断，单一writer /root。下一动作：ConfigManager reload先清空快照导致并发读取失败，改为独立候选完成后原子替换、失败保留原快照与合并并发加载；核对秘密解析诊断再完成日志/trace/redaction/health与全物理目录。P02整体、根集中源码和最终安装/平台/设备/恢复门未接受。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A配置原子快照单元完成：ConfigManager独占候选、并发init/reload同Promise、加载或失败中旧快照持续可读，完整校验/secret注入/Platform深冻结后一次接纳；旧flag/置空rollback/部分冻结删除，freezeCoreConfig消费者保留到P12B。3最小反例原实现FAIL后修复，Kernel6+12+31=49/Platform9与两包类型build按输入通过，独立只读检查真实消费者接受；docs/encoding/architecture/diff通过。基于d66f0663保存相关本地中文提交，无push、后台测试或外部阻断，单一writer /root。下一动作：ConfigManager四处YAML解析诊断可能携带secret片段，补固定marker失败反例，在App解析边界受控错误替换原文，不改变既有可选secret fallback与必需配置失败策略；然后日志/trace/redaction/health及完整物理清单。整体P02与最终源码/安装平台设备恢复门未接受。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

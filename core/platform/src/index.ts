@@ -30,7 +30,7 @@ export type {
 export { LifecycleCallbackGuard, LifecycleCoordinator } from './lifecycle/supervisor.js';
 export { ConfigurationValidator } from './configuration/schema.js';
 export type { ConfigurationValidation } from './configuration/schema.js';
-export { loadConfiguration } from './configuration/config-loader.js';
+export { loadConfiguration, freezeConfiguration } from './configuration/config-loader.js';
 export type { ConfigurationLoadOptions } from './configuration/config-loader.js';
 export { configurationRevision } from './configuration/config-revision.js';
 export { AuthorityConflictError, isAuthorityCurrent, validateAuthorityLease, validateAuthorityWindow } from './topology/authority-lease.js';

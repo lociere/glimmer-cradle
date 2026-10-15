@@ -141,7 +141,12 @@ YAML 唯一键/alias 限制、owner 之间约束及创建库前验证，不回�
 深冻结/解码与 Platform 旧配置 index 已 consumer-zero 删除，子路径直接落在 schema。
 `config-revision.ts` 保留有序 JSON 字节和换行分隔的 SHA-256；Kernel 仍选择原来的六份
 文档与 secret providers 投影并取前16位，串行更新、dry-run、冲突检查与重启策略留 App。
-这只覆盖加载机制及当前重读，不表示运行中配置热更新或早期启动预算已经完成。
+`freezeConfiguration` 供App转交组合后的独占候选，复用同一深冻结实现。当前Kernel
+ConfigManager在私有候选上完成各Document默认值、secret注入与校验，再冻结并一次替换
+已接纳指针。并发init/reload加入同一个实际加载；在途与失败期间旧快照持续可读，
+失败不再清空后回滚。候选与诊断同时失败保留两项错误。旧freezeCoreConfig调用入口
+仍由原启动consumer使用到P12B，实际部分冻结逻辑已删除，所有快照在发布前冻结。
+此处只接受当前配置读取/快照机制，Host运行中effect/重启策略仍由App控制。
 
 ## Authority 与受控转移
 
