@@ -7,13 +7,15 @@ import path from 'node:path';
 import os from 'node:os';
 import { create } from '@bufbuild/protobuf';
 import { PublishStateResponseSchema } from '@glimmer-cradle/contracts/glimmer/kernel/v1/kernel_control_service_pb';
+import { HostJobControlRoutes } from '../src/gateway/control-routes.js';
 
 it('Host 暴露实际 App 装配/adapter，而不暴露 Kernel 内部或底层 DB connection', () => {
   expect(Object.keys(api).sort()).toEqual(['CognitionClient', 'CognitionJobAdapter', 'HostCognitionError', 'HostJobsController',
     'HostJobsOwner', 'HostCognitionJobsOwner', 'ConfiguredHostCognitionJobsOwner', 'WorkerSupervisor', 'SqliteAuthorityStore',
-    'HostDataPaths', 'HostConfigurationError', 'HostConversationRoutes', 'loadHostCognitionJobsConfiguration',
+    'HostDataPaths', 'HostConfigurationError', 'HostConversationRoutes', 'HostJobControlRoutes', 'loadHostCognitionJobsConfiguration',
     'MEMORY_JOB_KIND', 'memoryJobEvidence', 'memoryJobIdentity', 'memoryJobRequest',
     'PermissionBroker', 'HostResourceContributions', 'HostKnowledgeController', 'HostCapabilityRequestError'].sort());
+  expect(api.HostJobControlRoutes).toBe(HostJobControlRoutes);
 });
 
 function configPaths() {
@@ -64,6 +66,19 @@ it('配置从唯一 Schema 填默认值并冻结；根显式分离，loader 不�
   expect(paths.authority_database).toBe(path.join(paths.data_root, 'state/platform/authority.sqlite'));
   expect(existsSync(paths.data_root)).toBe(false); expect(existsSync(paths.app_root)).toBe(false);
   expect(() => new api.HostDataPaths({ app_root: '.', config_root: '.', data_root: '.' })).toThrow('绝对路径');
+});
+it('配置重读失败不改变已接纳快照；修复同一源后读取新值，无默认回落或旧值突变', () => {
+  const paths = configPaths();
+  const previous = api.loadHostCognitionJobsConfiguration(paths);
+  writeFileSync(paths.jobs_config, 'scheduler: { batch_size: fixture-private-secret }', 'utf8');
+  expect(() => api.loadHostCognitionJobsConfiguration(paths)).toThrow(api.HostConfigurationError);
+  expect(previous.jobs.batch_size).toBe(8);
+  writeFileSync(paths.jobs_config, 'scheduler: { batch_size: 9 }', 'utf8');
+  const next = api.loadHostCognitionJobsConfiguration(paths);
+  expect(next.jobs.batch_size).toBe(9);
+  expect(previous.jobs.batch_size).toBe(8);
+  expect(Object.isFrozen(next.memory_document.consolidation)).toBe(true);
+  expect(existsSync(paths.data_root)).toBe(false);
 });
 it.each([
   ['jobs', { scheduler: { poll_interval_ms: 0 } }], ['jobs', { scheduler: { poll_interval_ms: 2147483648 } }],

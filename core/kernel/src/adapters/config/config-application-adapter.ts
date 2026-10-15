@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { configurationRevision } from '@glimmer-cradle/platform';
 import fs from 'fs-extra';
 import path from 'node:path';
 import type { GlobalConfig } from './config-schema';
@@ -724,19 +725,7 @@ function validateOrThrow<T>(schemaName: 'LLMConfig' | 'AudioConfig' | 'Embedding
 }
 
 function computeRevision(bundle: Pick<ConfigDocumentBundle, 'llm' | 'secrets' | 'audio' | 'embedding' | 'memory' | 'skills'>): string {
-  const digest = createHash('sha256');
-  digest.update(JSON.stringify(bundle.llm));
-  digest.update('\n');
-  digest.update(JSON.stringify(bundle.secrets.providers ?? {}));
-  digest.update('\n');
-  digest.update(JSON.stringify(bundle.audio));
-  digest.update('\n');
-  digest.update(JSON.stringify(bundle.embedding));
-  digest.update('\n');
-  digest.update(JSON.stringify(bundle.memory));
-  digest.update('\n');
-  digest.update(JSON.stringify(bundle.skills));
-  return digest.digest('hex').slice(0, 16);
+  return configurationRevision([bundle.llm, bundle.secrets.providers ?? {}, bundle.audio, bundle.embedding, bundle.memory, bundle.skills]).slice(0, 16);
 }
 
 function summarizeChanges(

@@ -1,7 +1,6 @@
 import { openSync, closeSync, readSync } from 'node:fs';
-import { TextDecoder } from 'node:util';
 import { parseDocument } from 'yaml';
-import { ConfigurationValidator } from '@glimmer-cradle/platform/configuration';
+import { ConfigurationValidator, loadConfiguration } from '@glimmer-cradle/platform';
 import { retryDelay } from '@glimmer-cradle/jobs';
 import JobsConfig from '@glimmer-cradle/contracts/json-schema/config/v1/jobs-config.schema.json';
 import HostConfig from '@glimmer-cradle/contracts/json-schema/config/v1/host-config.schema.json';
@@ -33,14 +32,14 @@ function document(file: string, owner: HostConfigurationError['owner'], schema: 
     const buffer = Buffer.alloc(1_048_577);
     try { while (size < buffer.length) { const count = readSync(fd, buffer, size, buffer.length - size, null); if (!count) break; size += count; } }
     finally { closeSync(fd); }
-    if (size > 1_048_576) throw new Error('配置超过读取上限');
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, size));
-    if (text.startsWith('\uFEFF')) throw new Error('配置包含 BOM');
-    const parsed = parseDocument(text, { uniqueKeys: true });
-    if (parsed.errors.length) throw new Error('配置 YAML 无效');
-    const value: unknown = parsed.toJS({ maxAliasCount: 100 });
-    if (!validator.validate(schema, value).ok) throw new Error('配置 Schema 无效');
-    return value as Record<string, unknown>;
+    return loadConfiguration<Record<string, unknown>, 'JobsConfig' | 'HostConfig' | 'MemoryConfig'>(buffer.subarray(0, size), {
+      schema, validator, maxBytes: 1_048_576,
+      parse: text => {
+        const parsed = parseDocument(text, { uniqueKeys: true });
+        if (parsed.errors.length) throw new Error('配置 YAML 无效');
+        return parsed.toJS({ maxAliasCount: 100 });
+      },
+    });
   } catch { throw new HostConfigurationError(owner); }
 }
 export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCognitionJobsConfiguration {
@@ -57,9 +56,7 @@ export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCo
       || cognition.request_timeout_ms > cognition.startup_timeout_ms) throw new HostConfigurationError('host');
     const debounce = consolidation.debounce_seconds * 1000;
     if (!Number.isSafeInteger(debounce) || debounce < 0) throw new HostConfigurationError('memory');
-    freezeDocument(memory);
     try { validateHostKnowledgeApprovals(approvals); } catch { throw new HostConfigurationError('host'); }
-    freezeDocument(approvals);
     return Object.freeze({
       jobs: Object.freeze({ poll_interval_ms: scheduler.poll_interval_ms, batch_size: scheduler.batch_size,
         lease_ms: scheduler.lease_ms, terminal_retention_ms: retention.terminal_ms,
@@ -72,7 +69,4 @@ export function loadHostCognitionJobsConfiguration(paths: HostDataPaths): HostCo
       knowledge_approvals: approvals,
     });
   } catch (error) { if (error instanceof HostConfigurationError) throw error; throw new HostConfigurationError('jobs'); }
-}
-function freezeDocument(value: unknown): void {
-  if (value && typeof value === 'object') { for (const child of Object.values(value)) freezeDocument(child); Object.freeze(value); }
 }

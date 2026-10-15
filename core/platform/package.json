@@ -12,9 +12,9 @@
   ],
   "exports": {
     "./configuration": {
-      "types": "./dist/configuration/index.d.ts",
-      "require": "./dist/configuration/index.js",
-      "default": "./dist/configuration/index.js"
+      "types": "./dist/configuration/schema.d.ts",
+      "require": "./dist/configuration/schema.js",
+      "default": "./dist/configuration/schema.js"
     },
     ".": {
       "types": "./dist/index.d.ts",
@@ -48,7 +48,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts tests/lifecycle-drain.test.ts tests/public-api.test.ts tests/windows-process-tree.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc --ignoreConfig --noEmit --target ES2022 --module Node16 --strict --skipLibCheck --types node tests/authority-fencing.test.ts tests/lifecycle-drain.test.ts tests/public-api.test.ts tests/windows-process-tree.test.ts tests/config-reload.test.ts",
     "build": "tsc -p tsconfig.json",
     "test": "pnpm run build && pnpm run build:native && node --test tests/*.test.mjs tests/*.test.ts",
     "build:native": "node native/build.mjs"

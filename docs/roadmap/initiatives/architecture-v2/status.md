@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：Cognition启动取消与受管准备单元已完成：首await接纳、generation fence、uv/identity共用startupProcess、迟到restart/recovery与诊断异常保留回收；unit24 PASS，实际Worker4项、最新注册/取消2项及增强ESRCH1项按输入范围复用，Kernel typecheck PASS；独立只读发现observer覆盖Native错误已修并补原Job重试，最后微差复审接受。文档/架构/编码/diff核对通过，保存相关本地中文提交，不推送。上一预算单元e7cd7b0d。下一动作：继续Platform config-loader/schema/config-revision真实消费链，解决foundation/AppStarting配置前预算；然后日志/trace/redaction/health及完整物理落位。P02A仍in-progress，未接受整体D04/最终源码与安装设备恢复门；无运行中测试句柄，当前单一writer /root。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：配置机制单元完成并保存本地中文提交：Platform schema/config-loader/config-revision已落精确目标，Host真实读取与Kernel现有串行配置更新消费，旧index/test及App重复机制consumer-zero删除；Platform9、Host33、Kernel16定向测试及三包typecheck通过，独立只读接受，文档/架构/编码/diff通过。上一单元5e94cca9。下一动作：解决foundation/AppStarting配置可用前的等待预算，以唯一Lifecycle Schema默认值作为早期预算来源并保留actual callback/start owner及stop重试；配置成为权威后扣除已用时间，不重开资源接纳。随后日志/trace/redaction/health/完整目录。P02A仍in-progress；没有根全量或最终产品安装/设备/恢复证据，无push、无后台测试，单一writer /root。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 

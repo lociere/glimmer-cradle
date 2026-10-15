@@ -50,8 +50,9 @@ Windows 受管启动还须提供 Platform Native 进程监督组件。`HostDataP
 ### 目标 Host 与 Jobs 配置
 
 `ConfiguredHostCognitionJobsOwner` 通过显式 `HostDataPaths` 读取 ConfigRoot 下的
-`system/host.yaml`、`system/jobs.yaml` 和现行 `system/memory.yaml`，复用 Platform validator
-应用唯一 Schema 默认值。目前 canonical Schema 仍在 `contracts/json-schema/config/v1/`；阶段 11
+`system/host.yaml`、`system/jobs.yaml` 和现行 `system/memory.yaml`。Host adapter 保留1 MiB
+有界文件读取与 YAML 唯一键/alias 限制，Platform `loadConfiguration` 拒绝损坏 UTF-8/BOM、
+应用唯一 Schema 默认值并深冻结独立文档；失败不会回落其他源或改动已接纳快照。目前 canonical Schema 仍在 `contracts/json-schema/config/v1/`；阶段 11
 原子迁入蓝图规定的 Host/Jobs owner schema 目录并切换 consumer，迁移前不建立副本。
 
 | Document / 组 | 默认值 | owner / 生效边界 |

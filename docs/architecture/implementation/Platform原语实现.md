@@ -16,6 +16,8 @@
 | `/observability` | TraceContext、Logger、Span、Observability | Kernel application/runtime；KernelObservabilityAdapter |
 | `/lifecycle` | RuntimeModule、LifecyclePhase、Observer、LifecycleCoordinator | Kernel runtime modules 与 LifecycleOrchestrator |
 | `/events` | 泛型 LiveEventPublisher、Subscriptions、Bus、Handler | KernelEventBusPort 与 EventBus adapter |
+| `/configuration` | 注入 Schema 的 AJV 校验/默认值/编译缓存；实现 `configuration/schema.ts` | Kernel registry 与产品装配；root 同时公开 validator |
+| root 的配置 exports | 有界 UTF-8、Schema 校验、深冻结加载与有序 JSON SHA-256 revision | Host 实际配置读取、Kernel 配置更新；路径、文件 IO、YAML 规则由 App 控制 |
 | root 的 topology exports | AuthorityLease/StorePort、fencing 判定、HandoverController | Host `SqliteAuthorityStore` 与 `HostJobsOwner`；无数据库依赖 |
 | root 的 security exports | 不可变 Principal、PermissionRequest/Grant/Decision 与身份验证 | Host PermissionBroker 登记/授权/审计/撤销；不解释 Resource 内容或 scope |
 | root 的 ManagedProcessSupervisor | Node/OS 受管进程启动、真实 PID、边界释放与失败保留 | 当前四类 Kernel App adapter 与共享 Host WorkerSupervisor；通用 Node/Windows Native 实现由 Platform 拥有 |
@@ -128,6 +130,14 @@ Live-event contract 表达进程内通知，不承诺持久化、重试或 exact
 Conversation log、PCM/token 流不因接口提取而并入此总线。
 Platform 不直接执行持久 IO；authority 状态由 Host Adapter 写入，logger/trace 与 clock 由 owner 注入，
 当前没有独立 Platform 配置文件。
+
+`configuration/config-loader.ts` 在解析前拒绝超限、损坏 UTF-8 与 BOM，校验通过后才深冻结
+返回独立文档；失败不透传 parser/Schema 可能包含秘密的原始错误。Host 保留有界 FD 读取、
+YAML 唯一键/alias 限制、owner 之间约束及创建库前验证，不回落另一配置源。旧私有
+深冻结/解码与 Platform 旧配置 index 已 consumer-zero 删除，子路径直接落在 schema。
+`config-revision.ts` 保留有序 JSON 字节和换行分隔的 SHA-256；Kernel 仍选择原来的六份
+文档与 secret providers 投影并取前16位，串行更新、dry-run、冲突检查与重启策略留 App。
+这只覆盖加载机制及当前重读，不表示运行中配置热更新或早期启动预算已经完成。
 
 ## Authority 与受控转移
 
