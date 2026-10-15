@@ -1,7 +1,6 @@
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'fs-extra';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import type { PerceptionEvent } from '../../ports/application-models';
 import type {
   AgentPlanRequest, AgentPlanResponse, AgentSynthesisRequest, AgentSynthesisResponse,
@@ -21,11 +20,10 @@ const logger = getLogger('cognition-manager');
 const processSupervisor = new ManagedProcessSupervisor(logger);
 const PROCESS_LOG = 'cognition.console.log';
 let processLogDir = path.join(resolveLogDir(), 'application');
-const execFileAsync = promisify(execFile);
 
 export class CognitionManager {
   private child: ChildProcess | null = null;
-  private pythonProbe: ChildProcess | null = null;
+  private startupProcess: ChildProcess | null = null;
   private running = false;
   private ready = false;
   private requestTimeoutMs = 30_000;
@@ -50,24 +48,25 @@ export class CognitionManager {
   public async start(): Promise<void> {
     if (this.stopping || this.stopOperation) throw new Error("Cognition 正在关闭");
     if (this.running && this.ready) return;
-    if (this.child || this.pythonProbe || this.starting) throw new Error('Cognition 上代进程尚未释放，拒绝并行启动');
-    const config = ConfigManager.instance.getConfig();
+    if (this.child || this.startupProcess || this.starting) throw new Error('Cognition 上代进程尚未释放，拒绝并行启动');
     const generation = this.recoveryGeneration;
-    const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
-    const repoRoot = resolveRepoRoot();
-    const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
-    const command = packagedPython || await ensureDevelopmentPython(repoRoot);
-    const args = ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', this.memoryJobsOwner];
-    this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
-    if (generation !== this.recoveryGeneration || this.stopOperation || this.child) throw new Error("Cognition 启动世代已关闭或已接纳");
-    this.transport.configureActionDeadline(this.requestTimeoutMs);
-    processLogDir = path.join(resolveLogDir(), 'application');
-    this.stopping = false;
     this.starting = true;
-    this.lifecycleObserver('starting', 'Cognition 正在启动并等待本代注册');
-    const bootstrap = this.transport.prepareProcess();
-
     try {
+      const config = ConfigManager.instance.getConfig();
+      const secrets = await ConfigManager.instance.loadDashScopeSecretEnvironment();
+      this.assertStartupCurrent(generation);
+      const repoRoot = resolveRepoRoot();
+      const packagedPython = process.env.GLIMMER_CRADLE_PYTHON_RUNTIME?.trim();
+      const command = packagedPython || await this.ensureDevelopmentPython(repoRoot, config.system.lifecycle.start_timeout_ms);
+      const args = ['-m', 'glimmer_cradle.cognition_worker', '--memory-jobs-owner', this.memoryJobsOwner];
+      this.requestTimeoutMs = config.system.cognition_service.request_timeout_ms;
+      this.assertStartupCurrent(generation);
+      this.transport.configureActionDeadline(this.requestTimeoutMs);
+      processLogDir = path.join(resolveLogDir(), 'application');
+      this.stopping = false;
+      this.lifecycleObserver('starting', 'Cognition 正在启动并等待本代注册');
+      const bootstrap = this.transport.prepareProcess();
+
       ConfigManager.instance.freezeCoreConfig();
       const pythonLaunch = await this.resolvePythonProcess(command, repoRoot);
       if (generation !== this.recoveryGeneration || this.stopOperation) throw new Error('Cognition 启动世代已关闭');
@@ -111,19 +110,33 @@ export class CognitionManager {
 
       logger.info('Cognition 认知核启动：等待 gRPC 注册与真实 readiness');
       await this.transport.waitForRegistration(config.system.cognition_service.registration_timeout_ms);
-      await this.client.initializeKnowledge(await ConfigManager.instance.loadKnowledgeBaseConfig(), this.requestTimeoutMs);
+      this.assertStartupCurrent(generation);
+      const knowledge = await ConfigManager.instance.loadKnowledgeBaseConfig();
+      this.assertStartupCurrent(generation);
+      await this.client.initializeKnowledge(knowledge, this.requestTimeoutMs);
+      this.assertStartupCurrent(generation);
       const readiness = await this.waitForBusinessReadiness(bootstrap.generation, this.requestTimeoutMs);
+      this.assertStartupCurrent(generation);
       this.ready = true;
-      this.starting = false;
       this.lifecycleObserver('ready', 'Cognition 已完成本代注册、初始化与 readiness');
       logger.info('Cognition 认知核已就绪', { startup_stage: readiness.phase });
     } catch (error) {
-      this.starting = false;
-      logger.error('Cognition 认知核启动失败', { error: normalizeError(error) });
-      await this.stop();
-      this.lifecycleObserver('failed', 'Cognition 启动失败，必需入站保持关闭');
+      if (generation !== this.recoveryGeneration) {
+        // 显式 stop 已接管清理；旧启动回调不能停止新 owner 或发布迟到失败。
+        await this.stopOperation;
+        throw error;
+      }
+      const failures: unknown[] = [error];
+      try { await this.stop(); } catch (cleanupError) { failures.push(cleanupError); }
+      try { logger.error('Cognition 认知核启动失败', { error: normalizeError(error) }); } catch (logError) { failures.push(logError); }
+      try { this.lifecycleObserver('failed', 'Cognition 启动失败，必需入站保持关闭'); } catch (observerError) { failures.push(observerError); }
+      if (failures.length > 1) throw new AggregateError(failures, 'Cognition 启动失败及清理错误');
       throw error;
-    }
+    } finally { this.starting = false; }
+  }
+
+  private assertStartupCurrent(generation: number): void {
+    if (generation !== this.recoveryGeneration || this.stopping || this.stopOperation) throw new Error('Cognition 启动世代已关闭');
   }
 
   public async sendPerceptionMessage(request: PerceptionEvent, traceId?: string): Promise<PerceptionOperationHandle> {
@@ -190,7 +203,9 @@ export class CognitionManager {
 
   public async restart(): Promise<void> {
     await this.stop();
+    const generation = this.recoveryGeneration;
     await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (generation !== this.recoveryGeneration) throw new Error('Cognition restart 世代已关闭');
     await this.start();
   }
 
@@ -211,13 +226,14 @@ export class CognitionManager {
     this.stopping = true;
     this.ready = false;
     try {
-      if (this.pythonProbe && !processSupervisor.isProcessReleased(this.pythonProbe)) {
-        await processSupervisor.forceTerminateManagedProcessTree(this.pythonProbe, 'Cognition Python identity probe', 1000, process.platform !== 'win32');
+      if (this.startupProcess && !processSupervisor.isProcessReleased(this.startupProcess)) {
+        await processSupervisor.forceTerminateManagedProcessTree(this.startupProcess, 'Cognition startup command', 1000, process.platform !== 'win32');
       }
-      if (this.pythonProbe && processSupervisor.isProcessReleased(this.pythonProbe)) this.pythonProbe = null;
+      if (this.startupProcess && processSupervisor.isProcessReleased(this.startupProcess)) this.startupProcess = null;
     } catch (error) {
       this.stopping = false;
-      this.lifecycleObserver('failed', 'Cognition 身份探测回收未确认，保留 owner 等待恢复');
+      try { this.lifecycleObserver('failed', 'Cognition 启动准备进程回收未确认，保留 owner 等待恢复'); }
+      catch (observerError) { throw new AggregateError([error, observerError], 'Cognition 启动准备回收及观察错误'); }
       throw error;
     }
     if (!this.running && !child) {
@@ -242,6 +258,8 @@ export class CognitionManager {
       return;
     }
     let processStopped = false;
+    const failures: unknown[] = [];
+    const observe = (action: () => void): void => { try { action(); } catch (error) { failures.push(error); } };
     try {
       let accepted = false;
       if (child && this.transport.isRegistered) {
@@ -249,7 +267,7 @@ export class CognitionManager {
           await this.client.shutdown('kernel_lifecycle_stop', 1000);
           accepted = true;
         } catch (error) {
-          logger.warn('Cognition gRPC 停机请求失败，转入受管进程回收', { error: normalizeError(error) });
+          observe(() => logger.warn('Cognition gRPC 停机请求失败，转入受管进程回收', { error: normalizeError(error) }));
         }
       }
       if (child && accepted) {
@@ -264,14 +282,16 @@ export class CognitionManager {
       }
       processStopped = true;
     } catch (error) {
-      this.lifecycleObserver('failed', 'Cognition 进程回收未确认，保留 owner 等待恢复');
-      throw error;
+      failures.push(error);
+      observe(() => this.lifecycleObserver('failed', 'Cognition 进程回收未确认，保留 owner 等待恢复'));
     } finally {
       try {
         await this.transport.invalidateProcess(
           child ? processSupervisor.managedProcessPid(child) : undefined,
           new Error('Cognition 受监督进程生命周期已结束'),
         );
+      } catch (error) {
+        failures.push(error);
       } finally {
         this.running = false;
         this.inFlightPerceptions.clear();
@@ -279,8 +299,12 @@ export class CognitionManager {
         this.stopping = false;
       }
     }
-    logger.info('Cognition 认知核停止完成');
-    this.lifecycleObserver('stopped', 'Cognition 已停止');
+    if (processStopped) {
+      observe(() => logger.info('Cognition 认知核停止完成'));
+      observe(() => this.lifecycleObserver('stopped', 'Cognition 已停止'));
+    }
+    if (failures.length === 1) throw failures[0];
+    if (failures.length > 1) throw new AggregateError(failures, 'Cognition 停止及资源清理错误');
   }
 
   public get isReady(): boolean {
@@ -296,7 +320,7 @@ export class CognitionManager {
     client: CognitionRequestPort,
     observer: CognitionLifecycleObserver,
   ): void {
-    if (this.running || this.starting || this.child || this.pythonProbe) {
+    if (this.running || this.starting || this.child || this.startupProcess) {
       if (this.transport !== transport || this.client !== client) {
         throw new Error('CognitionManager 运行期间不得替换 transport composition');
       }
@@ -411,6 +435,7 @@ export class CognitionManager {
         await this.start();
       }
     } catch (error) {
+      if (recoveryGeneration !== this.recoveryGeneration) return;
       this.lifecycleObserver('failed', 'Cognition 自动恢复失败，必需入站保持关闭');
       logger.error('Cognition 自动重启失败', { error: normalizeError(error) });
     }
@@ -427,19 +452,37 @@ export class CognitionManager {
   private async resolvePythonProcess(command: string, repoRoot: string): Promise<{ command: string; environment: NodeJS.ProcessEnv }> {
     if (process.platform !== 'win32') return { command, environment: {} };
     // The venv redirector and Python startup hooks may create descendants; the probe has its own Job.
-    const probe = processSupervisor.spawnManagedProcess(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], {
-      cwd: repoRoot, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-    }, resolveManagedProcessBridge(), spawn);
-    this.pythonProbe = probe;
-    const { stdout, code } = await processSupervisor.readManagedProcessOutput(probe, 10_000);
-    if (processSupervisor.isProcessReleased(probe)) this.pythonProbe = null;
-    if (code !== 0) throw new Error('Python 解释器身份查询失败');
+    const stdout = await this.runStartupProcess(command, ['-c', 'import json,sys;print(json.dumps(dict(base=sys._base_executable,executable=sys.executable)))'], repoRoot, 10_000);
     const interpreter: unknown = JSON.parse(stdout);
     if (!interpreter || typeof interpreter !== 'object' || !('base' in interpreter) || !('executable' in interpreter)
       || typeof interpreter.base !== 'string' || typeof interpreter.executable !== 'string') throw new Error('Python 解释器身份查询无效');
     if (interpreter.base === interpreter.executable) return { command, environment: {} };
     if (!path.isAbsolute(interpreter.base) || !path.isAbsolute(interpreter.executable) || !await fs.pathExists(interpreter.base)) throw new Error('Python 实际解释器路径无效');
     return { command: interpreter.base, environment: { __PYVENV_LAUNCHER__: interpreter.executable } };
+  }
+
+  private async runStartupProcess(command: string, args: readonly string[], cwd: string, timeoutMs: number, maxBufferBytes = 8192): Promise<string> {
+    if (this.startupProcess) throw new Error('Cognition 上代启动准备进程尚未释放');
+    const child = processSupervisor.spawnManagedProcess(command, args, {
+      cwd, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'],
+    }, resolveManagedProcessBridge(), spawn);
+    this.startupProcess = child;
+    const { stdout, code } = await processSupervisor.readManagedProcessOutput(child, timeoutMs, undefined, maxBufferBytes);
+    if (!processSupervisor.isProcessReleased(child)) throw new Error('Cognition 启动准备进程未确认释放');
+    this.startupProcess = null;
+    if (code !== 0) throw new Error('Cognition 启动准备命令失败');
+    return stdout;
+  }
+
+  private async ensureDevelopmentPython(repoRoot: string, timeoutMs: number): Promise<string> {
+    const python = process.platform === 'win32'
+      ? path.join(repoRoot, '.venv', 'Scripts', 'python.exe') : path.join(repoRoot, '.venv', 'bin', 'python');
+    // Audio 共用根环境；准备 Worker 依赖时保留其已安装的 extras。
+    await this.runStartupProcess(process.platform === 'win32' ? 'uv.exe' : 'uv', [
+      'sync', '--project', path.join(repoRoot, 'apps', 'cognition-worker'), '--frozen', '--inexact',
+    ], repoRoot, timeoutMs, 1024 * 1024);
+    if (!await fs.pathExists(python)) throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
+    return python;
   }
 
   private flushOutput(): void {
@@ -466,19 +509,4 @@ function routeProcessLine(line: string, stderr: boolean): void {
 
 function normalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function ensureDevelopmentPython(repoRoot: string): Promise<string> {
-  const python = process.platform === 'win32'
-    ? path.join(repoRoot, '.venv', 'Scripts', 'python.exe')
-    : path.join(repoRoot, '.venv', 'bin', 'python');
-  const uv = process.platform === 'win32' ? 'uv.exe' : 'uv';
-  // 根环境也供 Audio 使用；安装 Worker 时保留已安装的语音 extras。
-  await execFileAsync(uv, [
-    'sync', '--project', path.join(repoRoot, 'apps', 'cognition-worker'), '--frozen', '--inexact',
-  ], { cwd: repoRoot, windowsHide: true });
-  if (!await fs.pathExists(python)) {
-    throw new Error('Cognition Python 环境准备完成后仍缺少受监督解释器');
-  }
-  return python;
 }

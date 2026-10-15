@@ -152,6 +152,30 @@ describe.skipIf(!runIntegration)('CognitionManager real process integration', ()
     else process.env.GLIMMER_CRADLE_DATA_ROOT = previousDataRoot;
   });
 
+  it('explicit stop after real registration reclaims the actual root and late startup cannot replace stopped with failed', async () => {
+    let release!: () => void, registered = false;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const waitForRegistration = transport.waitForRegistration.bind(transport);
+    const registration = vi.spyOn(transport, 'waitForRegistration').mockImplementation(async timeout => {
+      await waitForRegistration(timeout); registered = true; await gate;
+    });
+    const startup = manager.start(); void startup.catch(() => undefined);
+    try {
+      await waitUntil(() => registered, 15_000);
+      const pid = (transport as unknown as { registeredProcessId: number }).registeredProcessId;
+      expect(Number.isSafeInteger(pid)).toBe(true); expect(pid).toBeGreaterThan(0);
+      expect(() => process.kill(pid, 0)).not.toThrow(); expect(manager.isReady).toBe(false);
+      await manager.stop();
+      try { process.kill(pid, 0); throw new Error('registered Worker root is still alive'); }
+      catch (error) { expect(error).toMatchObject({ code: 'ESRCH' }); }
+      expect((manager as unknown as { child: unknown }).child).toBeNull(); expect(transport.isRegistered).toBe(false);
+      expect(projection.getCatalog().runtimes.find(runtime => runtime.runtime_id === 'cognition')?.state).toBe('stopped');
+      release(); await expect(startup).rejects.toThrow('启动世代已关闭');
+      expect(manager.isReady).toBe(false);
+      expect(projection.getCatalog().runtimes.find(runtime => runtime.runtime_id === 'cognition')?.state).toBe('stopped');
+    } finally { release(); await startup.catch(() => undefined); registration.mockRestore(); await manager.stop(); }
+  }, 30_000);
+
   it('starts, reaches readiness, stops and recovers with a fresh supervised generation', async () => {
     await manager.start();
     expect(manager.isReady).toBe(true);

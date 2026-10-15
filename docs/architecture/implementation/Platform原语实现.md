@@ -74,6 +74,14 @@ Host 持有启动/请求/协议关闭 timer；取消确认后才移除，取消�
 startup timer 创建失败进入失败回收，取消成功后才开放 ready；所有结果都清零 FD3 能力，
 timer 异常不绕过实际 Worker 回收。
 
+现行Kernel Cognition adapter在首个启动await前封闭并行接纳，注册、知识配置/注入与
+readiness每次await后核验同一世代。显式stop拥有回收后，旧启动只join该stop，不再新建
+回收或发布迟到failed；延迟restart与自动恢复也受世代fence约束，当前真实失败仍报告。
+开发用uv依赖准备与Python身份探测由App同一startupProcess字段串行持有受管Job，输出
+与整树释放确认后才清owner；取消/失败保留原Job重试。日志/observer失败先汇总，不能
+跳过实际进程回收及transport失效。旧产品装配仍绑定P12B切换后删除，不将uv安装默认
+接入最终成品入口。
+
 ## 受管进程的实际边界
 
 `adapters/node/process-supervisor.ts` 由公开 root 暴露；当前四类 Kernel App adapter

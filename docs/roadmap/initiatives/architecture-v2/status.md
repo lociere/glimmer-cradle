@@ -4,7 +4,7 @@
 
 核对日期：2026-10-09；产品事实输入：`dc59181e`。日期不替代 Git/代码核对。
 
-下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A.3/4：bounded coordinator/Kernel根预算单元固定源码与最后微差已独立只读接受，Platform28/App26（factory spy零调用+正例、实际SQLite/迟到回调/原operation retry）/Schema5/两包typecheck/文档架构编码diff通过，保存本地中文提交。唯一Schema上限与JSON-only基线同步，generate和verify22及三语往返通过；最后guard合法baseline unstaged差异已正式暂存并只重跑failed generated通过，未改断言/白名单。下一动作：Cognition显式stop取消后迟到failed通知反例与修复，然后Platform配置loader/schema/revision真实链，解决foundation/AppStarting配置可用前预算事实源与有界等待；再日志trace/health及全部剩余物理目录。早期配置预算缺口仍未关闭，整体P02A/D04/最终验收未完成；唯一writer本会话，无后台测试，不推送。
+下一任务：**[P02A 剩余平台机制和关闭语义](execution-order.md#step-p02a)**（in-progress / implementation）。P02A：Cognition启动取消与受管准备单元已完成：首await接纳、generation fence、uv/identity共用startupProcess、迟到restart/recovery与诊断异常保留回收；unit24 PASS，实际Worker4项、最新注册/取消2项及增强ESRCH1项按输入范围复用，Kernel typecheck PASS；独立只读发现observer覆盖Native错误已修并补原Job重试，最后微差复审接受。文档/架构/编码/diff核对通过，保存相关本地中文提交，不推送。上一预算单元e7cd7b0d。下一动作：继续Platform config-loader/schema/config-revision真实消费链，解决foundation/AppStarting配置前预算；然后日志/trace/redaction/health及完整物理落位。P02A仍in-progress，未接受整体D04/最终源码与安装设备恢复门；无运行中测试句柄，当前单一writer /root。
 
 阶段 partial 表示已有历史成果且仍有最终门；不撤销历史局部完成，也不冒充最终验收。
 
