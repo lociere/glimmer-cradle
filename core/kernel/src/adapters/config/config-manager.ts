@@ -261,7 +261,7 @@ export class ConfigManager {
     try {
       const filePath = resolveConfigPath(path.join('extensions', 'active.yaml'));
       const content = await fs.readFile(filePath, 'utf-8');
-      const parsed = yaml.parse(content) as { active?: unknown } | null;
+      const parsed = parseConfigurationYaml(content) as { active?: unknown } | null;
       if (!Array.isArray(parsed?.active)) {
         throw new CoreException('extensions/active.yaml 必须声明 active 数组', ErrorCode.CONFIG_ERROR);
       }
@@ -367,7 +367,7 @@ export class ConfigManager {
 
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      return (yaml.parse(content) ?? {}) as Record<string, unknown>;
+      return (parseConfigurationYaml(content) ?? {}) as Record<string, unknown>;
     } catch (error) {
       throw new CoreException(
         `配置文件解析失败: ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -387,7 +387,7 @@ export class ConfigManager {
     }
     try {
       const content = await fs.readFile(secretsPath, 'utf-8');
-      const secrets = yaml.parse(content) as (
+      const secrets = parseConfigurationYaml(content) as (
         AudioSecretsLike & { providers?: Record<string, ProviderConfig> }
       ) | null;
       const apiKey = (
@@ -498,7 +498,7 @@ export class ConfigManager {
 
     try {
       const content = await fs.readFile(secretsPath, 'utf-8');
-      const secrets = yaml.parse(content) as { providers?: Record<string, ProviderConfig> } | null;
+      const secrets = parseConfigurationYaml(content) as { providers?: Record<string, ProviderConfig> } | null;
       const providers = secrets?.providers ?? {};
 
       if (!llmConfig.api_key) {
@@ -537,4 +537,17 @@ export class ConfigManager {
       });
     }
   }
+}
+
+
+/** YAML 自带错误会嵌入源文本；仅在 App 解析边界发布受控错误，不保留秘密片段或原始 cause。 */
+function parseConfigurationYaml(content: string): unknown {
+  try {
+    // parse() 会把含源文本的 warning 自动交给 process.emitWarning；文档 API 由本边界持有诊断。
+    const document = yaml.parseDocument(content);
+    if (document.errors.length) throw new Error('配置文档无效');
+    if (document.warnings.length) logger.warn('配置 YAML 解析存在警告', { warning_count: document.warnings.length });
+    return document.toJS({ maxAliasCount: 100 });
+  }
+  catch { throw new CoreException('配置 YAML 解析失败', ErrorCode.CONFIG_ERROR); }
 }

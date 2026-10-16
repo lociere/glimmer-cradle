@@ -908,7 +908,7 @@
         "evidence/2026-10-09-P02A.md"
       ],
       "blockedReason": null,
-      "nextAction": "P02A配置原子快照单元完成：ConfigManager独占候选、并发init/reload同Promise、加载或失败中旧快照持续可读，完整校验/secret注入/Platform深冻结后一次接纳；旧flag/置空rollback/部分冻结删除，freezeCoreConfig消费者保留到P12B。3最小反例原实现FAIL后修复，Kernel6+12+31=49/Platform9与两包类型build按输入通过，独立只读检查真实消费者接受；docs/encoding/architecture/diff通过。基于d66f0663保存相关本地中文提交，无push、后台测试或外部阻断，单一writer /root。下一动作：ConfigManager四处YAML解析诊断可能携带secret片段，补固定marker失败反例，在App解析边界受控错误替换原文，不改变既有可选secret fallback与必需配置失败策略；然后日志/trace/redaction/health及完整物理清单。整体P02与最终源码/安装平台设备恢复门未接受。",
+      "nextAction": "P02A YAML秘密诊断单元完成：四处App解析统一受控CONFIG_ERROR且无原文/cause，parseDocument显式errors/toJS alias100，warning只报数量不走process.emitWarning；原4路径marker与warning旁路反例实际FAIL后修复。配置12+应用12=24 PASS，最后warning计数微差配置12及Kernel类型PASS，应用12按未变输入复用；独立只读接受，docs/encoding/architecture/diff通过。2026-10-16恢复确认候选HEAD6aadeee5/dirty未变，保存相关中文提交，无push、后台测试/模型设备/外部消息/生产操作，临时数据已清理。单一writer /root。下一动作：按精确目标展开Platform observability logger/trace/metrics/redaction/health，先迁实际Kernel trace-context机制与消费者，保留现有wire mapper；同步公开出口、测试、consumer-zero删除旧机制及必要目录/事实页。整个P02及最终源码/产品/制品/安装平台设备恢复门未接受。",
       "mapping": [
         {
           "action": "split",

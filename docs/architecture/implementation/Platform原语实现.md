@@ -146,7 +146,10 @@ ConfigManager在私有候选上完成各Document默认值、secret注入与校�
 已接纳指针。并发init/reload加入同一个实际加载；在途与失败期间旧快照持续可读，
 失败不再清空后回滚。候选与诊断同时失败保留两项错误。旧freezeCoreConfig调用入口
 仍由原启动consumer使用到P12B，实际部分冻结逻辑已删除，所有快照在发布前冻结。
-此处只接受当前配置读取/快照机制，Host运行中effect/重启策略仍由App控制。
+当前Kernel四个YAML配置/secret解析入口统一持有解析文档；错误转换为不含原始
+文本或cause的CONFIG_ERROR。警告仅记录固定文案和数量，不经process.emitWarning
+输出源文本。必需配置/active错误仍失败，可选secret读取仍按原策略回退；有效注入
+与不可变快照不变。此处只接受当前配置读取/快照机制，Host运行中effect/重启策略仍由App控制。
 
 ## Authority 与受控转移
 

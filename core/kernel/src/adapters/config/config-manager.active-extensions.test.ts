@@ -6,6 +6,7 @@ import yaml from 'yaml';
 import { ConfigManager } from './config-manager';
 
 const originalConfigRoot = process.env.GLIMMER_CRADLE_CONFIG_ROOT;
+const originalDashScopeKey = process.env.DASHSCOPE_API_KEY;
 const ownedRoots = new Set<string>();
 const logger = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }));
 vi.mock('../observability/logger', () => ({ getLogger: () => logger }));
@@ -52,6 +53,8 @@ function setStartupBudget(root: string, milliseconds: number): void {
 afterEach(() => {
   if (originalConfigRoot === undefined) delete process.env.GLIMMER_CRADLE_CONFIG_ROOT;
   else process.env.GLIMMER_CRADLE_CONFIG_ROOT = originalConfigRoot;
+  if (originalDashScopeKey === undefined) delete process.env.DASHSCOPE_API_KEY;
+  else process.env.DASHSCOPE_API_KEY = originalDashScopeKey;
   (ConfigManager as unknown as { _instance: ConfigManager | null })._instance = null;
   vi.restoreAllMocks();
   Object.values(logger).forEach(method => method.mockReset());
@@ -149,5 +152,59 @@ describe('ConfigManager atomic configuration snapshots', () => {
     expect(manager.getConfig()).toBe(previous);
     logger.error.mockReset(); setStartupBudget(root, 45000); await manager.reloadConfig();
     expect(manager.getConfig().system.lifecycle.start_timeout_ms).toBe(45000);
+  });
+});
+
+describe('ConfigManager YAML diagnostic boundaries', () => {
+  const marker = 'fixture-private-yaml-marker';
+  const diagnostics = () => JSON.stringify(Object.values(logger).flatMap(method => method.mock.calls));
+
+  it.each(['required', 'active', 'llm-secret', 'environment-secret'])('%s malformed YAML never reaches diagnostics as source text', async mode => {
+    const root = configurationFixture(), manager = ConfigManager.instance;
+    delete process.env.DASHSCOPE_API_KEY;
+    if (mode === 'required') {
+      await manager.init(); const previous = manager.getConfig();
+      writeFileSync(path.join(root, 'system/kernel.yaml'), `lifecycle: [${marker}\n`, 'utf8');
+      const failure = await manager.reloadConfig().then(() => undefined, error => error as Error);
+      expect(failure).toBeInstanceOf(Error); expect(String(failure)).not.toContain(marker);
+      expect(manager.getConfig()).toBe(previous);
+    } else if (mode === 'active') {
+      mkdirSync(path.join(root, 'extensions'), { recursive: true });
+      writeFileSync(path.join(root, 'extensions/active.yaml'), `active: [${marker}\n`, 'utf8');
+      const failure = await manager.loadActiveExtensions().then(() => undefined, error => error as Error);
+      expect(failure).toMatchObject({ code: 'CONFIG_ERROR' }); expect(String(failure)).not.toContain(marker);
+    } else {
+      mkdirSync(path.join(root, 'secrets'), { recursive: true });
+      writeFileSync(path.join(root, 'secrets/secrets.yaml'), `providers: [${marker}\n`, 'utf8');
+      if (mode === 'llm-secret') { await manager.init(); expect(manager.getConfig()).toBeDefined(); }
+      else expect(await manager.loadDashScopeSecretEnvironment()).toEqual({});
+      expect(logger.warn).toHaveBeenCalled();
+    }
+    expect(diagnostics()).not.toContain(marker);
+  });
+
+  it('valid optional secrets retain explicit injection behavior without logging their values', async () => {
+    const root = configurationFixture(), manager = ConfigManager.instance;
+    delete process.env.DASHSCOPE_API_KEY;
+    const key = 'fixture-only-secret-value';
+    mkdirSync(path.join(root, 'secrets'), { recursive: true });
+    writeFileSync(path.join(root, 'characters/selrena/providers.yaml'), 'api_type: openai\n', 'utf8');
+    writeFileSync(path.join(root, 'secrets/secrets.yaml'), yaml.stringify({ providers: { openai: { api_key: key }, qwen: { api_key: key } } }), 'utf8');
+    await manager.init();
+    expect(manager.getConfig().character.llm?.api_key).toBe(key);
+    expect(await manager.loadDashScopeSecretEnvironment()).toEqual({ DASHSCOPE_API_KEY: key });
+    expect(diagnostics()).not.toContain(key);
+  });
+
+  it('accepted YAML warnings cannot bypass diagnostic redaction through process.emitWarning', async () => {
+    const root = configurationFixture(), manager = ConfigManager.instance;
+    delete process.env.DASHSCOPE_API_KEY;
+    const emitted = vi.spyOn(process, 'emitWarning').mockImplementation(() => undefined);
+    mkdirSync(path.join(root, 'secrets'), { recursive: true });
+    writeFileSync(path.join(root, 'secrets/secrets.yaml'), `providers: !${marker} { qwen: { api_key: fixture-key } }\n`, 'utf8');
+    expect(await manager.loadDashScopeSecretEnvironment()).toEqual({ DASHSCOPE_API_KEY: 'fixture-key' });
+    expect(logger.warn).toHaveBeenCalledWith('配置 YAML 解析存在警告', { warning_count: 1 });
+    expect(emitted.mock.calls.map(([warning]) => String(warning)).join('\n')).not.toContain(marker);
+    expect(diagnostics()).not.toContain(marker);
   });
 });

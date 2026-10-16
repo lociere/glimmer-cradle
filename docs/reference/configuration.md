@@ -17,6 +17,10 @@
 | 环境变量 | `GLIMMER_CRADLE_*` 等显式覆盖 | 启动环境 | Kernel/Engine/Avatar/Provider |
 | UI 投影 | Electron main/Kernel 提供的受控模型 | 对应 owner | Renderer |
 
+YAML 解析诊断不能带源文本片段、原始异常 cause 或未过滤的 warning 对象；当前 Kernel
+在配置/secret 的 App 解析边界返回受控 CONFIG_ERROR，警告只记录数量。必需配置拒绝
+与可选 secret 回退分别保持原策略。
+
 普通配置不得包含密钥明文。Renderer 不直接读取 YAML 或 secret 文件；它只能消费受控投影，并通过白名单 API 请求保存允许编辑的配置。
 
 系统配置的 canonical Document 只在 `contracts/json-schema/config/v1/`。Kernel 的 normalizer/应用模型和 Desktop、Personal Server 的脱敏 view model 都是 owner-local edge；`@glimmer-cradle/extension-sdk` 不公开 Audio、Embedding、Memory、SkillPlane 或 Control Center 配置类型。
