@@ -6,11 +6,11 @@
 
 ## 接手顺序
 
-1. 读取项目 Skill 和本页，核对实际 Git/写入 owner。
-2. 读取[状态](status.md)；机器状态唯一源为 [execution.json](execution.json)，禁止手改生成视图。
-3. 读取[主执行任务书](execution-order.md)公共规则及 nextTask 对应章节，按固定的 22 项任务顺序推进。
-4. 直接执行该节编号动作，展开精确文件映射并通过入口门；[通用切片流程](../../../how-to/执行架构切片.md)只补充通用方法。
-5. 依照任务书的完成门和[验收矩阵](acceptance.md)保存证据并前进，不重新设计架构或为每步另起一轮计划。
+已知本项目时直接从 [execution.json](execution.json) 的 in-progress/nextTask 和 nextAction 进入
+[主执行任务书](execution-order.md)对应节；首次接手再读其公共规则。
+[状态](status.md)是同源展示，不必与 JSON 重复读，禁止手改生成视图。专项 Skill 只按任务选择。
+普通继续、上下文恢复与候选变化按[通用切片流程](../../../how-to/执行架构切片.md#接手与选择任务)分别处理，
+不因恢复重跑导航/调查/检查。依照原完成门与[验收矩阵](acceptance.md)收束，不重新设计架构或重复起草计划。
 
 ## 职责与入口
 

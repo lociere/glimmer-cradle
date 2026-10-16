@@ -32,12 +32,12 @@
 
 - 从用户结果选择证据；正常行为、异常时序、拒权、取消、恢复和资源释放按影响验证。定向检查不足或跨模块接口、依赖、权限、生命周期、持久数据变化时扩大范围。
 - 日常定向验证，最终源码交付集中运行根 `pnpm typecheck`、`pnpm build` 及相关门；不因局部提交重复全量验证。纯文档/指令检查元数据、链接、编码、事实、规则与路由；脚本另验证实际行为。证据、审查与命令选择见 [测试与验收](docs/how-to/测试与验收.md)。
-- 高风险候选在内容固定后独立审查。未运行、环境阻断、静态检查、场景推演与真实运行证据分别报告；未通过必要门不宣称接受。连续两次同类无效尝试后改变假设或缩小实验。
+- 高风险按连贯结果固定批次候选后独立审查；保存提交不自动触发全量验证或逐提交审查，边界见测试与验收。未运行、环境阻断、静态检查、场景推演与真实运行证据分别报告；未通过必要门不宣称接受。连续两次同类无效尝试后改变假设或缩小实验。
 - [docs/README.md](docs/README.md) 按读者任务导航；docs 维护项目说明、技术参考和完整操作指南，Skill 封装任务选择与专项执行判断，两者都供人和 Codex 使用。详细内容保持一处维护，允许有用途明确的摘要和交叉引用；归属见 [文档架构](docs/governance/documentation-architecture.md)，临时状态沿用对应任务记录。
 - 文档变更运行 `pnpm check:docs`、`pnpm check:encoding`；Skill 变更追加 `pnpm check:skills`。文件增删同步目标清单、生成树与摘要锁，按 [架构变更宪章](docs/governance/architecture-change-policy.md) 操作。
 
 ## 当前架构迁移的适用边界
 
-仅在用户要求推进架构 v2 或改动触及其迁移步骤时，读取 [架构 v2 项目](docs/roadmap/initiatives/architecture-v2/README.md)，从 `execution.json` 恢复任务，按 `execution-order.md` 和专门完成门推进。`status.md` 由 `pnpm check:docs --write` 生成；历史“下一步”不能替代机器状态。该轮的提交、最终推送授权由任务书及用户后续指令决定，不能外推到其他任务。
+仅在用户要求推进架构 v2 或改动触及其迁移步骤时，按[接续情形](docs/how-to/执行架构切片.md#接手与选择任务)从 `execution.json` 与当前任务恢复，按 `execution-order.md` 和专门完成门推进；入口未知才用[架构 v2 项目](docs/roadmap/initiatives/architecture-v2/README.md)导航。`status.md` 由 `pnpm check:docs --write` 生成；历史“下一步”不能替代机器状态。该轮的提交、最终推送授权由任务书及用户后续指令决定，不能外推到其他任务。
 
 协作体系的职责、覆盖矩阵、研究和验证证据见 [工作流设计](docs/governance/agent-workflow-design.md)，仅在维护该体系时读取。

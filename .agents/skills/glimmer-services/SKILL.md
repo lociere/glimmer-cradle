@@ -7,9 +7,9 @@ description: Implement or review Glimmer Cradle Host services, persistence, Jobs
 
 只查询一个已知配置键或定义时直接查对应 Reference/源码，无需展开服务实现与验收流程。
 
-先追踪实际入口→接纳/授权→领域 owner→持久提交/副作用→公开投影→停止与恢复。
-从 [实现地图](../../../docs/architecture/implementation/README.md)、[当前拓扑](../../../docs/architecture/current/10-当前物理拓扑.md)
-和受影响包的 manifest、composition、公开 API、测试核对链路；不要仅测试 helper 后推断产品已接入。
+首次实现或链路不明时追踪实际入口→接纳/授权→领域 owner→持久提交/副作用→公开投影→停止与恢复。
+owner 和链路已明确时直接使用相关 manifest、composition、公开 API 与测试，只核对本次影响；
+未知入口再查 [实现地图](../../../docs/architecture/implementation/README.md)或[当前拓扑](../../../docs/architecture/current/10-当前物理拓扑.md)。不要仅测试 helper 后推断产品已接入。
 现有 Kernel/Product 与迁移中 Host 可同时存在，但不能建立第二 writer；目标边界查 [v2.1](../../../docs/architecture/target/baseline.md)。
 
 ## 选择必要细节
@@ -46,3 +46,4 @@ description: Implement or review Glimmer Cradle Host services, persistence, Jobs
 
 交付说明服务/数据 owner、调用与提交边界、实际集成证据及尚未切换的产品 consumer；
 验证和独立审查见 [共享方法](../../../docs/how-to/测试与验收.md)。
+紧耦合的接纳/资源 owner/失败传播修复按一个可验证结果收束；局部保存提交不拆断这条责任链，也不自动逐提交发审。

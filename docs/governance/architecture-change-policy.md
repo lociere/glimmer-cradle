@@ -58,13 +58,14 @@ Extension 只使用正式 SDK；同仓/异仓与第一方/第三方身份都不�
 ## 摘要锁维护
 
 1. 确认变更属于已授权普通文件/文档调整，或具备新边界的用户决策与 accepted ADR。
-2. 更新对应规范源、目标 files.json；先运行 `pnpm check:docs --write`，再运行
-   `pnpm check:target-layout --write`，使两个生成视图均来自同一清单。
-3. 对 baseline.lock.json 的 immutableSources 中每个文件按原始 UTF-8 字节计算 SHA-256，
-   更新对应项；规范源增删必须同时更新其列表并说明治理原因。
+2. 更新实际受影响的规范源；仅文件路径/owner 或清单改变时更新 files.json 并生成相应树，
+   状态改变时生成 status。触发条件由[文档维护](../how-to/文档维护.md#文件增删和受控目录)拥有，正文变化不重建未变目录。
+3. 对 baseline.lock.json 的 immutableSources 中受影响文件按原始 UTF-8 字节计算 SHA-256，
+   更新对应项；未变摘要保留，规范源增删必须同时更新其列表并说明治理原因。
 4. 将同一 JSON 对象同步到 `tools/repo-checks/src/architecture/baseline-lock.mjs` 的 expectedLock，
    保持 targetRoots/coreModules/migrationPolicy 不变，除非已授权对应语义变更。
-5. 审查源 diff 与锁 diff，运行 repo-checks 反例测试和 architecture 门。更新摘要本身不证明授权。
+5. 复核源 diff 与锁 diff并运行 architecture；锁结构、源集合或检查逻辑变化时追加 repo-checks 对应反例。
+   仅同步已授权正文的摘要值不自动触发全套工具测试。写后验证及有效证据复用按共享指南，更新摘要本身不证明授权。
 
 规范源包含蓝图、物理契约、治理宪章、采用 ADR、切片方法、项目计划、主执行任务书与验收要求。
 execution.json、status.md、切片卡和 evidence 保存可变进度，不纳入冻结摘要；它们的文件路径仍精确登记。

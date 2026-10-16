@@ -12,6 +12,7 @@
 - [本机与插件能力盘点](#本机与插件能力盘点)
 - [采用边界与维护](#采用边界与维护)
 - [文档工程与知识组织复核](#文档工程与知识组织复核)
+- [执行成本与阶段收束复核](#执行成本与阶段收束复核)
 
 ## 官方机制与工程建议
 
@@ -178,3 +179,22 @@ doc-coauthoring 目录只有 SKILL.md，没有独立许可；根目录也未提�
 使用 `pnpm --filter @glimmer-cradle/repo-checks add -D ... --ignore-scripts`，仅工程依赖/锁变化；解析 960 包、加入 31、下载 0，17.3 秒，退出 0。
 检查了清单/依赖行为，未执行外部安装 hook；无 Skill/插件安装。`--ignore-scripts` 不等于以后依赖自动无风险，后续升级仍审查实际行为/许可。
 新增行为、失败分支与 CLI 退出码由 repo-checks tests 验证；具体通过数与原始日志归 evaluation。
+
+## 执行成本与阶段收束复核
+
+2026-10-16 按六项实际执行问题定向复读下列一手正文，不重做全项目能力设计。
+未测得各项耗时/模型成本，不能把延期归因于 Skill 或声称提速比例；验证见[本轮记录](evaluation.md#执行成本与收束效率复核)。
+网页使用当日可读版本，未取得不可变发布版本的页面保留检索日期；本轮只吸收方法，没有复制或运行外部代码、安装工具或修改模型。
+
+| 一手依据 | 实际建议/机制 | 采用及限制 |
+|---|---|---|
+| [OpenAI Docs：Build skills](https://learn.chatgpt.com/docs/build-skills)、本机系统 skill-creator | 元数据发现、按需加载；只保留改变判断的指导，复杂流程才做有意义的前向验证 | 保持九入口和原描述，仅缩窄服务 Skill 的重复调查、文档 Skill 的逐补丁维护；不增加通用 Skill/模板 |
+| [OpenAI：Rethinking skills and prompts](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)（2026-09-11） | 避免每次编辑前必读整套资料、过长描述及过度具体配方；明确完成边界 | 四种接续情形、按变化触发检查。模型能力经验不是取消安全/恢复门的理由；不迁移模型 |
+| [OpenAI：Iterating Development Workflows](https://developers.openai.com/cookbook/examples/codex/iterating-development-workflows-with-codex) | 可观察接受条件、轻量方案；计划、重要上下文、进度/证据分别有权威来源；不抄日志或用文档完整代替阶段完成 | 复用 execution.json、任务书与既有 evidence 摘要；其多文件 harness 是示例，未照搬文件树或人审门 |
+| [Google：Small CLs](https://google.github.io/eng-practices/review/developer/small-cls.html) | 以一个自包含结果组织可理解的小变更，功能/重构不无关混合 | 验证/审查批次可含保存提交，但保持一个连贯结果；不是按 commit 数发审，也不攒整阶段大候选 |
+| [Google：Code Review Standard](https://google.github.io/eng-practices/review/reviewer/standard.html) | 区分必要代码健康与非阻塞偏好，按工程事实处理意见 | 分流当前真实阻断和独立完善；安全、恢复及原完成门仍是必要项，不能借“非阻塞”延期 |
+| [DORA：Small batches](https://dora.dev/capabilities/working-in-small-batches/)、[WIP limits](https://dora.dev/capabilities/wip-limits/) | 将工作拆成可独立测试/验证的较小批次，限制进行中的工作并完成它 | 当前 P02A 内先收束一个关联机制，用有限剩余项呈现退出距离；不设置机械时限/数量，不用测试数衡量阶段进展 |
+| [Bazel：Remote caching](https://bazel.build/remote/caching) | 命令、输入、工具/环境共同决定结果能否复用；未声明工具或运行中输入变化会导致错误命中 | 仅借鉴证据失效判断，不引入 Bazel/缓存服务。PID、ready、外部权限等时点事实仍重新观察 |
+
+上述是平台机制、厂商/工程团队建议与本项目适配，不是强制行业标准。
+批次定义、四种恢复情形与 P02A 分组是本项目决定；稳定流程在既有 how-to 一处维护，本文不作为执行入口。

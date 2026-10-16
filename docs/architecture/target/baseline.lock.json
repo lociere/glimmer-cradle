@@ -9,11 +9,11 @@
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/requirements.md",
-      "sha256": "9567a06ecad0b9a1e4c9d2f33589f39bdb47b4196691237676ca53333447c64e"
+      "sha256": "0efec334abfa694d23ed9837cbe78a1c8e2d044818a43025c82c425bc9559377"
     },
     {
       "path": "docs/governance/architecture-change-policy.md",
-      "sha256": "802e47b9cac6679f7d3e632246b30afe280a96abefd09fe7e371b279cc4868b2"
+      "sha256": "c3fab4f6b819ae6a8a2595f0643bc09adf6dc67ff13680c4cf5c1fd9742a9f28"
     },
     {
       "path": "docs/architecture/target/physical-layout.md",
@@ -41,7 +41,7 @@
     },
     {
       "path": "docs/how-to/执行架构切片.md",
-      "sha256": "dfd7d47d7c0883c6ecd6ec62d3247017db61b5465c8378f703e0b37747a055ca"
+      "sha256": "846ebcc6714d8a5e2f200d669e725bb5d7e19742b4666173a51f6e802f735782"
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/plan.md",
@@ -53,7 +53,7 @@
     },
     {
       "path": "docs/roadmap/initiatives/architecture-v2/execution-order.md",
-      "sha256": "daa716023106033ce817cca492fadef880100a9d6ca0be762875f3a906b6e032"
+      "sha256": "d2afe51d533177285a3e988de0d72a78811b6d3bed5054093acb66692b337206"
     }
   ],
   "targetRoots": [
